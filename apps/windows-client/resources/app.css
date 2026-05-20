@@ -174,10 +174,16 @@ svg {
   min-height: 712px;
 }
 
+.app-shell > * {
+  min-height: 0;
+}
+
 .sidebar {
   padding: 12px 10px 18px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   background: #f4f6f8;
   border-right: 1px solid #e8eaee;
 }

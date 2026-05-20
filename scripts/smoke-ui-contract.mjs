@@ -55,6 +55,11 @@ async function main() {
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
     assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
 
+    const styles = await getText(baseUrl, '/app.css');
+    assert(styles.contentType.includes('css'), 'app.css did not return CSS');
+    assert(styles.body.includes('.app-shell > *'), 'app.css missing fixed-window shrink guard');
+    assert(styles.body.includes('overflow: hidden'), 'app.css missing fixed-window overflow guard');
+
     const script = await getText(baseUrl, '/app.js');
     assert(script.contentType.includes('javascript'), 'app.js did not return JavaScript');
     for (const route of ['/api/workspace', '/api/files/tree', '/api/files/read', '/api/file-ops/preview', '/api/file-ops/apply']) {
