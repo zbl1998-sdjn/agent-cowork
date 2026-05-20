@@ -273,6 +273,7 @@ async function main() {
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
+          hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
           scroll
         };
       })()`,
@@ -283,6 +284,7 @@ async function main() {
     assert(desktopLayout.activeMode === '对话', 'live MVP should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'live MVP missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing Kimi quick actions');
+    assert(desktopLayout.hasInteractionStream, 'live MVP missing cowork interaction stream');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -320,7 +322,8 @@ async function main() {
             const afterPlan = {
               status: document.querySelector(".status-pill")?.innerText.trim(),
               artifact: document.querySelector(".artifact-preview p")?.innerText,
-              opCount: document.querySelectorAll(".diff-row").length
+              opCount: document.querySelectorAll(".diff-row").length,
+              stream: document.querySelector(".interaction-stream")?.innerText
             };
             approve.click();
             return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
@@ -330,7 +333,8 @@ async function main() {
                   status: document.querySelector(".status-pill")?.innerText.trim(),
                   artifact: document.querySelector(".artifact-preview p")?.innerText,
                   approve: document.querySelector(".approve-button")?.innerText.trim(),
-                  doneClass: document.querySelector(".approve-button")?.classList.contains("is-done")
+                  doneClass: document.querySelector(".approve-button")?.classList.contains("is-done"),
+                  stream: document.querySelector(".interaction-stream")?.innerText
                 }
               }));
           })
@@ -339,8 +343,11 @@ async function main() {
     );
     assert(interaction.afterPlan.status === '计划就绪', 'live MVP send did not reach 计划就绪');
     assert(interaction.afterPlan.opCount >= 1, 'live MVP did not render any operation preview');
+    assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'live MVP stream missing planning steps');
+    assert(interaction.afterPlan.stream.includes('等待审批'), 'live MVP stream missing approval wait state');
     assert(interaction.afterApprove.status === '已在本机执行', 'live MVP approve did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'live MVP approve button did not enter done state');
+    assert(interaction.afterApprove.stream.includes('执行完成'), 'live MVP stream missing completion state');
 
     const artifactAfter = listArtifacts(runtime.workspace);
     const newArtifacts = artifactAfter.filter((artifactPath) => !artifactBefore.has(artifactPath));

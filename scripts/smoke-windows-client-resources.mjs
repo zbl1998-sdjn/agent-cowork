@@ -227,6 +227,7 @@ async function main() {
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
+          hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
           scroll
         };
       })()`,
@@ -238,6 +239,7 @@ async function main() {
     assert(desktopLayout.activeMode === '对话', 'Windows resource should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'Windows resource missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'Windows resource missing expected Kimi controls');
+    assert(desktopLayout.hasInteractionStream, 'Windows resource missing cowork interaction stream');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'Windows desktop resource layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -269,7 +271,7 @@ async function main() {
       { send: sendPage },
       `(() => {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
-        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".approve-button"];
+        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".interaction-stream", ".approve-button"];
         const issues = [];
         for (const selector of selectors) {
           const rect = document.querySelector(selector)?.getBoundingClientRect();
@@ -315,7 +317,8 @@ async function main() {
           const afterPlan = {
             status: document.querySelector(".status-pill")?.innerText.trim(),
             artifact: document.querySelector(".artifact-preview p")?.innerText,
-            operationCount: document.querySelectorAll(".diff-row").length
+            operationCount: document.querySelectorAll(".diff-row").length,
+            stream: document.querySelector(".interaction-stream")?.innerText
           };
           approve.click();
           setTimeout(() => {
@@ -325,7 +328,8 @@ async function main() {
                 status: document.querySelector(".status-pill")?.innerText.trim(),
                 artifact: document.querySelector(".artifact-preview p")?.innerText,
                 approve: document.querySelector(".approve-button")?.innerText.trim(),
-                doneClass: document.querySelector(".approve-button")?.classList.contains("is-done")
+                doneClass: document.querySelector(".approve-button")?.classList.contains("is-done"),
+                stream: document.querySelector(".interaction-stream")?.innerText
               }
             });
           }, 100);
@@ -334,6 +338,7 @@ async function main() {
     );
     assert(interaction.afterPlan.status === '预览模式', 'Windows resource send did not enter 预览模式');
     assert(interaction.afterPlan.artifact.includes('Windows C 客户端资源操作'), 'Windows resource prompt was not reflected in preview');
+    assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('静态预览'), 'Windows resource stream missing static preview steps');
     assert(interaction.afterApprove.status === '预览已应用', 'Windows resource approve did not enter 预览已应用');
     assert(interaction.afterApprove.doneClass === true, 'Windows resource approve button did not enter done state');
 

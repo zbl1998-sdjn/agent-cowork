@@ -269,6 +269,7 @@ async function main() {
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
+          hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
           hasFrameworkOverlay: /vite|webpack|next\\\\.js|runtime error/i.test(text),
           scroll
         };
@@ -278,6 +279,7 @@ async function main() {
     assert(desktopLayout.activeMode === '对话', 'rendered page should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Kimi cowork quick actions');
+    assert(desktopLayout.hasInteractionStream, 'rendered page missing cowork interaction stream');
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'desktop layout has horizontal overflow');
 
@@ -310,7 +312,7 @@ async function main() {
       { send: sendPage },
       `(() => {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
-        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".approve-button"];
+        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".interaction-stream", ".approve-button"];
         const issues = [];
         for (const selector of selectors) {
           const rect = document.querySelector(selector)?.getBoundingClientRect();
@@ -372,7 +374,8 @@ async function main() {
             const afterPlan = {
               status: document.querySelector(".status-pill")?.innerText.trim(),
               artifact: document.querySelector(".artifact-preview p")?.innerText,
-              opCount: document.querySelectorAll(".diff-row").length
+              opCount: document.querySelectorAll(".diff-row").length,
+              stream: document.querySelector(".interaction-stream")?.innerText
             };
             approve.click();
             return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
@@ -382,7 +385,8 @@ async function main() {
                   status: document.querySelector(".status-pill")?.innerText.trim(),
                   artifact: document.querySelector(".artifact-preview p")?.innerText,
                   approve: document.querySelector(".approve-button")?.innerText.trim(),
-                  doneClass: document.querySelector(".approve-button")?.classList.contains("is-done")
+                  doneClass: document.querySelector(".approve-button")?.classList.contains("is-done"),
+                  stream: document.querySelector(".interaction-stream")?.innerText
                 }
               }));
           })
@@ -391,8 +395,11 @@ async function main() {
     );
     assert(interaction.afterPlan.status === '计划就绪', 'send interaction did not reach 计划就绪');
     assert(interaction.afterPlan.artifact.includes('renewal date'), 'plan did not include trusted file summary');
+    assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'plan interaction stream missing task steps');
+    assert(interaction.afterPlan.stream.includes('等待审批'), 'plan interaction stream missing approval wait state');
     assert(interaction.afterApprove.status === '已在本机执行', 'approve interaction did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'approve button did not enter done state');
+    assert(interaction.afterApprove.stream.includes('执行完成'), 'approve interaction stream missing completion state');
 
     const artifactsDir = path.join(workspace, '.KimiCowork', 'artifacts');
     const artifacts = fs.existsSync(artifactsDir)
@@ -452,7 +459,8 @@ async function main() {
                   activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
                   status: document.querySelector(".status-pill")?.innerText.trim(),
                   artifact: document.querySelector(".artifact-preview p")?.innerText,
-                  chatHidden: document.querySelector(".chat-output")?.hidden
+                  chatHidden: document.querySelector(".chat-output")?.hidden,
+                  stream: document.querySelector(".interaction-stream")?.innerText
                 }
               }));
           })
@@ -465,6 +473,8 @@ async function main() {
     assert(uploadAndChat.taskState.activeMode === '协作', 'chat send did not jump into cowork mode');
     assert(uploadAndChat.taskState.status === '计划就绪', 'chat send did not create a cowork plan');
     assert(uploadAndChat.taskState.artifact.includes('invoice smoke amount=128'), 'cowork plan did not use uploaded file summary');
+    assert(uploadAndChat.taskState.stream.includes('invoice smoke amount=128'), 'cowork interaction stream did not show uploaded file context');
+    assert(uploadAndChat.taskState.stream.includes('等待审批'), 'cowork interaction stream did not show approval state after chat handoff');
     assert(uploadAndChat.taskState.chatHidden === true, 'chat output should stay hidden after cowork task handoff');
     const uploadRoot = path.join(workspace, 'Kimi_Cowork上传');
     const uploadedFiles = fs.existsSync(uploadRoot)

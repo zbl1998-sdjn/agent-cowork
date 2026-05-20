@@ -8,6 +8,7 @@
 - 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
 - 可控命令运行（默认关闭）
 - Kimi CLI 对话 / 计划运行记录（`.KimiCowork/runs/*.json`）
+- Cowork 执行动态信息流（用户指令、读取上下文、Kimi 计划、等待审批、执行完成）
 - 最小 HTTP API
 
 当前产品基准是 `plan/kimi-cowork-latest-product-plan-v0.3.md`。
@@ -42,8 +43,8 @@ npm run smoke:host
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
-`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
-`npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
+`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
+`npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `KimiCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
 `npm run smoke:kimi-cli` 会启动一个临时 Host API，真实调用本机 Kimi CLI 的 `--print --final-message-only` 模式，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖本机已登录 Kimi CLI 和可用网络，不放进默认 `verify:mvp` 的运行项。
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。

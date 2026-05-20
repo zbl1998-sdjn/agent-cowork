@@ -8,6 +8,7 @@ const state = {
   kimiCliPlanEnabled: false,
   lastRun: null,
   uploadedFiles: [],
+  interactionItems: [],
 };
 
 window.kimiCowork = state;
@@ -29,6 +30,8 @@ const chatOutput = document.querySelector(".chat-output");
 const chatOutputText = document.querySelector(".chat-output p");
 const workbenchTitle = document.querySelector(".workbench-title");
 const workbenchCopy = document.querySelector(".workbench-copy");
+const interactionSubtitle = document.querySelector(".interaction-subtitle");
+const interactionItems = document.querySelector(".interaction-items");
 
 const placeholders = {
   chat: "今天想让 Kimi 做什么？",
@@ -55,6 +58,56 @@ function setRunChip(text, variant = "muted") {
 function setArtifact(message, pathText = artifactPath.textContent) {
   artifactText.textContent = message;
   artifactPath.textContent = pathText;
+}
+
+function compactText(text, maxLength = 220) {
+  const value = String(text || "").replace(/\s+/g, " ").trim();
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function renderInteraction(items, subtitle = "任务运行中") {
+  state.interactionItems = items;
+  interactionSubtitle.textContent = subtitle;
+  interactionItems.replaceChildren();
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = `interaction-row is-${item.state || "wait"}`;
+
+    const dot = document.createElement("span");
+    dot.className = "step-dot";
+
+    const body = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const detail = document.createElement("p");
+    detail.textContent = item.detail || "";
+    body.append(title, detail);
+
+    if (item.meta) {
+      const meta = document.createElement("code");
+      meta.textContent = item.meta;
+      body.append(meta);
+    }
+
+    row.append(dot, body);
+    interactionItems.append(row);
+  }
+}
+
+function resetInteraction() {
+  renderInteraction(
+    [
+      {
+        state: "wait",
+        title: "等待任务",
+        detail: "发送后这里会展示 Kimi 的读取、计划、审批和执行过程。",
+      },
+    ],
+    "等待任务输入",
+  );
 }
 
 function arrayBufferToBase64(buffer) {
@@ -362,6 +415,22 @@ async function uploadSelectedFiles(fileList, sourceLabel) {
     `已${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。现在可以直接发送任务让 Kimi 基于摘要生成计划。`,
     rootLabel,
   );
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "已导入本地文件",
+        detail: `${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。`,
+        meta: rootLabel,
+      },
+      {
+        state: "active",
+        title: "等待用户任务",
+        detail: "下一次发送会优先读取刚导入的文件，并在这里展示 Kimi 的计划过程。",
+      },
+    ],
+    "文件已就绪",
+  );
   setStatus("文件已导入");
   composer.value = composer.value || `读取刚上传的 ${imported.imported.length} 个文件，生成整理计划`;
   composer.focus();
@@ -374,16 +443,72 @@ async function generatePlan() {
     chatOutput.hidden = true;
     setView("cowork");
   }
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "active",
+        title: "读取本地上下文",
+        detail: "正在从可信工作区选择可读取的文本文件，生成给 Kimi 的安全摘要。",
+      },
+    ],
+    "正在创建 Cowork 任务",
+  );
 
   if (!state.hostApi) {
     setStatus("预览模式");
     setArtifact(`已根据 “${prompt.slice(0, 42)}” 生成本地操作预览，等待审批。`);
+    renderInteraction(
+      [
+        {
+          state: "done",
+          title: "用户指令",
+          detail: prompt,
+        },
+        {
+          state: "done",
+          title: "静态预览",
+          detail: "当前通过 file:// 打开，不能调用 Host API；已展示本地预览状态。",
+        },
+        {
+          state: "wait",
+          title: "等待 Host",
+          detail: "通过 localhost 启动后可读取文件、调用 Kimi CLI，并写入审计日志。",
+        },
+      ],
+      "静态预览",
+    );
     return;
   }
 
   setStatus("正在读取工作区");
   const candidate = textCandidate(activeFiles());
   const summary = await readCandidateSummary(candidate);
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "done",
+        title: "读取本地上下文",
+        detail: summary,
+        meta: candidate ? candidate.path : "无可读文本文件",
+      },
+      {
+        state: "active",
+        title: "调用 Kimi 生成计划",
+        detail: state.kimiCliPlanEnabled ? "正在调用本机 Kimi CLI，输出只作为计划文本，不直接执行本地操作。" : "Kimi CLI 未启用，使用本地摘要生成安全草稿。",
+      },
+    ],
+    "Kimi 正在规划",
+  );
   const kimiPlan = await tryKimiCliPlan(prompt, summary);
   state.lastRun = kimiPlan.runId
     ? {
@@ -439,6 +564,34 @@ async function generatePlan() {
   } else if (kimiPlan.failed) {
     setRunChip(`Kimi CLI 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
   }
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "done",
+        title: "读取本地上下文",
+        detail: summary,
+        meta: candidate ? candidate.path : "无可读文本文件",
+      },
+      {
+        state: kimiPlan.failed ? "error" : "done",
+        title: kimiPlan.used ? "Kimi 计划已返回" : kimiPlan.failed ? "Kimi 调用失败，已降级" : "本地计划已生成",
+        detail: compactText(kimiPlan.text),
+        meta: kimiPlan.runId ? `run ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs || 0}ms` : "local fallback",
+      },
+      {
+        state: "active",
+        title: "等待审批",
+        detail: `已生成 ${preview.operations.length} 个可审批操作，点击“审批执行”后才会写入本机。`,
+        meta: outputPath.replace(state.workspace, "."),
+      },
+    ],
+    "等待审批",
+  );
   setStatus("计划就绪");
 }
 
@@ -452,6 +605,17 @@ async function approvePlan() {
     approveButton.textContent = "已审批";
     approveButton.classList.add("is-done");
     setArtifact("预览模式下已完成界面状态切换；通过 localhost 启动可执行真实本地写入。");
+    renderInteraction(
+      [
+        ...state.interactionItems,
+        {
+          state: "done",
+          title: "预览已应用",
+          detail: "静态资源模式下只更新界面状态；真实写入需要通过 localhost Host API 执行。",
+        },
+      ],
+      "预览已应用",
+    );
     setStatus("预览已应用");
     return;
   }
@@ -464,6 +628,17 @@ async function approvePlan() {
   }
 
   setStatus("正在本机执行");
+  renderInteraction(
+    [
+      ...state.interactionItems.map((item) => (item.title === "等待审批" ? { ...item, state: "done", title: "审批已确认" } : item)),
+      {
+        state: "active",
+        title: "正在本机执行",
+        detail: "Host 正在按预览列表写入产物，并同步追加审计日志。",
+      },
+    ],
+    "正在执行",
+  );
   const applied = await postJson("/api/file-ops/apply", {
     trustedRoot: state.workspace,
     operations: state.operations,
@@ -472,6 +647,18 @@ async function approvePlan() {
   approveButton.textContent = "已审批";
   approveButton.classList.add("is-done");
   setArtifact(`已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`);
+  renderInteraction(
+    [
+      ...state.interactionItems.filter((item) => item.title !== "正在本机执行"),
+      {
+        state: "done",
+        title: "执行完成",
+        detail: `已应用 ${applied.applied.length} 个操作，产物和审计日志已写入可信工作区。`,
+        meta: ".KimiCowork/audit/host-events.jsonl",
+      },
+    ],
+    "执行完成",
+  );
   setStatus("已在本机执行");
 }
 
@@ -566,6 +753,7 @@ document.querySelector('[data-action="new-chat"]').addEventListener("click", () 
   chatOutput.hidden = true;
   state.operations = [];
   state.approved = false;
+  resetInteraction();
   approveButton.textContent = "审批执行";
   approveButton.classList.remove("is-done");
 });
@@ -599,4 +787,5 @@ approveButton.addEventListener("click", () => {
 });
 
 setView("chat");
+resetInteraction();
 loadHostWorkspace();
