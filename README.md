@@ -3,10 +3,11 @@
 这个项目是一个零外部依赖的 Node.js MVP-0 本地 PoC 主机服务（host），用于验证 Kimi 工作流前置能力：
 
 - 文件树枚举（仅限 trusted root）
+- 文件 / 文件夹导入（复制到 trusted root 下的 `Kimi_Cowork上传/`）
 - 文本文件读取与上下文打包
 - 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
 - 可控命令运行（默认关闭）
-- Kimi CLI 计划运行记录（`.KimiCowork/runs/*.json`）
+- Kimi CLI 对话 / 计划运行记录（`.KimiCowork/runs/*.json`）
 - 最小 HTTP API
 
 当前产品基准是 `plan/kimi-cowork-latest-product-plan-v0.3.md`。
@@ -55,7 +56,7 @@ npm run smoke:host
 
 启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Kimi Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.KimiCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
-Kimi CLI 计划生成功能默认关闭，避免普通 MVP 验证依赖真实账号/网络。要让前端“发送”时优先调用本机 Kimi CLI：
+Kimi CLI 计划生成功能默认关闭，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时优先调用本机 Kimi CLI：
 
 ```powershell
 $env:ENABLE_KIMI_CLI_PLAN = "1"
@@ -63,7 +64,13 @@ $env:KIMI_CLI = "C:\Users\Administrator\.local\bin\kimi.exe"
 npm run start:mvp
 ```
 
-后端接口是 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并使用 `--print --final-message-only` 生成文本计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`，前端会显示最近一次运行记录。审批执行仍走本地 `file-ops/apply`。
+后端接口是 `POST /api/kimi/chat` 和 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并使用 `--print --final-message-only` 生成文本回复或计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`。当前 UI 的主发送入口使用 `/api/kimi/plan` 创建 Cowork 任务，`/api/kimi/chat` 保留给直接对话 API 和后续更细的聊天视图。审批执行仍走本地 `file-ops/apply`。
+
+文件 / 文件夹上传是本地导入，不会无差别上传云端：前端通过文件选择器读取用户明确选择的文件，Host 写入 trusted root 下的 `Kimi_Cowork上传/<batch>/`，随后文件树和 Kimi 摘要会优先使用刚上传的文件。
+
+上传接口：
+
+- `POST /api/uploads/import`：导入用户选择的文件列表，单批默认最多 80 个文件、12MB，总路径必须保持在 trusted root 内。
 
 运行记录查询接口：
 

@@ -7,11 +7,14 @@ const state = {
   hostApi: window.location.protocol === "http:" || window.location.protocol === "https:",
   kimiCliPlanEnabled: false,
   lastRun: null,
+  uploadedFiles: [],
 };
 
 window.kimiCowork = state;
 
 const composer = document.querySelector(".composer textarea");
+const uploadInput = document.querySelector(".upload-input");
+const folderInput = document.querySelector(".folder-input");
 const approveButton = document.querySelector(".approve-button");
 const sendButton = document.querySelector(".send-button");
 const artifactText = document.querySelector(".artifact-preview p");
@@ -54,12 +57,28 @@ function setArtifact(message, pathText = artifactPath.textContent) {
   artifactPath.textContent = pathText;
 }
 
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 function basename(filePath) {
   return String(filePath || "").split(/[\\/]/).filter(Boolean).pop() || filePath;
 }
 
 function joinWin(root, ...parts) {
   return [root.replace(/[\\/]+$/, ""), ...parts.map((part) => String(part).replace(/^[\\/]+|[\\/]+$/g, ""))].join("\\");
+}
+
+function uniqueStamp(date = new Date()) {
+  const timestamp = date.toISOString().replace(/[-:.TZ]/g, "").slice(0, 17);
+  const suffix = Math.random().toString(16).slice(2, 6);
+  return `${timestamp}-${suffix}`;
 }
 
 function setWorkbenchCopy(view) {
@@ -164,6 +183,10 @@ function textCandidate(files) {
   return files.find((file) => /\.(md|txt|csv)$/i.test(file.path)) || files.find((file) => file.kind === "file");
 }
 
+function activeFiles() {
+  return [...state.uploadedFiles, ...state.files];
+}
+
 async function readCandidateSummary(candidate) {
   if (!candidate) {
     return "当前工作区没有可读取的文本文件，先生成一个本地审批产物。";
@@ -226,12 +249,130 @@ async function tryKimiCliPlan(prompt, summary) {
   }
 }
 
+async function tryKimiChat(prompt, summary) {
+  if (!state.kimiCliPlanEnabled) {
+    setRunChip("Kimi CLI 未启用", "muted");
+    return {
+      used: false,
+      text: `Kimi CLI chat 未启用；已收到消息：“${prompt.slice(0, 80)}”。需要真实对话时请用 ENABLE_KIMI_CLI_PLAN=1 启动。`,
+    };
+  }
+
+  try {
+    setRunChip("Kimi CLI 对话中", "ready");
+    const result = await postJson("/api/kimi/chat", {
+      trustedRoot: state.workspace,
+      prompt,
+      summary,
+    });
+    return {
+      used: true,
+      text: result.text,
+      durationMs: result.durationMs,
+      runId: result.runId,
+      runPath: result.runPath,
+    };
+  } catch (error) {
+    const runId = error.payload?.runId;
+    setRunChip(runId ? `Kimi CLI 失败 · ${shortRunId(runId)}` : "Kimi CLI 已降级", "muted");
+    return {
+      used: false,
+      text: `Kimi CLI 暂不可用：${error.message}`,
+      runId,
+      runPath: error.payload?.runPath,
+      failed: Boolean(runId),
+    };
+  }
+}
+
+async function sendChatMessage(prompt) {
+  if (!state.hostApi) {
+    showChatResponse(`已收到：“${prompt.slice(0, 120)}”。通过 localhost 启动后可调用 Kimi。`);
+    return;
+  }
+  setStatus("正在发送给 Kimi");
+  const candidate = textCandidate(activeFiles());
+  const summary = await readCandidateSummary(candidate);
+  const reply = await tryKimiChat(prompt, summary);
+  showChatResponse(reply.text);
+  if (reply.used) {
+    setRunChip(`Kimi Chat · ${shortRunId(reply.runId)} · ${reply.durationMs}ms`, "ready");
+    setStatus("Kimi 已回复");
+  } else if (reply.failed) {
+    setRunChip(`Kimi Chat 失败 · ${shortRunId(reply.runId)}`, "muted");
+    setStatus("Kimi 已降级");
+  } else {
+    setStatus("本地回复");
+  }
+}
+
+async function refreshWorkspaceTree() {
+  const tree = await postJson("/api/files/tree", { root: state.workspace });
+  state.files = tree.files;
+  summarizeFiles(tree.files);
+  renderFiles(tree.files);
+}
+
+async function uploadSelectedFiles(fileList, sourceLabel) {
+  const selected = Array.from(fileList || []);
+  if (selected.length === 0) {
+    return;
+  }
+  if (!state.hostApi) {
+    setArtifact("静态预览模式不能上传文件；请通过 localhost 启动本地 Host。");
+    return;
+  }
+  if (selected.length > 80) {
+    setArtifact("一次最多上传 80 个文件。");
+    return;
+  }
+
+  const totalBytes = selected.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > 12 * 1024 * 1024) {
+    setArtifact("当前 MVP 一次最多导入 12MB 文件；大文件后续走本地授权目录读取。");
+    return;
+  }
+
+  setView("cowork");
+  setStatus("正在导入文件");
+  const files = [];
+  for (const file of selected) {
+    files.push({
+      name: file.name,
+      relativePath: file.webkitRelativePath || file.name,
+      size: file.size,
+      type: file.type,
+      contentBase64: arrayBufferToBase64(await file.arrayBuffer()),
+    });
+  }
+
+  const imported = await postJson("/api/uploads/import", {
+    trustedRoot: state.workspace,
+    files,
+  });
+  state.uploadedFiles = imported.imported.map((file) => ({
+    path: file.path.replace(state.workspace, "").replace(/^[\\/]/, "").replace(/\\/g, "/"),
+    fullPath: file.path,
+    kind: "file",
+    size: file.size,
+  }));
+  await refreshWorkspaceTree();
+  const rootLabel = imported.uploadRoot.replace(state.workspace, ".");
+  setArtifact(
+    `已${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。现在可以直接发送任务让 Kimi 基于摘要生成计划。`,
+    rootLabel,
+  );
+  setStatus("文件已导入");
+  composer.value = composer.value || `读取刚上传的 ${imported.imported.length} 个文件，生成整理计划`;
+  composer.focus();
+}
+
 async function generatePlan() {
   const prompt = composer.value.trim() || "整理这个本地文件夹，生成可审批的安全操作计划";
 
   if (state.view !== "cowork" && state.view !== "code") {
-    showChatResponse(`我会按 “${prompt.slice(0, 56)}” 继续。需要读取或修改本地文件时，切到协作或代码模式。`);
-    return;
+    chatOutput.hidden = true;
+    setView("cowork");
   }
 
   if (!state.hostApi) {
@@ -241,7 +382,7 @@ async function generatePlan() {
   }
 
   setStatus("正在读取工作区");
-  const candidate = textCandidate(state.files);
+  const candidate = textCandidate(activeFiles());
   const summary = await readCandidateSummary(candidate);
   const kimiPlan = await tryKimiCliPlan(prompt, summary);
   state.lastRun = kimiPlan.runId
@@ -253,7 +394,7 @@ async function generatePlan() {
       }
     : null;
   const now = new Date();
-  const id = now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const id = uniqueStamp(now);
   const outputPath = joinWin(state.workspace, ".KimiCowork", "artifacts", `ui-plan-${id}.md`);
   state.operations = [
     {
@@ -343,14 +484,11 @@ async function loadHostWorkspace() {
   try {
     const workspace = await (await fetch("/api/workspace")).json();
     state.workspace = workspace.trustedRoot;
-    state.kimiCliPlanEnabled = workspace.kimiCli?.planEnabled === true;
+    state.kimiCliPlanEnabled = workspace.kimiCli?.planEnabled === true || workspace.kimiCli?.chatEnabled === true;
     setRunChip(state.kimiCliPlanEnabled ? "Kimi CLI 计划已启用" : "Kimi CLI 未启用", state.kimiCliPlanEnabled ? "ready" : "muted");
     workspacePath.textContent = state.workspace;
 
-    const tree = await postJson("/api/files/tree", { root: state.workspace });
-    state.files = tree.files;
-    summarizeFiles(tree.files);
-    renderFiles(tree.files);
+    await refreshWorkspaceTree();
     setStatus("本地 Agent 就绪");
   } catch (error) {
     setStatus("Host API 离线");
@@ -386,18 +524,40 @@ document.querySelectorAll("[data-quick]").forEach((item) => {
       learn: "帮我用简洁方式讲清楚这个复杂主题",
       write: "帮我起草一版结构清晰的文档",
       choice: "根据当前上下文，帮我选择下一步最有价值的任务",
-      "local-folder": "读取本地工作区，生成可审批的整理计划",
+      "local-folder": "读取上传文件夹，生成可审批的整理计划",
     };
     composer.value = prompts[quick] || "";
     setView(quick === "code" ? "code" : quick === "local-folder" ? "cowork" : "chat");
+    if (quick === "local-folder") {
+      folderInput?.click();
+      return;
+    }
     composer.focus();
   });
 });
 
-document.querySelector('[data-action="local-folder"]').addEventListener("click", () => {
+document.querySelector('[data-action="upload-files"]').addEventListener("click", () => {
   setView("cowork");
-  composer.value = composer.value || "读取本地工作区，生成可审批的整理计划";
+  uploadInput?.click();
   composer.focus();
+});
+
+uploadInput?.addEventListener("change", () => {
+  uploadSelectedFiles(uploadInput.files, "上传").catch((error) => {
+    setStatus("上传失败");
+    setArtifact(error.message);
+  }).finally(() => {
+    uploadInput.value = "";
+  });
+});
+
+folderInput?.addEventListener("change", () => {
+  uploadSelectedFiles(folderInput.files, "上传文件夹").catch((error) => {
+    setStatus("上传失败");
+    setArtifact(error.message);
+  }).finally(() => {
+    folderInput.value = "";
+  });
 });
 
 document.querySelector('[data-action="new-chat"]').addEventListener("click", () => {

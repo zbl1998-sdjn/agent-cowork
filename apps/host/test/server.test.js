@@ -41,6 +41,7 @@ test('workspace endpoint returns configured trusted root', async () => {
     assert.deepEqual(await response.json(), {
       trustedRoot,
       kimiCli: {
+        chatEnabled: false,
         planEnabled: false,
       },
     });
@@ -105,6 +106,100 @@ test('kimi plan endpoint calls configured runner inside trusted root', async () 
     assert.equal(record.type, 'kimi-plan');
     assert.equal(record.input.prompt, '生成计划');
     assert.equal(record.result.text, 'Kimi CLI 计划输出');
+  });
+});
+
+test('kimi chat endpoint calls configured Kimi runner', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  let captured;
+  await withServer({
+    trustedRoot,
+    enableKimiCliPlan: true,
+    kimiExecutable: 'kimi-test',
+    kimiChatRunner: async (input) => {
+      captured = input;
+      return {
+        ok: true,
+        provider: 'kimi-cli',
+        command: 'kimi-test',
+        mode: 'chat',
+        text: 'Kimi 对话输出',
+        durationMs: 15,
+      };
+    },
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/kimi/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        prompt: '你好',
+        summary: '上传文件摘要',
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.match(body.runId, /^run_/);
+    assert.equal(body.text, 'Kimi 对话输出');
+    assert.equal(captured.command, 'kimi-test');
+    assert.equal(captured.mode, 'chat');
+    assert.equal(captured.trustedRoot, trustedRoot);
+    assert.equal(captured.prompt, '你好');
+
+    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    assert.equal(record.type, 'kimi-chat');
+    assert.equal(record.status, 'succeeded');
+    assert.equal(record.result.text, 'Kimi 对话输出');
+  });
+});
+
+test('upload import persists selected local files under trusted workspace', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/uploads/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        files: [
+          {
+            name: 'invoice.txt',
+            relativePath: 'invoices/invoice.txt',
+            size: Buffer.byteLength('amount=100'),
+            contentBase64: Buffer.from('amount=100').toString('base64'),
+          },
+        ],
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.imported.length, 1);
+    assert.equal(body.totalBytes, Buffer.byteLength('amount=100'));
+    assert.equal(fs.readFileSync(body.imported[0].path, 'utf8'), 'amount=100');
+    assert.match(body.imported[0].path, /[\\\/]Kimi_Cowork上传[\\\/]/);
+  });
+});
+
+test('upload import rejects path traversal', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/uploads/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        files: [
+          {
+            name: 'secret.txt',
+            relativePath: '../secret.txt',
+            size: 1,
+            contentBase64: Buffer.from('x').toString('base64'),
+          },
+        ],
+      }),
+    });
+    assert.notEqual(response.status, 200);
+    assert.match((await response.json()).error, /invalid segment|relativePath/i);
   });
 });
 

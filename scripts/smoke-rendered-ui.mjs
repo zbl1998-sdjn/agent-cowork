@@ -268,7 +268,7 @@ async function main() {
           hasCowork: text.includes("Kimi Cowork"),
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
-          hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("本地文件夹"),
+          hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
           hasFrameworkOverlay: /vite|webpack|next\\\\.js|runtime error/i.test(text),
           scroll
         };
@@ -290,7 +290,22 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await evaluate({ send: sendPage }, `document.querySelector('[data-mode="cowork"]').click()`);
+    await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        document.querySelector('[data-mode="cowork"]').click();
+        const deadline = Date.now() + 2000;
+        function tick() {
+          const coworkReady =
+            document.body.dataset.view === "cowork" &&
+            !document.querySelector(".cowork-panel")?.hidden;
+          if (coworkReady) requestAnimationFrame(() => requestAnimationFrame(resolve));
+          else if (Date.now() > deadline) reject(new Error("cowork view did not become visible"));
+          else setTimeout(tick, 25);
+        }
+        tick();
+      })`,
+    );
     const compactLayout = await evaluate(
       { send: sendPage },
       `(() => {
@@ -388,6 +403,75 @@ async function main() {
     assert(artifactContent.includes('来源摘要'), 'artifact missing source summary');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'audit log missing browser write action');
 
+    const uploadAndChat = await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        const currentState = () => JSON.stringify({
+          mode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
+          status: document.querySelector(".status-pill")?.innerText.trim(),
+          artifact: document.querySelector(".artifact-preview p")?.innerText,
+          chatHidden: document.querySelector(".chat-output")?.hidden
+        });
+        const waitFor = (predicate, timeoutMs) => new Promise((ok, fail) => {
+          const deadline = Date.now() + timeoutMs;
+          function tick() {
+            try {
+              if (predicate()) ok(true);
+              else if (Date.now() > deadline) fail(new Error("timed out: " + currentState()));
+              else setTimeout(tick, 50);
+            } catch (error) {
+              fail(error);
+            }
+          }
+          tick();
+        });
+
+        const uploadInput = document.querySelector(".upload-input");
+        if (!uploadInput) reject(new Error("upload input missing"));
+        const dt = new DataTransfer();
+        dt.items.add(new File(["invoice smoke amount=128"], "invoice-ui-smoke.txt", { type: "text/plain" }));
+        uploadInput.files = dt.files;
+        uploadInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("文件已导入"), 5000)
+          .then(() => {
+            const uploadState = {
+              status: document.querySelector(".status-pill")?.innerText.trim(),
+              artifact: document.querySelector(".artifact-preview p")?.innerText,
+              files: Array.from(document.querySelectorAll(".file-list span")).map((node) => node.innerText)
+            };
+            document.querySelector('[data-mode="chat"]').click();
+            const textarea = document.querySelector(".composer textarea");
+            textarea.value = "请说明刚上传的文件可以怎么处理";
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            document.querySelector(".send-button").click();
+            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), 5000)
+              .then(() => ({
+                uploadState,
+                taskState: {
+                  activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
+                  status: document.querySelector(".status-pill")?.innerText.trim(),
+                  artifact: document.querySelector(".artifact-preview p")?.innerText,
+                  chatHidden: document.querySelector(".chat-output")?.hidden
+                }
+              }));
+          })
+          .then(resolve, reject);
+      })`,
+    );
+    assert(uploadAndChat.uploadState.status === '文件已导入', 'upload interaction did not reach 文件已导入');
+    assert(uploadAndChat.uploadState.artifact.includes('已上传 1 个文件'), 'upload interaction did not report imported file');
+    assert(uploadAndChat.uploadState.files.some((name) => name.includes('invoice-ui-smoke.txt')), 'uploaded file was not visible in file list');
+    assert(uploadAndChat.taskState.activeMode === '协作', 'chat send did not jump into cowork mode');
+    assert(uploadAndChat.taskState.status === '计划就绪', 'chat send did not create a cowork plan');
+    assert(uploadAndChat.taskState.artifact.includes('invoice smoke amount=128'), 'cowork plan did not use uploaded file summary');
+    assert(uploadAndChat.taskState.chatHidden === true, 'chat output should stay hidden after cowork task handoff');
+    const uploadRoot = path.join(workspace, 'Kimi_Cowork上传');
+    const uploadedFiles = fs.existsSync(uploadRoot)
+      ? fs.readdirSync(uploadRoot, { recursive: true }).filter((name) => String(name).endsWith('invoice-ui-smoke.txt'))
+      : [];
+    assert(uploadedFiles.length === 1, 'browser upload did not persist file into Kimi_Cowork上传');
+
     const report = {
       ok: true,
       generatedAt: new Date().toISOString(),
@@ -398,6 +482,7 @@ async function main() {
       desktopLayout,
       compactLayout,
       interaction,
+      uploadAndChat,
       artifacts: artifacts.map((name) => path.join(artifactsDir, name)),
       auditPath,
     };

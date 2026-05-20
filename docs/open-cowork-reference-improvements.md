@@ -26,7 +26,25 @@
    - Kimi CLI 成功时显示运行记录短 ID 和耗时。
    - Kimi CLI 失败降级时仍保留失败 runId，便于定位 `.KimiCowork/runs/*.json`。
 
+4. **Cowork handoff**
+   - 首页或“对话”页点击发送会自动切到“协作”工作台。
+   - 主输入创建透明计划、操作预览和审批状态，不再停留在普通聊天气泡。
+   - 快速连续发送使用毫秒级唯一产物名，避免同一秒内计划文件冲突。
+
 ## 下一批建议
+
+## 技术栈修正
+
+用户反馈后，当前方向调整为：
+
+- 桌面框架：优先评估 Electron 或 Tauri。
+- 前端 UI：React + Tailwind，用于替换当前静态 HTML/JS 原型。
+- Agent 核心：保持 Kimi-only，不能切成 Claude API；通用方案里写的 Anthropic Claude API 只作为外部参考，不进入本产品核心路径。
+- 工具协议：MCP，用于标准化工具扩展。
+- 沙箱执行：Docker / Hyper-V / WSL2，根据 Windows 普通用户安装成本分阶段引入。
+- 本地数据库：SQLite，用于任务历史、运行记录、配置、授权目录。
+
+当前先修 MVP 可用性：上传文件 / 文件夹、发送消息跳转 Cowork、Kimi CLI 计划、运行记录。之后再做 Electron/Tauri + React/Tailwind 的工程迁移。
 
 1. **Run Detail 面板**
    - 在“产物”页加入运行记录列表。

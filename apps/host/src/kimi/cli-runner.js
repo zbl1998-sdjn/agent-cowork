@@ -51,6 +51,25 @@ export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork' }) {
   ].join('\n');
 }
 
+export function buildKimiChatPrompt({ prompt, summary = '' }) {
+  const userPrompt = cleanText(prompt);
+  if (!userPrompt) {
+    throw new Error('prompt is required');
+  }
+  if (userPrompt.length > MAX_PROMPT_LENGTH) {
+    throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);
+  }
+
+  const safeSummary = cleanText(summary).slice(0, 2400);
+  return [
+    '你是 Kimi Cowork 的本地对话核心。',
+    '只基于用户消息和 Host 提供的摘要回答；不要读取文件，不要使用工具，不要修改文件，不要运行命令。',
+    '如果用户需要本地文件操作，提醒切到“协作”模式并等待审批。',
+    `已授权/已上传内容摘要：${safeSummary || '暂无。'}`,
+    `用户消息：${userPrompt}`,
+  ].join('\n');
+}
+
 export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSteps = DEFAULT_MAX_STEPS, model }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
@@ -70,21 +89,41 @@ export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSt
   return args;
 }
 
-export function runKimiCliPlan({
+export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = DEFAULT_MAX_STEPS, model }) {
+  if (!trustedRoot || typeof trustedRoot !== 'string') {
+    throw new Error('trustedRoot is required');
+  }
+  const args = [
+    '--work-dir',
+    trustedRoot,
+    '--print',
+    '--final-message-only',
+    '--max-steps-per-turn',
+    String(Math.max(1, Number(maxSteps) || DEFAULT_MAX_STEPS)),
+  ];
+  if (model) {
+    args.push('--model', String(model));
+  }
+  args.push('--prompt', buildKimiChatPrompt({ prompt, summary }));
+  return args;
+}
+
+function runKimiCliText({
   command = 'kimi',
-  trustedRoot,
+  argsBuilder,
   prompt,
   summary,
   mode,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxSteps = DEFAULT_MAX_STEPS,
   model,
+  resultMode,
 } = {}) {
   const startedAt = Date.now();
 
   // Use a temp work-dir so Kimi CLI does not resume a previous session.
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-kimi-'));
-  const args = buildKimiCliPlanArgs({ trustedRoot: tempDir, prompt, summary, mode, maxSteps, model });
+  const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, maxSteps, model });
 
   return new Promise((resolve, reject) => {
     const child = childProcess.spawn(command, args, {
@@ -151,10 +190,26 @@ export function runKimiCliPlan({
         ok: true,
         provider: 'kimi-cli',
         command: path.basename(command),
-        mode: mode === 'code' ? 'code' : 'cowork',
+        mode: resultMode || (mode === 'code' ? 'code' : 'cowork'),
         text: output,
         durationMs,
       });
     });
+  });
+}
+
+export function runKimiCliPlan(options = {}) {
+  return runKimiCliText({
+    ...options,
+    argsBuilder: buildKimiCliPlanArgs,
+    resultMode: options.mode === 'code' ? 'code' : 'cowork',
+  });
+}
+
+export function runKimiCliChat(options = {}) {
+  return runKimiCliText({
+    ...options,
+    argsBuilder: buildKimiCliChatArgs,
+    resultMode: 'chat',
   });
 }

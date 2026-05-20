@@ -103,9 +103,11 @@
 
             <div class="composer" aria-label="任务输入框">
               <textarea placeholder="今天想让 Kimi 做什么？"></textarea>
+              <input class="upload-input" type="file" multiple hidden aria-hidden="true" />
+              <input class="folder-input" type="file" multiple webkitdirectory hidden aria-hidden="true" />
               <div class="composer-footer">
                 <div class="composer-actions">
-                  <button class="round-button" type="button" title="添加文件" data-action="local-folder">
+                  <button class="round-button" type="button" title="上传文件" data-action="upload-files">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                   </button>
                 </div>
@@ -141,7 +143,7 @@
               </button>
               <button type="button" data-quick="local-folder">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7l2 2h7v9H4z" /></svg>
-                本地文件夹
+                上传文件夹
               </button>
             </div>
           </section>

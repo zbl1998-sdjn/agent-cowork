@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { buildKimiCliPlanArgs, buildKimiPlanPrompt } from '../src/kimi/cli-runner.js';
+import {
+  buildKimiChatPrompt,
+  buildKimiCliChatArgs,
+  buildKimiCliPlanArgs,
+  buildKimiPlanPrompt,
+} from '../src/kimi/cli-runner.js';
 
 test('buildKimiPlanPrompt constrains Kimi CLI to plan-only output', () => {
   const prompt = buildKimiPlanPrompt({
@@ -46,4 +51,37 @@ test('buildKimiCliPlanArgs rejects empty prompts', () => {
     () => buildKimiCliPlanArgs({ trustedRoot: 'C:\\workspace', prompt: '   ' }),
     /prompt is required/,
   );
+});
+
+test('buildKimiChatPrompt constrains chat to host-provided context', () => {
+  const prompt = buildKimiChatPrompt({
+    summary: '已上传 invoice.pdf。',
+    prompt: '这个文件能做什么？',
+  });
+
+  assert.match(prompt, /本地对话核心/);
+  assert.match(prompt, /Host 提供的摘要/);
+  assert.match(prompt, /不要读取文件/);
+  assert.match(prompt, /invoice\.pdf/);
+  assert.match(prompt, /这个文件能做什么/);
+});
+
+test('buildKimiCliChatArgs uses non-interactive chat mode', () => {
+  const args = buildKimiCliChatArgs({
+    trustedRoot: 'C:\\workspace',
+    prompt: '你好',
+    summary: '摘要',
+    maxSteps: 3,
+  });
+
+  assert.deepEqual(args.slice(0, 6), [
+    '--work-dir',
+    'C:\\workspace',
+    '--print',
+    '--final-message-only',
+    '--max-steps-per-turn',
+    '3',
+  ]);
+  assert.equal(args[6], '--prompt');
+  assert.match(args[7], /用户消息：你好/);
 });

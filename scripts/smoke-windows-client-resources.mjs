@@ -226,7 +226,7 @@ async function main() {
           hasCowork: text.includes("Kimi Cowork"),
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
-          hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("本地文件夹"),
+          hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
           scroll
         };
       })()`,
@@ -249,7 +249,22 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await evaluate({ send: sendPage }, `document.querySelector('[data-mode="cowork"]').click()`);
+    await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        document.querySelector('[data-mode="cowork"]').click();
+        const deadline = Date.now() + 2000;
+        function tick() {
+          const coworkReady =
+            document.body.dataset.view === "cowork" &&
+            !document.querySelector(".cowork-panel")?.hidden;
+          if (coworkReady) requestAnimationFrame(() => requestAnimationFrame(resolve));
+          else if (Date.now() > deadline) reject(new Error("cowork view did not become visible"));
+          else setTimeout(tick, 25);
+        }
+        tick();
+      })`,
+    );
     const compactLayout = await evaluate(
       { send: sendPage },
       `(() => {

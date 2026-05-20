@@ -5,8 +5,9 @@ import { listWorkspaceTree } from './workspace/file-tree.js';
 import { readTextFile } from './workspace/file-reader.js';
 import { buildContextBundle } from './workspace/context-bundle.js';
 import { previewFileOperations, applyFileOperations } from './workspace/file-operations.js';
+import { importUploadedFiles } from './workspace/uploads.js';
 import { detectKimiInfo } from './kimi/cli-detect.js';
-import { runKimiCliPlan } from './kimi/cli-runner.js';
+import { runKimiCliChat, runKimiCliPlan } from './kimi/cli-runner.js';
 import { createRunId, listRunRecords, readRunRecord, writeRunRecord } from './runtime/run-store.js';
 import { assertTrustedPath } from './security/path-policy.js';
 import fs from 'node:fs';
@@ -43,16 +44,25 @@ function sendFile(response, filePath, contentType) {
   }
 }
 
-function readJsonBody(request) {
+function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
   return new Promise((resolve, reject) => {
     let raw = '';
+    let rejected = false;
     request.on('data', (chunk) => {
+      if (rejected) {
+        return;
+      }
       raw += chunk.toString();
-      if (raw.length > 1024 * 1024) {
-        reject(new Error('Request body too large'));
+      if (raw.length > maxBytes) {
+        rejected = true;
+        reject(new Error(`Request body too large; max ${maxBytes} bytes`));
+        request.destroy();
       }
     });
     request.on('end', () => {
+      if (rejected) {
+        return;
+      }
       if (!raw) {
         resolve({});
         return;
@@ -67,10 +77,10 @@ function readJsonBody(request) {
   });
 }
 
-async function withJsonBody(request, response, handler) {
+async function withJsonBody(request, response, handler, options = {}) {
   let body;
   try {
-    body = await readJsonBody(request);
+    body = await readJsonBody(request, options);
   } catch (err) {
     sendJson(response, 400, { error: `Invalid JSON body: ${err.message}` });
     return;
@@ -90,7 +100,76 @@ export function createServer(config = {}) {
   const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot);
   const kimiCliPlanEnabled = config.enableKimiCliPlan === true;
   const kimiPlanRunner = config.kimiPlanRunner || runKimiCliPlan;
+  const kimiChatRunner = config.kimiChatRunner || runKimiCliChat;
   const runStoreRoot = path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.KimiCowork', 'runs'));
+
+  async function runKimiAndRecord({
+    type,
+    mode,
+    trustedRoot,
+    prompt,
+    summary,
+    runner,
+    response,
+  }) {
+    const runId = createRunId();
+    const startedAt = new Date();
+    const baseRecord = {
+      id: runId,
+      type,
+      provider: 'kimi-cli',
+      command: config.kimiExecutable || 'kimi',
+      mode,
+      trustedRoot,
+      startedAt: startedAt.toISOString(),
+      input: {
+        prompt,
+        summary: typeof summary === 'string' ? summary : '',
+      },
+    };
+    try {
+      const result = await runner({
+        command: baseRecord.command,
+        trustedRoot,
+        prompt,
+        summary,
+        mode,
+        timeoutMs: config.kimiCliTimeoutMs,
+        maxSteps: config.kimiCliMaxSteps,
+        model: config.kimiModel,
+      });
+      const finishedAt = new Date();
+      const runPath = writeRunRecord(runStoreRoot, {
+        ...baseRecord,
+        status: 'succeeded',
+        finishedAt: finishedAt.toISOString(),
+        durationMs: result.durationMs ?? finishedAt.getTime() - startedAt.getTime(),
+        result: {
+          ok: result.ok,
+          text: result.text,
+        },
+      });
+      sendJson(response, 200, {
+        ...result,
+        runId,
+        runPath,
+      });
+    } catch (err) {
+      const finishedAt = new Date();
+      const runPath = writeRunRecord(runStoreRoot, {
+        ...baseRecord,
+        status: 'failed',
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        error: {
+          message: err.message,
+        },
+      });
+      err.statusCode = /timed out/i.test(err.message) ? 504 : 502;
+      err.payload = { runId, runPath };
+      throw err;
+    }
+  }
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -113,6 +192,7 @@ export function createServer(config = {}) {
           trustedRoot: trustedRootDefault,
           kimiCli: {
             planEnabled: kimiCliPlanEnabled,
+            chatEnabled: kimiCliPlanEnabled,
           },
         });
         return;
@@ -137,64 +217,41 @@ export function createServer(config = {}) {
           }
           const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
           const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const runId = createRunId();
-          const startedAt = new Date();
-          const baseRecord = {
-            id: runId,
+          await runKimiAndRecord({
             type: 'kimi-plan',
-            provider: 'kimi-cli',
-            command: config.kimiExecutable || 'kimi',
             mode: body.mode === 'code' ? 'code' : 'cowork',
             trustedRoot: safeRoot,
-            startedAt: startedAt.toISOString(),
-            input: {
-              prompt: body.prompt,
-              summary: typeof body.summary === 'string' ? body.summary : '',
-            },
-          };
-          let plan;
-          try {
-            plan = await kimiPlanRunner({
-              command: baseRecord.command,
-              trustedRoot: safeRoot,
-              prompt: body.prompt,
-              summary: body.summary,
-              mode: body.mode,
-              timeoutMs: config.kimiCliTimeoutMs,
-              maxSteps: config.kimiCliMaxSteps,
-              model: config.kimiModel,
+            prompt: body.prompt,
+            summary: body.summary,
+            runner: kimiPlanRunner,
+            response,
+          });
+        });
+        return;
+      }
+
+      if (request.method === 'POST' && pathname === '/api/kimi/chat') {
+        await withJsonBody(request, response, async (body) => {
+          if (!kimiCliPlanEnabled) {
+            sendJson(response, 503, {
+              error: 'Kimi CLI chat is disabled. Set ENABLE_KIMI_CLI_PLAN=1 to enable it.',
             });
-            const finishedAt = new Date();
-            const runPath = writeRunRecord(runStoreRoot, {
-              ...baseRecord,
-              status: 'succeeded',
-              finishedAt: finishedAt.toISOString(),
-              durationMs: plan.durationMs ?? finishedAt.getTime() - startedAt.getTime(),
-              result: {
-                ok: plan.ok,
-                text: plan.text,
-              },
-            });
-            sendJson(response, 200, {
-              ...plan,
-              runId,
-              runPath,
-            });
-          } catch (err) {
-            const finishedAt = new Date();
-            const runPath = writeRunRecord(runStoreRoot, {
-              ...baseRecord,
-              status: 'failed',
-              finishedAt: finishedAt.toISOString(),
-              durationMs: finishedAt.getTime() - startedAt.getTime(),
-              error: {
-                message: err.message,
-              },
-            });
-            err.statusCode = /timed out/i.test(err.message) ? 504 : 502;
-            err.payload = { runId, runPath };
-            throw err;
+            return;
           }
+          if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
+            throw new Error('body.prompt is required');
+          }
+          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
+          await runKimiAndRecord({
+            type: 'kimi-chat',
+            mode: 'chat',
+            trustedRoot: safeRoot,
+            prompt: body.prompt,
+            summary: body.summary,
+            runner: kimiChatRunner,
+            response,
+          });
         });
         return;
       }
@@ -233,6 +290,19 @@ export function createServer(config = {}) {
           });
           sendJson(response, 200, { root: trustedRoot, files: tree });
         });
+        return;
+      }
+
+      if (request.method === 'POST' && pathname === '/api/uploads/import') {
+        await withJsonBody(request, response, async (body) => {
+          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
+          const imported = importUploadedFiles({
+            trustedRoot: safeRoot,
+            files: body.files,
+          });
+          sendJson(response, 200, imported);
+        }, { maxBytes: config.maxUploadJsonBytes || 18 * 1024 * 1024 });
         return;
       }
 
