@@ -44,4 +44,12 @@ go test ./...
 - `services/orchestrator`
 - `services/kimi-gateway`
 
-Windows C/WebView2 客户端骨架位于 `apps/windows-client`。当前机器 PATH 上未发现 `cl`、`gcc` 或 `clang`，所以 CMake 配置文件已提供，但本轮未把 C 客户端构建作为必过验证。
+Windows C/WebView2 客户端骨架位于 `apps/windows-client`。MSVC 已安装在 Visual Studio Community 2026 下，但普通 PowerShell 默认不会加载 `cl.exe`。请先进入 VS Developer PowerShell 环境再构建：
+
+```powershell
+& 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+cmake -S apps/windows-client -B build/windows-client-vs -G Ninja
+cmake --build build/windows-client-vs --config Debug
+```
+
+本机已验证该路径可生成 `build/windows-client-vs/KimiCowork.exe`。
