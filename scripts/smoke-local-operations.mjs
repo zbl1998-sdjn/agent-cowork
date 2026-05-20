@@ -60,6 +60,13 @@ async function main() {
     const health = await (await fetch(`${baseUrl}/health`)).json();
     assert(health.ok === true && health.service === 'kimi-cowork-host', 'health check failed');
 
+    const shell = await fetch(`${baseUrl}/`);
+    assert(shell.status === 200, `preview shell returned ${shell.status}`);
+    assert((await shell.text()).includes('Kimi Cowork'), 'preview shell missing Kimi Cowork UI');
+
+    const defaultWorkspace = await (await fetch(`${baseUrl}/api/workspace`)).json();
+    assert(defaultWorkspace.trustedRoot === workspace, 'workspace endpoint returned unexpected trusted root');
+
     const tree = await requestJson(baseUrl, '/api/files/tree', { root: workspace });
     assert(tree.files.some((entry) => entry.path === 'contracts/sample-contract.txt'), 'tree missing contract file');
 

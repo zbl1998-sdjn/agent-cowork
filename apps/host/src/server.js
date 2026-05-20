@@ -1,5 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { listWorkspaceTree } from './workspace/file-tree.js';
 import { readTextFile } from './workspace/file-reader.js';
 import { buildContextBundle } from './workspace/context-bundle.js';
@@ -8,6 +9,15 @@ import { detectKimiInfo } from './kimi/cli-detect.js';
 import { assertTrustedPath } from './security/path-policy.js';
 import fs from 'node:fs';
 
+const hostSrcDir = path.dirname(fileURLToPath(import.meta.url));
+const defaultStaticRoot = path.resolve(hostSrcDir, '../../windows-client/resources');
+const staticFiles = new Map([
+  ['/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/index.html', { file: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/app.css', { file: 'app.css', type: 'text/css; charset=utf-8' }],
+  ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
+]);
+
 function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
   response.writeHead(status, {
@@ -15,6 +25,20 @@ function sendJson(response, status, payload) {
     'content-length': Buffer.byteLength(body),
   });
   response.end(body);
+}
+
+function sendFile(response, filePath, contentType) {
+  try {
+    const body = fs.readFileSync(filePath);
+    response.writeHead(200, {
+      'content-type': contentType,
+      'content-length': body.length,
+      'cache-control': 'no-store',
+    });
+    response.end(body);
+  } catch (err) {
+    sendJson(response, 404, { error: `Static asset not found: ${err.message}` });
+  }
 }
 
 function readJsonBody(request) {
@@ -51,21 +75,36 @@ function withJsonBody(request, response, handler) {
 
 export function createServer(config = {}) {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
+  const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot);
 
   const server = http.createServer(async (request, response) => {
     try {
-      if (request.method === 'GET' && request.url === '/health') {
+      const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+      const pathname = requestUrl.pathname;
+
+      if (request.method === 'GET' && staticRoot && staticFiles.has(pathname)) {
+        const asset = staticFiles.get(pathname);
+        sendFile(response, path.join(staticRoot, asset.file), asset.type);
+        return;
+      }
+
+      if (request.method === 'GET' && pathname === '/health') {
         sendJson(response, 200, { ok: true, service: 'kimi-cowork-host' });
         return;
       }
 
-      if (request.method === 'GET' && request.url === '/api/kimi/info') {
+      if (request.method === 'GET' && pathname === '/api/workspace') {
+        sendJson(response, 200, { trustedRoot: trustedRootDefault });
+        return;
+      }
+
+      if (request.method === 'GET' && pathname === '/api/kimi/info') {
         const info = await detectKimiInfo(config.kimiExecutable || 'kimi');
         sendJson(response, 200, info);
         return;
       }
 
-      if (request.method === 'POST' && request.url === '/api/files/tree') {
+      if (request.method === 'POST' && pathname === '/api/files/tree') {
         await withJsonBody(request, response, async (body) => {
           if (!body || typeof body.root !== 'string' || !body.root.trim()) {
             throw new Error('body.root is required');
@@ -81,7 +120,7 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'POST' && request.url === '/api/files/read') {
+      if (request.method === 'POST' && pathname === '/api/files/read') {
         await withJsonBody(request, response, async (body) => {
           if (!body || typeof body.path !== 'string' || !body.path.trim()) {
             throw new Error('body.path is required');
@@ -96,7 +135,7 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'POST' && request.url === '/api/context/bundle') {
+      if (request.method === 'POST' && pathname === '/api/context/bundle') {
         await withJsonBody(request, response, async (body) => {
           const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
           if (!Array.isArray(body.paths)) {
@@ -116,7 +155,7 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'POST' && request.url === '/api/file-ops/preview') {
+      if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
         await withJsonBody(request, response, async (body) => {
           const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
           const preview = previewFileOperations(body.operations, { trustedRoot });
@@ -125,7 +164,7 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'POST' && request.url === '/api/file-ops/apply') {
+      if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
         await withJsonBody(request, response, async (body) => {
           const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
           const applied = applyFileOperations(body.operations, {
