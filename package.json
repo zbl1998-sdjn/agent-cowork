@@ -9,6 +9,7 @@
     "start:mvp": "node scripts/start-mvp.mjs",
     "status:mvp": "node scripts/status-mvp.mjs",
     "stop:mvp": "node scripts/stop-mvp.mjs",
+    "audit:mvp": "node scripts/audit-mvp.mjs",
     "verify:mvp": "node scripts/verify-mvp.mjs",
     "verify:windows-readiness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-client-readiness.ps1",
     "smoke:host": "node scripts/smoke-local-operations.mjs",

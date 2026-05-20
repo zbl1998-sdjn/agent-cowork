@@ -86,6 +86,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'stop-mvp.mjs')],
   },
   {
+    name: 'audit-mvp script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'audit-mvp.mjs')],
+  },
+  {
     name: 'mvp runtime smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],

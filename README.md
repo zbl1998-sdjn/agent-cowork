@@ -19,6 +19,7 @@ cd "C:\Users\Administrator\Desktop\kimi cowork"
 npm test
 npm run verify:mvp
 npm run verify:windows-readiness
+npm run audit:mvp
 npm run smoke:rendered-ui
 npm run smoke:mvp-runtime
 npm run smoke:ui
@@ -32,6 +33,7 @@ npm run start:mvp
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。
 `npm run smoke:host` 会启动本地 host API，验证前端入口、默认工作区 API、文件树、文件读取、上下文打包、write / rename / move preview、审批 apply、目标已存在阻止和 JSONL 审计。
 `npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke、MVP runtime smoke、UI contract smoke 和 rendered browser smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
+`npm run audit:mvp` 会读取当前 runtime、verification、rendered UI、runtime smoke 和 Windows readiness 证据，汇总到 `build/mvp-acceptance-audit.json`；默认会在 Web/Host MVP 已就绪但原生窗口 smoke 被 Defender ASR 阻塞时正常生成报告，`npm run audit:mvp -- --strict` 会把任何未完成的完整目标作为非零退出。
 `npm run verify:windows-readiness` 是只读检查：它不会修改 Defender，只会检查 `KimiCowork.exe` 是否存在、是否已有精确路径排除项、最近是否有 ASR 阻断事件，并写出 `build/windows-client-readiness.json`。
 `npm run start:mvp` 会创建 `build/mvp-workspace` 演示工作区，启动本地服务并打开 Kimi Cowork UI。
 `npm run status:mvp` 会读取 `build/mvp-runtime.json` 并检查 PID 与 `/health`；`npm run stop:mvp` 会根据 runtime 文件停止由 `start:mvp` 启动的服务。
