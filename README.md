@@ -19,6 +19,7 @@ cd "C:\Users\Administrator\Desktop\kimi cowork"
 npm test
 npm run verify:mvp
 npm run verify:windows-readiness
+npm run smoke:rendered-ui
 npm run smoke:ui
 npm run smoke:host
 npm run start:mvp
@@ -26,8 +27,9 @@ npm run start:mvp
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
+`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:host` 会启动本地 host API，验证前端入口、默认工作区 API、文件树、文件读取、上下文打包、write / rename / move preview、审批 apply、目标已存在阻止和 JSONL 审计。
-`npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke 和 UI contract smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
+`npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke、UI contract smoke 和 rendered browser smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
 `npm run verify:windows-readiness` 是只读检查：它不会修改 Defender，只会检查 `KimiCowork.exe` 是否存在、是否已有精确路径排除项、最近是否有 ASR 阻断事件，并写出 `build/windows-client-readiness.json`。
 `npm run start:mvp` 会创建 `build/mvp-workspace` 演示工作区，启动本地服务并打开 Kimi Cowork UI。
 
