@@ -27,3 +27,40 @@ test('applies safe write without overwrite flag when file missing', () => {
   assert.equal(applied.applied[0].status, 'applied');
   assert.equal(fs.readFileSync(target, 'utf8'), 'created');
 });
+
+test('forbids rename when target already exists', () => {
+  const source = path.join(root, 'rename-source.txt');
+  const target = path.join(root, 'rename-target.txt');
+  fs.writeFileSync(source, 'source', 'utf8');
+  fs.writeFileSync(target, 'target', 'utf8');
+
+  assert.throws(
+    () => previewFileOperations([{ type: 'rename', path: source, newName: path.basename(target) }], { trustedRoot: root }),
+    /target already exists/i,
+  );
+});
+
+test('forbids move when target already exists', () => {
+  const source = path.join(root, 'move-source.txt');
+  const target = path.join(root, 'archive', 'move-target.txt');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(source, 'source', 'utf8');
+  fs.writeFileSync(target, 'target', 'utf8');
+
+  assert.throws(
+    () => previewFileOperations([{ type: 'move', from: source, to: target }], { trustedRoot: root }),
+    /target already exists/i,
+  );
+});
+
+test('forbids move when target directory already exists', () => {
+  const source = path.join(root, 'move-source-dir-target.txt');
+  const target = path.join(root, 'archive', 'existing-dir-target');
+  fs.writeFileSync(source, 'source', 'utf8');
+  fs.mkdirSync(target, { recursive: true });
+
+  assert.throws(
+    () => previewFileOperations([{ type: 'move', from: source, to: target }], { trustedRoot: root }),
+    /target already exists/i,
+  );
+});

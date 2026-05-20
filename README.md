@@ -17,10 +17,12 @@
 ```powershell
 cd "C:\Users\Administrator\Desktop\kimi cowork"
 npm test
+npm run smoke:host
 node apps/host/src/main.js
 ```
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
+`npm run smoke:host` 会启动本地 host API，验证文件树、文件读取、上下文打包、write / rename / move preview、审批 apply、目标已存在阻止和 JSONL 审计。
 
 启动服务后会监听 `http://127.0.0.1:3001`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
@@ -53,6 +55,7 @@ cmake --build build/windows-client-vs --config Debug
 ```
 
 本机已验证该路径可生成 `build/windows-client-vs/KimiCowork.exe`。
+如果当前机器的 Microsoft Defender ASR 规则 `01443614-CD74-433A-B99E-2ECDC07BFC25` 拦截本地新构建 exe，GUI 烟测会在启动阶段报“拒绝访问”。这属于系统策略阻止执行，不是 CMake 构建失败或应用崩溃；需要用户在 Defender 中显式放行该精确 exe 路径后才能完成窗口级自动化 smoke。
 
 ### Windows 客户端操作烟测
 

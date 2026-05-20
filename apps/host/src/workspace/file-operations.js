@@ -24,6 +24,15 @@ function fileExists(p) {
   }
 }
 
+function pathExists(p) {
+  try {
+    fs.statSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function previewWrite(op, trustedRoot) {
   const target = assertTrustedPath(path.resolve(op.path), trustedRoot);
   const content = String(op.content ?? '');
@@ -54,6 +63,9 @@ function previewRename(op, trustedRoot) {
   if (!fileExists(source)) {
     throw new Error(`Source not found: ${source}`);
   }
+  if (pathExists(target)) {
+    throw new Error(`Target already exists: ${target}`);
+  }
   const beforeHash = readTextFile(source, { trustedRoot }).sha256;
   return {
     type: 'rename',
@@ -72,6 +84,9 @@ function previewMove(op, trustedRoot) {
   }
   if (!fileExists(source)) {
     throw new Error(`Source not found: ${source}`);
+  }
+  if (pathExists(target)) {
+    throw new Error(`Target already exists: ${target}`);
   }
   const beforeHash = readTextFile(source, { trustedRoot }).sha256;
   return {
