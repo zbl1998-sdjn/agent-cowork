@@ -228,6 +228,7 @@ async function main() {
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
           hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
+          hasRunCards: document.querySelector(".run-history-panel")?.textContent.includes("任务卡片") === true,
           scroll
         };
       })()`,
@@ -240,6 +241,7 @@ async function main() {
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'Windows resource missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'Windows resource missing expected Kimi controls');
     assert(desktopLayout.hasInteractionStream, 'Windows resource missing cowork interaction stream');
+    assert(desktopLayout.hasRunCards, 'Windows resource missing task card panel');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'Windows desktop resource layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -271,7 +273,7 @@ async function main() {
       { send: sendPage },
       `(() => {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
-        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".interaction-stream", ".approve-button"];
+        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".run-history-panel", ".task-grid", ".interaction-stream", ".approve-button"];
         const issues = [];
         for (const selector of selectors) {
           const rect = document.querySelector(selector)?.getBoundingClientRect();

@@ -174,6 +174,17 @@ async function main() {
   const host = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
+    enableKimiCliPlan: true,
+    kimiPlanRunner: async ({ prompt, summary, mode }) => ({
+      ok: true,
+      text: `测试 Kimi 计划：${mode} / ${prompt} / ${summary}`,
+      durationMs: 16,
+    }),
+    kimiChatRunner: async ({ prompt, summary }) => ({
+      ok: true,
+      text: `测试 Kimi 对话：${prompt} / ${summary}`,
+      durationMs: 12,
+    }),
   });
   await new Promise((resolve, reject) => {
     host.once('error', reject);
@@ -270,6 +281,7 @@ async function main() {
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
           hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
+          hasRunCards: document.querySelector(".run-history-panel")?.textContent.includes("任务卡片") === true,
           hasFrameworkOverlay: /vite|webpack|next\\\\.js|runtime error/i.test(text),
           scroll
         };
@@ -280,6 +292,7 @@ async function main() {
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Kimi cowork quick actions');
     assert(desktopLayout.hasInteractionStream, 'rendered page missing cowork interaction stream');
+    assert(desktopLayout.hasRunCards, 'rendered page missing task card panel');
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'desktop layout has horizontal overflow');
 
@@ -312,13 +325,18 @@ async function main() {
       { send: sendPage },
       `(() => {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
-        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".task-grid", ".interaction-stream", ".approve-button"];
+        const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".run-history-panel", ".task-grid", ".interaction-stream", ".approve-button"];
         const issues = [];
         for (const selector of selectors) {
           const rect = document.querySelector(selector)?.getBoundingClientRect();
           if (!rect) issues.push(selector + " missing");
           else if (rect.left < -1 || rect.top < -1 || rect.right > viewport.width + 1 || rect.bottom > viewport.height + 1) {
-            issues.push(selector + " out of viewport");
+            issues.push(selector + " out of viewport " + JSON.stringify({
+              left: Math.round(rect.left),
+              top: Math.round(rect.top),
+              right: Math.round(rect.right),
+              bottom: Math.round(rect.bottom)
+            }));
           }
         }
         return {
@@ -375,7 +393,10 @@ async function main() {
               status: document.querySelector(".status-pill")?.innerText.trim(),
               artifact: document.querySelector(".artifact-preview p")?.innerText,
               opCount: document.querySelectorAll(".diff-row").length,
-              stream: document.querySelector(".interaction-stream")?.innerText
+              stream: document.querySelector(".interaction-stream")?.innerText,
+              runCardCount: document.querySelectorAll(".run-card:not(.is-empty)").length,
+              activeRunCard: document.querySelector(".run-card.is-active")?.innerText || "",
+              runSummary: document.querySelector(".run-summary")?.innerText || ""
             };
             approve.click();
             return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
@@ -397,6 +418,9 @@ async function main() {
     assert(interaction.afterPlan.artifact.includes('renewal date'), 'plan did not include trusted file summary');
     assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'plan interaction stream missing task steps');
     assert(interaction.afterPlan.stream.includes('等待审批'), 'plan interaction stream missing approval wait state');
+    assert(interaction.afterPlan.runCardCount >= 1, 'plan did not render any task card');
+    assert(interaction.afterPlan.activeRunCard.includes('协作') && interaction.afterPlan.activeRunCard.includes('完成'), 'active task card did not show cowork completion');
+    assert(interaction.afterPlan.runSummary.includes('最近'), 'task card summary did not report recent runs');
     assert(interaction.afterApprove.status === '已在本机执行', 'approve interaction did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'approve button did not enter done state');
     assert(interaction.afterApprove.stream.includes('执行完成'), 'approve interaction stream missing completion state');
@@ -460,7 +484,9 @@ async function main() {
                   status: document.querySelector(".status-pill")?.innerText.trim(),
                   artifact: document.querySelector(".artifact-preview p")?.innerText,
                   chatHidden: document.querySelector(".chat-output")?.hidden,
-                  stream: document.querySelector(".interaction-stream")?.innerText
+                  stream: document.querySelector(".interaction-stream")?.innerText,
+                  runCardCount: document.querySelectorAll(".run-card:not(.is-empty)").length,
+                  activeRunCard: document.querySelector(".run-card.is-active")?.innerText || ""
                 }
               }));
           })
@@ -475,6 +501,8 @@ async function main() {
     assert(uploadAndChat.taskState.artifact.includes('invoice smoke amount=128'), 'cowork plan did not use uploaded file summary');
     assert(uploadAndChat.taskState.stream.includes('invoice smoke amount=128'), 'cowork interaction stream did not show uploaded file context');
     assert(uploadAndChat.taskState.stream.includes('等待审批'), 'cowork interaction stream did not show approval state after chat handoff');
+    assert(uploadAndChat.taskState.runCardCount >= 2, 'cowork handoff did not append a task card');
+    assert(uploadAndChat.taskState.activeRunCard.includes('协作') && uploadAndChat.taskState.activeRunCard.includes('完成'), 'cowork handoff did not highlight latest task card');
     assert(uploadAndChat.taskState.chatHidden === true, 'chat output should stay hidden after cowork task handoff');
     const uploadRoot = path.join(workspace, 'Kimi_Cowork上传');
     const uploadedFiles = fs.existsSync(uploadRoot)

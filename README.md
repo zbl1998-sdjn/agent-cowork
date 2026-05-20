@@ -9,6 +9,7 @@
 - 可控命令运行（默认关闭）
 - Kimi CLI 对话 / 计划运行记录（`.KimiCowork/runs/*.json`）
 - Cowork 执行动态信息流（用户指令、读取上下文、Kimi 计划、等待审批、执行完成）
+- 前台任务卡片（最近 Kimi run、状态、耗时、点击查看 run 详情）
 - 最小 HTTP API
 
 当前产品基准是 `plan/kimi-cowork-latest-product-plan-v0.3.md`。
@@ -43,8 +44,8 @@ npm run smoke:host
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
-`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
-`npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
+`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
+`npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，确认前台任务卡片显示最新 Cowork run，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `KimiCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
 `npm run smoke:kimi-cli` 会启动一个临时 Host API，真实调用本机 Kimi CLI 的 `--print --final-message-only` 模式，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖本机已登录 Kimi CLI 和可用网络，不放进默认 `verify:mvp` 的运行项。
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。
@@ -66,6 +67,8 @@ npm run start:mvp
 ```
 
 后端接口是 `POST /api/kimi/chat` 和 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并使用 `--print --final-message-only` 生成文本回复或计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`。当前 UI 的主发送入口使用 `/api/kimi/plan` 创建 Cowork 任务，`/api/kimi/chat` 保留给直接对话 API 和后续更细的聊天视图。审批执行仍走本地 `file-ops/apply`。
+
+前端“任务卡片”直接读取 `GET /api/runs`，展示最近 run 的类型、状态、耗时和短 ID；点击卡片会读取 `GET /api/runs/<runId>`，把输入摘要、Kimi 输出或错误展开到执行动态区域。
 
 文件 / 文件夹上传是本地导入，不会无差别上传云端：前端通过文件选择器读取用户明确选择的文件，Host 写入 trusted root 下的 `Kimi_Cowork上传/<batch>/`，随后文件树和 Kimi 摘要会优先使用刚上传的文件。
 

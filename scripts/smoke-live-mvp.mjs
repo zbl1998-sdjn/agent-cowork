@@ -274,6 +274,7 @@ async function main() {
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
           hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
+          hasRunCards: document.querySelector(".run-history-panel")?.textContent.includes("任务卡片") === true,
           scroll
         };
       })()`,
@@ -285,6 +286,7 @@ async function main() {
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'live MVP missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing Kimi quick actions');
     assert(desktopLayout.hasInteractionStream, 'live MVP missing cowork interaction stream');
+    assert(desktopLayout.hasRunCards, 'live MVP missing task card panel');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -323,7 +325,9 @@ async function main() {
               status: document.querySelector(".status-pill")?.innerText.trim(),
               artifact: document.querySelector(".artifact-preview p")?.innerText,
               opCount: document.querySelectorAll(".diff-row").length,
-              stream: document.querySelector(".interaction-stream")?.innerText
+              stream: document.querySelector(".interaction-stream")?.innerText,
+              runCardCount: document.querySelectorAll(".run-card:not(.is-empty)").length,
+              activeRunCard: document.querySelector(".run-card.is-active")?.innerText || ""
             };
             approve.click();
             return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
@@ -345,6 +349,8 @@ async function main() {
     assert(interaction.afterPlan.opCount >= 1, 'live MVP did not render any operation preview');
     assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'live MVP stream missing planning steps');
     assert(interaction.afterPlan.stream.includes('等待审批'), 'live MVP stream missing approval wait state');
+    assert(interaction.afterPlan.runCardCount >= 1, 'live MVP did not render a task card after planning');
+    assert(interaction.afterPlan.activeRunCard.includes('协作'), 'live MVP latest task card did not show cowork type');
     assert(interaction.afterApprove.status === '已在本机执行', 'live MVP approve did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'live MVP approve button did not enter done state');
     assert(interaction.afterApprove.stream.includes('执行完成'), 'live MVP stream missing completion state');

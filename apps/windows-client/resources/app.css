@@ -719,6 +719,124 @@ body[data-view="customize"] .greeting {
   background: #f7f7f5;
 }
 
+.run-history-panel {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(18, 22, 28, 0.04);
+}
+
+.run-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.run-history-header strong,
+.run-history-header span {
+  display: block;
+}
+
+.run-history-header strong {
+  color: #20211f;
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.run-summary {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-refresh {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #e1e1dd;
+  border-radius: 8px;
+  color: #4d4f4a;
+  background: #fafaf8;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.run-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.run-card {
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #ececea;
+  border-radius: 10px;
+  color: #282a25;
+  background: #fbfbfa;
+  text-align: left;
+}
+
+.run-card.is-active {
+  border-color: #f0a79a;
+  background: #fff7f4;
+}
+
+.run-card.is-failed {
+  border-color: #efd5d2;
+  background: #fff8f7;
+}
+
+.run-card.is-empty {
+  grid-column: 1 / -1;
+  min-height: 58px;
+}
+
+.run-card span {
+  overflow: hidden;
+  color: #74554b;
+  font-size: 11px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-card.is-succeeded span {
+  color: #276247;
+}
+
+.run-card.is-failed span {
+  color: #9a2f26;
+}
+
+.run-card strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #252722;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.run-card em {
+  overflow: hidden;
+  color: #7d7f79;
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .task-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
@@ -1068,6 +1186,10 @@ body[data-view="customize"] .greeting {
     grid-template-columns: 1fr;
   }
 
+  .run-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .interaction-items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1109,8 +1231,8 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .hero,
   body[data-view="artifacts"] .hero,
   body[data-view="customize"] .hero {
-    min-height: 204px;
-    padding-bottom: 8px;
+    min-height: 106px;
+    padding-bottom: 4px;
   }
 
   .greeting {
@@ -1122,7 +1244,7 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .greeting,
   body[data-view="artifacts"] .greeting,
   body[data-view="customize"] .greeting {
-    margin-bottom: 8px;
+    display: none;
   }
 
   .greeting h1 {
@@ -1144,9 +1266,9 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .composer,
   body[data-view="artifacts"] .composer,
   body[data-view="customize"] .composer {
-    min-height: 104px;
-    padding: 12px 18px 9px;
-    border-radius: 24px;
+    min-height: 84px;
+    padding: 8px 18px 6px;
+    border-radius: 20px;
   }
 
   body[data-view="cowork"] .composer textarea,
@@ -1154,7 +1276,7 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .composer textarea,
   body[data-view="artifacts"] .composer textarea,
   body[data-view="customize"] .composer textarea {
-    height: 34px;
+    height: 24px;
     font-size: 17px;
   }
 
@@ -1232,6 +1354,28 @@ body[data-view="customize"] .greeting {
     padding: 3px 8px;
   }
 
+  body[data-view="cowork"] .run-history-panel,
+  body[data-view="code"] .run-history-panel {
+    margin-bottom: 6px;
+    padding: 8px;
+  }
+
+  body[data-view="cowork"] .run-history-header,
+  body[data-view="code"] .run-history-header {
+    margin-bottom: 6px;
+  }
+
+  body[data-view="cowork"] .run-card,
+  body[data-view="code"] .run-card {
+    min-height: 48px;
+    padding: 7px 8px;
+  }
+
+  body[data-view="cowork"] .run-card strong,
+  body[data-view="code"] .run-card strong {
+    -webkit-line-clamp: 1;
+  }
+
   .task-card {
     min-height: 128px;
     padding: 13px;
@@ -1239,8 +1383,8 @@ body[data-view="customize"] .greeting {
 
   body[data-view="cowork"] .task-card,
   body[data-view="code"] .task-card {
-    min-height: 96px;
-    padding: 10px;
+    min-height: 82px;
+    padding: 9px;
   }
 
   body[data-view="cowork"] .card-title,
@@ -1261,8 +1405,13 @@ body[data-view="customize"] .greeting {
   }
 
   .file-list span {
-    height: 22px;
-    padding-top: 3px;
+    height: 20px;
+    padding-top: 2px;
+  }
+
+  body[data-view="cowork"] .file-list span:nth-child(n + 3),
+  body[data-view="code"] .file-list span:nth-child(n + 3) {
+    display: none;
   }
 
   .diff-row {
@@ -1280,7 +1429,7 @@ body[data-view="customize"] .greeting {
 
   body[data-view="cowork"] .artifact-preview,
   body[data-view="code"] .artifact-preview {
-    padding: 8px;
+    padding: 7px;
   }
 
   .approve-button {
@@ -1296,8 +1445,8 @@ body[data-view="customize"] .greeting {
 
   body[data-view="cowork"] .interaction-stream,
   body[data-view="code"] .interaction-stream {
-    margin-top: 10px;
-    padding: 10px;
+    margin-top: 6px;
+    padding: 7px;
   }
 
   body[data-view="cowork"] .stream-header,
@@ -1313,12 +1462,12 @@ body[data-view="customize"] .greeting {
 
   body[data-view="cowork"] .interaction-row,
   body[data-view="code"] .interaction-row {
-    min-height: 68px;
-    padding: 8px;
+    min-height: 42px;
+    padding: 6px;
   }
 
   body[data-view="cowork"] .interaction-row p,
   body[data-view="code"] .interaction-row p {
-    -webkit-line-clamp: 1;
+    display: none;
   }
 }

@@ -7,6 +7,7 @@ const state = {
   hostApi: window.location.protocol === "http:" || window.location.protocol === "https:",
   kimiCliPlanEnabled: false,
   lastRun: null,
+  runs: [],
   uploadedFiles: [],
   interactionItems: [],
 };
@@ -22,6 +23,9 @@ const artifactText = document.querySelector(".artifact-preview p");
 const artifactPath = document.querySelector(".artifact-preview code");
 const statusText = document.querySelector(".status-text");
 const runChip = document.querySelector(".run-chip");
+const runSummary = document.querySelector(".run-summary");
+const runList = document.querySelector(".run-list");
+const runRefreshButton = document.querySelector('[data-action="refresh-runs"]');
 const workspacePath = document.querySelector(".workspace-card > strong");
 const workspaceMeta = document.querySelector(".workspace-card > p");
 const fileList = document.querySelector(".file-list");
@@ -265,6 +269,169 @@ function shortRunId(runId) {
   return String(runId || "").split("_").slice(-1)[0] || runId;
 }
 
+function runStatusText(status) {
+  if (status === "succeeded") {
+    return "完成";
+  }
+  if (status === "failed") {
+    return "失败";
+  }
+  return "运行中";
+}
+
+function runTypeText(run) {
+  if (run.type === "kimi-chat") {
+    return "对话";
+  }
+  if (run.mode === "code") {
+    return "代码";
+  }
+  return "协作";
+}
+
+function formatDuration(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value < 0) {
+    return "未知耗时";
+  }
+  if (value < 1000) {
+    return `${Math.round(value)}ms`;
+  }
+  return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}s`;
+}
+
+function formatRunTime(value) {
+  if (!value) {
+    return "刚刚";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "刚刚";
+  }
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function renderRunCards(runs, activeRunId = state.lastRun?.id) {
+  state.runs = Array.isArray(runs) ? runs : [];
+  if (!runList || !runSummary) {
+    return;
+  }
+
+  runList.replaceChildren();
+  runSummary.textContent = state.hostApi
+    ? state.runs.length > 0
+      ? `最近 ${state.runs.length} 次 Kimi 任务，点击可查看输入和结果`
+      : "暂无 Kimi 运行记录"
+    : "静态预览模式不会读取运行记录";
+
+  if (state.runs.length === 0) {
+    const empty = document.createElement("button");
+    empty.className = "run-card is-empty";
+    empty.type = "button";
+    empty.setAttribute("role", "listitem");
+    empty.innerHTML = "<span>暂无运行记录</span><strong>发送任务后这里会展示 Kimi 运行卡片</strong><em>等待任务</em>";
+    runList.append(empty);
+    return;
+  }
+
+  for (const run of state.runs.slice(0, 6)) {
+    const card = document.createElement("button");
+    card.className = `run-card is-${run.status || "running"}`;
+    card.type = "button";
+    card.dataset.runId = run.id;
+    card.setAttribute("role", "listitem");
+    card.classList.toggle("is-active", run.id === activeRunId);
+
+    const top = document.createElement("span");
+    top.textContent = `${runTypeText(run)} · ${runStatusText(run.status)}`;
+
+    const title = document.createElement("strong");
+    title.textContent = compactText(run.prompt || "未记录任务输入", 64);
+
+    const meta = document.createElement("em");
+    meta.textContent = `${shortRunId(run.id)} · ${formatDuration(run.durationMs)} · ${formatRunTime(run.finishedAt || run.startedAt)}`;
+
+    card.append(top, title, meta);
+    card.addEventListener("click", () => {
+      showRunDetail(run.id).catch((error) => {
+        setStatus("任务记录读取失败");
+        setArtifact(error.message);
+      });
+    });
+    runList.append(card);
+  }
+}
+
+async function loadRunCards(activeRunId = state.lastRun?.id) {
+  if (!state.hostApi) {
+    renderRunCards([], activeRunId);
+    return;
+  }
+  const response = await fetch("/api/runs?limit=6");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || `runs returned ${response.status}`);
+  }
+  renderRunCards(payload.runs || [], activeRunId);
+}
+
+async function refreshRunCards(activeRunId = state.lastRun?.id) {
+  try {
+    await loadRunCards(activeRunId);
+  } catch (error) {
+    if (runSummary) {
+      runSummary.textContent = `运行记录暂不可用：${error.message}`;
+    }
+  }
+}
+
+async function showRunDetail(runId) {
+  if (!state.hostApi || !runId) {
+    return;
+  }
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
+  const run = await response.json();
+  if (!response.ok) {
+    throw new Error(run.error || `run detail returned ${response.status}`);
+  }
+
+  const failed = run.status === "failed";
+  renderRunCards(state.runs, run.id);
+  renderInteraction(
+    [
+      {
+        state: failed ? "error" : "done",
+        title: `${runTypeText(run)}任务 ${runStatusText(run.status)}`,
+        detail: run.input?.prompt || "未记录任务输入",
+        meta: `run ${shortRunId(run.id)} · ${formatDuration(run.durationMs)}`,
+      },
+      {
+        state: "done",
+        title: "本地摘要",
+        detail: compactText(run.input?.summary || "未记录摘要"),
+        meta: run.trustedRoot || state.workspace,
+      },
+      {
+        state: failed ? "error" : "done",
+        title: failed ? "错误信息" : "Kimi 输出",
+        detail: compactText(failed ? run.error?.message : run.result?.text, 260),
+        meta: formatRunTime(run.finishedAt || run.startedAt),
+      },
+    ],
+    failed ? "任务失败" : "任务详情",
+  );
+  setStatus(failed ? "任务记录失败" : "任务记录已打开");
+  setArtifact(
+    failed ? `任务 ${shortRunId(run.id)} 调用失败：${run.error?.message || "未知错误"}` : `已打开任务 ${shortRunId(run.id)} 的 Kimi 输出。`,
+    run.id,
+  );
+}
+
 async function tryKimiCliPlan(prompt, summary) {
   if (!state.kimiCliPlanEnabled) {
     setRunChip("Kimi CLI 未启用", "muted");
@@ -347,6 +514,14 @@ async function sendChatMessage(prompt) {
   const candidate = textCandidate(activeFiles());
   const summary = await readCandidateSummary(candidate);
   const reply = await tryKimiChat(prompt, summary);
+  state.lastRun = reply.runId
+    ? {
+        id: reply.runId,
+        path: reply.runPath,
+        durationMs: reply.durationMs,
+        failed: reply.failed === true,
+      }
+    : null;
   showChatResponse(reply.text);
   if (reply.used) {
     setRunChip(`Kimi Chat · ${shortRunId(reply.runId)} · ${reply.durationMs}ms`, "ready");
@@ -357,6 +532,7 @@ async function sendChatMessage(prompt) {
   } else {
     setStatus("本地回复");
   }
+  await refreshRunCards(reply.runId);
 }
 
 async function refreshWorkspaceTree() {
@@ -592,6 +768,7 @@ async function generatePlan() {
     ],
     "等待审批",
   );
+  await refreshRunCards(kimiPlan.runId);
   setStatus("计划就绪");
 }
 
@@ -676,6 +853,7 @@ async function loadHostWorkspace() {
     workspacePath.textContent = state.workspace;
 
     await refreshWorkspaceTree();
+    await refreshRunCards();
     setStatus("本地 Agent 就绪");
   } catch (error) {
     setStatus("Host API 离线");
@@ -786,6 +964,13 @@ approveButton.addEventListener("click", () => {
   });
 });
 
+runRefreshButton?.addEventListener("click", () => {
+  refreshRunCards().catch(() => {
+    // refreshRunCards owns the visible error state.
+  });
+});
+
 setView("chat");
 resetInteraction();
+renderRunCards([]);
 loadHostWorkspace();
