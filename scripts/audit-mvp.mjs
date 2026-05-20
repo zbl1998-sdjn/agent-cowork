@@ -93,6 +93,7 @@ async function main() {
   const verificationFile = path.join(buildDir, 'mvp-verification-report.json');
   const renderedFile = path.join(buildDir, 'rendered-ui-smoke-report.json');
   const runtimeSmokeFile = path.join(buildDir, 'mvp-runtime-smoke-report.json');
+  const windowsResourceSmokeFile = path.join(buildDir, 'windows-client-resource-smoke-report.json');
   const readinessFile = path.join(buildDir, 'windows-client-readiness.json');
   const windowsVerificationFile = path.join(buildDir, 'mvp-verification-report-windows.json');
 
@@ -105,6 +106,7 @@ async function main() {
   const verification = readJson(verificationFile);
   const rendered = readJson(renderedFile);
   const runtimeSmoke = readJson(runtimeSmokeFile);
+  const windowsResourceSmoke = readJson(windowsResourceSmokeFile);
   const readiness = readJson(readinessFile);
   const windowsVerification = readJson(windowsVerificationFile);
 
@@ -120,6 +122,14 @@ async function main() {
   const desktopLayout = rendered.value?.desktopLayout;
   const compactLayout = rendered.value?.compactLayout;
   const interaction = rendered.value?.interaction;
+  const windowsResourceScreenshotPath = windowsResourceSmoke.ok
+    ? windowsResourceSmoke.value.screenshotPath
+    : path.join(buildDir, 'windows-client-resource-smoke-1536x900.png');
+  const windowsResourceScreenshot = fileEvidence(windowsResourceScreenshotPath);
+  const windowsResourceScreenshotSize = readPngSize(windowsResourceScreenshotPath);
+  const windowsResourceDesktopLayout = windowsResourceSmoke.value?.desktopLayout;
+  const windowsResourceCompactLayout = windowsResourceSmoke.value?.compactLayout;
+  const windowsResourceInteraction = windowsResourceSmoke.value?.interaction;
 
   const visualPassed =
     rendered.value?.ok === true &&
@@ -190,6 +200,37 @@ async function main() {
       port: runtimeSmoke.value?.port,
       stopped: runtimeSmoke.value?.stop?.stopped,
     }),
+    requirement(
+      'native-windows-resource-smoke',
+      'Native Windows client resources render in static file mode and support preview/approve UI transitions',
+      windowsResourceSmoke.value?.ok === true &&
+        windowsResourceScreenshot.exists &&
+        windowsResourceScreenshotSize?.width === 1536 &&
+        windowsResourceScreenshotSize?.height === 900 &&
+        windowsResourceDesktopLayout?.title === 'Kimi Cowork' &&
+        windowsResourceDesktopLayout?.protocol === 'file:' &&
+        windowsResourceDesktopLayout?.hostApi === false &&
+        windowsResourceDesktopLayout?.hasKimi === true &&
+        windowsResourceDesktopLayout?.hasCowork === true &&
+        windowsResourceDesktopLayout?.hasLocalFolder === true &&
+        windowsResourceDesktopLayout?.hasApprove === true &&
+        windowsResourceCompactLayout?.issues?.length === 0 &&
+        windowsResourceInteraction?.afterPlan?.status === 'Preview Mode' &&
+        windowsResourceInteraction?.afterApprove?.status === 'Preview Applied' &&
+        windowsResourceInteraction?.afterApprove?.doneClass === true
+        ? 'passed'
+        : 'failed',
+      {
+        reportPath: windowsResourceSmokeFile,
+        generatedAt: windowsResourceSmoke.value?.generatedAt,
+        resourcesDir: windowsResourceSmoke.value?.resourcesDir,
+        screenshot: windowsResourceScreenshot,
+        screenshotSize: windowsResourceScreenshotSize,
+        desktopLayout: windowsResourceDesktopLayout,
+        compactLayout: windowsResourceCompactLayout,
+        interaction: windowsResourceInteraction,
+      },
+    ),
     requirement('native-windows-window-smoke', 'Native Windows C client window-level smoke', nativePassed ? 'passed' : nativeBlocked ? 'blocked' : 'failed', {
       readinessReportPath: readinessFile,
       windowsVerificationReportPath: windowsVerification.ok ? windowsVerificationFile : null,
@@ -216,6 +257,7 @@ async function main() {
     'visual-fidelity',
     'local-operation-test',
     'runtime-lifecycle-test',
+    'native-windows-resource-smoke',
   ];
   const webHostMvpReady = passed(requirements, webRequirementIds);
   const nativeWindowsReady = requirements.find((item) => item.id === 'native-windows-window-smoke')?.status === 'passed';

@@ -106,6 +106,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
   },
   {
+    name: 'windows client resource smoke script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
+  },
+  {
     name: 'host operation smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-local-operations.mjs')],
@@ -134,6 +139,11 @@ const checks = [
     name: 'rendered browser ui smoke',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
+  },
+  {
+    name: 'windows client static resource smoke',
+    command: nodeBin,
+    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
   },
 ];
 
