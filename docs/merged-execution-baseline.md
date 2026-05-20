@@ -8,12 +8,12 @@
 
 当前目录里的两个计划不能直接混成一个单一 MVP。
 
-- `2026-05-20-kimi-cowork-implementation-plan.md`
+- `plan/2026-05-20-kimi-cowork-implementation-plan.md`
   - 保留为 **MVP-0：Kimi CLI 本地原型计划**。
   - 用途：快速验证 Kimi-only、trusted workspace、本地文件树、上下文 bundle、diff/apply、审批、审计、Kimi Web 安全启动。
   - 限制：Node.js/TypeScript + React/Vite + Electron 不符合正式 C 前端方向；本地单机 host API 不符合多用户后端和千万级 QPS 目标。
 
-- `kimi_workspace_cowork_mvp_plan.md`
+- `plan/kimi_workspace_cowork_mvp_plan.md`
   - 升级为 **MVP-1 正式架构的主要方向来源**。
   - 应保留：Windows 主流用户、C/Win32 + WebView2、Local Agent、云端 API、Device Relay、Task Orchestrator、Kimi Gateway、文件操作 Journal、回滚、多用户扩展、QPS scaling。
   - 应收敛：云端/SaaS/QPS 是正式主线，但 MVP-1 第一阶段仍要可落地，不能一次性实现所有企业级能力。
@@ -223,4 +223,3 @@ docs/qps-scaling.md
    - `services/api` 的最小多租户数据模型和任务 API。
    - `services/orchestrator` 的任务状态机接口。
    - `services/kimi-gateway` 的 Kimi 调用边界。
-

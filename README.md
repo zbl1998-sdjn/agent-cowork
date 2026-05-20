@@ -8,7 +8,9 @@
 - 可控命令运行（默认关闭）
 - 最小 HTTP API
 
-注意：这是纯本地 Kimi-only PoC host，不是正式 MVP-1 产品主线。正式方向见 `docs/merged-execution-baseline.md` 和 `docs/mvp-1-windows-c-cloud-architecture.md`：Windows C 客户端、Local Agent、Cloud Backend、Device Relay、Task Orchestrator、Kimi Gateway 和长期 QPS scaling。
+当前产品基准是 `plan/kimi-cowork-latest-product-plan-v0.3.md`。
+
+注意：这是纯本地 Kimi-only PoC host，不是正式 MVP-1 产品主线。正式方向见 `docs/merged-execution-baseline.md`、`docs/mvp-1-windows-c-cloud-architecture.md` 和 `docs/v0.3-implementation-status.md`：Windows C 客户端、Go Local Agent、Cloud Backend、Device Relay、Task Orchestrator、Kimi Gateway、Office Mode、Developer Mode 和长期 QPS scaling。
 
 ## 快速开始
 
@@ -27,3 +29,19 @@ $env:PORT = "3011"
 $env:TRUSTED_ROOT = "C:\Users\Administrator\Desktop\kimi cowork"
 npm start
 ```
+
+## MVP-1 骨架验证
+
+```powershell
+go test ./...
+```
+
+分别从这些目录运行：
+
+- `apps/local-agent`
+- `services/api`
+- `services/relay`
+- `services/orchestrator`
+- `services/kimi-gateway`
+
+Windows C/WebView2 客户端骨架位于 `apps/windows-client`。当前机器 PATH 上未发现 `cl`、`gcc` 或 `clang`，所以 CMake 配置文件已提供，但本轮未把 C 客户端构建作为必过验证。

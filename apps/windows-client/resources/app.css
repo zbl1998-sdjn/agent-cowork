@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f6f7f9;
+  color: #20242a;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #ffffff;
+  border-right: 1px solid #dfe3e8;
+}
+
+.sidebar button {
+  height: 36px;
+  text-align: left;
+  border: 1px solid #ccd3dc;
+  background: #ffffff;
+}
+
+.workspace {
+  padding: 28px;
+}
+

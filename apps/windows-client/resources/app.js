@@ -1,0 +1,3 @@
+window.kimiCowork = {
+  mode: "office",
+};
