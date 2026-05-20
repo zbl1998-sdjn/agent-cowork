@@ -1,5 +1,6 @@
 #include "app_window.h"
 #include "native_bridge.h"
+#include "webview_bridge.h"
 
 #include <shlobj.h>
 #include <stdarg.h>
@@ -20,6 +21,7 @@ static const wchar_t *KCW_CLASS_NAME = L"KimiCoworkWindow";
 #define KCW_ID_RUN 1003
 #define KCW_ID_APPROVE 1004
 #define KCW_ID_DEVELOPER 1005
+#define KCW_ID_BROWSER 1006
 #define KCW_ID_PROMPT 2001
 #define KCW_ID_FILE_LIST 2002
 #define KCW_ID_ARTIFACT 2003
@@ -60,6 +62,7 @@ typedef struct KcwAppState {
     HWND run_button;
     HWND approve_button;
     HWND developer_button;
+    HWND browser_button;
     HWND template_buttons[KCW_TEMPLATE_COUNT];
 
     wchar_t trusted_root[MAX_PATH];
@@ -75,6 +78,7 @@ typedef struct KcwAppState {
     bool pending_move_ready;
     int selected_template;
     int file_count;
+    bool webview_visible;
 } KcwAppState;
 
 static KcwAppState g_app;
@@ -1096,6 +1100,7 @@ static void kcw_create_controls(HWND window) {
     g_app.run_button = kcw_create_owner_button(window, KCW_ID_RUN, L"生成计划");
     g_app.approve_button = kcw_create_owner_button(window, KCW_ID_APPROVE, L"审批执行");
     g_app.developer_button = kcw_create_owner_button(window, KCW_ID_DEVELOPER, L"Developer Mode");
+    g_app.browser_button = kcw_create_owner_button(window, KCW_ID_BROWSER, L"浏览器视图");
 
     for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) {
         g_app.template_buttons[i] = kcw_create_owner_button(window, KCW_ID_TEMPLATE_BASE + i, KCW_TEMPLATES[i]);
@@ -1174,29 +1179,47 @@ static void kcw_layout_controls(HWND window) {
 
     MoveWindow(g_app.new_chat_button, 14, compact ? 112 : 118, sidebar - 28, compact ? 42 : 46, TRUE);
     MoveWindow(g_app.developer_button, 14, compact ? height - 120 : height - 108, sidebar - 28, 42, TRUE);
+    MoveWindow(g_app.browser_button, 14, compact ? height - 170 : height - 160, sidebar - 28, 42, TRUE);
     MoveWindow(g_app.browse_button, 14, compact ? height - 70 : height - 214, sidebar - 28, 42, TRUE);
 
-    MoveWindow(g_app.prompt_edit, prompt_x + 26, prompt_y + 26, prompt_w - 52, 58, TRUE);
-    MoveWindow(g_app.run_button, prompt_x + prompt_w - 300, prompt_y + prompt_h - 54, 132, 36, TRUE);
-    MoveWindow(g_app.approve_button, prompt_x + prompt_w - 158, prompt_y + prompt_h - 54, 132, 36, TRUE);
+    if (g_app.webview_visible) {
+        ShowWindow(g_app.prompt_edit, SW_HIDE);
+        ShowWindow(g_app.run_button, SW_HIDE);
+        ShowWindow(g_app.approve_button, SW_HIDE);
+        ShowWindow(g_app.file_list, SW_HIDE);
+        ShowWindow(g_app.artifact_edit, SW_HIDE);
+        for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) ShowWindow(g_app.template_buttons[i], SW_HIDE);
+        kcw_webview_resize(content_x, 8, content_w, height - 16);
+    } else {
+        ShowWindow(g_app.prompt_edit, SW_SHOW);
+        ShowWindow(g_app.run_button, SW_SHOW);
+        ShowWindow(g_app.approve_button, SW_SHOW);
+        ShowWindow(g_app.file_list, SW_SHOW);
+        ShowWindow(g_app.artifact_edit, SW_SHOW);
+        for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) ShowWindow(g_app.template_buttons[i], SW_SHOW);
 
-    int template_w = 118;
-    int template_gap = 10;
-    int template_group_w = template_w * 4 + template_gap * 3;
-    int template_x = content_x + (content_w - template_group_w) / 2;
-    for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) {
-        int row = i / 4;
-        int col = i % 4;
-        MoveWindow(g_app.template_buttons[i], template_x + col * (template_w + template_gap), template_y + row * 40, template_w, 34, TRUE);
+        MoveWindow(g_app.prompt_edit, prompt_x + 26, prompt_y + 26, prompt_w - 52, 58, TRUE);
+        MoveWindow(g_app.run_button, prompt_x + prompt_w - 300, prompt_y + prompt_h - 54, 132, 36, TRUE);
+        MoveWindow(g_app.approve_button, prompt_x + prompt_w - 158, prompt_y + prompt_h - 54, 132, 36, TRUE);
+
+        int template_w = 118;
+        int template_gap = 10;
+        int template_group_w = template_w * 4 + template_gap * 3;
+        int template_x = content_x + (content_w - template_group_w) / 2;
+        for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) {
+            int row = i / 4;
+            int col = i % 4;
+            MoveWindow(g_app.template_buttons[i], template_x + col * (template_w + template_gap), template_y + row * 40, template_w, 34, TRUE);
+        }
+
+        int file_panel_x = card_x;
+        int file_panel_y = bottom_y;
+        int file_panel_h = panel_h;
+        int artifact_x = file_panel_x + left_panel_w + 18;
+        int artifact_w = card_w - left_panel_w - 18;
+        MoveWindow(g_app.file_list, file_panel_x + 20, file_panel_y + 58, left_panel_w - 40, file_panel_h - 82, TRUE);
+        MoveWindow(g_app.artifact_edit, artifact_x + 20, file_panel_y + 58, artifact_w - 40, file_panel_h - 82, TRUE);
     }
-
-    int file_panel_x = card_x;
-    int file_panel_y = bottom_y;
-    int file_panel_h = panel_h;
-    int artifact_x = file_panel_x + left_panel_w + 18;
-    int artifact_w = card_w - left_panel_w - 18;
-    MoveWindow(g_app.file_list, file_panel_x + 20, file_panel_y + 58, left_panel_w - 40, file_panel_h - 82, TRUE);
-    MoveWindow(g_app.artifact_edit, artifact_x + 20, file_panel_y + 58, artifact_w - 40, file_panel_h - 82, TRUE);
 }
 
 static void kcw_draw_sidebar(HDC dc, RECT client, int sidebar) {
@@ -1475,6 +1498,32 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
             InvalidateRect(window, NULL, TRUE);
             return 0;
         }
+        if (id == KCW_ID_BROWSER) {
+            g_app.webview_visible = !g_app.webview_visible;
+            if (g_app.webview_visible) {
+                if (!kcw_webview_is_created()) {
+                    wchar_t url[512];
+                    wcscpy_s(url, sizeof(url)/sizeof(url[0]), L"http://127.0.0.1:3017/");
+                    int r = kcw_webview_create(window, url);
+                    if (r != 0) {
+                        /* fallback to static resource */
+                        wchar_t exe_dir[MAX_PATH];
+                        GetModuleFileNameW(NULL, exe_dir, MAX_PATH);
+                        wchar_t *last_slash = wcsrchr(exe_dir, L'\\');
+                        if (last_slash) *last_slash = L'\0';
+                        swprintf_s(url, sizeof(url)/sizeof(url[0]), L"file:///%s/resources/app.html", exe_dir);
+                        for (wchar_t *p = url; *p; p++) if (*p == L'\\') *p = L'/';
+                        kcw_webview_create(window, url);
+                    }
+                }
+                kcw_set_status(L"浏览器视图已打开。");
+            } else {
+                kcw_set_status(L"已返回原生视图。");
+            }
+            kcw_layout_controls(window);
+            InvalidateRect(window, NULL, TRUE);
+            return 0;
+        }
         if (kcw_is_template_id(id)) {
             g_app.selected_template = id - KCW_ID_TEMPLATE_BASE;
             wchar_t status[256];
@@ -1487,6 +1536,7 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
     }
 
     case WM_DESTROY:
+        kcw_webview_destroy();
         kcw_destroy_resources();
         PostQuitMessage(0);
         return 0;

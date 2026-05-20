@@ -5,6 +5,8 @@ const state = {
   operations: [],
   approved: false,
   hostApi: window.location.protocol === "http:" || window.location.protocol === "https:",
+  kimiCliPlanEnabled: false,
+  lastRun: null,
 };
 
 window.kimiCowork = state;
@@ -15,6 +17,7 @@ const sendButton = document.querySelector(".send-button");
 const artifactText = document.querySelector(".artifact-preview p");
 const artifactPath = document.querySelector(".artifact-preview code");
 const statusText = document.querySelector(".status-text");
+const runChip = document.querySelector(".run-chip");
 const workspacePath = document.querySelector(".workspace-card > strong");
 const workspaceMeta = document.querySelector(".workspace-card > p");
 const fileList = document.querySelector(".file-list");
@@ -35,6 +38,15 @@ const placeholders = {
 
 function setStatus(text) {
   statusText.textContent = text;
+}
+
+function setRunChip(text, variant = "muted") {
+  if (!runChip) {
+    return;
+  }
+  runChip.textContent = text;
+  runChip.classList.toggle("is-ready", variant === "ready");
+  runChip.classList.toggle("is-muted", variant === "muted");
 }
 
 function setArtifact(message, pathText = artifactPath.textContent) {
@@ -140,7 +152,10 @@ async function postJson(route, body) {
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || `${route} returned ${response.status}`);
+    const error = new Error(payload.error || `${route} returned ${response.status}`);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
   return payload;
 }
@@ -170,6 +185,47 @@ function showChatResponse(message) {
   chatOutputText.textContent = message;
 }
 
+function shortRunId(runId) {
+  return String(runId || "").split("_").slice(-1)[0] || runId;
+}
+
+async function tryKimiCliPlan(prompt, summary) {
+  if (!state.kimiCliPlanEnabled) {
+    setRunChip("Kimi CLI 未启用", "muted");
+    return {
+      used: false,
+      text: "Kimi CLI plan 未启用；当前使用本地只读摘要生成审批草稿。",
+    };
+  }
+
+  try {
+    setStatus("正在调用 Kimi CLI");
+    const result = await postJson("/api/kimi/plan", {
+      trustedRoot: state.workspace,
+      prompt,
+      summary,
+      mode: state.view,
+    });
+    return {
+      used: true,
+      text: result.text,
+      durationMs: result.durationMs,
+      runId: result.runId,
+      runPath: result.runPath,
+    };
+  } catch (error) {
+    const runId = error.payload?.runId;
+    setRunChip(runId ? `Kimi CLI 失败 · ${shortRunId(runId)}` : "Kimi CLI 已降级", "muted");
+    return {
+      used: false,
+      text: `Kimi CLI 暂不可用，已降级到本地计划：${error.message}`,
+      runId,
+      runPath: error.payload?.runPath,
+      failed: Boolean(runId),
+    };
+  }
+}
+
 async function generatePlan() {
   const prompt = composer.value.trim() || "整理这个本地文件夹，生成可审批的安全操作计划";
 
@@ -187,6 +243,15 @@ async function generatePlan() {
   setStatus("正在读取工作区");
   const candidate = textCandidate(state.files);
   const summary = await readCandidateSummary(candidate);
+  const kimiPlan = await tryKimiCliPlan(prompt, summary);
+  state.lastRun = kimiPlan.runId
+    ? {
+        id: kimiPlan.runId,
+        path: kimiPlan.runPath,
+        durationMs: kimiPlan.durationMs,
+        failed: kimiPlan.failed === true,
+      }
+    : null;
   const now = new Date();
   const id = now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
   const outputPath = joinWin(state.workspace, ".KimiCowork", "artifacts", `ui-plan-${id}.md`);
@@ -201,7 +266,14 @@ async function generatePlan() {
         `- 指令: ${prompt}`,
         `- 工作区: ${state.workspace}`,
         `- 来源摘要: ${summary}`,
+        `- Kimi CLI: ${kimiPlan.used ? `已接入，耗时 ${kimiPlan.durationMs}ms` : kimiPlan.failed ? "调用失败，已安全降级" : "未使用，安全降级"}`,
+        `- Run ID: ${kimiPlan.runId || "local-fallback"}`,
+        `- Run 记录: ${kimiPlan.runPath ? kimiPlan.runPath.replace(state.workspace, ".") : "未生成"}`,
         `- 生成时间: ${now.toISOString()}`,
+        "",
+        "## Kimi CLI 计划",
+        "",
+        kimiPlan.text,
         "",
       ].join("\n"),
     },
@@ -215,7 +287,17 @@ async function generatePlan() {
   approveButton.textContent = "审批执行";
   approveButton.classList.remove("is-done");
   renderOperations(preview.operations);
-  setArtifact(`已读取本地内容：${summary}`, outputPath.replace(state.workspace, "."));
+  setArtifact(
+    kimiPlan.used
+      ? `已读取本地内容：${summary}；Kimi CLI 已生成计划，运行记录 ${shortRunId(kimiPlan.runId)}。`
+      : `已读取本地内容：${summary}`,
+    outputPath.replace(state.workspace, "."),
+  );
+  if (kimiPlan.used) {
+    setRunChip(`Kimi CLI · ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs}ms`, "ready");
+  } else if (kimiPlan.failed) {
+    setRunChip(`Kimi CLI 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
+  }
   setStatus("计划就绪");
 }
 
@@ -261,6 +343,8 @@ async function loadHostWorkspace() {
   try {
     const workspace = await (await fetch("/api/workspace")).json();
     state.workspace = workspace.trustedRoot;
+    state.kimiCliPlanEnabled = workspace.kimiCli?.planEnabled === true;
+    setRunChip(state.kimiCliPlanEnabled ? "Kimi CLI 计划已启用" : "Kimi CLI 未启用", state.kimiCliPlanEnabled ? "ready" : "muted");
     workspacePath.textContent = state.workspace;
 
     const tree = await postJson("/api/files/tree", { root: state.workspace });

@@ -288,6 +288,7 @@ async function main() {
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
+    const planTimeoutMs = runtime.kimiCliPlanEnabled ? 90_000 : 5000;
     const interaction = await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {
@@ -314,7 +315,7 @@ async function main() {
           tick();
         });
 
-        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), 5000)
+        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), ${planTimeoutMs})
           .then(() => {
             const afterPlan = {
               status: document.querySelector(".status-pill")?.innerText.trim(),

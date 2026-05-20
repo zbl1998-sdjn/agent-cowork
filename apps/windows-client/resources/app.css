@@ -661,6 +661,13 @@ body[data-view="customize"] .greeting {
   font-size: 14px;
 }
 
+.panel-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
 .status-pill {
   height: 32px;
   display: inline-flex;
@@ -682,6 +689,34 @@ body[data-view="customize"] .greeting {
   border-radius: 50%;
   background: var(--success);
   box-shadow: 0 0 0 3px rgba(25, 195, 125, 0.14);
+}
+
+.run-chip {
+  max-width: 260px;
+  min-height: 24px;
+  overflow: hidden;
+  padding: 4px 9px;
+  border: 1px solid #ebe4df;
+  border-radius: 8px;
+  color: #7a4e43;
+  background: #fff7f3;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-chip.is-ready {
+  color: #255b43;
+  border-color: #dcefe5;
+  background: #f2fbf6;
+}
+
+.run-chip.is-muted {
+  color: #686863;
+  border-color: #e6e6e2;
+  background: #f7f7f5;
 }
 
 .task-grid {
@@ -1056,10 +1091,23 @@ body[data-view="customize"] .greeting {
     margin-bottom: 6px;
   }
 
+  body[data-view="cowork"] .panel-status,
+  body[data-view="code"] .panel-status {
+    flex-direction: row;
+    align-items: center;
+  }
+
   body[data-view="cowork"] .status-pill,
   body[data-view="code"] .status-pill {
     height: 28px;
     padding: 0 10px;
+  }
+
+  body[data-view="cowork"] .run-chip,
+  body[data-view="code"] .run-chip {
+    max-width: 220px;
+    min-height: 22px;
+    padding: 3px 8px;
   }
 
   .task-card {

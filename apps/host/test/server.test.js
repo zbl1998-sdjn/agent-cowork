@@ -38,7 +38,149 @@ test('workspace endpoint returns configured trusted root', async () => {
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/workspace`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { trustedRoot });
+    assert.deepEqual(await response.json(), {
+      trustedRoot,
+      kimiCli: {
+        planEnabled: false,
+      },
+    });
+  });
+});
+
+test('kimi plan endpoint is disabled unless explicitly enabled', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, prompt: '生成计划' }),
+    });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /disabled/i);
+  });
+});
+
+test('kimi plan endpoint calls configured runner inside trusted root', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  let captured;
+  await withServer({
+    trustedRoot,
+    enableKimiCliPlan: true,
+    kimiExecutable: 'kimi-test',
+    kimiPlanRunner: async (input) => {
+      captured = input;
+      return {
+        ok: true,
+        provider: 'kimi-cli',
+        command: 'kimi-test',
+        mode: input.mode,
+        text: 'Kimi CLI 计划输出',
+        durationMs: 12,
+      };
+    },
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        prompt: '生成计划',
+        summary: '本地摘要',
+        mode: 'cowork',
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.match(body.runId, /^run_/);
+    assert.equal(fs.existsSync(body.runPath), true);
+    assert.equal(body.text, 'Kimi CLI 计划输出');
+    assert.equal(captured.command, 'kimi-test');
+    assert.equal(captured.trustedRoot, trustedRoot);
+    assert.equal(captured.prompt, '生成计划');
+    assert.equal(captured.summary, '本地摘要');
+
+    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    assert.equal(record.id, body.runId);
+    assert.equal(record.status, 'succeeded');
+    assert.equal(record.type, 'kimi-plan');
+    assert.equal(record.input.prompt, '生成计划');
+    assert.equal(record.result.text, 'Kimi CLI 计划输出');
+  });
+});
+
+test('run endpoints expose persisted Kimi plan records', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  let runId;
+  await withServer({
+    trustedRoot,
+    enableKimiCliPlan: true,
+    kimiPlanRunner: async () => ({
+      ok: true,
+      provider: 'kimi-cli',
+      command: 'kimi',
+      mode: 'cowork',
+      text: '可复跑的计划记录',
+      durationMs: 18,
+    }),
+  }, async (baseUrl) => {
+    const planResponse = await fetch(`${baseUrl}/api/kimi/plan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        prompt: '生成可追踪计划',
+        summary: '运行记录摘要',
+        mode: 'cowork',
+      }),
+    });
+    assert.equal(planResponse.status, 200);
+    runId = (await planResponse.json()).runId;
+
+    const listResponse = await fetch(`${baseUrl}/api/runs`);
+    assert.equal(listResponse.status, 200);
+    const listBody = await listResponse.json();
+    assert.equal(listBody.runs.length, 1);
+    assert.equal(listBody.runs[0].id, runId);
+    assert.equal(listBody.runs[0].status, 'succeeded');
+    assert.equal(listBody.runs[0].prompt, '生成可追踪计划');
+
+    const detailResponse = await fetch(`${baseUrl}/api/runs/${encodeURIComponent(runId)}`);
+    assert.equal(detailResponse.status, 200);
+    const detail = await detailResponse.json();
+    assert.equal(detail.result.text, '可复跑的计划记录');
+    assert.equal(detail.input.summary, '运行记录摘要');
+  });
+});
+
+test('kimi plan failures persist run record and expose run id', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({
+    trustedRoot,
+    enableKimiCliPlan: true,
+    kimiPlanRunner: async () => {
+      throw new Error('simulated kimi failure');
+    },
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot,
+        prompt: '生成失败记录',
+        summary: '失败摘要',
+        mode: 'cowork',
+      }),
+    });
+    assert.equal(response.status, 502);
+    const body = await response.json();
+    assert.match(body.error, /simulated kimi failure/);
+    assert.match(body.runId, /^run_/);
+    assert.equal(fs.existsSync(body.runPath), true);
+
+    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    assert.equal(record.status, 'failed');
+    assert.equal(record.error.message, 'simulated kimi failure');
+    assert.equal(record.input.prompt, '生成失败记录');
   });
 });
 

@@ -6,10 +6,15 @@ import { getSessionPath } from './storage/app-home.js';
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3001);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || process.cwd());
+const enableKimiCliPlan = process.env.ENABLE_KIMI_CLI_PLAN === '1';
 
 const server = createServer({
   trustedRoot,
   kimiExecutable: process.env.KIMI_CLI || 'kimi',
+  enableKimiCliPlan,
+  kimiCliTimeoutMs: Number(process.env.KIMI_CLI_TIMEOUT_MS || 60_000),
+  kimiCliMaxSteps: Number(process.env.KIMI_CLI_MAX_STEPS || 10),
+  kimiModel: process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(
     path.join(getSessionPath('default'), 'events.jsonl'),
   ),

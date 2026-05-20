@@ -16,6 +16,7 @@
     "smoke:host": "node scripts/smoke-local-operations.mjs",
     "smoke:live-mvp": "node scripts/smoke-live-mvp.mjs",
     "smoke:mvp-runtime": "node scripts/smoke-mvp-runtime.mjs",
+    "smoke:kimi-cli": "node scripts/smoke-kimi-cli.mjs",
     "smoke:rendered-ui": "node scripts/smoke-rendered-ui.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:ui": "node scripts/smoke-ui-contract.mjs",

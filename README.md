@@ -6,6 +6,7 @@
 - 文本文件读取与上下文打包
 - 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
 - 可控命令运行（默认关闭）
+- Kimi CLI 计划运行记录（`.KimiCowork/runs/*.json`）
 - 最小 HTTP API
 
 当前产品基准是 `plan/kimi-cowork-latest-product-plan-v0.3.md`。
@@ -32,6 +33,7 @@ npm run verify:windows-readiness
 npm run audit:mvp
 npm run smoke:rendered-ui
 npm run smoke:windows-resources
+npm run smoke:kimi-cli
 npm run smoke:mvp-runtime
 npm run smoke:ui
 npm run smoke:host
@@ -42,6 +44,7 @@ npm run smoke:host
 `npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `KimiCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
+`npm run smoke:kimi-cli` 会启动一个临时 Host API，真实调用本机 Kimi CLI 的 `--print --final-message-only` 模式，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖本机已登录 Kimi CLI 和可用网络，不放进默认 `verify:mvp` 的运行项。
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。
 `npm run smoke:host` 会启动本地 host API，验证前端入口、默认工作区 API、文件树、文件读取、上下文打包、write / rename / move preview、审批 apply、目标已存在阻止和 JSONL 审计。
 `npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke、MVP runtime smoke、UI contract smoke 和 rendered browser smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
@@ -51,6 +54,21 @@ npm run smoke:host
 `npm run status:mvp` 会读取 `build/mvp-runtime.json` 并检查 PID 与 `/health`；`npm run stop:mvp` 会根据 runtime 文件停止由 `start:mvp` 启动的服务。
 
 启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Kimi Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.KimiCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
+
+Kimi CLI 计划生成功能默认关闭，避免普通 MVP 验证依赖真实账号/网络。要让前端“发送”时优先调用本机 Kimi CLI：
+
+```powershell
+$env:ENABLE_KIMI_CLI_PLAN = "1"
+$env:KIMI_CLI = "C:\Users\Administrator\.local\bin\kimi.exe"
+npm run start:mvp
+```
+
+后端接口是 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并使用 `--print --final-message-only` 生成文本计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`，前端会显示最近一次运行记录。审批执行仍走本地 `file-ops/apply`。
+
+运行记录查询接口：
+
+- `GET /api/runs`：列出最近的 Kimi 计划运行。
+- `GET /api/runs/<runId>`：读取单次运行详情，包含输入摘要、状态、耗时、结果或错误。
 
 ```powershell
 $env:PORT = "3011"
