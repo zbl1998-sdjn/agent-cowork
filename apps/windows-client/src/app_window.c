@@ -66,6 +66,7 @@ typedef struct KcwAppState {
 } KcwAppState;
 
 static KcwAppState g_app;
+static wchar_t g_initial_workspace[MAX_PATH];
 
 static const wchar_t *KCW_TEMPLATES[KCW_TEMPLATE_COUNT] = {
     L"文件夹整理",
@@ -112,6 +113,90 @@ static int kcw_max_int(int a, int b) {
 
 static void kcw_set_status(const wchar_t *status) {
     wcsncpy_s(g_app.status_line, sizeof(g_app.status_line) / sizeof(g_app.status_line[0]), status, _TRUNCATE);
+}
+
+static const wchar_t *kcw_skip_spaces_local(const wchar_t *value) {
+    while (value && (*value == L' ' || *value == L'\t')) {
+        value++;
+    }
+    return value;
+}
+
+static void kcw_trim_trailing_spaces_local(wchar_t *value) {
+    size_t len = wcslen(value);
+    while (len > 0 && (value[len - 1] == L' ' || value[len - 1] == L'\t')) {
+        value[len - 1] = L'\0';
+        len--;
+    }
+}
+
+static bool kcw_parse_workspace_from_text(const wchar_t *text, wchar_t *workspace, size_t workspace_len) {
+    if (!text || text[0] == L'\0') {
+        return false;
+    }
+
+    const wchar_t equals_flag[] = L"--workspace=";
+    const wchar_t space_flag[] = L"--workspace";
+    const wchar_t *value = wcsstr(text, equals_flag);
+    if (value) {
+        value += wcslen(equals_flag);
+    } else {
+        value = wcsstr(text, space_flag);
+        if (!value) {
+            return false;
+        }
+        value += wcslen(space_flag);
+        value = kcw_skip_spaces_local(value);
+    }
+
+    if (!value || value[0] == L'\0') {
+        return false;
+    }
+
+    if (value[0] == L'"') {
+        value++;
+        const wchar_t *end = wcschr(value, L'"');
+        if (end) {
+            size_t len = (size_t)(end - value);
+            if (len >= workspace_len) {
+                len = workspace_len - 1;
+            }
+            wcsncpy_s(workspace, workspace_len, value, len);
+            workspace[len] = L'\0';
+            return workspace[0] != L'\0';
+        }
+    }
+
+    wcsncpy_s(workspace, workspace_len, value, _TRUNCATE);
+    kcw_trim_trailing_spaces_local(workspace);
+    return workspace[0] != L'\0';
+}
+
+static void kcw_detect_initial_workspace(void) {
+    if (g_initial_workspace[0] != L'\0') {
+        return;
+    }
+
+    wchar_t env_workspace[MAX_PATH] = L"";
+    if (GetEnvironmentVariableW(L"KIMI_COWORK_WORKSPACE", env_workspace, (DWORD)(sizeof(env_workspace) / sizeof(env_workspace[0]))) > 0) {
+        wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), env_workspace, _TRUNCATE);
+        return;
+    }
+
+    wchar_t parsed_workspace[MAX_PATH] = L"";
+    if (kcw_parse_workspace_from_text(GetCommandLineW(), parsed_workspace, sizeof(parsed_workspace) / sizeof(parsed_workspace[0]))) {
+        wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), parsed_workspace, _TRUNCATE);
+        return;
+    }
+
+    wchar_t current_dir[MAX_PATH] = L"";
+    if (GetCurrentDirectoryW((DWORD)(sizeof(current_dir) / sizeof(current_dir[0])), current_dir) > 0) {
+        wchar_t marker[MAX_PATH] = L"";
+        swprintf_s(marker, sizeof(marker) / sizeof(marker[0]), L"%s\\kimi-cowork.workspace", current_dir);
+        if (GetFileAttributesW(marker) != INVALID_FILE_ATTRIBUTES) {
+            wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), current_dir, _TRUNCATE);
+        }
+    }
 }
 
 static HFONT kcw_create_named_font(int size, int weight, const wchar_t *family) {
@@ -364,6 +449,18 @@ static void kcw_scan_trusted_root(void) {
     kcw_set_status(status);
 }
 
+static void kcw_show_workspace_ready(void) {
+    kcw_scan_trusted_root();
+
+    wchar_t message[2048];
+    swprintf_s(
+        message,
+        sizeof(message) / sizeof(message[0]),
+        L"工作区：%s\r\n\r\nOffice Mode 已准备好。\r\n\r\n1. 选择文件或文件夹作为上下文\r\n2. 选择任务模板\r\n3. 生成计划并在审批中心确认\r\n4. 输出 Markdown / CSV / XLSX 草稿，默认不覆盖原文件",
+        g_app.trusted_root);
+    SetWindowTextW(g_app.artifact_edit, message);
+}
+
 static void kcw_select_workspace(HWND window) {
     BROWSEINFOW browse = {0};
     browse.hwndOwner = window;
@@ -376,14 +473,7 @@ static void kcw_select_workspace(HWND window) {
     }
 
     if (SHGetPathFromIDListW(list, g_app.trusted_root)) {
-        kcw_scan_trusted_root();
-        wchar_t message[2048];
-        swprintf_s(
-            message,
-            sizeof(message) / sizeof(message[0]),
-            L"工作区：%s\r\n\r\nOffice Mode 已准备好。\r\n\r\n1. 选择文件或文件夹作为上下文\r\n2. 选择任务模板\r\n3. 生成计划并在审批中心确认\r\n4. 输出 Markdown / CSV / XLSX 草稿，默认不覆盖原文件",
-            g_app.trusted_root);
-        SetWindowTextW(g_app.artifact_edit, message);
+        kcw_show_workspace_ready();
     }
 
     CoTaskMemFree(list);
@@ -521,19 +611,20 @@ static void kcw_layout_controls(HWND window) {
     int content_w = kcw_max_int(560, width - content_x - 8);
     int card_x = content_x + 24;
     int card_w = content_w - 48;
+    bool compact = height < 780;
     int prompt_w = kcw_min_int(960, card_w - 96);
     int prompt_x = content_x + (content_w - prompt_w) / 2;
-    int brand_y = kcw_max_int(118, height / 4);
-    int prompt_y = brand_y + 130;
-    int prompt_h = 148;
-    int template_y = prompt_y + prompt_h + 22;
-    int bottom_y = template_y + 86;
+    int brand_y = compact ? 92 : kcw_max_int(118, height / 4);
+    int prompt_y = brand_y + (compact ? 96 : 130);
+    int prompt_h = compact ? 132 : 148;
+    int template_y = prompt_y + prompt_h + (compact ? 16 : 22);
+    int bottom_y = template_y + (compact ? 76 : 86);
     int panel_h = kcw_max_int(172, height - bottom_y - 42);
     int left_panel_w = kcw_min_int(392, kcw_max_int(320, (card_w - 18) / 3));
 
-    MoveWindow(g_app.new_chat_button, 14, 118, sidebar - 28, 46, TRUE);
-    MoveWindow(g_app.browse_button, 14, height - 214, sidebar - 28, 42, TRUE);
-    MoveWindow(g_app.developer_button, 14, height - 108, sidebar - 28, 42, TRUE);
+    MoveWindow(g_app.new_chat_button, 14, compact ? 112 : 118, sidebar - 28, compact ? 42 : 46, TRUE);
+    MoveWindow(g_app.developer_button, 14, compact ? height - 120 : height - 108, sidebar - 28, 42, TRUE);
+    MoveWindow(g_app.browse_button, 14, compact ? height - 70 : height - 214, sidebar - 28, 42, TRUE);
 
     MoveWindow(g_app.prompt_edit, prompt_x + 26, prompt_y + 26, prompt_w - 52, 58, TRUE);
     MoveWindow(g_app.run_button, prompt_x + prompt_w - 300, prompt_y + prompt_h - 54, 132, 36, TRUE);
@@ -559,6 +650,7 @@ static void kcw_layout_controls(HWND window) {
 }
 
 static void kcw_draw_sidebar(HDC dc, RECT client, int sidebar) {
+    bool compact = client.bottom < 780;
     RECT sidebar_rect = {0, 0, sidebar, client.bottom};
     FillRect(dc, &sidebar_rect, g_app.brush_bg);
 
@@ -583,7 +675,7 @@ static void kcw_draw_sidebar(HDC dc, RECT client, int sidebar) {
     kcw_draw_text(dc, g_app.font_small, L"Cowork", tab_cowork, KCW_COLOR_TEXT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     kcw_draw_text(dc, g_app.font_small, L"Code", tab_code, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    int y = 190;
+    int y = compact ? 176 : 190;
     for (int i = 0; i < KCW_NAV_COUNT; i++) {
         RECT icon = {22, y + 6, 42, y + 28};
         RECT row = {54, y, sidebar - 22, y + 34};
@@ -602,7 +694,11 @@ static void kcw_draw_sidebar(HDC dc, RECT client, int sidebar) {
             kcw_draw_text(dc, g_app.font_small, KCW_NAV_ICONS[i], icon, color, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         }
         kcw_draw_text(dc, font, KCW_NAV_ITEMS[i], row, color, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        y += i == 4 ? 42 : 40;
+        y += i == 4 ? (compact ? 32 : 42) : (compact ? 34 : 40);
+    }
+
+    if (compact) {
+        return;
     }
 
     RECT recent_title = {22, client.bottom - 318, sidebar - 22, client.bottom - 294};
@@ -632,13 +728,14 @@ static void kcw_draw_main(HDC dc, RECT client, int sidebar) {
 
     int card_x = content_x + 24;
     int card_w = content_w - 48;
+    bool compact = client.bottom < 780;
     int prompt_w = kcw_min_int(960, card_w - 96);
     int prompt_x = content_x + (content_w - prompt_w) / 2;
-    int brand_y = kcw_max_int(118, client.bottom / 4);
-    int prompt_y = brand_y + 130;
-    int prompt_h = 148;
-    int template_y = prompt_y + prompt_h + 22;
-    int bottom_y = template_y + 86;
+    int brand_y = compact ? 92 : kcw_max_int(118, client.bottom / 4);
+    int prompt_y = brand_y + (compact ? 96 : 130);
+    int prompt_h = compact ? 132 : 148;
+    int template_y = prompt_y + prompt_h + (compact ? 16 : 22);
+    int bottom_y = template_y + (compact ? 76 : 86);
     int panel_h = kcw_max_int(172, client.bottom - bottom_y - 42);
     int left_panel_w = kcw_min_int(392, kcw_max_int(320, (card_w - 18) / 3));
     int file_panel_x = card_x;
@@ -755,11 +852,20 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
         kcw_native_bridge_init(window);
         kcw_create_controls(window);
         kcw_layout_controls(window);
+        kcw_detect_initial_workspace();
+        if (g_initial_workspace[0] != L'\0') {
+            wcsncpy_s(g_app.trusted_root, sizeof(g_app.trusted_root) / sizeof(g_app.trusted_root[0]), g_initial_workspace, _TRUNCATE);
+            kcw_show_workspace_ready();
+        }
         return 0;
 
     case WM_SIZE:
         kcw_layout_controls(window);
         InvalidateRect(window, NULL, TRUE);
+        return 0;
+
+    case WM_PAINT:
+        kcw_paint(window);
         return 0;
 
     case WM_ERASEBKGND:
@@ -841,6 +947,15 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
 }
 
 int kcw_run_app(HINSTANCE instance, int show_command) {
+    return kcw_run_app_with_workspace(instance, show_command, NULL);
+}
+
+int kcw_run_app_with_workspace(HINSTANCE instance, int show_command, const wchar_t *initial_workspace) {
+    g_initial_workspace[0] = L'\0';
+    if (initial_workspace && initial_workspace[0] != L'\0') {
+        wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), initial_workspace, _TRUNCATE);
+    }
+
     HRESULT com_result = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
     WNDCLASSW window_class = {0};
@@ -864,8 +979,8 @@ int kcw_run_app(HINSTANCE instance, int show_command) {
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        1280,
-        860,
+        1160,
+        680,
         NULL,
         NULL,
         instance,

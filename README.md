@@ -53,3 +53,16 @@ cmake --build build/windows-client-vs --config Debug
 ```
 
 本机已验证该路径可生成 `build/windows-client-vs/KimiCowork.exe`。
+
+### Windows 客户端操作烟测
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
+```
+
+该脚本会创建一个本地测试工作区，构建并启动 `KimiCowork.exe --workspace <path>`，然后验证：
+
+- 自动加载信任工作区并扫描本地文件。
+- 生成计划按钮会更新产物区。
+- 审批执行按钮会追加审批记录。
+- Developer Mode 按钮会打开模型/能力边界面板。
