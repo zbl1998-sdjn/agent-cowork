@@ -47,21 +47,62 @@ function openBrowser(url) {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(scriptDir);
+const buildDir = path.join(repoRoot, 'build');
 const workspace = path.resolve(process.env.TRUSTED_ROOT || path.join(repoRoot, 'build', 'mvp-workspace'));
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
+const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
+const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'host-events.jsonl');
 
 ensureDemoWorkspace(workspace);
+fs.mkdirSync(path.dirname(runtimeFile), { recursive: true });
 
 const server = createServer({
   trustedRoot: workspace,
-  journalWriter: new JsonlWriter(path.join(workspace, '.KimiCowork', 'audit', 'host-events.jsonl')),
+  journalWriter: new JsonlWriter(auditPath),
 });
 
+function writeRuntimeFile() {
+  const runtime = {
+    ok: true,
+    pid: process.pid,
+    host,
+    port,
+    url,
+    workspace,
+    auditPath,
+    startedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(runtimeFile, `${JSON.stringify(runtime, null, 2)}\n`, 'utf8');
+}
+
+function removeRuntimeFile() {
+  try {
+    if (!fs.existsSync(runtimeFile)) {
+      return;
+    }
+    const current = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
+    if (current.pid === process.pid) {
+      fs.rmSync(runtimeFile, { force: true });
+    }
+  } catch {
+    // Runtime status is best-effort; do not mask shutdown.
+  }
+}
+
+function shutdown() {
+  server.close(() => {
+    removeRuntimeFile();
+    process.exit(0);
+  });
+}
+
 server.listen(port, host, () => {
+  writeRuntimeFile();
   console.log(`Kimi Cowork MVP running at ${url}`);
   console.log(`Trusted workspace: ${workspace}`);
+  console.log(`Runtime file: ${runtimeFile}`);
   console.log('Press Ctrl+C to stop.');
   openBrowser(url);
 });
@@ -75,8 +116,6 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-process.once('SIGINT', () => {
-  server.close(() => {
-    process.exit(0);
-  });
-});
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
+process.once('exit', removeRuntimeFile);

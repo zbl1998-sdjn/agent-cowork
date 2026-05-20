@@ -76,6 +76,21 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'start-mvp.mjs')],
   },
   {
+    name: 'status-mvp script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'status-mvp.mjs')],
+  },
+  {
+    name: 'stop-mvp script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'stop-mvp.mjs')],
+  },
+  {
+    name: 'mvp runtime smoke script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
+  },
+  {
     name: 'ui contract smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-ui-contract.mjs')],
@@ -99,6 +114,11 @@ const checks = [
     name: 'host local operation smoke',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'smoke-local-operations.mjs')],
+  },
+  {
+    name: 'mvp runtime lifecycle smoke',
+    command: nodeBin,
+    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
   },
   {
     name: 'ui to host api contract smoke',
