@@ -92,6 +92,7 @@ async function main() {
   const runtimeFile = path.join(buildDir, 'mvp-runtime.json');
   const verificationFile = path.join(buildDir, 'mvp-verification-report.json');
   const renderedFile = path.join(buildDir, 'rendered-ui-smoke-report.json');
+  const liveMvpSmokeFile = path.join(buildDir, 'live-mvp-smoke-report.json');
   const runtimeSmokeFile = path.join(buildDir, 'mvp-runtime-smoke-report.json');
   const windowsResourceSmokeFile = path.join(buildDir, 'windows-client-resource-smoke-report.json');
   const readinessFile = path.join(buildDir, 'windows-client-readiness.json');
@@ -105,6 +106,7 @@ async function main() {
 
   const verification = readJson(verificationFile);
   const rendered = readJson(renderedFile);
+  const liveMvpSmoke = readJson(liveMvpSmokeFile);
   const runtimeSmoke = readJson(runtimeSmokeFile);
   const windowsResourceSmoke = readJson(windowsResourceSmokeFile);
   const readiness = readJson(readinessFile);
@@ -122,6 +124,18 @@ async function main() {
   const desktopLayout = rendered.value?.desktopLayout;
   const compactLayout = rendered.value?.compactLayout;
   const interaction = rendered.value?.interaction;
+  const liveMvpScreenshotPath = liveMvpSmoke.ok
+    ? liveMvpSmoke.value.screenshotPath
+    : path.join(buildDir, 'live-mvp-smoke-1536x900.png');
+  const liveMvpScreenshot = fileEvidence(liveMvpScreenshotPath);
+  const liveMvpScreenshotSize = readPngSize(liveMvpScreenshotPath);
+  const liveMvpDesktopLayout = liveMvpSmoke.value?.desktopLayout;
+  const liveMvpInteraction = liveMvpSmoke.value?.interaction;
+  const liveMvpArtifactEvidence =
+    liveMvpSmoke.ok && Array.isArray(liveMvpSmoke.value.artifacts)
+      ? liveMvpSmoke.value.artifacts.map((artifactPath) => fileEvidence(artifactPath))
+      : [];
+  const liveMvpAuditEvidence = liveMvpSmoke.ok ? fileEvidence(liveMvpSmoke.value.auditPath) : null;
   const windowsResourceScreenshotPath = windowsResourceSmoke.ok
     ? windowsResourceSmoke.value.screenshotPath
     : path.join(buildDir, 'windows-client-resource-smoke-1536x900.png');
@@ -194,6 +208,41 @@ async function main() {
       artifacts: artifactEvidence,
       audit: auditEvidence,
     }),
+    requirement(
+      'live-running-operation-test',
+      'Currently running MVP service can be operated through the browser and writes into its runtime workspace',
+      liveMvpSmoke.value?.ok === true &&
+        liveMvpScreenshot.exists &&
+        liveMvpScreenshotSize?.width === 1536 &&
+        liveMvpScreenshotSize?.height === 900 &&
+        liveMvpSmoke.value?.runtime?.pid === runtime.value?.pid &&
+        liveMvpSmoke.value?.runtime?.url === runtime.value?.url &&
+        liveMvpDesktopLayout?.title === 'Kimi Cowork' &&
+        liveMvpDesktopLayout?.workspace === runtime.value?.workspace &&
+        liveMvpInteraction?.afterPlan?.status === 'Plan Ready' &&
+        liveMvpInteraction?.afterPlan?.opCount >= 1 &&
+        liveMvpInteraction?.afterApprove?.status === 'Applied Locally' &&
+        liveMvpInteraction?.afterApprove?.doneClass === true &&
+        liveMvpArtifactEvidence.length > 0 &&
+        liveMvpArtifactEvidence.every((artifact) => artifact.exists && artifact.bytes > 0) &&
+        liveMvpAuditEvidence?.exists === true &&
+        liveMvpSmoke.value?.auditSizeAfter > liveMvpSmoke.value?.auditSizeBefore
+        ? 'passed'
+        : 'failed',
+      {
+        reportPath: liveMvpSmokeFile,
+        generatedAt: liveMvpSmoke.value?.generatedAt,
+        runtime: liveMvpSmoke.value?.runtime,
+        screenshot: liveMvpScreenshot,
+        screenshotSize: liveMvpScreenshotSize,
+        desktopLayout: liveMvpDesktopLayout,
+        interaction: liveMvpInteraction,
+        artifacts: liveMvpArtifactEvidence,
+        audit: liveMvpAuditEvidence,
+        auditSizeBefore: liveMvpSmoke.value?.auditSizeBefore,
+        auditSizeAfter: liveMvpSmoke.value?.auditSizeAfter,
+      },
+    ),
     requirement('runtime-lifecycle-test', 'MVP lifecycle smoke proves start, status, stop, and runtime cleanup', runtimeSmoke.value?.ok === true ? 'passed' : 'failed', {
       reportPath: runtimeSmokeFile,
       generatedAt: runtimeSmoke.value?.generatedAt,
@@ -256,6 +305,7 @@ async function main() {
     'default-verifier',
     'visual-fidelity',
     'local-operation-test',
+    'live-running-operation-test',
     'runtime-lifecycle-test',
     'native-windows-resource-smoke',
   ];

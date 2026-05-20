@@ -13,6 +13,7 @@
     "verify:mvp": "node scripts/verify-mvp.mjs",
     "verify:windows-readiness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-client-readiness.ps1",
     "smoke:host": "node scripts/smoke-local-operations.mjs",
+    "smoke:live-mvp": "node scripts/smoke-live-mvp.mjs",
     "smoke:mvp-runtime": "node scripts/smoke-mvp-runtime.mjs",
     "smoke:rendered-ui": "node scripts/smoke-rendered-ui.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
