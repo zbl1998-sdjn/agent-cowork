@@ -287,6 +287,8 @@ async function main() {
       executableExists: readiness.value?.executableExists,
       readyToRunNativeSmoke: readiness.value?.readyToRunNativeSmoke,
       blockedByAsr: readiness.value?.blockedByAsr,
+      exactExclusionRequired: readiness.value?.exactExclusionRequired,
+      diagnosis: readiness.value?.diagnosis,
       defender: readiness.value?.defender,
       latestMatchingAsrEvent: readiness.value?.latestMatchingAsrEvent
         ? {
@@ -295,6 +297,11 @@ async function main() {
             providerName: readiness.value.latestMatchingAsrEvent.providerName,
           }
         : null,
+      explicitApprovalText: readiness.value?.explicitApprovalText,
+      proposedUnblockCommand: readiness.value?.proposedUnblockCommand,
+      rerunCommand: readiness.value?.rerunCommand,
+      fullVerificationCommand: readiness.value?.fullVerificationCommand,
+      strictAuditCommand: readiness.value?.strictAuditCommand,
       requiredUserAction: readiness.value?.requiredUserAction,
       nativeCheck: nativeCheck || null,
     }),

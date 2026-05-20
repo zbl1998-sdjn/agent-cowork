@@ -102,7 +102,22 @@ cmake --build build/windows-client-vs --config Debug
 
 本机已验证该路径可生成 `build/windows-client-vs/KimiCowork.exe`。
 如果当前机器的 Microsoft Defender ASR 规则 `01443614-CD74-433A-B99E-2ECDC07BFC25` 拦截本地新构建 exe，GUI 烟测会在启动阶段报“拒绝访问”。这属于系统策略阻止执行，不是 CMake 构建失败或应用崩溃；需要用户在 Defender 中显式放行该精确 exe 路径后才能完成窗口级自动化 smoke。
-`scripts\smoke-windows-client.ps1` 会在启动被拦截时读取最近的 Defender ASR 事件，并输出被拦截路径、规则 ID 和重跑命令，便于精确放行后复测。
+`scripts\smoke-windows-client.ps1` 会在启动被拦截时读取最近的 Defender ASR 事件，并输出被拦截路径、规则 ID 和重跑命令，便于精确放行后复测。`npm run verify:windows-readiness` 是只读诊断入口；它会同时列出目录级 exclusion、是否缺少精确 exe exclusion、建议授权文字和放行后复测命令。
+
+当前完整目标的最后一步需要原生窗口级 smoke。只有在你明确接受这个安全权衡后，才应添加精确路径排除项：
+
+```powershell
+Add-MpPreference -ExclusionPath "C:\Users\Administrator\Desktop\kimi cowork\build\windows-client-vs\KimiCowork.exe"
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
+node .\scripts\verify-mvp.mjs --windows-client
+npm run audit:mvp -- --strict
+```
+
+推荐的明确授权文字是：
+
+```text
+同意为 C:\Users\Administrator\Desktop\kimi cowork\build\windows-client-vs\KimiCowork.exe 添加 Microsoft Defender 精确路径排除项
+```
 
 ### Windows 客户端操作烟测
 

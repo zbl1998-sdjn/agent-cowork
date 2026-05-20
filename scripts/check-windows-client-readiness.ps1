@@ -21,6 +21,7 @@ $exeExists = Test-Path -LiteralPath $exe
 $exclusions = @()
 $hasExactExclusion = $false
 $matchingExclusions = @()
+$ancestorExclusions = @()
 $mpPreferenceError = $null
 
 try {
@@ -30,6 +31,11 @@ try {
     $matchingExclusions = @(
         $exclusions | Where-Object {
             $_ -eq $exe -or $exe.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase)
+        }
+    )
+    $ancestorExclusions = @(
+        $matchingExclusions | Where-Object {
+            $_ -ne $exe
         }
     )
 }
@@ -56,6 +62,8 @@ catch {
 
 $blockedByAsr = (-not $hasExactExclusion) -and ($null -ne $latestAsrEvent)
 $readyToRunNativeSmoke = $exeExists -and $hasExactExclusion
+$exactExclusionRequired = $exeExists -and (-not $hasExactExclusion)
+$unblockCommand = "Add-MpPreference -ExclusionPath `"$exe`""
 
 $requiredUserAction = $null
 if (-not $exeExists) {
@@ -63,6 +71,22 @@ if (-not $exeExists) {
 }
 elseif (-not $hasExactExclusion) {
     $requiredUserAction = "If you accept the security tradeoff, explicitly approve adding a Microsoft Defender exclusion for this exact file path: $exe"
+}
+
+$diagnosis = if (-not $exeExists) {
+    "The native Windows client executable has not been built yet."
+}
+elseif ($hasExactExclusion) {
+    "The exact executable path is already listed in Microsoft Defender exclusions; native window smoke can be retried."
+}
+elseif ($ancestorExclusions.Count -gt 0 -and $blockedByAsr) {
+    "A broader exclusion exists, but the latest Defender ASR event still names this executable. Treat the native window smoke as blocked until this exact executable path is explicitly approved and then retested."
+}
+elseif ($blockedByAsr) {
+    "The latest Defender ASR event names this executable and no exact path exclusion is present."
+}
+else {
+    "No exact executable exclusion is present. Add one only after explicit approval, then rerun the native window smoke."
 }
 
 $report = [ordered]@{
@@ -75,6 +99,7 @@ $report = [ordered]@{
         asrRuleId = $asrRuleId
         hasExactExclusion = $hasExactExclusion
         matchingExclusions = $matchingExclusions
+        ancestorExclusions = $ancestorExclusions
         exclusionPathCount = $exclusions.Count
         preferenceError = $mpPreferenceError
     }
@@ -91,8 +116,13 @@ $report = [ordered]@{
     }
     blockedByAsr = $blockedByAsr
     readyToRunNativeSmoke = $readyToRunNativeSmoke
+    exactExclusionRequired = $exactExclusionRequired
+    diagnosis = $diagnosis
+    explicitApprovalText = "同意为 $exe 添加 Microsoft Defender 精确路径排除项"
+    proposedUnblockCommand = $unblockCommand
     rerunCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1"
     fullVerificationCommand = "node .\scripts\verify-mvp.mjs --windows-client"
+    strictAuditCommand = "npm run audit:mvp -- --strict"
     requiredUserAction = $requiredUserAction
 }
 
