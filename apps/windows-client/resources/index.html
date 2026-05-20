@@ -9,112 +9,112 @@
   </head>
   <body data-view="chat">
     <div class="window">
-      <header class="titlebar" aria-label="Kimi Cowork window controls">
+      <header class="titlebar" aria-label="Kimi Cowork 窗口控制">
         <div class="titlebar-left">
-          <button class="chrome-button" aria-label="Menu">
+          <button class="chrome-button" aria-label="菜单">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
-          <button class="chrome-button" aria-label="Sidebar">
+          <button class="chrome-button" aria-label="侧边栏">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM10 5v14" /></svg>
           </button>
-          <button class="chrome-button" aria-label="Search">
+          <button class="chrome-button" aria-label="搜索">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 20-4.8-4.8M10.8 17a6.2 6.2 0 1 1 0-12.4 6.2 6.2 0 0 1 0 12.4Z" /></svg>
           </button>
-          <button class="chrome-button is-muted" aria-label="Back">
+          <button class="chrome-button is-muted" aria-label="后退">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 9 12l6 6" /></svg>
           </button>
-          <button class="chrome-button is-disabled" aria-label="Forward">
+          <button class="chrome-button is-disabled" aria-label="前进">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </button>
         </div>
         <div class="titlebar-right">
-          <button class="ghost-mark" aria-label="Kimi Cowork status">
+          <button class="ghost-mark" aria-label="Kimi Cowork 状态">
             <span></span>
           </button>
-          <button class="window-dot" aria-label="Minimize"></button>
-          <button class="window-dot is-square" aria-label="Maximize"></button>
-          <button class="window-dot is-close" aria-label="Close"></button>
+          <button class="window-dot" aria-label="最小化"></button>
+          <button class="window-dot is-square" aria-label="最大化"></button>
+          <button class="window-dot is-close" aria-label="关闭"></button>
         </div>
       </header>
 
       <main class="app-shell">
-        <aside class="sidebar" aria-label="Kimi navigation">
-          <div class="mode-switch" role="tablist" aria-label="Workspace modes">
+        <aside class="sidebar" aria-label="Kimi 导航">
+          <div class="mode-switch" role="tablist" aria-label="工作模式">
             <button class="mode-tab is-active" type="button" role="tab" aria-selected="true" data-mode="chat">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A3.5 3.5 0 0 1 8.5 3h7A3.5 3.5 0 0 1 19 6.5v5A3.5 3.5 0 0 1 15.5 15H12l-4 4v-4A3.5 3.5 0 0 1 5 11.5Z" /></svg>
-              Chat
+              对话
             </button>
             <button class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="cowork">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12M6 13h7M6 18h12M18 13l2 2-2 2" /></svg>
-              Cowork
+              协作
             </button>
             <button class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="code">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18-6-6 6-6M15 6l6 6-6 6" /></svg>
-              Code
+              代码
             </button>
           </div>
 
           <button class="new-session" type="button" data-action="new-chat">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-            <span>New chat</span>
+            <span>新建会话</span>
           </button>
 
-          <nav class="nav-section" aria-label="Primary">
+          <nav class="nav-section" aria-label="主要入口">
             <button class="nav-item" type="button" data-section="projects">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7l2 2h7v9H4zM4 7V5h6l2 2" /></svg>
-              Projects
+              项目
             </button>
             <button class="nav-item" type="button" data-section="artifacts">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM10 8h4M10 12h4M10 16h3" /></svg>
-              Artifacts
+              产物
             </button>
             <button class="nav-item" type="button" data-section="customize">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3" /></svg>
-              Customize
+              自定义
             </button>
           </nav>
 
-          <div class="recent" aria-label="Recent chats">
-            <div class="section-title">Recents</div>
+          <div class="recent" aria-label="最近会话">
+            <div class="section-title">最近</div>
             <button type="button" data-recent="Kimi Code 安全模式开启">Kimi Code 安全模式开启</button>
             <button type="button" data-recent="Kimi Cowork 使用指南">Kimi Cowork 使用指南</button>
             <button type="button" data-recent="查看Kimi额度消耗用量">查看Kimi额度消耗用量</button>
             <button type="button" data-recent="物业管理KPI目标制定">物业管理KPI目标制定</button>
-            <button type="button" data-recent="Chinese language capability">Chinese language capability</button>
-            <button type="button" data-recent="Help me understand a complex topic">Help me understand a complex topic</button>
+            <button type="button" data-recent="中文语言能力">中文语言能力</button>
+            <button type="button" data-recent="帮我理解一个复杂主题">帮我理解一个复杂主题</button>
           </div>
 
           <div class="account">
             <div class="avatar">D</div>
             <div>
               <strong>Derrick</strong>
-              <span>Pro</span>
+              <span>专业版</span>
             </div>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
           </div>
         </aside>
 
-        <section class="workspace" aria-label="Kimi Cowork workspace">
+        <section class="workspace" aria-label="Kimi Cowork 工作区">
           <section class="hero">
             <div class="greeting">
               <span class="kimi-burst" aria-hidden="true"></span>
-              <h1>Back at it, Derrick</h1>
+              <h1>欢迎回来，Derrick</h1>
             </div>
 
-            <div class="composer" aria-label="Task composer">
-              <textarea placeholder="How can Kimi help you today?"></textarea>
+            <div class="composer" aria-label="任务输入框">
+              <textarea placeholder="今天想让 Kimi 做什么？"></textarea>
               <div class="composer-footer">
                 <div class="composer-actions">
-                  <button class="round-button" type="button" title="Add files" data-action="local-folder">
+                  <button class="round-button" type="button" title="添加文件" data-action="local-folder">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                   </button>
                 </div>
                 <div class="model-actions">
-                  <button class="model-button" type="button">K2.6 Extended <span>⌄</span></button>
-                  <button class="mic-button" type="button" aria-label="Voice input">
+                  <button class="model-button" type="button">K2.6 扩展 <span>⌄</span></button>
+                  <button class="mic-button" type="button" aria-label="语音输入">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3ZM5 11v1a7 7 0 0 0 14 0v-1M12 19v3M8 22h8" /></svg>
                   </button>
-                  <button class="send-button" type="button" aria-label="Send">
+                  <button class="send-button" type="button" aria-label="发送">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
                   </button>
                 </div>
@@ -122,26 +122,26 @@
               <div class="ai-badge">AI</div>
             </div>
 
-            <div class="quick-actions" aria-label="Quick actions">
+            <div class="quick-actions" aria-label="快捷操作">
               <button type="button" data-quick="code">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18-6-6 6-6M15 6l6 6-6 6" /></svg>
-                Code
+                代码
               </button>
               <button type="button" data-quick="learn">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7 12 3l8 4-8 4-8-4ZM6 10v5c2 2 10 2 12 0v-5" /></svg>
-                Learn
+                学习
               </button>
               <button type="button" data-quick="write">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h5l11-11-5-5L4 15zM14 5l5 5" /></svg>
-                Write
+                写作
               </button>
               <button type="button" data-quick="choice">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M5 5l3 3M16 16l3 3M3 12h4M17 12h4M5 19l3-3M16 8l3-3" /></svg>
-                Kimi's choice
+                Kimi 推荐
               </button>
               <button type="button" data-quick="local-folder">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7l2 2h7v9H4z" /></svg>
-                From local folder
+                本地文件夹
               </button>
             </div>
           </section>
@@ -161,7 +161,7 @@
               </div>
               <div class="status-pill">
                 <span class="status-dot"></span>
-                <span class="status-text">Local Agent Ready</span>
+                <span class="status-text">本地 Agent 就绪</span>
               </div>
             </div>
 
@@ -220,19 +220,19 @@
 
           <section class="library-panel view-panel" data-views="projects" hidden>
             <div class="library-header">
-              <h2>Projects</h2>
+              <h2>项目</h2>
               <button type="button" data-action="new-project">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                New project
+                新建项目
               </button>
             </div>
             <div class="library-list">
-              <button type="button" data-project="Kimi Cowork Desktop">
-                <strong>Kimi Cowork Desktop</strong>
-                <span>Windows C client / local agent / Kimi-only MVP</span>
+              <button type="button" data-project="Kimi Cowork 桌面端">
+                <strong>Kimi Cowork 桌面端</strong>
+                <span>Windows C 客户端 / 本地 Agent / Kimi-only MVP</span>
               </button>
-              <button type="button" data-project="Local Agent Playbook">
-                <strong>Local Agent Playbook</strong>
+              <button type="button" data-project="本地 Agent 运行手册">
+                <strong>本地 Agent 运行手册</strong>
                 <span>可信目录、审批、审计、回滚</span>
               </button>
             </div>
@@ -240,7 +240,7 @@
 
           <section class="library-panel view-panel" data-views="artifacts" hidden>
             <div class="library-header">
-              <h2>Artifacts</h2>
+              <h2>产物</h2>
             </div>
             <div class="artifact-list">
               <button type="button" data-artifact=".KimiCowork/artifacts">
@@ -256,7 +256,7 @@
 
           <section class="library-panel view-panel" data-views="customize" hidden>
             <div class="library-header">
-              <h2>Customize</h2>
+              <h2>自定义</h2>
             </div>
             <div class="settings-list">
               <label><input type="checkbox" checked /> 审批前总是预览 diff</label>

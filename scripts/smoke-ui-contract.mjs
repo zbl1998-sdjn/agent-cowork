@@ -51,11 +51,11 @@ async function main() {
   try {
     const index = await getText(baseUrl, '/');
     assert(index.contentType.includes('text/html'), 'index did not return HTML');
-    assert(index.body.includes('class="mode-switch"'), 'index missing Chat/Cowork/Code mode switch');
+    assert(index.body.includes('class="mode-switch"'), 'index missing 对话/协作/代码 mode switch');
     assert(index.body.includes('class="composer"'), 'index missing composer UI');
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
     assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
-    for (const copy of ['Chat', 'Cowork', 'Code', 'New chat', 'Projects', 'Artifacts', 'Customize', 'Recents']) {
+    for (const copy of ['对话', '协作', '代码', '新建会话', '项目', '产物', '自定义', '最近']) {
       assert(index.body.includes(copy), `index missing Image #1 functional copy: ${copy}`);
     }
     assert(!index.body.includes('Claude'), 'index must remain Kimi-only and not include Claude branding');
@@ -93,7 +93,7 @@ async function main() {
       {
         type: 'write',
         path: artifactPath,
-        content: `# UI Smoke Plan\n\nSource summary: ${read.content}\n`,
+        content: `# UI Smoke 计划\n\n来源摘要: ${read.content}\n`,
       },
     ];
     const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
@@ -101,7 +101,7 @@ async function main() {
 
     const applied = await requestJson(baseUrl, '/api/file-ops/apply', { trustedRoot: workspace, operations });
     assert(applied.applied.length === 1 && applied.applied[0].status === 'applied', 'UI apply flow did not apply write operation');
-    assert(fs.readFileSync(artifactPath, 'utf8').includes('UI Smoke Plan'), 'UI apply flow did not write artifact');
+    assert(fs.readFileSync(artifactPath, 'utf8').includes('UI Smoke 计划'), 'UI apply flow did not write artifact');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'UI apply flow did not write audit event');
 
     console.log(

@@ -25,12 +25,12 @@ const workbenchTitle = document.querySelector(".workbench-title");
 const workbenchCopy = document.querySelector(".workbench-copy");
 
 const placeholders = {
-  chat: "How can Kimi help you today?",
+  chat: "今天想让 Kimi 做什么？",
   cowork: "选择本地文件夹，描述要让 Kimi Cowork 在本机完成的操作",
-  code: "Describe the code task Kimi should inspect locally",
-  projects: "Search or open a project",
-  artifacts: "Find an artifact or audit log",
-  customize: "Tell Kimi how this workspace should behave",
+  code: "描述要让 Kimi 在本地检查的代码任务",
+  projects: "搜索或打开一个项目",
+  artifacts: "查找产物或审计日志",
+  customize: "告诉 Kimi 这个工作区应该如何运行",
 };
 
 function setStatus(text) {
@@ -174,17 +174,17 @@ async function generatePlan() {
   const prompt = composer.value.trim() || "整理这个本地文件夹，生成可审批的安全操作计划";
 
   if (state.view !== "cowork" && state.view !== "code") {
-    showChatResponse(`我会按 “${prompt.slice(0, 56)}” 继续。需要读取或修改本地文件时，切到 Cowork 或 Code。`);
+    showChatResponse(`我会按 “${prompt.slice(0, 56)}” 继续。需要读取或修改本地文件时，切到协作或代码模式。`);
     return;
   }
 
   if (!state.hostApi) {
-    setStatus("Preview Mode");
+    setStatus("预览模式");
     setArtifact(`已根据 “${prompt.slice(0, 42)}” 生成本地操作预览，等待审批。`);
     return;
   }
 
-  setStatus("Reading Workspace");
+  setStatus("正在读取工作区");
   const candidate = textCandidate(state.files);
   const summary = await readCandidateSummary(candidate);
   const now = new Date();
@@ -195,13 +195,13 @@ async function generatePlan() {
       type: "write",
       path: outputPath,
       content: [
-        "# Kimi Cowork UI Plan",
+        "# Kimi Cowork 界面计划",
         "",
-        `- Mode: ${state.view}`,
-        `- Prompt: ${prompt}`,
-        `- Workspace: ${state.workspace}`,
-        `- Source summary: ${summary}`,
-        `- Generated at: ${now.toISOString()}`,
+        `- 模式: ${state.view}`,
+        `- 指令: ${prompt}`,
+        `- 工作区: ${state.workspace}`,
+        `- 来源摘要: ${summary}`,
+        `- 生成时间: ${now.toISOString()}`,
         "",
       ].join("\n"),
     },
@@ -216,7 +216,7 @@ async function generatePlan() {
   approveButton.classList.remove("is-done");
   renderOperations(preview.operations);
   setArtifact(`已读取本地内容：${summary}`, outputPath.replace(state.workspace, "."));
-  setStatus("Plan Ready");
+  setStatus("计划就绪");
 }
 
 async function approvePlan() {
@@ -229,7 +229,7 @@ async function approvePlan() {
     approveButton.textContent = "已审批";
     approveButton.classList.add("is-done");
     setArtifact("预览模式下已完成界面状态切换；通过 localhost 启动可执行真实本地写入。");
-    setStatus("Preview Applied");
+    setStatus("预览已应用");
     return;
   }
 
@@ -240,7 +240,7 @@ async function approvePlan() {
     await generatePlan();
   }
 
-  setStatus("Applying Locally");
+  setStatus("正在本机执行");
   const applied = await postJson("/api/file-ops/apply", {
     trustedRoot: state.workspace,
     operations: state.operations,
@@ -249,12 +249,12 @@ async function approvePlan() {
   approveButton.textContent = "已审批";
   approveButton.classList.add("is-done");
   setArtifact(`已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`);
-  setStatus("Applied Locally");
+  setStatus("已在本机执行");
 }
 
 async function loadHostWorkspace() {
   if (!state.hostApi) {
-    setStatus("Static Preview");
+    setStatus("静态预览");
     return;
   }
 
@@ -267,9 +267,9 @@ async function loadHostWorkspace() {
     state.files = tree.files;
     summarizeFiles(tree.files);
     renderFiles(tree.files);
-    setStatus("Local Agent Ready");
+    setStatus("本地 Agent 就绪");
   } catch (error) {
-    setStatus("Host API Offline");
+    setStatus("Host API 离线");
     setArtifact(`无法连接本地 Host API：${error.message}`);
   }
 }
@@ -342,14 +342,14 @@ document.querySelectorAll("[data-artifact]").forEach((item) => {
 
 sendButton.addEventListener("click", () => {
   generatePlan().catch((error) => {
-    setStatus("Plan Failed");
+    setStatus("计划失败");
     setArtifact(error.message);
   });
 });
 
 approveButton.addEventListener("click", () => {
   approvePlan().catch((error) => {
-    setStatus("Apply Blocked");
+    setStatus("执行受阻");
     setArtifact(error.message);
   });
 });

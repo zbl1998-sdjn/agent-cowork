@@ -229,7 +229,7 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("Back at it, Derrick")) resolve(true);
+          if (document.readyState === "complete" && document.body.innerText.includes("欢迎回来，Derrick")) resolve(true);
           else if (Date.now() > deadline) reject(new Error("live MVP page did not render"));
           else setTimeout(tick, 50);
         }
@@ -244,7 +244,7 @@ async function main() {
         function tick() {
           const status = document.querySelector(".status-pill")?.innerText.trim();
           const workspace = document.querySelector(".workspace-card > strong")?.innerText.trim();
-          if (status === "Local Agent Ready" && workspace === expectedWorkspace) resolve(true);
+          if (status === "本地 Agent 就绪" && workspace === expectedWorkspace) resolve(true);
           else if (Date.now() > deadline) reject(new Error("live MVP workspace did not synchronize with runtime"));
           else setTimeout(tick, 50);
         }
@@ -268,11 +268,11 @@ async function main() {
           status: document.querySelector(".status-pill")?.innerText.trim(),
           workspace: document.querySelector(".workspace-card > strong")?.innerText.trim(),
           activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
-          hasGreeting: text.includes("Back at it, Derrick"),
+          hasGreeting: text.includes("欢迎回来，Derrick"),
           hasCowork: text.includes("Kimi Cowork"),
-          hasModeTabs: text.includes("Chat") && text.includes("Cowork") && text.includes("Code"),
-          hasSidebarActions: text.includes("New chat") && text.includes("Projects") && text.includes("Artifacts") && text.includes("Customize"),
-          hasQuickActions: text.includes("Learn") && text.includes("Write") && text.includes("Kimi's choice") && text.includes("From local folder"),
+          hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
+          hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
+          hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("本地文件夹"),
           scroll
         };
       })()`,
@@ -280,7 +280,7 @@ async function main() {
     assert(desktopLayout.title === 'Kimi Cowork', 'live MVP title mismatch');
     assert(desktopLayout.location.startsWith(runtime.url), 'live MVP did not load runtime URL');
     assert(desktopLayout.workspace === runtime.workspace, 'live MVP workspace does not match runtime workspace');
-    assert(desktopLayout.activeMode === 'Chat', 'live MVP should default to Chat mode');
+    assert(desktopLayout.activeMode === '对话', 'live MVP should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'live MVP missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing Kimi quick actions');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
@@ -314,7 +314,7 @@ async function main() {
           tick();
         });
 
-        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("Plan Ready"), 5000)
+        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), 5000)
           .then(() => {
             const afterPlan = {
               status: document.querySelector(".status-pill")?.innerText.trim(),
@@ -322,7 +322,7 @@ async function main() {
               opCount: document.querySelectorAll(".diff-row").length
             };
             approve.click();
-            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("Applied Locally"), 5000)
+            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
               .then(() => ({
                 afterPlan,
                 afterApprove: {
@@ -336,16 +336,16 @@ async function main() {
           .then(resolve, reject);
       })`,
     );
-    assert(interaction.afterPlan.status === 'Plan Ready', 'live MVP send did not reach Plan Ready');
+    assert(interaction.afterPlan.status === '计划就绪', 'live MVP send did not reach 计划就绪');
     assert(interaction.afterPlan.opCount >= 1, 'live MVP did not render any operation preview');
-    assert(interaction.afterApprove.status === 'Applied Locally', 'live MVP approve did not reach Applied Locally');
+    assert(interaction.afterApprove.status === '已在本机执行', 'live MVP approve did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'live MVP approve button did not enter done state');
 
     const artifactAfter = listArtifacts(runtime.workspace);
     const newArtifacts = artifactAfter.filter((artifactPath) => !artifactBefore.has(artifactPath));
     assert(newArtifacts.length > 0, 'live MVP did not write a new artifact');
     const artifactContent = fs.readFileSync(newArtifacts[0], 'utf8');
-    assert(artifactContent.includes('Source summary'), 'live MVP artifact missing source summary');
+    assert(artifactContent.includes('来源摘要'), 'live MVP artifact missing source summary');
     assert(fs.existsSync(auditPath), 'live MVP audit log missing');
     const auditSizeAfter = fs.statSync(auditPath).size;
     assert(auditSizeAfter > auditSizeBefore, 'live MVP audit log did not grow after approval');

@@ -92,7 +92,7 @@ function hasReferenceFunctionalShell(layout) {
   }
 
   const newShell =
-    layout.activeMode === 'Chat' &&
+    layout.activeMode === '对话' &&
     layout.hasGreeting === true &&
     layout.hasCowork === true &&
     layout.hasModeTabs === true &&
@@ -182,9 +182,9 @@ async function main() {
 
   const operationPassed =
     rendered.value?.ok === true &&
-    interaction?.afterPlan?.status === 'Plan Ready' &&
+    interaction?.afterPlan?.status === '计划就绪' &&
     interaction?.afterPlan?.opCount >= 1 &&
-    interaction?.afterApprove?.status === 'Applied Locally' &&
+    interaction?.afterApprove?.status === '已在本机执行' &&
     interaction?.afterApprove?.doneClass === true &&
     artifactEvidence.length > 0 &&
     artifactEvidence.every((artifact) => artifact.exists && artifact.bytes > 0) &&
@@ -213,7 +213,7 @@ async function main() {
       summary: verification.value?.summary,
       notes: verification.value?.notes,
     }),
-    requirement('visual-fidelity', 'Rendered UI matches the reference Chat/Cowork/Code shell and fits 1536x900 plus 1366x768 without overflow', visualPassed ? 'passed' : 'failed', {
+    requirement('visual-fidelity', 'Rendered UI matches the reference 对话/协作/代码 shell and fits 1536x900 plus 1366x768 without overflow', visualPassed ? 'passed' : 'failed', {
       reportPath: renderedFile,
       generatedAt: rendered.value?.generatedAt,
       screenshot,
@@ -238,9 +238,9 @@ async function main() {
         liveMvpSmoke.value?.runtime?.url === runtime.value?.url &&
         liveMvpDesktopLayout?.title === 'Kimi Cowork' &&
         liveMvpDesktopLayout?.workspace === runtime.value?.workspace &&
-        liveMvpInteraction?.afterPlan?.status === 'Plan Ready' &&
+        liveMvpInteraction?.afterPlan?.status === '计划就绪' &&
         liveMvpInteraction?.afterPlan?.opCount >= 1 &&
-        liveMvpInteraction?.afterApprove?.status === 'Applied Locally' &&
+        liveMvpInteraction?.afterApprove?.status === '已在本机执行' &&
         liveMvpInteraction?.afterApprove?.doneClass === true &&
         liveMvpArtifactEvidence.length > 0 &&
         liveMvpArtifactEvidence.every((artifact) => artifact.exists && artifact.bytes > 0) &&
@@ -280,8 +280,8 @@ async function main() {
         windowsResourceDesktopLayout?.hostApi === false &&
         hasReferenceFunctionalShell(windowsResourceDesktopLayout) &&
         windowsResourceCompactLayout?.issues?.length === 0 &&
-        windowsResourceInteraction?.afterPlan?.status === 'Preview Mode' &&
-        windowsResourceInteraction?.afterApprove?.status === 'Preview Applied' &&
+        windowsResourceInteraction?.afterPlan?.status === '预览模式' &&
+        windowsResourceInteraction?.afterApprove?.status === '预览已应用' &&
         windowsResourceInteraction?.afterApprove?.doneClass === true
         ? 'passed'
         : 'failed',

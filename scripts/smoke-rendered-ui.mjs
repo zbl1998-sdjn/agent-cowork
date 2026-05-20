@@ -229,7 +229,7 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("Back at it, Derrick")) resolve(true);
+          if (document.readyState === "complete" && document.body.innerText.includes("欢迎回来，Derrick")) resolve(true);
           else if (Date.now() > deadline) reject(new Error("page did not render"));
           else setTimeout(tick, 50);
         }
@@ -242,7 +242,7 @@ async function main() {
         const deadline = Date.now() + 5000;
         function tick() {
           const status = document.querySelector(".status-pill")?.innerText.trim();
-          if (status === "Local Agent Ready") resolve(true);
+          if (status === "本地 Agent 就绪") resolve(true);
           else if (Date.now() > deadline) reject(new Error("workspace did not become ready"));
           else setTimeout(tick, 50);
         }
@@ -264,18 +264,18 @@ async function main() {
           title: document.title,
           status: document.querySelector(".status-pill")?.innerText.trim(),
           activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
-          hasGreeting: text.includes("Back at it, Derrick"),
+          hasGreeting: text.includes("欢迎回来，Derrick"),
           hasCowork: text.includes("Kimi Cowork"),
-          hasModeTabs: text.includes("Chat") && text.includes("Cowork") && text.includes("Code"),
-          hasSidebarActions: text.includes("New chat") && text.includes("Projects") && text.includes("Artifacts") && text.includes("Customize"),
-          hasQuickActions: text.includes("Code") && text.includes("Learn") && text.includes("Write") && text.includes("Kimi's choice") && text.includes("From local folder"),
+          hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
+          hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
+          hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("本地文件夹"),
           hasFrameworkOverlay: /vite|webpack|next\\\\.js|runtime error/i.test(text),
           scroll
         };
       })()`,
     );
     assert(desktopLayout.title === 'Kimi Cowork', 'rendered page title mismatch');
-    assert(desktopLayout.activeMode === 'Chat', 'rendered page should default to Chat mode');
+    assert(desktopLayout.activeMode === '对话', 'rendered page should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Kimi cowork quick actions');
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');
@@ -352,7 +352,7 @@ async function main() {
           tick();
         });
 
-        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("Plan Ready"), 5000)
+        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), 5000)
           .then(() => {
             const afterPlan = {
               status: document.querySelector(".status-pill")?.innerText.trim(),
@@ -360,7 +360,7 @@ async function main() {
               opCount: document.querySelectorAll(".diff-row").length
             };
             approve.click();
-            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("Applied Locally"), 5000)
+            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
               .then(() => ({
                 afterPlan,
                 afterApprove: {
@@ -374,9 +374,9 @@ async function main() {
           .then(resolve, reject);
       })`,
     );
-    assert(interaction.afterPlan.status === 'Plan Ready', 'send interaction did not reach Plan Ready');
+    assert(interaction.afterPlan.status === '计划就绪', 'send interaction did not reach 计划就绪');
     assert(interaction.afterPlan.artifact.includes('renewal date'), 'plan did not include trusted file summary');
-    assert(interaction.afterApprove.status === 'Applied Locally', 'approve interaction did not reach Applied Locally');
+    assert(interaction.afterApprove.status === '已在本机执行', 'approve interaction did not reach 已在本机执行');
     assert(interaction.afterApprove.doneClass === true, 'approve button did not enter done state');
 
     const artifactsDir = path.join(workspace, '.KimiCowork', 'artifacts');
@@ -385,7 +385,7 @@ async function main() {
       : [];
     assert(artifacts.length > 0, 'browser interaction did not write an artifact');
     const artifactContent = fs.readFileSync(path.join(artifactsDir, artifacts[0]), 'utf8');
-    assert(artifactContent.includes('Source summary'), 'artifact missing source summary');
+    assert(artifactContent.includes('来源摘要'), 'artifact missing source summary');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'audit log missing browser write action');
 
     const report = {

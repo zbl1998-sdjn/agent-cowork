@@ -197,7 +197,7 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("Back at it, Derrick")) resolve(true);
+          if (document.readyState === "complete" && document.body.innerText.includes("欢迎回来，Derrick")) resolve(true);
           else if (Date.now() > deadline) reject(new Error("windows resource page did not render"));
           else setTimeout(tick, 50);
         }
@@ -222,11 +222,11 @@ async function main() {
           hostApi: state.hostApi,
           status: document.querySelector(".status-pill")?.innerText.trim(),
           activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
-          hasGreeting: text.includes("Back at it, Derrick"),
+          hasGreeting: text.includes("欢迎回来，Derrick"),
           hasCowork: text.includes("Kimi Cowork"),
-          hasModeTabs: text.includes("Chat") && text.includes("Cowork") && text.includes("Code"),
-          hasSidebarActions: text.includes("New chat") && text.includes("Projects") && text.includes("Artifacts") && text.includes("Customize"),
-          hasQuickActions: text.includes("Learn") && text.includes("Write") && text.includes("Kimi's choice") && text.includes("From local folder"),
+          hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
+          hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
+          hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("本地文件夹"),
           scroll
         };
       })()`,
@@ -234,8 +234,8 @@ async function main() {
     assert(desktopLayout.title === 'Kimi Cowork', 'Windows resource title mismatch');
     assert(desktopLayout.protocol === 'file:', 'Windows resource smoke must load via file:// static resource mode');
     assert(desktopLayout.hostApi === false, 'Windows resource static preview should not call Host API');
-    assert(desktopLayout.status === 'Static Preview', 'Windows resource did not enter static preview status');
-    assert(desktopLayout.activeMode === 'Chat', 'Windows resource should default to Chat mode');
+    assert(desktopLayout.status === '静态预览', 'Windows resource did not enter static preview status');
+    assert(desktopLayout.activeMode === '对话', 'Windows resource should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'Windows resource missing Image #1 functional shell');
     assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'Windows resource missing expected Kimi controls');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'Windows desktop resource layout has horizontal overflow');
@@ -317,9 +317,9 @@ async function main() {
         }, 100);
       })`,
     );
-    assert(interaction.afterPlan.status === 'Preview Mode', 'Windows resource send did not enter Preview Mode');
+    assert(interaction.afterPlan.status === '预览模式', 'Windows resource send did not enter 预览模式');
     assert(interaction.afterPlan.artifact.includes('Windows C 客户端资源操作'), 'Windows resource prompt was not reflected in preview');
-    assert(interaction.afterApprove.status === 'Preview Applied', 'Windows resource approve did not enter Preview Applied');
+    assert(interaction.afterApprove.status === '预览已应用', 'Windows resource approve did not enter 预览已应用');
     assert(interaction.afterApprove.doneClass === true, 'Windows resource approve button did not enter done state');
 
     const report = {
