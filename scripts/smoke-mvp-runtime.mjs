@@ -69,8 +69,8 @@ function runNodeScript(script, env) {
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   const port = await getFreePort();
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-runtime-workspace-'));
-  const runtimeFile = path.join(os.tmpdir(), `kcw-runtime-${process.pid}-${Date.now()}.json`);
+  const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-runtime-workspace-'));
+  const runtimeFile = path.join(buildDir, `kcw-runtime-${process.pid}-${Date.now()}.json`);
   const env = {
     ...process.env,
     PORT: String(port),

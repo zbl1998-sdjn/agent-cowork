@@ -1,11 +1,11 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { buildContextBundle } from '../src/workspace/context-bundle.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kfcowork-bundle-'));
+const root = makeTestWorkspace('kfcowork-bundle');
 const normal = path.join(root, 'report.txt');
 const sensitive = path.join(root, '.env');
 

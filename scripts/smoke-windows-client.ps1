@@ -215,6 +215,7 @@ Latest Defender ASR evidence:
 $eventText
 
 To complete this smoke test, allow this exact executable path in Microsoft Defender / enterprise ASR policy, then rerun:
+Add-MpPreference -AttackSurfaceReductionOnlyExclusions "$ExePath"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
 "@
 }

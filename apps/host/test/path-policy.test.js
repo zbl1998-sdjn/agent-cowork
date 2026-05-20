@@ -1,11 +1,11 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { assertTrustedPath, isSensitivePath } from '../src/security/path-policy.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kfcowork-root-'));
+const root = makeTestWorkspace('kfcowork-root');
 const workspace = path.join(root, 'workspace');
 const outside = path.join(root, 'outside');
 fs.mkdirSync(workspace, { recursive: true });

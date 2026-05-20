@@ -159,7 +159,7 @@ async function main() {
   const browserPath = findBrowser();
   assert(browserPath, 'No Edge or Chrome executable was found for rendered UI smoke');
 
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-rendered-ui-'));
+  const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-rendered-ui-'));
   fs.mkdirSync(path.join(workspace, 'contracts'), { recursive: true });
   fs.mkdirSync(path.join(workspace, 'finance'), { recursive: true });
   fs.writeFileSync(

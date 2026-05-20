@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createServer } from '../src/server.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
 async function withServer(config, fn) {
   const server = createServer(config);
@@ -22,7 +22,7 @@ async function withServer(config, fn) {
 }
 
 test('health returns stable host metadata', async () => {
-  const trustedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-trusted-'));
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/health`);
     assert.equal(response.status, 200);
@@ -34,7 +34,7 @@ test('health returns stable host metadata', async () => {
 });
 
 test('workspace endpoint returns configured trusted root', async () => {
-  const trustedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-trusted-'));
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/workspace`);
     assert.equal(response.status, 200);
@@ -43,8 +43,8 @@ test('workspace endpoint returns configured trusted root', async () => {
 });
 
 test('serves the local preview shell and assets', async () => {
-  const trustedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-trusted-'));
-  const staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-static-'));
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const staticRoot = makeTestWorkspace('kcw-static');
   fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>Kimi Cowork</title>', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.css'), 'body { color: black; }', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.kimiCowork = {};', 'utf8');
@@ -62,8 +62,8 @@ test('serves the local preview shell and assets', async () => {
 });
 
 test('file tree rejects roots outside configured trusted root', async () => {
-  const trustedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-trusted-'));
-  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-outside-'));
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const outsideRoot = makeTestWorkspace('kcw-outside');
   fs.writeFileSync(path.join(outsideRoot, 'leak.txt'), 'secret');
 
   await withServer({ trustedRoot }, async (baseUrl) => {

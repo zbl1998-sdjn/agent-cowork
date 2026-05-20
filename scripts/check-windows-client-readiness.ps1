@@ -17,27 +17,78 @@ if (-not (Test-Path -LiteralPath $buildRoot)) {
     New-Item -ItemType Directory -Path $buildRoot | Out-Null
 }
 
+function Normalize-DefenderPath {
+    param([AllowNull()][string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+    return $Path.Trim().TrimEnd("\", "/")
+}
+
+function Test-ExactDefenderPath {
+    param(
+        [AllowNull()][string]$Candidate,
+        [Parameter(Mandatory = $true)][string]$Target
+    )
+    $candidatePath = Normalize-DefenderPath -Path $Candidate
+    $targetPath = Normalize-DefenderPath -Path $Target
+    return $candidatePath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-DefenderPathCovers {
+    param(
+        [AllowNull()][string]$Candidate,
+        [Parameter(Mandatory = $true)][string]$Target
+    )
+    $candidatePath = Normalize-DefenderPath -Path $Candidate
+    $targetPath = Normalize-DefenderPath -Path $Target
+    if ($candidatePath.Length -eq 0) {
+        return $false
+    }
+    return $targetPath.Equals($candidatePath, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $targetPath.StartsWith("$candidatePath\", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 $exeExists = Test-Path -LiteralPath $exe
-$exclusions = @()
-$hasExactExclusion = $false
-$matchingExclusions = @()
-$ancestorExclusions = @()
+$standardExclusions = @()
+$asrOnlyExclusions = @()
+$hasExactStandardExclusion = $false
+$hasExactAsrOnlyExclusion = $false
+$standardMatchingExclusions = @()
+$asrOnlyMatchingExclusions = @()
+$standardAncestorExclusions = @()
+$asrOnlyAncestorExclusions = @()
+$targetAsrAction = $null
 $mpPreferenceError = $null
 
 try {
     $mpPreference = Get-MpPreference
-    $exclusions = @($mpPreference.ExclusionPath)
-    $hasExactExclusion = $exclusions -contains $exe
-    $matchingExclusions = @(
-        $exclusions | Where-Object {
-            $_ -eq $exe -or $exe.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase)
-        }
+    $standardExclusions = @($mpPreference.ExclusionPath)
+    $asrOnlyExclusions = @($mpPreference.AttackSurfaceReductionOnlyExclusions)
+    $hasExactStandardExclusion = @($standardExclusions | Where-Object { Test-ExactDefenderPath -Candidate $_ -Target $exe }).Count -gt 0
+    $hasExactAsrOnlyExclusion = @($asrOnlyExclusions | Where-Object { Test-ExactDefenderPath -Candidate $_ -Target $exe }).Count -gt 0
+    $standardMatchingExclusions = @(
+        $standardExclusions | Where-Object { Test-DefenderPathCovers -Candidate $_ -Target $exe }
     )
-    $ancestorExclusions = @(
-        $matchingExclusions | Where-Object {
-            $_ -ne $exe
-        }
+    $asrOnlyMatchingExclusions = @(
+        $asrOnlyExclusions | Where-Object { Test-DefenderPathCovers -Candidate $_ -Target $exe }
     )
+    $standardAncestorExclusions = @(
+        $standardMatchingExclusions | Where-Object { -not (Test-ExactDefenderPath -Candidate $_ -Target $exe) }
+    )
+    $asrOnlyAncestorExclusions = @(
+        $asrOnlyMatchingExclusions | Where-Object { -not (Test-ExactDefenderPath -Candidate $_ -Target $exe) }
+    )
+    $asrRuleIds = @($mpPreference.AttackSurfaceReductionRules_Ids)
+    $asrRuleActions = @($mpPreference.AttackSurfaceReductionRules_Actions)
+    for ($i = 0; $i -lt $asrRuleIds.Count; $i++) {
+        if ($asrRuleIds[$i].Equals($asrRuleId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ($i -lt $asrRuleActions.Count) {
+                $targetAsrAction = $asrRuleActions[$i]
+            }
+            break
+        }
+    }
 }
 catch {
     $mpPreferenceError = $_.Exception.Message
@@ -60,33 +111,33 @@ catch {
     $latestAsrEvent = $null
 }
 
-$blockedByAsr = (-not $hasExactExclusion) -and ($null -ne $latestAsrEvent)
-$readyToRunNativeSmoke = $exeExists -and $hasExactExclusion
-$exactExclusionRequired = $exeExists -and (-not $hasExactExclusion)
-$unblockCommand = "Add-MpPreference -ExclusionPath `"$exe`""
+$blockedByAsr = (-not $hasExactAsrOnlyExclusion) -and ($null -ne $latestAsrEvent)
+$readyToRunNativeSmoke = $exeExists -and $hasExactAsrOnlyExclusion
+$exactExclusionRequired = $exeExists -and (-not $hasExactAsrOnlyExclusion)
+$unblockCommand = "Add-MpPreference -AttackSurfaceReductionOnlyExclusions `"$exe`""
 
 $requiredUserAction = $null
 if (-not $exeExists) {
     $requiredUserAction = "Build the Windows client first with scripts\smoke-windows-client.ps1 or the documented CMake commands."
 }
-elseif (-not $hasExactExclusion) {
-    $requiredUserAction = "If you accept the security tradeoff, explicitly approve adding a Microsoft Defender exclusion for this exact file path: $exe"
+elseif (-not $hasExactAsrOnlyExclusion) {
+    $requiredUserAction = "If you accept the security tradeoff, explicitly approve adding a Microsoft Defender ASR-only exclusion for this exact file path: $exe"
 }
 
 $diagnosis = if (-not $exeExists) {
     "The native Windows client executable has not been built yet."
 }
-elseif ($hasExactExclusion) {
-    "The exact executable path is already listed in Microsoft Defender exclusions; native window smoke can be retried."
+elseif ($hasExactAsrOnlyExclusion) {
+    "The exact executable path is already listed in Microsoft Defender ASR-only exclusions; native window smoke can be retried."
 }
-elseif ($ancestorExclusions.Count -gt 0 -and $blockedByAsr) {
-    "A broader exclusion exists, but the latest Defender ASR event still names this executable. Treat the native window smoke as blocked until this exact executable path is explicitly approved and then retested."
+elseif (($standardMatchingExclusions.Count -gt 0 -or $standardAncestorExclusions.Count -gt 0) -and $blockedByAsr) {
+    "A regular Defender ExclusionPath already covers this executable, but the latest ASR event still names it. Treat the native window smoke as blocked until this exact executable path is explicitly approved with AttackSurfaceReductionOnlyExclusions and then retested."
 }
 elseif ($blockedByAsr) {
-    "The latest Defender ASR event names this executable and no exact path exclusion is present."
+    "The latest Defender ASR event names this executable and no exact ASR-only exclusion is present."
 }
 else {
-    "No exact executable exclusion is present. Add one only after explicit approval, then rerun the native window smoke."
+    "No exact ASR-only executable exclusion is present. Add one only after explicit approval, then rerun the native window smoke."
 }
 
 $report = [ordered]@{
@@ -97,10 +148,15 @@ $report = [ordered]@{
     executableExists = $exeExists
     defender = [ordered]@{
         asrRuleId = $asrRuleId
-        hasExactExclusion = $hasExactExclusion
-        matchingExclusions = $matchingExclusions
-        ancestorExclusions = $ancestorExclusions
-        exclusionPathCount = $exclusions.Count
+        targetAsrAction = $targetAsrAction
+        hasExactAsrOnlyExclusion = $hasExactAsrOnlyExclusion
+        hasExactStandardExclusion = $hasExactStandardExclusion
+        standardMatchingExclusions = $standardMatchingExclusions
+        standardAncestorExclusions = $standardAncestorExclusions
+        asrOnlyMatchingExclusions = $asrOnlyMatchingExclusions
+        asrOnlyAncestorExclusions = $asrOnlyAncestorExclusions
+        standardExclusionPathCount = $standardExclusions.Count
+        asrOnlyExclusionPathCount = $asrOnlyExclusions.Count
         preferenceError = $mpPreferenceError
     }
     latestMatchingAsrEvent = if ($null -eq $latestAsrEvent) {
@@ -118,7 +174,7 @@ $report = [ordered]@{
     readyToRunNativeSmoke = $readyToRunNativeSmoke
     exactExclusionRequired = $exactExclusionRequired
     diagnosis = $diagnosis
-    explicitApprovalText = "同意为 $exe 添加 Microsoft Defender 精确路径排除项"
+    explicitApprovalText = "同意为 $exe 添加 Microsoft Defender ASR-only 精确路径排除项"
     proposedUnblockCommand = $unblockCommand
     rerunCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1"
     fullVerificationCommand = "node .\scripts\verify-mvp.mjs --windows-client"

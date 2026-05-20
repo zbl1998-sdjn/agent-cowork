@@ -1,11 +1,11 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { previewFileOperations, applyFileOperations } from '../src/workspace/file-operations.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kfcowork-ops-'));
+const root = makeTestWorkspace('kfcowork-ops');
 
 test('forbids delete operations', () => {
   assert.throws(() => previewFileOperations([{ type: 'delete', path: path.join(root, 'a.txt') }], { trustedRoot: root }), /forbidden/i);

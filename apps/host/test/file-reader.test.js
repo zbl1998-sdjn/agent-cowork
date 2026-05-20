@@ -1,12 +1,12 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readTextFile } from '../src/workspace/file-reader.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kfcowork-reader-'));
+const root = makeTestWorkspace('kfcowork-reader');
 
 test('reads text file with sha256 and size metadata', () => {
   const p = path.join(root, 'note.txt');

@@ -384,7 +384,8 @@ svg {
 
 .workspace {
   padding: 0 24px 24px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--surface);
 }
 
@@ -951,8 +952,8 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .hero,
   body[data-view="artifacts"] .hero,
   body[data-view="customize"] .hero {
-    min-height: 314px;
-    padding-bottom: 14px;
+    min-height: 248px;
+    padding-bottom: 10px;
   }
 
   .greeting {
@@ -964,7 +965,7 @@ body[data-view="customize"] .greeting {
   body[data-view="projects"] .greeting,
   body[data-view="artifacts"] .greeting,
   body[data-view="customize"] .greeting {
-    margin-bottom: 14px;
+    margin-bottom: 8px;
   }
 
   .greeting h1 {
@@ -981,6 +982,53 @@ body[data-view="customize"] .greeting {
     font-size: 19px;
   }
 
+  body[data-view="cowork"] .composer,
+  body[data-view="code"] .composer,
+  body[data-view="projects"] .composer,
+  body[data-view="artifacts"] .composer,
+  body[data-view="customize"] .composer {
+    min-height: 112px;
+    padding: 14px 18px 10px;
+    border-radius: 24px;
+  }
+
+  body[data-view="cowork"] .composer textarea,
+  body[data-view="code"] .composer textarea,
+  body[data-view="projects"] .composer textarea,
+  body[data-view="artifacts"] .composer textarea,
+  body[data-view="customize"] .composer textarea {
+    height: 38px;
+    font-size: 17px;
+  }
+
+  body[data-view="cowork"] .round-button,
+  body[data-view="cowork"] .send-button,
+  body[data-view="cowork"] .mic-button,
+  body[data-view="code"] .round-button,
+  body[data-view="code"] .send-button,
+  body[data-view="code"] .mic-button,
+  body[data-view="projects"] .round-button,
+  body[data-view="projects"] .send-button,
+  body[data-view="projects"] .mic-button,
+  body[data-view="artifacts"] .round-button,
+  body[data-view="artifacts"] .send-button,
+  body[data-view="artifacts"] .mic-button,
+  body[data-view="customize"] .round-button,
+  body[data-view="customize"] .send-button,
+  body[data-view="customize"] .mic-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  body[data-view="cowork"] .model-button,
+  body[data-view="code"] .model-button,
+  body[data-view="projects"] .model-button,
+  body[data-view="artifacts"] .model-button,
+  body[data-view="customize"] .model-button {
+    height: 36px;
+    font-size: 16px;
+  }
+
   .quick-actions {
     margin-top: 14px;
   }
@@ -990,13 +1038,56 @@ body[data-view="customize"] .greeting {
     font-size: 15px;
   }
 
+  body[data-view="cowork"] .quick-actions,
+  body[data-view="code"] .quick-actions,
+  body[data-view="projects"] .quick-actions,
+  body[data-view="artifacts"] .quick-actions,
+  body[data-view="customize"] .quick-actions {
+    display: none;
+  }
+
   .panel-header {
     margin-bottom: 8px;
+  }
+
+  body[data-view="cowork"] .panel-header,
+  body[data-view="code"] .panel-header {
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  body[data-view="cowork"] .status-pill,
+  body[data-view="code"] .status-pill {
+    height: 28px;
+    padding: 0 10px;
   }
 
   .task-card {
     min-height: 128px;
     padding: 13px;
+  }
+
+  body[data-view="cowork"] .task-card,
+  body[data-view="code"] .task-card {
+    min-height: 110px;
+    padding: 11px;
+  }
+
+  body[data-view="cowork"] .card-title,
+  body[data-view="code"] .card-title {
+    margin-bottom: 8px;
+  }
+
+  body[data-view="cowork"] .task-card p,
+  body[data-view="code"] .task-card p {
+    margin-top: 4px;
+    line-height: 1.32;
+  }
+
+  body[data-view="cowork"] .file-list,
+  body[data-view="code"] .file-list {
+    gap: 4px;
+    margin-top: 6px;
   }
 
   .file-list span {
@@ -1008,11 +1099,28 @@ body[data-view="customize"] .greeting {
     padding: 6px 0;
   }
 
+  body[data-view="cowork"] .diff-row,
+  body[data-view="code"] .diff-row {
+    padding: 4px 0;
+  }
+
   .artifact-preview {
     padding: 10px;
   }
 
+  body[data-view="cowork"] .artifact-preview,
+  body[data-view="code"] .artifact-preview {
+    padding: 8px;
+  }
+
   .approve-button {
     height: 34px;
+  }
+
+  body[data-view="cowork"] .approve-button,
+  body[data-view="code"] .approve-button {
+    height: 32px;
+    margin-top: 6px;
+    border-radius: 9px;
   }
 }

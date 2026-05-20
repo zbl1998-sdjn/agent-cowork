@@ -1,8 +1,11 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
+
+const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const buildDir = path.join(repoRoot, 'build');
 
 function assert(condition, message) {
   if (!condition) {
@@ -29,7 +32,8 @@ async function getText(baseUrl, route) {
 }
 
 async function main() {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-ui-smoke-'));
+  fs.mkdirSync(buildDir, { recursive: true });
+  const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-ui-smoke-'));
   fs.mkdirSync(path.join(workspace, 'contracts'), { recursive: true });
   const contractPath = path.join(workspace, 'contracts', 'sample-contract.txt');
   fs.writeFileSync(contractPath, 'Contract draft. Party A, Party B, renewal date, payment terms.', 'utf8');

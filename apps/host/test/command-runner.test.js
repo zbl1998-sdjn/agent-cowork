@@ -1,11 +1,10 @@
-import os from 'node:os';
-import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { runCommand } from '../src/workspace/command-runner.js';
+import { makeTestWorkspace } from './test-fixtures.js';
 
-const workspace = path.join(os.tmpdir(), 'kfcowork-commands');
+const workspace = makeTestWorkspace('kfcowork-commands');
 mkdirSync(workspace, { recursive: true });
 
 test('command runner is disabled unless allowCommands is true', async () => {
