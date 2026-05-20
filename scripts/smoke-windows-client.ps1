@@ -159,8 +159,78 @@ function Find-Child {
     return $null
 }
 
+function Get-LatestDefenderAsrEvent {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][datetime]$Since
+    )
+
+    try {
+        $events = Get-WinEvent -FilterHashtable @{
+            LogName = "Microsoft-Windows-Windows Defender/Operational"
+            Id = 1121
+        } -MaxEvents 12 -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+
+    $normalizedPath = $Path.ToLowerInvariant()
+    foreach ($event in $events) {
+        if ($event.Message.ToLowerInvariant().Contains($normalizedPath)) {
+            return $event
+        }
+    }
+    foreach ($event in $events) {
+        if ($event.TimeCreated -ge $Since.AddMinutes(-1) -and $event.Message.Contains("01443614-CD74-433A-B99E-2ECDC07BFC25")) {
+            return $event
+        }
+    }
+    foreach ($event in $events) {
+        if ($event.Message.Contains("01443614-CD74-433A-B99E-2ECDC07BFC25")) {
+            return $event
+        }
+    }
+    return $null
+}
+
+function New-AsrBlockedMessage {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExePath,
+        $Event
+    )
+
+    $eventText = "No matching Defender ASR event was found in the current log window."
+    if ($null -ne $Event) {
+        $eventText = $Event.Message
+    }
+
+    return @"
+KimiCowork.exe could not be launched. This machine currently appears to block locally built executables before the window can be tested.
+
+Executable:
+$ExePath
+
+Latest Defender ASR evidence:
+$eventText
+
+To complete this smoke test, allow this exact executable path in Microsoft Defender / enterprise ASR policy, then rerun:
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
+"@
+}
+
 $workspaceArg = "--workspace=`"$workspace`""
-$process = Start-Process -FilePath $exe -ArgumentList $workspaceArg -WorkingDirectory $buildDir -PassThru
+$launchAttemptAt = Get-Date
+$process = $null
+try {
+    $process = Start-Process -FilePath $exe -ArgumentList $workspaceArg -WorkingDirectory $buildDir -PassThru -ErrorAction Stop
+}
+catch {
+    Start-Sleep -Milliseconds 1500
+    $asrEvent = Get-LatestDefenderAsrEvent -Path $exe -Since $launchAttemptAt.AddMinutes(-1)
+    throw (New-AsrBlockedMessage -ExePath $exe -Event $asrEvent)
+}
+
 try {
     $window = Wait-ForMainWindow -Process $process
     Start-Sleep -Milliseconds 500
