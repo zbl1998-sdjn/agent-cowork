@@ -46,6 +46,24 @@ go test ./...
 - `services/orchestrator`
 - `services/kimi-gateway`
 
+Local Agent CLI 已经可直接提供本地文件能力：
+
+```powershell
+cd "C:\Users\Administrator\Desktop\kimi cowork\apps\local-agent"
+go run .\cmd\kimi-cowork-agent health
+go run .\cmd\kimi-cowork-agent list --root "C:\path\to\workspace"
+go run .\cmd\kimi-cowork-agent read --root "C:\path\to\workspace" --path "C:\path\to\workspace\notes.md"
+go run .\cmd\kimi-cowork-agent apply --root "C:\path\to\workspace" --ops "C:\path\to\ops.json" --journal "C:\path\to\workspace\.KimiCowork\audit\agent.jsonl" --batch demo
+```
+
+显式 CLI 操作 smoke：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-local-agent.ps1
+```
+
+当前机器的 Defender ASR 也会拦截 Go 生成的临时测试 exe，规则同样是 `01443614-CD74-433A-B99E-2ECDC07BFC25`。因此该 smoke 在未放行前会报 `Access is denied`；带标签测试源码已编译通过，默认 `go test ./...` 不依赖该显式 smoke。
+
 Windows C/WebView2 客户端骨架位于 `apps/windows-client`。MSVC 已安装在 Visual Studio Community 2026 下，但普通 PowerShell 默认不会加载 `cl.exe`。请先进入 VS Developer PowerShell 环境再构建：
 
 ```powershell
