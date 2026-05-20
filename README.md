@@ -16,17 +16,25 @@
 
 ```powershell
 cd "C:\Users\Administrator\Desktop\kimi cowork"
+npm run demo:mvp
+```
+
+`npm run demo:mvp` 是当前 Web/Host MVP 的一键演示验收入口：如果没有健康的 MVP 运行态，它会在后台启动 `start:mvp` 并打开页面；随后运行 live 操作测试、默认验证、Windows readiness 只读检查和总审计，最后写出 `build/mvp-demo-report.json`。
+
+手动拆分执行时，建议按这个顺序：
+
+```powershell
+npm run start:mvp
+npm run smoke:live-mvp
 npm test
 npm run verify:mvp
 npm run verify:windows-readiness
-npm run smoke:live-mvp
 npm run audit:mvp
 npm run smoke:rendered-ui
 npm run smoke:windows-resources
 npm run smoke:mvp-runtime
 npm run smoke:ui
 npm run smoke:host
-npm run start:mvp
 ```
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
