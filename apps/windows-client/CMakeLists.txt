@@ -12,5 +12,7 @@ add_executable(KimiCowork WIN32
 
 target_compile_features(KimiCowork PRIVATE c_std_17 cxx_std_17)
 target_compile_definitions(KimiCowork PRIVATE UNICODE _UNICODE)
+if(MSVC)
+  target_compile_options(KimiCowork PRIVATE /utf-8)
+endif()
 target_link_libraries(KimiCowork PRIVATE user32 shell32 ole32)
-
