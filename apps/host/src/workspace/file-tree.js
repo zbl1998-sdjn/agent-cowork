@@ -1,0 +1,77 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { assertTrustedPath, isSensitivePath } from '../security/path-policy.js';
+
+const DEFAULT_SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+]);
+
+function isSkippableName(name) {
+  if (name === '') return true;
+  if (name.startsWith('.')) return true;
+  return DEFAULT_SKIP_DIRS.has(name);
+}
+
+export function listWorkspaceTree(trustedRoot, options = {}) {
+  const root = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
+  const includeFiles = options.includeFiles !== false;
+  const includeDirs = options.includeDirectories !== false;
+  const results = [];
+
+  const stack = [{ absPath: root, depth: 0 }];
+
+  while (stack.length > 0) {
+    const { absPath, depth } = stack.pop();
+    const stat = fs.statSync(absPath);
+    if (!stat.isDirectory()) {
+      throw new Error(`Expected workspace root directory, got file: ${absPath}`);
+    }
+
+    if (depth > 0 && includeDirs) {
+      results.push({
+        path: path.relative(root, absPath) || '.',
+        fullPath: absPath,
+        kind: 'directory',
+      });
+    }
+
+    const entries = fs.readdirSync(absPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const name = entry.name;
+      const next = path.join(absPath, name);
+
+      if (isSkippableName(name) || isSensitivePath(next)) {
+        continue;
+      }
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        stack.push({ absPath: next, depth: depth + 1 });
+        continue;
+      }
+
+      if (!includeFiles || !entry.isFile()) {
+        continue;
+      }
+
+      try {
+        const fileStat = fs.statSync(next);
+        results.push({
+          path: path.relative(root, next).replace(/\\/g, '/'),
+          fullPath: next,
+          kind: 'file',
+          size: fileStat.size,
+          mtimeMs: fileStat.mtimeMs,
+        });
+      } catch {
+        // Skip unreadable files in tree listing to keep host resilient.
+      }
+    }
+  }
+
+  return results.sort((a, b) => a.path.localeCompare(b.path));
+}
