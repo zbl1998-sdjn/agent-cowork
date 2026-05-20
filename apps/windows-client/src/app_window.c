@@ -22,21 +22,27 @@ static const wchar_t *KCW_CLASS_NAME = L"KimiCoworkWindow";
 #define KCW_ID_ARTIFACT 2003
 #define KCW_ID_TEMPLATE_BASE 3000
 
-#define KCW_COLOR_BG RGB(248, 249, 250)
+#define KCW_COLOR_BG RGB(247, 248, 250)
 #define KCW_COLOR_SURFACE RGB(255, 255, 255)
-#define KCW_COLOR_SIDEBAR RGB(247, 248, 250)
-#define KCW_COLOR_PANEL RGB(250, 250, 251)
-#define KCW_COLOR_BORDER RGB(226, 229, 233)
-#define KCW_COLOR_TEXT RGB(24, 26, 29)
-#define KCW_COLOR_MUTED RGB(109, 113, 122)
-#define KCW_COLOR_SOFT RGB(241, 242, 244)
+#define KCW_COLOR_SIDEBAR RGB(248, 249, 251)
+#define KCW_COLOR_PANEL RGB(252, 252, 253)
+#define KCW_COLOR_BORDER RGB(226, 228, 232)
+#define KCW_COLOR_BORDER_DARK RGB(206, 210, 216)
+#define KCW_COLOR_TEXT RGB(20, 22, 26)
+#define KCW_COLOR_MUTED RGB(108, 112, 120)
+#define KCW_COLOR_FAINT RGB(147, 151, 158)
+#define KCW_COLOR_SOFT RGB(243, 244, 246)
+#define KCW_COLOR_SOFT_ACTIVE RGB(235, 237, 241)
 #define KCW_COLOR_ACCENT RGB(255, 76, 64)
+#define KCW_COLOR_ACCENT_SOFT RGB(255, 241, 239)
 #define KCW_COLOR_BLACK RGB(14, 15, 17)
 
 typedef struct KcwAppState {
     HFONT font_ui;
     HFONT font_ui_bold;
     HFONT font_small;
+    HFONT font_micro;
+    HFONT font_heading;
     HFONT font_brand;
     HFONT font_title;
     HBRUSH brush_bg;
@@ -84,6 +90,18 @@ static const wchar_t *KCW_NAV_ITEMS[KCW_NAV_COUNT] = {
     L"Kimi Cowork",
 };
 
+static const wchar_t *KCW_NAV_ICONS[KCW_NAV_COUNT] = {
+    L"▱",
+    L"□",
+    L"⌕",
+    L"▭",
+    L"▦",
+    L"⌘",
+    L">",
+    L"↔",
+    L"●",
+};
+
 static int kcw_min_int(int a, int b) {
     return a < b ? a : b;
 }
@@ -96,7 +114,7 @@ static void kcw_set_status(const wchar_t *status) {
     wcsncpy_s(g_app.status_line, sizeof(g_app.status_line) / sizeof(g_app.status_line[0]), status, _TRUNCATE);
 }
 
-static HFONT kcw_create_font(int size, int weight) {
+static HFONT kcw_create_named_font(int size, int weight, const wchar_t *family) {
     return CreateFontW(
         -size,
         0,
@@ -111,7 +129,20 @@ static HFONT kcw_create_font(int size, int weight) {
         CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE,
-        L"Segoe UI");
+        family);
+}
+
+static HFONT kcw_create_font(int size, int weight) {
+    return kcw_create_named_font(size, weight, L"Microsoft YaHei UI");
+}
+
+static void kcw_draw_line(HDC dc, int x1, int y1, int x2, int y2, COLORREF color) {
+    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    HGDIOBJ old_pen = SelectObject(dc, pen);
+    MoveToEx(dc, x1, y1, NULL);
+    LineTo(dc, x2, y2);
+    SelectObject(dc, old_pen);
+    DeleteObject(pen);
 }
 
 static void kcw_draw_round_rect(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius) {
@@ -126,12 +157,29 @@ static void kcw_draw_round_rect(HDC dc, RECT rect, COLORREF fill, COLORREF borde
     DeleteObject(brush);
 }
 
+static void kcw_draw_soft_shadow(HDC dc, RECT rect, int radius) {
+    RECT layer = rect;
+    OffsetRect(&layer, 0, 8);
+    InflateRect(&layer, 8, 8);
+    kcw_draw_round_rect(dc, layer, RGB(243, 244, 246), RGB(243, 244, 246), radius + 10);
+
+    layer = rect;
+    OffsetRect(&layer, 0, 4);
+    InflateRect(&layer, 4, 4);
+    kcw_draw_round_rect(dc, layer, RGB(237, 239, 243), RGB(237, 239, 243), radius + 6);
+}
+
 static void kcw_draw_text(HDC dc, HFONT font, const wchar_t *text, RECT rect, COLORREF color, UINT format) {
     HFONT old_font = (HFONT)SelectObject(dc, font);
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, color);
     DrawTextW(dc, text, -1, &rect, format);
     SelectObject(dc, old_font);
+}
+
+static void kcw_draw_badge(HDC dc, RECT rect, const wchar_t *text, COLORREF fill, COLORREF border, COLORREF color) {
+    kcw_draw_round_rect(dc, rect, fill, border, 12);
+    kcw_draw_text(dc, g_app.font_micro, text, rect, color, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 static HWND kcw_create_owner_button(HWND parent, int id, const wchar_t *text) {
@@ -168,24 +216,40 @@ static void kcw_draw_button(const DRAWITEMSTRUCT *item) {
     COLORREF fill = KCW_COLOR_SURFACE;
     COLORREF border = KCW_COLOR_BORDER;
     COLORREF text_color = KCW_COLOR_TEXT;
+    HFONT font = g_app.font_ui;
+    UINT text_format = DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS;
+    int radius = 16;
 
     if (id == KCW_ID_RUN) {
         fill = pressed ? RGB(48, 49, 52) : KCW_COLOR_BLACK;
         border = fill;
         text_color = RGB(255, 255, 255);
+        font = g_app.font_ui_bold;
     } else if (id == KCW_ID_APPROVE) {
         fill = pressed ? RGB(225, 56, 45) : KCW_COLOR_ACCENT;
         border = fill;
         text_color = RGB(255, 255, 255);
+        font = g_app.font_ui_bold;
     } else if (id == KCW_ID_BROWSE || id == KCW_ID_NEW_CHAT) {
-        fill = pressed ? KCW_COLOR_SOFT : KCW_COLOR_SURFACE;
+        fill = pressed ? KCW_COLOR_SOFT_ACTIVE : KCW_COLOR_SURFACE;
+        text_format = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS;
+        font = g_app.font_ui_bold;
     } else if (template_selected) {
         fill = KCW_COLOR_BLACK;
         border = KCW_COLOR_BLACK;
         text_color = RGB(255, 255, 255);
+        font = g_app.font_small;
+        radius = 18;
     } else if (id == KCW_ID_DEVELOPER) {
-        fill = RGB(242, 246, 255);
-        border = RGB(213, 224, 250);
+        fill = KCW_COLOR_ACCENT_SOFT;
+        border = RGB(255, 216, 211);
+        text_format = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS;
+        font = g_app.font_ui_bold;
+    } else if (kcw_is_template_id(id)) {
+        fill = KCW_COLOR_SURFACE;
+        border = RGB(221, 224, 229);
+        font = g_app.font_small;
+        radius = 18;
     }
 
     if (focused && id != KCW_ID_RUN && id != KCW_ID_APPROVE && !template_selected) {
@@ -194,8 +258,23 @@ static void kcw_draw_button(const DRAWITEMSTRUCT *item) {
 
     RECT rect = item->rcItem;
     InflateRect(&rect, -1, -1);
-    kcw_draw_round_rect(item->hDC, rect, fill, border, 18);
-    kcw_draw_text(item->hDC, g_app.font_ui, text, rect, text_color, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    kcw_draw_round_rect(item->hDC, rect, fill, border, radius);
+
+    RECT text_rect = rect;
+    if (text_format & DT_LEFT) {
+        text_rect.left += 18;
+        text_rect.right -= 18;
+        if (id == KCW_ID_NEW_CHAT) {
+            text_rect.right -= 76;
+        }
+    }
+    kcw_draw_text(item->hDC, font, text, text_rect, text_color, text_format);
+
+    if (id == KCW_ID_NEW_CHAT) {
+        RECT key = {rect.right - 76, rect.top + 8, rect.right - 16, rect.bottom - 8};
+        kcw_draw_round_rect(item->hDC, key, KCW_COLOR_SOFT, KCW_COLOR_SOFT, 8);
+        kcw_draw_text(item->hDC, g_app.font_micro, L"Ctrl  K", key, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
 }
 
 static bool kcw_has_document_extension(const wchar_t *name) {
@@ -372,8 +451,8 @@ static void kcw_approve_plan(HWND window) {
 }
 
 static void kcw_create_controls(HWND window) {
-    g_app.new_chat_button = kcw_create_owner_button(window, KCW_ID_NEW_CHAT, L"+ 新建会话");
-    g_app.browse_button = kcw_create_owner_button(window, KCW_ID_BROWSE, L"+ 选择工作区");
+    g_app.new_chat_button = kcw_create_owner_button(window, KCW_ID_NEW_CHAT, L"+  新建会话");
+    g_app.browse_button = kcw_create_owner_button(window, KCW_ID_BROWSE, L"+  选择本地文件夹");
     g_app.run_button = kcw_create_owner_button(window, KCW_ID_RUN, L"生成计划");
     g_app.approve_button = kcw_create_owner_button(window, KCW_ID_APPROVE, L"审批执行");
     g_app.developer_button = kcw_create_owner_button(window, KCW_ID_DEVELOPER, L"Developer Mode");
@@ -396,6 +475,7 @@ static void kcw_create_controls(HWND window) {
         GetModuleHandleW(NULL),
         NULL);
     SendMessageW(g_app.prompt_edit, WM_SETFONT, (WPARAM)g_app.font_ui, TRUE);
+    SendMessageW(g_app.prompt_edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(0, 0));
 
     g_app.file_list = CreateWindowExW(
         0,
@@ -411,6 +491,7 @@ static void kcw_create_controls(HWND window) {
         GetModuleHandleW(NULL),
         NULL);
     SendMessageW(g_app.file_list, WM_SETFONT, (WPARAM)g_app.font_small, TRUE);
+    SendMessageW(g_app.file_list, LB_SETITEMHEIGHT, 0, 24);
 
     g_app.artifact_edit = CreateWindowExW(
         0,
@@ -426,6 +507,7 @@ static void kcw_create_controls(HWND window) {
         GetModuleHandleW(NULL),
         NULL);
     SendMessageW(g_app.artifact_edit, WM_SETFONT, (WPARAM)g_app.font_small, TRUE);
+    SendMessageW(g_app.artifact_edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(0, 0));
 }
 
 static void kcw_layout_controls(HWND window) {
@@ -434,32 +516,33 @@ static void kcw_layout_controls(HWND window) {
     int width = client.right - client.left;
     int height = client.bottom - client.top;
 
-    int sidebar = kcw_min_int(300, kcw_max_int(260, width / 5));
+    int sidebar = kcw_min_int(304, kcw_max_int(272, width / 5));
     int content_x = sidebar + 8;
-    int content_w = kcw_max_int(520, width - content_x - 8);
+    int content_w = kcw_max_int(560, width - content_x - 8);
     int card_x = content_x + 24;
     int card_w = content_w - 48;
-    int prompt_w = kcw_min_int(930, card_w - 80);
+    int prompt_w = kcw_min_int(960, card_w - 96);
     int prompt_x = content_x + (content_w - prompt_w) / 2;
-    int brand_y = kcw_max_int(106, height / 4);
-    int prompt_y = brand_y + 126;
-    int prompt_h = 132;
-    int template_y = prompt_y + prompt_h + 18;
-    int bottom_y = template_y + 56;
-    int panel_h = kcw_max_int(155, height - bottom_y - 38);
-    int left_panel_w = kcw_min_int(390, (card_w - 16) / 3);
+    int brand_y = kcw_max_int(118, height / 4);
+    int prompt_y = brand_y + 130;
+    int prompt_h = 148;
+    int template_y = prompt_y + prompt_h + 22;
+    int bottom_y = template_y + 86;
+    int panel_h = kcw_max_int(172, height - bottom_y - 42);
+    int left_panel_w = kcw_min_int(392, kcw_max_int(320, (card_w - 18) / 3));
 
-    MoveWindow(g_app.new_chat_button, 14, 94, sidebar - 28, 42, TRUE);
-    MoveWindow(g_app.browse_button, 14, height - 202, sidebar - 28, 42, TRUE);
-    MoveWindow(g_app.developer_button, 14, height - 98, sidebar - 28, 42, TRUE);
+    MoveWindow(g_app.new_chat_button, 14, 118, sidebar - 28, 46, TRUE);
+    MoveWindow(g_app.browse_button, 14, height - 214, sidebar - 28, 42, TRUE);
+    MoveWindow(g_app.developer_button, 14, height - 108, sidebar - 28, 42, TRUE);
 
-    MoveWindow(g_app.prompt_edit, prompt_x + 24, prompt_y + 24, prompt_w - 48, 56, TRUE);
-    MoveWindow(g_app.run_button, prompt_x + prompt_w - 292, prompt_y + prompt_h - 48, 126, 34, TRUE);
-    MoveWindow(g_app.approve_button, prompt_x + prompt_w - 154, prompt_y + prompt_h - 48, 126, 34, TRUE);
+    MoveWindow(g_app.prompt_edit, prompt_x + 26, prompt_y + 26, prompt_w - 52, 58, TRUE);
+    MoveWindow(g_app.run_button, prompt_x + prompt_w - 300, prompt_y + prompt_h - 54, 132, 36, TRUE);
+    MoveWindow(g_app.approve_button, prompt_x + prompt_w - 158, prompt_y + prompt_h - 54, 132, 36, TRUE);
 
-    int template_x = prompt_x;
-    int template_w = 116;
+    int template_w = 118;
     int template_gap = 10;
+    int template_group_w = template_w * 4 + template_gap * 3;
+    int template_x = content_x + (content_w - template_group_w) / 2;
     for (int i = 0; i < KCW_TEMPLATE_COUNT; i++) {
         int row = i / 4;
         int col = i % 4;
@@ -469,51 +552,76 @@ static void kcw_layout_controls(HWND window) {
     int file_panel_x = card_x;
     int file_panel_y = bottom_y;
     int file_panel_h = panel_h;
-    int artifact_x = file_panel_x + left_panel_w + 16;
-    int artifact_w = card_w - left_panel_w - 16;
-    MoveWindow(g_app.file_list, file_panel_x + 18, file_panel_y + 48, left_panel_w - 36, file_panel_h - 66, TRUE);
-    MoveWindow(g_app.artifact_edit, artifact_x + 18, file_panel_y + 48, artifact_w - 36, file_panel_h - 66, TRUE);
+    int artifact_x = file_panel_x + left_panel_w + 18;
+    int artifact_w = card_w - left_panel_w - 18;
+    MoveWindow(g_app.file_list, file_panel_x + 20, file_panel_y + 58, left_panel_w - 40, file_panel_h - 82, TRUE);
+    MoveWindow(g_app.artifact_edit, artifact_x + 20, file_panel_y + 58, artifact_w - 40, file_panel_h - 82, TRUE);
 }
 
 static void kcw_draw_sidebar(HDC dc, RECT client, int sidebar) {
     RECT sidebar_rect = {0, 0, sidebar, client.bottom};
     FillRect(dc, &sidebar_rect, g_app.brush_bg);
 
-    RECT logo_rect = {20, 24, 54, 58};
+    RECT logo_rect = {18, 28, 54, 64};
     kcw_draw_round_rect(dc, logo_rect, KCW_COLOR_BLACK, KCW_COLOR_BLACK, 10);
     kcw_draw_text(dc, g_app.font_ui_bold, L"K", logo_rect, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    RECT dot = {45, 26, 52, 33};
-    kcw_draw_round_rect(dc, dot, RGB(63, 141, 255), RGB(63, 141, 255), 7);
+    RECT dot = {45, 30, 53, 38};
+    kcw_draw_round_rect(dc, dot, RGB(48, 126, 255), RGB(48, 126, 255), 8);
 
     RECT collapse = {sidebar - 48, 28, sidebar - 18, 56};
-    kcw_draw_text(dc, g_app.font_ui, L"▣", collapse, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    kcw_draw_text(dc, g_app.font_ui, L"▱", collapse, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    int y = 162;
+    RECT tabs = {14, 76, sidebar - 14, 110};
+    kcw_draw_round_rect(dc, tabs, RGB(242, 243, 245), RGB(242, 243, 245), 14);
+    int tab_w = (tabs.right - tabs.left) / 3;
+    RECT active_tab = {tabs.left + tab_w, tabs.top + 2, tabs.left + tab_w * 2, tabs.bottom - 2};
+    kcw_draw_round_rect(dc, active_tab, KCW_COLOR_SURFACE, KCW_COLOR_BORDER, 12);
+    RECT tab_chat = {tabs.left, tabs.top, tabs.left + tab_w, tabs.bottom};
+    RECT tab_cowork = {tabs.left + tab_w, tabs.top, tabs.left + tab_w * 2, tabs.bottom};
+    RECT tab_code = {tabs.left + tab_w * 2, tabs.top, tabs.right, tabs.bottom};
+    kcw_draw_text(dc, g_app.font_small, L"Chat", tab_chat, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    kcw_draw_text(dc, g_app.font_small, L"Cowork", tab_cowork, KCW_COLOR_TEXT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    kcw_draw_text(dc, g_app.font_small, L"Code", tab_code, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    int y = 190;
     for (int i = 0; i < KCW_NAV_COUNT; i++) {
-        RECT row = {22, y, sidebar - 22, y + 32};
+        RECT icon = {22, y + 6, 42, y + 28};
+        RECT row = {54, y, sidebar - 22, y + 34};
         COLORREF color = i >= 5 ? KCW_COLOR_TEXT : KCW_COLOR_MUTED;
         HFONT font = i >= 5 ? g_app.font_ui_bold : g_app.font_ui;
 
         if (i == KCW_NAV_COUNT - 1) {
-            RECT selected = {14, y - 4, sidebar - 14, y + 36};
-            kcw_draw_round_rect(dc, selected, KCW_COLOR_SURFACE, KCW_COLOR_BORDER, 16);
+            RECT selected = {14, y - 5, sidebar - 14, y + 39};
+            kcw_draw_round_rect(dc, selected, KCW_COLOR_SURFACE, KCW_COLOR_BORDER, 15);
         }
 
-        wchar_t label[96];
-        swprintf_s(label, sizeof(label) / sizeof(label[0]), L"%s%s", i == KCW_NAV_COUNT - 1 ? L"●  " : L"   ", KCW_NAV_ITEMS[i]);
-        kcw_draw_text(dc, font, label, row, color, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        y += i == 4 ? 46 : 50;
+        if (i == KCW_NAV_COUNT - 1) {
+            kcw_draw_round_rect(dc, icon, KCW_COLOR_ACCENT_SOFT, RGB(255, 225, 220), 10);
+            kcw_draw_text(dc, g_app.font_micro, KCW_NAV_ICONS[i], icon, KCW_COLOR_ACCENT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        } else {
+            kcw_draw_text(dc, g_app.font_small, KCW_NAV_ICONS[i], icon, color, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+        kcw_draw_text(dc, font, KCW_NAV_ITEMS[i], row, color, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        y += i == 4 ? 42 : 40;
     }
 
-    RECT recent_title = {22, client.bottom - 292, sidebar - 22, client.bottom - 266};
-    kcw_draw_text(dc, g_app.font_small, L"工作区", recent_title, KCW_COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    RECT recent_title = {22, client.bottom - 318, sidebar - 22, client.bottom - 294};
+    kcw_draw_text(dc, g_app.font_small, L"历史会话", recent_title, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-    RECT root_rect = {22, client.bottom - 154, sidebar - 22, client.bottom - 114};
+    RECT recent1 = {54, client.bottom - 280, sidebar - 24, client.bottom - 258};
+    RECT recent2 = {54, client.bottom - 242, sidebar - 24, client.bottom - 220};
+    kcw_draw_text(dc, g_app.font_small, L"Agent 岗位要点", recent1, KCW_COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    kcw_draw_text(dc, g_app.font_small, L"合同摘要与归档", recent2, KCW_COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+    RECT workspace_title = {22, client.bottom - 174, sidebar - 22, client.bottom - 150};
+    kcw_draw_text(dc, g_app.font_small, L"当前工作区", workspace_title, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+    RECT root_rect = {22, client.bottom - 146, sidebar - 22, client.bottom - 112};
     const wchar_t *root = g_app.trusted_root[0] ? g_app.trusted_root : L"尚未选择本地文件夹";
     kcw_draw_text(dc, g_app.font_small, root, root_rect, KCW_COLOR_MUTED, DT_LEFT | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS);
 
     RECT user = {22, client.bottom - 44, sidebar - 22, client.bottom - 18};
-    kcw_draw_text(dc, g_app.font_small, L"~  Kimi Cowork · Local", user, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    kcw_draw_text(dc, g_app.font_small, L"~  Allegretto", user, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 }
 
 static void kcw_draw_main(HDC dc, RECT client, int sidebar) {
@@ -524,56 +632,74 @@ static void kcw_draw_main(HDC dc, RECT client, int sidebar) {
 
     int card_x = content_x + 24;
     int card_w = content_w - 48;
-    int prompt_w = kcw_min_int(930, card_w - 80);
+    int prompt_w = kcw_min_int(960, card_w - 96);
     int prompt_x = content_x + (content_w - prompt_w) / 2;
-    int brand_y = kcw_max_int(106, client.bottom / 4);
-    int prompt_y = brand_y + 126;
-    int prompt_h = 132;
-    int template_y = prompt_y + prompt_h + 18;
-    int bottom_y = template_y + 56;
-    int panel_h = kcw_max_int(155, client.bottom - bottom_y - 38);
-    int left_panel_w = kcw_min_int(390, (card_w - 16) / 3);
+    int brand_y = kcw_max_int(118, client.bottom / 4);
+    int prompt_y = brand_y + 130;
+    int prompt_h = 148;
+    int template_y = prompt_y + prompt_h + 22;
+    int bottom_y = template_y + 86;
+    int panel_h = kcw_max_int(172, client.bottom - bottom_y - 42);
+    int left_panel_w = kcw_min_int(392, kcw_max_int(320, (card_w - 18) / 3));
     int file_panel_x = card_x;
-    int artifact_x = file_panel_x + left_panel_w + 16;
-    int artifact_w = card_w - left_panel_w - 16;
+    int artifact_x = file_panel_x + left_panel_w + 18;
+    int artifact_w = card_w - left_panel_w - 18;
+
+    RECT top_status = {main_card.left + 22, main_card.top + 14, main_card.right - 22, main_card.top + 42};
+    RECT local_badge = {top_status.left, top_status.top + 2, top_status.left + 94, top_status.bottom - 2};
+    RECT policy_badge = {local_badge.right + 8, top_status.top + 2, local_badge.right + 118, top_status.bottom - 2};
+    RECT model_badge = {top_status.right - 138, top_status.top + 2, top_status.right, top_status.bottom - 2};
+    kcw_draw_badge(dc, local_badge, L"Local First", RGB(244, 246, 249), RGB(234, 236, 240), KCW_COLOR_MUTED);
+    kcw_draw_badge(dc, policy_badge, L"审批后执行", KCW_COLOR_ACCENT_SOFT, RGB(255, 224, 220), RGB(194, 64, 55));
+    kcw_draw_badge(dc, model_badge, L"Kimi API 默认", RGB(244, 246, 249), RGB(234, 236, 240), KCW_COLOR_MUTED);
 
     RECT brand = {content_x, brand_y, client.right - 8, brand_y + 76};
     kcw_draw_text(dc, g_app.font_brand, L"KIMI", brand, RGB(0, 0, 0), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    RECT sub = {content_x, brand_y + 74, client.right - 8, brand_y + 104};
-    kcw_draw_text(dc, g_app.font_ui, L"Cowork · 本地文件工作台", sub, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    RECT sub = {content_x, brand_y + 78, client.right - 8, brand_y + 106};
+    kcw_draw_text(dc, g_app.font_small, L"Cowork · 本地文件工作台 · Office Mode", sub, KCW_COLOR_MUTED, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     RECT prompt_card = {prompt_x, prompt_y, prompt_x + prompt_w, prompt_y + prompt_h};
-    kcw_draw_round_rect(dc, prompt_card, KCW_COLOR_SURFACE, RGB(209, 213, 219), 28);
+    kcw_draw_soft_shadow(dc, prompt_card, 30);
+    kcw_draw_round_rect(dc, prompt_card, KCW_COLOR_SURFACE, RGB(204, 209, 216), 30);
+    RECT prompt_inner_line = {prompt_card.left + 18, prompt_card.bottom - 62, prompt_card.right - 18, prompt_card.bottom - 61};
+    kcw_draw_line(dc, prompt_inner_line.left, prompt_inner_line.top, prompt_inner_line.right, prompt_inner_line.top, RGB(241, 242, 244));
 
-    RECT plus = {prompt_x + 18, prompt_y + prompt_h - 48, prompt_x + 54, prompt_y + prompt_h - 12};
+    RECT plus = {prompt_x + 20, prompt_y + prompt_h - 54, prompt_x + 58, prompt_y + prompt_h - 16};
     kcw_draw_round_rect(dc, plus, KCW_COLOR_SURFACE, KCW_COLOR_BORDER, 18);
     kcw_draw_text(dc, g_app.font_title, L"+", plus, KCW_COLOR_TEXT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    RECT agent = {prompt_x + 64, prompt_y + prompt_h - 48, prompt_x + 150, prompt_y + prompt_h - 12};
+    RECT agent = {prompt_x + 70, prompt_y + prompt_h - 54, prompt_x + 158, prompt_y + prompt_h - 16};
     kcw_draw_round_rect(dc, agent, KCW_COLOR_SURFACE, KCW_COLOR_BORDER, 18);
     kcw_draw_text(dc, g_app.font_small, L"Agent", agent, KCW_COLOR_TEXT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    RECT model = {prompt_x + prompt_w - 456, prompt_y + prompt_h - 48, prompt_x + prompt_w - 306, prompt_y + prompt_h - 12};
+    RECT model = {prompt_x + prompt_w - 464, prompt_y + prompt_h - 54, prompt_x + prompt_w - 310, prompt_y + prompt_h - 16};
     kcw_draw_text(dc, g_app.font_ui, L"K2.6 思考⌄", model, KCW_COLOR_TEXT, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    RECT ai = {prompt_x + prompt_w + 8, prompt_y + prompt_h - 54, prompt_x + prompt_w + 46, prompt_y + prompt_h - 16};
+    RECT ai = {prompt_x + prompt_w + 8, prompt_y + prompt_h - 60, prompt_x + prompt_w + 48, prompt_y + prompt_h - 20};
     kcw_draw_round_rect(dc, ai, KCW_COLOR_ACCENT, KCW_COLOR_ACCENT, 14);
     kcw_draw_text(dc, g_app.font_ui_bold, L"AI", ai, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    RECT tray_title = {card_x, template_y - 26, card_x + card_w, template_y - 6};
+    kcw_draw_text(dc, g_app.font_micro, L"常用办公技能", tray_title, KCW_COLOR_FAINT, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     int file_panel_y = bottom_y;
     RECT file_panel = {file_panel_x, file_panel_y, file_panel_x + left_panel_w, file_panel_y + panel_h};
     RECT artifact_panel = {artifact_x, file_panel_y, artifact_x + artifact_w, file_panel_y + panel_h};
-    kcw_draw_round_rect(dc, file_panel, KCW_COLOR_PANEL, KCW_COLOR_BORDER, 14);
-    kcw_draw_round_rect(dc, artifact_panel, KCW_COLOR_PANEL, KCW_COLOR_BORDER, 14);
+    kcw_draw_round_rect(dc, file_panel, KCW_COLOR_PANEL, KCW_COLOR_BORDER, 16);
+    kcw_draw_round_rect(dc, artifact_panel, KCW_COLOR_PANEL, KCW_COLOR_BORDER, 16);
 
-    RECT file_title = {file_panel.left + 18, file_panel.top + 12, file_panel.right - 18, file_panel.top + 42};
+    RECT file_title = {file_panel.left + 20, file_panel.top + 14, file_panel.right - 20, file_panel.top + 40};
     wchar_t file_label[96];
     swprintf_s(file_label, sizeof(file_label) / sizeof(file_label[0]), L"本地文件  %d", g_app.file_count);
     kcw_draw_text(dc, g_app.font_ui_bold, file_label, file_title, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    RECT file_caption = {file_panel.left + 20, file_panel.top + 38, file_panel.right - 20, file_panel.top + 56};
+    kcw_draw_text(dc, g_app.font_micro, L"只读取已信任目录，默认禁止全盘扫描", file_caption, KCW_COLOR_FAINT, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-    RECT artifact_title = {artifact_panel.left + 18, artifact_panel.top + 12, artifact_panel.right - 18, artifact_panel.top + 42};
+    RECT artifact_title = {artifact_panel.left + 20, artifact_panel.top + 14, artifact_panel.right - 20, artifact_panel.top + 40};
     kcw_draw_text(dc, g_app.font_ui_bold, L"计划 / 产物 / 审批", artifact_title, KCW_COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    RECT artifact_caption = {artifact_panel.left + 20, artifact_panel.top + 38, artifact_panel.right - 20, artifact_panel.top + 56};
+    kcw_draw_text(dc, g_app.font_micro, L"生成草稿、预览 diff、审批后才执行本地操作", artifact_caption, KCW_COLOR_FAINT, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
     RECT status = {content_x + 28, client.bottom - 36, client.right - 24, client.bottom - 14};
     kcw_draw_text(dc, g_app.font_small, g_app.status_line, status, KCW_COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
@@ -595,10 +721,12 @@ static void kcw_paint(HWND window) {
 }
 
 static void kcw_init_resources(void) {
-    g_app.font_ui = kcw_create_font(18, FW_NORMAL);
-    g_app.font_ui_bold = kcw_create_font(18, FW_SEMIBOLD);
-    g_app.font_small = kcw_create_font(15, FW_NORMAL);
-    g_app.font_brand = kcw_create_font(64, FW_BOLD);
+    g_app.font_ui = kcw_create_font(17, FW_NORMAL);
+    g_app.font_ui_bold = kcw_create_font(17, FW_SEMIBOLD);
+    g_app.font_small = kcw_create_font(14, FW_NORMAL);
+    g_app.font_micro = kcw_create_font(12, FW_NORMAL);
+    g_app.font_heading = kcw_create_font(20, FW_SEMIBOLD);
+    g_app.font_brand = kcw_create_named_font(68, FW_HEAVY, L"Arial Black");
     g_app.font_title = kcw_create_font(24, FW_NORMAL);
     g_app.brush_bg = CreateSolidBrush(KCW_COLOR_BG);
     g_app.brush_surface = CreateSolidBrush(KCW_COLOR_SURFACE);
@@ -611,6 +739,8 @@ static void kcw_destroy_resources(void) {
     DeleteObject(g_app.font_ui);
     DeleteObject(g_app.font_ui_bold);
     DeleteObject(g_app.font_small);
+    DeleteObject(g_app.font_micro);
+    DeleteObject(g_app.font_heading);
     DeleteObject(g_app.font_brand);
     DeleteObject(g_app.font_title);
     DeleteObject(g_app.brush_bg);
@@ -639,7 +769,15 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX: {
         HDC dc = (HDC)wparam;
+        HWND child = (HWND)lparam;
         SetTextColor(dc, KCW_COLOR_TEXT);
+        if (child == g_app.file_list || child == g_app.artifact_edit) {
+            SetBkColor(dc, KCW_COLOR_PANEL);
+            return (LRESULT)g_app.brush_panel;
+        }
+        if (child == g_app.prompt_edit) {
+            SetTextColor(dc, KCW_COLOR_MUTED);
+        }
         SetBkColor(dc, KCW_COLOR_SURFACE);
         return (LRESULT)g_app.brush_surface;
     }
