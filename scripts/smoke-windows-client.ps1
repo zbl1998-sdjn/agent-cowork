@@ -200,12 +200,15 @@ try {
     Start-Sleep -Milliseconds 300
     $artifactText = [KcwSmokeWin32]::Text($artifact.Hwnd)
     Assert-True ($artifactText.Contains("Kimi Cowork 执行计划")) "Generate plan did not update artifact panel"
+    Assert-True ($artifactText.Contains("文件操作预览")) "Generate plan did not include file operation preview"
+    Assert-True ($artifactText.Contains("类型：move")) "Generate plan did not include move preview"
 
     [KcwSmokeWin32]::SendMessage($approve.Hwnd, $bmClick, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 300
     $artifactText = [KcwSmokeWin32]::Text($artifact.Hwnd)
     Assert-True ($artifactText.Contains("审批记录")) "Approval did not append approval record"
     Assert-True ($artifactText.Contains("approved_applied")) "Approval did not apply the approved artifact"
+    Assert-True ($artifactText.Contains("move_applied")) "Approval did not apply the approved move operation"
 
     $artifactDir = Join-Path $workspace ".KimiCowork\artifacts"
     $auditPath = Join-Path $workspace ".KimiCowork\audit\audit.jsonl"
@@ -221,7 +224,15 @@ try {
     $rollbackLog = Get-Content -LiteralPath $rollbackFiles[0].FullName -Raw
     Assert-True ($generatedArtifact.Contains("Kimi Cowork Office Mode 产物")) "Generated artifact content is missing title"
     Assert-True ($auditLog.Contains('"event":"approval_apply"')) "Audit log does not contain approval_apply event"
+    Assert-True ($auditLog.Contains('"event":"file_move_apply"')) "Audit log does not contain file_move_apply event"
     Assert-True ($rollbackLog.Contains('"operation":"write_new_artifact"')) "Rollback log does not contain write_new_artifact operation"
+    Assert-True ($rollbackLog.Contains('"operation":"move_file"')) "Rollback log does not contain move_file operation"
+
+    $moveRoot = Join-Path $workspace "Kimi_Cowork整理"
+    $movedFiles = @(Get-ChildItem -LiteralPath $moveRoot -Recurse -File -ErrorAction SilentlyContinue)
+    Assert-True ($movedFiles.Count -eq 1) "Expected one moved file under Kimi_Cowork整理, got $($movedFiles.Count)"
+    $movedFilePath = $movedFiles[0].FullName
+    Assert-True ($movedFilePath.StartsWith($moveRoot, [System.StringComparison]::OrdinalIgnoreCase)) "Moved file is outside the expected move root: $movedFilePath"
 
     [KcwSmokeWin32]::SendMessage($developer.Hwnd, $bmClick, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 300
@@ -235,6 +246,7 @@ try {
         GeneratePlan = "passed"
         Approve = "passed"
         ArtifactPath = $artifactFiles[0].FullName
+        MovedFilePath = $movedFilePath
         AuditPath = $auditPath
         RollbackPath = $rollbackFiles[0].FullName
         DeveloperMode = "passed"

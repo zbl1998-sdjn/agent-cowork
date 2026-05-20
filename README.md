@@ -64,5 +64,6 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
 
 - 自动加载信任工作区并扫描本地文件。
 - 生成计划按钮会更新产物区。
-- 审批执行按钮会写入 `.KimiCowork/artifacts/*.md`、`.KimiCowork/audit/audit.jsonl` 和 `.KimiCowork/rollback/*.jsonl`。
+- 生成计划会展示一个最小安全文件移动 preview。
+- 审批执行按钮会写入 `.KimiCowork/artifacts/*.md`、`.KimiCowork/audit/audit.jsonl` 和 `.KimiCowork/rollback/*.jsonl`，并把预览文件移动到 `Kimi_Cowork整理/<模板名>/`。
 - Developer Mode 按钮会打开模型/能力边界面板。

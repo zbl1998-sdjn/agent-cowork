@@ -64,6 +64,12 @@ typedef struct KcwAppState {
     wchar_t last_artifact_path[MAX_PATH];
     wchar_t last_audit_path[MAX_PATH];
     wchar_t last_rollback_path[MAX_PATH];
+    wchar_t file_paths[KCW_MAX_FILES][MAX_PATH];
+    wchar_t pending_move_from[MAX_PATH];
+    wchar_t pending_move_to[MAX_PATH];
+    wchar_t pending_move_from_relative[MAX_PATH];
+    wchar_t pending_move_to_relative[MAX_PATH];
+    bool pending_move_ready;
     int selected_template;
     int file_count;
 } KcwAppState;
@@ -390,6 +396,56 @@ static void kcw_join_path(wchar_t *out, size_t out_len, const wchar_t *base, con
     swprintf_s(out, out_len, L"%s\\%s", base, child);
 }
 
+static const wchar_t *kcw_file_name_from_relative(const wchar_t *relative) {
+    const wchar_t *slash = wcsrchr(relative, L'\\');
+    if (!slash) {
+        return relative;
+    }
+    return slash + 1;
+}
+
+static void kcw_clear_pending_move(void) {
+    g_app.pending_move_ready = false;
+    g_app.pending_move_from[0] = L'\0';
+    g_app.pending_move_to[0] = L'\0';
+    g_app.pending_move_from_relative[0] = L'\0';
+    g_app.pending_move_to_relative[0] = L'\0';
+}
+
+static bool kcw_build_pending_move_preview(void) {
+    kcw_clear_pending_move();
+    if (g_app.trusted_root[0] == L'\0' || g_app.file_count <= 0) {
+        return false;
+    }
+
+    const wchar_t *source_relative = g_app.file_paths[0];
+    const wchar_t *file_name = kcw_file_name_from_relative(source_relative);
+    if (!source_relative || source_relative[0] == L'\0' || !file_name || file_name[0] == L'\0') {
+        return false;
+    }
+
+    swprintf_s(
+        g_app.pending_move_to_relative,
+        sizeof(g_app.pending_move_to_relative) / sizeof(g_app.pending_move_to_relative[0]),
+        L"Kimi_Cowork整理\\%s\\%s",
+        KCW_TEMPLATES[g_app.selected_template],
+        file_name);
+    kcw_join_path(g_app.pending_move_from, sizeof(g_app.pending_move_from) / sizeof(g_app.pending_move_from[0]), g_app.trusted_root, source_relative);
+    kcw_join_path(g_app.pending_move_to, sizeof(g_app.pending_move_to) / sizeof(g_app.pending_move_to[0]), g_app.trusted_root, g_app.pending_move_to_relative);
+    wcsncpy_s(
+        g_app.pending_move_from_relative,
+        sizeof(g_app.pending_move_from_relative) / sizeof(g_app.pending_move_from_relative[0]),
+        source_relative,
+        _TRUNCATE);
+
+    if (GetFileAttributesW(g_app.pending_move_from) == INVALID_FILE_ATTRIBUTES) {
+        kcw_clear_pending_move();
+        return false;
+    }
+    g_app.pending_move_ready = true;
+    return true;
+}
+
 static void kcw_scan_files_recursive(const wchar_t *root, const wchar_t *relative, int depth) {
     if (depth > 4 || g_app.file_count >= KCW_MAX_FILES) {
         return;
@@ -426,6 +482,11 @@ static void kcw_scan_files_recursive(const wchar_t *root, const wchar_t *relativ
         }
 
         if (kcw_has_document_extension(data.cFileName)) {
+            wcsncpy_s(
+                g_app.file_paths[g_app.file_count],
+                sizeof(g_app.file_paths[g_app.file_count]) / sizeof(g_app.file_paths[g_app.file_count][0]),
+                child_relative,
+                _TRUNCATE);
             SendMessageW(g_app.file_list, LB_ADDSTRING, 0, (LPARAM)child_relative);
             g_app.file_count++;
             if (g_app.file_count >= KCW_MAX_FILES) {
@@ -440,6 +501,7 @@ static void kcw_scan_files_recursive(const wchar_t *root, const wchar_t *relativ
 static void kcw_scan_trusted_root(void) {
     SendMessageW(g_app.file_list, LB_RESETCONTENT, 0, 0);
     g_app.file_count = 0;
+    kcw_clear_pending_move();
 
     if (g_app.trusted_root[0] == L'\0') {
         return;
@@ -589,6 +651,69 @@ static bool kcw_write_approved_artifact(const wchar_t *plan_text, wchar_t *error
     return true;
 }
 
+static bool kcw_apply_pending_move(wchar_t *error, size_t error_len) {
+    if (!g_app.pending_move_ready) {
+        wcsncpy_s(error, error_len, L"没有可执行的文件移动预览。", _TRUNCATE);
+        return false;
+    }
+    if (g_app.last_audit_path[0] == L'\0' || g_app.last_rollback_path[0] == L'\0') {
+        wcsncpy_s(error, error_len, L"缺少审计或回滚日志路径。", _TRUNCATE);
+        return false;
+    }
+    if (GetFileAttributesW(g_app.pending_move_from) == INVALID_FILE_ATTRIBUTES) {
+        wcsncpy_s(error, error_len, L"源文件不存在，文件移动已取消。", _TRUNCATE);
+        return false;
+    }
+    if (GetFileAttributesW(g_app.pending_move_to) != INVALID_FILE_ATTRIBUTES) {
+        wcsncpy_s(error, error_len, L"目标文件已存在，文件移动已取消以避免覆盖。", _TRUNCATE);
+        return false;
+    }
+
+    wchar_t move_root[MAX_PATH];
+    wchar_t move_template_dir[MAX_PATH];
+    swprintf_s(move_root, sizeof(move_root) / sizeof(move_root[0]), L"%s\\Kimi_Cowork整理", g_app.trusted_root);
+    swprintf_s(move_template_dir, sizeof(move_template_dir) / sizeof(move_template_dir[0]), L"%s\\%s", move_root, KCW_TEMPLATES[g_app.selected_template]);
+    if (!kcw_ensure_directory(move_root) || !kcw_ensure_directory(move_template_dir)) {
+        wcsncpy_s(error, error_len, L"无法创建目标整理目录。", _TRUNCATE);
+        return false;
+    }
+
+    FILE *audit = NULL;
+    if (_wfopen_s(&audit, g_app.last_audit_path, L"a, ccs=UTF-8") != 0 || !audit) {
+        wcsncpy_s(error, error_len, L"无法打开审计日志，文件移动已取消。", _TRUNCATE);
+        return false;
+    }
+    FILE *rollback = NULL;
+    if (_wfopen_s(&rollback, g_app.last_rollback_path, L"a, ccs=UTF-8") != 0 || !rollback) {
+        fclose(audit);
+        wcsncpy_s(error, error_len, L"无法打开回滚日志，文件移动已取消。", _TRUNCATE);
+        return false;
+    }
+
+    if (!MoveFileExW(g_app.pending_move_from, g_app.pending_move_to, MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH)) {
+        fclose(audit);
+        fclose(rollback);
+        swprintf_s(error, error_len, L"文件移动失败，Windows 错误码：%lu。", GetLastError());
+        return false;
+    }
+
+    fwprintf(audit, L"{\"event\":\"file_move_apply\",\"from\":");
+    kcw_json_write_string(audit, g_app.pending_move_from);
+    fwprintf(audit, L",\"to\":");
+    kcw_json_write_string(audit, g_app.pending_move_to);
+    fwprintf(audit, L",\"status\":\"done\"}\n");
+    fclose(audit);
+
+    fwprintf(rollback, L"{\"operation\":\"move_file\",\"from\":");
+    kcw_json_write_string(rollback, g_app.pending_move_to);
+    fwprintf(rollback, L",\"to\":");
+    kcw_json_write_string(rollback, g_app.pending_move_from);
+    fwprintf(rollback, L",\"rollback\":\"move_back_after_user_confirmation\",\"status\":\"ready\"}\n");
+    fclose(rollback);
+
+    return true;
+}
+
 static void kcw_show_workspace_ready(void) {
     kcw_scan_trusted_root();
 
@@ -631,7 +756,27 @@ static void kcw_generate_plan(HWND window) {
     const wchar_t *root = g_app.trusted_root[0] ? g_app.trusted_root : L"尚未选择";
     const wchar_t *template_name = KCW_TEMPLATES[g_app.selected_template];
 
-    wchar_t plan[4096];
+    wchar_t move_preview[1024];
+    if (kcw_build_pending_move_preview()) {
+        swprintf_s(
+            move_preview,
+            sizeof(move_preview) / sizeof(move_preview[0]),
+            L"文件操作预览\r\n"
+            L"- 类型：move\r\n"
+            L"- From：%s\r\n"
+            L"- To：%s\r\n"
+            L"- 规则：目标存在则停止，不覆盖；审批后写 audit / rollback。\r\n\r\n",
+            g_app.pending_move_from_relative,
+            g_app.pending_move_to_relative);
+    } else {
+        swprintf_s(
+            move_preview,
+            sizeof(move_preview) / sizeof(move_preview[0]),
+            L"文件操作预览\r\n"
+            L"- 当前没有可移动文件，审批只生成安全产物、审计和回滚日志。\r\n\r\n");
+    }
+
+    wchar_t plan[8192];
     swprintf_s(
         plan,
         sizeof(plan) / sizeof(plan[0]),
@@ -648,13 +793,15 @@ static void kcw_generate_plan(HWND window) {
         L"3. 在产物区生成 Markdown / CSV / XLSX 草稿。\r\n"
         L"4. 对重命名和移动操作先生成 diff/preview，不自动执行。\r\n"
         L"5. 等待审批中心确认后再执行本地文件操作，并写入 rollback journal。\r\n\r\n"
+        L"%s"
         L"安全边界\r\n"
         L"- 默认禁止 shell、删除、全盘扫描和凭据目录访问。\r\n"
         L"- 所有高风险动作必须审批、审计、可回滚。\r\n",
         root,
         template_name,
         g_app.file_count,
-        prompt);
+        prompt,
+        move_preview);
 
     SetWindowTextW(g_app.artifact_edit, plan);
     kcw_set_status(L"计划已生成，等待审批中心确认。");
@@ -669,7 +816,7 @@ static void kcw_approve_plan(HWND window) {
         return;
     }
 
-    wchar_t current[4096] = L"";
+    wchar_t current[8192] = L"";
     GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
     if (wcsstr(current, L"Kimi Cowork 执行计划") == NULL) {
         kcw_generate_plan(window);
@@ -678,18 +825,77 @@ static void kcw_approve_plan(HWND window) {
 
     wchar_t error[256] = L"";
     bool wrote_artifact = kcw_write_approved_artifact(current, error, sizeof(error) / sizeof(error[0]));
+    bool had_move_preview = g_app.pending_move_ready;
+    bool move_applied = false;
+    wchar_t move_error[256] = L"";
+    wchar_t moved_from_relative[MAX_PATH] = L"";
+    wchar_t moved_to_relative[MAX_PATH] = L"";
+    if (had_move_preview) {
+        wcsncpy_s(moved_from_relative, sizeof(moved_from_relative) / sizeof(moved_from_relative[0]), g_app.pending_move_from_relative, _TRUNCATE);
+        wcsncpy_s(moved_to_relative, sizeof(moved_to_relative) / sizeof(moved_to_relative[0]), g_app.pending_move_to_relative, _TRUNCATE);
+    }
+    if (wrote_artifact && had_move_preview) {
+        move_applied = kcw_apply_pending_move(move_error, sizeof(move_error) / sizeof(move_error[0]));
+    }
 
-    wchar_t approved[4096];
+    wchar_t approved[8192];
     if (wrote_artifact) {
-        swprintf_s(
-            approved,
-            sizeof(approved) / sizeof(approved[0]),
-            L"%s\r\n审批记录\r\n- 状态：approved_applied\r\n- 已写入 Markdown 产物：%s\r\n- 审计日志：%s\r\n- 回滚日志：%s\r\n- 本轮不覆盖、不删除、不自动上传。\r\n",
-            current,
-            g_app.last_artifact_path,
-            g_app.last_audit_path,
-            g_app.last_rollback_path);
-        kcw_set_status(L"审批已执行：产物、审计日志和回滚日志已写入本地工作区。");
+        if (had_move_preview && move_applied) {
+            swprintf_s(
+                approved,
+                sizeof(approved) / sizeof(approved[0]),
+                L"%s\r\n审批记录\r\n"
+                L"- 状态：approved_applied\r\n"
+                L"- 已写入 Markdown 产物：%s\r\n"
+                L"- 文件操作：move_applied\r\n"
+                L"- From：%s\r\n"
+                L"- To：%s\r\n"
+                L"- 审计日志：%s\r\n"
+                L"- 回滚日志：%s\r\n"
+                L"- 本轮不覆盖、不删除、不自动上传。\r\n",
+                current,
+                g_app.last_artifact_path,
+                moved_from_relative,
+                moved_to_relative,
+                g_app.last_audit_path,
+                g_app.last_rollback_path);
+            kcw_scan_trusted_root();
+            kcw_set_status(L"审批已执行：产物、文件移动、审计日志和回滚日志已写入本地工作区。");
+        } else if (had_move_preview) {
+            swprintf_s(
+                approved,
+                sizeof(approved) / sizeof(approved[0]),
+                L"%s\r\n审批记录\r\n"
+                L"- 状态：partial_applied\r\n"
+                L"- 已写入 Markdown 产物：%s\r\n"
+                L"- 文件操作：move_failed\r\n"
+                L"- 原因：%s\r\n"
+                L"- 审计日志：%s\r\n"
+                L"- 回滚日志：%s\r\n"
+                L"- 未覆盖、未删除、未上传任何用户文件。\r\n",
+                current,
+                g_app.last_artifact_path,
+                move_error[0] ? move_error : L"未知错误",
+                g_app.last_audit_path,
+                g_app.last_rollback_path);
+            kcw_set_status(L"审批部分执行：产物已写入，文件移动被阻止。");
+        } else {
+            swprintf_s(
+                approved,
+                sizeof(approved) / sizeof(approved[0]),
+                L"%s\r\n审批记录\r\n"
+                L"- 状态：approved_applied\r\n"
+                L"- 已写入 Markdown 产物：%s\r\n"
+                L"- 文件操作：no_preview\r\n"
+                L"- 审计日志：%s\r\n"
+                L"- 回滚日志：%s\r\n"
+                L"- 本轮不覆盖、不删除、不自动上传。\r\n",
+                current,
+                g_app.last_artifact_path,
+                g_app.last_audit_path,
+                g_app.last_rollback_path);
+            kcw_set_status(L"审批已执行：产物、审计日志和回滚日志已写入本地工作区。");
+        }
     } else {
         swprintf_s(
             approved,
