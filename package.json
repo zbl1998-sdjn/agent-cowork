@@ -6,7 +6,9 @@
   "description": "Kimi-only local cowork host MVP scaffold",
   "scripts": {
     "start": "node apps/host/src/main.js",
+    "start:mvp": "node scripts/start-mvp.mjs",
     "smoke:host": "node scripts/smoke-local-operations.mjs",
+    "smoke:ui": "node scripts/smoke-ui-contract.mjs",
     "test": "node --test --test-isolation=none",
     "test:isolated": "node --test"
   },
