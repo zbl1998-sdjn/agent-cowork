@@ -229,7 +229,7 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("Kimi Cowork")) resolve(true);
+          if (document.readyState === "complete" && document.body.innerText.includes("Back at it, Derrick")) resolve(true);
           else if (Date.now() > deadline) reject(new Error("live MVP page did not render"));
           else setTimeout(tick, 50);
         }
@@ -267,10 +267,12 @@ async function main() {
           location: window.location.href,
           status: document.querySelector(".status-pill")?.innerText.trim(),
           workspace: document.querySelector(".workspace-card > strong")?.innerText.trim(),
-          hasKimi: text.includes("KIMI"),
+          activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
+          hasGreeting: text.includes("Back at it, Derrick"),
           hasCowork: text.includes("Kimi Cowork"),
-          hasLocalFolder: text.includes("本地文件夹"),
-          hasApprove: text.includes("审批执行"),
+          hasModeTabs: text.includes("Chat") && text.includes("Cowork") && text.includes("Code"),
+          hasSidebarActions: text.includes("New chat") && text.includes("Projects") && text.includes("Artifacts") && text.includes("Customize"),
+          hasQuickActions: text.includes("Learn") && text.includes("Write") && text.includes("Kimi's choice") && text.includes("From local folder"),
           scroll
         };
       })()`,
@@ -278,7 +280,9 @@ async function main() {
     assert(desktopLayout.title === 'Kimi Cowork', 'live MVP title mismatch');
     assert(desktopLayout.location.startsWith(runtime.url), 'live MVP did not load runtime URL');
     assert(desktopLayout.workspace === runtime.workspace, 'live MVP workspace does not match runtime workspace');
-    assert(desktopLayout.hasKimi && desktopLayout.hasCowork && desktopLayout.hasLocalFolder && desktopLayout.hasApprove, 'live MVP missing core UI text');
+    assert(desktopLayout.activeMode === 'Chat', 'live MVP should default to Chat mode');
+    assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'live MVP missing Image #1 functional shell');
+    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing Kimi quick actions');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -287,6 +291,7 @@ async function main() {
     const interaction = await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {
+        document.querySelector('[data-mode="cowork"]').click();
         const textarea = document.querySelector(".composer textarea");
         const send = document.querySelector(".send-button");
         const approve = document.querySelector(".approve-button");

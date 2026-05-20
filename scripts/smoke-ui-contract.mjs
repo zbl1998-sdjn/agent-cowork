@@ -51,17 +51,26 @@ async function main() {
   try {
     const index = await getText(baseUrl, '/');
     assert(index.contentType.includes('text/html'), 'index did not return HTML');
+    assert(index.body.includes('class="mode-switch"'), 'index missing Chat/Cowork/Code mode switch');
     assert(index.body.includes('class="composer"'), 'index missing composer UI');
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
     assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
+    for (const copy of ['Chat', 'Cowork', 'Code', 'New chat', 'Projects', 'Artifacts', 'Customize', 'Recents']) {
+      assert(index.body.includes(copy), `index missing Image #1 functional copy: ${copy}`);
+    }
+    assert(!index.body.includes('Claude'), 'index must remain Kimi-only and not include Claude branding');
 
     const styles = await getText(baseUrl, '/app.css');
     assert(styles.contentType.includes('css'), 'app.css did not return CSS');
     assert(styles.body.includes('.app-shell > *'), 'app.css missing fixed-window shrink guard');
     assert(styles.body.includes('overflow: hidden'), 'app.css missing fixed-window overflow guard');
+    assert(styles.body.includes('.mode-switch'), 'app.css missing mode switch styling');
+    assert(styles.body.includes('[hidden]'), 'app.css missing hidden panel guard');
 
     const script = await getText(baseUrl, '/app.js');
     assert(script.contentType.includes('javascript'), 'app.js did not return JavaScript');
+    assert(script.body.includes('function setView'), 'app.js missing view switching controller');
+    assert(script.body.includes('[data-quick]'), 'app.js missing quick action handlers');
     for (const route of ['/api/workspace', '/api/files/tree', '/api/files/read', '/api/file-ops/preview', '/api/file-ops/apply']) {
       assert(script.body.includes(route), `app.js missing UI contract route ${route}`);
     }

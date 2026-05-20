@@ -1,5 +1,5 @@
 const state = {
-  mode: "office",
+  view: "chat",
   workspace: "C:\\Users\\Administrator\\Desktop\\kimi cowork",
   files: [],
   operations: [],
@@ -14,14 +14,27 @@ const approveButton = document.querySelector(".approve-button");
 const sendButton = document.querySelector(".send-button");
 const artifactText = document.querySelector(".artifact-preview p");
 const artifactPath = document.querySelector(".artifact-preview code");
-const statusPill = document.querySelector(".status-pill");
+const statusText = document.querySelector(".status-text");
 const workspacePath = document.querySelector(".workspace-card > strong");
 const workspaceMeta = document.querySelector(".workspace-card > p");
 const fileList = document.querySelector(".file-list");
 const operationList = document.querySelector(".operation-list");
+const chatOutput = document.querySelector(".chat-output");
+const chatOutputText = document.querySelector(".chat-output p");
+const workbenchTitle = document.querySelector(".workbench-title");
+const workbenchCopy = document.querySelector(".workbench-copy");
+
+const placeholders = {
+  chat: "How can Kimi help you today?",
+  cowork: "选择本地文件夹，描述要让 Kimi Cowork 在本机完成的操作",
+  code: "Describe the code task Kimi should inspect locally",
+  projects: "Search or open a project",
+  artifacts: "Find an artifact or audit log",
+  customize: "Tell Kimi how this workspace should behave",
+};
 
 function setStatus(text) {
-  statusPill.childNodes[statusPill.childNodes.length - 1].textContent = ` ${text}`;
+  statusText.textContent = text;
 }
 
 function setArtifact(message, pathText = artifactPath.textContent) {
@@ -35,6 +48,43 @@ function basename(filePath) {
 
 function joinWin(root, ...parts) {
   return [root.replace(/[\\/]+$/, ""), ...parts.map((part) => String(part).replace(/^[\\/]+|[\\/]+$/g, ""))].join("\\");
+}
+
+function setWorkbenchCopy(view) {
+  if (view === "code") {
+    workbenchTitle.textContent = "Kimi Code";
+    workbenchCopy.textContent = "读取当前项目上下文，生成代码任务计划，审批后写入本地产物。";
+    return;
+  }
+  workbenchTitle.textContent = "Kimi Cowork";
+  workbenchCopy.textContent = "读取本地文件夹、生成操作预览、审批后在本机执行。";
+}
+
+function setView(view) {
+  state.view = view;
+  document.body.dataset.view = view;
+  composer.placeholder = placeholders[view] || placeholders.chat;
+
+  document.querySelectorAll(".mode-tab").forEach((tab) => {
+    const active = tab.dataset.mode === view;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.classList.toggle("is-active", item.dataset.section === view);
+  });
+
+  document.querySelectorAll(".view-panel").forEach((panel) => {
+    const views = (panel.dataset.views || "").split(/\s+/).filter(Boolean);
+    const visible = views.includes(view);
+    panel.hidden = !visible;
+    panel.classList.toggle("is-visible", visible);
+  });
+
+  if (view === "cowork" || view === "code") {
+    setWorkbenchCopy(view);
+  }
 }
 
 function summarizeFiles(files) {
@@ -115,8 +165,18 @@ async function readCandidateSummary(candidate) {
   }
 }
 
+function showChatResponse(message) {
+  chatOutput.hidden = false;
+  chatOutputText.textContent = message;
+}
+
 async function generatePlan() {
   const prompt = composer.value.trim() || "整理这个本地文件夹，生成可审批的安全操作计划";
+
+  if (state.view !== "cowork" && state.view !== "code") {
+    showChatResponse(`我会按 “${prompt.slice(0, 56)}” 继续。需要读取或修改本地文件时，切到 Cowork 或 Code。`);
+    return;
+  }
 
   if (!state.hostApi) {
     setStatus("Preview Mode");
@@ -137,6 +197,7 @@ async function generatePlan() {
       content: [
         "# Kimi Cowork UI Plan",
         "",
+        `- Mode: ${state.view}`,
         `- Prompt: ${prompt}`,
         `- Workspace: ${state.workspace}`,
         `- Source summary: ${summary}`,
@@ -159,6 +220,10 @@ async function generatePlan() {
 }
 
 async function approvePlan() {
+  if (state.view !== "cowork" && state.view !== "code") {
+    setView("cowork");
+  }
+
   if (!state.hostApi) {
     state.approved = true;
     approveButton.textContent = "已审批";
@@ -209,10 +274,69 @@ async function loadHostWorkspace() {
   }
 }
 
+document.querySelectorAll(".mode-tab").forEach((item) => {
+  item.addEventListener("click", () => {
+    setView(item.dataset.mode);
+  });
+});
+
 document.querySelectorAll(".nav-item").forEach((item) => {
   item.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((entry) => entry.classList.remove("is-active"));
-    item.classList.add("is-active");
+    setView(item.dataset.section);
+  });
+});
+
+document.querySelectorAll("[data-recent]").forEach((item) => {
+  item.addEventListener("click", () => {
+    setView("chat");
+    composer.value = item.dataset.recent;
+    showChatResponse(`已打开最近会话：${item.dataset.recent}`);
+  });
+});
+
+document.querySelectorAll("[data-quick]").forEach((item) => {
+  item.addEventListener("click", () => {
+    const quick = item.dataset.quick;
+    const prompts = {
+      code: "检查当前项目，列出可以安全修改的文件和测试命令",
+      learn: "帮我用简洁方式讲清楚这个复杂主题",
+      write: "帮我起草一版结构清晰的文档",
+      choice: "根据当前上下文，帮我选择下一步最有价值的任务",
+      "local-folder": "读取本地工作区，生成可审批的整理计划",
+    };
+    composer.value = prompts[quick] || "";
+    setView(quick === "code" ? "code" : quick === "local-folder" ? "cowork" : "chat");
+    composer.focus();
+  });
+});
+
+document.querySelector('[data-action="local-folder"]').addEventListener("click", () => {
+  setView("cowork");
+  composer.value = composer.value || "读取本地工作区，生成可审批的整理计划";
+  composer.focus();
+});
+
+document.querySelector('[data-action="new-chat"]').addEventListener("click", () => {
+  setView("chat");
+  composer.value = "";
+  chatOutput.hidden = true;
+  state.operations = [];
+  state.approved = false;
+  approveButton.textContent = "审批执行";
+  approveButton.classList.remove("is-done");
+});
+
+document.querySelectorAll("[data-project]").forEach((item) => {
+  item.addEventListener("click", () => {
+    setView("cowork");
+    composer.value = `打开项目：${item.dataset.project}`;
+  });
+});
+
+document.querySelectorAll("[data-artifact]").forEach((item) => {
+  item.addEventListener("click", () => {
+    setView("cowork");
+    setArtifact(`已选择产物目录：${item.dataset.artifact}`, item.dataset.artifact);
   });
 });
 
@@ -230,4 +354,5 @@ approveButton.addEventListener("click", () => {
   });
 });
 
+setView("chat");
 loadHostWorkspace();

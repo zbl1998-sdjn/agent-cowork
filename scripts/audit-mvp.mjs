@@ -86,6 +86,28 @@ function passed(requirements, ids) {
   return ids.every((id) => requirements.find((item) => item.id === id)?.status === 'passed');
 }
 
+function hasReferenceFunctionalShell(layout) {
+  if (!layout) {
+    return false;
+  }
+
+  const newShell =
+    layout.activeMode === 'Chat' &&
+    layout.hasGreeting === true &&
+    layout.hasCowork === true &&
+    layout.hasModeTabs === true &&
+    layout.hasSidebarActions === true &&
+    layout.hasQuickActions === true;
+
+  const legacyShell =
+    layout.hasKimi === true &&
+    layout.hasCowork === true &&
+    layout.hasLocalFolder === true &&
+    layout.hasApprove === true;
+
+  return newShell || legacyShell;
+}
+
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
 
@@ -151,10 +173,7 @@ async function main() {
     screenshotSize?.width === 1536 &&
     screenshotSize?.height === 900 &&
     desktopLayout?.title === 'Kimi Cowork' &&
-    desktopLayout?.hasKimi === true &&
-    desktopLayout?.hasCowork === true &&
-    desktopLayout?.hasLocalFolder === true &&
-    desktopLayout?.hasApprove === true &&
+    hasReferenceFunctionalShell(desktopLayout) &&
     desktopLayout?.hasFrameworkOverlay === false &&
     desktopLayout?.scroll?.width <= desktopLayout?.scroll?.clientWidth + 1 &&
     compactLayout?.issues?.length === 0 &&
@@ -194,7 +213,7 @@ async function main() {
       summary: verification.value?.summary,
       notes: verification.value?.notes,
     }),
-    requirement('visual-fidelity', 'Rendered UI matches Kimi-style shell and fits 1536x900 plus 1366x768 without overflow', visualPassed ? 'passed' : 'failed', {
+    requirement('visual-fidelity', 'Rendered UI matches the reference Chat/Cowork/Code shell and fits 1536x900 plus 1366x768 without overflow', visualPassed ? 'passed' : 'failed', {
       reportPath: renderedFile,
       generatedAt: rendered.value?.generatedAt,
       screenshot,
@@ -259,10 +278,7 @@ async function main() {
         windowsResourceDesktopLayout?.title === 'Kimi Cowork' &&
         windowsResourceDesktopLayout?.protocol === 'file:' &&
         windowsResourceDesktopLayout?.hostApi === false &&
-        windowsResourceDesktopLayout?.hasKimi === true &&
-        windowsResourceDesktopLayout?.hasCowork === true &&
-        windowsResourceDesktopLayout?.hasLocalFolder === true &&
-        windowsResourceDesktopLayout?.hasApprove === true &&
+        hasReferenceFunctionalShell(windowsResourceDesktopLayout) &&
         windowsResourceCompactLayout?.issues?.length === 0 &&
         windowsResourceInteraction?.afterPlan?.status === 'Preview Mode' &&
         windowsResourceInteraction?.afterApprove?.status === 'Preview Applied' &&

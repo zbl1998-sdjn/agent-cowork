@@ -7,7 +7,7 @@
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./app.css" />
   </head>
-  <body>
+  <body data-view="chat">
     <div class="window">
       <header class="titlebar" aria-label="Kimi Cowork window controls">
         <div class="titlebar-left">
@@ -39,64 +39,49 @@
 
       <main class="app-shell">
         <aside class="sidebar" aria-label="Kimi navigation">
-          <div class="brand-row">
-            <div class="brand-mark">K</div>
-            <button class="sidebar-toggle" aria-label="Collapse sidebar">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3ZM10 5v14" /></svg>
+          <div class="mode-switch" role="tablist" aria-label="Workspace modes">
+            <button class="mode-tab is-active" type="button" role="tab" aria-selected="true" data-mode="chat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A3.5 3.5 0 0 1 8.5 3h7A3.5 3.5 0 0 1 19 6.5v5A3.5 3.5 0 0 1 15.5 15H12l-4 4v-4A3.5 3.5 0 0 1 5 11.5Z" /></svg>
+              Chat
+            </button>
+            <button class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="cowork">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12M6 13h7M6 18h12M18 13l2 2-2 2" /></svg>
+              Cowork
+            </button>
+            <button class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="code">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18-6-6 6-6M15 6l6 6-6 6" /></svg>
+              Code
             </button>
           </div>
 
-          <button class="new-session">
+          <button class="new-session" type="button" data-action="new-chat">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-            <span>新建会话</span>
-            <kbd>Ctrl</kbd><kbd>K</kbd>
+            <span>New chat</span>
           </button>
 
           <nav class="nav-section" aria-label="Primary">
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h10v4l-3 3 3 3v4H7v-4l3-3-3-3Z" /></svg>
-              PPT
+            <button class="nav-item" type="button" data-section="projects">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7l2 2h7v9H4zM4 7V5h6l2 2" /></svg>
+              Projects
             </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h7l4 4v12H7zM14 4v5h5" /></svg>
-              文档
+            <button class="nav-item" type="button" data-section="artifacts">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM10 8h4M10 12h4M10 16h3" /></svg>
+              Artifacts
             </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18c5 0 10-4 10-10M7 14l3 3 7-7M5 20h14" /></svg>
-              深度研究
-            </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 10h16" /></svg>
-              网站
-            </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14" /></svg>
-              表格
-            </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7v10M17 7v10M12 4v16M7 12h10M5 7h4M15 17h4" /></svg>
-              Agent 集群
-            </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h8v8H8zM4 4l4 4M20 4l-4 4M4 20l4-4M20 20l-4-4" /></svg>
-              Kimi Code
-            </button>
-            <button class="nav-item">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8M8 12h8M6 17h12M4 4h16v16H4z" /></svg>
-              Kimi WebBridge
-            </button>
-            <button class="nav-item is-active">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15c0-5 3-8 6-8s6 3 6 8M8 15h8M9 19h6" /></svg>
-              Kimi Cowork
-              <span class="beta">Beta</span>
+            <button class="nav-item" type="button" data-section="customize">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3" /></svg>
+              Customize
             </button>
           </nav>
 
-          <div class="recent">
-            <div class="section-title">历史会话</div>
-            <button>Agent岗位要点</button>
-            <button>LRU缓存淘汰规则</button>
-            <button>合同摘要模板</button>
+          <div class="recent" aria-label="Recent chats">
+            <div class="section-title">Recents</div>
+            <button type="button" data-recent="Kimi Code 安全模式开启">Kimi Code 安全模式开启</button>
+            <button type="button" data-recent="Kimi Cowork 使用指南">Kimi Cowork 使用指南</button>
+            <button type="button" data-recent="查看Kimi额度消耗用量">查看Kimi额度消耗用量</button>
+            <button type="button" data-recent="物业管理KPI目标制定">物业管理KPI目标制定</button>
+            <button type="button" data-recent="Chinese language capability">Chinese language capability</button>
+            <button type="button" data-recent="Help me understand a complex topic">Help me understand a complex topic</button>
           </div>
 
           <div class="account">
@@ -111,43 +96,72 @@
 
         <section class="workspace" aria-label="Kimi Cowork workspace">
           <section class="hero">
-            <div class="kimi-word">KIMI</div>
+            <div class="greeting">
+              <span class="kimi-burst" aria-hidden="true"></span>
+              <h1>Back at it, Derrick</h1>
+            </div>
+
             <div class="composer" aria-label="Task composer">
-              <textarea placeholder="输入 “/” 可快速使用技能，也可以选择本地文件夹让 Kimi Cowork 操作"></textarea>
+              <textarea placeholder="How can Kimi help you today?"></textarea>
               <div class="composer-footer">
                 <div class="composer-actions">
-                  <button class="round-button" title="添加文件夹">
+                  <button class="round-button" type="button" title="Add files" data-action="local-folder">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                  </button>
-                  <button class="pill-button">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v10H5zM8 7V5h8v2M9 11h6M9 15h4" /></svg>
-                    本地文件夹
-                  </button>
-                  <button class="pill-button is-selected">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3" /></svg>
-                    Agent
                   </button>
                 </div>
                 <div class="model-actions">
-                  <button class="model-button">K2.6 思考 <span>⌄</span></button>
-                  <button class="send-button" aria-label="Send">
+                  <button class="model-button" type="button">K2.6 Extended <span>⌄</span></button>
+                  <button class="mic-button" type="button" aria-label="Voice input">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3ZM5 11v1a7 7 0 0 0 14 0v-1M12 19v3M8 22h8" /></svg>
+                  </button>
+                  <button class="send-button" type="button" aria-label="Send">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
                   </button>
                 </div>
               </div>
               <div class="ai-badge">AI</div>
             </div>
+
+            <div class="quick-actions" aria-label="Quick actions">
+              <button type="button" data-quick="code">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18-6-6 6-6M15 6l6 6-6 6" /></svg>
+                Code
+              </button>
+              <button type="button" data-quick="learn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7 12 3l8 4-8 4-8-4ZM6 10v5c2 2 10 2 12 0v-5" /></svg>
+                Learn
+              </button>
+              <button type="button" data-quick="write">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h5l11-11-5-5L4 15zM14 5l5 5" /></svg>
+                Write
+              </button>
+              <button type="button" data-quick="choice">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M5 5l3 3M16 16l3 3M3 12h4M17 12h4M5 19l3-3M16 8l3-3" /></svg>
+                Kimi's choice
+              </button>
+              <button type="button" data-quick="local-folder">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7l2 2h7v9H4z" /></svg>
+                From local folder
+              </button>
+            </div>
           </section>
 
-          <section class="cowork-panel" aria-label="Kimi Cowork controls">
+          <section class="chat-panel view-panel is-visible" data-views="chat" aria-live="polite">
+            <div class="chat-output" hidden>
+              <strong>Kimi</strong>
+              <p></p>
+            </div>
+          </section>
+
+          <section class="cowork-panel workbench-panel view-panel" data-views="cowork code" hidden>
             <div class="panel-header">
               <div>
-                <h1>Kimi Cowork</h1>
-                <p>读取本地文件夹、生成操作预览、审批后在本机执行。</p>
+                <h2 class="workbench-title">Kimi Cowork</h2>
+                <p class="workbench-copy">读取本地文件夹、生成操作预览、审批后在本机执行。</p>
               </div>
               <div class="status-pill">
-                <span></span>
-                Local Agent Ready
+                <span class="status-dot"></span>
+                <span class="status-text">Local Agent Ready</span>
               </div>
             </div>
 
@@ -199,8 +213,55 @@
                   <p>本地内容摘要已读取，等待审批执行。</p>
                   <code>.KimiCowork/audit/audit.jsonl</code>
                 </div>
-                <button class="approve-button">审批执行</button>
+                <button class="approve-button" type="button">审批执行</button>
               </article>
+            </div>
+          </section>
+
+          <section class="library-panel view-panel" data-views="projects" hidden>
+            <div class="library-header">
+              <h2>Projects</h2>
+              <button type="button" data-action="new-project">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                New project
+              </button>
+            </div>
+            <div class="library-list">
+              <button type="button" data-project="Kimi Cowork Desktop">
+                <strong>Kimi Cowork Desktop</strong>
+                <span>Windows C client / local agent / Kimi-only MVP</span>
+              </button>
+              <button type="button" data-project="Local Agent Playbook">
+                <strong>Local Agent Playbook</strong>
+                <span>可信目录、审批、审计、回滚</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="library-panel view-panel" data-views="artifacts" hidden>
+            <div class="library-header">
+              <h2>Artifacts</h2>
+            </div>
+            <div class="artifact-list">
+              <button type="button" data-artifact=".KimiCowork/artifacts">
+                <strong>Kimi Cowork 执行计划</strong>
+                <span>.KimiCowork/artifacts</span>
+              </button>
+              <button type="button" data-artifact=".KimiCowork/audit">
+                <strong>审计日志</strong>
+                <span>.KimiCowork/audit/host-events.jsonl</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="library-panel view-panel" data-views="customize" hidden>
+            <div class="library-header">
+              <h2>Customize</h2>
+            </div>
+            <div class="settings-list">
+              <label><input type="checkbox" checked /> 审批前总是预览 diff</label>
+              <label><input type="checkbox" checked /> 仅允许可信工作区内读写</label>
+              <label><input type="checkbox" checked /> Kimi-only agent backend</label>
             </div>
           </section>
         </section>

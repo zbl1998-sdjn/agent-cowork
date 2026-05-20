@@ -229,8 +229,21 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("Kimi Cowork")) resolve(true);
+          if (document.readyState === "complete" && document.body.innerText.includes("Back at it, Derrick")) resolve(true);
           else if (Date.now() > deadline) reject(new Error("page did not render"));
+          else setTimeout(tick, 50);
+        }
+        tick();
+      })`,
+    );
+    await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000;
+        function tick() {
+          const status = document.querySelector(".status-pill")?.innerText.trim();
+          if (status === "Local Agent Ready") resolve(true);
+          else if (Date.now() > deadline) reject(new Error("workspace did not become ready"));
           else setTimeout(tick, 50);
         }
         tick();
@@ -250,17 +263,21 @@ async function main() {
         return {
           title: document.title,
           status: document.querySelector(".status-pill")?.innerText.trim(),
-          hasKimi: text.includes("KIMI"),
+          activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
+          hasGreeting: text.includes("Back at it, Derrick"),
           hasCowork: text.includes("Kimi Cowork"),
-          hasLocalFolder: text.includes("本地文件夹"),
-          hasApprove: text.includes("审批执行"),
+          hasModeTabs: text.includes("Chat") && text.includes("Cowork") && text.includes("Code"),
+          hasSidebarActions: text.includes("New chat") && text.includes("Projects") && text.includes("Artifacts") && text.includes("Customize"),
+          hasQuickActions: text.includes("Code") && text.includes("Learn") && text.includes("Write") && text.includes("Kimi's choice") && text.includes("From local folder"),
           hasFrameworkOverlay: /vite|webpack|next\\\\.js|runtime error/i.test(text),
           scroll
         };
       })()`,
     );
     assert(desktopLayout.title === 'Kimi Cowork', 'rendered page title mismatch');
-    assert(desktopLayout.hasKimi && desktopLayout.hasCowork && desktopLayout.hasLocalFolder, 'rendered page missing core Kimi UI text');
+    assert(desktopLayout.activeMode === 'Chat', 'rendered page should default to Chat mode');
+    assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
+    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Kimi cowork quick actions');
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'desktop layout has horizontal overflow');
 
@@ -273,6 +290,7 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    await evaluate({ send: sendPage }, `document.querySelector('[data-mode="cowork"]').click()`);
     const compactLayout = await evaluate(
       { send: sendPage },
       `(() => {
@@ -311,6 +329,7 @@ async function main() {
     const interaction = await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {
+        document.querySelector('[data-mode="cowork"]').click();
         const textarea = document.querySelector(".composer textarea");
         const send = document.querySelector(".send-button");
         const approve = document.querySelector(".approve-button");
