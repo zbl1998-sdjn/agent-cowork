@@ -2,6 +2,7 @@
 #include "native_bridge.h"
 
 #include <shlobj.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <wchar.h>
@@ -9,6 +10,8 @@
 static const wchar_t *KCW_CLASS_NAME = L"KimiCoworkWindow";
 
 #define KCW_MAX_FILES 240
+#define KCW_CONTEXT_MAX_FILES 3
+#define KCW_CONTEXT_SNIPPET_BYTES 768
 #define KCW_TEMPLATE_COUNT 8
 #define KCW_NAV_COUNT 9
 
@@ -382,10 +385,35 @@ static bool kcw_has_document_extension(const wchar_t *name) {
            _wcsicmp(dot, L".txt") == 0 || _wcsicmp(dot, L".md") == 0 || _wcsicmp(dot, L".pptx") == 0;
 }
 
+static bool kcw_has_text_summary_extension(const wchar_t *name) {
+    const wchar_t *dot = wcsrchr(name, L'.');
+    if (!dot) {
+        return false;
+    }
+    return _wcsicmp(dot, L".txt") == 0 || _wcsicmp(dot, L".md") == 0 || _wcsicmp(dot, L".csv") == 0;
+}
+
 static bool kcw_skip_directory(const wchar_t *name) {
     return _wcsicmp(name, L".git") == 0 || _wcsicmp(name, L"node_modules") == 0 ||
            _wcsicmp(name, L"build") == 0 || _wcsicmp(name, L"dist") == 0 ||
            _wcsicmp(name, L".KimiCowork") == 0;
+}
+
+static void kcw_append_text(wchar_t *out, size_t out_len, const wchar_t *text) {
+    if (!out || out_len == 0 || !text) {
+        return;
+    }
+    wcsncat_s(out, out_len, text, _TRUNCATE);
+}
+
+static void kcw_append_format(wchar_t *out, size_t out_len, const wchar_t *format, ...) {
+    wchar_t line[1200];
+    line[0] = L'\0';
+    va_list args;
+    va_start(args, format);
+    vswprintf_s(line, sizeof(line) / sizeof(line[0]), format, args);
+    va_end(args);
+    kcw_append_text(out, out_len, line);
 }
 
 static void kcw_join_path(wchar_t *out, size_t out_len, const wchar_t *base, const wchar_t *child) {
@@ -394,6 +422,144 @@ static void kcw_join_path(wchar_t *out, size_t out_len, const wchar_t *base, con
         return;
     }
     swprintf_s(out, out_len, L"%s\\%s", base, child);
+}
+
+static void kcw_normalize_snippet(wchar_t *value) {
+    bool previous_space = false;
+    wchar_t *write = value;
+    for (wchar_t *read = value; read && *read; read++) {
+        wchar_t ch = *read;
+        bool is_space = ch == L'\r' || ch == L'\n' || ch == L'\t' || ch == L' ';
+        if (is_space) {
+            if (!previous_space) {
+                *write++ = L' ';
+                previous_space = true;
+            }
+            continue;
+        }
+        *write++ = ch;
+        previous_space = false;
+    }
+    *write = L'\0';
+    kcw_trim_trailing_spaces_local(value);
+}
+
+static bool kcw_read_text_snippet(const wchar_t *relative, wchar_t *snippet, size_t snippet_len, DWORD *size_out) {
+    if (!relative || relative[0] == L'\0' || !snippet || snippet_len == 0 || g_app.trusted_root[0] == L'\0') {
+        return false;
+    }
+    snippet[0] = L'\0';
+
+    wchar_t full_path[MAX_PATH];
+    kcw_join_path(full_path, sizeof(full_path) / sizeof(full_path[0]), g_app.trusted_root, relative);
+
+    WIN32_FILE_ATTRIBUTE_DATA attrs;
+    if (!GetFileAttributesExW(full_path, GetFileExInfoStandard, &attrs)) {
+        return false;
+    }
+    if ((attrs.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || attrs.nFileSizeHigh != 0) {
+        return false;
+    }
+    if (size_out) {
+        *size_out = attrs.nFileSizeLow;
+    }
+
+    HANDLE file = CreateFileW(full_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    char bytes[KCW_CONTEXT_SNIPPET_BYTES + 1];
+    DWORD bytes_read = 0;
+    BOOL ok = ReadFile(file, bytes, KCW_CONTEXT_SNIPPET_BYTES, &bytes_read, NULL);
+    CloseHandle(file);
+    if (!ok || bytes_read == 0) {
+        return false;
+    }
+
+    for (DWORD i = 0; i < bytes_read; i++) {
+        if (bytes[i] == '\0') {
+            return false;
+        }
+    }
+    bytes[bytes_read] = '\0';
+
+    const char *input = bytes;
+    int input_len = (int)bytes_read;
+    if (bytes_read >= 3 && (unsigned char)bytes[0] == 0xEF && (unsigned char)bytes[1] == 0xBB && (unsigned char)bytes[2] == 0xBF) {
+        input += 3;
+        input_len -= 3;
+    }
+
+    int converted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, input, input_len, snippet, (int)snippet_len - 1);
+    if (converted == 0) {
+        converted = MultiByteToWideChar(CP_ACP, 0, input, input_len, snippet, (int)snippet_len - 1);
+    }
+    if (converted <= 0) {
+        snippet[0] = L'\0';
+        return false;
+    }
+    snippet[converted] = L'\0';
+    kcw_normalize_snippet(snippet);
+    return snippet[0] != L'\0';
+}
+
+static void kcw_build_context_summary(wchar_t *out, size_t out_len, int *read_count_out, int *skipped_count_out) {
+    if (!out || out_len == 0) {
+        return;
+    }
+    out[0] = L'\0';
+    int read_count = 0;
+    int skipped_count = 0;
+
+    kcw_append_text(out, out_len, L"本地内容摘要\r\n");
+    if (g_app.trusted_root[0] == L'\0' || g_app.file_count <= 0) {
+        kcw_append_text(out, out_len, L"- 尚未选择信任工作区或未扫描到可处理文件。\r\n\r\n");
+        if (read_count_out) {
+            *read_count_out = 0;
+        }
+        if (skipped_count_out) {
+            *skipped_count_out = 0;
+        }
+        return;
+    }
+
+    for (int i = 0; i < g_app.file_count; i++) {
+        const wchar_t *relative = g_app.file_paths[i];
+        if (!kcw_has_text_summary_extension(relative)) {
+            skipped_count++;
+            continue;
+        }
+
+        wchar_t snippet[512];
+        DWORD file_size = 0;
+        if (!kcw_read_text_snippet(relative, snippet, sizeof(snippet) / sizeof(snippet[0]), &file_size)) {
+            skipped_count++;
+            continue;
+        }
+
+        kcw_append_format(out, out_len, L"- %s (%lu bytes)：%s\r\n", relative, (unsigned long)file_size, snippet);
+        read_count++;
+        if (read_count >= KCW_CONTEXT_MAX_FILES) {
+            skipped_count += g_app.file_count - i - 1;
+            break;
+        }
+    }
+
+    if (read_count == 0) {
+        kcw_append_text(out, out_len, L"- 已扫描文件，但当前只预览 TXT / Markdown / CSV；PDF / Office 文件会留给后续解析器处理。\r\n");
+    }
+    if (skipped_count > 0) {
+        kcw_append_format(out, out_len, L"- 跳过：%d 个二进制、Office/PDF、不可读或超出本轮摘要上限的文件。\r\n", skipped_count);
+    }
+    kcw_append_text(out, out_len, L"\r\n");
+
+    if (read_count_out) {
+        *read_count_out = read_count;
+    }
+    if (skipped_count_out) {
+        *skipped_count_out = skipped_count;
+    }
 }
 
 static const wchar_t *kcw_file_name_from_relative(const wchar_t *relative) {
@@ -756,6 +922,15 @@ static void kcw_generate_plan(HWND window) {
     const wchar_t *root = g_app.trusted_root[0] ? g_app.trusted_root : L"尚未选择";
     const wchar_t *template_name = KCW_TEMPLATES[g_app.selected_template];
 
+    wchar_t context_summary[2500];
+    int context_read_count = 0;
+    int context_skipped_count = 0;
+    kcw_build_context_summary(
+        context_summary,
+        sizeof(context_summary) / sizeof(context_summary[0]),
+        &context_read_count,
+        &context_skipped_count);
+
     wchar_t move_preview[1024];
     if (kcw_build_pending_move_preview()) {
         swprintf_s(
@@ -776,7 +951,7 @@ static void kcw_generate_plan(HWND window) {
             L"- 当前没有可移动文件，审批只生成安全产物、审计和回滚日志。\r\n\r\n");
     }
 
-    wchar_t plan[8192];
+    wchar_t plan[12000];
     swprintf_s(
         plan,
         sizeof(plan) / sizeof(plan[0]),
@@ -786,7 +961,10 @@ static void kcw_generate_plan(HWND window) {
         L"信任工作区：%s\r\n"
         L"任务模板：%s\r\n"
         L"可处理文件：%d\r\n"
+        L"已读取摘要文件：%d\r\n"
+        L"摘要跳过文件：%d\r\n"
         L"用户任务：%s\r\n\r\n"
+        L"%s"
         L"计划步骤\r\n"
         L"1. 只读取信任工作区内的 PDF / DOCX / XLSX / CSV / TXT / Markdown 文件。\r\n"
         L"2. 提取摘要、分类、关键字段和待办事项，生成结构化中间结果。\r\n"
@@ -800,7 +978,10 @@ static void kcw_generate_plan(HWND window) {
         root,
         template_name,
         g_app.file_count,
+        context_read_count,
+        context_skipped_count,
         prompt,
+        context_summary,
         move_preview);
 
     SetWindowTextW(g_app.artifact_edit, plan);
@@ -816,7 +997,7 @@ static void kcw_approve_plan(HWND window) {
         return;
     }
 
-    wchar_t current[8192] = L"";
+    wchar_t current[12000] = L"";
     GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
     if (wcsstr(current, L"Kimi Cowork 执行计划") == NULL) {
         kcw_generate_plan(window);
@@ -838,7 +1019,7 @@ static void kcw_approve_plan(HWND window) {
         move_applied = kcw_apply_pending_move(move_error, sizeof(move_error) / sizeof(move_error[0]));
     }
 
-    wchar_t approved[8192];
+    wchar_t approved[14000];
     if (wrote_artifact) {
         if (had_move_preview && move_applied) {
             swprintf_s(
