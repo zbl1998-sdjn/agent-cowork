@@ -61,6 +61,9 @@ typedef struct KcwAppState {
 
     wchar_t trusted_root[MAX_PATH];
     wchar_t status_line[256];
+    wchar_t last_artifact_path[MAX_PATH];
+    wchar_t last_audit_path[MAX_PATH];
+    wchar_t last_rollback_path[MAX_PATH];
     int selected_template;
     int file_count;
 } KcwAppState;
@@ -449,6 +452,143 @@ static void kcw_scan_trusted_root(void) {
     kcw_set_status(status);
 }
 
+static bool kcw_ensure_directory(const wchar_t *path) {
+    DWORD attributes = GetFileAttributesW(path);
+    if (attributes != INVALID_FILE_ATTRIBUTES) {
+        return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    }
+    return CreateDirectoryW(path, NULL) != 0 || GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
+static bool kcw_prepare_app_directories(wchar_t *artifacts_dir, size_t artifacts_len, wchar_t *audit_dir, size_t audit_len, wchar_t *rollback_dir, size_t rollback_len) {
+    if (g_app.trusted_root[0] == L'\0') {
+        return false;
+    }
+
+    wchar_t app_dir[MAX_PATH];
+    swprintf_s(app_dir, sizeof(app_dir) / sizeof(app_dir[0]), L"%s\\.KimiCowork", g_app.trusted_root);
+    swprintf_s(artifacts_dir, artifacts_len, L"%s\\artifacts", app_dir);
+    swprintf_s(audit_dir, audit_len, L"%s\\audit", app_dir);
+    swprintf_s(rollback_dir, rollback_len, L"%s\\rollback", app_dir);
+
+    return kcw_ensure_directory(app_dir) && kcw_ensure_directory(artifacts_dir) && kcw_ensure_directory(audit_dir) && kcw_ensure_directory(rollback_dir);
+}
+
+static void kcw_make_batch_id(wchar_t *batch_id, size_t batch_len) {
+    SYSTEMTIME now;
+    GetLocalTime(&now);
+    swprintf_s(
+        batch_id,
+        batch_len,
+        L"%04u%02u%02u-%02u%02u%02u-%03u",
+        now.wYear,
+        now.wMonth,
+        now.wDay,
+        now.wHour,
+        now.wMinute,
+        now.wSecond,
+        now.wMilliseconds);
+}
+
+static void kcw_json_write_string(FILE *file, const wchar_t *value) {
+    fputwc(L'"', file);
+    for (const wchar_t *cursor = value; cursor && *cursor; cursor++) {
+        wchar_t ch = *cursor;
+        if (ch == L'\\' || ch == L'"') {
+            fputwc(L'\\', file);
+            fputwc(ch, file);
+        } else if (ch == L'\r') {
+            fwprintf(file, L"\\r");
+        } else if (ch == L'\n') {
+            fwprintf(file, L"\\n");
+        } else if (ch == L'\t') {
+            fwprintf(file, L"\\t");
+        } else {
+            fputwc(ch, file);
+        }
+    }
+    fputwc(L'"', file);
+}
+
+static bool kcw_write_approved_artifact(const wchar_t *plan_text, wchar_t *error, size_t error_len) {
+    wchar_t artifacts_dir[MAX_PATH];
+    wchar_t audit_dir[MAX_PATH];
+    wchar_t rollback_dir[MAX_PATH];
+    if (!kcw_prepare_app_directories(artifacts_dir, sizeof(artifacts_dir) / sizeof(artifacts_dir[0]), audit_dir, sizeof(audit_dir) / sizeof(audit_dir[0]), rollback_dir, sizeof(rollback_dir) / sizeof(rollback_dir[0]))) {
+        wcsncpy_s(error, error_len, L"无法创建 .KimiCowork 本地产物目录。", _TRUNCATE);
+        return false;
+    }
+
+    wchar_t batch_id[64];
+    kcw_make_batch_id(batch_id, sizeof(batch_id) / sizeof(batch_id[0]));
+
+    wchar_t artifact_path[MAX_PATH];
+    wchar_t audit_path[MAX_PATH];
+    wchar_t rollback_path[MAX_PATH];
+    swprintf_s(artifact_path, sizeof(artifact_path) / sizeof(artifact_path[0]), L"%s\\office-plan-%s.md", artifacts_dir, batch_id);
+    swprintf_s(audit_path, sizeof(audit_path) / sizeof(audit_path[0]), L"%s\\audit.jsonl", audit_dir);
+    swprintf_s(rollback_path, sizeof(rollback_path) / sizeof(rollback_path[0]), L"%s\\rollback-%s.jsonl", rollback_dir, batch_id);
+
+    if (GetFileAttributesW(artifact_path) != INVALID_FILE_ATTRIBUTES || GetFileAttributesW(rollback_path) != INVALID_FILE_ATTRIBUTES) {
+        wcsncpy_s(error, error_len, L"产物文件已存在，已停止以避免覆盖。", _TRUNCATE);
+        return false;
+    }
+
+    FILE *artifact = NULL;
+    if (_wfopen_s(&artifact, artifact_path, L"w, ccs=UTF-8") != 0 || !artifact) {
+        wcsncpy_s(error, error_len, L"无法写入 Markdown 产物。", _TRUNCATE);
+        return false;
+    }
+    fwprintf(
+        artifact,
+        L"# Kimi Cowork Office Mode 产物\n\n"
+        L"- Batch ID: %s\n"
+        L"- Trusted Workspace: %s\n"
+        L"- Template: %s\n"
+        L"- Scanned Files: %d\n"
+        L"- Safety: approval required, no overwrite, no delete, no upload\n\n"
+        L"## Approved Plan\n\n%s\n",
+        batch_id,
+        g_app.trusted_root,
+        KCW_TEMPLATES[g_app.selected_template],
+        g_app.file_count,
+        plan_text);
+    fclose(artifact);
+
+    FILE *audit = NULL;
+    if (_wfopen_s(&audit, audit_path, L"a, ccs=UTF-8") != 0 || !audit) {
+        wcsncpy_s(error, error_len, L"产物已写入，但审计日志写入失败。", _TRUNCATE);
+        return false;
+    }
+    fwprintf(audit, L"{\"event\":\"approval_apply\",\"batch_id\":");
+    kcw_json_write_string(audit, batch_id);
+    fwprintf(audit, L",\"template\":");
+    kcw_json_write_string(audit, KCW_TEMPLATES[g_app.selected_template]);
+    fwprintf(audit, L",\"trusted_root\":");
+    kcw_json_write_string(audit, g_app.trusted_root);
+    fwprintf(audit, L",\"artifact_path\":");
+    kcw_json_write_string(audit, artifact_path);
+    fwprintf(audit, L",\"scanned_files\":%d,\"status\":\"done\"}\n", g_app.file_count);
+    fclose(audit);
+
+    FILE *rollback = NULL;
+    if (_wfopen_s(&rollback, rollback_path, L"w, ccs=UTF-8") != 0 || !rollback) {
+        wcsncpy_s(error, error_len, L"产物和审计已写入，但回滚日志写入失败。", _TRUNCATE);
+        return false;
+    }
+    fwprintf(rollback, L"{\"batch_id\":");
+    kcw_json_write_string(rollback, batch_id);
+    fwprintf(rollback, L",\"operation\":\"write_new_artifact\",\"artifact_path\":");
+    kcw_json_write_string(rollback, artifact_path);
+    fwprintf(rollback, L",\"rollback\":\"remove_created_artifact_after_user_confirmation\",\"status\":\"ready\"}\n");
+    fclose(rollback);
+
+    wcsncpy_s(g_app.last_artifact_path, sizeof(g_app.last_artifact_path) / sizeof(g_app.last_artifact_path[0]), artifact_path, _TRUNCATE);
+    wcsncpy_s(g_app.last_audit_path, sizeof(g_app.last_audit_path) / sizeof(g_app.last_audit_path[0]), audit_path, _TRUNCATE);
+    wcsncpy_s(g_app.last_rollback_path, sizeof(g_app.last_rollback_path) / sizeof(g_app.last_rollback_path[0]), rollback_path, _TRUNCATE);
+    return true;
+}
+
 static void kcw_show_workspace_ready(void) {
     kcw_scan_trusted_root();
 
@@ -522,6 +662,13 @@ static void kcw_generate_plan(HWND window) {
 }
 
 static void kcw_approve_plan(HWND window) {
+    if (g_app.trusted_root[0] == L'\0') {
+        SetWindowTextW(g_app.artifact_edit, L"请先选择本地信任工作区。审批执行只会写入该工作区内的 .KimiCowork 安全产物目录。");
+        kcw_set_status(L"审批被阻止：尚未选择信任工作区。");
+        InvalidateRect(window, NULL, TRUE);
+        return;
+    }
+
     wchar_t current[4096] = L"";
     GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
     if (wcsstr(current, L"Kimi Cowork 执行计划") == NULL) {
@@ -529,14 +676,30 @@ static void kcw_approve_plan(HWND window) {
         GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
     }
 
+    wchar_t error[256] = L"";
+    bool wrote_artifact = kcw_write_approved_artifact(current, error, sizeof(error) / sizeof(error[0]));
+
     wchar_t approved[4096];
-    swprintf_s(
-        approved,
-        sizeof(approved) / sizeof(approved[0]),
-        L"%s\r\n审批记录\r\n- 状态：approved\r\n- 本轮仅执行安全预览，不覆盖、不删除、不自动上传。\r\n- 下一步：接入 Go Local Agent 后写入 SQLite task_events / approvals / audit_logs。\r\n",
-        current);
+    if (wrote_artifact) {
+        swprintf_s(
+            approved,
+            sizeof(approved) / sizeof(approved[0]),
+            L"%s\r\n审批记录\r\n- 状态：approved_applied\r\n- 已写入 Markdown 产物：%s\r\n- 审计日志：%s\r\n- 回滚日志：%s\r\n- 本轮不覆盖、不删除、不自动上传。\r\n",
+            current,
+            g_app.last_artifact_path,
+            g_app.last_audit_path,
+            g_app.last_rollback_path);
+        kcw_set_status(L"审批已执行：产物、审计日志和回滚日志已写入本地工作区。");
+    } else {
+        swprintf_s(
+            approved,
+            sizeof(approved) / sizeof(approved[0]),
+            L"%s\r\n审批记录\r\n- 状态：apply_failed\r\n- 原因：%s\r\n- 未覆盖、未删除、未上传任何用户文件。\r\n",
+            current,
+            error[0] ? error : L"未知错误");
+        kcw_set_status(L"审批执行失败，未改动用户文件。");
+    }
     SetWindowTextW(g_app.artifact_edit, approved);
-    kcw_set_status(L"审批已记录。当前版本仍处于安全预览阶段。");
     InvalidateRect(window, NULL, TRUE);
 }
 

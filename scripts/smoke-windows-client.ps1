@@ -205,6 +205,23 @@ try {
     Start-Sleep -Milliseconds 300
     $artifactText = [KcwSmokeWin32]::Text($artifact.Hwnd)
     Assert-True ($artifactText.Contains("审批记录")) "Approval did not append approval record"
+    Assert-True ($artifactText.Contains("approved_applied")) "Approval did not apply the approved artifact"
+
+    $artifactDir = Join-Path $workspace ".KimiCowork\artifacts"
+    $auditPath = Join-Path $workspace ".KimiCowork\audit\audit.jsonl"
+    $rollbackDir = Join-Path $workspace ".KimiCowork\rollback"
+    $artifactFiles = @(Get-ChildItem -LiteralPath $artifactDir -Filter "office-plan-*.md" -File -ErrorAction SilentlyContinue)
+    $rollbackFiles = @(Get-ChildItem -LiteralPath $rollbackDir -Filter "rollback-*.jsonl" -File -ErrorAction SilentlyContinue)
+    Assert-True ($artifactFiles.Count -eq 1) "Expected one generated Markdown artifact, got $($artifactFiles.Count)"
+    Assert-True (Test-Path -LiteralPath $auditPath) "Audit log was not created: $auditPath"
+    Assert-True ($rollbackFiles.Count -eq 1) "Expected one rollback journal, got $($rollbackFiles.Count)"
+
+    $generatedArtifact = Get-Content -LiteralPath $artifactFiles[0].FullName -Raw
+    $auditLog = Get-Content -LiteralPath $auditPath -Raw
+    $rollbackLog = Get-Content -LiteralPath $rollbackFiles[0].FullName -Raw
+    Assert-True ($generatedArtifact.Contains("Kimi Cowork Office Mode 产物")) "Generated artifact content is missing title"
+    Assert-True ($auditLog.Contains('"event":"approval_apply"')) "Audit log does not contain approval_apply event"
+    Assert-True ($rollbackLog.Contains('"operation":"write_new_artifact"')) "Rollback log does not contain write_new_artifact operation"
 
     [KcwSmokeWin32]::SendMessage($developer.Hwnd, $bmClick, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 300
@@ -217,6 +234,9 @@ try {
         ScannedFiles = $fileCount
         GeneratePlan = "passed"
         Approve = "passed"
+        ArtifactPath = $artifactFiles[0].FullName
+        AuditPath = $auditPath
+        RollbackPath = $rollbackFiles[0].FullName
         DeveloperMode = "passed"
     }
 }
