@@ -42,7 +42,7 @@
 | 对话流主区 (conversation timeline) | 🟡 | 静态 HTML/CSS/JS 版已上, 已补 Tauri/React 组件迁移清单; 真实 React 运行时仍待接入 |
 | 用户/Assistant 气泡 | ✅ | message bubble controller 已落地 |
 | 进度行 (ProgressLine) | ✅ | 前端已接 `EventSource` 订阅 SSE, 由服务端权威事件流驱动 (老 webview 无 EventSource 时降级到同步渲染) |
-| SSE event stream | ✅ | 后端 `GET /api/runs/:id/events` (RunEventBus + Last-Event-ID + 持久 events[] 重放) + **前端 `subscribeRunEvents` 用 EventSource 实接**; recipe 流发 user_message→assistant_start→progress→preview→awaiting_approval→sources→assistant_end |
+| SSE event stream | ✅ | 后端 `GET /api/runs/:id/events` (RunEventBus + Last-Event-ID + 持久 events[] 重放) + **前端 `app-run-events.js` 的 `subscribeRunEvents` 用 EventSource 实接**; recipe 流发 user_message→assistant_start→progress→preview→awaiting_approval→sources→assistant_end |
 | 操作预览卡 (PreviewCard) | ✅ | 内嵌气泡, 跟随对话流 |
 | 审批按钮 (ApprovalActions) | ✅ | 内嵌, 不再固定面板 |
 | 产物卡 (ArtifactCard) | ✅ | 跟着对话气泡走 |
@@ -73,7 +73,7 @@
 | MCP 客户端 | ❌ | 0 实现, 仍在 plan v0.3 V1 阶段 |
 | 外部 SaaS 连接器 (Slack/Notion/Gmail/...) | ❌ | 0 实现 |
 | 工具懒加载 (ToolSearch 等价) | ❌ | 当前全暴露 |
-| Scheduled Tasks | ✅ | `apps/host/src/runtime/scheduler.js` + cron 解析器 (零依赖); `/api/schedules` CRUD + `_tick`; cron + 一次性; tenant 隔离; create 强制 Idempotency-Key; 默认 executor 已接 `runRecipe` 真正产出可审批产物 + 入索引; 文件 store + SQLite store adapter |
+| Scheduled Tasks | ✅ | `apps/host/src/runtime/scheduler.js` + cron 解析器 (零依赖); `/api/schedules` CRUD + `_tick`; cron + 一次性; tenant 隔离; create/cancel/delete/_tick 均强制 Idempotency-Key, 手动 tick 只触发当前 tenant; 默认 executor 已接 `runRecipe` 真正产出可审批产物 + 入索引; 文件 store + SQLite store adapter |
 | Memory 跨会话 (MEMORY.md) | ✅ | `apps/host/src/memory/memory-store.js`; `/api/memory` + facts/notes; Kimi CLI plan/chat 调用前自动注入; 文件 store + SQLite facts/notes adapter; SQLite 写入同样落 memory audit |
 | Runs 索引 (Repository 形态) | ✅ | `apps/host/src/runtime/runs-index.js` JSONL append-only file adapter + `SqliteRunsIndex`, ULID 主键, tenant 隔离, `/api/runs/index`; legacy `/api/runs`、`/api/tasks`、`/api/runs/:id/events` 也已按 tenant 收口 |
 | SQLite 持久化 | ✅ | `KCW_STORE=sqlite` / `storeBackend:'sqlite'` 可切 Memory facts/notes、Runs index、Schedules 到 Node 内置 `node:sqlite`; schema 走 `apps/host/src/storage/migrations/0001_init.sql`, migration 逐文件事务化 |
@@ -91,7 +91,7 @@
 | 1 | tenant_id / user_id / trace_id / version | 🟡 | Host API 已注入 + 响应头返回; runs-index / scheduler / memory 三个新模块都按 tenant 隔离 + version 乐观锁; Node 侧默认值仍是 `tenant_local`/`user_local` (待 Phase B auth 填真值) |
 | 2 | ULID/UUIDv7 主键 (不用自增 INT) | 🟡 | Go domain 有 ULID 工厂; Node 侧 `runs-index.js` 已加 `createUlid()` (Crockford base32, 时间前缀可排序), schedule id 用 `sched_` 前缀 ULID; 旧 runs/*.json 仍用 timestamp runId |
 | 3 | Ports & Adapters | 🟡 | Go 侧 Port 接口已定 (Repository/LLMClient/SandboxPort/BlobStore/EventBus/JobQueue); Node host 仍直接读写 fs |
-| 4 | Idempotency-Key 关键写接口 | ✅ | `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create 已强制; cache key 绑定 tenant/user/path/key + body fingerprint, 同 key 不同 body 409 |
+| 4 | Idempotency-Key 关键写接口 | ✅ | `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create/cancel/delete/_tick 已强制; cache key 绑定 tenant/user/path/key + body fingerprint, 同 key 不同 body 409 |
 | 5 | Schema migration 工具 | ✅ | `apps/host/src/storage/sqlite.js` 极简 migration runner + `migrations/0001_init.sql`; 每个 migration 文件在 `BEGIN IMMEDIATE` 事务内执行并记录 |
 | 6 | 文件路径不进业务表 (blob_id + CAS) | ❌ | runs/*.json 还在用路径字段 |
 | 7 | Audit 走 EventBus 异步 | ✅ | `AuditEventBus` + JSONL subscriber 已落地; memory audit 不再 inline 同步写 hot path, SQLite memory 写入同样发 audit, `flush` 会暴露 subscriber failure |
@@ -462,7 +462,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - **tenant 隔离补齐**:
   - `/api/runs`、`/api/tasks`、`/api/runs/:id`、`/api/runs/:id/events` 均按 request tenant 过滤; 其他 tenant 读取返回空列表或 404。
 - **Idempotency-Key 收口**:
-  - `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create 强制 `Idempotency-Key`。
+  - `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create/cancel/delete/_tick 强制 `Idempotency-Key`。
   - idempotency cache 增加稳定 body fingerprint; 同 tenant/user/path/key 但 body 不同返回 409, 防止错体复用旧结果。
 - **SQLite / audit 修复**:
   - `SqliteMemoryStore` 的 facts/notes 写入同样发布 memory audit JSONL。
@@ -487,3 +487,42 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `npm run smoke:host` 通过。
 - `npm run smoke:tauri-scaffold` 通过, 仍报告本机 `cargo` / `rustc` / `cargo tauri` 不可用, 因此未做真实 Tauri dev window/installer 验收。
 - `go test ./...` (`services/kimi-gateway`) 通过。
+
+---
+
+## 17. 2026-05-21 本轮实现 (God-class split + schedule hardening)
+
+接续深度 review, 本轮继续拆分 `server.js` / `app.js` 上帝文件, 并修复 review agent 发现的 schedule mutation 与 JSON body byte limit 问题。
+
+已落地:
+
+- **后端上帝类拆分**:
+  - `apps/host/src/routes/memory-routes.js`: 承接 `/api/memory`、facts、notes。
+  - `apps/host/src/routes/run-routes.js`: 承接 `/api/tasks`、runs index、run detail、SSE events。
+  - `apps/host/src/routes/schedule-routes.js`: 承接 schedules CRUD 与 `_tick`。
+  - `apps/host/src/server.js` 降到约 592 行, 继续保留 `createServer(config)` 入口。
+- **前端上帝类拆分**:
+  - `apps/windows-client/resources/app-api-client.js`: 承接 `getJson` / `postJson` 和 idempotency header 注入。
+  - `apps/windows-client/resources/app-run-events.js`: 承接 SSE event payload 渲染与 `EventSource` 订阅。
+  - `index.html` 和 Host 静态白名单同步新增两个 classic script; smoke 会解析所有 script 逐个 GET。
+- **schedule hardening**:
+  - `/api/schedules/<id>/cancel`、`DELETE /api/schedules/<id>`、`POST /api/schedules/_tick` 均强制 `Idempotency-Key`。
+  - cancel/delete 先校验 schedule 属于当前 request tenant; 跨租户返回 404。
+  - 手动 `_tick` 只触发当前 tenant 的 due schedules, 不能替其他 tenant 触发任务。
+- **request body limit 修复**:
+  - `readJsonBody` 改为按 UTF-8 byte length 累计 chunk, 不再用 JS 字符长度低估 CJK/emoji payload。
+- **run id 错误收口**:
+  - `GET /api/runs/:id` 非法 id 返回 400, 与 SSE route 行为一致。
+
+新增/更新测试:
+
+- `apps/host/test/request-utils.test.js` 覆盖多字节 JSON body 超限。
+- `apps/host/test/server-security.test.js` 覆盖 schedule mutation 缺 idempotency key 与跨租户 cancel/delete/tick。
+- `apps/host/test/server-runtime-features.test.js` 覆盖 schedule mutation 正常路径 idempotency header、run detail 非法 id。
+- `apps/host/test/server.test.js` 和 `scripts/smoke-ui-contract.mjs` 覆盖新增前端静态脚本。
+
+验收:
+
+- `node --check apps/windows-client/resources/app.js` 通过。
+- `node --test --test-isolation=none` 全量通过。
+- `npm run smoke:ui` 通过。

@@ -190,6 +190,23 @@ test('critical writes require Idempotency-Key and reject same key with different
     });
     assert.equal(scheduleMissing.status, 428);
 
+    const scheduled = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'schedule-for-mutations' },
+      body: { name: 'cancel target', fireAt: new Date(Date.now() + 60_000).toISOString(), payload: {} },
+    });
+    assert.equal(scheduled.status, 200);
+    const scheduleId = scheduled.body.schedule.id;
+
+    const tickMissing = await jsonRequest(base, '/api/schedules/_tick', { method: 'POST' });
+    assert.equal(tickMissing.status, 428);
+
+    const cancelMissing = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, { method: 'POST' });
+    assert.equal(cancelMissing.status, 428);
+
+    const deleteMissing = await jsonRequest(base, `/api/schedules/${scheduleId}`, { method: 'DELETE' });
+    assert.equal(deleteMissing.status, 428);
+
     const first = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
       headers: { 'idempotency-key': 'same-key' },
@@ -213,6 +230,89 @@ test('critical writes require Idempotency-Key and reject same key with different
     });
     assert.equal(mismatch.status, 409);
     assert.match(mismatch.body.error, /reused/i);
+  } finally {
+    await close(server);
+  }
+});
+
+test('schedule mutation routes are tenant scoped', async () => {
+  const trustedRoot = tempRoot();
+  const fired = [];
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    scheduleExecutor: async (record) => {
+      fired.push(record.id);
+      return { runId: `run_${record.id}` };
+    },
+  });
+  const base = await bind(server);
+  try {
+    const created = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'tenant-schedule-create',
+      },
+      body: {
+        name: 'tenant-owned',
+        fireAt: new Date(Date.now() + 60_000).toISOString(),
+        payload: {},
+      },
+    });
+    assert.equal(created.status, 200);
+    const scheduleId = created.body.schedule.id;
+
+    const bobCancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-cancel',
+      },
+    });
+    assert.equal(bobCancel.status, 404);
+
+    const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
+
+    const bobTick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-tick',
+      },
+    });
+    assert.equal(bobTick.status, 200);
+    assert.equal(bobTick.body.fired, 0);
+    assert.equal(fired.length, 0);
+
+    const bobDelete = await jsonRequest(base, `/api/schedules/${scheduleId}`, {
+      method: 'DELETE',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-delete',
+      },
+    });
+    assert.equal(bobDelete.status, 404);
+
+    const aliceTick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'alice-tick',
+      },
+    });
+    assert.equal(aliceTick.status, 200);
+    assert.equal(aliceTick.body.fired, 1);
+    assert.equal(fired.length, 1);
   } finally {
     await close(server);
   }

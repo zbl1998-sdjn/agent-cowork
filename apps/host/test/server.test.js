@@ -378,6 +378,9 @@ test('serves the local preview shell and assets', async () => {
   const staticRoot = makeTestWorkspace('kcw-static');
   fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>Kimi Cowork</title>', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.css'), 'body { color: black; }', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.KimiCoworkUtils = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.KimiCoworkApi = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.KimiCoworkRunEvents = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.kimiCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
@@ -389,6 +392,18 @@ test('serves the local preview shell and assets', async () => {
     const script = await fetch(`${baseUrl}/app.js`);
     assert.equal(script.status, 200);
     assert.match(script.headers.get('content-type'), /javascript/);
+
+    const utils = await fetch(`${baseUrl}/app-utils.js`);
+    assert.equal(utils.status, 200);
+    assert.match(utils.headers.get('content-type'), /javascript/);
+
+    const apiClient = await fetch(`${baseUrl}/app-api-client.js`);
+    assert.equal(apiClient.status, 200);
+    assert.match(apiClient.headers.get('content-type'), /javascript/);
+
+    const runEvents = await fetch(`${baseUrl}/app-run-events.js`);
+    assert.equal(runEvents.status, 200);
+    assert.match(runEvents.headers.get('content-type'), /javascript/);
   });
 });
 

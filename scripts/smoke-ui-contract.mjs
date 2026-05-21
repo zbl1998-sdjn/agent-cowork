@@ -35,6 +35,11 @@ async function getText(baseUrl, route) {
   return { body, contentType: response.headers.get('content-type') || '' };
 }
 
+function scriptRoutesFromHtml(html) {
+  return [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/gi)]
+    .map((match) => `/${match[1].replace(/^\.\//, '')}`);
+}
+
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-ui-smoke-'));
@@ -78,19 +83,37 @@ async function main() {
 
     const script = await getText(baseUrl, '/app.js');
     assert(script.contentType.includes('javascript'), 'app.js did not return JavaScript');
-    assert(script.body.includes('function setView'), 'app.js missing view switching controller');
-    assert(script.body.includes('function appendAssistantMessage'), 'app.js missing message bubble controller');
-    assert(script.body.includes('function handleComposerSend'), 'app.js missing composer send router');
-    assert(script.body.includes('[data-quick]'), 'app.js missing quick action handlers');
-    assert(script.body.includes('function subscribeRunEvents'), 'app.js missing SSE run-event subscriber');
-    assert(script.body.includes('new EventSource('), 'app.js missing EventSource client');
-    assert(script.body.includes('/events`'), 'app.js missing SSE /events route usage');
-    assert(script.body.includes('function handleComposerInput'), 'app.js missing composer popover input handler');
-    assert(script.body.includes('detectComposerTrigger'), 'app.js missing slash/at trigger detection');
-    assert(script.body.includes('historyRunItems'), 'app.js missing # history run picker');
-    assert(script.body.includes('/api/runs/index'), 'app.js missing runs-index picker route');
-    assert(script.body.includes('mode: "history"'), 'app.js missing # history trigger detection');
-    assert(script.body.includes('replayRunEvents'), 'app.js missing history run event replay');
+    const scriptRoutes = scriptRoutesFromHtml(index.body);
+    assert(scriptRoutes.includes('/app-utils.js'), 'index missing app-utils.js script');
+    assert(scriptRoutes.includes('/app-api-client.js'), 'index missing app-api-client.js script');
+    assert(scriptRoutes.includes('/app-run-events.js'), 'index missing app-run-events.js script');
+    assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
+    assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-api-client.js') < scriptRoutes.indexOf('/app.js'), 'app-api-client.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-run-events.js') < scriptRoutes.indexOf('/app.js'), 'app-run-events.js must load before app.js');
+    const scriptBodies = [];
+    for (const route of scriptRoutes) {
+      const asset = await getText(baseUrl, route);
+      assert(asset.contentType.includes('javascript'), `${route} did not return JavaScript`);
+      scriptBodies.push(asset.body);
+    }
+    const allScripts = scriptBodies.join('\n');
+    assert(allScripts.includes('window.KimiCoworkUtils'), 'utility module global missing');
+    assert(allScripts.includes('window.KimiCoworkApi'), 'API client module global missing');
+    assert(allScripts.includes('window.KimiCoworkRunEvents'), 'run-events module global missing');
+    assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');
+    assert(allScripts.includes('function appendAssistantMessage'), 'app scripts missing message bubble controller');
+    assert(allScripts.includes('function handleComposerSend'), 'app scripts missing composer send router');
+    assert(allScripts.includes('[data-quick]'), 'app scripts missing quick action handlers');
+    assert(allScripts.includes('function subscribeRunEvents'), 'app scripts missing SSE run-event subscriber');
+    assert(allScripts.includes('new EventSource('), 'app scripts missing EventSource client');
+    assert(allScripts.includes('/events`'), 'app scripts missing SSE /events route usage');
+    assert(allScripts.includes('function handleComposerInput'), 'app scripts missing composer popover input handler');
+    assert(allScripts.includes('detectComposerTrigger'), 'app scripts missing slash/at trigger detection');
+    assert(allScripts.includes('historyRunItems'), 'app scripts missing # history run picker');
+    assert(allScripts.includes('/api/runs/index'), 'app scripts missing runs-index picker route');
+    assert(allScripts.includes('mode: "history"'), 'app scripts missing # history trigger detection');
+    assert(allScripts.includes('replayRunEvents'), 'app scripts missing history run event replay');
     assert(index.body.includes('class="composer-popover"'), 'index missing composer popover container');
     for (const route of [
       '/api/workspace',
@@ -102,7 +125,7 @@ async function main() {
       '/api/file-ops/preview',
       '/api/file-ops/apply',
     ]) {
-      assert(script.body.includes(route), `app.js missing UI contract route ${route}`);
+      assert(allScripts.includes(route), `app scripts missing UI contract route ${route}`);
     }
     assert(index.body.includes('任务模板'), 'index missing recipe panel');
     assert(index.body.includes('澄清问题'), 'index missing clarification primitive');

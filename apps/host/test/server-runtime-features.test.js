@@ -234,18 +234,27 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
 
-    const tick = await jsonRequest(base, '/api/schedules/_tick', { method: 'POST' });
+    const tick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-tick' },
+    });
     assert.equal(tick.status, 200);
     assert.equal(tick.body.fired, 1);
     assert.equal(fired.length, 1);
 
     // Cancel the schedule.
-    const cancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, { method: 'POST' });
+    const cancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-cancel' },
+    });
     assert.equal(cancel.status, 200);
     assert.equal(cancel.body.schedule.status, 'cancelled');
 
     // Removing it should also work.
-    const remove = await jsonRequest(base, `/api/schedules/${scheduleId}`, { method: 'DELETE' });
+    const remove = await jsonRequest(base, `/api/schedules/${scheduleId}`, {
+      method: 'DELETE',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-remove' },
+    });
     assert.equal(remove.status, 200);
     const afterRemove = await jsonRequest(base, '/api/schedules', {
       headers: { 'x-tenant-id': 'tenant_alice' },
@@ -393,6 +402,18 @@ test('SSE: invalid run id returns 400', async () => {
   }
 });
 
+test('run detail invalid run id returns 400', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/runs/bad%2Fid`);
+    assert.equal(res.status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('scheduler default executor runs a recipe and records a run', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({
@@ -421,7 +442,10 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
 
-    const tick = await jsonRequest(base, '/api/schedules/_tick', { method: 'POST' });
+    const tick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-default-tick' },
+    });
     assert.equal(tick.status, 200);
     assert.equal(tick.body.fired, 1);
     assert.ok(tick.body.results[0].runId, 'executor produced a runId');

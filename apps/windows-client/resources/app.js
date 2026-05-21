@@ -62,6 +62,23 @@ const placeholders = {
   customize: "告诉 Kimi 这个工作区应该如何运行",
 };
 
+const {
+  arrayBufferToBase64,
+  basename,
+  compactText,
+  formatDuration,
+  formatRunTime,
+  idempotencyKey,
+  joinWin,
+  messageStatusClass,
+  runStatusText,
+  runTypeText,
+  shortRunId,
+  uniqueStamp,
+} = window.KimiCoworkUtils;
+const { getJson, postJson } = window.KimiCoworkApi;
+const { renderRunEventPayload, subscribeRunEvents } = window.KimiCoworkRunEvents;
+
 function setStatus(text) {
   statusText.textContent = text;
 }
@@ -78,14 +95,6 @@ function setRunChip(text, variant = "muted") {
 function setArtifact(message, pathText = artifactPath.textContent) {
   artifactText.textContent = message;
   artifactPath.textContent = pathText;
-}
-
-function compactText(text, maxLength = 220) {
-  const value = String(text || "").replace(/\s+/g, " ").trim();
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength - 1)}…`;
 }
 
 function renderInteraction(items, subtitle = "任务运行中") {
@@ -128,30 +137,6 @@ function resetInteraction() {
     ],
     "等待任务输入",
   );
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
-}
-
-function basename(filePath) {
-  return String(filePath || "").split(/[\\/]/).filter(Boolean).pop() || filePath;
-}
-
-function joinWin(root, ...parts) {
-  return [root.replace(/[\\/]+$/, ""), ...parts.map((part) => String(part).replace(/^[\\/]+|[\\/]+$/g, ""))].join("\\");
-}
-
-function uniqueStamp(date = new Date()) {
-  const timestamp = date.toISOString().replace(/[-:.TZ]/g, "").slice(0, 17);
-  const suffix = Math.random().toString(16).slice(2, 6);
-  return `${timestamp}-${suffix}`;
 }
 
 function setWorkbenchCopy(view) {
@@ -285,11 +270,7 @@ async function loadRecipes() {
     renderRecipes([]);
     return;
   }
-  const response = await fetch("/api/recipes");
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || `recipes returned ${response.status}`);
-  }
+  const payload = await getJson("/api/recipes");
   renderRecipes(payload.recipes || []);
 }
 
@@ -411,11 +392,7 @@ async function historyRunItems(query) {
   if (!state.hostApi) {
     return [];
   }
-  const response = await fetch("/api/runs/index?limit=20");
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || `runs index returned ${response.status}`);
-  }
+  const payload = await getJson("/api/runs/index?limit=20");
   const q = String(query || "").toLowerCase();
   return (payload.runs || [])
     .filter((run) => {
@@ -554,33 +531,6 @@ composer?.addEventListener("input", handleComposerInput);
 composer?.addEventListener("blur", () => {
   setTimeout(hideComposerPopover, 120);
 });
-
-async function postJson(route, body) {
-  const headers = { "content-type": "application/json" };
-  if (body?.idempotencyKey) {
-    headers["idempotency-key"] = body.idempotencyKey;
-  }
-  const response = await fetch(route, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    const error = new Error(payload.error || `${route} returned ${response.status}`);
-    error.status = response.status;
-    error.payload = payload;
-    throw error;
-  }
-  return payload;
-}
-
-function idempotencyKey(prefix = "kcw") {
-  if (window.crypto?.randomUUID) {
-    return `${prefix}-${window.crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function textCandidate(files) {
   return files.find((file) => /\.(md|txt|csv|docx|xlsx|pptx|pdf)$/i.test(file.path)) || files.find((file) => file.kind === "file");
@@ -759,22 +709,6 @@ function scrollConversationToEnd() {
   });
 }
 
-function messageStatusClass(status) {
-  if (/失败|错误|受阻/.test(status || "")) {
-    return "is-error";
-  }
-  if (/等待|审批/.test(status || "")) {
-    return "is-waiting";
-  }
-  if (/完成|已回复|已执行|就绪/.test(status || "")) {
-    return "is-done";
-  }
-  if (/中|正在|计划|读取|调用|处理/.test(status || "")) {
-    return "is-running";
-  }
-  return "";
-}
-
 function setMessageStatus(message, status) {
   if (!message?.statusEl) {
     return;
@@ -862,117 +796,6 @@ function addProgressLines(message, items) {
   }
   message.body.append(list);
   scrollConversationToEnd();
-}
-
-function progressStateFromIcon(icon) {
-  if (icon === "check") return "done";
-  if (icon === "loader") return "running";
-  return "wait";
-}
-
-function renderRunEventPayload(type, payload, appendLine) {
-  if (type === "progress") {
-    appendLine(progressStateFromIcon(payload.icon), payload.text || "处理中", payload.meta);
-    return true;
-  }
-  if (type === "preview") {
-    appendLine("done", `生成 ${payload.count ?? (payload.operations || []).length} 个可审批操作`);
-    return true;
-  }
-  if (type === "awaiting_approval") {
-    appendLine("running", "等待审批，审批前不会写入本机");
-    return true;
-  }
-  if (type === "sources") {
-    const names = (payload.items || [])
-      .map((item) => item.relativePath || item.path || "")
-      .filter(Boolean)
-      .join("、");
-    if (names) {
-      appendLine("done", `来源 (${(payload.items || []).length})`, names.slice(0, 120));
-      return true;
-    }
-    return false;
-  }
-  if (type === "assistant_end") {
-    appendLine(payload.status === "failed" ? "failed" : "done",
-      payload.status === "failed" ? "运行失败" : "运行完成",
-      payload.durationMs != null ? `${payload.durationMs}ms` : "");
-    return true;
-  }
-  return false;
-}
-
-// Subscribe to the server's authoritative run event stream via SSE and render
-// the timeline into the message bubble. Returns the EventSource, or null when
-// EventSource is unavailable (older webview) so callers can fall back to the
-// synchronous progress rendering.
-function subscribeRunEvents(message, runId, options = {}) {
-  if (!runId || typeof EventSource === "undefined" || !message?.body) {
-    return null;
-  }
-  const list = document.createElement("div");
-  list.className = "message-progress message-progress-sse";
-  message.body.append(list);
-
-  const appendLine = (state, title, meta) => {
-    const row = document.createElement("div");
-    row.className = `progress-line is-${state || "wait"}`;
-    row.textContent = meta ? `${title} · ${meta}` : title;
-    list.append(row);
-    scrollConversationToEnd();
-  };
-
-  let source;
-  try {
-    source = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
-  } catch {
-    list.remove();
-    return null;
-  }
-  state.activeEventSource = source;
-  const seen = new Set();
-  const close = () => {
-    try {
-      source.close();
-    } catch {
-      // ignore
-    }
-    if (state.activeEventSource === source) {
-      state.activeEventSource = null;
-    }
-  };
-
-  const handle = (type, payload) => {
-    const seq = payload?.seq;
-    if (seq != null) {
-      if (seen.has(seq)) return;
-      seen.add(seq);
-    }
-    renderRunEventPayload(type, payload, appendLine);
-    if (type === "assistant_end") {
-      close();
-      if (typeof options.onComplete === "function") options.onComplete(payload);
-    }
-  };
-
-  for (const type of ["user_message", "assistant_start", "progress", "preview", "awaiting_approval", "sources", "assistant_end"]) {
-    source.addEventListener(type, (event) => {
-      let payload = {};
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
-        payload = {};
-      }
-      handle(type, payload);
-    });
-  }
-  source.onerror = () => {
-    // SSE either finished (server closed) or dropped; stop reconnect storms.
-    close();
-    if (typeof options.onError === "function") options.onError();
-  };
-  return source;
 }
 
 function addClarificationCard(message, prompt, options) {
@@ -1152,57 +975,6 @@ function clearConversation() {
   syncConversationState();
 }
 
-function shortRunId(runId) {
-  return String(runId || "").split("_").slice(-1)[0] || runId;
-}
-
-function runStatusText(status) {
-  if (status === "succeeded") {
-    return "完成";
-  }
-  if (status === "failed") {
-    return "失败";
-  }
-  return "运行中";
-}
-
-function runTypeText(run) {
-  if (run.type === "kimi-chat") {
-    return "对话";
-  }
-  if (run.mode === "code") {
-    return "代码";
-  }
-  return "协作";
-}
-
-function formatDuration(ms) {
-  const value = Number(ms);
-  if (!Number.isFinite(value) || value < 0) {
-    return "未知耗时";
-  }
-  if (value < 1000) {
-    return `${Math.round(value)}ms`;
-  }
-  return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}s`;
-}
-
-function formatRunTime(value) {
-  if (!value) {
-    return "刚刚";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "刚刚";
-  }
-  return date.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function renderRunCards(runs, activeRunId = state.lastRun?.id) {
   state.runs = Array.isArray(runs) ? runs : [];
   if (!runList || !runSummary) {
@@ -1259,11 +1031,7 @@ async function loadRunCards(activeRunId = state.lastRun?.id) {
     renderRunCards([], activeRunId);
     return;
   }
-  const response = await fetch("/api/runs?limit=6");
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || `runs returned ${response.status}`);
-  }
+  const payload = await getJson("/api/runs?limit=6");
   renderRunCards(payload.runs || [], activeRunId);
 }
 
@@ -1281,11 +1049,7 @@ async function showRunDetail(runId) {
   if (!state.hostApi || !runId) {
     return;
   }
-  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
-  const run = await response.json();
-  if (!response.ok) {
-    throw new Error(run.error || `run detail returned ${response.status}`);
-  }
+  const run = await getJson(`/api/runs/${encodeURIComponent(runId)}`);
 
   const failed = run.status === "failed";
   renderRunCards(state.runs, run.id);
@@ -1350,11 +1114,7 @@ async function selectHistoryRun(indexRun) {
   if (!state.hostApi || !indexRun?.id) {
     return;
   }
-  const response = await fetch(`/api/runs/${encodeURIComponent(indexRun.id)}`);
-  const run = await response.json();
-  if (!response.ok) {
-    throw new Error(run.error || `run detail returned ${response.status}`);
-  }
+  const run = await getJson(`/api/runs/${encodeURIComponent(indexRun.id)}`);
   renderRunCards(state.runs, run.id);
   state.lastRun = {
     id: run.id,
@@ -1580,7 +1340,7 @@ async function runRecipePlan(prompt, recipe) {
   setRunChip(`模板任务 · ${shortRunId(result.runId)}`, "ready");
   // Prefer the authoritative SSE timeline; fall back to a synchronous summary
   // when EventSource is unavailable (older webview).
-  const streamed = subscribeRunEvents(message, result.runId);
+  const streamed = subscribeRunEvents(message, result.runId, { state, scrollConversationToEnd });
   if (!streamed) {
     addProgressLines(message, [
       {
@@ -2051,7 +1811,7 @@ async function loadHostWorkspace() {
   }
 
   try {
-    const workspace = await (await fetch("/api/workspace")).json();
+    const workspace = await getJson("/api/workspace");
     state.workspace = workspace.trustedRoot;
     state.kimiCliPlanEnabled = workspace.kimiCli?.planEnabled === true || workspace.kimiCli?.chatEnabled === true;
     setRunChip(state.kimiCliPlanEnabled ? "Kimi CLI 计划已启用" : "Kimi CLI 未启用", state.kimiCliPlanEnabled ? "ready" : "muted");

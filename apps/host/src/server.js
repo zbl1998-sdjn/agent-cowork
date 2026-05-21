@@ -1,7 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import crypto from 'node:crypto';
 import { listWorkspaceTree } from './workspace/file-tree.js';
 import { readTextFile } from './workspace/file-reader.js';
 import { extractDocumentText } from './workspace/document-extractor.js';
@@ -12,17 +11,27 @@ import { importUploadedFiles } from './workspace/uploads.js';
 import { buildRecipeOperations, getRecipe, listRecipes } from './recipes/registry.js';
 import { detectKimiInfo } from './kimi/cli-detect.js';
 import { runKimiCliChat, runKimiCliPlan } from './kimi/cli-runner.js';
-import { createRunId, listRunRecords, readRunRecord, writeRunRecord } from './runtime/run-store.js';
+import { createRunId, writeRunRecord } from './runtime/run-store.js';
 import { createRunsIndex, summariseRunForIndex } from './runtime/runs-index.js';
 import { Scheduler, createScheduleStore } from './runtime/scheduler.js';
-import { RunEventBus, formatSseFrame, parseLastEventId } from './runtime/run-events.js';
+import { RunEventBus } from './runtime/run-events.js';
 import { runRecipe } from './recipes/run-recipe.js';
-import {
-  createMemoryStore,
-  MEMORY_LIMITS,
-} from './memory/memory-store.js';
+import { createMemoryStore } from './memory/memory-store.js';
 import { assertTrustedPath } from './security/path-policy.js';
+import { handleMemoryRoutes } from './routes/memory-routes.js';
+import { handleRunRoutes } from './routes/run-routes.js';
+import { handleScheduleRoutes } from './routes/schedule-routes.js';
 import fs from 'node:fs';
+import {
+  bodyFingerprint,
+  createRequestContext,
+  headerValue,
+  isAllowedOrigin,
+  requiresOriginCheck,
+  sendFile,
+  sendJson,
+  withJsonBody,
+} from './http/request-utils.js';
 
 const hostSrcDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultStaticRoot = path.resolve(hostSrcDir, '../../windows-client/resources');
@@ -30,179 +39,11 @@ const staticFiles = new Map([
   ['/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
   ['/index.html', { file: 'index.html', type: 'text/html; charset=utf-8' }],
   ['/app.css', { file: 'app.css', type: 'text/css; charset=utf-8' }],
+  ['/app-utils.js', { file: 'app-utils.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-api-client.js', { file: 'app-api-client.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-run-events.js', { file: 'app-run-events.js', type: 'text/javascript; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
 ]);
-
-function sendJson(response, status, payload) {
-  const body = JSON.stringify(payload);
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'content-length': Buffer.byteLength(body),
-  });
-  response.end(body);
-}
-
-function headerValue(request, name) {
-  const value = request.headers[name.toLowerCase()];
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function stableHeader(value, fallback) {
-  const text = String(value || '').trim();
-  return /^[a-zA-Z0-9_.:-]{1,96}$/.test(text) ? text : fallback;
-}
-
-function isJsonContentType(request) {
-  const value = String(headerValue(request, 'content-type') || '').toLowerCase();
-  return value.split(';')[0].trim() === 'application/json';
-}
-
-function isLoopbackHostname(hostname) {
-  const value = String(hostname || '').toLowerCase();
-  return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
-}
-
-function isAllowedOrigin(origin) {
-  const value = String(origin || '').trim();
-  if (!value || value === 'null') {
-    return true;
-  }
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol === 'tauri:') {
-      return true;
-    }
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && isLoopbackHostname(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function requiresOriginCheck(method, pathname) {
-  return pathname.startsWith('/api/')
-    && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
-}
-
-function stableJsonStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
-      .sort()
-      .map((key) => {
-        const encoded = stableJsonStringify(value[key]);
-        return encoded === undefined ? undefined : `${JSON.stringify(key)}:${encoded}`;
-      })
-      .filter(Boolean);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function bodyFingerprint(body) {
-  return crypto
-    .createHash('sha256')
-    .update(stableJsonStringify(body ?? {}) || '{}')
-    .digest('hex');
-}
-
-function createRequestContext(request) {
-  const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
-  return {
-    traceId,
-    tenantId: stableHeader(headerValue(request, 'x-tenant-id'), 'tenant_local'),
-    userId: stableHeader(headerValue(request, 'x-user-id'), 'user_local'),
-    idempotencyKey: stableHeader(headerValue(request, 'idempotency-key'), ''),
-  };
-}
-
-function sendFile(response, filePath, contentType) {
-  try {
-    const body = fs.readFileSync(filePath);
-    response.writeHead(200, {
-      'content-type': contentType,
-      'content-length': body.length,
-      'cache-control': 'no-store',
-    });
-    response.end(body);
-  } catch (err) {
-    sendJson(response, 404, { error: `Static asset not found: ${err.message}` });
-  }
-}
-
-function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
-  return new Promise((resolve, reject) => {
-    let raw = '';
-    let rejected = false;
-    request.on('data', (chunk) => {
-      if (rejected) {
-        return;
-      }
-      raw += chunk.toString();
-      if (raw.length > maxBytes) {
-        rejected = true;
-        reject(new Error(`Request body too large; max ${maxBytes} bytes`));
-        request.destroy();
-      }
-    });
-    request.on('end', () => {
-      if (rejected) {
-        return;
-      }
-      if (!raw) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw));
-      } catch (err) {
-        reject(err);
-      }
-    });
-    request.on('error', reject);
-  });
-}
-
-function taskFromRun(run) {
-  const status = run.status === 'succeeded' ? 'done' : run.status === 'failed' ? 'failed' : 'in_progress';
-  return {
-    id: run.id,
-    status,
-    activeForm: status === 'in_progress' ? '任务运行中' : status === 'failed' ? '需要查看错误' : '已完成',
-    prompt: run.prompt,
-    mode: run.mode,
-    type: run.type,
-    provider: run.provider,
-    startedAt: run.startedAt,
-    finishedAt: run.finishedAt,
-    durationMs: run.durationMs,
-    summary: run.summary,
-  };
-}
-
-async function withJsonBody(request, response, handler, options = {}) {
-  if (options.requireJsonContentType !== false && !isJsonContentType(request)) {
-    sendJson(response, 415, { error: 'content-type must be application/json' });
-    return;
-  }
-  let body;
-  try {
-    body = await readJsonBody(request, options);
-  } catch (err) {
-    sendJson(response, 400, { error: `Invalid JSON body: ${err.message}` });
-    return;
-  }
-  try {
-    await handler(body);
-  } catch (err) {
-    sendJson(response, err.statusCode || 400, {
-      error: err.message,
-      ...(err.payload || {}),
-    });
-  }
-}
 
 export function createServer(config = {}) {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
@@ -276,20 +117,6 @@ export function createServer(config = {}) {
 
   function safeTrustedRoot(requestedRoot = trustedRootDefault) {
     return assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault);
-  }
-
-  function recordTenantId(record) {
-    return stableHeader(record?.context?.tenantId || record?.tenantId, 'tenant_local');
-  }
-
-  function recordVisibleToContext(record, context) {
-    return Boolean(record) && recordTenantId(record) === context.tenantId;
-  }
-
-  function visibleRunRecords(context, limit) {
-    return listRunRecords(runStoreRoot, { limit: Number.MAX_SAFE_INTEGER })
-      .filter((record) => recordVisibleToContext(record, context))
-      .slice(0, limit);
   }
 
   function cacheKeyFor(context, method, pathname) {
@@ -481,13 +308,16 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'GET' && pathname === '/api/tasks') {
-        const limit = Number(requestUrl.searchParams.get('limit')) || 20;
-        const runs = visibleRunRecords(requestContext, limit);
-        sendJson(response, 200, {
-          runStoreRoot,
-          tasks: runs.map(taskFromRun),
-        });
+      if (await handleRunRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        runStoreRoot,
+        runsIndex,
+        runEvents,
+      })) {
         return;
       }
 
@@ -498,84 +328,15 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'GET' && pathname === '/api/memory') {
-        const trustedRoot = path.resolve(
-          requestUrl.searchParams.get('trustedRoot') || trustedRootDefault,
-        );
-        const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-        const main = memoryStore.readMainMemory(safeRoot, requestContext);
-        const notes = memoryStore.listMemoryNotes(safeRoot, requestContext).map((note) => ({
-          name: note.name,
-          size: note.size,
-          modifiedAt: note.modifiedAt,
-        }));
-        sendJson(response, 200, {
-          trustedRoot: safeRoot,
-          memory: {
-            enabled: Boolean(main.trim()),
-            bytes: Buffer.byteLength(main, 'utf8'),
-            text: main,
-            notes,
-          },
-          limits: MEMORY_LIMITS,
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/memory/facts') {
-        await withJsonBody(request, response, async (body) => {
-          const trustedRoot = path.resolve(body?.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const result = memoryStore.appendMemoryFact(
-            safeRoot,
-            { key: body?.key, value: body?.value, scope: body?.scope },
-            requestContext,
-          );
-          sendJson(response, 200, {
-            trustedRoot: safeRoot,
-            fact: result.fact,
-            file: result.file,
-            context: requestContext,
-          });
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/memory/notes') {
-        await withJsonBody(request, response, async (body) => {
-          if (!body || typeof body.name !== 'string' || !body.name.trim()) {
-            throw new Error('body.name is required');
-          }
-          if (typeof body.body !== 'string') {
-            throw new Error('body.body must be a string');
-          }
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const written = memoryStore.writeMemoryNote(safeRoot, body.name, body.body, requestContext);
-          sendJson(response, 200, {
-            trustedRoot: safeRoot,
-            note: { name: body.name, path: written },
-            context: requestContext,
-          });
-        });
-        return;
-      }
-
-      if (request.method === 'GET' && pathname.startsWith('/api/memory/notes/')) {
-        const noteName = decodeURIComponent(pathname.slice('/api/memory/notes/'.length));
-        const trustedRoot = path.resolve(
-          requestUrl.searchParams.get('trustedRoot') || trustedRootDefault,
-        );
-        const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-        const body = memoryStore.readMemoryNote(safeRoot, noteName, requestContext);
-        if (body == null) {
-          sendJson(response, 404, { error: 'Memory note not found' });
-          return;
-        }
-        sendJson(response, 200, {
-          trustedRoot: safeRoot,
-          note: { name: noteName, body },
-        });
+      if (await handleMemoryRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        trustedRootDefault,
+        memoryStore,
+      })) {
         return;
       }
 
@@ -636,120 +397,6 @@ export function createServer(config = {}) {
             context: requestContext,
           });
         });
-        return;
-      }
-
-      if (request.method === 'GET' && pathname === '/api/runs/index') {
-        const limit = Number(requestUrl.searchParams.get('limit')) || 50;
-        const status = requestUrl.searchParams.get('status') || undefined;
-        const type = requestUrl.searchParams.get('type') || undefined;
-        const recipeId = requestUrl.searchParams.get('recipeId') || undefined;
-        const userId = requestUrl.searchParams.get('userId') || undefined;
-        const records = runsIndex.list({
-          tenantId: requestContext.tenantId,
-          userId,
-          limit,
-          status,
-          type,
-          recipeId,
-        });
-        sendJson(response, 200, {
-          context: requestContext,
-          stats: runsIndex.stats({ tenantId: requestContext.tenantId }),
-          runs: records,
-        });
-        return;
-      }
-
-      if (request.method === 'GET' && pathname.startsWith('/api/runs/') && pathname.endsWith('/events')) {
-        const runId = decodeURIComponent(pathname.slice('/api/runs/'.length, -'/events'.length));
-        if (!/^[a-z0-9_-]+$/i.test(runId)) {
-          sendJson(response, 400, { error: 'Invalid run id' });
-          return;
-        }
-        const lastEventId = parseLastEventId(
-          headerValue(request, 'last-event-id') || requestUrl.searchParams.get('lastEventId'),
-        );
-        let persisted = [];
-        try {
-          const record = readRunRecord(runStoreRoot, runId);
-          if (!recordVisibleToContext(record, requestContext)) {
-            sendJson(response, 404, { error: 'Run record not found' });
-            return;
-          }
-          if (Array.isArray(record.events)) {
-            persisted = record.events;
-          }
-        } catch {
-          sendJson(response, 404, { error: 'Run record not found' });
-          return;
-        }
-        runEvents.seed(runId, persisted);
-
-        response.writeHead(200, {
-          'content-type': 'text/event-stream; charset=utf-8',
-          'cache-control': 'no-store',
-          connection: 'keep-alive',
-          'x-trace-id': requestContext.traceId,
-          'x-tenant-id': requestContext.tenantId,
-        });
-        response.write('retry: 3000\n\n');
-
-        const sentSeqs = new Set();
-        const writeEvent = (event) => {
-          if (event.seq != null) {
-            if (sentSeqs.has(event.seq)) {
-              return;
-            }
-            sentSeqs.add(event.seq);
-          }
-          response.write(formatSseFrame(event));
-        };
-
-        for (const event of persisted) {
-          if ((Number(event.seq) || 0) > lastEventId) {
-            writeEvent(event);
-          }
-        }
-        for (const event of runEvents.replay(runId, lastEventId)) {
-          writeEvent(event);
-        }
-
-        const unsubscribe = runEvents.subscribe(runId, (event) => {
-          writeEvent(event);
-        });
-        const heartbeat = setInterval(() => {
-          response.write(': ping\n\n');
-        }, 15000);
-        if (heartbeat && typeof heartbeat.unref === 'function') {
-          heartbeat.unref();
-        }
-        const cleanup = () => {
-          clearInterval(heartbeat);
-          unsubscribe();
-        };
-        request.on('close', cleanup);
-        response.on('close', cleanup);
-        return;
-      }
-
-      if (request.method === 'GET' && pathname === '/api/runs') {
-        const limit = Number(requestUrl.searchParams.get('limit')) || 20;
-        sendJson(response, 200, {
-          runStoreRoot,
-          runs: visibleRunRecords(requestContext, limit),
-        });
-        return;
-      }
-
-      if (request.method === 'GET' && pathname.startsWith('/api/runs/')) {
-        const runId = decodeURIComponent(pathname.slice('/api/runs/'.length));
-        const run = readRunRecord(runStoreRoot, runId);
-        if (!recordVisibleToContext(run, requestContext)) {
-          sendJson(response, 404, { error: 'Run record not found' });
-          return;
-        }
-        sendJson(response, 200, run);
         return;
       }
 
@@ -922,94 +569,18 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'GET' && pathname === '/api/schedules') {
-        const userId = requestUrl.searchParams.get('userId') || undefined;
-        const list = activeScheduler ? activeScheduler.list({
-          tenantId: requestContext.tenantId,
-          userId,
-        }) : [];
-        sendJson(response, 200, {
-          context: requestContext,
-          schedules: list,
-          enabled: Boolean(activeScheduler),
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/schedules') {
-        await withJsonBody(request, response, async (body) => {
-          if (!activeScheduler) {
-            sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
-            return;
-          }
-          if (!requireIdempotencyKey(response, requestContext)) {
-            return;
-          }
-          const fingerprint = bodyFingerprint(body);
-          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-            return;
-          }
-          const payload = body?.payload && typeof body.payload === 'object' ? { ...body.payload } : {};
-          if (payload.trustedRoot) {
-            payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
-          }
-          const record = activeScheduler.create({
-            name: body?.name,
-            cron: body?.cron,
-            fireAt: body?.fireAt,
-            payload,
-            tenantId: requestContext.tenantId,
-            userId: requestContext.userId,
-            traceId: requestContext.traceId,
-            idempotencyKey: requestContext.idempotencyKey,
-          });
-          sendCachedOrStore(response, cacheKey, fingerprint, 200, { schedule: record, context: requestContext });
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname.startsWith('/api/schedules/') && pathname.endsWith('/cancel')) {
-        if (!activeScheduler) {
-          sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
-          return;
-        }
-        const id = decodeURIComponent(pathname.slice('/api/schedules/'.length, -'/cancel'.length));
-        const ok = activeScheduler.cancel(id);
-        if (!ok) {
-          sendJson(response, 404, { error: 'Schedule not found' });
-          return;
-        }
-        sendJson(response, 200, { ok: true, schedule: activeScheduler.get(id) });
-        return;
-      }
-
-      if (request.method === 'DELETE' && pathname.startsWith('/api/schedules/')) {
-        if (!activeScheduler) {
-          sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
-          return;
-        }
-        const id = decodeURIComponent(pathname.slice('/api/schedules/'.length));
-        const ok = activeScheduler.remove(id);
-        if (!ok) {
-          sendJson(response, 404, { error: 'Schedule not found' });
-          return;
-        }
-        sendJson(response, 200, { ok: true });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/schedules/_tick') {
-        if (!activeScheduler) {
-          sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
-          return;
-        }
-        const results = await activeScheduler.tickOnce();
-        sendJson(response, 200, {
-          ok: true,
-          fired: results.length,
-          results: results.map((r) => ({ ok: r.ok, scheduleId: r.schedule?.id, runId: r.schedule?.lastRunId })),
-        });
+      if (await handleScheduleRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        activeScheduler,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+        safeTrustedRoot,
+      })) {
         return;
       }
 

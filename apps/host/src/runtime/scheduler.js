@@ -290,8 +290,10 @@ export class Scheduler {
     return this.store.remove(id);
   }
 
-  pickDue(asOf = this.now()) {
-    return this.list().filter((record) => {
+  pickDue(filterOrAsOf = {}, maybeAsOf = this.now()) {
+    const filter = filterOrAsOf instanceof Date ? {} : filterOrAsOf;
+    const asOf = filterOrAsOf instanceof Date ? filterOrAsOf : maybeAsOf;
+    return this.list(filter).filter((record) => {
       if (record.status !== 'pending') return false;
       if (!record.nextFireAt) return false;
       return Date.parse(record.nextFireAt) <= asOf.getTime();
@@ -341,11 +343,11 @@ export class Scheduler {
     }
   }
 
-  async tickOnce() {
+  async tickOnce(filter = {}) {
     if (this.tickInFlight) return [];
     this.tickInFlight = true;
     try {
-      const due = this.pickDue();
+      const due = this.pickDue(filter);
       const results = [];
       for (const record of due) {
         results.push(await this._fireOne(record));
