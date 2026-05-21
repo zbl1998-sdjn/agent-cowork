@@ -28,6 +28,24 @@ test('applies safe write without overwrite flag when file missing', () => {
   assert.equal(fs.readFileSync(target, 'utf8'), 'created');
 });
 
+test('applies binary write operations from base64 content', () => {
+  const target = path.join(root, 'report.xlsx');
+  const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
+  const applied = applyFileOperations(
+    [
+      {
+        type: 'write',
+        path: target,
+        encoding: 'base64',
+        contentBase64: bytes.toString('base64'),
+      },
+    ],
+    { trustedRoot: root },
+  );
+  assert.equal(applied.applied.length, 1);
+  assert.deepEqual(fs.readFileSync(target), bytes);
+});
+
 test('forbids rename when target already exists', () => {
   const source = path.join(root, 'rename-source.txt');
   const target = path.join(root, 'rename-target.txt');

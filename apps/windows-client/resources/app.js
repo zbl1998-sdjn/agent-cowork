@@ -10,11 +10,20 @@ const state = {
   runs: [],
   uploadedFiles: [],
   interactionItems: [],
+  recipes: [],
+  selectedRecipeId: "",
+  selectedRecipeSource: "",
+  lastSources: [],
+  applyIdempotencyKey: "",
+  activeTaskMessage: null,
+  mentionedFiles: [],
+  activeEventSource: null,
 };
 
 window.kimiCowork = state;
 
 const composer = document.querySelector(".composer textarea");
+const composerPopover = document.querySelector(".composer-popover");
 const uploadInput = document.querySelector(".upload-input");
 const folderInput = document.querySelector(".folder-input");
 const approveButton = document.querySelector(".approve-button");
@@ -32,10 +41,17 @@ const fileList = document.querySelector(".file-list");
 const operationList = document.querySelector(".operation-list");
 const chatOutput = document.querySelector(".chat-output");
 const chatOutputText = document.querySelector(".chat-output p");
+const conversationTimeline = document.querySelector(".conversation-timeline");
+const conversationEmpty = document.querySelector(".conversation-empty");
 const workbenchTitle = document.querySelector(".workbench-title");
 const workbenchCopy = document.querySelector(".workbench-copy");
 const interactionSubtitle = document.querySelector(".interaction-subtitle");
 const interactionItems = document.querySelector(".interaction-items");
+const recipeSummary = document.querySelector(".recipe-summary");
+const recipeList = document.querySelector(".recipe-list");
+const recipeClearButton = document.querySelector('[data-action="clear-recipe"]');
+const clarifyPanel = document.querySelector(".clarify-panel");
+const clarifyOptions = document.querySelector(".clarify-options");
 
 const placeholders = {
   chat: "今天想让 Kimi 做什么？",
@@ -220,10 +236,263 @@ function renderOperations(operations) {
   }
 }
 
+function selectedRecipe() {
+  return state.recipes.find((recipe) => recipe.id === state.selectedRecipeId) || null;
+}
+
+function renderRecipes(recipes) {
+  state.recipes = Array.isArray(recipes) ? recipes : [];
+  if (!recipeList || !recipeSummary) {
+    return;
+  }
+  recipeList.replaceChildren();
+  recipeSummary.textContent = state.recipes.length > 0
+    ? `已加载 ${state.recipes.length} 个本地模板，模板输出仍需审批后写入`
+    : "模板暂不可用";
+
+  for (const recipe of state.recipes) {
+    const card = document.createElement("button");
+    card.className = "recipe-card";
+    card.type = "button";
+    card.dataset.recipeId = recipe.id;
+    card.setAttribute("role", "listitem");
+    card.classList.toggle("is-active", recipe.id === state.selectedRecipeId);
+
+    const title = document.createElement("strong");
+    title.textContent = recipe.name;
+    const detail = document.createElement("p");
+    detail.textContent = recipe.description;
+    const meta = document.createElement("em");
+    meta.textContent = recipe.output;
+    card.append(title, detail, meta);
+    card.addEventListener("click", () => {
+      state.selectedRecipeId = recipe.id;
+      state.selectedRecipeSource = "manual";
+      renderRecipes(state.recipes);
+      setView("cowork");
+      setStatus(`已选择模板：${recipe.name}`);
+      if (!composer.value.trim()) {
+        composer.value = `${recipe.name}：读取本地材料并生成可审批产物`;
+      }
+      composer.focus();
+    });
+    recipeList.append(card);
+  }
+}
+
+async function loadRecipes() {
+  if (!state.hostApi) {
+    renderRecipes([]);
+    return;
+  }
+  const response = await fetch("/api/recipes");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || `recipes returned ${response.status}`);
+  }
+  renderRecipes(payload.recipes || []);
+}
+
+async function searchLocalFiles(query) {
+  if (!state.hostApi || !query.trim()) {
+    return [];
+  }
+  const payload = await postJson("/api/files/search", {
+    trustedRoot: state.workspace,
+    query,
+    includeContent: true,
+    maxResults: 8,
+  });
+  return payload.results || [];
+}
+
+// ---- Composer slash/at popover (templates + file mentions) ----
+const composerPopoverState = { open: false, mode: null, items: [], active: 0, triggerStart: 0 };
+let mentionSearchToken = 0;
+
+function hideComposerPopover() {
+  composerPopoverState.open = false;
+  composerPopoverState.mode = null;
+  composerPopoverState.items = [];
+  composerPopoverState.active = 0;
+  if (composerPopover) {
+    composerPopover.hidden = true;
+    composerPopover.replaceChildren();
+  }
+}
+
+function renderComposerPopover() {
+  if (!composerPopover) {
+    return;
+  }
+  composerPopover.replaceChildren();
+  if (composerPopoverState.items.length === 0) {
+    hideComposerPopover();
+    return;
+  }
+  const header = document.createElement("div");
+  header.className = "popover-header";
+  header.textContent = composerPopoverState.mode === "template" ? "选择任务模板" : "引用本地文件";
+  composerPopover.append(header);
+  composerPopoverState.items.forEach((item, index) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = `popover-item${index === composerPopoverState.active ? " is-active" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const detail = document.createElement("span");
+    detail.textContent = item.detail || "";
+    row.append(title, detail);
+    row.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      selectComposerPopoverItem(index);
+    });
+    composerPopover.append(row);
+  });
+  composerPopover.hidden = false;
+  composerPopoverState.open = true;
+}
+
+function detectComposerTrigger() {
+  const value = composer.value;
+  const caret = composer.selectionStart ?? value.length;
+  const before = value.slice(0, caret);
+  const slashMatch = before.match(/(?:^|\n)\/([^\s/]*)$/);
+  if (slashMatch) {
+    return { mode: "template", query: slashMatch[1], start: before.length - slashMatch[1].length - 1 };
+  }
+  const atMatch = before.match(/@([^\s@]*)$/);
+  if (atMatch) {
+    return { mode: "mention", query: atMatch[1], start: before.length - atMatch[1].length - 1 };
+  }
+  return null;
+}
+
+function templateItems(query) {
+  const q = String(query || "").toLowerCase();
+  return state.recipes
+    .filter((recipe) => !q || `${recipe.name} ${recipe.id} ${recipe.summary || ""}`.toLowerCase().includes(q))
+    .slice(0, 6)
+    .map((recipe) => ({ kind: "template", id: recipe.id, title: recipe.name, detail: recipe.summary || recipe.id, recipe }));
+}
+
+async function refreshMentionItems(query) {
+  const token = ++mentionSearchToken;
+  let results = [];
+  try {
+    results = await searchLocalFiles(query);
+  } catch {
+    results = [];
+  }
+  if (token !== mentionSearchToken || composerPopoverState.mode !== "mention") {
+    return;
+  }
+  composerPopoverState.items = results.slice(0, 8).map((file) => ({
+    kind: "mention",
+    title: file.path,
+    detail: file.excerpt ? compactText(file.excerpt, 60) : (file.extension || "file"),
+    file: { path: file.path, fullPath: file.fullPath, kind: "file", size: file.size },
+  }));
+  composerPopoverState.active = 0;
+  renderComposerPopover();
+}
+
+function replaceTriggerToken(start, insertText) {
+  const value = composer.value;
+  const caret = composer.selectionStart ?? value.length;
+  composer.value = value.slice(0, start) + insertText + value.slice(caret);
+  const next = start + insertText.length;
+  composer.setSelectionRange(next, next);
+}
+
+function selectComposerPopoverItem(index) {
+  const item = composerPopoverState.items[index];
+  if (!item) {
+    return;
+  }
+  if (item.kind === "template") {
+    state.selectedRecipeId = item.id;
+    state.selectedRecipeSource = "slash";
+    renderRecipes(state.recipes);
+    composer.value = `${item.title}：读取本地材料并生成可审批产物`;
+  } else if (item.kind === "mention") {
+    const key = item.file.fullPath || item.file.path;
+    if (!state.mentionedFiles.some((file) => (file.fullPath || file.path) === key)) {
+      state.mentionedFiles.push(item.file);
+    }
+    replaceTriggerToken(composerPopoverState.triggerStart, `@${basename(item.file.path)} `);
+  }
+  hideComposerPopover();
+  composer.focus();
+}
+
+function handleComposerInput() {
+  const trigger = detectComposerTrigger();
+  if (!trigger) {
+    hideComposerPopover();
+    return;
+  }
+  composerPopoverState.mode = trigger.mode;
+  composerPopoverState.triggerStart = trigger.start;
+  if (trigger.mode === "template") {
+    composerPopoverState.items = templateItems(trigger.query);
+    composerPopoverState.active = 0;
+    renderComposerPopover();
+    return;
+  }
+  if (!trigger.query) {
+    hideComposerPopover();
+    return;
+  }
+  refreshMentionItems(trigger.query);
+}
+
+function isComposerPopoverOpen() {
+  return composerPopoverState.open;
+}
+
+function composerPopoverHandleKey(event) {
+  if (!composerPopoverState.open || composerPopoverState.items.length === 0) {
+    return false;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    hideComposerPopover();
+    return true;
+  }
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    composerPopoverState.active = (composerPopoverState.active + 1) % composerPopoverState.items.length;
+    renderComposerPopover();
+    return true;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    composerPopoverState.active = (composerPopoverState.active - 1 + composerPopoverState.items.length) % composerPopoverState.items.length;
+    renderComposerPopover();
+    return true;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    selectComposerPopoverItem(composerPopoverState.active);
+    return true;
+  }
+  return false;
+}
+
+composer?.addEventListener("input", handleComposerInput);
+composer?.addEventListener("blur", () => {
+  setTimeout(hideComposerPopover, 120);
+});
+
 async function postJson(route, body) {
+  const headers = { "content-type": "application/json" };
+  if (body?.idempotencyKey) {
+    headers["idempotency-key"] = body.idempotencyKey;
+  }
   const response = await fetch(route, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   const payload = await response.json();
@@ -236,12 +505,142 @@ async function postJson(route, body) {
   return payload;
 }
 
+function idempotencyKey(prefix = "kcw") {
+  if (window.crypto?.randomUUID) {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function textCandidate(files) {
-  return files.find((file) => /\.(md|txt|csv)$/i.test(file.path)) || files.find((file) => file.kind === "file");
+  return files.find((file) => /\.(md|txt|csv|docx|xlsx|pptx|pdf)$/i.test(file.path)) || files.find((file) => file.kind === "file");
 }
 
 function activeFiles() {
-  return [...state.uploadedFiles, ...state.files];
+  return [...state.mentionedFiles, ...state.uploadedFiles, ...state.files];
+}
+
+function recipeFiles() {
+  const seen = new Set();
+  return activeFiles()
+    .filter((file) => file.kind === "file")
+    .filter((file) => /\.(md|txt|csv|docx|xlsx|pptx|pdf|json|log)$/i.test(file.path))
+    .filter((file) => {
+      const key = file.fullPath || file.path;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 6);
+}
+
+function inferRecipeId(prompt) {
+  const text = String(prompt || "").toLowerCase();
+  const pairs = [
+    ["meeting-actions", /会议|纪要|行动项|待办|todo|meeting/],
+    ["excel-cleaning", /表格|清洗|excel|xlsx|csv|数据/],
+    ["reimbursement", /报销|发票|费用|invoice|金额/],
+    ["contract-summary", /合同|条款|付款|续约|contract/],
+    ["feedback-clusters", /反馈|评价|投诉|建议|聚类/],
+    ["summary-report", /总结|周报|报告|汇总/],
+    ["email-draft", /邮件|email|回复|发送/],
+    ["folder-organize", /文件夹|整理|归档|分类/],
+  ];
+  return pairs.find(([, pattern]) => pattern.test(text))?.[0] || "";
+}
+
+function maybeSelectRecipe(prompt) {
+  if (state.selectedRecipeId && state.selectedRecipeSource !== "auto") {
+    return selectedRecipe();
+  }
+  const inferred = inferRecipeId(prompt);
+  if (inferred) {
+    state.selectedRecipeId = inferred;
+    state.selectedRecipeSource = "auto";
+    renderRecipes(state.recipes);
+    return selectedRecipe();
+  }
+  if (state.selectedRecipeSource === "auto") {
+    state.selectedRecipeId = "";
+    state.selectedRecipeSource = "";
+    renderRecipes(state.recipes);
+  }
+  return null;
+}
+
+function shouldClarify(prompt) {
+  const text = String(prompt || "").trim();
+  return !state.selectedRecipeId && text.length > 0 && text.length <= 12 && /整理|处理|看看|弄一下|做一下/.test(text);
+}
+
+function shouldUseCowork(prompt) {
+  const text = String(prompt || "").trim();
+  if (state.view === "cowork" || state.view === "code") {
+    return true;
+  }
+  if (state.uploadedFiles.length > 0 || state.selectedRecipeId) {
+    return true;
+  }
+  return /本地|工作区|文件|文件夹|目录|上传|读取|整理|归档|审批|执行|生成|写入|移动|重命名|合同|会议|纪要|行动项|报销|发票|表格|清洗|xlsx|csv|docx|pptx|pdf|代码|项目/i.test(text);
+}
+
+function showClarification(prompt) {
+  if (!clarifyPanel || !clarifyOptions) {
+    return false;
+  }
+  clarifyOptions.replaceChildren();
+  const options = [
+    { recipeId: "folder-organize", title: "整理文件夹", detail: "只生成整理计划，不直接移动文件。" },
+    { recipeId: "meeting-actions", title: "提取行动项", detail: "适合会议纪要、待办和负责人。" },
+    { recipeId: "summary-report", title: "生成总结", detail: "把本地材料汇总成报告。" },
+  ];
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerHTML = `<strong>${option.title}</strong><span>${option.detail}</span>`;
+    button.addEventListener("click", () => {
+      state.selectedRecipeId = option.recipeId;
+      state.selectedRecipeSource = "clarify";
+      clarifyPanel.hidden = true;
+      renderRecipes(state.recipes);
+      composer.value = `${prompt}，按“${option.title}”执行`;
+      appendUserMessage(`我选择：${option.title}`);
+      generatePlan({ appendUser: false }).catch((error) => {
+        setStatus("计划失败");
+        setArtifact(error.message);
+      });
+    });
+    clarifyOptions.append(button);
+  }
+  clarifyPanel.hidden = false;
+  setStatus("等待澄清");
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "active",
+        title: "需要澄清",
+        detail: "指令较宽泛，先选择一个任务模板再生成可审批操作。",
+      },
+    ],
+    "等待用户选择",
+  );
+  const message = appendAssistantMessage("我需要先确认你要我按哪种方式处理。", { status: "协作 · 等待澄清" });
+  state.activeTaskMessage = message;
+  addClarificationCard(message, prompt, options);
+  return true;
+}
+
+function hideClarification() {
+  if (clarifyPanel) {
+    clarifyPanel.hidden = true;
+  }
 }
 
 async function readCandidateSummary(candidate) {
@@ -249,20 +648,421 @@ async function readCandidateSummary(candidate) {
     return "当前工作区没有可读取的文本文件，先生成一个本地审批产物。";
   }
   try {
-    const read = await postJson("/api/files/read", {
+    const read = await postJson("/api/files/extract", {
       trustedRoot: state.workspace,
       path: candidate.fullPath,
-      maxSize: 1600,
+      maxSize: 1024 * 1024,
     });
     return read.content.replace(/\s+/g, " ").slice(0, 180);
   } catch (error) {
-    return `文件 ${candidate.path} 暂不可直接读取：${error.message}`;
+    try {
+      const read = await postJson("/api/files/read", {
+        trustedRoot: state.workspace,
+        path: candidate.fullPath,
+        maxSize: 1600,
+      });
+      return read.content.replace(/\s+/g, " ").slice(0, 180);
+    } catch {
+      return `文件 ${candidate.path} 暂不可直接读取：${error.message}`;
+    }
   }
 }
 
 function showChatResponse(message) {
   chatOutput.hidden = false;
   chatOutputText.textContent = message;
+}
+
+function syncConversationState() {
+  const hasMessages = conversationTimeline?.querySelector(".message-bubble") !== null;
+  document.body.classList.toggle("has-conversation", hasMessages);
+  if (conversationEmpty) {
+    conversationEmpty.classList.toggle("is-hidden", hasMessages);
+  }
+}
+
+function scrollConversationToEnd() {
+  syncConversationState();
+  requestAnimationFrame(() => {
+    const target = conversationTimeline?.lastElementChild || composer;
+    target?.scrollIntoView({ block: "end", behavior: "smooth" });
+  });
+}
+
+function messageStatusClass(status) {
+  if (/失败|错误|受阻/.test(status || "")) {
+    return "is-error";
+  }
+  if (/等待|审批/.test(status || "")) {
+    return "is-waiting";
+  }
+  if (/完成|已回复|已执行|就绪/.test(status || "")) {
+    return "is-done";
+  }
+  if (/中|正在|计划|读取|调用|处理/.test(status || "")) {
+    return "is-running";
+  }
+  return "";
+}
+
+function setMessageStatus(message, status) {
+  if (!message?.statusEl) {
+    return;
+  }
+  message.statusEl.textContent = status;
+  message.statusEl.className = `message-status ${messageStatusClass(status)}`.trim();
+}
+
+function appendMessage(role, text, { status = "", meta = "" } = {}) {
+  if (!conversationTimeline) {
+    return null;
+  }
+  const bubble = document.createElement("article");
+  bubble.className = `message-bubble is-${role}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = "message-avatar";
+  avatar.textContent = role === "user" ? "D" : "K";
+
+  const card = document.createElement("div");
+  card.className = "message-card";
+
+  const header = document.createElement("div");
+  header.className = "message-header";
+  const name = document.createElement("strong");
+  name.textContent = role === "user" ? "Derrick" : "Kimi";
+  const right = document.createElement("span");
+  if (status) {
+    right.className = `message-status ${messageStatusClass(status)}`.trim();
+    right.textContent = status;
+  } else {
+    right.className = "message-meta";
+    right.textContent = meta || new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  }
+  header.append(name, right);
+
+  const body = document.createElement("div");
+  body.className = "message-body";
+  if (text) {
+    const paragraph = document.createElement("p");
+    paragraph.className = "message-text";
+    paragraph.textContent = text;
+    body.append(paragraph);
+  }
+
+  card.append(header, body);
+  bubble.append(avatar, card);
+  conversationTimeline.append(bubble);
+
+  const message = { bubble, card, body, statusEl: status ? right : null };
+  scrollConversationToEnd();
+  return message;
+}
+
+function appendUserMessage(text) {
+  return appendMessage("user", text);
+}
+
+function appendAssistantMessage(text, options = {}) {
+  return appendMessage("assistant", text, options);
+}
+
+function appendMessageText(message, text) {
+  if (!message?.body || !text) {
+    return;
+  }
+  const paragraph = document.createElement("p");
+  paragraph.className = "message-text";
+  paragraph.textContent = text;
+  message.body.append(paragraph);
+  scrollConversationToEnd();
+}
+
+function addProgressLines(message, items) {
+  if (!message?.body || !Array.isArray(items) || items.length === 0) {
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "message-progress";
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = `progress-line is-${item.state || "wait"}`;
+    row.textContent = item.meta ? `${item.title} · ${item.meta}` : item.title;
+    list.append(row);
+  }
+  message.body.append(list);
+  scrollConversationToEnd();
+}
+
+function progressStateFromIcon(icon) {
+  if (icon === "check") return "done";
+  if (icon === "loader") return "running";
+  return "wait";
+}
+
+// Subscribe to the server's authoritative run event stream via SSE and render
+// the timeline into the message bubble. Returns the EventSource, or null when
+// EventSource is unavailable (older webview) so callers can fall back to the
+// synchronous progress rendering.
+function subscribeRunEvents(message, runId, options = {}) {
+  if (!runId || typeof EventSource === "undefined" || !message?.body) {
+    return null;
+  }
+  const list = document.createElement("div");
+  list.className = "message-progress message-progress-sse";
+  message.body.append(list);
+
+  const appendLine = (state, title, meta) => {
+    const row = document.createElement("div");
+    row.className = `progress-line is-${state || "wait"}`;
+    row.textContent = meta ? `${title} · ${meta}` : title;
+    list.append(row);
+    scrollConversationToEnd();
+  };
+
+  let source;
+  try {
+    source = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
+  } catch {
+    list.remove();
+    return null;
+  }
+  state.activeEventSource = source;
+  const seen = new Set();
+  const close = () => {
+    try {
+      source.close();
+    } catch {
+      // ignore
+    }
+    if (state.activeEventSource === source) {
+      state.activeEventSource = null;
+    }
+  };
+
+  const handle = (type, payload) => {
+    const seq = payload?.seq;
+    if (seq != null) {
+      if (seen.has(seq)) return;
+      seen.add(seq);
+    }
+    if (type === "progress") {
+      appendLine(progressStateFromIcon(payload.icon), payload.text || "处理中", payload.meta);
+    } else if (type === "preview") {
+      appendLine("done", `生成 ${payload.count ?? (payload.operations || []).length} 个可审批操作`);
+    } else if (type === "awaiting_approval") {
+      appendLine("running", "等待审批，审批前不会写入本机");
+    } else if (type === "sources") {
+      const names = (payload.items || [])
+        .map((item) => item.relativePath || item.path || "")
+        .filter(Boolean)
+        .join("、");
+      if (names) {
+        appendLine("done", `来源 (${(payload.items || []).length})`, names.slice(0, 120));
+      }
+    } else if (type === "assistant_end") {
+      appendLine(payload.status === "failed" ? "failed" : "done",
+        payload.status === "failed" ? "运行失败" : "运行完成",
+        payload.durationMs != null ? `${payload.durationMs}ms` : "");
+      close();
+      if (typeof options.onComplete === "function") options.onComplete(payload);
+    }
+  };
+
+  for (const type of ["user_message", "assistant_start", "progress", "preview", "awaiting_approval", "sources", "assistant_end"]) {
+    source.addEventListener(type, (event) => {
+      let payload = {};
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        payload = {};
+      }
+      handle(type, payload);
+    });
+  }
+  source.onerror = () => {
+    // SSE either finished (server closed) or dropped; stop reconnect storms.
+    close();
+    if (typeof options.onError === "function") options.onError();
+  };
+  return source;
+}
+
+function addClarificationCard(message, prompt, options) {
+  if (!message?.body) {
+    return;
+  }
+  const card = document.createElement("div");
+  card.className = "clarification-card";
+  const header = document.createElement("header");
+  const title = document.createElement("strong");
+  title.textContent = "需要确认执行方向";
+  header.append(title);
+  const copy = document.createElement("p");
+  copy.className = "message-text";
+  copy.textContent = "这条指令比较宽泛，先选一个方向，我再生成可审批的本地操作。";
+  const choices = document.createElement("div");
+  choices.className = "clarification-options";
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    const choiceTitle = document.createElement("strong");
+    choiceTitle.textContent = option.title;
+    const detail = document.createElement("span");
+    detail.textContent = option.detail;
+    button.append(choiceTitle, detail);
+    button.addEventListener("click", () => {
+      choices.querySelectorAll("button").forEach((node) => {
+        node.disabled = true;
+      });
+      state.selectedRecipeId = option.recipeId;
+      state.selectedRecipeSource = "clarify";
+      hideClarification();
+      renderRecipes(state.recipes);
+      composer.value = `${prompt}，按“${option.title}”执行`;
+      appendUserMessage(`我选择：${option.title}`);
+      setMessageStatus(message, "协作 · 已澄清");
+      generatePlan({ appendUser: false }).catch((error) => {
+        setStatus("计划失败");
+        setArtifact(error.message);
+      });
+    });
+    choices.append(button);
+  }
+  card.append(header, copy, choices);
+  message.body.append(card);
+  scrollConversationToEnd();
+}
+
+function addPreviewCard(message, operations, summary = "等待审批") {
+  if (!message?.body) {
+    return;
+  }
+  const card = document.createElement("div");
+  card.className = "inline-preview";
+  const header = document.createElement("header");
+  const title = document.createElement("strong");
+  title.textContent = "操作预览";
+  const badge = document.createElement("em");
+  badge.textContent = summary;
+  header.append(title, badge);
+  card.append(header);
+  for (const item of (operations || []).slice(0, 4)) {
+    const row = document.createElement("div");
+    row.className = "inline-op";
+    const type = document.createElement("span");
+    type.textContent = item.type;
+    type.classList.toggle("is-write", item.type === "write");
+    const detail = document.createElement("p");
+    detail.textContent = (item.targetPath || item.path || "").replace(state.workspace, ".") || "待执行操作";
+    row.append(type, detail);
+    card.append(row);
+  }
+  if ((operations || []).length > 4) {
+    const more = document.createElement("p");
+    more.textContent = `另有 ${(operations || []).length - 4} 个操作会在审批后执行。`;
+    card.append(more);
+  }
+  message.body.append(card);
+  scrollConversationToEnd();
+}
+
+function addApprovalActions(message) {
+  if (!message?.body) {
+    return;
+  }
+  message.actionsEl?.remove();
+  const actions = document.createElement("div");
+  actions.className = "approval-actions";
+  const approve = document.createElement("button");
+  approve.type = "button";
+  approve.className = "primary";
+  approve.textContent = "审批执行";
+  approve.addEventListener("click", () => {
+    approvePlan().catch((error) => {
+      setStatus("执行受阻");
+      setArtifact(error.message);
+      setMessageStatus(message, "协作 · 执行受阻");
+    });
+  });
+  const diff = document.createElement("button");
+  diff.type = "button";
+  diff.textContent = "查看预览";
+  diff.addEventListener("click", () => {
+    setView("cowork");
+    document.querySelector(".operations-card")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+  const reject = document.createElement("button");
+  reject.type = "button";
+  reject.textContent = "拒绝";
+  reject.addEventListener("click", () => {
+    actions.className = "approval-actions is-done";
+    actions.textContent = "已拒绝，本次不会写入本机。";
+    setMessageStatus(message, "协作 · 已拒绝");
+    setStatus("已拒绝");
+  });
+  actions.append(approve, diff, reject);
+  message.actionsEl = actions;
+  message.body.append(actions);
+  scrollConversationToEnd();
+}
+
+function markApprovalDone(message) {
+  if (!message?.actionsEl) {
+    return;
+  }
+  message.actionsEl.className = "approval-actions is-done";
+  message.actionsEl.textContent = `已审批 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function addArtifactCard(message, title, description, pathText) {
+  if (!message?.body) {
+    return;
+  }
+  const card = document.createElement("div");
+  card.className = "inline-artifact";
+  const header = document.createElement("header");
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const meta = document.createElement("em");
+  meta.textContent = "本地产物";
+  header.append(strong, meta);
+  const copy = document.createElement("p");
+  copy.textContent = description;
+  const pathLine = document.createElement("p");
+  pathLine.textContent = pathText || ".KimiCowork/artifacts";
+  card.append(header, copy, pathLine);
+  message.body.append(card);
+  scrollConversationToEnd();
+}
+
+function addSourcesFooter(message, sources) {
+  if (!message?.body || !Array.isArray(sources) || sources.length === 0) {
+    return;
+  }
+  const card = document.createElement("div");
+  card.className = "inline-sources";
+  const header = document.createElement("header");
+  const strong = document.createElement("strong");
+  strong.textContent = `来源 (${sources.length})`;
+  const meta = document.createElement("em");
+  meta.textContent = "可信工作区";
+  header.append(strong, meta);
+  card.append(header);
+  for (const source of sources.slice(0, 4)) {
+    const row = document.createElement("p");
+    const label = source.relativePath || basename(source.path);
+    row.textContent = source.excerpt ? `${label}: ${compactText(source.excerpt, 110)}` : label;
+    card.append(row);
+  }
+  message.body.append(card);
+  scrollConversationToEnd();
+}
+
+function clearConversation() {
+  conversationTimeline?.querySelectorAll(".message-bubble").forEach((node) => node.remove());
+  state.activeTaskMessage = null;
+  syncConversationState();
 }
 
 function shortRunId(runId) {
@@ -506,13 +1306,28 @@ async function tryKimiChat(prompt, summary) {
 }
 
 async function sendChatMessage(prompt) {
+  appendUserMessage(prompt);
+  const message = appendAssistantMessage("我先读取当前可用上下文，然后直接回复。", { status: "对话 · 处理中" });
   if (!state.hostApi) {
-    showChatResponse(`已收到：“${prompt.slice(0, 120)}”。通过 localhost 启动后可调用 Kimi。`);
+    const fallback = `已收到：“${prompt.slice(0, 120)}”。通过 localhost 启动后可调用 Kimi。`;
+    showChatResponse(fallback);
+    appendMessageText(message, fallback);
+    setMessageStatus(message, "对话 · 本地预览");
     return;
   }
   setStatus("正在发送给 Kimi");
   const candidate = textCandidate(activeFiles());
   const summary = await readCandidateSummary(candidate);
+  addProgressLines(message, [
+    {
+      state: "done",
+      title: candidate ? `已读取上下文：${candidate.path}` : "当前没有额外本地文件上下文",
+    },
+    {
+      state: "running",
+      title: state.kimiCliPlanEnabled ? "正在调用 Kimi CLI 对话" : "Kimi CLI 未启用，使用本地安全回复",
+    },
+  ]);
   const reply = await tryKimiChat(prompt, summary);
   state.lastRun = reply.runId
     ? {
@@ -523,14 +1338,18 @@ async function sendChatMessage(prompt) {
       }
     : null;
   showChatResponse(reply.text);
+  appendMessageText(message, reply.text);
   if (reply.used) {
     setRunChip(`Kimi Chat · ${shortRunId(reply.runId)} · ${reply.durationMs}ms`, "ready");
     setStatus("Kimi 已回复");
+    setMessageStatus(message, "对话 · 已回复");
   } else if (reply.failed) {
     setRunChip(`Kimi Chat 失败 · ${shortRunId(reply.runId)}`, "muted");
     setStatus("Kimi 已降级");
+    setMessageStatus(message, "对话 · 已降级");
   } else {
     setStatus("本地回复");
+    setMessageStatus(message, "对话 · 本地回复");
   }
   await refreshRunCards(reply.runId);
 }
@@ -540,6 +1359,128 @@ async function refreshWorkspaceTree() {
   state.files = tree.files;
   summarizeFiles(tree.files);
   renderFiles(tree.files);
+}
+
+async function runRecipePlan(prompt, recipe) {
+  const files = recipeFiles();
+  const message = state.activeTaskMessage || appendAssistantMessage(`我会按“${recipe.name}”处理本地材料。`, { status: "协作 · 模板处理中" });
+  state.activeTaskMessage = message;
+  setMessageStatus(message, "协作 · 模板处理中");
+  addProgressLines(message, [
+    {
+      state: "running",
+      title: files.length > 0 ? `正在抽取 ${files.length} 个本地文件` : "当前没有可抽取文件，将生成空来源草稿",
+    },
+  ]);
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "active",
+        title: `运行模板：${recipe.name}`,
+        detail: files.length > 0 ? `正在抽取 ${files.length} 个本地文件，生成可审批产物。` : "当前没有可抽取文件，将生成空来源草稿。",
+      },
+    ],
+    "模板正在处理",
+  );
+  const result = await postJson(`/api/recipes/${encodeURIComponent(recipe.id)}/run`, {
+    trustedRoot: state.workspace,
+    prompt,
+    files: files.map((file) => file.fullPath),
+    maxSize: 2 * 1024 * 1024,
+  });
+  state.lastSources = result.sources || [];
+  state.lastRun = result.runId
+    ? {
+        id: result.runId,
+        path: result.runPath,
+        durationMs: 0,
+        failed: false,
+      }
+    : null;
+  state.operations = result.operations || [];
+  state.applyIdempotencyKey = idempotencyKey("apply");
+  const preview = await postJson("/api/file-ops/preview", {
+    trustedRoot: state.workspace,
+    operations: state.operations,
+  });
+  state.approved = false;
+  approveButton.textContent = "审批执行";
+  approveButton.classList.remove("is-done");
+  renderOperations(preview.operations);
+  const sourceCopy = state.lastSources.length > 0
+    ? state.lastSources.map((source) => source.relativePath || basename(source.path)).join("、")
+    : "无来源文件";
+  const sourceExcerpt = compactText(state.lastSources.find((source) => source.excerpt)?.excerpt || "", 150);
+  const firstOutput = preview.operations[0]?.path?.replace(state.workspace, ".") || ".KimiCowork/artifacts";
+  setArtifact(`${recipe.name} 已生成 ${preview.operations.length} 个操作；来源：${sourceCopy}${sourceExcerpt ? `；摘要：${sourceExcerpt}` : ""}`, firstOutput);
+  setRunChip(`模板任务 · ${shortRunId(result.runId)}`, "ready");
+  // Prefer the authoritative SSE timeline; fall back to a synchronous summary
+  // when EventSource is unavailable (older webview).
+  const streamed = subscribeRunEvents(message, result.runId);
+  if (!streamed) {
+    addProgressLines(message, [
+      {
+        state: "done",
+        title: `已生成模板产物预览：${recipe.name}`,
+        meta: `${preview.operations.length} 个操作`,
+      },
+      {
+        state: "done",
+        title: `Sources: ${sourceCopy}`,
+        meta: result.runId ? `run ${shortRunId(result.runId)}` : "local recipe",
+      },
+      {
+        state: "running",
+        title: "等待审批，审批前不会写入本机",
+        meta: firstOutput,
+      },
+    ]);
+  }
+  addPreviewCard(message, preview.operations, "等待审批");
+  addSourcesFooter(message, state.lastSources);
+  addApprovalActions(message);
+  setMessageStatus(message, "协作 · 等待审批");
+  renderInteraction(
+    [
+      {
+        state: "done",
+        title: "用户指令",
+        detail: prompt,
+      },
+      {
+        state: "done",
+        title: "读取本地上下文",
+        detail: sourceExcerpt ? `${sourceCopy}: ${sourceExcerpt}` : sourceCopy,
+        meta: `${state.lastSources.length} 个来源`,
+      },
+      {
+        state: "done",
+        title: `模板：${recipe.name}`,
+        detail: recipe.description,
+        meta: recipe.output,
+      },
+      {
+        state: "done",
+        title: "Sources",
+        detail: sourceExcerpt ? `${sourceCopy}: ${sourceExcerpt}` : sourceCopy,
+        meta: result.runId ? `run ${shortRunId(result.runId)}` : "local recipe",
+      },
+      {
+        state: "active",
+        title: "等待审批",
+        detail: `已生成 ${preview.operations.length} 个可审批操作，审批后才会写入本机。`,
+        meta: firstOutput,
+      },
+    ],
+    "等待审批",
+  );
+  await refreshRunCards(result.runId);
+  setStatus("计划就绪");
 }
 
 async function uploadSelectedFiles(fileList, sourceLabel) {
@@ -591,6 +1532,11 @@ async function uploadSelectedFiles(fileList, sourceLabel) {
     `已${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。现在可以直接发送任务让 Kimi 基于摘要生成计划。`,
     rootLabel,
   );
+  const message = appendAssistantMessage(
+    `已${sourceLabel} ${imported.imported.length} 个文件。你现在可以直接发送整理、提取、总结或生成表格任务。`,
+    { status: "协作 · 文件已就绪" },
+  );
+  addArtifactCard(message, "已授权本地文件", `${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节`, rootLabel);
   renderInteraction(
     [
       {
@@ -612,13 +1558,29 @@ async function uploadSelectedFiles(fileList, sourceLabel) {
   composer.focus();
 }
 
-async function generatePlan() {
+async function generatePlan(options = {}) {
+  const { appendUser = true } = options;
   const prompt = composer.value.trim() || "整理这个本地文件夹，生成可审批的安全操作计划";
 
   if (state.view !== "cowork" && state.view !== "code") {
     chatOutput.hidden = true;
     setView("cowork");
   }
+  if (appendUser) {
+    appendUserMessage(prompt);
+  }
+  if (shouldClarify(prompt) && showClarification(prompt)) {
+    return;
+  }
+  hideClarification();
+  const taskMessage = appendAssistantMessage("我会先读取可信工作区，再生成需要审批的本地操作预览。", { status: "协作 · 计划中" });
+  state.activeTaskMessage = taskMessage;
+  addProgressLines(taskMessage, [
+    {
+      state: "running",
+      title: "正在读取本地上下文",
+    },
+  ]);
   renderInteraction(
     [
       {
@@ -638,6 +1600,17 @@ async function generatePlan() {
   if (!state.hostApi) {
     setStatus("预览模式");
     setArtifact(`已根据 “${prompt.slice(0, 42)}” 生成本地操作预览，等待审批。`);
+    addProgressLines(taskMessage, [
+      {
+        state: "done",
+        title: "静态预览已生成",
+      },
+      {
+        state: "wait",
+        title: "通过 localhost 启动后可执行真实本地写入",
+      },
+    ]);
+    setMessageStatus(taskMessage, "协作 · 预览模式");
     renderInteraction(
       [
         {
@@ -658,6 +1631,12 @@ async function generatePlan() {
       ],
       "静态预览",
     );
+    return;
+  }
+
+  const recipe = maybeSelectRecipe(prompt);
+  if (recipe) {
+    await runRecipePlan(prompt, recipe);
     return;
   }
 
@@ -685,6 +1664,17 @@ async function generatePlan() {
     ],
     "Kimi 正在规划",
   );
+  addProgressLines(taskMessage, [
+    {
+      state: "done",
+      title: "已读取本地上下文",
+      meta: candidate ? candidate.path : "无可读文本文件",
+    },
+    {
+      state: "running",
+      title: state.kimiCliPlanEnabled ? "正在调用 Kimi CLI 生成计划" : "Kimi CLI 未启用，使用本地摘要生成安全草稿",
+    },
+  ]);
   const kimiPlan = await tryKimiCliPlan(prompt, summary);
   state.lastRun = kimiPlan.runId
     ? {
@@ -720,6 +1710,7 @@ async function generatePlan() {
       ].join("\n"),
     },
   ];
+  state.applyIdempotencyKey = idempotencyKey("apply");
 
   const preview = await postJson("/api/file-ops/preview", {
     trustedRoot: state.workspace,
@@ -740,6 +1731,22 @@ async function generatePlan() {
   } else if (kimiPlan.failed) {
     setRunChip(`Kimi CLI 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
   }
+  addProgressLines(taskMessage, [
+    {
+      state: kimiPlan.failed ? "error" : "done",
+      title: kimiPlan.used ? "Kimi 计划已返回" : kimiPlan.failed ? "Kimi 调用失败，已降级" : "本地计划已生成",
+      meta: kimiPlan.runId ? `run ${shortRunId(kimiPlan.runId)}` : "local fallback",
+    },
+    {
+      state: "running",
+      title: "等待审批，审批前不会写入本机",
+      meta: outputPath.replace(state.workspace, "."),
+    },
+  ]);
+  addPreviewCard(taskMessage, preview.operations, "等待审批");
+  addSourcesFooter(taskMessage, candidate ? [{ path: candidate.fullPath, relativePath: candidate.path, excerpt: summary }] : []);
+  addApprovalActions(taskMessage);
+  setMessageStatus(taskMessage, "协作 · 等待审批");
   renderInteraction(
     [
       {
@@ -782,6 +1789,14 @@ async function approvePlan() {
     approveButton.textContent = "已审批";
     approveButton.classList.add("is-done");
     setArtifact("预览模式下已完成界面状态切换；通过 localhost 启动可执行真实本地写入。");
+    markApprovalDone(state.activeTaskMessage);
+    addProgressLines(state.activeTaskMessage, [
+      {
+        state: "done",
+        title: "预览模式已应用",
+      },
+    ]);
+    setMessageStatus(state.activeTaskMessage, "协作 · 预览已应用");
     renderInteraction(
       [
         ...state.interactionItems,
@@ -805,6 +1820,14 @@ async function approvePlan() {
   }
 
   setStatus("正在本机执行");
+  setMessageStatus(state.activeTaskMessage, "协作 · 正在执行");
+  markApprovalDone(state.activeTaskMessage);
+  addProgressLines(state.activeTaskMessage, [
+    {
+      state: "running",
+      title: "正在本机执行审批操作",
+    },
+  ]);
   renderInteraction(
     [
       ...state.interactionItems.map((item) => (item.title === "等待审批" ? { ...item, state: "done", title: "审批已确认" } : item)),
@@ -819,11 +1842,22 @@ async function approvePlan() {
   const applied = await postJson("/api/file-ops/apply", {
     trustedRoot: state.workspace,
     operations: state.operations,
+    idempotencyKey: state.applyIdempotencyKey || idempotencyKey("apply"),
   });
   state.approved = true;
   approveButton.textContent = "已审批";
   approveButton.classList.add("is-done");
   setArtifact(`已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`);
+  const artifactPathText = applied.applied[0]?.path?.replace?.(state.workspace, ".") || artifactPath.textContent || ".KimiCowork/artifacts";
+  addProgressLines(state.activeTaskMessage, [
+    {
+      state: "done",
+      title: `执行完成：已应用 ${applied.applied.length} 个操作`,
+      meta: ".KimiCowork/audit/host-events.jsonl",
+    },
+  ]);
+  addArtifactCard(state.activeTaskMessage, "执行完成", `已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`, artifactPathText);
+  setMessageStatus(state.activeTaskMessage, "协作 · 完成");
   renderInteraction(
     [
       ...state.interactionItems.filter((item) => item.title !== "正在本机执行"),
@@ -837,6 +1871,18 @@ async function approvePlan() {
     "执行完成",
   );
   setStatus("已在本机执行");
+}
+
+async function handleComposerSend() {
+  const prompt = composer.value.trim();
+  if (!prompt) {
+    return;
+  }
+  if (shouldUseCowork(prompt)) {
+    await generatePlan({ appendUser: true });
+    return;
+  }
+  await sendChatMessage(prompt);
 }
 
 async function loadHostWorkspace() {
@@ -853,6 +1899,7 @@ async function loadHostWorkspace() {
     workspacePath.textContent = state.workspace;
 
     await refreshWorkspaceTree();
+    await loadRecipes();
     await refreshRunCards();
     setStatus("本地 Agent 就绪");
   } catch (error) {
@@ -878,6 +1925,7 @@ document.querySelectorAll("[data-recent]").forEach((item) => {
     setView("chat");
     composer.value = item.dataset.recent;
     showChatResponse(`已打开最近会话：${item.dataset.recent}`);
+    appendAssistantMessage(`已打开最近会话：${item.dataset.recent}`, { status: "对话 · 已打开" });
   });
 });
 
@@ -901,7 +1949,7 @@ document.querySelectorAll("[data-quick]").forEach((item) => {
   });
 });
 
-document.querySelector('[data-action="upload-files"]').addEventListener("click", () => {
+document.querySelector('[data-action="upload-files"]')?.addEventListener("click", () => {
   setView("cowork");
   uploadInput?.click();
   composer.focus();
@@ -925,12 +1973,22 @@ folderInput?.addEventListener("change", () => {
   });
 });
 
-document.querySelector('[data-action="new-chat"]').addEventListener("click", () => {
+document.querySelector('[data-action="new-chat"]')?.addEventListener("click", () => {
   setView("chat");
   composer.value = "";
-  chatOutput.hidden = true;
+  if (typeof chatOutput !== "undefined" && chatOutput) {
+    chatOutput.hidden = true;
+  }
   state.operations = [];
   state.approved = false;
+  if (state.activeEventSource) {
+    try {
+      state.activeEventSource.close();
+    } catch {
+      // ignore
+    }
+    state.activeEventSource = null;
+  }
   resetInteraction();
   approveButton.textContent = "审批执行";
   approveButton.classList.remove("is-done");
@@ -951,10 +2009,23 @@ document.querySelectorAll("[data-artifact]").forEach((item) => {
 });
 
 sendButton.addEventListener("click", () => {
-  generatePlan().catch((error) => {
+  handleComposerSend().catch((error) => {
     setStatus("计划失败");
     setArtifact(error.message);
   });
+});
+
+composer?.addEventListener("keydown", (event) => {
+  if (composerPopoverHandleKey(event)) {
+    return;
+  }
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    handleComposerSend().catch((error) => {
+      setStatus("计划失败");
+      setArtifact(error.message);
+    });
+  }
 });
 
 approveButton.addEventListener("click", () => {

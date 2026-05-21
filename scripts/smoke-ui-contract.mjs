@@ -57,6 +57,7 @@ async function main() {
     assert(index.contentType.includes('text/html'), 'index did not return HTML');
     assert(index.body.includes('class="mode-switch"'), 'index missing 对话/协作/代码 mode switch');
     assert(index.body.includes('class="composer"'), 'index missing composer UI');
+    assert(index.body.includes('class="conversation-timeline"'), 'index missing conversation timeline');
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
     assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
     for (const copy of ['对话', '协作', '代码', '新建会话', '项目', '产物', '自定义', '最近']) {
@@ -74,10 +75,29 @@ async function main() {
     const script = await getText(baseUrl, '/app.js');
     assert(script.contentType.includes('javascript'), 'app.js did not return JavaScript');
     assert(script.body.includes('function setView'), 'app.js missing view switching controller');
+    assert(script.body.includes('function appendAssistantMessage'), 'app.js missing message bubble controller');
+    assert(script.body.includes('function handleComposerSend'), 'app.js missing composer send router');
     assert(script.body.includes('[data-quick]'), 'app.js missing quick action handlers');
-    for (const route of ['/api/workspace', '/api/files/tree', '/api/files/read', '/api/file-ops/preview', '/api/file-ops/apply']) {
+    assert(script.body.includes('function subscribeRunEvents'), 'app.js missing SSE run-event subscriber');
+    assert(script.body.includes('new EventSource('), 'app.js missing EventSource client');
+    assert(script.body.includes('/events`'), 'app.js missing SSE /events route usage');
+    assert(script.body.includes('function handleComposerInput'), 'app.js missing composer popover input handler');
+    assert(script.body.includes('detectComposerTrigger'), 'app.js missing slash/at trigger detection');
+    assert(index.body.includes('class="composer-popover"'), 'index missing composer popover container');
+    for (const route of [
+      '/api/workspace',
+      '/api/files/tree',
+      '/api/files/read',
+      '/api/files/extract',
+      '/api/files/search',
+      '/api/recipes',
+      '/api/file-ops/preview',
+      '/api/file-ops/apply',
+    ]) {
       assert(script.body.includes(route), `app.js missing UI contract route ${route}`);
     }
+    assert(index.body.includes('任务模板'), 'index missing recipe panel');
+    assert(index.body.includes('澄清问题'), 'index missing clarification primitive');
 
     const workspaceInfo = await (await fetch(`${baseUrl}/api/workspace`)).json();
     assert(workspaceInfo.trustedRoot === workspace, 'workspace endpoint returned unexpected root');
@@ -91,6 +111,16 @@ async function main() {
       maxSize: 1600,
     });
     assert(read.content.includes('renewal date'), 'UI read flow cannot read trusted file content');
+
+    const extracted = await requestJson(baseUrl, '/api/files/extract', {
+      trustedRoot: workspace,
+      path: contractPath,
+      maxSize: 1600,
+    });
+    assert(extracted.content.includes('renewal date'), 'UI extract flow cannot extract trusted file content');
+
+    const recipes = await (await fetch(`${baseUrl}/api/recipes`)).json();
+    assert(recipes.recipes.length >= 8, 'UI recipe flow did not expose MVP templates');
 
     const artifactPath = path.join(workspace, '.KimiCowork', 'artifacts', 'ui-smoke-plan.md');
     const operations = [

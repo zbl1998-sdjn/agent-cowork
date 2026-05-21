@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { assertTrustedPath } from '../security/path-policy.js';
-import { readTextFile } from './file-reader.js';
 
 function normalizeOp(op) {
   if (!op || typeof op !== 'object') {
@@ -12,8 +11,19 @@ function normalizeOp(op) {
   return { ...op, type };
 }
 
-function hashContent(content) {
-  return crypto.createHash('sha256').update(String(content ?? '')).digest('hex');
+function hashBuffer(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+function hashFile(filePath) {
+  return hashBuffer(fs.readFileSync(filePath));
+}
+
+function operationContentBuffer(op) {
+  if (op.encoding === 'base64' || typeof op.contentBase64 === 'string') {
+    return Buffer.from(String(op.contentBase64 ?? op.content ?? ''), 'base64');
+  }
+  return Buffer.from(String(op.content ?? ''), 'utf8');
 }
 
 function fileExists(p) {
@@ -35,15 +45,15 @@ function pathExists(p) {
 
 function previewWrite(op, trustedRoot) {
   const target = assertTrustedPath(path.resolve(op.path), trustedRoot);
-  const content = String(op.content ?? '');
+  const content = operationContentBuffer(op);
   const overwrite = op.overwrite === true;
   const beforeExists = fileExists(target);
   if (beforeExists && !overwrite) {
     throw new Error(`Overwrite disabled: ${target}`);
   }
 
-  const beforeHash = beforeExists ? readTextFile(target, { trustedRoot }).sha256 : null;
-  const afterHash = hashContent(content);
+  const beforeHash = beforeExists ? hashFile(target) : null;
+  const afterHash = hashBuffer(content);
 
   return {
     type: 'write',
@@ -66,7 +76,7 @@ function previewRename(op, trustedRoot) {
   if (pathExists(target)) {
     throw new Error(`Target already exists: ${target}`);
   }
-  const beforeHash = readTextFile(source, { trustedRoot }).sha256;
+  const beforeHash = hashFile(source);
   return {
     type: 'rename',
     path: source,
@@ -88,7 +98,7 @@ function previewMove(op, trustedRoot) {
   if (pathExists(target)) {
     throw new Error(`Target already exists: ${target}`);
   }
-  const beforeHash = readTextFile(source, { trustedRoot }).sha256;
+  const beforeHash = hashFile(source);
   return {
     type: 'move',
     path: source,
@@ -133,7 +143,7 @@ export function previewFileOperations(operations, options = {}) {
 function applyWrite(op, options) {
   const parentDir = path.dirname(op.path);
   fs.mkdirSync(parentDir, { recursive: true });
-  fs.writeFileSync(op.path, String(op.content ?? ''), 'utf8');
+  fs.writeFileSync(op.path, operationContentBuffer(op));
 }
 
 function applyRename(op) {
@@ -169,10 +179,10 @@ export function applyFileOperations(operations, options = {}) {
     if (op.type === 'write') {
       const original = operations.find((o) => o.type === 'write' && path.resolve(o.path) === op.path);
       applyWrite(Object.assign(op, original || {}));
-      const after = readTextFile(op.path, { trustedRoot });
+      const afterStat = fs.statSync(op.path);
       event.status = 'applied';
-      event.afterHash = after.sha256;
-      event.size = after.size;
+      event.afterHash = hashFile(op.path);
+      event.size = afterStat.size;
       if (journalWriter?.append) {
         journalWriter.append({ ...event, stage: 'after' });
       }

@@ -103,6 +103,7 @@
 
             <div class="composer" aria-label="任务输入框">
               <textarea placeholder="今天想让 Kimi 做什么？"></textarea>
+              <div class="composer-popover" role="listbox" aria-label="模板与文件建议" hidden></div>
               <input class="upload-input" type="file" multiple hidden aria-hidden="true" />
               <input class="folder-input" type="file" multiple webkitdirectory hidden aria-hidden="true" />
               <div class="composer-footer">
@@ -148,7 +149,19 @@
             </div>
           </section>
 
-          <section class="chat-panel view-panel is-visible" data-views="chat" aria-live="polite">
+          <section class="chat-panel view-panel is-visible" data-views="chat cowork code" aria-live="polite">
+            <div class="conversation-timeline" role="log" aria-label="对话时间线">
+              <div class="conversation-empty">
+                <strong>Kimi Cowork</strong>
+                <p>直接提问，或上传本地文件后让 Kimi 生成可审批的执行计划。</p>
+                <div class="empty-suggestions">
+                  <button type="button" data-suggestion="读取刚上传的文件，生成可审批的整理计划">整理上传文件</button>
+                  <button type="button" data-suggestion="把会议纪要提取成行动项 xlsx">会议行动项</button>
+                  <button type="button" data-suggestion="读取本地合同，生成摘要和风险点">合同摘要</button>
+                  <button type="button" data-suggestion="清洗这个表格并输出 xlsx">表格清洗</button>
+                </div>
+              </div>
+            </div>
             <div class="chat-output" hidden>
               <strong>Kimi</strong>
               <p></p>
@@ -185,6 +198,25 @@
                   <em>等待任务</em>
                 </button>
               </div>
+            </section>
+
+            <section class="recipe-panel" aria-label="任务模板">
+              <div class="recipe-header">
+                <div>
+                  <strong>任务模板</strong>
+                  <span class="recipe-summary">正在加载 Kimi-only 本地模板</span>
+                </div>
+                <button class="recipe-clear" type="button" data-action="clear-recipe">自动选择</button>
+              </div>
+              <div class="recipe-list" role="list"></div>
+            </section>
+
+            <section class="clarify-panel" aria-label="澄清问题" hidden>
+              <div>
+                <strong>需要确认任务类型</strong>
+                <p>这条指令比较宽泛，请先选择一个执行方向。</p>
+              </div>
+              <div class="clarify-options"></div>
             </section>
 
             <div class="task-grid">

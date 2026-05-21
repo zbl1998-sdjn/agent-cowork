@@ -38,13 +38,12 @@ test('workspace endpoint returns configured trusted root', async () => {
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/workspace`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-      trustedRoot,
-      kimiCli: {
-        chatEnabled: false,
-        planEnabled: false,
-      },
-    });
+    const body = await response.json();
+    assert.equal(body.trustedRoot, trustedRoot);
+    assert.equal(body.kimiCli.chatEnabled, false);
+    assert.equal(body.kimiCli.planEnabled, false);
+    assert.equal(body.context.tenantId, 'tenant_local');
+    assert.ok(response.headers.get('x-trace-id'));
   });
 });
 
@@ -244,6 +243,101 @@ test('run endpoints expose persisted Kimi plan records', async () => {
     const detail = await detailResponse.json();
     assert.equal(detail.result.text, '可复跑的计划记录');
     assert.equal(detail.input.summary, '运行记录摘要');
+  });
+});
+
+test('task endpoint maps persisted runs into task cards', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({
+    trustedRoot,
+    enableKimiCliPlan: true,
+    kimiPlanRunner: async () => ({
+      ok: true,
+      provider: 'kimi-cli',
+      command: 'kimi',
+      mode: 'cowork',
+      text: '任务卡片计划',
+      durationMs: 11,
+    }),
+  }, async (baseUrl) => {
+    await fetch(`${baseUrl}/api/kimi/plan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, prompt: '生成任务卡片', mode: 'cowork' }),
+    });
+    const response = await fetch(`${baseUrl}/api/tasks`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.tasks.length, 1);
+    assert.equal(body.tasks[0].status, 'done');
+    assert.equal(body.tasks[0].activeForm, '已完成');
+    assert.equal(body.tasks[0].prompt, '生成任务卡片');
+  });
+});
+
+test('document extraction, search, and recipe endpoints generate approval operations', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const notes = path.join(trustedRoot, 'meeting-notes.md');
+  fs.writeFileSync(notes, '# 周会\n- 行动项：Derrick 5月30日准备周报\n', 'utf8');
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const recipes = await fetch(`${baseUrl}/api/recipes`);
+    assert.equal(recipes.status, 200);
+    assert.equal((await recipes.json()).recipes.length, 8);
+
+    const extract = await fetch(`${baseUrl}/api/files/extract`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, path: notes }),
+    });
+    assert.equal(extract.status, 200);
+    assert.match((await extract.json()).content, /准备周报/);
+
+    const search = await fetch(`${baseUrl}/api/files/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, query: '准备周报', includeContent: true }),
+    });
+    assert.equal(search.status, 200);
+    assert.equal((await search.json()).results[0].match, 'content');
+
+    const run = await fetch(`${baseUrl}/api/recipes/meeting-actions/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, prompt: '提取会议行动项', files: [notes] }),
+    });
+    assert.equal(run.status, 200);
+    const body = await run.json();
+    assert.match(body.runId, /^run_/);
+    assert.equal(body.operations.length, 2);
+    assert.equal(body.operations.some((op) => op.path.endsWith('.xlsx') && op.contentBase64), true);
+    assert.equal(fs.existsSync(body.runPath), true);
+  });
+});
+
+test('apply endpoint replays duplicate idempotency key without applying twice', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const target = path.join(trustedRoot, '.KimiCowork', 'artifacts', 'idem.txt');
+  const operations = [{ type: 'write', path: target, content: 'once' }];
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const first = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'same-key' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(first.status, 200);
+    assert.equal((await first.json()).applied.length, 1);
+
+    const second = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'same-key' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(second.status, 200);
+    const replay = await second.json();
+    assert.equal(replay.idempotentReplay, true);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'once');
   });
 });
 

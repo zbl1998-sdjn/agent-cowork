@@ -32,7 +32,19 @@ function decodeCliOutput(chunks) {
   }
 }
 
-export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork' }) {
+function buildMemoryBlock(memory) {
+  const text = cleanText(memory).slice(0, 4096);
+  if (!text) {
+    return '';
+  }
+  return [
+    '工作区记忆 (.KimiCowork/MEMORY.md, 用户已确认的长期事实, 严格遵守):',
+    text,
+    '工作区记忆结束。',
+  ].join('\n');
+}
+
+export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
     throw new Error('prompt is required');
@@ -42,16 +54,22 @@ export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork' }) {
   }
 
   const safeSummary = cleanText(summary).slice(0, 2400);
-  return [
+  const memoryBlock = buildMemoryBlock(memory);
+  const lines = [];
+  if (memoryBlock) {
+    lines.push(memoryBlock);
+  }
+  lines.push(
     '只基于下面摘要回答，不要读取文件，不要使用工具，不要修改文件，不要运行命令。',
     '用中文 Markdown 输出：目标理解、三条整理建议、审批前本地动作清单。',
     `模式：${mode === 'code' ? 'code' : 'cowork'}`,
     `摘要：${safeSummary || '暂无。'}`,
     `用户指令：${userPrompt}`,
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
-export function buildKimiChatPrompt({ prompt, summary = '' }) {
+export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
     throw new Error('prompt is required');
@@ -61,16 +79,22 @@ export function buildKimiChatPrompt({ prompt, summary = '' }) {
   }
 
   const safeSummary = cleanText(summary).slice(0, 2400);
-  return [
+  const memoryBlock = buildMemoryBlock(memory);
+  const lines = [];
+  if (memoryBlock) {
+    lines.push(memoryBlock);
+  }
+  lines.push(
     '你是 Kimi Cowork 的本地对话核心。',
     '只基于用户消息和 Host 提供的摘要回答；不要读取文件，不要使用工具，不要修改文件，不要运行命令。',
     '如果用户需要本地文件操作，提醒切到“协作”模式并等待审批。',
     `已授权/已上传内容摘要：${safeSummary || '暂无。'}`,
     `用户消息：${userPrompt}`,
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
-export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSteps = DEFAULT_MAX_STEPS, model }) {
+export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
   }
@@ -85,11 +109,11 @@ export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSt
   if (model) {
     args.push('--model', String(model));
   }
-  args.push('--prompt', buildKimiPlanPrompt({ prompt, summary, mode }));
+  args.push('--prompt', buildKimiPlanPrompt({ prompt, summary, mode, memory }));
   return args;
 }
 
-export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = DEFAULT_MAX_STEPS, model }) {
+export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
   }
@@ -104,7 +128,7 @@ export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = 
   if (model) {
     args.push('--model', String(model));
   }
-  args.push('--prompt', buildKimiChatPrompt({ prompt, summary }));
+  args.push('--prompt', buildKimiChatPrompt({ prompt, summary, memory }));
   return args;
 }
 
@@ -114,6 +138,7 @@ function runKimiCliText({
   prompt,
   summary,
   mode,
+  memory = '',
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxSteps = DEFAULT_MAX_STEPS,
   model,
@@ -123,7 +148,7 @@ function runKimiCliText({
 
   // Use a temp work-dir so Kimi CLI does not resume a previous session.
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-kimi-'));
-  const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, maxSteps, model });
+  const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, memory, maxSteps, model });
 
   return new Promise((resolve, reject) => {
     const child = childProcess.spawn(command, args, {
