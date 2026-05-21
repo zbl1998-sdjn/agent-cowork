@@ -50,7 +50,7 @@
 | 澄清气泡 (ClarificationCard) | ✅ | MVP 版双轨展示 |
 | Composer `/` 模板 picker | ✅ | `/` 触发模板 popover (键盘上下选 + Enter/Esc), 选中插入模板 prompt + 设 selectedRecipeId |
 | Composer `@` 文件 mention | ✅ | `@` 触发文件 popover, 走 `/api/files/search` 实时检索, 选中插入 `@文件名` 并加入 `state.mentionedFiles` 供模板/计划引用 |
-| Composer `#` 历史 run picker | ❌ | 未做 |
+| Composer `#` 历史 run picker | ✅ | `#` 触发历史任务 popover, 走 `/api/runs/index` 列最近 runs; 选中后读取 `/api/runs/:id`, 回放 run record 的 `events[]`, 并把原 prompt 放回 Composer 便于复跑 |
 | 任务状态 Badge | 🟡 | 任务卡片在, 但消息头部 badge 仍简化 |
 | computer:// 等价一键打开 | ❌ | 产物卡有路径, 缺 shell open 集成 |
 | 内联可视化 widget (Chart/Mermaid) | ❌ | 未做 |
@@ -119,7 +119,7 @@
 
 1. ~~**真 SSE event stream**~~ ✅ 后端 + 前端 EventSource 全通; 伪流式已被服务端权威事件流取代。
 2. ~~**SQLite + MEMORY.md + Scheduled Tasks**~~ ✅ 三件运行时模块已落地 (Repository 形态, 待换 SQLite adapter)。
-3. ~~**Composer `/模板` + `@文件` popover**~~ ✅ 已落地 (`#历史` picker 仍未做, 优先级低)。
+3. ~~**Composer `/模板` + `@文件` + `#历史` popover**~~ ✅ 已落地。
 4. **Tauri/Electron 迁移 + React 重写** (退出 C/Win32 + Defender ASR 战线) — 未做。
 
 下一步聚焦: (a) 把 Memory/Runs/Schedule 的文件后端换成真 SQLite adapter (接口已就位); (b) Tauri/Electron + React 迁移; (c) Kimi Gateway 流式 + tool calls。
@@ -388,5 +388,28 @@ P1-B 完成 — memory audit 写入从同步 `fs.appendFileSync` 改为 `AuditEv
 
 验收:
 
+- `node --test` 全量 **96 通过 / 0 失败**。
+- `npm run smoke:ui` 通过。
+
+---
+
+## 14. 2026-05-21 本轮实现 (#历史 run picker)
+
+P2-B 完成 — Composer 新增 `#` 历史任务 picker, 从 runs-index 列最近任务, 选中后读取 run record 并把持久化 `events[]` 回放到对话流, 同时把原 prompt 放回输入框供用户复跑。
+
+已落地:
+
+- **历史 picker** (`apps/windows-client/resources/app.js`):
+  - `#` 触发 popover, 支持按 run id / promptPreview / recipeId / status / type 本地过滤。
+  - 数据源走 `/api/runs/index?limit=20`, 不扫描文件系统。
+  - 选中后读取 `/api/runs/:id`, 高亮最近任务卡, 回放 progress / preview / sources / assistant_end 事件。
+  - 若历史 run 带 `recipeId`, 自动恢复 selected recipe; 若带 prompt, 自动回填 Composer 便于复跑。
+- **契约 smoke** (`scripts/smoke-ui-contract.mjs`):
+  - 新增 `historyRunItems`、`/api/runs/index`、`mode: "history"`、`replayRunEvents` 断言。
+
+验收:
+
+- `node --check apps/windows-client/resources/app.js` 通过。
+- `node --check scripts/smoke-ui-contract.mjs` 通过。
 - `node --test` 全量 **96 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。

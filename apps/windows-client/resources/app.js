@@ -306,9 +306,10 @@ async function searchLocalFiles(query) {
   return payload.results || [];
 }
 
-// ---- Composer slash/at popover (templates + file mentions) ----
+// ---- Composer slash/at/hash popover (templates + file mentions + run history) ----
 const composerPopoverState = { open: false, mode: null, items: [], active: 0, triggerStart: 0 };
 let mentionSearchToken = 0;
+let historySearchToken = 0;
 
 function hideComposerPopover() {
   composerPopoverState.open = false;
@@ -332,7 +333,12 @@ function renderComposerPopover() {
   }
   const header = document.createElement("div");
   header.className = "popover-header";
-  header.textContent = composerPopoverState.mode === "template" ? "选择任务模板" : "引用本地文件";
+  const headerLabels = {
+    template: "选择任务模板",
+    mention: "引用本地文件",
+    history: "历史任务",
+  };
+  header.textContent = headerLabels[composerPopoverState.mode] || "选择建议";
   composerPopover.append(header);
   composerPopoverState.items.forEach((item, index) => {
     const row = document.createElement("button");
@@ -364,6 +370,10 @@ function detectComposerTrigger() {
   const atMatch = before.match(/@([^\s@]*)$/);
   if (atMatch) {
     return { mode: "mention", query: atMatch[1], start: before.length - atMatch[1].length - 1 };
+  }
+  const historyMatch = before.match(/#([^\s#]*)$/);
+  if (historyMatch) {
+    return { mode: "history", query: historyMatch[1], start: before.length - historyMatch[1].length - 1 };
   }
   return null;
 }
@@ -397,6 +407,56 @@ async function refreshMentionItems(query) {
   renderComposerPopover();
 }
 
+async function historyRunItems(query) {
+  if (!state.hostApi) {
+    return [];
+  }
+  const response = await fetch("/api/runs/index?limit=20");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || `runs index returned ${response.status}`);
+  }
+  const q = String(query || "").toLowerCase();
+  return (payload.runs || [])
+    .filter((run) => {
+      if (!q) {
+        return true;
+      }
+      return [
+        run.id,
+        run.promptPreview,
+        run.recipeId,
+        run.status,
+        run.type,
+        run.mode,
+      ].filter(Boolean).join(" ").toLowerCase().includes(q);
+    })
+    .slice(0, 8)
+    .map((run) => ({
+      kind: "history",
+      id: run.id,
+      title: `${runTypeText(run)} · ${runStatusText(run.status)} · ${shortRunId(run.id)}`,
+      detail: compactText(run.promptPreview || run.recipeId || run.type || "历史任务", 80),
+      run,
+    }));
+}
+
+async function refreshHistoryRunItems(query) {
+  const token = ++historySearchToken;
+  let results = [];
+  try {
+    results = await historyRunItems(query);
+  } catch {
+    results = [];
+  }
+  if (token !== historySearchToken || composerPopoverState.mode !== "history") {
+    return;
+  }
+  composerPopoverState.items = results;
+  composerPopoverState.active = 0;
+  renderComposerPopover();
+}
+
 function replaceTriggerToken(start, insertText) {
   const value = composer.value;
   const caret = composer.selectionStart ?? value.length;
@@ -421,6 +481,12 @@ function selectComposerPopoverItem(index) {
       state.mentionedFiles.push(item.file);
     }
     replaceTriggerToken(composerPopoverState.triggerStart, `@${basename(item.file.path)} `);
+  } else if (item.kind === "history") {
+    replaceTriggerToken(composerPopoverState.triggerStart, `#${shortRunId(item.id)} `);
+    selectHistoryRun(item.run).catch((error) => {
+      setStatus("历史任务读取失败");
+      setArtifact(error.message);
+    });
   }
   hideComposerPopover();
   composer.focus();
@@ -438,6 +504,10 @@ function handleComposerInput() {
     composerPopoverState.items = templateItems(trigger.query);
     composerPopoverState.active = 0;
     renderComposerPopover();
+    return;
+  }
+  if (trigger.mode === "history") {
+    refreshHistoryRunItems(trigger.query);
     return;
   }
   if (!trigger.query) {
@@ -800,6 +870,39 @@ function progressStateFromIcon(icon) {
   return "wait";
 }
 
+function renderRunEventPayload(type, payload, appendLine) {
+  if (type === "progress") {
+    appendLine(progressStateFromIcon(payload.icon), payload.text || "处理中", payload.meta);
+    return true;
+  }
+  if (type === "preview") {
+    appendLine("done", `生成 ${payload.count ?? (payload.operations || []).length} 个可审批操作`);
+    return true;
+  }
+  if (type === "awaiting_approval") {
+    appendLine("running", "等待审批，审批前不会写入本机");
+    return true;
+  }
+  if (type === "sources") {
+    const names = (payload.items || [])
+      .map((item) => item.relativePath || item.path || "")
+      .filter(Boolean)
+      .join("、");
+    if (names) {
+      appendLine("done", `来源 (${(payload.items || []).length})`, names.slice(0, 120));
+      return true;
+    }
+    return false;
+  }
+  if (type === "assistant_end") {
+    appendLine(payload.status === "failed" ? "failed" : "done",
+      payload.status === "failed" ? "运行失败" : "运行完成",
+      payload.durationMs != null ? `${payload.durationMs}ms` : "");
+    return true;
+  }
+  return false;
+}
+
 // Subscribe to the server's authoritative run event stream via SSE and render
 // the timeline into the message bubble. Returns the EventSource, or null when
 // EventSource is unavailable (older webview) so callers can fall back to the
@@ -846,24 +949,8 @@ function subscribeRunEvents(message, runId, options = {}) {
       if (seen.has(seq)) return;
       seen.add(seq);
     }
-    if (type === "progress") {
-      appendLine(progressStateFromIcon(payload.icon), payload.text || "处理中", payload.meta);
-    } else if (type === "preview") {
-      appendLine("done", `生成 ${payload.count ?? (payload.operations || []).length} 个可审批操作`);
-    } else if (type === "awaiting_approval") {
-      appendLine("running", "等待审批，审批前不会写入本机");
-    } else if (type === "sources") {
-      const names = (payload.items || [])
-        .map((item) => item.relativePath || item.path || "")
-        .filter(Boolean)
-        .join("、");
-      if (names) {
-        appendLine("done", `来源 (${(payload.items || []).length})`, names.slice(0, 120));
-      }
-    } else if (type === "assistant_end") {
-      appendLine(payload.status === "failed" ? "failed" : "done",
-        payload.status === "failed" ? "运行失败" : "运行完成",
-        payload.durationMs != null ? `${payload.durationMs}ms` : "");
+    renderRunEventPayload(type, payload, appendLine);
+    if (type === "assistant_end") {
       close();
       if (typeof options.onComplete === "function") options.onComplete(payload);
     }
@@ -1230,6 +1317,77 @@ async function showRunDetail(runId) {
     failed ? `任务 ${shortRunId(run.id)} 调用失败：${run.error?.message || "未知错误"}` : `已打开任务 ${shortRunId(run.id)} 的 Kimi 输出。`,
     run.id,
   );
+}
+
+function replayRunEvents(message, run) {
+  if (!message?.body) {
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "message-progress message-progress-sse";
+  message.body.append(list);
+
+  const appendLine = (lineState, title, meta) => {
+    const row = document.createElement("div");
+    row.className = `progress-line is-${lineState || "wait"}`;
+    row.textContent = meta ? `${title} · ${meta}` : title;
+    list.append(row);
+    scrollConversationToEnd();
+  };
+
+  let rendered = 0;
+  for (const event of Array.isArray(run?.events) ? run.events : []) {
+    if (renderRunEventPayload(event.type, event, appendLine)) {
+      rendered += 1;
+    }
+  }
+  if (rendered === 0) {
+    appendLine("wait", "这条历史任务没有可回放事件", "已打开详情");
+  }
+}
+
+async function selectHistoryRun(indexRun) {
+  if (!state.hostApi || !indexRun?.id) {
+    return;
+  }
+  const response = await fetch(`/api/runs/${encodeURIComponent(indexRun.id)}`);
+  const run = await response.json();
+  if (!response.ok) {
+    throw new Error(run.error || `run detail returned ${response.status}`);
+  }
+  renderRunCards(state.runs, run.id);
+  state.lastRun = {
+    id: run.id,
+    path: run.runPath || indexRun.runPath || "",
+    durationMs: run.durationMs || indexRun.durationMs || 0,
+    failed: run.status === "failed",
+  };
+  if (run.recipeId) {
+    state.selectedRecipeId = run.recipeId;
+    state.selectedRecipeSource = "history";
+    renderRecipes(state.recipes);
+  }
+  const prompt = run.input?.prompt || indexRun.promptPreview || "";
+  if (prompt) {
+    composer.value = prompt;
+  }
+  const message = appendAssistantMessage(`回放历史任务 ${shortRunId(run.id)}。`, {
+    status: run.status === "failed" ? "历史 · 失败" : "历史 · 回放中",
+  });
+  replayRunEvents(message, run);
+  renderInteraction(
+    [
+      {
+        state: run.status === "failed" ? "error" : "done",
+        title: `${runTypeText(run)}任务 ${runStatusText(run.status)}`,
+        detail: prompt || "未记录任务输入",
+        meta: `run ${shortRunId(run.id)} · ${formatDuration(run.durationMs)}`,
+      },
+    ],
+    "历史任务",
+  );
+  setStatus("历史任务已回放");
+  setRunChip(`历史任务 · ${shortRunId(run.id)}`, "ready");
 }
 
 async function tryKimiCliPlan(prompt, summary) {

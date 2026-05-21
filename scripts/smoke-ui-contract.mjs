@@ -83,6 +83,10 @@ async function main() {
     assert(script.body.includes('/events`'), 'app.js missing SSE /events route usage');
     assert(script.body.includes('function handleComposerInput'), 'app.js missing composer popover input handler');
     assert(script.body.includes('detectComposerTrigger'), 'app.js missing slash/at trigger detection');
+    assert(script.body.includes('historyRunItems'), 'app.js missing # history run picker');
+    assert(script.body.includes('/api/runs/index'), 'app.js missing runs-index picker route');
+    assert(script.body.includes('mode: "history"'), 'app.js missing # history trigger detection');
+    assert(script.body.includes('replayRunEvents'), 'app.js missing history run event replay');
     assert(index.body.includes('class="composer-popover"'), 'index missing composer popover container');
     for (const route of [
       '/api/workspace',
