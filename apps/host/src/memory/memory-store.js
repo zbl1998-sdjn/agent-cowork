@@ -3,6 +3,7 @@ import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createUlid } from '../runtime/runs-index.js';
 import { createSqliteDatabase } from '../storage/sqlite.js';
+import { AuditEventBus, createJsonlAuditSubscriber } from '../runtime/audit-events.js';
 
 const MEMORY_DIR_NAME = '.KimiCowork';
 const MAIN_MEMORY_FILE = 'MEMORY.md';
@@ -14,6 +15,7 @@ const MAX_MEMORY_BYTES = 64 * 1024;
 const MAX_FACT_KEY_LENGTH = 96;
 const MAX_FACT_VALUE_LENGTH = 4 * 1024;
 const NOTE_NAME_RE = /^[a-z0-9_.-]{1,96}\.md$/i;
+const defaultAuditBuses = new Map();
 
 function ensureTrustedRoot(trustedRoot) {
   const root = String(trustedRoot || '').trim();
@@ -50,11 +52,21 @@ function safeWriteSync(filePath, body) {
   return filePath;
 }
 
-function appendAuditEvent(trustedRoot, event) {
+function getDefaultAuditBus(trustedRoot) {
   const audit = auditPath(trustedRoot);
-  ensureDirSync(path.dirname(audit));
-  const line = `${JSON.stringify({ ts: new Date().toISOString(), ...event })}\n`;
-  fs.appendFileSync(audit, line, 'utf8');
+  let bus = defaultAuditBuses.get(audit);
+  if (!bus) {
+    bus = new AuditEventBus();
+    bus.subscribe(createJsonlAuditSubscriber(audit));
+    defaultAuditBuses.set(audit, bus);
+  }
+  return bus;
+}
+
+function appendAuditEvent(trustedRoot, event, context = {}) {
+  const audit = auditPath(trustedRoot);
+  const bus = context.auditBus || getDefaultAuditBus(trustedRoot);
+  bus.publish(event);
   return audit;
 }
 
@@ -176,7 +188,7 @@ export function writeMemoryNote(trustedRoot, noteName, body, context = {}) {
     traceId: context.traceId,
     tenantId: context.tenantId,
     userId: context.userId,
-  });
+  }, context);
   return file;
 }
 
@@ -205,7 +217,7 @@ export function appendMemoryFact(trustedRoot, fact, context = {}) {
     tenantId: context.tenantId,
     userId: context.userId,
     idempotencyKey: context.idempotencyKey,
-  });
+  }, context);
   return {
     file,
     fact: { key, value, scope },
@@ -449,4 +461,11 @@ export function createMemoryStore({ backend = 'file', dbPath, db, now } = {}) {
     return new SqliteMemoryStore({ dbPath, db, now });
   }
   return new FileMemoryStore();
+}
+
+export async function flushMemoryAuditEvents(trustedRoot) {
+  const bus = defaultAuditBuses.get(auditPath(trustedRoot));
+  if (bus) {
+    await bus.flush();
+  }
 }

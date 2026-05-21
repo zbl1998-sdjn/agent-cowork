@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import { flushMemoryAuditEvents } from '../src/memory/memory-store.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-runtime-'));
@@ -58,7 +59,7 @@ test('memory routes: append fact, list notes, read back, inject in workspace inf
 
     const factResp = await jsonRequest(base, '/api/memory/facts', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'k1' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'x-trace-id': 'trace_memory_route', 'idempotency-key': 'k1' },
       body: { key: '客户简称', value: '阿里 = 阿里巴巴中国区运营' },
     });
     assert.equal(factResp.status, 200);
@@ -80,7 +81,10 @@ test('memory routes: append fact, list notes, read back, inject in workspace inf
     assert.ok(noteRead.body.note.body.includes('Alpha'));
 
     const audit = path.join(trustedRoot, '.KimiCowork', 'audit', 'memory.jsonl');
+    await flushMemoryAuditEvents(trustedRoot);
     assert.ok(fs.existsSync(audit), 'memory audit JSONL must exist');
+    const auditLines = fs.readFileSync(audit, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.ok(auditLines.some((line) => line.trace_id === 'trace_memory_route'), 'audit line must include trace_id');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

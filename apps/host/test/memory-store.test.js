@@ -11,6 +11,7 @@ import {
   readMainMemory,
   readMemoryNote,
   writeMemoryNote,
+  flushMemoryAuditEvents,
   MEMORY_LIMITS,
 } from '../src/memory/memory-store.js';
 
@@ -23,7 +24,7 @@ test('readMainMemory returns empty string when MEMORY.md absent', () => {
   assert.equal(readMainMemory(root), '');
 });
 
-test('appendMemoryFact bootstraps MEMORY.md and appends bullet', () => {
+test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
   const root = tempRoot();
   const result = appendMemoryFact(
     root,
@@ -34,6 +35,7 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', () => {
   const body = readMainMemory(root);
   assert.match(body, /# Kimi Cowork 项目记忆/);
   assert.match(body, /\*\*客户简称\*\* \(project\): 阿里 = 阿里巴巴中国区运营/);
+  await flushMemoryAuditEvents(root);
   const auditLines = fs
     .readFileSync(path.join(root, '.KimiCowork', 'audit', 'memory.jsonl'), 'utf8')
     .trim()
@@ -43,6 +45,7 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', () => {
   assert.equal(event.key, '客户简称');
   assert.equal(event.tenantId, 'tenant_test');
   assert.equal(event.traceId, 'trace_test');
+  assert.equal(event.trace_id, 'trace_test');
 });
 
 test('appendMemoryFact rejects empty key or value and over-long value', () => {

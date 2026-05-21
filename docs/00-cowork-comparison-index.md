@@ -94,8 +94,8 @@
 | 4 | Idempotency-Key 关键写接口 | ✅ | `/api/file-ops/apply` 已支持; `/api/recipes/:id/run` 已支持同 tenant/user/key replay 并复用 runId, 不重复写 runs index |
 | 5 | Schema migration 工具 | ✅ | `apps/host/src/storage/sqlite.js` 极简 migration runner + `migrations/0001_init.sql`; 表遵守 `id TEXT PK`、`tenant_id TEXT NOT NULL`、`(tenant_id, created_at DESC)` 索引 |
 | 6 | 文件路径不进业务表 (blob_id + CAS) | ❌ | runs/*.json 还在用路径字段 |
-| 7 | Audit 走 EventBus 异步 | 🟡 | JSONL audit 已存在, 还没走 EventBus 抽象; 后续 EventBus Port 已定 |
-| 8 | trace_id 贯穿日志和 metric | 🟡 | trace_id 已注入并返回, 但日志还没结构化输出 + 还没 metric |
+| 7 | Audit 走 EventBus 异步 | ✅ | `AuditEventBus` + JSONL subscriber 已落地; memory audit 不再 inline 同步写 hot path, `flush` 仅测试/收尾使用 |
+| 8 | trace_id 贯穿日志和 metric | 🟡 | trace_id 已注入并返回; audit JSONL 已结构化输出 `trace_id`/`tenant_id`/`user_id`, metric 仍未做 |
 
 ### 2.4 验收 / 工程
 
@@ -365,4 +365,28 @@ P1-A 完成 — `services/kimi-gateway/internal/kimi` 从非流式 OpenAI-compat
 
 - `go test ./...` (`services/kimi-gateway`) 通过。
 - `node --test` 全量 **95 通过 / 0 失败**。
+- `npm run smoke:ui` 通过。
+
+---
+
+## 13. 2026-05-21 本轮实现 (Audit EventBus + structured trace logs)
+
+P1-B 完成 — memory audit 写入从同步 `fs.appendFileSync` 改为 `AuditEventBus` 事件发布 + JSONL subscriber 异步落盘, 每条 audit line 结构化携带 `trace_id` / `tenant_id` / `user_id`。
+
+已落地:
+
+- **AuditEventBus** (`apps/host/src/runtime/audit-events.js`):
+  - `publish/subscribe/flush` 极简事件总线。
+  - subscriber 通过 Promise microtask 异步执行, 避免写 audit 文件阻塞请求 hot path。
+  - `createJsonlAuditSubscriber(filePath)` 负责结构化 JSONL 落盘。
+- **Memory audit 接入** (`apps/host/src/memory/memory-store.js`):
+  - `appendMemoryFact` / `writeMemoryNote` 改为发布 audit event。
+  - audit line 同时保留旧 `traceId` 字段并新增标准 `trace_id` 字段, 兼容已有读取方。
+- **测试覆盖**:
+  - `audit-events.test.js` 断言 subscriber 不 inline 执行, `flush()` 后 JSONL 带 `trace_id`。
+  - `server-runtime-features.test.js` 断言 memory route 产生的 audit line 带请求注入的 `trace_id`。
+
+验收:
+
+- `node --test` 全量 **96 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
