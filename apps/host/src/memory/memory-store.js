@@ -348,7 +348,7 @@ export class SqliteMemoryStore {
   }
 
   writeMemoryNote(trustedRoot, noteName, body, context = {}) {
-    ensureTrustedRoot(trustedRoot);
+    const root = ensureTrustedRoot(trustedRoot);
     if (!NOTE_NAME_RE.test(String(noteName || ''))) {
       throw new Error('Invalid memory note name');
     }
@@ -394,11 +394,20 @@ export class SqliteMemoryStore {
       note.updatedAt,
       JSON.stringify(note),
     );
+    appendAuditEvent(root, {
+      action: 'memory_note_write',
+      note: noteName,
+      size: note.size,
+      traceId: context.traceId,
+      tenantId: context.tenantId,
+      userId: context.userId,
+      idempotencyKey: context.idempotencyKey,
+    }, context);
     return `sqlite://memory_notes/${id}`;
   }
 
   appendMemoryFact(trustedRoot, fact, context = {}) {
-    ensureTrustedRoot(trustedRoot);
+    const root = ensureTrustedRoot(trustedRoot);
     const key = cleanFactKey(fact?.key);
     const value = cleanFactValue(fact?.value);
     const scope = cleanScope(fact?.scope);
@@ -425,6 +434,16 @@ export class SqliteMemoryStore {
       now,
       JSON.stringify(storedFact),
     );
+    appendAuditEvent(root, {
+      action: 'memory_fact_append',
+      key,
+      scope,
+      size: Buffer.byteLength(value, 'utf8'),
+      traceId: context.traceId,
+      tenantId: context.tenantId,
+      userId: context.userId,
+      idempotencyKey: context.idempotencyKey,
+    }, context);
     return {
       file: `sqlite://memory_facts/${id}`,
       fact: { key, value, scope },

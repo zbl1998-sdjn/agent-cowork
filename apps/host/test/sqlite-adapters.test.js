@@ -4,10 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import { SqliteMemoryStore } from '../src/memory/memory-store.js';
+import { SqliteMemoryStore, flushMemoryAuditEvents } from '../src/memory/memory-store.js';
 import { SqliteRunsIndex, createUlid } from '../src/runtime/runs-index.js';
 import { Scheduler, SqliteScheduleStore } from '../src/runtime/scheduler.js';
 import { createServer } from '../src/server.js';
+import { migrateSqliteDatabase, openSqliteDatabase } from '../src/storage/sqlite.js';
 
 const require = createRequire(import.meta.url);
 
@@ -169,13 +170,18 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
   });
   const base = await bind(server);
   try {
-    const headers = { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' };
+    const headers = { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'x-trace-id': 'trace_sqlite' };
     const fact = await jsonRequest(base, '/api/memory/facts', {
       method: 'POST',
       headers,
       body: { key: '术语', value: 'OKR = Objectives and Key Results' },
     });
     assert.equal(fact.status, 200);
+    await flushMemoryAuditEvents(trustedRoot);
+    const auditPath = path.join(trustedRoot, '.KimiCowork', 'audit', 'memory.jsonl');
+    assert.ok(fs.existsSync(auditPath), 'sqlite memory writes must emit audit JSONL');
+    const auditLines = fs.readFileSync(auditPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.ok(auditLines.some((line) => line.trace_id === 'trace_sqlite' && line.action === 'memory_fact_append'));
 
     const memory = await jsonRequest(base, '/api/memory', { headers });
     assert.equal(memory.status, 200);
@@ -183,7 +189,7 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
 
     const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
-      headers,
+      headers: { ...headers, 'idempotency-key': 'sqlite-run' },
       body: { prompt: '把会议纪要整理', files: [] },
     });
     assert.equal(run.status, 200);
@@ -196,7 +202,7 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const schedule = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
-      headers,
+      headers: { ...headers, 'idempotency-key': 'sqlite-schedule' },
       body: { name: 'once', fireAt, payload: { recipeId: 'meeting-actions' } },
     });
     assert.equal(schedule.status, 200);
@@ -204,4 +210,32 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test('SQLite migrations roll back failed migration files atomically', { skip: !sqliteAvailable }, () => {
+  const root = tempRoot();
+  const migrationsPath = path.join(root, 'migrations');
+  fs.mkdirSync(migrationsPath, { recursive: true });
+  fs.writeFileSync(
+    path.join(migrationsPath, '0001_ok.sql'),
+    'CREATE TABLE ok_table (id TEXT PRIMARY KEY);\n',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(migrationsPath, '0002_bad.sql'),
+    'CREATE TABLE rollback_probe (id TEXT PRIMARY KEY);\nSELECT * FROM table_that_does_not_exist;\n',
+    'utf8',
+  );
+
+  const db = openSqliteDatabase(path.join(root, 'state.sqlite'));
+  assert.throws(() => migrateSqliteDatabase(db, { migrationsPath }), /table_that_does_not_exist|no such table/i);
+
+  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => row.id);
+  assert.deepEqual(applied, ['0001_ok.sql']);
+  const leakedTable = db.prepare(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table' AND name = 'rollback_probe'
+  `).get();
+  assert.equal(leakedTable, undefined);
 });

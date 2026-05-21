@@ -1550,6 +1550,7 @@ async function runRecipePlan(prompt, recipe) {
     prompt,
     files: files.map((file) => file.fullPath),
     maxSize: 2 * 1024 * 1024,
+    idempotencyKey: idempotencyKey("recipe"),
   });
   state.lastSources = result.sources || [];
   state.lastRun = result.runId

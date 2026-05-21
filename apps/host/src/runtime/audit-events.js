@@ -23,10 +23,12 @@ function normaliseAuditEvent(event, now = () => new Date()) {
 }
 
 export class AuditEventBus {
-  constructor({ now = () => new Date() } = {}) {
+  constructor({ now = () => new Date(), onError = null } = {}) {
     this.now = now;
+    this.onError = onError;
     this.subscribers = new Set();
     this.pending = new Set();
+    this.errors = [];
   }
 
   subscribe(handler) {
@@ -44,7 +46,17 @@ export class AuditEventBus {
     for (const handler of this.subscribers) {
       const pending = Promise.resolve()
         .then(() => handler(enriched))
-        .catch(() => {})
+        .catch((error) => {
+          const failure = error instanceof Error ? error : new Error(String(error));
+          this.errors.push(failure);
+          if (typeof this.onError === 'function') {
+            try {
+              this.onError(failure, enriched);
+            } catch (onErrorFailure) {
+              this.errors.push(onErrorFailure instanceof Error ? onErrorFailure : new Error(String(onErrorFailure)));
+            }
+          }
+        })
         .finally(() => {
           this.pending.delete(pending);
         });
@@ -56,6 +68,10 @@ export class AuditEventBus {
   async flush() {
     while (this.pending.size > 0) {
       await Promise.all([...this.pending]);
+    }
+    if (this.errors.length > 0) {
+      const errors = this.errors.splice(0);
+      throw new AggregateError(errors, 'AuditEventBus subscriber failed');
     }
   }
 }

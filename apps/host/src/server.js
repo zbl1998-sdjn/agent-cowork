@@ -52,6 +52,62 @@ function stableHeader(value, fallback) {
   return /^[a-zA-Z0-9_.:-]{1,96}$/.test(text) ? text : fallback;
 }
 
+function isJsonContentType(request) {
+  const value = String(headerValue(request, 'content-type') || '').toLowerCase();
+  return value.split(';')[0].trim() === 'application/json';
+}
+
+function isLoopbackHostname(hostname) {
+  const value = String(hostname || '').toLowerCase();
+  return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
+}
+
+function isAllowedOrigin(origin) {
+  const value = String(origin || '').trim();
+  if (!value || value === 'null') {
+    return true;
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'tauri:') {
+      return true;
+    }
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && isLoopbackHostname(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function requiresOriginCheck(method, pathname) {
+  return pathname.startsWith('/api/')
+    && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
+}
+
+function stableJsonStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .sort()
+      .map((key) => {
+        const encoded = stableJsonStringify(value[key]);
+        return encoded === undefined ? undefined : `${JSON.stringify(key)}:${encoded}`;
+      })
+      .filter(Boolean);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function bodyFingerprint(body) {
+  return crypto
+    .createHash('sha256')
+    .update(stableJsonStringify(body ?? {}) || '{}')
+    .digest('hex');
+}
+
 function createRequestContext(request) {
   const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
   return {
@@ -127,6 +183,10 @@ function taskFromRun(run) {
 }
 
 async function withJsonBody(request, response, handler, options = {}) {
+  if (options.requireJsonContentType !== false && !isJsonContentType(request)) {
+    sendJson(response, 415, { error: 'content-type must be application/json' });
+    return;
+  }
   let body;
   try {
     body = await readJsonBody(request, options);
@@ -180,7 +240,7 @@ export function createServer(config = {}) {
       }
       const result = runRecipe({
         recipeId: payload.recipeId,
-        trustedRoot: payload.trustedRoot || trustedRootDefault,
+        trustedRoot: safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
         prompt: payload.prompt || '',
         files: payload.files || [],
         maxSize: payload.maxSize,
@@ -214,6 +274,24 @@ export function createServer(config = {}) {
     }
   }
 
+  function safeTrustedRoot(requestedRoot = trustedRootDefault) {
+    return assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault);
+  }
+
+  function recordTenantId(record) {
+    return stableHeader(record?.context?.tenantId || record?.tenantId, 'tenant_local');
+  }
+
+  function recordVisibleToContext(record, context) {
+    return Boolean(record) && recordTenantId(record) === context.tenantId;
+  }
+
+  function visibleRunRecords(context, limit) {
+    return listRunRecords(runStoreRoot, { limit: Number.MAX_SAFE_INTEGER })
+      .filter((record) => recordVisibleToContext(record, context))
+      .slice(0, limit);
+  }
+
   function cacheKeyFor(context, method, pathname) {
     if (!context.idempotencyKey) {
       return '';
@@ -221,9 +299,21 @@ export function createServer(config = {}) {
     return `${context.tenantId}:${context.userId}:${method}:${pathname}:${context.idempotencyKey}`;
   }
 
-  function sendCachedOrStore(response, cacheKey, status, payload) {
+  function requireIdempotencyKey(response, context) {
+    if (context.idempotencyKey) {
+      return true;
+    }
+    sendJson(response, 428, { error: 'Idempotency-Key header is required for this write operation' });
+    return false;
+  }
+
+  function sendCachedOrStore(response, cacheKey, fingerprint, status, payload) {
     if (cacheKey && idempotencyStore.has(cacheKey)) {
       const cached = idempotencyStore.get(cacheKey);
+      if (fingerprint && cached.fingerprint && cached.fingerprint !== fingerprint) {
+        sendJson(response, 409, { error: 'Idempotency-Key reused with different request body' });
+        return true;
+      }
       sendJson(response, cached.status, {
         ...cached.payload,
         idempotentReplay: true,
@@ -237,6 +327,7 @@ export function createServer(config = {}) {
       idempotencyStore.set(cacheKey, {
         status,
         payload,
+        fingerprint,
       });
     }
     sendJson(response, status, payload);
@@ -362,6 +453,11 @@ export function createServer(config = {}) {
       response.setHeader('x-tenant-id', requestContext.tenantId);
       response.setHeader('x-user-id', requestContext.userId);
 
+      if (requiresOriginCheck(request.method, pathname) && !isAllowedOrigin(headerValue(request, 'origin'))) {
+        sendJson(response, 403, { error: 'Origin not allowed' });
+        return;
+      }
+
       if (request.method === 'GET' && staticRoot && staticFiles.has(pathname)) {
         const asset = staticFiles.get(pathname);
         sendFile(response, path.join(staticRoot, asset.file), asset.type);
@@ -386,9 +482,8 @@ export function createServer(config = {}) {
       }
 
       if (request.method === 'GET' && pathname === '/api/tasks') {
-        const runs = listRunRecords(runStoreRoot, {
-          limit: Number(requestUrl.searchParams.get('limit')) || 20,
-        });
+        const limit = Number(requestUrl.searchParams.get('limit')) || 20;
+        const runs = visibleRunRecords(requestContext, limit);
         sendJson(response, 200, {
           runStoreRoot,
           tasks: runs.map(taskFromRun),
@@ -578,11 +673,16 @@ export function createServer(config = {}) {
         let persisted = [];
         try {
           const record = readRunRecord(runStoreRoot, runId);
-          if (record && Array.isArray(record.events)) {
+          if (!recordVisibleToContext(record, requestContext)) {
+            sendJson(response, 404, { error: 'Run record not found' });
+            return;
+          }
+          if (Array.isArray(record.events)) {
             persisted = record.events;
           }
         } catch {
-          persisted = [];
+          sendJson(response, 404, { error: 'Run record not found' });
+          return;
         }
         runEvents.seed(runId, persisted);
 
@@ -634,11 +734,10 @@ export function createServer(config = {}) {
       }
 
       if (request.method === 'GET' && pathname === '/api/runs') {
+        const limit = Number(requestUrl.searchParams.get('limit')) || 20;
         sendJson(response, 200, {
           runStoreRoot,
-          runs: listRunRecords(runStoreRoot, {
-            limit: Number(requestUrl.searchParams.get('limit')) || 20,
-          }),
+          runs: visibleRunRecords(requestContext, limit),
         });
         return;
       }
@@ -646,7 +745,7 @@ export function createServer(config = {}) {
       if (request.method === 'GET' && pathname.startsWith('/api/runs/')) {
         const runId = decodeURIComponent(pathname.slice('/api/runs/'.length));
         const run = readRunRecord(runStoreRoot, runId);
-        if (!run) {
+        if (!recordVisibleToContext(run, requestContext)) {
           sendJson(response, 404, { error: 'Run record not found' });
           return;
         }
@@ -688,7 +787,7 @@ export function createServer(config = {}) {
           if (!body || typeof body.path !== 'string' || !body.path.trim()) {
             throw new Error('body.path is required');
           }
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const trustedRoot = safeTrustedRoot(body.trustedRoot);
           const file = readTextFile(body.path, {
             trustedRoot,
             maxSize: body.maxSize,
@@ -738,12 +837,15 @@ export function createServer(config = {}) {
             sendJson(response, 404, { error: 'Recipe not found' });
             return;
           }
-          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-          if (sendCachedOrStore(response, cacheKey, 200)) {
+          if (!requireIdempotencyKey(response, requestContext)) {
             return;
           }
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
+          const fingerprint = bodyFingerprint(body);
+          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+            return;
+          }
+          const safeRoot = safeTrustedRoot(body.trustedRoot);
           const result = runRecipe({
             recipeId,
             trustedRoot: safeRoot,
@@ -755,7 +857,7 @@ export function createServer(config = {}) {
             runEvents,
             runsIndex,
           });
-          sendCachedOrStore(response, cacheKey, 200, {
+          sendCachedOrStore(response, cacheKey, fingerprint, 200, {
             recipe: result.recipe,
             runId: result.runId,
             runPath: result.runPath,
@@ -770,7 +872,7 @@ export function createServer(config = {}) {
 
       if (request.method === 'POST' && pathname === '/api/context/bundle') {
         await withJsonBody(request, response, async (body) => {
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const trustedRoot = safeTrustedRoot(body.trustedRoot);
           if (!Array.isArray(body.paths)) {
             throw new Error('body.paths must be an array');
           }
@@ -790,7 +892,7 @@ export function createServer(config = {}) {
 
       if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
         await withJsonBody(request, response, async (body) => {
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const trustedRoot = safeTrustedRoot(body.trustedRoot);
           const preview = previewFileOperations(body.operations, { trustedRoot });
           sendJson(response, 200, preview);
         });
@@ -799,21 +901,20 @@ export function createServer(config = {}) {
 
       if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
         await withJsonBody(request, response, async (body) => {
-          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-          if (cacheKey && idempotencyStore.has(cacheKey)) {
-            const cached = idempotencyStore.get(cacheKey);
-            sendJson(response, cached.status, {
-              ...cached.payload,
-              idempotentReplay: true,
-            });
+          if (!requireIdempotencyKey(response, requestContext)) {
             return;
           }
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
+          const fingerprint = bodyFingerprint(body);
+          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+            return;
+          }
+          const trustedRoot = safeTrustedRoot(body.trustedRoot);
           const applied = applyFileOperations(body.operations, {
             trustedRoot,
             journalWriter: config.journalWriter,
           });
-          sendCachedOrStore(response, cacheKey, 200, {
+          sendCachedOrStore(response, cacheKey, fingerprint, 200, {
             ...applied,
             context: requestContext,
           });
@@ -841,17 +942,29 @@ export function createServer(config = {}) {
             sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
             return;
           }
+          if (!requireIdempotencyKey(response, requestContext)) {
+            return;
+          }
+          const fingerprint = bodyFingerprint(body);
+          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+            return;
+          }
+          const payload = body?.payload && typeof body.payload === 'object' ? { ...body.payload } : {};
+          if (payload.trustedRoot) {
+            payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
+          }
           const record = activeScheduler.create({
             name: body?.name,
             cron: body?.cron,
             fireAt: body?.fireAt,
-            payload: body?.payload || {},
+            payload,
             tenantId: requestContext.tenantId,
             userId: requestContext.userId,
             traceId: requestContext.traceId,
             idempotencyKey: requestContext.idempotencyKey,
           });
-          sendJson(response, 200, { schedule: record, context: requestContext });
+          sendCachedOrStore(response, cacheKey, fingerprint, 200, { schedule: record, context: requestContext });
         });
         return;
       }

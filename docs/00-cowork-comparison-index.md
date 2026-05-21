@@ -27,7 +27,7 @@
 
 ---
 
-## 2. 当前状态全景 (2026-05-20 合并视图)
+## 2. 当前状态全景 (2026-05-21 合并视图)
 
 以下表格把 4 份 doc 各自的"本轮实现状态"汇总成一个矩阵。状态符号:
 
@@ -60,12 +60,12 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| 文件树 + trusted root + path policy | ✅ | 长板, 比 Claude Cowork 更严 |
-| Preview / Apply / Rollback / Audit | ✅ | 长板, no-overwrite/no-delete 已锁 |
+| 文件树 + trusted root + path policy | ✅ | 长板, 比 Claude Cowork 更严; 所有请求传入的 `trustedRoot` 都先夹在 host 配置根内, 禁止用 body 覆盖逃逸 |
+| Preview / Apply / Rollback / Audit | ✅ | 长板, no-overwrite/no-delete 已锁; `/api/file-ops/apply` 现在强制 JSON + 本地 Origin + Idempotency-Key, 且同 key 不同 body 返回 409 |
 | DOCX/XLSX/PPTX 抽取 | 🟡 | `/api/files/extract` MVP, 不含 OCR / 复杂表格恢复 |
 | PDF 抽取 | 🟡 | 仅基础文本, 无 fill/sign/表单/OCR |
 | 真实模板 (会议纪要 / Excel 清洗 / 报销) | ✅ | 3 个端到端通; 8 入口都在 `/api/recipes` |
-| Recipe 注册表 | ✅ | `/api/recipes` + `/api/recipes/:id/run`; recipe run 已支持同 tenant/user/Idempotency-Key replay, 不重复产出 run |
+| Recipe 注册表 | ✅ | `/api/recipes` + `/api/recipes/:id/run`; recipe run 强制 Idempotency-Key, 同 tenant/user/key/body replay, 不同 body 409, 不重复产出 run |
 | 文件卡片 (`present_files` 等价) | 🟡 | 卡片在, 缺系统级一键打开 |
 | Kimi CLI 集成 | ✅ | 长板, runs/*.json 审计级落盘 |
 | Kimi Gateway (OpenAI-compatible chat) | ✅ | 非流式 + 重试 + 超时, 已 httptest 覆盖 |
@@ -73,10 +73,10 @@
 | MCP 客户端 | ❌ | 0 实现, 仍在 plan v0.3 V1 阶段 |
 | 外部 SaaS 连接器 (Slack/Notion/Gmail/...) | ❌ | 0 实现 |
 | 工具懒加载 (ToolSearch 等价) | ❌ | 当前全暴露 |
-| Scheduled Tasks | ✅ | `apps/host/src/runtime/scheduler.js` + cron 解析器 (零依赖); `/api/schedules` CRUD + `_tick`; cron + 一次性; tenant 隔离; 默认 executor 已接 `runRecipe` 真正产出可审批产物 + 入索引; 文件 store + SQLite store adapter; 12 单测 + 集成 |
-| Memory 跨会话 (MEMORY.md) | ✅ | `apps/host/src/memory/memory-store.js`; `/api/memory` + facts/notes; Kimi CLI plan/chat 调用前自动注入; 文件 store + SQLite facts/notes adapter; 10 文件单测 + SQLite 对等测试 |
-| Runs 索引 (Repository 形态) | ✅ | `apps/host/src/runtime/runs-index.js` JSONL append-only file adapter + `SqliteRunsIndex`, ULID 主键, tenant 隔离, `/api/runs/index`; 8 文件单测 + SQLite 对等测试 |
-| SQLite 持久化 | ✅ | `KCW_STORE=sqlite` / `storeBackend:'sqlite'` 可切 Memory facts/notes、Runs index、Schedules 到 Node 内置 `node:sqlite`; schema 走 `apps/host/src/storage/migrations/0001_init.sql` |
+| Scheduled Tasks | ✅ | `apps/host/src/runtime/scheduler.js` + cron 解析器 (零依赖); `/api/schedules` CRUD + `_tick`; cron + 一次性; tenant 隔离; create 强制 Idempotency-Key; 默认 executor 已接 `runRecipe` 真正产出可审批产物 + 入索引; 文件 store + SQLite store adapter |
+| Memory 跨会话 (MEMORY.md) | ✅ | `apps/host/src/memory/memory-store.js`; `/api/memory` + facts/notes; Kimi CLI plan/chat 调用前自动注入; 文件 store + SQLite facts/notes adapter; SQLite 写入同样落 memory audit |
+| Runs 索引 (Repository 形态) | ✅ | `apps/host/src/runtime/runs-index.js` JSONL append-only file adapter + `SqliteRunsIndex`, ULID 主键, tenant 隔离, `/api/runs/index`; legacy `/api/runs`、`/api/tasks`、`/api/runs/:id/events` 也已按 tenant 收口 |
+| SQLite 持久化 | ✅ | `KCW_STORE=sqlite` / `storeBackend:'sqlite'` 可切 Memory facts/notes、Runs index、Schedules 到 Node 内置 `node:sqlite`; schema 走 `apps/host/src/storage/migrations/0001_init.sql`, migration 逐文件事务化 |
 | 浏览器 Agent | ❌ | smoke:rendered-ui 是工程内用, 没产品化 |
 | Windows OS 自动化 MCP | ❌ | 客户端骨架在, 未对外暴露 |
 | 子 Agent / Plan mode 产品化 | ❌ | 状态机有, 缺前台呈现 |
@@ -91,10 +91,10 @@
 | 1 | tenant_id / user_id / trace_id / version | 🟡 | Host API 已注入 + 响应头返回; runs-index / scheduler / memory 三个新模块都按 tenant 隔离 + version 乐观锁; Node 侧默认值仍是 `tenant_local`/`user_local` (待 Phase B auth 填真值) |
 | 2 | ULID/UUIDv7 主键 (不用自增 INT) | 🟡 | Go domain 有 ULID 工厂; Node 侧 `runs-index.js` 已加 `createUlid()` (Crockford base32, 时间前缀可排序), schedule id 用 `sched_` 前缀 ULID; 旧 runs/*.json 仍用 timestamp runId |
 | 3 | Ports & Adapters | 🟡 | Go 侧 Port 接口已定 (Repository/LLMClient/SandboxPort/BlobStore/EventBus/JobQueue); Node host 仍直接读写 fs |
-| 4 | Idempotency-Key 关键写接口 | ✅ | `/api/file-ops/apply` 已支持; `/api/recipes/:id/run` 已支持同 tenant/user/key replay 并复用 runId, 不重复写 runs index |
-| 5 | Schema migration 工具 | ✅ | `apps/host/src/storage/sqlite.js` 极简 migration runner + `migrations/0001_init.sql`; 表遵守 `id TEXT PK`、`tenant_id TEXT NOT NULL`、`(tenant_id, created_at DESC)` 索引 |
+| 4 | Idempotency-Key 关键写接口 | ✅ | `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create 已强制; cache key 绑定 tenant/user/path/key + body fingerprint, 同 key 不同 body 409 |
+| 5 | Schema migration 工具 | ✅ | `apps/host/src/storage/sqlite.js` 极简 migration runner + `migrations/0001_init.sql`; 每个 migration 文件在 `BEGIN IMMEDIATE` 事务内执行并记录 |
 | 6 | 文件路径不进业务表 (blob_id + CAS) | ❌ | runs/*.json 还在用路径字段 |
-| 7 | Audit 走 EventBus 异步 | ✅ | `AuditEventBus` + JSONL subscriber 已落地; memory audit 不再 inline 同步写 hot path, `flush` 仅测试/收尾使用 |
+| 7 | Audit 走 EventBus 异步 | ✅ | `AuditEventBus` + JSONL subscriber 已落地; memory audit 不再 inline 同步写 hot path, SQLite memory 写入同样发 audit, `flush` 会暴露 subscriber failure |
 | 8 | trace_id 贯穿日志和 metric | 🟡 | trace_id 已注入并返回; audit JSONL 已结构化输出 `trace_id`/`tenant_id`/`user_id`, metric 仍未做 |
 
 ### 2.4 验收 / 工程
@@ -107,21 +107,21 @@
 | `npm run smoke:kimi-cli` | ✅ | 通过 (依赖本机 Kimi CLI) |
 | `npm run verify:windows-readiness` | ✅ | 只读诊断, 不修改 Defender |
 | `npm run audit:mvp` | ✅ | 聚合验收, Web/Host MVP 就绪 |
-| Tauri desktop scaffold | ✅ | `apps/windows-client/src-tauri` 已有 Tauri v2 配置、Rust command 入口、shell.open/notification 插件、Node host dev 启动脚本、组件迁移清单和 scaffold smoke; 当前机器缺 `cargo`/`rustc`/`cargo tauri`, 尚不能验收 dev 窗口/安装器 |
+| Tauri desktop scaffold | ✅ | `apps/windows-client/src-tauri` 已有 Tauri v2 配置、Rust command 入口、packaged sidecar 契约、safe opener、CSP、Node host dev 启动脚本、组件迁移清单和 scaffold smoke; 当前机器缺 `cargo`/`rustc`/`cargo tauri`, 尚不能验收 dev 窗口/安装器 |
 | Windows 原生客户端 GUI smoke | 🟡 | C/Win32 + WebView2 仍保留作 legacy 参考, 但 Defender ASR 仍卡 KimiCowork.exe; 新主线转向 Tauri scaffold |
 
 ---
 
 ## 3. 当前阶段一句话
 
-**Kimi Cowork 已经走过 "PoC + 单一 dashboard" 阶段, 进入 "对话流 MVP + 真实模板"**。本地审批/回滚/审计/runs 这套长板还在; UX 原语已覆盖 SSE、Composer `/`/`@`/`#`、Memory/Schedule/Runs SQLite adapter、Kimi Gateway 流式/tool/vision 和 audit EventBus; 但 **MCP 生态、真实 React runtime、Tauri dev/window/installer、HTML Artifact 活页** 仍是后续主线。
+**Kimi Cowork 已经走过 "PoC + 单一 dashboard" 阶段, 进入 "对话流 MVP + 真实模板"**。本地审批/回滚/审计/runs 这套长板还在; UX 原语已覆盖 SSE、Composer `/`/`@`/`#`、Memory/Schedule/Runs SQLite adapter、Kimi Gateway 流式/tool/vision、audit EventBus 和关键本地 API 安全边界; 但 **MCP 生态、真实 React runtime、Tauri dev/window/installer、HTML Artifact 活页** 仍是后续主线。
 
 距离 "像 Claude Cowork" 的关键 4 件大事 (按 ROI 排):
 
 1. ~~**真 SSE event stream**~~ ✅ 后端 + 前端 EventSource 全通; 伪流式已被服务端权威事件流取代。
-2. ~~**SQLite + MEMORY.md + Scheduled Tasks**~~ ✅ 三件运行时模块已落地 (Repository 形态, 待换 SQLite adapter)。
+2. ~~**SQLite + MEMORY.md + Scheduled Tasks**~~ ✅ 三件运行时模块已落地 (Repository 形态 + SQLite adapter)。
 3. ~~**Composer `/模板` + `@文件` + `#历史` popover**~~ ✅ 已落地。
-4. **Tauri/Electron 迁移 + React 重写** (退出 C/Win32 + Defender ASR 战线) — Tauri scaffold / 组件契约已落地; 完整 dev 窗口 + 打包验收受本机缺 Rust/Tauri 工具链阻塞。
+4. **Tauri/Electron 迁移 + React 重写** (退出 C/Win32 + Defender ASR 战线) — Tauri scaffold / 组件契约 / sidecar + safe opener 契约已落地; 完整 dev 窗口 + 打包验收受本机缺 Rust/Tauri 工具链阻塞。
 
 下一步聚焦: (a) 安装/接入 Rust + Tauri CLI 后完成 dev 窗口和安装器验收; (b) 把静态 DOM helper 迁到真实 React runtime; (c) MCP 客户端和 HTML Artifact 活页。
 
@@ -425,14 +425,16 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 
 - **Tauri shell scaffold** (`apps/windows-client/src-tauri`):
   - `tauri.conf.json` 指向 `http://127.0.0.1:3017` devUrl, `frontendDist` 复用现有 `../resources` 静态前端。
-  - Rust 侧注册 `host_status` / `start_node_host` / `open_path` command。
-  - 初始化 `tauri-plugin-shell` 和 `tauri-plugin-notification`, 为 `shell.open` 和系统通知预留主线。
+  - `bundle.externalBin = ["binaries/kimi-cowork-host"]`, Rust 侧 `start_node_host` 走 `ShellExt::sidecar("binaries/kimi-cowork-host")`, 不再依赖 PATH 上的 `node` 和源码相对路径。
+  - Rust 侧注册 `host_status` / `start_node_host` / `open_path` command; `open_path` 先 canonicalize 并限制在 `KCW_TRUSTED_ROOT`/`KCW_REPO_ROOT`/当前目录内, 再走 opener 插件。
+  - 初始化 `tauri-plugin-shell`、`tauri-plugin-opener` 和 `tauri-plugin-notification`; capability 只允许 packaged host sidecar execute, 不再给 broad `shell:allow-open`。
+  - `tauri.conf.json` 已设置非空 CSP, 限制脚本/连接/图片来源。
 - **Node host dev sidecar** (`scripts/start-tauri-host.mjs`):
   - Tauri dev 期间固定启动 Host API 到 `127.0.0.1:3017`, 业务仍由现有 Node host 承担。
 - **React 迁移组件契约** (`apps/windows-client/resources/component-manifest.json`):
   - 覆盖 `MessageBubble` / `ProgressLine` / `PreviewCard` / `ApprovalActions` / `ArtifactCard` / `SourcesFooter` / `Composer` / `ClarificationCard` / `TaskStatusBadge`。
 - **测试覆盖**:
-  - `apps/host/test/tauri-scaffold.test.js` 断言 npm zero-deps、Tauri config、Rust command/plugin 入口和组件清单。
+  - `apps/host/test/tauri-scaffold.test.js` 断言 npm zero-deps、Tauri config、externalBin、CSP、Rust sidecar/opener command/plugin 入口、capability 和组件清单。
   - `scripts/smoke-tauri-scaffold.mjs` 输出当前工具链可运行性; 本机报告 `runnable:false`。
 
 验收:
@@ -442,3 +444,46 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `npm run smoke:tauri-scaffold` 通过, 但报告 `cargo` / `rustc` / `cargo tauri` 不可用。
 - `node --test` 全量 **99 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
+
+---
+
+## 16. 2026-05-21 本轮修复 (security/idempotency/audit/tauri hardening)
+
+接上轮深度 review, 本轮把已复现的安全边界和一致性问题全部补成回归测试后修复。
+
+已落地:
+
+- **Host API trusted root 收口**:
+  - `/api/files/read`、`/api/context/bundle`、`/api/file-ops/preview`、`/api/file-ops/apply` 不再信任 request body 里的任意 `trustedRoot`; 所有请求根都必须落在 host 配置的 `trustedRootDefault` 内。
+  - scheduler 默认 executor 也会对 payload.trustedRoot 做相同校验。
+- **本地 API 请求边界**:
+  - 所有 mutating `/api/*` 请求检查 `Origin`; 仅允许无 Origin、`null`、Tauri scheme、localhost/127.0.0.1/::1。
+  - `withJsonBody` 默认强制 `content-type: application/json`, 阻断 `text/plain` simple POST。
+- **tenant 隔离补齐**:
+  - `/api/runs`、`/api/tasks`、`/api/runs/:id`、`/api/runs/:id/events` 均按 request tenant 过滤; 其他 tenant 读取返回空列表或 404。
+- **Idempotency-Key 收口**:
+  - `/api/file-ops/apply`、`/api/recipes/:id/run`、`/api/schedules` create 强制 `Idempotency-Key`。
+  - idempotency cache 增加稳定 body fingerprint; 同 tenant/user/path/key 但 body 不同返回 409, 防止错体复用旧结果。
+- **SQLite / audit 修复**:
+  - `SqliteMemoryStore` 的 facts/notes 写入同样发布 memory audit JSONL。
+  - `AuditEventBus.flush()` 不再吞 subscriber failure, 会用 `AggregateError` 暴露失败。
+  - SQLite migration runner 对每个 migration 文件加 `BEGIN IMMEDIATE` 事务, 失败时 rollback 且不记录 schema_migrations。
+- **Tauri scaffold hardening**:
+  - Tauri config 增加 `bundle.externalBin` host sidecar 契约和非空 CSP。
+  - Rust 侧 `start_node_host` 改用 packaged sidecar, 不再 `Command::new("node")`。
+  - `open_path` 改为 trusted-root 内 canonicalized path + `tauri-plugin-opener`; capability 移除 broad `shell:allow-open`, 只允许 host sidecar execute。
+
+新增/更新测试:
+
+- `apps/host/test/server-security.test.js` 覆盖 Origin/JSON、trustedRoot escape、tenant run 泄漏、idempotency mismatch。
+- `apps/host/test/sqlite-adapters.test.js` 覆盖 SQLite memory audit 与 migration rollback。
+- `apps/host/test/audit-events.test.js` 覆盖 subscriber failure 可见性。
+- `apps/host/test/tauri-scaffold.test.js` 与 `scripts/smoke-tauri-scaffold.mjs` 覆盖 sidecar/opener/CSP/capability 契约。
+
+验收:
+
+- `node --test --test-isolation=none` 全量 **105 通过 / 0 失败**。
+- `npm run smoke:ui` 通过。
+- `npm run smoke:host` 通过。
+- `npm run smoke:tauri-scaffold` 通过, 仍报告本机 `cargo` / `rustc` / `cargo tauri` 不可用, 因此未做真实 Tauri dev window/installer 验收。
+- `go test ./...` (`services/kimi-gateway`) 通过。

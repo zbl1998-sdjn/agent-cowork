@@ -33,3 +33,23 @@ test('AuditEventBus writes structured JSONL asynchronously with trace_id', async
   assert.equal(line.tenant_id, 'tenant_test');
   assert.equal(line.user_id, 'user_test');
 });
+
+test('AuditEventBus flush reports subscriber failures', async () => {
+  const bus = new AuditEventBus();
+  bus.subscribe(() => {
+    throw new Error('audit sink failed');
+  });
+
+  bus.publish({ action: 'will_fail', traceId: 'trace_fail' });
+
+  await assert.rejects(
+    () => bus.flush(),
+    (error) => {
+      assert.equal(error.name, 'AggregateError');
+      assert.match(error.message, /AuditEventBus subscriber failed/);
+      assert.equal(error.errors.length, 1);
+      assert.match(error.errors[0].message, /audit sink failed/);
+      return true;
+    },
+  );
+});

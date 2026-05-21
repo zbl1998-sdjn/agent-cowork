@@ -16,9 +16,13 @@ function assertInside(child, parent, label) {
 }
 
 async function requestJson(baseUrl, route, body, expectedStatus = 200) {
+  const headers = { 'content-type': 'application/json' };
+  if (body?.idempotencyKey) {
+    headers['idempotency-key'] = body.idempotencyKey;
+  }
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const payload = await response.json();
@@ -94,7 +98,11 @@ async function main() {
     assert(preview.operations.length === 3, `preview expected 3 operations, got ${preview.operations.length}`);
     assert(preview.operations.map((op) => op.type).join(',') === 'write,rename,move', 'preview operation order changed');
 
-    const applied = await requestJson(baseUrl, '/api/file-ops/apply', { trustedRoot: workspace, operations });
+    const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
+      trustedRoot: workspace,
+      operations,
+      idempotencyKey: 'local-ops-apply',
+    });
     assert(applied.applied.length === 3, `apply expected 3 operations, got ${applied.applied.length}`);
     assert(applied.applied.every((op) => op.status === 'applied'), 'not all operations were applied');
 

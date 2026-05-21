@@ -19,19 +19,40 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.equal(config.build.devUrl, 'http://127.0.0.1:3017');
   assert.equal(config.build.frontendDist, '../resources');
   assert.equal(config.app.windows[0].label, 'main');
+  assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
+  assert.deepEqual(config.bundle.externalBin, ['binaries/kimi-cowork-host']);
 });
 
-test('Tauri scaffold exposes host, shell-open and notification integration points', () => {
+test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
   const cargoToml = fs.readFileSync(path.join(tauriRoot, 'Cargo.toml'), 'utf8');
   assert.match(cargoToml, /tauri\s*=/);
   assert.match(cargoToml, /tauri-plugin-shell/);
+  assert.match(cargoToml, /tauri-plugin-opener/);
   assert.match(cargoToml, /tauri-plugin-notification/);
 
   const lib = fs.readFileSync(path.join(tauriRoot, 'src', 'lib.rs'), 'utf8');
-  for (const symbol of ['start_node_host', 'host_status', 'open_path', 'tauri_plugin_shell::init()', 'tauri_plugin_notification::init()']) {
+  for (const symbol of [
+    'start_node_host',
+    'host_status',
+    'open_path',
+    '.sidecar("binaries/kimi-cowork-host")',
+    'tauri_plugin_shell::init()',
+    'tauri_plugin_opener::init()',
+    'tauri_plugin_notification::init()',
+    'assert_trusted_path',
+  ]) {
     assert.ok(lib.includes(symbol), `missing ${symbol}`);
   }
+  assert.equal(lib.includes('Command::new("node")'), false, 'packaged Tauri app must use sidecar instead of PATH node');
+
+  const capability = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8'));
+  assert.ok(capability.permissions.includes('opener:default'));
+  assert.equal(capability.permissions.includes('shell:allow-open'), false);
+  assert.ok(capability.permissions.some((permission) => (
+    permission.identifier === 'shell:allow-execute'
+    && permission.allow?.some((item) => item.name === 'binaries/kimi-cowork-host' && item.sidecar === true)
+  )));
 });
 
 test('component manifest covers the React rewrite component contract', () => {

@@ -32,6 +32,22 @@ function listMigrationFiles(dir = migrationsDir) {
     .map((name) => path.join(dir, name));
 }
 
+function runSqliteTransaction(db, fn) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // Prefer the original migration error.
+    }
+    throw err;
+  }
+}
+
 export function openSqliteDatabase(dbPath) {
   if (!dbPath || typeof dbPath !== 'string') {
     throw new Error('SQLite dbPath is required');
@@ -63,8 +79,11 @@ export function migrateSqliteDatabase(db, { migrationsPath = migrationsDir } = {
     if (hasMigration.get(id)) {
       continue;
     }
-    db.exec(fs.readFileSync(file, 'utf8'));
-    insertMigration.run(id, new Date().toISOString());
+    const migrationSql = fs.readFileSync(file, 'utf8');
+    runSqliteTransaction(db, () => {
+      db.exec(migrationSql);
+      insertMigration.run(id, new Date().toISOString());
+    });
   }
   return db;
 }

@@ -14,9 +14,13 @@ function assert(condition, message) {
 }
 
 async function requestJson(baseUrl, route, body, expectedStatus = 200) {
+  const headers = { 'content-type': 'application/json' };
+  if (body?.idempotencyKey) {
+    headers['idempotency-key'] = body.idempotencyKey;
+  }
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const payload = await response.json();
@@ -137,7 +141,11 @@ async function main() {
     const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
     assert(preview.operations.length === 1 && preview.operations[0].type === 'write', 'UI preview flow did not produce write preview');
 
-    const applied = await requestJson(baseUrl, '/api/file-ops/apply', { trustedRoot: workspace, operations });
+    const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
+      trustedRoot: workspace,
+      operations,
+      idempotencyKey: 'ui-smoke-apply',
+    });
     assert(applied.applied.length === 1 && applied.applied[0].status === 'applied', 'UI apply flow did not apply write operation');
     assert(fs.readFileSync(artifactPath, 'utf8').includes('UI Smoke 计划'), 'UI apply flow did not write artifact');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'UI apply flow did not write audit event');

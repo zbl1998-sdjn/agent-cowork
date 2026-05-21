@@ -129,7 +129,7 @@ test('runs index: recipe-run upserts a tenant-scoped record', async () => {
 
     const recipeRun = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'index-run' },
       body: { prompt: '把会议纪要整理', files: [] },
     });
     assert.equal(recipeRun.status, 200);
@@ -214,7 +214,7 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
 
     const createCron = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-weekly' },
       body: { name: 'weekly', cron: '* * * * *', payload: { recipeId: 'meeting-actions' } },
     });
     assert.equal(createCron.status, 200);
@@ -269,6 +269,7 @@ test('schedules: one-shot fireAt creates schedule', async () => {
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const created = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
+      headers: { 'idempotency-key': 'sched-once' },
       body: { name: 'once', fireAt, payload: {} },
     });
     assert.equal(created.status, 200);
@@ -302,7 +303,7 @@ test('SSE: /api/runs/:id/events replays a completed recipe run timeline', async 
   try {
     const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sse-run' },
       body: { prompt: '会议纪要整理', files: [] },
     });
     assert.equal(run.status, 200);
@@ -312,7 +313,7 @@ test('SSE: /api/runs/:id/events replays a completed recipe run timeline', async 
     // Connect to SSE; the run is already finished, so persisted events replay.
     const controller = new AbortController();
     const res = await fetch(`${base}/api/runs/${runId}/events`, {
-      headers: { accept: 'text/event-stream' },
+      headers: { accept: 'text/event-stream', 'x-tenant-id': 'tenant_alice' },
       signal: controller.signal,
     });
     assert.equal(res.status, 200);
@@ -347,6 +348,7 @@ test('SSE: Last-Event-ID skips already-delivered events', async () => {
   try {
     const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
+      headers: { 'idempotency-key': 'sse-last-event-id' },
       body: { prompt: 'x', files: [] },
     });
     const runId = run.body.runId;
@@ -403,7 +405,7 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const created = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-default-executor' },
       body: {
         name: '每周会议纪要',
         fireAt,

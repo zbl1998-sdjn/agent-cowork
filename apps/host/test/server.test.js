@@ -303,7 +303,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
 
     const run = await fetch(`${baseUrl}/api/recipes/meeting-actions/run`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'recipe-approval-ops' },
       body: JSON.stringify({ trustedRoot, prompt: '提取会议行动项', files: [notes] }),
     });
     assert.equal(run.status, 200);
