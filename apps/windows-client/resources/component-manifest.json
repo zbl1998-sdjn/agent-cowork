@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "target": "tauri-react",
+  "source": "docs/kimi-cowork-chat-ux-redesign.md#4",
+  "status": "component-contract",
+  "components": [
+    {
+      "name": "MessageBubble",
+      "currentDomHelpers": ["appendUserMessage", "appendAssistantMessage", "setMessageStatus"],
+      "data": ["role", "runId", "status", "chunks"]
+    },
+    {
+      "name": "ClarificationCard",
+      "currentDomHelpers": ["addClarificationCard"],
+      "data": ["question", "options", "answer"]
+    },
+    {
+      "name": "ProgressLine",
+      "currentDomHelpers": ["addProgressLines", "renderRunEventPayload"],
+      "data": ["status", "icon", "text", "duration"]
+    },
+    {
+      "name": "PreviewCard",
+      "currentDomHelpers": ["addPreviewCard"],
+      "data": ["operations", "summary", "risk"]
+    },
+    {
+      "name": "ApprovalActions",
+      "currentDomHelpers": ["addApprovalActions"],
+      "data": ["runId", "operations", "approvalState"]
+    },
+    {
+      "name": "ArtifactCard",
+      "currentDomHelpers": ["addArtifactCard"],
+      "data": ["file", "metadata", "openAction"]
+    },
+    {
+      "name": "SourcesFooter",
+      "currentDomHelpers": ["addSourcesFooter"],
+      "data": ["sources"]
+    },
+    {
+      "name": "Composer",
+      "currentDomHelpers": ["handleComposerInput", "handleComposerSend", "composerPopoverHandleKey"],
+      "data": ["slashCommands", "mentions", "historyRuns"]
+    },
+    {
+      "name": "TaskStatusBadge",
+      "currentDomHelpers": ["setRunChip", "setStatus"],
+      "data": ["runId", "status", "activeForm"]
+    }
+  ]
+}
