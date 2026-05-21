@@ -87,10 +87,12 @@ async function main() {
     assert(scriptRoutes.includes('/app-utils.js'), 'index missing app-utils.js script');
     assert(scriptRoutes.includes('/app-api-client.js'), 'index missing app-api-client.js script');
     assert(scriptRoutes.includes('/app-run-events.js'), 'index missing app-run-events.js script');
+    assert(scriptRoutes.includes('/app-composer-popover.js'), 'index missing app-composer-popover.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
     assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-api-client.js') < scriptRoutes.indexOf('/app.js'), 'app-api-client.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-run-events.js') < scriptRoutes.indexOf('/app.js'), 'app-run-events.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-composer-popover.js') < scriptRoutes.indexOf('/app.js'), 'app-composer-popover.js must load before app.js');
     const scriptBodies = [];
     for (const route of scriptRoutes) {
       const asset = await getText(baseUrl, route);
@@ -101,6 +103,8 @@ async function main() {
     assert(allScripts.includes('window.KimiCoworkUtils'), 'utility module global missing');
     assert(allScripts.includes('window.KimiCoworkApi'), 'API client module global missing');
     assert(allScripts.includes('window.KimiCoworkRunEvents'), 'run-events module global missing');
+    assert(allScripts.includes('window.KimiCoworkComposerPopover'), 'composer popover module global missing');
+    assert(allScripts.includes('createComposerPopover'), 'composer popover factory missing');
     assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');
     assert(allScripts.includes('function appendAssistantMessage'), 'app scripts missing message bubble controller');
     assert(allScripts.includes('function handleComposerSend'), 'app scripts missing composer send router');

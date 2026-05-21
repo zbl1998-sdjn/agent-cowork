@@ -191,6 +191,24 @@ test('recipe run endpoint replays duplicate idempotency key without creating a s
   }
 });
 
+test('recipe run invalid route id returns 400', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const response = await fetch(`${base}/api/recipes/bad%2Fid/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'bad-recipe-id' },
+      body: JSON.stringify({ prompt: 'x', files: [] }),
+    });
+    assert.equal(response.status, 400);
+    const body = await response.json();
+    assert.match(body.error, /Invalid recipe id/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('schedules: create cron + list + cancel + manual tick', async () => {
   const trustedRoot = tempRoot();
   const fired = [];

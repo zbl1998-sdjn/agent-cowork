@@ -6,10 +6,10 @@
 
 | 文件 | 本轮前 | 本轮后 | 说明 |
 |---|---:|---:|---|
-| `apps/windows-client/resources/app.js` | 2054 行 | 1966 行 | 仍是最大前端编排文件, 已抽出纯工具函数、API client 和 SSE/run event 渲染 |
-| `apps/host/src/server.js` | 961 行 | 592 行 | 已抽出 HTTP/request helpers、task presenter、memory/run/schedule routes |
+| `apps/windows-client/resources/app.js` | 2054 行 | 1739 行 | 仍是最大前端编排文件, 已抽出纯工具函数、API client、SSE/run event 渲染和 composer popover controller |
+| `apps/host/src/server.js` | 961 行 | 442 行 | 已抽出 HTTP/request helpers、task presenter、memory/run/schedule/workspace-file/recipe routes |
 | `apps/windows-client/resources/app.css` | 1777 行 | 1777 行 | 后续需要按 layout/components 分层 |
-| `services/kimi-gateway/internal/kimi/client.go` | 647 行 | 647 行 | 后续可按 request/stream/tools/vision/fallback 拆 |
+| `services/kimi-gateway/internal/kimi/client.go` | 647 行 | 321 行 | 已拆出 types、breaker、response parser、stream handler; `client.go` 保留 client/retry/transport |
 
 ## 并行审查结论
 
@@ -24,7 +24,7 @@
 - `app-composer-popover.js`: 后续抽 composer popover controller, 由 `app.js` 注入 DOM/state/callback。
 - `app-run-events.js`: 后续抽 SSE/replay 事件渲染, 由 `app.js` 管理 `state.activeEventSource`。
 
-本轮已抽 `app-utils.js`、`app-api-client.js`、`app-run-events.js`, 避免一次跨越 `generatePlan()` / `runRecipePlan()` / `approvePlan()` 这些高耦合编排点。
+本轮已抽 `app-utils.js`、`app-api-client.js`、`app-run-events.js`、`app-composer-popover.js`, 避免一次跨越 `generatePlan()` / `runRecipePlan()` / `approvePlan()` 这些高耦合编排点。
 
 ### 后端 `server.js`
 
@@ -37,6 +37,8 @@
 - `routes/memory-routes.js`: memory 读写路由。
 - `routes/run-routes.js`: `/api/tasks`、runs index、run detail、SSE event stream。
 - `routes/schedule-routes.js`: schedules CRUD、手动 tick、schedule mutation 幂等与租户归属。
+- `routes/workspace-file-routes.js`: files/tree/read/extract/search、uploads、context bundle、file-ops preview/apply。
+- `routes/recipe-routes.js`: recipe list + recipe run。
 
 本轮保持 public `createServer(config)` 不变, route 顺序和安全边界由集成测试约束。
 
@@ -47,36 +49,49 @@
 - 新增 `apps/host/src/routes/memory-routes.js`。
 - 新增 `apps/host/src/routes/run-routes.js`。
 - 新增 `apps/host/src/routes/schedule-routes.js`。
+- 新增 `apps/host/src/routes/workspace-file-routes.js`。
+- 新增 `apps/host/src/routes/recipe-routes.js`。
 - 新增 `apps/windows-client/resources/app-utils.js`。
 - 新增 `apps/windows-client/resources/app-api-client.js`。
 - 新增 `apps/windows-client/resources/app-run-events.js`。
-- `index.html` 改为先加载 `app-utils.js`、`app-api-client.js`、`app-run-events.js`, 再加载 `app.js`, 保持 classic script, 不用 `type=module`。
-- Host 静态白名单新增 `/app-utils.js`、`/app-api-client.js`、`/app-run-events.js`。
+- 新增 `apps/windows-client/resources/app-composer-popover.js`。
+- 新增 `services/kimi-gateway/internal/kimi/types.go`。
+- 新增 `services/kimi-gateway/internal/kimi/breaker.go`。
+- 新增 `services/kimi-gateway/internal/kimi/response_parser.go`。
+- 新增 `services/kimi-gateway/internal/kimi/stream_handler.go`。
+- `index.html` 改为先加载 `app-utils.js`、`app-api-client.js`、`app-run-events.js`、`app-composer-popover.js`, 再加载 `app.js`, 保持 classic script, 不用 `type=module`。
+- Host 静态白名单新增 `/app-utils.js`、`/app-api-client.js`、`/app-run-events.js`、`/app-composer-popover.js`。
 - `scripts/smoke-ui-contract.mjs` 改为解析 `index.html` 中所有 script, 逐个 GET 并拼接检查契约, 防止拆文件后 smoke 误报或漏报。
 - `apps/host/test/server.test.js` 覆盖新增静态 JS 资源。
 - 修复 `readJsonBody` 只按 UTF-16 字符数判断限制的问题, 改为按 UTF-8 byte length 累计。
 - 修复 schedule cancel/delete/_tick 缺 `Idempotency-Key` 与跨租户归属校验的问题; 手动 tick 只触发当前 tenant due schedules。
 - `GET /api/runs/:id` 非法 id 现在返回 400, 与 SSE route 对齐。
+- 修复 `/api/recipes/:id/run` 非法 route id 返回 400。
+- 修复 Kimi gateway SSE 缺 `[DONE]` 被当成功、breaker 阻断同次 fallback、上游错误 body 泄漏、空 content part 放行、multipart 无总量限制/非法字段晚失败的问题。
 
 ## 后续优先拆分
 
-1. `app-composer-popover.js`: 抽 composer popover controller, 保持 slash/at/hash 触发契约。
-2. `app-plan-flow.js`: 抽 `generatePlan()` / `runRecipePlan()` / approval 编排, 需要先补更细前端 smoke。
-3. `routes/workspace-file-routes.js`: 从 `server.js` 抽 files/tree/read/extract/search/upload/context-bundle。
-4. `app.css`: 按 base/layout/components 分文件, 同步更新 Host 静态白名单和 smoke。
-5. `services/kimi-gateway/internal/kimi/client.go`: 按 request/stream/tools/vision/fallback 拆 Go client。
+1. `app-plan-flow.js`: 抽 `generatePlan()` / `runRecipePlan()` / approval 编排, 需要先补更细前端 smoke。
+2. `app-run-history.js`: 抽 run cards / run detail / history replay, 复用 `app-run-events.js`。
+3. `app.css`: 按 base/layout/components 分文件, 同步更新 Host 静态白名单和 smoke。
+4. `services/kimi-gateway/internal/kimi/transport.go`: 可继续从 `client.go` 抽 `chatOnce` / `streamOnce` / `doChatRequest`, 但应先补 ChatStream retry 细节测试。
+5. `apps/host/src/server.js`: 继续抽 Kimi plan/chat routes 与 static serving, 保持 `createServer(config)` public API。
 
 ## 验证命令
 
 - `node --check apps/windows-client/resources/app-utils.js`
+- `node --check apps/windows-client/resources/app-composer-popover.js`
 - `node --check apps/windows-client/resources/app.js`
 - `node --check apps/host/src/server.js`
 - `node --check apps/host/src/http/request-utils.js`
 - `node --check apps/host/src/routes/*.js`
-- `node --test --test-isolation=none`
+- `node --test`
 - `npm run smoke:ui`
 - `npm run smoke:host`
+- `npm run smoke:windows-resources`
+- `npm run smoke:rendered-ui`
 - `npm run smoke:tauri-scaffold`
-- `go test ./...` in `services/kimi-gateway`
+- `npm run verify:mvp`
+- `go test -count=1 -mod=readonly ./...` + `go vet -mod=readonly ./...` in every Go module
 
 备注: 当前机器缺 `cargo` / `rustc` / `cargo tauri`, 所以 Tauri smoke 只能验证 scaffold contract, 不能验证真实 dev window / installer。

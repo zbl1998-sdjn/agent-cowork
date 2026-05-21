@@ -120,6 +120,30 @@ func TestClientChatDoesNotRetry400(t *testing.T) {
 	}
 }
 
+func TestClientChatErrorDoesNotExposeResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "upstream-secret-token", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", time.Second)
+	client.RetryPolicy = RetryPolicy{MaxAttempts: 1}
+
+	_, err := client.Chat(context.Background(), ChatRequest{
+		Model:    "kimi-k2",
+		Messages: []Message{{Role: "user", Content: "ping"}},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "upstream-secret-token") {
+		t.Fatalf("error exposed upstream body: %v", err)
+	}
+	if !strings.Contains(err.Error(), "status 500") {
+		t.Fatalf("expected status in error, got %v", err)
+	}
+}
+
 func TestClientChatValidatesInputs(t *testing.T) {
 	client := NewClient("http://127.0.0.1", "key", time.Second)
 	if _, err := client.Chat(context.Background(), ChatRequest{Messages: []Message{{Role: "user", Content: "hi"}}}); err == nil {
@@ -229,6 +253,33 @@ func TestClientChatStreamParsesDeltasToolCallsUsageAndDone(t *testing.T) {
 	}
 }
 
+func TestClientChatStreamRequiresDoneSentinel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"id\":\"s1\",\"model\":\"kimi-k2\",\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n"))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", time.Second)
+	client.RetryPolicy = RetryPolicy{MaxAttempts: 1}
+	var events []StreamEvent
+	err := client.ChatStream(context.Background(), ChatRequest{
+		Model:    "kimi-k2",
+		Messages: []Message{{Role: "user", Content: "ping"}},
+	}, func(event StreamEvent) error {
+		events = append(events, event)
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "before [DONE]") {
+		t.Fatalf("expected missing DONE error, got %v", err)
+	}
+	for _, event := range events {
+		if event.Type == StreamEventDone {
+			t.Fatalf("unexpected done event after truncated stream: %+v", events)
+		}
+	}
+}
+
 func TestClientRotatesKeysAndFallsBackBaseURLs(t *testing.T) {
 	var seenAuth []string
 	first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -261,6 +312,39 @@ func TestClientRotatesKeysAndFallsBackBaseURLs(t *testing.T) {
 	}
 }
 
+func TestClientBreakerDoesNotBlockFallbackAttempt(t *testing.T) {
+	firstAttempts := 0
+	first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		firstAttempts++
+		http.Error(w, "temporary", http.StatusServiceUnavailable)
+	}))
+	defer first.Close()
+	secondAttempts := 0
+	second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		secondAttempts++
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer second.Close()
+
+	breaker := &CircuitBreaker{MaxFailures: 1, Cooldown: time.Minute}
+	client := NewClient(first.URL, "key-a", time.Second)
+	client.BaseURLs = []string{second.URL}
+	client.APIKeys = []string{"key-b"}
+	client.RetryPolicy = RetryPolicy{MaxAttempts: 2, Backoff: 0}
+	client.Breaker = breaker
+
+	response, err := client.Chat(context.Background(), ChatRequest{
+		Model:    "kimi-k2",
+		Messages: []Message{{Role: "user", Content: "ping"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Content != "ok" || firstAttempts != 1 || secondAttempts != 1 {
+		t.Fatalf("unexpected fallback result response=%+v first=%d second=%d", response, firstAttempts, secondAttempts)
+	}
+}
+
 func TestCircuitBreakerOpensAfterRetryableFailure(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -290,6 +374,25 @@ func TestCircuitBreakerOpensAfterRetryableFailure(t *testing.T) {
 	}
 	if attempts != 1 {
 		t.Fatalf("expected breaker to stop second request, got %d attempts", attempts)
+	}
+}
+
+func TestClientChatRejectsEmptyStructuredContentParts(t *testing.T) {
+	client := NewClient("http://127.0.0.1", "test-key", time.Second)
+	cases := []any{
+		[]ContentPart{{Type: "text", Text: "   "}},
+		[]ContentPart{{Type: "image_url", ImageURL: &ImageURL{}}},
+		[]any{map[string]any{"type": "text", "text": "   "}},
+		[]any{map[string]any{"type": "image_url", "image_url": map[string]any{"url": ""}}},
+	}
+	for _, content := range cases {
+		_, err := client.Chat(context.Background(), ChatRequest{
+			Model:    "kimi-k2",
+			Messages: []Message{{Role: "user", Content: content}},
+		})
+		if err == nil || !strings.Contains(err.Error(), "message role and content") {
+			t.Fatalf("expected content validation error for %#v, got %v", content, err)
+		}
 	}
 }
 
@@ -345,5 +448,78 @@ func TestStreamHandlerAcceptsMultipartVisionAndEmitsSSE(t *testing.T) {
 	parts, ok := seen.Messages[0].Content.([]any)
 	if !ok || len(parts) != 2 {
 		t.Fatalf("expected text + image_url content parts, got %#v", seen.Messages[0].Content)
+	}
+}
+
+func TestStreamHandlerRejectsInvalidMultipartBeforeStreaming(t *testing.T) {
+	handler := NewStreamHandler(NewClient("http://127.0.0.1:1", "test-key", time.Second))
+
+	cases := []struct {
+		name   string
+		fields map[string]string
+	}{
+		{
+			name: "invalid max tokens",
+			fields: map[string]string{
+				"model":      "kimi-k2",
+				"prompt":     "hi",
+				"max_tokens": "not-a-number",
+			},
+		},
+		{
+			name: "missing prompt and image",
+			fields: map[string]string{
+				"model": "kimi-k2",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body strings.Builder
+			writer := multipart.NewWriter(&body)
+			for name, value := range tc.fields {
+				if err := AddMultipartField(writer, name, value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/v1/chat/stream", strings.NewReader(body.String()))
+			request.Header.Set("content-type", writer.FormDataContentType())
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestStreamHandlerRejectsOversizedMultipartBeforeStreaming(t *testing.T) {
+	handler := NewStreamHandler(NewClient("http://127.0.0.1:1", "test-key", time.Second))
+
+	var body strings.Builder
+	writer := multipart.NewWriter(&body)
+	if err := AddMultipartField(writer, "model", "kimi-k2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMultipartField(writer, "prompt", strings.Repeat("x", 17<<20)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/stream", strings.NewReader(body.String()))
+	request.Header.Set("content-type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", response.Code, response.Body.String())
 	}
 }

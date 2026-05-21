@@ -1,14 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listWorkspaceTree } from './workspace/file-tree.js';
-import { readTextFile } from './workspace/file-reader.js';
-import { extractDocumentText } from './workspace/document-extractor.js';
-import { searchWorkspace } from './workspace/file-search.js';
-import { buildContextBundle } from './workspace/context-bundle.js';
-import { previewFileOperations, applyFileOperations } from './workspace/file-operations.js';
-import { importUploadedFiles } from './workspace/uploads.js';
-import { buildRecipeOperations, getRecipe, listRecipes } from './recipes/registry.js';
 import { detectKimiInfo } from './kimi/cli-detect.js';
 import { runKimiCliChat, runKimiCliPlan } from './kimi/cli-runner.js';
 import { createRunId, writeRunRecord } from './runtime/run-store.js';
@@ -20,10 +12,10 @@ import { createMemoryStore } from './memory/memory-store.js';
 import { assertTrustedPath } from './security/path-policy.js';
 import { handleMemoryRoutes } from './routes/memory-routes.js';
 import { handleRunRoutes } from './routes/run-routes.js';
+import { handleRecipeRoutes } from './routes/recipe-routes.js';
 import { handleScheduleRoutes } from './routes/schedule-routes.js';
-import fs from 'node:fs';
+import { handleWorkspaceFileRoutes } from './routes/workspace-file-routes.js';
 import {
-  bodyFingerprint,
   createRequestContext,
   headerValue,
   isAllowedOrigin,
@@ -42,6 +34,7 @@ const staticFiles = new Map([
   ['/app-utils.js', { file: 'app-utils.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-api-client.js', { file: 'app-api-client.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-run-events.js', { file: 'app-run-events.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-composer-popover.js', { file: 'app-composer-popover.js', type: 'text/javascript; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
 ]);
 
@@ -321,10 +314,19 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'GET' && pathname === '/api/recipes') {
-        sendJson(response, 200, {
-          recipes: listRecipes(),
-        });
+      if (await handleRecipeRoutes({
+        request,
+        response,
+        pathname,
+        requestContext,
+        runStoreRoot,
+        runEvents,
+        runsIndex,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+        safeTrustedRoot,
+      })) {
         return;
       }
 
@@ -400,172 +402,18 @@ export function createServer(config = {}) {
         return;
       }
 
-      if (request.method === 'POST' && pathname === '/api/files/tree') {
-        await withJsonBody(request, response, async (body) => {
-          if (!body || typeof body.root !== 'string' || !body.root.trim()) {
-            throw new Error('body.root is required');
-          }
-          const requestedRoot = path.resolve(body.root);
-          const trustedRoot = assertTrustedPath(requestedRoot, trustedRootDefault);
-          const tree = listWorkspaceTree(trustedRoot, {
-            includeFiles: body.includeFiles !== false,
-            includeDirectories: body.includeDirectories !== false,
-          });
-          sendJson(response, 200, { root: trustedRoot, files: tree });
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/uploads/import') {
-        await withJsonBody(request, response, async (body) => {
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const imported = importUploadedFiles({
-            trustedRoot: safeRoot,
-            files: body.files,
-          });
-          sendJson(response, 200, imported);
-        }, { maxBytes: config.maxUploadJsonBytes || 18 * 1024 * 1024 });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/files/read') {
-        await withJsonBody(request, response, async (body) => {
-          if (!body || typeof body.path !== 'string' || !body.path.trim()) {
-            throw new Error('body.path is required');
-          }
-          const trustedRoot = safeTrustedRoot(body.trustedRoot);
-          const file = readTextFile(body.path, {
-            trustedRoot,
-            maxSize: body.maxSize,
-          });
-          sendJson(response, 200, file);
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/files/extract') {
-        await withJsonBody(request, response, async (body) => {
-          if (!body || typeof body.path !== 'string' || !body.path.trim()) {
-            throw new Error('body.path is required');
-          }
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const extracted = extractDocumentText(body.path, {
-            trustedRoot: safeRoot,
-            maxSize: body.maxSize,
-          });
-          sendJson(response, 200, extracted);
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/files/search') {
-        await withJsonBody(request, response, async (body) => {
-          const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-          const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-          const results = searchWorkspace({
-            trustedRoot: safeRoot,
-            query: body.query,
-            maxResults: body.maxResults,
-            includeContent: body.includeContent,
-            maxContentBytes: body.maxContentBytes,
-          });
-          sendJson(response, 200, results);
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname.startsWith('/api/recipes/') && pathname.endsWith('/run')) {
-        await withJsonBody(request, response, async (body) => {
-          const recipeId = decodeURIComponent(pathname.slice('/api/recipes/'.length, -'/run'.length));
-          const recipe = getRecipe(recipeId);
-          if (!recipe) {
-            sendJson(response, 404, { error: 'Recipe not found' });
-            return;
-          }
-          if (!requireIdempotencyKey(response, requestContext)) {
-            return;
-          }
-          const fingerprint = bodyFingerprint(body);
-          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-            return;
-          }
-          const safeRoot = safeTrustedRoot(body.trustedRoot);
-          const result = runRecipe({
-            recipeId,
-            trustedRoot: safeRoot,
-            prompt: body.prompt,
-            files: body.files,
-            maxSize: body.maxSize,
-            context: requestContext,
-            runStoreRoot,
-            runEvents,
-            runsIndex,
-          });
-          sendCachedOrStore(response, cacheKey, fingerprint, 200, {
-            recipe: result.recipe,
-            runId: result.runId,
-            runPath: result.runPath,
-            context: requestContext,
-            sources: result.sources,
-            operations: result.operations,
-            events: result.events,
-          });
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/context/bundle') {
-        await withJsonBody(request, response, async (body) => {
-          const trustedRoot = safeTrustedRoot(body.trustedRoot);
-          if (!Array.isArray(body.paths)) {
-            throw new Error('body.paths must be an array');
-          }
-          const bundle = buildContextBundle({
-            root: trustedRoot,
-            paths: body.paths,
-            maxTextSize: body.maxTextSize,
-            fsStatFn: (candidate) => {
-              const safe = assertTrustedPath(candidate, trustedRoot);
-              return fs.statSync(safe);
-            },
-          });
-          sendJson(response, 200, bundle);
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
-        await withJsonBody(request, response, async (body) => {
-          const trustedRoot = safeTrustedRoot(body.trustedRoot);
-          const preview = previewFileOperations(body.operations, { trustedRoot });
-          sendJson(response, 200, preview);
-        });
-        return;
-      }
-
-      if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
-        await withJsonBody(request, response, async (body) => {
-          if (!requireIdempotencyKey(response, requestContext)) {
-            return;
-          }
-          const fingerprint = bodyFingerprint(body);
-          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-          if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-            return;
-          }
-          const trustedRoot = safeTrustedRoot(body.trustedRoot);
-          const applied = applyFileOperations(body.operations, {
-            trustedRoot,
-            journalWriter: config.journalWriter,
-          });
-          sendCachedOrStore(response, cacheKey, fingerprint, 200, {
-            ...applied,
-            context: requestContext,
-          });
-        });
+      if (await handleWorkspaceFileRoutes({
+        request,
+        response,
+        pathname,
+        requestContext,
+        trustedRootDefault,
+        config,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+        safeTrustedRoot,
+      })) {
         return;
       }
 

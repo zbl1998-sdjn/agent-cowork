@@ -48,9 +48,9 @@
 | 产物卡 (ArtifactCard) | ✅ | 跟着对话气泡走 |
 | 来源页脚 (SourcesFooter) | ✅ | 显示来源文件 + 摘录 |
 | 澄清气泡 (ClarificationCard) | ✅ | MVP 版双轨展示 |
-| Composer `/` 模板 picker | ✅ | `/` 触发模板 popover (键盘上下选 + Enter/Esc), 选中插入模板 prompt + 设 selectedRecipeId |
-| Composer `@` 文件 mention | ✅ | `@` 触发文件 popover, 走 `/api/files/search` 实时检索, 选中插入 `@文件名` 并加入 `state.mentionedFiles` 供模板/计划引用 |
-| Composer `#` 历史 run picker | ✅ | `#` 触发历史任务 popover, 走 `/api/runs/index` 列最近 runs; 选中后读取 `/api/runs/:id`, 回放 run record 的 `events[]`, 并把原 prompt 放回 Composer 便于复跑 |
+| Composer `/` 模板 picker | ✅ | `/` 触发模板 popover (键盘上下选 + Enter/Esc), 选中插入模板 prompt + 设 selectedRecipeId; controller 已拆到 `app-composer-popover.js` |
+| Composer `@` 文件 mention | ✅ | `@` 触发文件 popover, 走 `/api/files/search` 实时检索, 选中插入 `@文件名` 并加入 `state.mentionedFiles` 供模板/计划引用; controller 已拆到 `app-composer-popover.js` |
+| Composer `#` 历史 run picker | ✅ | `#` 触发历史任务 popover, 走 `/api/runs/index` 列最近 runs; 选中后读取 `/api/runs/:id`, 回放 run record 的 `events[]`, 并把原 prompt 放回 Composer 便于复跑; controller 已拆到 `app-composer-popover.js` |
 | 任务状态 Badge | 🟡 | 任务卡片在, 但消息头部 badge 仍简化 |
 | computer:// 等价一键打开 | ❌ | 产物卡有路径, 缺 shell open 集成 |
 | 内联可视化 widget (Chart/Mermaid) | ❌ | 未做 |
@@ -69,7 +69,7 @@
 | 文件卡片 (`present_files` 等价) | 🟡 | 卡片在, 缺系统级一键打开 |
 | Kimi CLI 集成 | ✅ | 长板, runs/*.json 审计级落盘 |
 | Kimi Gateway (OpenAI-compatible chat) | ✅ | 非流式 + 重试 + 超时, 已 httptest 覆盖 |
-| Kimi Gateway 流式 / tool calls / vision | ✅ | `services/kimi-gateway` 已支持 `ChatStream`、`POST /v1/chat/stream` SSE handler、OpenAI tools/tool_calls、multipart `image_url` vision、`llm.usage` 事件、多 key/baseURL fallback、熔断；httptest 覆盖 |
+| Kimi Gateway 流式 / tool calls / vision | ✅ | `services/kimi-gateway` 已支持 `ChatStream`、`POST /v1/chat/stream` SSE handler、OpenAI tools/tool_calls、multipart `image_url` vision、`llm.usage` 事件、多 key/baseURL fallback、熔断；client 已拆成 types/breaker/parser/stream handler, 并补齐 stream `[DONE]`、multipart limit、content part、错误泄漏回归测试 |
 | MCP 客户端 | ❌ | 0 实现, 仍在 plan v0.3 V1 阶段 |
 | 外部 SaaS 连接器 (Slack/Notion/Gmail/...) | ❌ | 0 实现 |
 | 工具懒加载 (ToolSearch 等价) | ❌ | 当前全暴露 |
@@ -526,3 +526,57 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `node --check apps/windows-client/resources/app.js` 通过。
 - `node --test --test-isolation=none` 全量通过。
 - `npm run smoke:ui` 通过。
+
+---
+
+## 18. 2026-05-21 本轮实现 (Route/client split + stream hardening)
+
+接续“全部修复”深度 review, 本轮继续拆 `server.js`、`app.js`、`services/kimi-gateway/internal/kimi/client.go`, 并把并行审查发现的 Go gateway 行为风险全部补成回归测试后修复。
+
+已落地:
+
+- **后端 route 继续拆分**:
+  - 新增 `apps/host/src/routes/workspace-file-routes.js`, 承接 files/tree、upload import、files/read、extract、search、context bundle、file-ops preview/apply。
+  - 新增 `apps/host/src/routes/recipe-routes.js`, 承接 `/api/recipes` 与 `/api/recipes/:id/run`。
+  - `apps/host/src/server.js` 降到约 442 行, `createServer(config)` 入口保持不变。
+- **Recipe route 输入收口**:
+  - `/api/recipes/:id/run` 对非法 route id 返回 400, 避免 encoded slash 等异常 id 落到 registry lookup。
+- **前端 composer controller 拆分**:
+  - 新增 `apps/windows-client/resources/app-composer-popover.js`, 承接 `/` 模板、`@` 文件 mention、`#` 历史 run picker 的 state、渲染、键盘处理。
+  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.mjs`、`verify-mvp.mjs`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
+  - `apps/windows-client/resources/app.js` 降到约 1739 行; `node --check` 已验证未截断。
+- **测试入口对齐**:
+  - `package.json` 的 `test` script 对齐为默认 `node --test`, 与 handoff 要求一致; 受 Windows 沙箱限制时仍可用 `node --test --test-isolation=none` 做本地补充验证。
+- **Go gateway 拆分**:
+  - `services/kimi-gateway/internal/kimi/types.go`: DTO / stream event constants。
+  - `breaker.go`: `CircuitBreaker`。
+  - `response_parser.go`: OpenAI-compatible response / SSE payload / message content validation。
+  - `stream_handler.go`: `POST /v1/chat/stream`、multipart decode、SSE writer。
+  - `client.go` 降到约 321 行, 保留 `NewClient` / `Chat` / `ChatStream` / transport / retry flow。
+- **Go gateway hardening**:
+  - SSE stream 如果 EOF 前没有收到 `[DONE]`, 不再伪造 done, 返回 `kimi stream ended before [DONE]`。
+  - Circuit breaker 不再挡掉同一次调用内的 fallback attempt; 只在调用开始时拒绝已打开 breaker, 调用耗尽 retryable failure 后再记录失败。
+  - 上游非 2xx 错误不再把 response body 拼进错误字符串, 避免泄漏上游细节。
+  - 结构化 message content parts 必须包含非空 text 或非空 image_url。
+  - multipart stream handler 在写 `200 OK` 前限制总请求大小、拒绝非法 `max_tokens`、拒绝空 prompt/image, 并清理 multipart 临时文件。
+
+新增/更新测试:
+
+- `apps/host/test/server-runtime-features.test.js`: recipe route 非法 id 返回 400。
+- `apps/host/test/server.test.js`: 新增 composer popover 静态资源。
+- `services/kimi-gateway/internal/kimi/client_test.go`: 覆盖 missing `[DONE]`、错误 body 不泄漏、breaker fallback、空 content parts、非法 multipart、超大 multipart。
+- `scripts/smoke-ui-contract.mjs` / `scripts/verify-mvp.mjs` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
+
+验收:
+
+- 全 repo JS/MJS `node --check` 通过。
+- `node --test` 全量 **110 通过 / 0 失败**。
+- `npm run smoke:ui` 通过。
+- `npm run smoke:host` 通过。
+- `npm run smoke:windows-resources` 通过。
+- `npm run smoke:rendered-ui` 通过。
+- `npm run smoke:tauri-scaffold` 通过, 仍报告本机 `cargo` / `rustc` / `cargo tauri` 不可用。
+- `npm run smoke:mvp-runtime` 通过。
+- `npm run verify:mvp` 全部 **20/20 passed**。
+- 所有 Go module: `go test -count=1 -mod=readonly ./...` + `go vet -mod=readonly ./...` 通过。
+- `npm ls --depth=0` 显示 `(empty)`, 仍保持 zero external npm deps。

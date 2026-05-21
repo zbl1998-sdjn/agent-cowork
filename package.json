@@ -22,7 +22,7 @@
     "smoke:rendered-ui": "node scripts/smoke-rendered-ui.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:ui": "node scripts/smoke-ui-contract.mjs",
-    "test": "node --test --test-isolation=none",
+    "test": "node --test",
     "test:isolated": "node --test"
   },
   "engines": {

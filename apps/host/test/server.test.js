@@ -381,6 +381,7 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.KimiCoworkUtils = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.KimiCoworkApi = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.KimiCoworkRunEvents = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-composer-popover.js'), 'window.KimiCoworkComposerPopover = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.kimiCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
@@ -404,6 +405,10 @@ test('serves the local preview shell and assets', async () => {
     const runEvents = await fetch(`${baseUrl}/app-run-events.js`);
     assert.equal(runEvents.status, 200);
     assert.match(runEvents.headers.get('content-type'), /javascript/);
+
+    const composerPopover = await fetch(`${baseUrl}/app-composer-popover.js`);
+    assert.equal(composerPopover.status, 200);
+    assert.match(composerPopover.headers.get('content-type'), /javascript/);
   });
 });
 

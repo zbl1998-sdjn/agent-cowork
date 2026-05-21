@@ -71,6 +71,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'apps', 'windows-client', 'resources', 'app.js')],
   },
   {
+    name: 'frontend app-composer-popover.js syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'apps', 'windows-client', 'resources', 'app-composer-popover.js')],
+  },
+  {
     name: 'start-mvp script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'start-mvp.mjs')],
