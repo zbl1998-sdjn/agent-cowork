@@ -69,7 +69,7 @@
 | 文件卡片 (`present_files` 等价) | 🟡 | 卡片在, 缺系统级一键打开 |
 | Kimi CLI 集成 | ✅ | 长板, runs/*.json 审计级落盘 |
 | Kimi Gateway (OpenAI-compatible chat) | ✅ | 非流式 + 重试 + 超时, 已 httptest 覆盖 |
-| Kimi Gateway 流式 / tool calls / vision | ❌ | 全缺 |
+| Kimi Gateway 流式 / tool calls / vision | ✅ | `services/kimi-gateway` 已支持 `ChatStream`、`POST /v1/chat/stream` SSE handler、OpenAI tools/tool_calls、multipart `image_url` vision、`llm.usage` 事件、多 key/baseURL fallback、熔断；httptest 覆盖 |
 | MCP 客户端 | ❌ | 0 实现, 仍在 plan v0.3 V1 阶段 |
 | 外部 SaaS 连接器 (Slack/Notion/Gmail/...) | ❌ | 0 实现 |
 | 工具懒加载 (ToolSearch 等价) | ❌ | 当前全暴露 |
@@ -336,3 +336,33 @@ P0 阶段当前状态:
 
 - P0-A SQLite adapter ✅
 - P0-B recipe run 幂等 ✅
+
+---
+
+## 12. 2026-05-21 本轮实现 (Kimi Gateway stream/tools/vision)
+
+P1-A 完成 — `services/kimi-gateway/internal/kimi` 从非流式 OpenAI-compatible chat client 扩展为可流式、可工具调用、可 vision 输入、可多 key/baseURL fallback 的 gateway 内核, 全部用 httptest 覆盖, 不依赖真实网络或真实密钥。
+
+已落地:
+
+- **SSE 流式**:
+  - `Client.ChatStream(ctx, request, emit)` 调 Kimi OpenAI-compatible `/chat/completions` 并解析 `data:` SSE chunk。
+  - 解析 delta content、tool_call、usage 和 `[DONE]`。
+  - `NewStreamHandler(client)` 暴露 `POST /v1/chat/stream`, 输出本地 SSE 事件。
+- **Tool calls**:
+  - `ChatRequest.Tools` / `ToolChoice` 支持 OpenAI tools schema。
+  - 非流式 response 解析 `tool_calls`, 允许 assistant content 为空但有 tool call。
+- **Vision multipart**:
+  - `POST /v1/chat/stream` 支持 `multipart/form-data` 的 `model` / `prompt` / `image_url` 字段, 转成 OpenAI content parts (`text` + `image_url`)。
+- **Usage 事件**:
+  - upstream usage chunk 转成本地 `event: llm.usage`。
+- **多 key + fallback + 熔断**:
+  - `Client.APIKeys` / `Client.BaseURLs` 按 retry attempt 轮询。
+  - retryable 失败会切下一个 key/baseURL。
+  - 内置轻量 `CircuitBreaker` 在连续 retryable failure 后打开, 冷却前拒绝新请求。
+
+验收:
+
+- `go test ./...` (`services/kimi-gateway`) 通过。
+- `node --test` 全量 **95 通过 / 0 失败**。
+- `npm run smoke:ui` 通过。
