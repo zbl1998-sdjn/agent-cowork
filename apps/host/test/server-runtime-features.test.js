@@ -149,6 +149,44 @@ test('runs index: recipe-run upserts a tenant-scoped record', async () => {
   }
 });
 
+test('recipe run endpoint replays duplicate idempotency key without creating a second run', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const headers = {
+      'x-tenant-id': 'tenant_alice',
+      'x-user-id': 'user_alice',
+      'idempotency-key': 'recipe-run-once',
+    };
+    const first = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers,
+      body: { prompt: '把会议纪要整理', files: [] },
+    });
+    assert.equal(first.status, 200);
+    assert.ok(first.body.runId);
+    assert.equal(first.body.idempotentReplay, undefined);
+
+    const second = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers,
+      body: { prompt: '把会议纪要整理', files: [] },
+    });
+    assert.equal(second.status, 200);
+    assert.equal(second.body.idempotentReplay, true);
+    assert.equal(second.body.runId, first.body.runId);
+
+    const index = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_alice' },
+    });
+    assert.equal(index.body.runs.length, 1);
+    assert.equal(index.body.stats.total, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('schedules: create cron + list + cancel + manual tick', async () => {
   const trustedRoot = tempRoot();
   const fired = [];

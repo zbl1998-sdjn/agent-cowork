@@ -228,7 +228,10 @@ export function createServer(config = {}) {
         ...cached.payload,
         idempotentReplay: true,
       });
-      return;
+      return true;
+    }
+    if (payload === undefined) {
+      return false;
     }
     if (cacheKey) {
       idempotencyStore.set(cacheKey, {
@@ -237,6 +240,7 @@ export function createServer(config = {}) {
       });
     }
     sendJson(response, status, payload);
+    return false;
   }
 
   async function runKimiAndRecord({
@@ -734,6 +738,10 @@ export function createServer(config = {}) {
             sendJson(response, 404, { error: 'Recipe not found' });
             return;
           }
+          const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+          if (sendCachedOrStore(response, cacheKey, 200)) {
+            return;
+          }
           const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
           const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
           const result = runRecipe({
@@ -747,7 +755,7 @@ export function createServer(config = {}) {
             runEvents,
             runsIndex,
           });
-          sendJson(response, 200, {
+          sendCachedOrStore(response, cacheKey, 200, {
             recipe: result.recipe,
             runId: result.runId,
             runPath: result.runPath,
