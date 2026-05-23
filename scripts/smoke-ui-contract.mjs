@@ -68,6 +68,8 @@ async function main() {
     assert(index.body.includes('class="composer"'), 'index missing composer UI');
     assert(index.body.includes('class="conversation-timeline"'), 'index missing conversation timeline');
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
+    assert(index.body.includes('data-artifact-list'), 'index missing artifact catalog container');
+    assert(index.body.includes('data-action="refresh-artifacts"'), 'index missing artifact refresh control');
     assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
     for (const copy of ['对话', '协作', '代码', '新建会话', '项目', '产物', '自定义', '最近']) {
       assert(index.body.includes(copy), `index missing Image #1 functional copy: ${copy}`);
@@ -118,6 +120,8 @@ async function main() {
     assert(allScripts.includes('/api/runs/index'), 'app scripts missing runs-index picker route');
     assert(allScripts.includes('mode: "history"'), 'app scripts missing # history trigger detection');
     assert(allScripts.includes('replayRunEvents'), 'app scripts missing history run event replay');
+    assert(allScripts.includes('/api/artifacts'), 'app scripts missing artifact catalog route');
+    assert(allScripts.includes('/api/artifacts/view'), 'app scripts missing artifact live page route');
     assert(index.body.includes('class="composer-popover"'), 'index missing composer popover container');
     for (const route of [
       '/api/workspace',
@@ -176,6 +180,13 @@ async function main() {
     assert(applied.applied.length === 1 && applied.applied[0].status === 'applied', 'UI apply flow did not apply write operation');
     assert(fs.readFileSync(artifactPath, 'utf8').includes('UI Smoke 计划'), 'UI apply flow did not write artifact');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'UI apply flow did not write audit event');
+
+    const artifactCatalog = await (await fetch(`${baseUrl}/api/artifacts?limit=5`)).json();
+    assert(artifactCatalog.artifacts.some((item) => item.path === artifactPath), 'artifact catalog did not expose applied artifact');
+    const artifactView = await getText(baseUrl, `/api/artifacts/view?path=${encodeURIComponent(artifactPath)}`);
+    assert(artifactView.contentType.includes('text/html'), 'artifact live page did not return HTML');
+    assert(artifactView.body.includes('Artifact Live Page'), 'artifact live page missing title');
+    assert(artifactView.body.includes('UI Smoke 计划'), 'artifact live page missing applied artifact content');
 
     console.log(
       JSON.stringify(

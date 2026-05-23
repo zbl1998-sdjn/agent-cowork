@@ -179,7 +179,7 @@
                   <span class="status-dot"></span>
                   <span class="status-text">本地 Agent 就绪</span>
                 </div>
-                <div class="run-chip" title="Kimi CLI 运行记录">Kimi CLI 未启用</div>
+                <div class="run-chip" title="Kimi API 运行记录">Kimi API 未配置</div>
               </div>
             </div>
 
@@ -314,8 +314,12 @@
           <section class="library-panel view-panel" data-views="artifacts" hidden>
             <div class="library-header">
               <h2>产物</h2>
+              <button type="button" data-action="refresh-artifacts">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.6-5.7M20 12a8 8 0 0 1-13.6 5.7M17 3v4h-4M7 21v-4h4" /></svg>
+                刷新
+              </button>
             </div>
-            <div class="artifact-list">
+            <div class="artifact-list" data-artifact-list>
               <button type="button" data-artifact=".KimiCowork/artifacts">
                 <strong>Kimi Cowork 执行计划</strong>
                 <span>.KimiCowork/artifacts</span>

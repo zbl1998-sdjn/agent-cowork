@@ -1,10 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
-function ensureDirSync(dir) {
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
+import { JsonlWriter } from '../storage/jsonl-writer.js';
 
 function normaliseAuditEvent(event, now = () => new Date()) {
   const traceId = event.trace_id || event.traceId || null;
@@ -76,12 +70,13 @@ export class AuditEventBus {
   }
 }
 
-export function createJsonlAuditSubscriber(filePath) {
+// Persist audit events to a JSONL file WITH size-based rotation, so actions.jsonl
+// / memory.jsonl can't grow without bound. `opts` ({ maxBytes, maxFiles }) is
+// forwarded to JsonlWriter (env-tunable defaults apply otherwise).
+export function createJsonlAuditSubscriber(filePath, opts = {}) {
   if (!filePath || typeof filePath !== 'string') {
     throw new Error('audit filePath is required');
   }
-  return (event) => {
-    ensureDirSync(path.dirname(filePath));
-    fs.appendFileSync(filePath, `${JSON.stringify(event)}\n`, 'utf8');
-  };
+  const writer = new JsonlWriter(filePath, opts);
+  return (event) => writer.append(event);
 }

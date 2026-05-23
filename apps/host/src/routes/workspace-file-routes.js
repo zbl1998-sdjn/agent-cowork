@@ -2,11 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listWorkspaceTree } from '../workspace/file-tree.js';
 import { readTextFile } from '../workspace/file-reader.js';
+import { readFilePreview } from '../workspace/file-preview.js';
 import { extractDocumentText } from '../workspace/document-extractor.js';
 import { searchWorkspace } from '../workspace/file-search.js';
 import { buildContextBundle } from '../workspace/context-bundle.js';
 import { previewFileOperations, applyFileOperations } from '../workspace/file-operations.js';
 import { importUploadedFiles } from '../workspace/uploads.js';
+import { buildAttachmentContext } from '../workspace/attachment-context.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 
@@ -62,6 +64,22 @@ export async function handleWorkspaceFileRoutes({
         maxSize: body.maxSize,
       });
       sendJson(response, 200, file);
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/files/preview') {
+    await withJsonBody(request, response, async (body) => {
+      if (!body || typeof body.path !== 'string' || !body.path.trim()) {
+        throw new Error('body.path is required');
+      }
+      const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      try {
+        const preview = readFilePreview(body.path, { trustedRoot, maxBytes: body.maxBytes });
+        sendJson(response, 200, preview);
+      } catch (err) {
+        sendJson(response, err.statusCode || 400, { error: err.message });
+      }
     });
     return true;
   }
@@ -146,6 +164,15 @@ export async function handleWorkspaceFileRoutes({
         ...applied,
         context: requestContext,
       });
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/attachments/context') {
+    await withJsonBody(request, response, async (body) => {
+      const trustedRoot = safeTrustedRoot(body && body.trustedRoot);
+      const result = buildAttachmentContext({ files: body && body.files, trustedRoot, maxSize: body && body.maxSize });
+      sendJson(response, 200, { context: requestContext, ...result });
     });
     return true;
   }

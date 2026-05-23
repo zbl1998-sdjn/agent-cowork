@@ -1,0 +1,130 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createApprovalRegistry } from '../src/runtime/approvals.js';
+import { createServer } from '../src/server.js';
+
+function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-agent-')); }
+async function bind(s) { await new Promise((r) => s.listen(0, '127.0.0.1', r)); return `http://127.0.0.1:${s.address().port}`; }
+
+test('native agent tools (Read/Write/Glob) are jailed to the workspace', async () => {
+  const root = tmp();
+  fs.writeFileSync(path.join(root, 'a.txt'), 'hello', 'utf8');
+  const tools = createAgentTools({ trustedRoot: root });
+  const byName = (n) => tools.find((t) => t.name === n);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['Edit', 'Glob', 'Grep', 'Read', 'WebFetch', 'Write']);
+  const glob = await byName('Glob').handler({ pattern: '*.txt' });
+  assert.ok(glob.matches.includes('a.txt'));
+  const read = await byName('Read').handler({ path: 'a.txt' });
+  assert.equal(read.content, 'hello');
+  const wrote = await byName('Write').handler({ path: 'sub/b.txt', content: 'world' });
+  assert.equal(wrote.ok, true);
+  assert.equal(fs.readFileSync(path.join(root, 'sub', 'b.txt'), 'utf8'), 'world');
+  // Write/Edit are flagged mutating (gated by approval in the loop)
+  assert.equal(byName('Write').mutating, true);
+  assert.equal(byName('Read').mutating, false);
+  await assert.rejects(() => byName('Write').handler({ path: '../escape.txt', content: 'x' }), /escaped|Sensitive|outside/i);
+});
+
+test('Edit replaces a string in a workspace file', async () => {
+  const root = tmp();
+  fs.writeFileSync(path.join(root, 'c.txt'), 'foo bar foo', 'utf8');
+  const tools = createAgentTools({ trustedRoot: root });
+  const edit = tools.find((t) => t.name === 'Edit');
+  await edit.handler({ path: 'c.txt', old_string: 'foo', new_string: 'baz' });
+  assert.equal(fs.readFileSync(path.join(root, 'c.txt'), 'utf8'), 'baz bar foo');
+  const all = await edit.handler({ path: 'c.txt', old_string: 'foo', new_string: 'X', replace_all: true });
+  assert.equal(all.replacements, 1);
+});
+
+test('runAgentChat executes a Write tool call then returns a final answer', async () => {
+  const root = tmp();
+  let calls = 0;
+  const modelCall = async () => {
+    calls += 1;
+    if (calls === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: JSON.stringify({ path: 'out.txt', content: 'hello agent' }) } }] };
+    return { content: '已为你创建 out.txt。' };
+  };
+  const out = await runAgentChat({ prompt: '创建 out.txt', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, runStoreRoot: path.join(root, 'runs') });
+  assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'hello agent');
+  assert.equal(out.text, '已为你创建 out.txt。');
+});
+
+test('POST /api/agent/chat/stream (autoApprove) writes the file and records an agent-chat run', async () => {
+  const root = tmp();
+  let calls = 0;
+  const agentModelCall = async () => {
+    calls += 1;
+    if (calls === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: JSON.stringify({ path: 'note.md', content: '# 标题\n内容' }) } }] };
+    return { content: '已写入 note.md。' };
+  };
+  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '写 note.md', autoApprove: true }) });
+    assert.equal(res.status, 200);
+    const text = await res.text();
+    assert.match(text, /event: tool_call/);
+    assert.match(text, /event: done/);
+    assert.equal(fs.readFileSync(path.join(root, 'note.md'), 'utf8'), '# 标题\n内容');
+    const idx = await (await fetch(`${base}/api/runs/index`)).json();
+    assert.ok((idx.runs || []).some((r) => r.type === 'agent-chat'));
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('plan mode blocks writes until ExitPlanMode is approved, then executes', async () => {
+  const root = tmp();
+  const approvals = createApprovalRegistry();
+  const events = [];
+  // Auto-approve the plan as soon as it is proposed (simulates the user clicking "批准并执行").
+  const emit = (type, payload) => {
+    events.push({ type, payload });
+    if (type === 'plan_proposed') approvals.resolve(payload.id, 'once');
+  };
+  let calls = 0;
+  const modelCall = async () => {
+    calls += 1;
+    if (calls === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: JSON.stringify({ path: 'out.txt', content: 'EARLY' }) } }] };
+    if (calls === 2) return { content: '', tool_calls: [{ id: 'c2', function: { name: 'ExitPlanMode', arguments: JSON.stringify({ plan: '1. 写 out.txt' }) } }] };
+    if (calls === 3) return { content: '', tool_calls: [{ id: 'c3', function: { name: 'Write', arguments: JSON.stringify({ path: 'out.txt', content: 'APPROVED' }) } }] };
+    return { content: '已按计划完成。' };
+  };
+  const out = await runAgentChat({ prompt: '写 out.txt', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, approvals, planMode: true, emit, runStoreRoot: path.join(root, 'runs') });
+
+  // The pre-approval Write must have been blocked, not executed.
+  assert.ok(out.steps.some((s) => s.tool === 'Write' && s.planBlocked), 'early write blocked');
+  // A plan was proposed (frontend onPlanProposed) and approved.
+  assert.ok(events.some((e) => e.type === 'plan_proposed'), 'plan_proposed emitted');
+  assert.ok(out.steps.some((s) => s.tool === 'ExitPlanMode' && s.plan && s.approved), 'plan approved');
+  // After approval the second Write executed with the approved content.
+  assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'APPROVED');
+  assert.equal(out.text, '已按计划完成。');
+});
+
+test('plan mode: rejecting the plan keeps mutating tools blocked', async () => {
+  const root = tmp();
+  const approvals = createApprovalRegistry();
+  let planProposals = 0;
+  const emit = (type, payload) => {
+    if (type === 'plan_proposed') { planProposals += 1; approvals.resolve(payload.id, 'reject'); }
+  };
+  let calls = 0;
+  const modelCall = async () => {
+    calls += 1;
+    if (calls === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'ExitPlanMode', arguments: JSON.stringify({ plan: '改 out.txt' }) } }] };
+    if (calls === 2) return { content: '', tool_calls: [{ id: 'c2', function: { name: 'Write', arguments: JSON.stringify({ path: 'out.txt', content: 'NOPE' }) } }] };
+    return { content: '好的，我再完善计划。' };
+  };
+  const out = await runAgentChat({ prompt: '改 out.txt', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, approvals, planMode: true, emit, runStoreRoot: path.join(root, 'runs') });
+
+  assert.equal(planProposals, 1);
+  assert.ok(out.steps.some((s) => s.tool === 'ExitPlanMode' && s.approved === false), 'plan rejected');
+  assert.ok(out.steps.some((s) => s.tool === 'Write' && s.planBlocked), 'write still blocked after reject');
+  assert.equal(fs.existsSync(path.join(root, 'out.txt')), false, 'file never written');
+});

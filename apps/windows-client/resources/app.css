@@ -1631,6 +1631,19 @@ body.has-conversation .composer {
   line-height: 1.45;
 }
 
+.artifact-list button {
+  overflow: hidden;
+}
+
+.artifact-list .artifact-empty {
+  grid-column: 1 / -1;
+  cursor: default;
+}
+
+.artifact-list [data-artifact-path] span {
+  word-break: break-word;
+}
+
 .settings-list {
   display: grid;
   gap: 12px;

@@ -35,10 +35,29 @@
     return false;
   }
 
+  // Resolve an auth token if the host shipped one into this page. The legacy
+  // browser UI predates auth, so this is best-effort: with auth ON the call may
+  // still 401, in which case we fail once and degrade (no infinite retry).
+  function resolveAuthToken() {
+    try {
+      return (
+        window.KimiCoworkApi?.authToken ||
+        window.__KCW_TOKEN__ ||
+        (window.localStorage && window.localStorage.getItem("kcw_token")) ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  // SSE over fetch (not EventSource): EventSource cannot send an Authorization
+  // header, so under the auth gate it 401s and retries forever. fetch lets us
+  // attach the bearer token and abort cleanly. Returns a handle with close().
   function subscribeRunEvents(message, runId, options = {}) {
     const state = options.state || window.kimiCowork;
     const scrollConversationToEnd = options.scrollConversationToEnd || window.scrollConversationToEnd || function () {};
-    if (!runId || typeof EventSource === "undefined" || !message?.body) {
+    if (!runId || typeof fetch === "undefined" || !message?.body) {
       return null;
     }
     const list = document.createElement("div");
@@ -53,27 +72,17 @@
       scrollConversationToEnd();
     };
 
-    let source;
-    try {
-      source = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
-    } catch {
-      list.remove();
-      return null;
-    }
-    state.activeEventSource = source;
+    const eventsPath = `/api/runs/${encodeURIComponent(runId)}/events`;
+    const eventsUrl = window.KimiCoworkApi?.resolveUrl
+      ? window.KimiCoworkApi.resolveUrl(eventsPath)
+      : eventsPath;
+    const controller = new AbortController();
     const seen = new Set();
-    const close = () => {
-      try {
-        source.close();
-      } catch {
-        // ignore
-      }
-      if (state.activeEventSource === source) {
-        state.activeEventSource = null;
-      }
-    };
+    let closed = false;
+    const handle = { close: () => { closed = true; try { controller.abort(); } catch { /* ignore */ } if (state.activeEventSource === handle) state.activeEventSource = null; } };
+    state.activeEventSource = handle;
 
-    const handle = (type, payload) => {
+    const dispatch = (type, payload) => {
       const seq = payload?.seq;
       if (seq != null) {
         if (seen.has(seq)) return;
@@ -81,27 +90,53 @@
       }
       renderRunEventPayload(type, payload, appendLine);
       if (type === "assistant_end") {
-        close();
+        handle.close();
         if (typeof options.onComplete === "function") options.onComplete(payload);
       }
     };
 
-    for (const type of ["user_message", "assistant_start", "progress", "preview", "awaiting_approval", "sources", "assistant_end"]) {
-      source.addEventListener(type, (event) => {
-        let payload = {};
-        try {
-          payload = JSON.parse(event.data);
-        } catch {
-          payload = {};
+    (async () => {
+      try {
+        const token = resolveAuthToken();
+        const headers = { accept: "text/event-stream" };
+        if (token) headers.authorization = `Bearer ${token}`;
+        const res = await fetch(eventsUrl, { headers, signal: controller.signal });
+        if (!res.ok || !res.body) throw new Error(`events ${res.status}`);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        // Parse SSE frames: blocks separated by a blank line, each with optional
+        // `event:` and one or more `data:` lines.
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done || closed) break;
+          buffer += decoder.decode(value, { stream: true });
+          let sep;
+          while ((sep = buffer.indexOf("\n\n")) !== -1) {
+            const frame = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            let evType = "message";
+            const dataLines = [];
+            for (const raw of frame.split("\n")) {
+              if (raw.startsWith("event:")) evType = raw.slice(6).trim();
+              else if (raw.startsWith("data:")) dataLines.push(raw.slice(5).trim());
+            }
+            if (!dataLines.length) continue;
+            let payload = {};
+            try { payload = JSON.parse(dataLines.join("\n")); } catch { payload = {}; }
+            dispatch(evType, payload);
+          }
         }
-        handle(type, payload);
-      });
-    }
-    source.onerror = () => {
-      close();
-      if (typeof options.onError === "function") options.onError();
-    };
-    return source;
+      } catch (err) {
+        if (!closed) {
+          if (err && err.name !== "AbortError" && typeof options.onError === "function") options.onError();
+        }
+      } finally {
+        handle.close();
+      }
+    })();
+
+    return handle;
   }
 
   window.KimiCoworkRunEvents = Object.freeze({

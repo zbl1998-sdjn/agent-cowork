@@ -38,4 +38,22 @@ describe('path-policy', () => {
   it('flags sensitive extension quickly', () => {
     assert.equal(isSensitivePath(path.join(workspace, 'certs', 'deploy.key')), true);
   });
+
+  it('does not block a normal write just because the root prefix contains a sensitive segment', () => {
+    // Simulate a workspace whose absolute path includes "appdata" (e.g. an app
+    // data dir). Writes BELOW the root must be allowed; the root prefix is trusted.
+    const fakeRoot = path.join(root, 'AppData', 'Local', 'MyWorkspace');
+    fs.mkdirSync(path.join(fakeRoot, 'docs'), { recursive: true });
+    const normalFile = path.join(fakeRoot, 'docs', 'report.md');
+    fs.writeFileSync(normalFile, '# ok', 'utf8');
+    // relative-to-root form (used internally by assertTrustedPath) is NOT sensitive
+    assert.equal(isSensitivePath(normalFile, fakeRoot), false);
+    assert.ok(assertTrustedPath(normalFile, fakeRoot).endsWith('report.md'));
+    // ...but a sensitive name created BELOW the root is still blocked.
+    fs.mkdirSync(path.join(fakeRoot, '.ssh'), { recursive: true });
+    fs.writeFileSync(path.join(fakeRoot, '.ssh', 'config'), 'x', 'utf8');
+    assert.equal(isSensitivePath(path.join(fakeRoot, '.ssh', 'config'), fakeRoot), true);
+    // Whole-path form (no root) keeps the legacy behaviour for direct callers.
+    assert.equal(isSensitivePath(normalFile), true);
+  });
 });

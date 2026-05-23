@@ -174,14 +174,17 @@ async function main() {
   const host = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
-    enableKimiCliPlan: true,
     kimiPlanRunner: async ({ prompt, summary, mode }) => ({
       ok: true,
+      provider: 'kimi-api',
+      model: 'kimi-test',
       text: `测试 Kimi 计划：${mode} / ${prompt} / ${summary}`,
       durationMs: 16,
     }),
     kimiChatRunner: async ({ prompt, summary }) => ({
       ok: true,
+      provider: 'kimi-api',
+      model: 'kimi-test',
       text: `测试 Kimi 对话：${prompt} / ${summary}`,
       durationMs: 12,
     }),

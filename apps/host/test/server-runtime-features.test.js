@@ -1,13 +1,4 @@
-// Integration smoke for the runtime features added in this round:
-//   1) Memory routes: GET /api/memory, POST /api/memory/facts, POST /api/memory/notes,
-//      GET /api/memory/notes/<name>.
-//   2) Runs index: GET /api/runs/index — backed by RunsIndex with tenant scope.
-//   3) Schedules: POST /api/schedules (cron + one-shot), GET /api/schedules,
-//      POST /api/schedules/<id>/cancel, DELETE /api/schedules/<id>,
-//      POST /api/schedules/_tick.
-//
-// The server is bound to 127.0.0.1:0 so each test gets a fresh ephemeral port.
-
+// Integration smoke for the runtime features added in this round.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -47,10 +38,7 @@ async function jsonRequest(base, route, { method = 'GET', body, headers = {} } =
 
 test('memory routes: append fact, list notes, read back, inject in workspace info', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({
-    trustedRoot,
-    enableScheduler: false,
-  });
+  const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const empty = await jsonRequest(base, '/api/memory');
@@ -246,7 +234,6 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     assert.equal(listOne.body.schedules.length, 1);
     assert.equal(listOne.body.schedules[0].name, 'weekly');
 
-    // Wait one minute would be excessive; bump nextFireAt into the past and tick.
     const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
@@ -260,7 +247,6 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     assert.equal(tick.body.fired, 1);
     assert.equal(fired.length, 1);
 
-    // Cancel the schedule.
     const cancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
       method: 'POST',
       headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-cancel' },
@@ -268,7 +254,6 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     assert.equal(cancel.status, 200);
     assert.equal(cancel.body.schedule.status, 'cancelled');
 
-    // Removing it should also work.
     const remove = await jsonRequest(base, `/api/schedules/${scheduleId}`, {
       method: 'DELETE',
       headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-remove' },
@@ -337,7 +322,6 @@ test('SSE: /api/runs/:id/events replays a completed recipe run timeline', async 
     const runId = run.body.runId;
     assert.ok(Array.isArray(run.body.events) && run.body.events.length > 0);
 
-    // Connect to SSE; the run is already finished, so persisted events replay.
     const controller = new AbortController();
     const res = await fetch(`${base}/api/runs/${runId}/events`, {
       headers: { accept: 'text/event-stream', 'x-tenant-id': 'tenant_alice' },
@@ -380,7 +364,7 @@ test('SSE: Last-Event-ID skips already-delivered events', async () => {
     });
     const runId = run.body.runId;
     const totalEvents = run.body.events.length;
-    const lastSeq = run.body.events[1].seq; // skip first two
+    const lastSeq = run.body.events[1].seq;
 
     const controller = new AbortController();
     const res = await fetch(`${base}/api/runs/${runId}/events`, {
@@ -399,7 +383,6 @@ test('SSE: Last-Event-ID skips already-delivered events', async () => {
     }
     controller.abort();
 
-    // Should not include the first event (seq 1) again.
     assert.ok(!buffered.includes('id: 1\n'), 'seq 1 must be skipped');
     assert.match(buffered, /event: assistant_end/);
     assert.ok(totalEvents > 2);
@@ -454,7 +437,6 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     assert.equal(created.status, 200);
     const scheduleId = created.body.schedule.id;
 
-    // Push nextFireAt into the past and tick.
     const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
@@ -468,7 +450,6 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     assert.equal(tick.body.fired, 1);
     assert.ok(tick.body.results[0].runId, 'executor produced a runId');
 
-    // The produced run should appear in the tenant-scoped index.
     const index = await jsonRequest(base, '/api/runs/index', {
       headers: { 'x-tenant-id': 'tenant_alice' },
     });

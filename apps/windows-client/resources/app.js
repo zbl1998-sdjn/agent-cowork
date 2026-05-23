@@ -5,7 +5,7 @@ const state = {
   operations: [],
   approved: false,
   hostApi: window.location.protocol === "http:" || window.location.protocol === "https:",
-  kimiCliPlanEnabled: false,
+  kimiApiEnabled: false,
   lastRun: null,
   runs: [],
   uploadedFiles: [],
@@ -35,6 +35,8 @@ const runChip = document.querySelector(".run-chip");
 const runSummary = document.querySelector(".run-summary");
 const runList = document.querySelector(".run-list");
 const runRefreshButton = document.querySelector('[data-action="refresh-runs"]');
+const artifactList = document.querySelector("[data-artifact-list]");
+const artifactRefreshButton = document.querySelector('[data-action="refresh-artifacts"]');
 const workspacePath = document.querySelector(".workspace-card > strong");
 const workspaceMeta = document.querySelector(".workspace-card > p");
 const fileList = document.querySelector(".file-list");
@@ -95,6 +97,52 @@ function setRunChip(text, variant = "muted") {
 function setArtifact(message, pathText = artifactPath.textContent) {
   artifactText.textContent = message;
   artifactPath.textContent = pathText;
+}
+
+function renderArtifactCatalog(items) {
+  if (!artifactList) {
+    return;
+  }
+  artifactList.replaceChildren();
+  const artifacts = Array.isArray(items) ? items : [];
+  if (artifacts.length === 0) {
+    const empty = document.createElement("button");
+    empty.type = "button";
+    empty.className = "artifact-empty";
+    empty.innerHTML = "<strong>暂无活页产物</strong><span>审批执行后，这里会显示可打开的 HTML Artifact。</span>";
+    artifactList.append(empty);
+    return;
+  }
+  for (const item of artifacts.slice(0, 12)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.artifactPath = item.path || "";
+    const title = document.createElement("strong");
+    title.textContent = item.name || basename(item.path);
+    const meta = document.createElement("span");
+    meta.textContent = `${item.kind || "artifact"} · ${item.relativePath || item.path}`;
+    button.append(title, meta);
+    button.addEventListener("click", () => openArtifactView(item));
+    artifactList.append(button);
+  }
+}
+
+async function loadArtifactCatalog() {
+  if (!state.hostApi || !artifactList) {
+    return;
+  }
+  const payload = await getJson("/api/artifacts?limit=12");
+  renderArtifactCatalog(payload.artifacts || []);
+}
+
+function openArtifactView(item) {
+  if (!state.hostApi || !item?.path) {
+    setArtifact("静态预览模式不能打开 Artifact 活页；请通过 localhost 启动本地 Host。");
+    return;
+  }
+  const url = `/api/artifacts/view?path=${encodeURIComponent(item.path)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+  setArtifact(`已打开 Artifact 活页：${item.name || basename(item.path)}`, item.relativePath || item.path);
 }
 
 function renderInteraction(items, subtitle = "任务运行中") {
@@ -173,6 +221,11 @@ function setView(view) {
 
   if (view === "cowork" || view === "code") {
     setWorkbenchCopy(view);
+  }
+  if (view === "artifacts") {
+    loadArtifactCatalog().catch((error) => {
+      setArtifact(`产物列表暂不可用：${error.message}`);
+    });
   }
 }
 
@@ -923,17 +976,17 @@ async function selectHistoryRun(indexRun) {
   setRunChip(`历史任务 · ${shortRunId(run.id)}`, "ready");
 }
 
-async function tryKimiCliPlan(prompt, summary) {
-  if (!state.kimiCliPlanEnabled) {
-    setRunChip("Kimi CLI 未启用", "muted");
+async function tryKimiApiPlan(prompt, summary) {
+  if (!state.kimiApiEnabled) {
+    setRunChip("Kimi API 未配置", "muted");
     return {
       used: false,
-      text: "Kimi CLI plan 未启用；当前使用本地只读摘要生成审批草稿。",
+      text: "Kimi API 未配置；当前使用本地只读摘要生成审批草稿。",
     };
   }
 
   try {
-    setStatus("正在调用 Kimi CLI");
+    setStatus("正在调用 Kimi API");
     const result = await postJson("/api/kimi/plan", {
       trustedRoot: state.workspace,
       prompt,
@@ -949,10 +1002,10 @@ async function tryKimiCliPlan(prompt, summary) {
     };
   } catch (error) {
     const runId = error.payload?.runId;
-    setRunChip(runId ? `Kimi CLI 失败 · ${shortRunId(runId)}` : "Kimi CLI 已降级", "muted");
+    setRunChip(runId ? `Kimi API 失败 · ${shortRunId(runId)}` : "Kimi API 已降级", "muted");
     return {
       used: false,
-      text: `Kimi CLI 暂不可用，已降级到本地计划：${error.message}`,
+      text: `Kimi API 暂不可用，已降级到本地计划：${error.message}`,
       runId,
       runPath: error.payload?.runPath,
       failed: Boolean(runId),
@@ -961,16 +1014,16 @@ async function tryKimiCliPlan(prompt, summary) {
 }
 
 async function tryKimiChat(prompt, summary) {
-  if (!state.kimiCliPlanEnabled) {
-    setRunChip("Kimi CLI 未启用", "muted");
+  if (!state.kimiApiEnabled) {
+    setRunChip("Kimi API 未配置", "muted");
     return {
       used: false,
-      text: `Kimi CLI chat 未启用；已收到消息：“${prompt.slice(0, 80)}”。需要真实对话时请用 ENABLE_KIMI_CLI_PLAN=1 启动。`,
+      text: `Kimi API 未配置；已收到消息：“${prompt.slice(0, 80)}”。需要真实对话时请设置 KIMI_API_KEY 或 MOONSHOT_API_KEY 后启动。`,
     };
   }
 
   try {
-    setRunChip("Kimi CLI 对话中", "ready");
+    setRunChip("Kimi API 对话中", "ready");
     const result = await postJson("/api/kimi/chat", {
       trustedRoot: state.workspace,
       prompt,
@@ -985,10 +1038,10 @@ async function tryKimiChat(prompt, summary) {
     };
   } catch (error) {
     const runId = error.payload?.runId;
-    setRunChip(runId ? `Kimi CLI 失败 · ${shortRunId(runId)}` : "Kimi CLI 已降级", "muted");
+    setRunChip(runId ? `Kimi API 失败 · ${shortRunId(runId)}` : "Kimi API 已降级", "muted");
     return {
       used: false,
-      text: `Kimi CLI 暂不可用：${error.message}`,
+      text: `Kimi API 暂不可用：${error.message}`,
       runId,
       runPath: error.payload?.runPath,
       failed: Boolean(runId),
@@ -1016,7 +1069,7 @@ async function sendChatMessage(prompt) {
     },
     {
       state: "running",
-      title: state.kimiCliPlanEnabled ? "正在调用 Kimi CLI 对话" : "Kimi CLI 未启用，使用本地安全回复",
+      title: state.kimiApiEnabled ? "正在调用 Kimi API 对话" : "Kimi API 未配置，使用本地安全回复",
     },
   ]);
   const reply = await tryKimiChat(prompt, summary);
@@ -1318,7 +1371,7 @@ async function generatePlan(options = {}) {
         {
           state: "wait",
           title: "等待 Host",
-          detail: "通过 localhost 启动后可读取文件、调用 Kimi CLI，并写入审计日志。",
+          detail: "通过 localhost 启动后可读取文件、调用 Kimi API，并写入审计日志。",
         },
       ],
       "静态预览",
@@ -1351,7 +1404,7 @@ async function generatePlan(options = {}) {
       {
         state: "active",
         title: "调用 Kimi 生成计划",
-        detail: state.kimiCliPlanEnabled ? "正在调用本机 Kimi CLI，输出只作为计划文本，不直接执行本地操作。" : "Kimi CLI 未启用，使用本地摘要生成安全草稿。",
+        detail: state.kimiApiEnabled ? "正在调用服务端 Kimi API，输出只作为计划文本，不直接执行本地操作。" : "Kimi API 未配置，使用本地摘要生成安全草稿。",
       },
     ],
     "Kimi 正在规划",
@@ -1364,10 +1417,10 @@ async function generatePlan(options = {}) {
     },
     {
       state: "running",
-      title: state.kimiCliPlanEnabled ? "正在调用 Kimi CLI 生成计划" : "Kimi CLI 未启用，使用本地摘要生成安全草稿",
+      title: state.kimiApiEnabled ? "正在调用 Kimi API 生成计划" : "Kimi API 未配置，使用本地摘要生成安全草稿",
     },
   ]);
-  const kimiPlan = await tryKimiCliPlan(prompt, summary);
+  const kimiPlan = await tryKimiApiPlan(prompt, summary);
   state.lastRun = kimiPlan.runId
     ? {
         id: kimiPlan.runId,
@@ -1390,12 +1443,12 @@ async function generatePlan(options = {}) {
         `- 指令: ${prompt}`,
         `- 工作区: ${state.workspace}`,
         `- 来源摘要: ${summary}`,
-        `- Kimi CLI: ${kimiPlan.used ? `已接入，耗时 ${kimiPlan.durationMs}ms` : kimiPlan.failed ? "调用失败，已安全降级" : "未使用，安全降级"}`,
+        `- Kimi API: ${kimiPlan.used ? `已接入，耗时 ${kimiPlan.durationMs}ms` : kimiPlan.failed ? "调用失败，已安全降级" : "未使用，安全降级"}`,
         `- Run ID: ${kimiPlan.runId || "local-fallback"}`,
         `- Run 记录: ${kimiPlan.runPath ? kimiPlan.runPath.replace(state.workspace, ".") : "未生成"}`,
         `- 生成时间: ${now.toISOString()}`,
         "",
-        "## Kimi CLI 计划",
+        "## Kimi API 计划",
         "",
         kimiPlan.text,
         "",
@@ -1414,14 +1467,14 @@ async function generatePlan(options = {}) {
   renderOperations(preview.operations);
   setArtifact(
     kimiPlan.used
-      ? `已读取本地内容：${summary}；Kimi CLI 已生成计划，运行记录 ${shortRunId(kimiPlan.runId)}。`
+      ? `已读取本地内容：${summary}；Kimi API 已生成计划，运行记录 ${shortRunId(kimiPlan.runId)}。`
       : `已读取本地内容：${summary}`,
     outputPath.replace(state.workspace, "."),
   );
   if (kimiPlan.used) {
-    setRunChip(`Kimi CLI · ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs}ms`, "ready");
+    setRunChip(`Kimi API · ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs}ms`, "ready");
   } else if (kimiPlan.failed) {
-    setRunChip(`Kimi CLI 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
+    setRunChip(`Kimi API 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
   }
   addProgressLines(taskMessage, [
     {
@@ -1562,6 +1615,9 @@ async function approvePlan() {
     ],
     "执行完成",
   );
+  await loadArtifactCatalog().catch(() => {
+    // Artifact catalog refresh is best-effort after apply.
+  });
   setStatus("已在本机执行");
 }
 
@@ -1586,13 +1642,14 @@ async function loadHostWorkspace() {
   try {
     const workspace = await getJson("/api/workspace");
     state.workspace = workspace.trustedRoot;
-    state.kimiCliPlanEnabled = workspace.kimiCli?.planEnabled === true || workspace.kimiCli?.chatEnabled === true;
-    setRunChip(state.kimiCliPlanEnabled ? "Kimi CLI 计划已启用" : "Kimi CLI 未启用", state.kimiCliPlanEnabled ? "ready" : "muted");
+    state.kimiApiEnabled = workspace.kimiApi?.planEnabled === true || workspace.kimiApi?.chatEnabled === true;
+    setRunChip(state.kimiApiEnabled ? "Kimi API 已接入" : "Kimi API 未配置", state.kimiApiEnabled ? "ready" : "muted");
     workspacePath.textContent = state.workspace;
 
     await refreshWorkspaceTree();
     await loadRecipes();
     await refreshRunCards();
+    await loadArtifactCatalog();
     setStatus("本地 Agent 就绪");
   } catch (error) {
     setStatus("Host API 离线");
@@ -1730,6 +1787,12 @@ approveButton.addEventListener("click", () => {
 runRefreshButton?.addEventListener("click", () => {
   refreshRunCards().catch(() => {
     // refreshRunCards owns the visible error state.
+  });
+});
+
+artifactRefreshButton?.addEventListener("click", () => {
+  loadArtifactCatalog().catch((error) => {
+    setArtifact(`产物列表暂不可用：${error.message}`);
   });
 });
 

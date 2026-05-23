@@ -3,30 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createSqliteDatabase } from '../storage/sqlite.js';
 
-// Zero-dep, file-backed runs index. Repository-shaped so it can be swapped
-// for a SQLite or Postgres adapter later without touching call sites.
-//
-// Storage layout under <indexRoot>:
-//   index.jsonl  — append-only event log (one JSON event per line)
-//   id.txt       — monotonic ULID-like counter persisted between restarts
-//
-// The current in-memory state is a Map<id, RunIndexRecord> rebuilt at boot
-// by replaying index.jsonl. Reads go through the Map; writes append + update.
-//
-// Each event row schema:
-//   { ts, tenantId, userId, traceId, id, op, ...fields }
-//   op ∈ { 'upsert', 'delete' }
-
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const ID_PREFIX = 'run';
 
 function pickAlphabet(byte) {
-  // Map a random byte into the Crockford base32 alphabet by masking lower 5 bits.
   return ULID_ALPHABET[byte & 0x1f];
 }
 
 function timestampPart(ms) {
-  // 10 chars base32 representation of milliseconds since epoch.
   let value = BigInt(ms);
   const base = BigInt(32);
   const out = new Array(10);

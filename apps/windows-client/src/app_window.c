@@ -1492,7 +1492,7 @@ static LRESULT CALLBACK kcw_window_proc(HWND window, UINT message, WPARAM wparam
                 L"Developer Mode\r\n\r\n"
                 L"- Kimi API：默认模型 Provider\r\n"
                 L"- OpenAI-compatible：可配置 base URL / model / API key\r\n"
-                L"- Kimi CLI / Kimi WebBridge：后续作为高级用户能力接入\r\n"
+                L"- Kimi API Gateway / WebBridge：后续作为高级用户能力接入\r\n"
                 L"- Shell、MCP、插件、脚本执行默认关闭，必须单独审批\r\n");
             kcw_set_status(L"Developer Mode 面板已打开。");
             InvalidateRect(window, NULL, TRUE);

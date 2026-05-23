@@ -1,0 +1,13 @@
+import { createServer } from './src/server.js';
+import { makeTestWorkspace } from './test/test-fixtures.js';
+const trustedRoot = makeTestWorkspace('kcw-dbg-del');
+const server = createServer({ trustedRoot });
+await new Promise((r) => server.listen(0,'127.0.0.1',r));
+const base = `http://127.0.0.1:${server.address().port}`;
+const reg = await (await fetch(`${base}/api/auth/register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'zoe',password:'passw0rd'})})).json();
+const auth = { authorization:`Bearer ${reg.token}`, 'content-type':'application/json' };
+await fetch(`${base}/api/conversations/c1`,{method:'PUT',headers:auth,body:JSON.stringify({title:'t',messages:[]})});
+const del = await fetch(`${base}/api/conversations/c1`,{method:'DELETE',headers:auth});
+console.log('DELETE status', del.status);
+console.log('DELETE body', await del.text());
+await new Promise((r)=>server.close(r));

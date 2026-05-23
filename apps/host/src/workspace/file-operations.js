@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 
 function normalizeOp(op) {
   if (!op || typeof op !== 'object') {
@@ -44,7 +44,9 @@ function pathExists(p) {
 }
 
 function previewWrite(op, trustedRoot) {
-  const target = assertTrustedPath(path.resolve(op.path), trustedRoot);
+  // Create-aware: a write target may not exist yet, so resolve the real parent
+  // (defeats junction/symlink escape).
+  const target = assertTrustedPathForCreate(path.resolve(op.path), trustedRoot);
   const content = operationContentBuffer(op);
   const overwrite = op.overwrite === true;
   const beforeExists = fileExists(target);
@@ -66,7 +68,7 @@ function previewWrite(op, trustedRoot) {
 function previewRename(op, trustedRoot) {
   const source = assertTrustedPath(path.resolve(op.path), trustedRoot);
   const base = path.dirname(source);
-  const target = assertTrustedPath(path.resolve(base, op.newName), trustedRoot);
+  const target = assertTrustedPathForCreate(path.resolve(base, op.newName), trustedRoot);
   if (source === target) {
     throw new Error(`Rename target equals source: ${source}`);
   }
@@ -88,7 +90,7 @@ function previewRename(op, trustedRoot) {
 
 function previewMove(op, trustedRoot) {
   const source = assertTrustedPath(path.resolve(op.from), trustedRoot);
-  const target = assertTrustedPath(path.resolve(op.to), trustedRoot);
+  const target = assertTrustedPathForCreate(path.resolve(op.to), trustedRoot);
   if (source === target) {
     throw new Error(`Move target equals source: ${source}`);
   }

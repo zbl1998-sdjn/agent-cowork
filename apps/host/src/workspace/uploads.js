@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertTrustedPathForCreate } from '../security/path-policy.js';
 
 const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_TOTAL_BYTES = 12 * 1024 * 1024;
@@ -23,6 +23,14 @@ function cleanPathPart(part) {
   return value;
 }
 
+// Active-content extensions that could execute or run script if later opened by
+// the user from the workspace. Uploads are data, not programs — reject these.
+const BLOCKED_UPLOAD_EXTENSIONS = new Set([
+  '.exe', '.com', '.scr', '.msi', '.bat', '.cmd', '.ps1', '.psm1', '.vbs', '.vbe',
+  '.js', '.jse', '.wsf', '.wsh', '.hta', '.jar', '.lnk', '.reg', '.dll', '.sh',
+  '.html', '.htm', '.svg', '.xhtml', '.mht', '.mhtml',
+]);
+
 export function sanitizeUploadRelativePath(input) {
   const raw = String(input || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!raw || path.isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) {
@@ -31,6 +39,10 @@ export function sanitizeUploadRelativePath(input) {
   const parts = raw.split('/').filter(Boolean).map(cleanPathPart);
   if (parts.length === 0) {
     throw new Error('Upload relativePath is required');
+  }
+  const ext = path.extname(parts[parts.length - 1]).toLowerCase();
+  if (BLOCKED_UPLOAD_EXTENSIONS.has(ext)) {
+    throw new Error(`Upload type not allowed: ${ext} (active content is blocked)`);
   }
   return parts.join(path.sep);
 }
@@ -68,7 +80,7 @@ export function importUploadedFiles({
   }
 
   const safeRoot = path.resolve(trustedRoot);
-  const uploadRoot = assertTrustedPath(path.join(safeRoot, 'Kimi_Cowork上传', batchId), safeRoot);
+  const uploadRoot = assertTrustedPathForCreate(path.join(safeRoot, 'Kimi_Cowork上传', batchId), safeRoot);
   let totalBytes = 0;
   const imported = [];
 
@@ -83,7 +95,7 @@ export function importUploadedFiles({
       throw new Error(`Upload batch is too large; max ${maxTotalBytes} bytes`);
     }
 
-    const targetPath = assertTrustedPath(path.join(uploadRoot, relativePath), safeRoot);
+    const targetPath = assertTrustedPathForCreate(path.join(uploadRoot, relativePath), safeRoot);
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.writeFileSync(targetPath, content);
     imported.push({

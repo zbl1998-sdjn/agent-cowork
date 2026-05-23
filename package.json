@@ -17,13 +17,17 @@
     "smoke:host": "node scripts/smoke-local-operations.mjs",
     "smoke:live-mvp": "node scripts/smoke-live-mvp.mjs",
     "smoke:mvp-runtime": "node scripts/smoke-mvp-runtime.mjs",
-    "smoke:kimi-cli": "node scripts/smoke-kimi-cli.mjs",
+    "smoke:kimi-api": "node scripts/smoke-kimi-api.mjs",
     "smoke:tauri-scaffold": "node scripts/smoke-tauri-scaffold.mjs",
     "smoke:rendered-ui": "node scripts/smoke-rendered-ui.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:ui": "node scripts/smoke-ui-contract.mjs",
-    "test": "node --test",
-    "test:isolated": "node --test"
+    "test": "npm run test:host && npm run test:ui",
+    "test:isolated": "cd apps/host && node --test",
+    "build:ui": "node scripts/build-ui.mjs",
+    "build:ui:fresh": "node scripts/build-ui.mjs --install",
+    "test:host": "cd apps/host && node --test --test-isolation=process --test-timeout=60000 --import ../../test-setup.mjs \"test/*.test.js\"",
+    "test:ui": "npm --prefix apps/windows-client/ui run test"
   },
   "engines": {
     "node": ">=20"

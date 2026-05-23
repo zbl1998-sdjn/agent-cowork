@@ -292,7 +292,7 @@ async function main() {
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
-    const planTimeoutMs = runtime.kimiCliPlanEnabled ? 90_000 : 5000;
+    const planTimeoutMs = runtime.kimiApiPlanEnabled ? 90_000 : 5000;
     const interaction = await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {

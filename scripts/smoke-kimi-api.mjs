@@ -53,8 +53,11 @@ async function main() {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.dirname(scriptDir);
   const buildDir = path.join(repoRoot, 'build');
-  const workspace = path.join(buildDir, 'kimi-cli-smoke-workspace');
-  const reportPath = path.join(buildDir, 'kimi-cli-smoke-report.json');
+  const workspace = path.join(buildDir, 'kimi-api-smoke-workspace');
+  const reportPath = path.join(buildDir, 'kimi-api-smoke-report.json');
+  const apiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
+
+  assert(apiKey, 'Set KIMI_API_KEY or MOONSHOT_API_KEY before running smoke:kimi-api');
 
   fs.mkdirSync(workspace, { recursive: true });
   fs.writeFileSync(
@@ -65,10 +68,10 @@ async function main() {
 
   const server = createServer({
     trustedRoot: workspace,
-    kimiExecutable: process.env.KIMI_CLI || 'kimi',
-    enableKimiCliPlan: true,
-    kimiCliTimeoutMs: Number(process.env.KIMI_CLI_TIMEOUT_MS || 90_000),
-    kimiCliMaxSteps: Number(process.env.KIMI_CLI_MAX_STEPS || 10),
+    kimiApiKey: apiKey,
+    kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+    kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
+    kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
     kimiModel: process.env.KIMI_MODEL,
     staticRoot: false,
   });
@@ -89,17 +92,18 @@ async function main() {
       prompt: '基于摘要输出三条中文整理建议。不要修改文件，不要运行命令。',
     });
 
-    assert(plan.ok === true, 'Kimi CLI smoke did not return ok=true');
-    assert(plan.provider === 'kimi-cli', 'Kimi CLI smoke returned unexpected provider');
-    assert(typeof plan.text === 'string' && plan.text.length > 8, 'Kimi CLI smoke returned empty text');
-    assert(/^run_/.test(plan.runId || ''), 'Kimi CLI smoke did not return a run id');
-    assert(fs.existsSync(plan.runPath), 'Kimi CLI smoke did not persist a run record');
+    assert(plan.ok === true, 'Kimi API smoke did not return ok=true');
+    assert(plan.provider === 'kimi-api', 'Kimi API smoke returned unexpected provider');
+    assert(typeof plan.text === 'string' && plan.text.length > 8, 'Kimi API smoke returned empty text');
+    assert(/^run_/.test(plan.runId || ''), 'Kimi API smoke did not return a run id');
+    assert(fs.existsSync(plan.runPath), 'Kimi API smoke did not persist a run record');
 
     const report = {
       ok: true,
       generatedAt: new Date().toISOString(),
       workspace,
-      command: process.env.KIMI_CLI || 'kimi',
+      baseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL || 'https://api.moonshot.ai/v1',
+      model: process.env.KIMI_MODEL || 'kimi-k2.6',
       durationMs: plan.durationMs,
       runId: plan.runId,
       runPath: plan.runPath,

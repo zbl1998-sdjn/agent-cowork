@@ -6,14 +6,13 @@ import { getSessionPath } from './storage/app-home.js';
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3001);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || process.cwd());
-const enableKimiCliPlan = process.env.ENABLE_KIMI_CLI_PLAN === '1';
 
 const server = createServer({
   trustedRoot,
-  kimiExecutable: process.env.KIMI_CLI || 'kimi',
-  enableKimiCliPlan,
-  kimiCliTimeoutMs: Number(process.env.KIMI_CLI_TIMEOUT_MS || 60_000),
-  kimiCliMaxSteps: Number(process.env.KIMI_CLI_MAX_STEPS || 10),
+  kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
+  kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+  kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),
+  kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
   kimiModel: process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(
     path.join(getSessionPath('default'), 'events.jsonl'),
@@ -39,8 +38,17 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-process.once('SIGINT', () => {
-  server.close(() => {
-    process.exit(0);
-  });
-});
+// Graceful shutdown: drain in-flight SSE / abort runs / close MCP, then exit.
+let shuttingDown = false;
+function gracefulExit() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const done = () => process.exit(0);
+  if (typeof server.shutdown === 'function') {
+    server.shutdown({ timeoutMs: 10000 }).then(done, done);
+  } else {
+    server.close(done);
+  }
+}
+process.once('SIGINT', gracefulExit);
+process.once('SIGTERM', gracefulExit);

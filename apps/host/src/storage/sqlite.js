@@ -32,22 +32,6 @@ function listMigrationFiles(dir = migrationsDir) {
     .map((name) => path.join(dir, name));
 }
 
-function runSqliteTransaction(db, fn) {
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const result = fn();
-    db.exec('COMMIT');
-    return result;
-  } catch (err) {
-    try {
-      db.exec('ROLLBACK');
-    } catch {
-      // Prefer the original migration error.
-    }
-    throw err;
-  }
-}
-
 export function openSqliteDatabase(dbPath) {
   if (!dbPath || typeof dbPath !== 'string') {
     throw new Error('SQLite dbPath is required');
@@ -55,7 +39,17 @@ export function openSqliteDatabase(dbPath) {
   ensureDirSync(path.dirname(dbPath));
   const Database = loadDatabaseSync();
   const db = new Database(dbPath);
+  // foreign_keys: integrity. WAL: concurrent readers + a single writer don't
+  // block each other (much better under load). busy_timeout: wait instead of
+  // immediately throwing SQLITE_BUSY when another connection holds the lock.
   db.exec('PRAGMA foreign_keys = ON');
+  try {
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.exec('PRAGMA synchronous = NORMAL');
+  } catch {
+    // Some VFS/backends don't support WAL — degrade gracefully to defaults.
+  }
   return db;
 }
 
@@ -79,11 +73,19 @@ export function migrateSqliteDatabase(db, { migrationsPath = migrationsDir } = {
     if (hasMigration.get(id)) {
       continue;
     }
-    const migrationSql = fs.readFileSync(file, 'utf8');
-    runSqliteTransaction(db, () => {
-      db.exec(migrationSql);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(fs.readFileSync(file, 'utf8'));
       insertMigration.run(id, new Date().toISOString());
-    });
+      db.exec('COMMIT');
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // ignore rollback failure; original error is more useful
+      }
+      throw err;
+    }
   }
   return db;
 }

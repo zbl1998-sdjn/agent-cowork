@@ -16,8 +16,8 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
 
   const config = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8'));
   assert.equal(config.productName, 'Kimi Cowork');
-  assert.equal(config.build.devUrl, 'http://127.0.0.1:3017');
-  assert.equal(config.build.frontendDist, '../resources');
+  assert.equal(config.build.devUrl, 'http://127.0.0.1:5173');
+  assert.equal(config.build.frontendDist, '../ui-dist');
   assert.equal(config.app.windows[0].label, 'main');
   assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
@@ -31,23 +31,36 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   assert.match(cargoToml, /tauri-plugin-opener/);
   assert.match(cargoToml, /tauri-plugin-notification/);
 
-  const lib = fs.readFileSync(path.join(tauriRoot, 'src', 'lib.rs'), 'utf8');
+  // The shell is modular: integration points live across src/*.rs, so scan the
+  // whole crate source rather than assuming everything sits in lib.rs.
+  const srcDir = path.join(tauriRoot, 'src');
+  const rust = fs
+    .readdirSync(srcDir)
+    .filter((name) => name.endsWith('.rs'))
+    .map((name) => fs.readFileSync(path.join(srcDir, name), 'utf8'))
+    .join('\n');
   for (const symbol of [
     'start_node_host',
     'host_status',
     'open_path',
-    '.sidecar("binaries/kimi-cowork-host")',
+    '.sidecar(',
+    'binaries/kimi-cowork-host',
     'tauri_plugin_shell::init()',
     'tauri_plugin_opener::init()',
     'tauri_plugin_notification::init()',
     'assert_trusted_path',
   ]) {
-    assert.ok(lib.includes(symbol), `missing ${symbol}`);
+    assert.ok(rust.includes(symbol), `missing ${symbol}`);
   }
-  assert.equal(lib.includes('Command::new("node")'), false, 'packaged Tauri app must use sidecar instead of PATH node');
+  assert.equal(rust.includes('Command::new("node")'), false, 'packaged Tauri app must use sidecar instead of PATH node');
 
   const capability = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8'));
-  assert.ok(capability.permissions.includes('opener:default'));
+  // Hardened: the broad opener:default / shell:allow-open / shell:default grants
+  // are intentionally NOT present (they would let the webview open arbitrary
+  // paths/URLs or shell out). The "safe opener" is the custom open_path command
+  // above, which validates against the trusted root via assert_trusted_path.
+  assert.equal(capability.permissions.includes('opener:default'), false);
+  assert.equal(capability.permissions.includes('shell:default'), false);
   assert.equal(capability.permissions.includes('shell:allow-open'), false);
   assert.ok(capability.permissions.some((permission) => (
     permission.identifier === 'shell:allow-execute'

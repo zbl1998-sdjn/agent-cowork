@@ -39,7 +39,7 @@ grep -nP "\xEF\xBF\xBD" apps/windows-client/resources/app.js   # 应无输出
 ## 2. 已落地模块速查 (别重复造)
 
 后端 (`apps/host/src/`):
-- `memory/memory-store.js` — MEMORY.md 系统; 路由 `/api/memory`, `/api/memory/facts`, `/api/memory/notes[/<name>]`。Kimi CLI plan/chat 调用前注入。
+- `memory/memory-store.js` — MEMORY.md 系统; 路由 `/api/memory`, `/api/memory/facts`, `/api/memory/notes[/<name>]`。Kimi API plan/chat 调用前注入。
 - `runtime/runs-index.js` — `RunsIndex` (JSONL append-only + 内存重放 + `createUlid()`); 路由 `/api/runs/index`。Repository 形态。
 - `runtime/cron.js` + `runtime/scheduler.js` — 零依赖 cron + 调度器; 路由 `/api/schedules` CRUD + `_tick`。默认 executor 已接 `runRecipe`。
 - `runtime/run-events.js` — `RunEventBus` (seq + ring buffer + Last-Event-ID); 路由 `GET /api/runs/:id/events` (SSE)。

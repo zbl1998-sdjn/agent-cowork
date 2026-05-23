@@ -1,0 +1,7 @@
+{
+  "main": "dist/host-bundle.cjs",
+  "output": "dist/host.blob",
+  "disableExperimentalSEAWarning": true,
+  "useSnapshot": false,
+  "useCodeCache": false
+}

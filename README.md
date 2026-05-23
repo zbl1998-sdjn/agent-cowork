@@ -7,7 +7,7 @@
 - 文本文件读取与上下文打包
 - 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
 - 可控命令运行（默认关闭）
-- Kimi CLI 对话 / 计划运行记录（`.KimiCowork/runs/*.json`）
+- Kimi API 对话 / 计划运行记录（`.KimiCowork/runs/*.json`）
 - Cowork 执行动态信息流（用户指令、读取上下文、Kimi 计划、等待审批、执行完成）
 - 前台任务卡片（最近 Kimi run、状态、耗时、点击查看 run 详情）
 - 最小 HTTP API
@@ -36,7 +36,7 @@ npm run verify:windows-readiness
 npm run audit:mvp
 npm run smoke:rendered-ui
 npm run smoke:windows-resources
-npm run smoke:kimi-cli
+npm run smoke:kimi-api
 npm run smoke:mvp-runtime
 npm run smoke:ui
 npm run smoke:host
@@ -47,7 +47,7 @@ npm run smoke:host
 `npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，确认前台任务卡片显示最新 Cowork run，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `KimiCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
-`npm run smoke:kimi-cli` 会启动一个临时 Host API，真实调用本机 Kimi CLI 的 `--print --final-message-only` 模式，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖本机已登录 Kimi CLI 和可用网络，不放进默认 `verify:mvp` 的运行项。
+`npm run smoke:kimi-api` 会启动一个临时 Host API，真实调用 Kimi/Moonshot OpenAI-compatible API，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖 `KIMI_API_KEY` 或 `MOONSHOT_API_KEY` 和可用网络，不放进默认 `verify:mvp` 的运行项。
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。
 `npm run smoke:host` 会启动本地 host API，验证前端入口、默认工作区 API、文件树、文件读取、上下文打包、write / rename / move preview、审批 apply、目标已存在阻止和 JSONL 审计。
 `npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke、MVP runtime smoke、UI contract smoke 和 rendered browser smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
@@ -58,15 +58,16 @@ npm run smoke:host
 
 启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Kimi Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.KimiCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
-Kimi CLI 计划生成功能默认关闭，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时优先调用本机 Kimi CLI：
+Kimi API 计划生成功能默认只在配置服务端 API key 后启用，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时调用 Kimi API：
 
 ```powershell
-$env:ENABLE_KIMI_CLI_PLAN = "1"
-$env:KIMI_CLI = "C:\Users\Administrator\.local\bin\kimi.exe"
+$env:KIMI_API_KEY = "<your-kimi-api-key>"
+$env:KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+$env:KIMI_MODEL = "kimi-k2.6"
 npm run start:mvp
 ```
 
-后端接口是 `POST /api/kimi/chat` 和 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并使用 `--print --final-message-only` 生成文本回复或计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`。当前 UI 的主发送入口使用 `/api/kimi/plan` 创建 Cowork 任务，`/api/kimi/chat` 保留给直接对话 API 和后续更细的聊天视图。审批执行仍走本地 `file-ops/apply`。
+后端接口是 `POST /api/kimi/chat` 和 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并由服务端通过 OpenAI-compatible `POST /chat/completions` 生成文本回复或计划；每次调用都会生成 `runId`、`runPath` 并写入 `.KimiCowork/runs/`。当前 UI 的主发送入口使用 `/api/kimi/plan` 创建 Cowork 任务，`/api/kimi/chat` 保留给直接对话 API 和后续更细的聊天视图。审批执行仍走本地 `file-ops/apply`，API key 不会暴露给前端。
 
 前端“任务卡片”直接读取 `GET /api/runs`，展示最近 run 的类型、状态、耗时和短 ID；点击卡片会读取 `GET /api/runs/<runId>`，把输入摘要、Kimi 输出或错误展开到执行动态区域。
 

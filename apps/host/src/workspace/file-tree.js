@@ -18,11 +18,16 @@ export function listWorkspaceTree(trustedRoot, options = {}) {
   const root = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
   const includeFiles = options.includeFiles !== false;
   const includeDirs = options.includeDirectories !== false;
+  // Bound the traversal so a huge/deep workspace can't exhaust memory or hang the
+  // UI (the listing is unbounded otherwise). Caller-overridable, hard-capped.
+  const maxDepth = Math.min(Math.max(1, Number(options.maxDepth ?? 8)), 20);
+  const maxEntries = Math.min(Math.max(1, Number(options.maxEntries ?? 5000)), 20000);
   const results = [];
 
   const stack = [{ absPath: root, depth: 0 }];
 
   while (stack.length > 0) {
+    if (results.length >= maxEntries) break;
     const { absPath, depth } = stack.pop();
     const stat = fs.statSync(absPath);
     if (!stat.isDirectory()) {
@@ -50,13 +55,14 @@ export function listWorkspaceTree(trustedRoot, options = {}) {
       }
 
       if (entry.isDirectory()) {
-        stack.push({ absPath: next, depth: depth + 1 });
+        if (depth + 1 <= maxDepth) stack.push({ absPath: next, depth: depth + 1 });
         continue;
       }
 
       if (!includeFiles || !entry.isFile()) {
         continue;
       }
+      if (results.length >= maxEntries) break;
 
       try {
         const fileStat = fs.statSync(next);

@@ -1,20 +1,53 @@
 import http from 'node:http';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { detectKimiInfo } from './kimi/cli-detect.js';
-import { runKimiCliChat, runKimiCliPlan } from './kimi/cli-runner.js';
+import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from './kimi/api-runner.js';
+import { streamChat } from './kimi/chat-stream.js';
+import { streamAgentChat, modelBreakerStats } from './kimi/agent-runner.js';
 import { createRunId, writeRunRecord } from './runtime/run-store.js';
 import { createRunsIndex, summariseRunForIndex } from './runtime/runs-index.js';
+import { createPostgresRunsIndex, withSafeWrites } from './storage/postgres-runs-index.js';
 import { Scheduler, createScheduleStore } from './runtime/scheduler.js';
 import { RunEventBus } from './runtime/run-events.js';
 import { runRecipe } from './recipes/run-recipe.js';
 import { createMemoryStore } from './memory/memory-store.js';
 import { assertTrustedPath } from './security/path-policy.js';
 import { handleMemoryRoutes } from './routes/memory-routes.js';
+import { createConversationStore } from './storage/conversation-store.js';
+import { createPostgresConversationStore } from './storage/postgres-conversation-store.js';
+import { handleConversationRoutes } from './routes/conversation-routes.js';
 import { handleRunRoutes } from './routes/run-routes.js';
 import { handleRecipeRoutes } from './routes/recipe-routes.js';
 import { handleScheduleRoutes } from './routes/schedule-routes.js';
 import { handleWorkspaceFileRoutes } from './routes/workspace-file-routes.js';
+import { handleArtifactRoutes } from './routes/artifact-routes.js';
+import { handleSandboxRoutes } from './routes/sandbox-routes.js';
+import { handleToolRoutes } from './routes/tool-routes.js';
+import { handleVizRoutes } from './routes/viz-routes.js';
+import { createSandbox, DEFAULT_ALLOW_TOOLS } from './sandbox/index.js';
+import { createToolRegistry } from './tools/tool-registry.js';
+import { createBuiltinTools } from './tools/builtin-tools.js';
+import { connectMcpServers, closeMcpClients } from './mcp/connect.js';
+import { createSkillRegistry } from './skills/skill-registry.js';
+import { createCancellationRegistry } from './runtime/cancellation.js';
+import { resolveJwtIdentity } from './auth/jwt.js';
+import { createPostgresApprovalStore } from './storage/postgres-approvals.js';
+import { createPostgresEventBus } from './storage/postgres-event-bus.js';
+import { createPostgresMemoryStore } from './storage/postgres-memory-store.js';
+import { createCachedPostgresScheduleStore } from './storage/cached-pg-schedule-store.js';
+import { createConcurrencyLimiter } from './runtime/concurrency.js';
+import { createRateLimiter } from './runtime/rate-limit.js';
+import { redactText } from './security/redaction.js';
+import { createApprovalRegistry } from './runtime/approvals.js';
+import { handleSkillRoutes } from './routes/skill-routes.js';
+import { handlePlanRoutes } from './routes/plan-routes.js';
+import { createClarificationStore } from './runtime/clarifications.js';
+import { handleClarifyRoutes } from './routes/clarify-routes.js';
+import { handleConnectorRoutes } from './routes/connector-routes.js';
+import { createUserStore } from './auth/user-store.js';
+import { createSqliteUserStore } from './auth/sqlite-user-store.js';
+import { handleAuthRoutes } from './routes/auth-routes.js';
 import {
   createRequestContext,
   headerValue,
@@ -22,8 +55,29 @@ import {
   requiresOriginCheck,
   sendFile,
   sendJson,
+  stableHeader,
   withJsonBody,
 } from './http/request-utils.js';
+
+// Hardening headers sent on every response (see security probe findings).
+const SECURITY_HEADERS = Object.freeze({
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+});
+
+// The only /api routes reachable without a verified identity. Everything else is
+// gated by the auth check (see requireAuth). /health is exempt as it's not /api.
+const PUBLIC_API_ROUTES = [
+  ['POST', '/api/auth/register'],
+  ['POST', '/api/auth/login'],
+  ['POST', '/api/auth/guest'],
+];
+function isPublicApiRoute(method, pathname) {
+  return PUBLIC_API_ROUTES.some(([m, p]) => m === method && p === pathname);
+}
 
 const hostSrcDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultStaticRoot = path.resolve(hostSrcDir, '../../windows-client/resources');
@@ -38,31 +92,167 @@ const staticFiles = new Map([
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
 ]);
 
+function applyPersistedKimiConfig(file, target) {
+  try {
+    if (!fs.existsSync(file)) return;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const kimi = raw && typeof raw === 'object' ? (raw.kimiApi || raw.kimi || raw) : null;
+    if (!kimi || typeof kimi !== 'object') return;
+    if (typeof kimi.apiKey === 'string' && kimi.apiKey.trim()) target.apiKey = kimi.apiKey.trim();
+    if (typeof kimi.baseUrl === 'string' && kimi.baseUrl.trim()) target.baseUrl = kimi.baseUrl.trim().replace(/\/+$/, '');
+    if (typeof kimi.model === 'string' && kimi.model.trim()) target.model = kimi.model.trim();
+    target.configured = Boolean(target.apiKey);
+  } catch {
+    // Corrupt config file -> ignore and fall back to env-derived config.
+  }
+}
+
+function persistKimiConfig(file, source) {
+  const payload = {
+    kimiApi: {
+      apiKey: source.apiKey || '',
+      baseUrl: source.baseUrl || '',
+      model: source.model || '',
+    },
+  };
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2), 'utf8');
+}
+
 export function createServer(config = {}) {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
   const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot);
-  const kimiCliPlanEnabled = config.enableKimiCliPlan === true;
-  const kimiPlanRunner = config.kimiPlanRunner || runKimiCliPlan;
-  const kimiChatRunner = config.kimiChatRunner || runKimiCliChat;
+  // Prefer the built React UI (single conversational flow) when present; the
+  // legacy multi-mode static UI under resources/ is deprecated and only used as
+  // a fallback until ui-dist is built.
+  const uiDistRoot = path.resolve(config.uiDistRoot || path.join(hostSrcDir, '../../windows-client/ui-dist'));
+  const uiDistEnabled = config.uiDist !== false && fs.existsSync(path.join(uiDistRoot, 'index.html'));
+  const UI_DIST_TYPES = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.map': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.ico': 'image/x-icon',
+    '.woff2': 'font/woff2',
+    '.txt': 'text/plain; charset=utf-8',
+  };
+  function serveFromUiDist(response, pathname) {
+    const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    const candidate = path.resolve(uiDistRoot, rel);
+    const inside = candidate === uiDistRoot || candidate.startsWith(uiDistRoot + path.sep);
+    if (!inside) {
+      return false;
+    }
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      sendFile(response, candidate, UI_DIST_TYPES[path.extname(candidate).toLowerCase()] || 'application/octet-stream');
+      return true;
+    }
+    // SPA fallback: a route with no file extension -> serve index.html.
+    if (!path.extname(rel)) {
+      sendFile(response, path.join(uiDistRoot, 'index.html'), 'text/html; charset=utf-8');
+      return true;
+    }
+    return false;
+  }
+  const kimiConfigFile = path.resolve(
+    config.kimiConfigFile || path.join(trustedRootDefault, '.KimiCowork', 'config.json'),
+  );
+  const kimiApiConfig = resolveKimiApiConfig(config);
+  // Persisted overrides (.KimiCowork/config.json) win over env so a key entered
+  // via the API settings panel survives restarts.
+  applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
+  function recomputeKimiEnabled() {
+    return config.enableKimiApi !== false
+      && (kimiApiConfig.configured || Boolean(config.kimiPlanRunner) || Boolean(config.kimiChatRunner));
+  }
+  let kimiApiEnabled = recomputeKimiEnabled();
+  const kimiPlanRunner = config.kimiPlanRunner || runKimiApiPlan;
+  const kimiChatRunner = config.kimiChatRunner || runKimiApiChat;
+  const kimiChatStreamRunner = config.kimiChatStreamRunner || runKimiApiChatStream;
   const runStoreRoot = path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.KimiCowork', 'runs'));
   const idempotencyStore = config.idempotencyStore || new Map();
   const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.KimiCowork', 'index'));
-  const storeBackend = String(config.storeBackend || process.env.KCW_STORE || 'file').toLowerCase() === 'sqlite'
-    ? 'sqlite'
-    : 'file';
+  const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'file').toLowerCase();
+  const storeBackend = storeRaw === 'sqlite' ? 'sqlite' : storeRaw === 'postgres' ? 'postgres' : 'file';
+  const databaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
+  const usePostgresState = storeBackend === 'postgres' && !!databaseUrl;
   const sqliteDbPath = path.resolve(
     config.sqliteDbPath || process.env.KCW_SQLITE_PATH || path.join(trustedRootDefault, '.KimiCowork', 'state.sqlite'),
   );
-  const runsIndex = config.runsIndex || createRunsIndex({
-    backend: storeBackend,
-    indexRoot: runsIndexRoot,
-    dbPath: sqliteDbPath,
+  const runsIndex = config.runsIndex || (storeBackend === 'postgres'
+    ? withSafeWrites(createPostgresRunsIndex({ connectionString: databaseUrl }))
+    : createRunsIndex({ backend: storeBackend, indexRoot: runsIndexRoot, dbPath: sqliteDbPath }));
+  const memoryStore = config.memoryStore || (usePostgresState
+    ? createPostgresMemoryStore({ connectionString: databaseUrl })
+    : createMemoryStore({ backend: storeBackend, dbPath: sqliteDbPath }));
+  const conversationStore = config.conversationStore || (usePostgresState
+    ? createPostgresConversationStore({ connectionString: databaseUrl })
+    : createConversationStore({ backend: storeBackend }));
+  const runEvents = config.runEventBus || (usePostgresState ? createPostgresEventBus({ connectionString: databaseUrl }) : new RunEventBus());
+  const sandboxEnabled = config.enableSandbox !== false;
+  const sandbox = config.sandbox || createSandbox({
+    backend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'local',
+    ...(config.sandboxOptions || {}),
   });
-  const memoryStore = config.memoryStore || createMemoryStore({
-    backend: storeBackend,
-    dbPath: sqliteDbPath,
+  const sandboxLimits = {
+    allowTools: config.sandboxAllowTools || DEFAULT_ALLOW_TOOLS,
+    allowEnv: config.sandboxAllowEnv || [],
+    maxTimeoutMs: config.sandboxMaxTimeoutMs,
+    defaultMaxOutputBytes: config.sandboxMaxOutputBytes,
+  };
+  const toolRegistry = config.toolRegistry || createToolRegistry().registerMany(
+    createBuiltinTools({
+      sandbox: sandboxEnabled ? sandbox : null,
+      sandboxLimits,
+      runStoreRoot,
+      runEvents,
+      runsIndex,
+    }),
+  );
+  const skillRegistry = config.skillRegistry || createSkillRegistry();
+  const cancellation = config.cancellation || createCancellationRegistry();
+  const approvalRegistry = config.approvalRegistry || (usePostgresState ? createPostgresApprovalStore({ connectionString: databaseUrl }) : createApprovalRegistry());
+  // Multi-instance (Postgres) mode: open the LISTEN connections so approvals
+  // resolved on a peer instance and run events from peers are delivered here.
+  if (usePostgresState) {
+    if (approvalRegistry && typeof approvalRegistry.start === 'function') Promise.resolve(approvalRegistry.start()).catch(() => {});
+    if (runEvents && typeof runEvents.start === 'function') Promise.resolve(runEvents.start()).catch(() => {});
+  }
+  const agentConcurrency = config.agentConcurrency || createConcurrencyLimiter({
+    maxConcurrent: Number(process.env.KCW_MAX_CONCURRENT_RUNS || 64),
+    maxPerTenant: Number(process.env.KCW_MAX_RUNS_PER_TENANT || 8),
   });
-  const runEvents = config.runEventBus || new RunEventBus();
+  // Per-tenant HTTP rate limiter (requests/sec). Complements agentConcurrency
+  // (which caps simultaneous streams). Set config.rateLimit=false to disable.
+  const rateLimiter = config.rateLimit === false ? null : (config.rateLimiter || createRateLimiter({
+    ratePerSec: Number(config.rateLimitPerSec || process.env.KCW_RATE_PER_SEC || 50),
+    burst: Number(config.rateLimitBurst || process.env.KCW_RATE_BURST || 100),
+  }));
+  let draining = false;
+  const clarifications = config.clarifications || createClarificationStore();
+  // Auth store: persist users/sessions/guest tenants across restarts by default
+  // (SQLite, gracefully degrades to in-memory if node:sqlite is unavailable).
+  // Set config.persistAuth=false / KCW_AUTH_PERSIST=false for ephemeral hosts
+  // and tests that don't want to touch disk.
+  const authDbPath = path.resolve(
+    config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.KimiCowork', 'auth.sqlite'),
+  );
+  const persistAuth = config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false');
+  const authStore = config.authStore || (persistAuth ? createSqliteUserStore({ dbPath: authDbPath }) : createUserStore());
+  const jwtSecret = config.jwtSecret || process.env.KCW_JWT_SECRET || null;
+  // Auth gate (P0): every /api route except the public auth endpoints requires a
+  // verified identity. Default ON; opt out with config.requireAuth=false or
+  // KCW_REQUIRE_AUTH=false (e.g. for functional tests). `trustIdentityHeaders`
+  // (default OFF) re-enables x-tenant-id/x-user-id only behind a trusted proxy.
+  const requireAuth = config.requireAuth ?? (process.env.KCW_REQUIRE_AUTH !== 'false');
+  // Explicit config wins over the env fallback (so a test can force the gate
+  // semantics regardless of the suite-wide KCW_TRUST_IDENTITY_HEADERS preload).
+  const trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');
   const scheduleStoreDir = path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.KimiCowork', 'schedules'));
   const scheduler = config.scheduler || null;
   let activeScheduler = scheduler;
@@ -87,11 +277,9 @@ export function createServer(config = {}) {
     });
     activeScheduler = new Scheduler({
       storeDir: scheduleStoreDir,
-      store: config.scheduleStore || createScheduleStore({
-        backend: storeBackend,
-        storeDir: scheduleStoreDir,
-        dbPath: sqliteDbPath,
-      }),
+      store: config.scheduleStore || (usePostgresState
+        ? createCachedPostgresScheduleStore({ connectionString: databaseUrl })
+        : createScheduleStore({ backend: storeBackend, storeDir: scheduleStoreDir, dbPath: sqliteDbPath })),
       executor: defaultExecutor,
       tickIntervalMs: config.schedulerTickMs || 30_000,
     });
@@ -169,8 +357,9 @@ export function createServer(config = {}) {
     const baseRecord = {
       id: runId,
       type,
-      provider: 'kimi-cli',
-      command: config.kimiExecutable || 'kimi',
+      provider: 'kimi-api',
+      model: kimiApiConfig.model,
+      baseUrl: kimiApiConfig.baseUrl,
       mode,
       trustedRoot,
       startedAt: startedAt.toISOString(),
@@ -193,15 +382,19 @@ export function createServer(config = {}) {
     }
     try {
       const result = await runner({
-        command: baseRecord.command,
         trustedRoot,
         prompt,
         summary,
         mode,
         memory: memoryContext.text,
-        timeoutMs: config.kimiCliTimeoutMs,
-        maxSteps: config.kimiCliMaxSteps,
-        model: config.kimiModel,
+        apiKey: kimiApiConfig.apiKey,
+        baseUrl: kimiApiConfig.baseUrl,
+        timeoutMs: kimiApiConfig.timeoutMs,
+        maxTokens: kimiApiConfig.maxTokens,
+        model: kimiApiConfig.model,
+        userAgent: kimiApiConfig.userAgent,
+        temperature: kimiApiConfig.temperature,
+        fetchImpl: config.fetchImpl,
       });
       const finishedAt = new Date();
       const runPath = writeRunRecord(runStoreRoot, {
@@ -212,6 +405,9 @@ export function createServer(config = {}) {
         result: {
           ok: result.ok,
           text: result.text,
+          provider: result.provider || baseRecord.provider,
+          model: result.model || baseRecord.model,
+          usage: result.usage || null,
         },
       });
       indexRun({
@@ -269,13 +465,93 @@ export function createServer(config = {}) {
       const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
       const pathname = requestUrl.pathname;
       const requestContext = createRequestContext(request);
+      const authHeader = headerValue(request, 'authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        // Stateless JWT first (works across instances); fall back to opaque session.
+        let session = jwtSecret ? resolveJwtIdentity(token, jwtSecret) : null;
+        if (!session) session = authStore.resolveToken(token);
+        if (session) {
+          // A valid token is the ONLY thing that marks a request authenticated
+          // and sets its tenant/user. This is what the /api gate checks.
+          requestContext.authenticated = true;
+          if (session.userId) requestContext.userId = session.userId;
+          if (session.tenantId) requestContext.tenantId = session.tenantId;
+        }
+      }
+      // Escape hatch for tests / a trusted reverse proxy: allow identity headers
+      // only when explicitly enabled. Off by default — never trust them in prod.
+      if (!requestContext.authenticated && trustIdentityHeaders) {
+        const t = stableHeader(headerValue(request, 'x-tenant-id'), '');
+        const u = stableHeader(headerValue(request, 'x-user-id'), '');
+        if (t) requestContext.tenantId = t;
+        if (u) requestContext.userId = u;
+        requestContext.authenticated = true;
+      }
       response.setHeader('x-trace-id', requestContext.traceId);
       response.setHeader('x-tenant-id', requestContext.tenantId);
       response.setHeader('x-user-id', requestContext.userId);
+      // Defense-in-depth response headers applied to every response. The host is
+      // a loopback API for the desktop shell, so these are conservative:
+      //  - nosniff:        never MIME-sniff (blocks content-type confusion)
+      //  - DENY framing:    the API/UI must not be embedded in a foreign frame
+      //  - no-referrer:     never leak URLs to other origins
+      //  - COOP/CORP:       isolate this origin's browsing context + resources
+      for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+        response.setHeader(name, value);
+      }
+
+      // CORS for loopback origins (browser preview at :5173 and the Tauri
+      // webview both fetch the host cross-origin). Only origins vetted by
+      // isAllowedOrigin (loopback http/https + tauri:) are reflected.
+      const requestOrigin = headerValue(request, 'origin');
+      const originOk = isAllowedOrigin(requestOrigin);
+      if (requestOrigin && originOk) {
+        response.setHeader('access-control-allow-origin', requestOrigin);
+        response.setHeader('vary', 'Origin');
+        response.setHeader('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+        response.setHeader('access-control-allow-headers', 'content-type,idempotency-key,x-tenant-id,x-user-id,x-trace-id,last-event-id');
+        response.setHeader('access-control-max-age', '600');
+      }
+      if (request.method === 'OPTIONS') {
+        response.writeHead(originOk ? 204 : 403);
+        response.end();
+        return;
+      }
 
       if (requiresOriginCheck(request.method, pathname) && !isAllowedOrigin(headerValue(request, 'origin'))) {
         sendJson(response, 403, { error: 'Origin not allowed' });
         return;
+      }
+
+      // Per-tenant HTTP rate limit (gap #1). Applies to the /api surface only —
+      // /health and static UI assets are exempt so monitoring and the shell are
+      // never throttled. Emits standard X-RateLimit-* headers; 429 + Retry-After
+      // when the tenant's token bucket is empty.
+      if (rateLimiter && pathname.startsWith('/api/')) {
+        const rl = rateLimiter.take(requestContext.tenantId);
+        response.setHeader('X-RateLimit-Limit', String(rl.limit));
+        response.setHeader('X-RateLimit-Remaining', String(rl.remaining));
+        if (!rl.allowed) {
+          response.setHeader('Retry-After', String(rl.retryAfterSec));
+          sendJson(response, 429, { error: 'rate limit exceeded; slow down', retryAfterSec: rl.retryAfterSec });
+          return;
+        }
+      }
+
+      // Auth gate (P0): the /api surface requires a verified identity, except the
+      // public auth endpoints (register/login/guest). Without this an unauthed
+      // caller could read/write the trusted root. /health and static UI are not
+      // under /api so they stay reachable for monitoring + first paint.
+      if (requireAuth && pathname.startsWith('/api/') && !isPublicApiRoute(request.method, pathname) && !requestContext.authenticated) {
+        sendJson(response, 401, { error: 'authentication required' });
+        return;
+      }
+
+      if (request.method === 'GET' && uiDistEnabled && pathname !== '/health' && pathname !== '/metrics' && !pathname.startsWith('/api/')) {
+        if (serveFromUiDist(response, pathname)) {
+          return;
+        }
       }
 
       if (request.method === 'GET' && staticRoot && staticFiles.has(pathname)) {
@@ -289,14 +565,121 @@ export function createServer(config = {}) {
         return;
       }
 
+      // Minimal Prometheus metrics. Not under /api/, so (like /health) it's
+      // exempt from the auth gate + rate limit for monitoring/scraping. Exposes
+      // only operational gauges — no secrets, no per-request payloads.
+      if (request.method === 'GET' && pathname === '/metrics') {
+        const c = agentConcurrency.stats();
+        const rl = rateLimiter ? rateLimiter.stats() : { tenants: 0 };
+        let breakers = [];
+        try { breakers = modelBreakerStats(); } catch { breakers = []; }
+        const openBreakers = breakers.filter((b) => b.state === 'open').length;
+        const mem = process.memoryUsage();
+        const body = [
+          '# HELP kcw_uptime_seconds Host process uptime in seconds.',
+          '# TYPE kcw_uptime_seconds gauge',
+          `kcw_uptime_seconds ${Math.floor(process.uptime())}`,
+          '# HELP kcw_concurrency_active Active agent streams.',
+          '# TYPE kcw_concurrency_active gauge',
+          `kcw_concurrency_active ${c.active}`,
+          `kcw_concurrency_max ${c.maxConcurrent}`,
+          `kcw_concurrency_tenants ${c.tenants}`,
+          '# HELP kcw_ratelimit_tenants Tenants with an active rate-limit bucket.',
+          '# TYPE kcw_ratelimit_tenants gauge',
+          `kcw_ratelimit_tenants ${rl.tenants || 0}`,
+          '# HELP kcw_model_breakers_open Open model circuit breakers.',
+          '# TYPE kcw_model_breakers_open gauge',
+          `kcw_model_breakers_open ${openBreakers}`,
+          '# HELP kcw_draining Whether the host is draining for shutdown (1/0).',
+          '# TYPE kcw_draining gauge',
+          `kcw_draining ${draining ? 1 : 0}`,
+          '# HELP process_resident_memory_bytes Resident set size in bytes.',
+          '# TYPE process_resident_memory_bytes gauge',
+          `process_resident_memory_bytes ${mem.rss}`,
+          '',
+        ].join('\n');
+        response.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8', ...SECURITY_HEADERS });
+        response.end(body);
+        return;
+      }
+
+      // Security/resilience self-check. Reports posture without exposing secrets
+      // (the API key surfaces only as configured/hasKey booleans) so the UI can
+      // render a red/green dashboard and ops can curl it.
+      if (request.method === 'GET' && pathname === '/api/selfcheck') {
+        let breakers = [];
+        try { breakers = modelBreakerStats(); } catch { breakers = []; }
+        const rateLimit = rateLimiter ? { enabled: true, ...rateLimiter.stats() } : { enabled: false };
+        const checks = [];
+        const add = (id, ok, detail) => checks.push({ id, status: ok ? 'pass' : 'warn', detail });
+        add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
+        add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
+        add('api-key', kimiApiConfig.configured, kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
+        add('rate-limit', Boolean(rateLimiter), rateLimiter ? `${rateLimit.ratePerSec}/s · burst ${rateLimit.burst}` : '限流未启用');
+        add('model-circuit', !breakers.some((b) => b.state === 'open'), breakers.length ? breakers.map((b) => `${b.name}:${b.state}`).join(', ') : '尚无模型调用');
+        add('accepting-requests', !draining, draining ? '正在优雅停机' : '正常受理请求');
+        sendJson(response, 200, {
+          service: 'kimi-cowork-host',
+          time: new Date().toISOString(),
+          security: {
+            responseHeaders: Object.keys(SECURITY_HEADERS),
+            cors: 'loopback+tauri only',
+            apiKey: { configured: kimiApiConfig.configured, hasKey: Boolean(kimiApiConfig.apiKey) },
+            bodyLimitBytes: 1024 * 1024,
+          },
+          resilience: { rateLimit, concurrency: agentConcurrency.stats(), modelBreakers: breakers, draining },
+          storage: { backend: storeBackend, postgres: usePostgresState },
+          checks,
+        });
+        return;
+      }
+
       if (request.method === 'GET' && pathname === '/api/workspace') {
         sendJson(response, 200, {
           trustedRoot: trustedRootDefault,
           context: requestContext,
-          kimiCli: {
-            planEnabled: kimiCliPlanEnabled,
-            chatEnabled: kimiCliPlanEnabled,
+          kimiApi: {
+            provider: 'kimi-api',
+            configured: kimiApiConfig.configured,
+            planEnabled: kimiApiEnabled,
+            chatEnabled: kimiApiEnabled,
+            baseUrl: kimiApiConfig.baseUrl,
+            model: kimiApiConfig.model,
           },
+          kimiCli: {
+            planEnabled: false,
+            chatEnabled: false,
+            legacy: true,
+          },
+        });
+        return;
+      }
+
+      if (request.method === 'POST' && /^\/api\/runs\/[a-zA-Z0-9_-]+\/cancel$/.test(pathname)) {
+        const id = pathname.split('/')[3];
+        sendJson(response, 200, { context: requestContext, runId: id, cancelled: cancellation.cancel(id) });
+        return;
+      }
+
+      // ── Route dispatch chain ──────────────────────────────────────────────
+      // Each handler inspects (method, pathname) and returns true if it owns the
+      // request (and has already responded), or false to fall through to the next
+      // one. Auth/CORS/security-headers were applied above the chain, so handlers
+      // only deal with their own paths. Order matters only where prefixes overlap;
+      // keep narrow/specific handlers before broad fallbacks. See docs/EXTENDING.md.
+      if (await handleAuthRoutes({ request, response, pathname, requestContext, authStore })) {
+        return;
+      }
+
+      if (request.method === 'POST' && /^\/api\/approvals\/[a-zA-Z0-9_-]+$/.test(pathname)) {
+        await withJsonBody(request, response, async (body) => {
+          const id = pathname.split('/')[3];
+          // AskUserQuestion answers carry a free-form { answer }; approvals carry { decision }.
+          const hasAnswer = body && typeof body.answer !== 'undefined';
+          const ok = hasAnswer
+            ? await approvalRegistry.respond(id, body.answer)
+            : await approvalRegistry.resolve(id, body && body.decision);
+          sendJson(response, ok ? 200 : 404, { context: requestContext, id, ok, decision: body && body.decision, answer: hasAnswer ? body.answer : undefined });
         });
         return;
       }
@@ -342,17 +725,85 @@ export function createServer(config = {}) {
         return;
       }
 
+      if (await handleConversationRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        trustedRootDefault,
+        conversationStore,
+      })) {
+        return;
+      }
+
+      if (await handleArtifactRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        trustedRootDefault,
+        safeTrustedRoot,
+      })) {
+        return;
+      }
+
+      if (request.method === 'POST' && pathname === '/api/kimi/config') {
+        await withJsonBody(request, response, async (body) => {
+          const next = body && typeof body === 'object' ? body : {};
+          if (next.clearKey === true) {
+            kimiApiConfig.apiKey = '';
+          } else if (typeof next.apiKey === 'string' && next.apiKey.trim()) {
+            kimiApiConfig.apiKey = next.apiKey.trim();
+          }
+          if (typeof next.baseUrl === 'string' && next.baseUrl.trim()) {
+            kimiApiConfig.baseUrl = next.baseUrl.trim().replace(/\/+$/, '');
+          }
+          if (typeof next.model === 'string' && next.model.trim()) {
+            kimiApiConfig.model = next.model.trim();
+          }
+          kimiApiConfig.configured = Boolean(kimiApiConfig.apiKey);
+          kimiApiEnabled = recomputeKimiEnabled();
+          try {
+            persistKimiConfig(kimiConfigFile, kimiApiConfig);
+          } catch (err) {
+            sendJson(response, 500, {
+              error: 'Failed to persist Kimi config: ' + ((err && err.message) || 'unknown'),
+            });
+            return;
+          }
+          // Never echo the API key back to the client; only a boolean flag.
+          sendJson(response, 200, {
+            configured: kimiApiConfig.configured,
+            chatEnabled: kimiApiEnabled,
+            planEnabled: kimiApiEnabled,
+            baseUrl: kimiApiConfig.baseUrl,
+            model: kimiApiConfig.model,
+            hasKey: Boolean(kimiApiConfig.apiKey),
+          });
+        });
+        return;
+      }
+
       if (request.method === 'GET' && pathname === '/api/kimi/info') {
-        const info = await detectKimiInfo(config.kimiExecutable || 'kimi');
-        sendJson(response, 200, info);
+        sendJson(response, 200, {
+          provider: 'kimi-api',
+          configured: kimiApiConfig.configured,
+          planEnabled: kimiApiEnabled,
+          chatEnabled: kimiApiEnabled,
+          baseUrl: kimiApiConfig.baseUrl,
+          model: kimiApiConfig.model,
+          hasKey: Boolean(kimiApiConfig.apiKey),
+        });
         return;
       }
 
       if (request.method === 'POST' && pathname === '/api/kimi/plan') {
         await withJsonBody(request, response, async (body) => {
-          if (!kimiCliPlanEnabled) {
+          if (!kimiApiEnabled) {
             sendJson(response, 503, {
-              error: 'Kimi CLI plan is disabled. Set ENABLE_KIMI_CLI_PLAN=1 to enable it.',
+              error: 'Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY to enable it.',
             });
             return;
           }
@@ -377,9 +828,9 @@ export function createServer(config = {}) {
 
       if (request.method === 'POST' && pathname === '/api/kimi/chat') {
         await withJsonBody(request, response, async (body) => {
-          if (!kimiCliPlanEnabled) {
+          if (!kimiApiEnabled) {
             sendJson(response, 503, {
-              error: 'Kimi CLI chat is disabled. Set ENABLE_KIMI_CLI_PLAN=1 to enable it.',
+              error: 'Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY to enable it.',
             });
             return;
           }
@@ -402,6 +853,79 @@ export function createServer(config = {}) {
         return;
       }
 
+      if (request.method === 'POST' && pathname === '/api/agent/chat/stream') {
+        await withJsonBody(request, response, async (body) => {
+          if (!kimiApiEnabled) {
+            sendJson(response, 503, { error: 'Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY to enable it.' });
+            return;
+          }
+          if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
+            sendJson(response, 400, { error: 'body.prompt is required' });
+            return;
+          }
+          const safeRoot = safeTrustedRoot(body.trustedRoot);
+          if (draining) {
+            sendJson(response, 503, { error: '服务正在停机，暂不接受新任务。', context: requestContext });
+            return;
+          }
+          const releaseSlot = agentConcurrency.tryAcquire(requestContext.tenantId);
+          if (!releaseSlot) {
+            sendJson(response, 429, { error: '并发运行数已达上限，请稍后重试。', context: requestContext });
+            return;
+          }
+          try {
+            await streamAgentChat({
+            response,
+            request,
+            requestContext,
+            body,
+            kimiConfig: kimiApiConfig,
+            trustedRoot: safeRoot,
+            runStoreRoot,
+            runsIndex,
+            runEvents,
+            sandbox: sandboxEnabled ? sandbox : null,
+            sandboxLimits,
+            modelCall: config.agentModelCall,
+            toolRegistry,
+            skillRegistry,
+            approvals: approvalRegistry,
+            cancellation,
+            scheduler: activeScheduler,
+            });
+          } finally {
+            releaseSlot();
+          }
+        });
+        return;
+      }
+
+      if (request.method === 'POST' && pathname === '/api/kimi/chat/stream') {
+        await withJsonBody(request, response, async (body) => {
+          if (!kimiApiEnabled) {
+            sendJson(response, 503, { error: 'Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY to enable it.' });
+            return;
+          }
+          if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
+            sendJson(response, 400, { error: 'body.prompt is required' });
+            return;
+          }
+          const safeRoot = safeTrustedRoot(body.trustedRoot);
+          await streamChat({
+            response,
+            requestContext,
+            body,
+            streamRunner: kimiChatStreamRunner,
+            cancellation,
+            kimiConfig: kimiApiConfig,
+            trustedRoot: safeRoot,
+            runStoreRoot,
+            runsIndex,
+          });
+        });
+        return;
+      }
+
       if (await handleWorkspaceFileRoutes({
         request,
         response,
@@ -413,6 +937,83 @@ export function createServer(config = {}) {
         requireIdempotencyKey,
         sendCachedOrStore,
         safeTrustedRoot,
+      })) {
+        return;
+      }
+
+      if (await handleSandboxRoutes({
+        request,
+        response,
+        pathname,
+        requestContext,
+        sandbox,
+        sandboxEnabled,
+        sandboxLimits,
+        runStoreRoot,
+        runsIndex,
+        runEvents,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+        safeTrustedRoot,
+      })) {
+        return;
+      }
+
+      if (await handleToolRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        toolRegistry,
+        runStoreRoot,
+        runEvents,
+        runsIndex,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+        safeTrustedRoot,
+      })) {
+        return;
+      }
+
+      if (await handleVizRoutes({
+        request,
+        response,
+        pathname,
+        requestUrl,
+        requestContext,
+        trustedRootDefault,
+        safeTrustedRoot,
+        cacheKeyFor,
+        requireIdempotencyKey,
+        sendCachedOrStore,
+      })) {
+        return;
+      }
+
+      if (await handleSkillRoutes({ request, response, pathname, requestContext, skillRegistry })) {
+        return;
+      }
+
+      if (await handlePlanRoutes({ request, response, pathname, requestContext, toolRegistry, planner: config.planner })) {
+        return;
+      }
+
+      if (await handleClarifyRoutes({ request, response, pathname, requestContext, clarifications })) {
+        return;
+      }
+
+      if (await handleConnectorRoutes({
+        request, response, pathname, requestUrl, requestContext,
+        toolRegistry, safeTrustedRoot,
+        fsServerPath: path.join(hostSrcDir, '../mcp-servers/fs-server.mjs'),
+        // Route through server.connectMcpServers (NOT a bare connectMcpServers call)
+        // so the spawned MCP clients are registered in server._mcpClients and get
+        // reaped by server.closeMcp()/shutdown(). Otherwise connector-API children
+        // leak — they keep the process alive (the host never exits cleanly).
+        connectMcp: (servers) => server.connectMcpServers(servers),
       })) {
         return;
       }
@@ -434,9 +1035,50 @@ export function createServer(config = {}) {
 
       sendJson(response, 404, { error: 'Not found' });
     } catch (err) {
-      sendJson(response, 500, { error: err.message });
+      // Never leak internal detail (stack/paths/secrets) to clients. Log it
+      // redacted for ops; return a generic 500. Expected validation errors are
+      // already handled by the route handlers above with their own safe messages.
+      try { console.error('[host] unhandled request error:', redactText(String((err && err.stack) || err))); } catch { /* ignore */ }
+      sendJson(response, 500, { error: 'internal server error' });
     }
   });
+
+
+  server.toolRegistry = toolRegistry;
+  server._mcpClients = [];
+  server.connectMcpServers = async (servers) => {
+    const outcome = await connectMcpServers({ registry: toolRegistry, servers, spawn: config.mcpSpawn });
+    server._mcpClients.push(...outcome.clients);
+    return outcome;
+  };
+  server.closeMcp = () => { closeMcpClients(server._mcpClients); server._mcpClients = []; };
+
+  // Graceful shutdown: stop accepting new streams, abort in-flight runs so their
+  // SSE connections drain, unblock awaiting approvals, close MCP children, then
+  // close the listener (with a hard timeout so a stuck socket can't hang exit).
+  server.isDraining = () => draining;
+  server.shutdown = async ({ timeoutMs = 10000 } = {}) => {
+    draining = true;
+    try { cancellation.cancelAll('shutdown'); } catch { /* ignore */ }
+    try { approvalRegistry.cancelAll('reject'); } catch { /* ignore */ }
+    try { server.closeMcp(); } catch { /* ignore */ }
+    // Stop the schedule tick (the interval is unref'd, but stopping it releases
+    // its store/handles deterministically — important for clean test teardown).
+    try { if (activeScheduler && typeof activeScheduler.stop === 'function') activeScheduler.stop(); } catch { /* ignore */ }
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      // Forcibly destroy lingering keep-alive / SSE sockets so server.close()'s
+      // callback can actually fire. Without this, an open EventStream socket
+      // keeps the event loop alive forever and the process never exits — the
+      // root cause of the full-suite test hang / libuv close-race assertion.
+      try { if (typeof server.closeAllConnections === 'function') server.closeAllConnections(); } catch { /* ignore */ }
+      server.close(() => { clearTimeout(timer); resolve(); });
+    });
+  };
+
+  if (Array.isArray(config.mcpServers) && config.mcpServers.length > 0 && config.connectMcpOnStart !== false) {
+    server.connectMcpServers(config.mcpServers).catch(() => { /* a broken connector must not crash startup */ });
+  }
 
   return server;
 }

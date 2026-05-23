@@ -1,5 +1,6 @@
 import childProcess from 'node:child_process';
 import { assertTrustedPath } from '../security/path-policy.js';
+import { createCappedBuffer } from '../sandbox/exec-child.js';
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_MAX_OUTPUT_BYTES = 8192;
@@ -10,14 +11,6 @@ function parseCommand(cmd) {
   }
   const [command, ...args] = cmd.trim().split(/\s+/);
   return { command, args };
-}
-
-function toLimitedString(parts, maxBytes) {
-  const buffer = Buffer.concat(parts);
-  if (buffer.length <= maxBytes) {
-    return buffer.toString('utf8');
-  }
-  return buffer.subarray(0, maxBytes).toString('utf8');
 }
 
 export async function runCommand(input) {
@@ -48,36 +41,25 @@ export async function runCommand(input) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  const outParts = [];
-  const errParts = [];
+  // Stream into memory-bounded sinks so a high-output command can never grow
+  // the heap past the cap before the timeout fires (see createCappedBuffer).
+  const out = createCappedBuffer(maxOutputBytes);
+  const err = createCappedBuffer(maxOutputBytes);
   let timeout;
   let timedOut = false;
-  child.stdout.on('data', (chunk) => {
-    if (Buffer.isBuffer(chunk)) {
-      outParts.push(chunk);
-    }
-  });
-  child.stderr.on('data', (chunk) => {
-    if (Buffer.isBuffer(chunk)) {
-      errParts.push(chunk);
-    }
-  });
+  child.stdout.on('data', (chunk) => out.push(chunk));
+  child.stderr.on('data', (chunk) => err.push(chunk));
 
   const result = new Promise((resolve, reject) => {
-    child.on('error', (err) => reject(err));
+    child.on('error', (e) => reject(e));
     child.on('close', (code, signal) => {
-      const outputBuffer = Buffer.concat(outParts);
-      const errorBuffer = Buffer.concat(errParts);
-      const output = toLimitedString([outputBuffer], maxOutputBytes);
-      const errorOutput = toLimitedString([errorBuffer], maxOutputBytes);
-      const timeoutTruncated = timedOut;
       resolve({
         exitCode: code === null ? -1 : code,
         signal,
-        stdout: output,
-        stderr: errorOutput,
+        stdout: out.text,
+        stderr: err.text,
         timedOut,
-        truncated: outputBuffer.length > maxOutputBytes || errorBuffer.length > maxOutputBytes || timeoutTruncated,
+        truncated: out.truncated || err.truncated || timedOut,
       });
     });
   });

@@ -8,6 +8,10 @@ export function buildContextBundle(input) {
   const trustedRoot = input.root ?? input.trustedRoot;
   const paths = input.paths ?? [];
   const maxTextSize = input.maxTextSize ?? 256 * 1024;
+  // Global budget across all bundled files (not just per-file) so a big directory
+  // can't blow up the model context window or host memory.
+  const maxTotalBytes = input.maxTotalBytes ?? 4 * 1024 * 1024;
+  const maxFiles = input.maxFiles ?? 200;
   const fsStat = input.fsStatFn || ((candidate) => fs.statSync(candidate));
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
@@ -55,14 +59,16 @@ export function buildContextBundle(input) {
   }
 
   const files = [];
+  let totalBytes = 0;
   for (const filePath of fileTargets) {
+    if (files.length >= maxFiles || totalBytes >= maxTotalBytes) {
+      skipped.push({ path: filePath, reason: 'context budget exceeded' });
+      continue;
+    }
     try {
-      files.push(
-        readTextFile(filePath, {
-          trustedRoot,
-          maxSize: maxTextSize,
-        }),
-      );
+      const file = readTextFile(filePath, { trustedRoot, maxSize: maxTextSize });
+      totalBytes += Buffer.byteLength(file.content || '', 'utf8');
+      files.push(file);
     } catch (err) {
       skipped.push({ path: filePath, reason: err.message });
     }

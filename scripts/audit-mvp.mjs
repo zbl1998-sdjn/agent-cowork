@@ -198,6 +198,36 @@ async function main() {
     nativeCheck?.status === 'blocked' ||
     nativeCheck?.blockedByAsr === true;
 
+  // Evidence integrity (strict mode): a release gate must never "pass" on stale
+  // or foreign-repo evidence. Reject any contributing report that is older than
+  // STALE_MS or whose recorded repoRoot points at a different checkout (e.g. an
+  // old `kimi cowork` tree). Reports without these fields are not penalised.
+  const STALE_MS = 10 * 60 * 1000;
+  const evidenceReports = [
+    { label: 'mvp-runtime', value: runtime.value },
+    { label: 'default-verifier', value: verification.value },
+    { label: 'rendered-ui-smoke', value: rendered.value },
+    { label: 'live-mvp-smoke', value: liveMvpSmoke.value },
+    { label: 'runtime-smoke', value: runtimeSmoke.value },
+    { label: 'windows-resource-smoke', value: windowsResourceSmoke.value },
+    { label: 'windows-client-readiness', value: readiness.value },
+    { label: 'windows-verification', value: windowsVerification.value },
+  ];
+  const evidenceIssues = [];
+  for (const { label, value } of evidenceReports) {
+    if (!value || typeof value !== 'object') continue;
+    if (value.generatedAt) {
+      const ts = Date.parse(value.generatedAt);
+      if (Number.isFinite(ts) && Date.now() - ts > STALE_MS) {
+        evidenceIssues.push({ label, reason: 'stale', generatedAt: value.generatedAt });
+      }
+    }
+    if (value.repoRoot && path.resolve(value.repoRoot) !== path.resolve(repoRoot)) {
+      evidenceIssues.push({ label, reason: 'wrong-repo', repoRoot: value.repoRoot });
+    }
+  }
+  const evidenceFresh = evidenceIssues.length === 0;
+
   const requirements = [
     requirement('running-web-mvp', 'Runnable local MVP service with runtime file and health check', pidAlive && healthOk ? 'passed' : 'failed', {
       runtimeFile,
@@ -296,6 +326,11 @@ async function main() {
         interaction: windowsResourceInteraction,
       },
     ),
+    requirement('fresh-current-repo-evidence', 'All contributing evidence reports are fresh (<10min) and from the current repo (strict gate)', evidenceFresh ? 'passed' : 'failed', {
+      staleThresholdMs: STALE_MS,
+      repoRoot,
+      issues: evidenceIssues,
+    }),
     requirement('native-windows-window-smoke', 'Native Windows C client window-level smoke', nativePassed ? 'passed' : nativeBlocked ? 'blocked' : 'failed', {
       readinessReportPath: readinessFile,
       windowsVerificationReportPath: windowsVerification.ok ? windowsVerificationFile : null,
@@ -335,11 +370,15 @@ async function main() {
   const webHostMvpReady = passed(requirements, webRequirementIds);
   const nativeWindowsReady = requirements.find((item) => item.id === 'native-windows-window-smoke')?.status === 'passed';
   const blocked = requirements.filter((item) => item.status === 'blocked');
-  const failed = requirements.filter((item) => item.status === 'failed');
+  // The evidence-freshness requirement is a STRICT-only gate, so it must not
+  // affect the regular (non-strict) ok/exit semantics.
+  const failed = requirements.filter((item) => item.status === 'failed' && item.id !== 'fresh-current-repo-evidence');
 
   const report = {
     ok: webHostMvpReady && failed.length === 0,
     completeGoal: webHostMvpReady && nativeWindowsReady,
+    // In strict mode the gate additionally requires fresh, current-repo evidence.
+    strictReady: webHostMvpReady && nativeWindowsReady && evidenceFresh,
     generatedAt: new Date().toISOString(),
     repoRoot,
     reportPath,
@@ -349,6 +388,8 @@ async function main() {
       blocked: blocked.length,
       webHostMvpReady,
       nativeWindowsReady,
+      evidenceFresh,
+      evidenceIssues,
     },
     requirements,
   };
@@ -356,7 +397,7 @@ async function main() {
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
 
-  if (strict && !report.completeGoal) {
+  if (strict && (!report.completeGoal || !evidenceFresh)) {
     process.exit(1);
   }
   if (!webHostMvpReady || failed.length > 0) {

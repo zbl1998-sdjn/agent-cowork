@@ -4,15 +4,6 @@ import { nextFireAt, parseCron, describeCron } from './cron.js';
 import { createUlid } from './runs-index.js';
 import { createSqliteDatabase } from '../storage/sqlite.js';
 
-// File-backed scheduler. Stores schedules as JSON files under a directory,
-// runs a low-frequency tick (every 30s by default), and fires due jobs by
-// invoking a caller-supplied executor with the schedule record.
-//
-// Scale-readiness note: this is the Phase A adapter. Phase B will replace
-// the file store with Postgres + Redis lock, and the executor with a queue
-// (NATS/Temporal). The Schedule shape (tenantId/userId/traceId/version/
-// idempotency) is forward-compatible.
-
 const SCHEDULE_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 
 function ensureDirSync(dir) {
@@ -241,7 +232,6 @@ export class Scheduler {
       throw new Error('Scheduler: cron or fireAt is required');
     }
     if (cron) {
-      // Validate.
       parseCron(cron);
     }
     if (fireAt && !isPositiveFutureIso(fireAt)) {
@@ -305,9 +295,7 @@ export class Scheduler {
     try {
       const result = await this.executor(record);
       const lastRunId = result?.runId || result?.id || null;
-      const next = record.kind === 'one-shot'
-        ? null
-        : nextFireAt(record.cron, startedAt);
+      const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron, startedAt);
       const updated = {
         ...record,
         status: record.kind === 'one-shot' ? 'completed' : 'pending',
@@ -322,9 +310,7 @@ export class Scheduler {
       this.store.save(updated);
       return { ok: true, schedule: updated, result };
     } catch (err) {
-      const next = record.kind === 'one-shot'
-        ? null
-        : nextFireAt(record.cron, startedAt);
+      const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron, startedAt);
       const updated = {
         ...record,
         status: record.kind === 'one-shot' ? 'failed' : 'pending',

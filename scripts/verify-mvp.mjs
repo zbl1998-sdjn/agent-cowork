@@ -106,9 +106,9 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
   },
   {
-    name: 'kimi cli smoke script syntax',
+    name: 'kimi api smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-kimi-cli.mjs')],
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-kimi-api.mjs')],
   },
   {
     name: 'live-mvp smoke script syntax',

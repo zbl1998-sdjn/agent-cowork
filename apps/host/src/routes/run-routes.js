@@ -51,7 +51,9 @@ export async function handleRunRoutes({
     const type = requestUrl.searchParams.get('type') || undefined;
     const recipeId = requestUrl.searchParams.get('recipeId') || undefined;
     const userId = requestUrl.searchParams.get('userId') || undefined;
-    const records = runsIndex.list({
+    // await: transparent for the sync file/sqlite adapters, required for the
+    // async PostgreSQL adapter (multi-instance backend).
+    const records = await runsIndex.list({
       tenantId: requestContext.tenantId,
       userId,
       limit,
@@ -59,9 +61,10 @@ export async function handleRunRoutes({
       type,
       recipeId,
     });
+    const stats = await runsIndex.stats({ tenantId: requestContext.tenantId });
     sendJson(response, 200, {
       context: requestContext,
-      stats: runsIndex.stats({ tenantId: requestContext.tenantId }),
+      stats,
       runs: records,
     });
     return true;

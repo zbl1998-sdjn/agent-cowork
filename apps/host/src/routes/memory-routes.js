@@ -17,8 +17,8 @@ export async function handleMemoryRoutes({
       requestUrl.searchParams.get('trustedRoot') || trustedRootDefault,
     );
     const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-    const main = memoryStore.readMainMemory(safeRoot, requestContext);
-    const notes = memoryStore.listMemoryNotes(safeRoot, requestContext).map((note) => ({
+    const main = await memoryStore.readMainMemory(safeRoot, requestContext);
+    const notes = (await memoryStore.listMemoryNotes(safeRoot, requestContext)).map((note) => ({
       name: note.name,
       size: note.size,
       modifiedAt: note.modifiedAt,
@@ -40,7 +40,7 @@ export async function handleMemoryRoutes({
     await withJsonBody(request, response, async (body) => {
       const trustedRoot = path.resolve(body?.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-      const result = memoryStore.appendMemoryFact(
+      const result = await memoryStore.appendMemoryFact(
         safeRoot,
         { key: body?.key, value: body?.value, scope: body?.scope },
         requestContext,
@@ -65,7 +65,7 @@ export async function handleMemoryRoutes({
       }
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-      const written = memoryStore.writeMemoryNote(safeRoot, body.name, body.body, requestContext);
+      const written = await memoryStore.writeMemoryNote(safeRoot, body.name, body.body, requestContext);
       sendJson(response, 200, {
         trustedRoot: safeRoot,
         note: { name: body.name, path: written },
@@ -85,7 +85,7 @@ export async function handleMemoryRoutes({
       requestUrl.searchParams.get('trustedRoot') || trustedRootDefault,
     );
     const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-    const body = memoryStore.readMemoryNote(safeRoot, noteName, requestContext);
+    const body = await memoryStore.readMemoryNote(safeRoot, noteName, requestContext);
     if (body == null) {
       sendJson(response, 404, { error: 'Memory note not found' });
       return true;

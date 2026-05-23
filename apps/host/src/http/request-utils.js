@@ -32,8 +32,15 @@ export function isLoopbackHostname(hostname) {
 
 export function isAllowedOrigin(origin) {
   const value = String(origin || '').trim();
-  if (!value || value === 'null') {
+  // No Origin header = same-origin navigation or a non-browser client (curl, the
+  // desktop host itself) — allowed. The literal opaque origin "null" (sandboxed
+  // iframe, file://, data:) is NOT allowed: it can't be attributed to a trusted
+  // loopback/tauri context, so we never reflect CORS for it.
+  if (!value) {
     return true;
+  }
+  if (value === 'null') {
+    return false;
   }
   try {
     const parsed = new URL(value);
@@ -80,8 +87,13 @@ export function createRequestContext(request) {
   const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
   return {
     traceId,
-    tenantId: stableHeader(headerValue(request, 'x-tenant-id'), 'tenant_local'),
-    userId: stableHeader(headerValue(request, 'x-user-id'), 'user_local'),
+    // SECURITY: tenant/user are NOT read from client headers (those are
+    // spoofable — trusting them let any caller impersonate any tenant). They
+    // start as the local identity and are overwritten ONLY by a verified
+    // session/JWT in the request entry. `authenticated` then gates /api/*.
+    tenantId: 'tenant_local',
+    userId: 'user_local',
+    authenticated: false,
     idempotencyKey: stableHeader(headerValue(request, 'idempotency-key'), ''),
   };
 }
@@ -121,8 +133,18 @@ export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
       totalBytes += buffer.length;
       if (totalBytes > maxBytes) {
         rejected = true;
-        reject(new Error(`Request body too large; max ${maxBytes} bytes`));
-        request.destroy();
+        // DoS guard: refuse oversized bodies. Pause (don't destroy yet) so the
+        // caller can send a clear 413 response FIRST — Node then closes the
+        // socket once the response finishes with the body still unread, instead
+        // of the client seeing a bare connection reset.
+        const err = new Error(`Request body too large; max ${maxBytes} bytes`);
+        err.statusCode = 413;
+        // Drain & DISCARD the rest (don't buffer it) so the caller can send a
+        // clean 413 and the connection closes normally — the client gets a real
+        // status code instead of a connection reset. Subsequent chunks hit the
+        // `rejected` guard above and are dropped, so memory stays bounded.
+        if (typeof request.resume === 'function') request.resume();
+        reject(err);
         return;
       }
       chunks.push(buffer);
@@ -155,7 +177,8 @@ export async function withJsonBody(request, response, handler, options = {}) {
   try {
     body = await readJsonBody(request, options);
   } catch (err) {
-    sendJson(response, 400, { error: `Invalid JSON body: ${err.message}` });
+    // 413 for oversized bodies, 400 for malformed JSON.
+    sendJson(response, err.statusCode || 400, { error: `Invalid JSON body: ${err.message}` });
     return;
   }
   try {

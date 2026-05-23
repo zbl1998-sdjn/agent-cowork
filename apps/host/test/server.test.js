@@ -6,7 +6,7 @@ import { createServer } from '../src/server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 async function withServer(config, fn) {
-  const server = createServer(config);
+  const server = createServer({ requireAuth: false, ...config });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -40,6 +40,9 @@ test('workspace endpoint returns configured trusted root', async () => {
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.trustedRoot, trustedRoot);
+    assert.equal(body.kimiApi.configured, false);
+    assert.equal(body.kimiApi.chatEnabled, false);
+    assert.equal(body.kimiApi.planEnabled, false);
     assert.equal(body.kimiCli.chatEnabled, false);
     assert.equal(body.kimiCli.planEnabled, false);
     assert.equal(body.context.tenantId, 'tenant_local');
@@ -47,7 +50,7 @@ test('workspace endpoint returns configured trusted root', async () => {
   });
 });
 
-test('kimi plan endpoint is disabled unless explicitly enabled', async () => {
+test('kimi plan endpoint is disabled unless API key or runner is configured', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/kimi/plan`, {
@@ -56,25 +59,23 @@ test('kimi plan endpoint is disabled unless explicitly enabled', async () => {
       body: JSON.stringify({ trustedRoot, prompt: '生成计划' }),
     });
     assert.equal(response.status, 503);
-    assert.match((await response.json()).error, /disabled/i);
+    assert.match((await response.json()).error, /Kimi API is not configured/i);
   });
 });
 
-test('kimi plan endpoint calls configured runner inside trusted root', async () => {
+test('kimi plan endpoint calls configured API runner inside trusted root', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   let captured;
   await withServer({
     trustedRoot,
-    enableKimiCliPlan: true,
-    kimiExecutable: 'kimi-test',
     kimiPlanRunner: async (input) => {
       captured = input;
       return {
         ok: true,
-        provider: 'kimi-cli',
-        command: 'kimi-test',
+        provider: 'kimi-api',
+        model: input.model,
         mode: input.mode,
-        text: 'Kimi CLI 计划输出',
+        text: 'Kimi API 计划输出',
         durationMs: 12,
       };
     },
@@ -93,8 +94,9 @@ test('kimi plan endpoint calls configured runner inside trusted root', async () 
     const body = await response.json();
     assert.match(body.runId, /^run_/);
     assert.equal(fs.existsSync(body.runPath), true);
-    assert.equal(body.text, 'Kimi CLI 计划输出');
-    assert.equal(captured.command, 'kimi-test');
+    assert.equal(body.text, 'Kimi API 计划输出');
+    assert.equal(captured.baseUrl, 'https://api.moonshot.ai/v1');
+    assert.equal(captured.model, 'kimi-k2.6');
     assert.equal(captured.trustedRoot, trustedRoot);
     assert.equal(captured.prompt, '生成计划');
     assert.equal(captured.summary, '本地摘要');
@@ -103,24 +105,23 @@ test('kimi plan endpoint calls configured runner inside trusted root', async () 
     assert.equal(record.id, body.runId);
     assert.equal(record.status, 'succeeded');
     assert.equal(record.type, 'kimi-plan');
+    assert.equal(record.provider, 'kimi-api');
     assert.equal(record.input.prompt, '生成计划');
-    assert.equal(record.result.text, 'Kimi CLI 计划输出');
+    assert.equal(record.result.text, 'Kimi API 计划输出');
   });
 });
 
-test('kimi chat endpoint calls configured Kimi runner', async () => {
+test('kimi chat endpoint calls configured Kimi API runner', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   let captured;
   await withServer({
     trustedRoot,
-    enableKimiCliPlan: true,
-    kimiExecutable: 'kimi-test',
     kimiChatRunner: async (input) => {
       captured = input;
       return {
         ok: true,
-        provider: 'kimi-cli',
-        command: 'kimi-test',
+        provider: 'kimi-api',
+        model: input.model,
         mode: 'chat',
         text: 'Kimi 对话输出',
         durationMs: 15,
@@ -140,8 +141,8 @@ test('kimi chat endpoint calls configured Kimi runner', async () => {
     const body = await response.json();
     assert.match(body.runId, /^run_/);
     assert.equal(body.text, 'Kimi 对话输出');
-    assert.equal(captured.command, 'kimi-test');
     assert.equal(captured.mode, 'chat');
+    assert.equal(captured.baseUrl, 'https://api.moonshot.ai/v1');
     assert.equal(captured.trustedRoot, trustedRoot);
     assert.equal(captured.prompt, '你好');
 
@@ -207,11 +208,10 @@ test('run endpoints expose persisted Kimi plan records', async () => {
   let runId;
   await withServer({
     trustedRoot,
-    enableKimiCliPlan: true,
     kimiPlanRunner: async () => ({
       ok: true,
-      provider: 'kimi-cli',
-      command: 'kimi',
+      provider: 'kimi-api',
+      model: 'kimi-k2.6',
       mode: 'cowork',
       text: '可复跑的计划记录',
       durationMs: 18,
@@ -250,11 +250,10 @@ test('task endpoint maps persisted runs into task cards', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({
     trustedRoot,
-    enableKimiCliPlan: true,
     kimiPlanRunner: async () => ({
       ok: true,
-      provider: 'kimi-cli',
-      command: 'kimi',
+      provider: 'kimi-api',
+      model: 'kimi-k2.6',
       mode: 'cowork',
       text: '任务卡片计划',
       durationMs: 11,
@@ -341,11 +340,37 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
   });
 });
 
+test('artifact endpoints list local artifacts and render safe HTML views', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const artifactDir = path.join(trustedRoot, '.KimiCowork', 'artifacts');
+  const artifactPath = path.join(artifactDir, 'report.md');
+  fs.mkdirSync(artifactDir, { recursive: true });
+  fs.writeFileSync(artifactPath, '# Report\n\n<script>alert("x")</script>\n', 'utf8');
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const list = await fetch(`${baseUrl}/api/artifacts?limit=10`);
+    assert.equal(list.status, 200);
+    const body = await list.json();
+    assert.equal(body.artifacts.length, 1);
+    assert.equal(body.artifacts[0].name, 'report.md');
+    assert.equal(body.artifacts[0].relativePath, '.KimiCowork/artifacts/report.md');
+    assert.equal(body.artifacts[0].viewable, true);
+
+    const view = await fetch(`${baseUrl}/api/artifacts/view?path=${encodeURIComponent(artifactPath)}`);
+    assert.equal(view.status, 200);
+    assert.match(view.headers.get('content-type'), /text\/html/);
+    const html = await view.text();
+    assert.match(html, /Artifact Live Page/);
+    assert.match(html, /Report/);
+    assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
+    assert.doesNotMatch(html, /<script>alert/);
+  });
+});
+
 test('kimi plan failures persist run record and expose run id', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({
     trustedRoot,
-    enableKimiCliPlan: true,
     kimiPlanRunner: async () => {
       throw new Error('simulated kimi failure');
     },

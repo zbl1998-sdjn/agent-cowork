@@ -54,17 +54,17 @@ const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
 const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
 const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'host-events.jsonl');
-const enableKimiCliPlan = process.env.ENABLE_KIMI_CLI_PLAN === '1';
+const kimiApiPlanEnabled = Boolean(process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
 
 ensureDemoWorkspace(workspace);
 fs.mkdirSync(path.dirname(runtimeFile), { recursive: true });
 
 const server = createServer({
   trustedRoot: workspace,
-  kimiExecutable: process.env.KIMI_CLI || 'kimi',
-  enableKimiCliPlan,
-  kimiCliTimeoutMs: Number(process.env.KIMI_CLI_TIMEOUT_MS || 60_000),
-  kimiCliMaxSteps: Number(process.env.KIMI_CLI_MAX_STEPS || 10),
+  kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
+  kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+  kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),
+  kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
   kimiModel: process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(auditPath),
 });
@@ -78,7 +78,7 @@ function writeRuntimeFile() {
     url,
     workspace,
     auditPath,
-    kimiCliPlanEnabled: enableKimiCliPlan,
+    kimiApiPlanEnabled,
     startedAt: new Date().toISOString(),
   };
   fs.writeFileSync(runtimeFile, `${JSON.stringify(runtime, null, 2)}\n`, 'utf8');
@@ -109,7 +109,7 @@ server.listen(port, host, () => {
   writeRuntimeFile();
   console.log(`Kimi Cowork MVP running at ${url}`);
   console.log(`Trusted workspace: ${workspace}`);
-  console.log(`Kimi CLI plan: ${enableKimiCliPlan ? 'enabled' : 'disabled'}`);
+  console.log(`Kimi API plan: ${kimiApiPlanEnabled ? 'enabled' : 'not configured'}`);
   console.log(`Runtime file: ${runtimeFile}`);
   console.log('Press Ctrl+C to stop.');
   openBrowser(url);
