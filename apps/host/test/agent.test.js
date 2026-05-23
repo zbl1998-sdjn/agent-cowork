@@ -128,3 +128,30 @@ test('plan mode: rejecting the plan keeps mutating tools blocked', async () => {
   assert.ok(out.steps.some((s) => s.tool === 'Write' && s.planBlocked), 'write still blocked after reject');
   assert.equal(fs.existsSync(path.join(root, 'out.txt')), false, 'file never written');
 });
+
+test('a run that exhausts the step budget still returns a written reply (no blank "task ended")', async () => {
+  const root = tmp();
+  fs.writeFileSync(path.join(root, 'a.txt'), 'x', 'utf8');
+  // Model that NEVER stops calling tools -> the loop runs out of steps. The
+  // post-loop forced-summary turn (tools:[]) must produce the final text so the
+  // user never sees an empty assistant bubble.
+  const modelCall = async ({ tools }) => {
+    if (tools && tools.length > 0) {
+      return { content: '', tool_calls: [{ id: 'c' + Math.random(), function: { name: 'Glob', arguments: JSON.stringify({ pattern: '*' }) } }] };
+    }
+    return { content: '【小结】我浏览了工作区。' };
+  };
+  const out = await runAgentChat({ prompt: '看看这里', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, maxSteps: 3, emit: () => {} });
+  assert.ok(out.text && out.text.length > 0, 'final text must not be empty after budget exhaustion');
+  assert.match(out.text, /小结|工作区/);
+});
+
+test('static backstop fires when even the forced summary comes back empty', async () => {
+  const root = tmp();
+  const modelCall = async ({ tools }) => {
+    if (tools && tools.length > 0) return { content: '', tool_calls: [{ id: 'z', function: { name: 'Glob', arguments: '{"pattern":"*"}' } }] };
+    return { content: '' }; // forced-summary turn also empty
+  };
+  const out = await runAgentChat({ prompt: 'x', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, maxSteps: 2, emit: () => {} });
+  assert.ok(out.text && out.text.length > 0, 'static backstop must provide a non-empty reply');
+});

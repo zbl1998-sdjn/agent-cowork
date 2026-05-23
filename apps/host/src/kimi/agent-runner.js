@@ -280,6 +280,40 @@ export async function runAgentChat({
       if (hooks) await hooks.run('post_tool', { name, result, ok });
     }
   }
+  // The loop above only sets `finalText` when the model returns a message with
+  // NO tool calls. If we exhausted the step budget while still mid-task (the
+  // model kept calling tools), or the model returned an empty message, finalText
+  // is '' and the user would see the task simply stop with a blank reply. To keep
+  // the UX promise "every run produces an answer", do ONE more turn with NO tools
+  // so the model is forced to write a summary of what it did / found. Skipped when
+  // the run was aborted (the user cancelled).
+  if (!finalText && !(signal && signal.aborted)) {
+    try {
+      messages.push({
+        role: 'user',
+        content: '已达到本轮工具调用上限。请不要再调用任何工具，直接用简洁的中文总结你目前已完成的内容和得到的结果，并说明若还有未完成的步骤是什么。',
+      });
+      const wrap = await callModelResilient(modelCall, {
+        messages, tools: [], kimiConfig, fetchImpl,
+        onContent: (d) => { if (d) emit('token', { delta: d }); },
+        onReasoning: () => {},
+      }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
+      finalText = (wrap && wrap.content) || '';
+      if (wrap && wrap.usage) {
+        usageTotals.prompt_tokens += Number(wrap.usage.prompt_tokens || 0);
+        usageTotals.completion_tokens += Number(wrap.usage.completion_tokens || 0);
+        usageTotals.total_tokens += Number(wrap.usage.total_tokens || 0);
+      }
+    } catch {
+      // fall through to the static backstop below
+    }
+  }
+  // Last-resort backstop: never end a normal (non-cancelled) run with a blank
+  // reply — give the user something actionable instead of silence.
+  if (!finalText && !(signal && signal.aborted)) {
+    finalText = '我执行了几步操作，但还没能在本轮内完成并给出结论。你可以让我"继续"，或把任务说得更具体一些。';
+    emit('token', { delta: finalText });
+  }
   return { text: finalText, steps, usage: usageTotals, cancelled: !!(signal && signal.aborted) };
 }
 
@@ -477,7 +511,7 @@ export async function streamAgentChat({
       skills: skillsList,
       // Clamp client-supplied step budget to a safe range so a request body
       // can't blow up upstream cost / runtime (1..12, default 6).
-      maxSteps: Math.min(Math.max(Number(body.maxSteps) || 6, 1), 12),
+      maxSteps: Math.min(Math.max(Number(body.maxSteps) || 8, 1), 16),
       verify: body.verify === true || body.thinking === 'deep',
       approvals,
       autoApprove: body.autoApprove === true,
