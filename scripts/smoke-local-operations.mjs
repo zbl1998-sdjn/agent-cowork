@@ -87,7 +87,7 @@ async function main() {
 
     const artifactPath = path.join(workspace, '.AgentCowork', 'artifacts', 'summary.md');
     const renamedNotePath = path.join(workspace, 'notes', 'weekly-renamed.md');
-    const movedContractPath = path.join(workspace, 'Kimi_Cowork整理', '合同审核', 'sample-contract.txt');
+    const movedContractPath = path.join(workspace, 'Agent_Cowork整理', '合同审核', 'sample-contract.txt');
     const operations = [
       { type: 'write', path: artifactPath, content: '# Agent Cowork Summary\n\n- Local operation smoke passed.\n' },
       { type: 'rename', path: notePath, newName: 'weekly-renamed.md' },

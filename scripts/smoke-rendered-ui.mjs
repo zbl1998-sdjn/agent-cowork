@@ -507,11 +507,11 @@ async function main() {
     assert(uploadAndChat.taskState.runCardCount >= 2, 'cowork handoff did not append a task card');
     assert(uploadAndChat.taskState.activeRunCard.includes('协作') && uploadAndChat.taskState.activeRunCard.includes('完成'), 'cowork handoff did not highlight latest task card');
     assert(uploadAndChat.taskState.chatHidden === true, 'chat output should stay hidden after cowork task handoff');
-    const uploadRoot = path.join(workspace, 'Kimi_Cowork上传');
+    const uploadRoot = path.join(workspace, 'Agent_Cowork上传');
     const uploadedFiles = fs.existsSync(uploadRoot)
       ? fs.readdirSync(uploadRoot, { recursive: true }).filter((name) => String(name).endsWith('invoice-ui-smoke.txt'))
       : [];
-    assert(uploadedFiles.length === 1, 'browser upload did not persist file into Kimi_Cowork上传');
+    assert(uploadedFiles.length === 1, 'browser upload did not persist file into Agent_Cowork上传');
 
     const report = {
       ok: true,

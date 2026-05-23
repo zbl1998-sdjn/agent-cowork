@@ -22,7 +22,7 @@ func TestCLIEndToEnd(t *testing.T) {
 	notePath := filepath.Join(root, "notes", "weekly.md")
 	artifactPath := filepath.Join(root, ".AgentCowork", "artifacts", "agent-summary.md")
 	renamedNotePath := filepath.Join(root, "notes", "weekly-renamed.md")
-	movedContractPath := filepath.Join(root, "Kimi_Cowork整理", "合同审核", "sample-contract.txt")
+	movedContractPath := filepath.Join(root, "Agent_Cowork整理", "合同审核", "sample-contract.txt")
 	journalPath := filepath.Join(root, ".AgentCowork", "audit", "agent.jsonl")
 	opsPath := filepath.Join(root, "ops.json")
 

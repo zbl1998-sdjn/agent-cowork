@@ -80,7 +80,7 @@ export function importUploadedFiles({
   }
 
   const safeRoot = path.resolve(trustedRoot);
-  const uploadRoot = assertTrustedPathForCreate(path.join(safeRoot, 'Kimi_Cowork上传', batchId), safeRoot);
+  const uploadRoot = assertTrustedPathForCreate(path.join(safeRoot, 'Agent_Cowork上传', batchId), safeRoot);
   let totalBytes = 0;
   const imported = [];
 

@@ -597,7 +597,7 @@ static bool kcw_build_pending_move_preview(void) {
     swprintf_s(
         g_app.pending_move_to_relative,
         sizeof(g_app.pending_move_to_relative) / sizeof(g_app.pending_move_to_relative[0]),
-        L"Kimi_Cowork整理\\%s\\%s",
+        L"Agent_Cowork整理\\%s\\%s",
         KCW_TEMPLATES[g_app.selected_template],
         file_name);
     kcw_join_path(g_app.pending_move_from, sizeof(g_app.pending_move_from) / sizeof(g_app.pending_move_from[0]), g_app.trusted_root, source_relative);
@@ -841,7 +841,7 @@ static bool kcw_apply_pending_move(wchar_t *error, size_t error_len) {
 
     wchar_t move_root[MAX_PATH];
     wchar_t move_template_dir[MAX_PATH];
-    swprintf_s(move_root, sizeof(move_root) / sizeof(move_root[0]), L"%s\\Kimi_Cowork整理", g_app.trusted_root);
+    swprintf_s(move_root, sizeof(move_root) / sizeof(move_root[0]), L"%s\\Agent_Cowork整理", g_app.trusted_root);
     swprintf_s(move_template_dir, sizeof(move_template_dir) / sizeof(move_template_dir[0]), L"%s\\%s", move_root, KCW_TEMPLATES[g_app.selected_template]);
     if (!kcw_ensure_directory(move_root) || !kcw_ensure_directory(move_template_dir)) {
         wcsncpy_s(error, error_len, L"无法创建目标整理目录。", _TRUNCATE);

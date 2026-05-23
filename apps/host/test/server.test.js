@@ -176,7 +176,7 @@ test('upload import persists selected local files under trusted workspace', asyn
     assert.equal(body.imported.length, 1);
     assert.equal(body.totalBytes, Buffer.byteLength('amount=100'));
     assert.equal(fs.readFileSync(body.imported[0].path, 'utf8'), 'amount=100');
-    assert.match(body.imported[0].path, /[\\\/]Kimi_Cowork上传[\\\/]/);
+    assert.match(body.imported[0].path, /[\\\/]Agent_Cowork上传[\\\/]/);
   });
 });
 

@@ -303,9 +303,9 @@ try {
     Assert-True ($rollbackLog.Contains('"operation":"write_new_artifact"')) "Rollback log does not contain write_new_artifact operation"
     Assert-True ($rollbackLog.Contains('"operation":"move_file"')) "Rollback log does not contain move_file operation"
 
-    $moveRoot = Join-Path $workspace "Kimi_Cowork整理"
+    $moveRoot = Join-Path $workspace "Agent_Cowork整理"
     $movedFiles = @(Get-ChildItem -LiteralPath $moveRoot -Recurse -File -ErrorAction SilentlyContinue)
-    Assert-True ($movedFiles.Count -eq 1) "Expected one moved file under Kimi_Cowork整理, got $($movedFiles.Count)"
+    Assert-True ($movedFiles.Count -eq 1) "Expected one moved file under Agent_Cowork整理, got $($movedFiles.Count)"
     $movedFilePath = $movedFiles[0].FullName
     Assert-True ($movedFilePath.StartsWith($moveRoot, [System.StringComparison]::OrdinalIgnoreCase)) "Moved file is outside the expected move root: $movedFilePath"
 

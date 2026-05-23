@@ -3,7 +3,7 @@
 这个项目是一个零外部依赖的 Node.js MVP-0 本地 PoC 主机服务（host），用于验证 Kimi 工作流前置能力：
 
 - 文件树枚举（仅限 trusted root）
-- 文件 / 文件夹导入（复制到 trusted root 下的 `Kimi_Cowork上传/`）
+- 文件 / 文件夹导入（复制到 trusted root 下的 `Agent_Cowork上传/`）
 - 文本文件读取与上下文打包
 - 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
 - 可控命令运行（默认关闭）
@@ -71,7 +71,7 @@ npm run start:mvp
 
 前端“任务卡片”直接读取 `GET /api/runs`，展示最近 run 的类型、状态、耗时和短 ID；点击卡片会读取 `GET /api/runs/<runId>`，把输入摘要、Kimi 输出或错误展开到执行动态区域。
 
-文件 / 文件夹上传是本地导入，不会无差别上传云端：前端通过文件选择器读取用户明确选择的文件，Host 写入 trusted root 下的 `Kimi_Cowork上传/<batch>/`，随后文件树和 Kimi 摘要会优先使用刚上传的文件。
+文件 / 文件夹上传是本地导入，不会无差别上传云端：前端通过文件选择器读取用户明确选择的文件，Host 写入 trusted root 下的 `Agent_Cowork上传/<batch>/`，随后文件树和 Kimi 摘要会优先使用刚上传的文件。
 
 上传接口：
 
@@ -160,5 +160,5 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
 - 自动加载信任工作区并扫描本地文件。
 - 生成计划按钮会更新产物区，并读取信任工作区内 TXT / Markdown / CSV 的本地内容摘要。
 - 生成计划会展示一个最小安全文件移动 preview。
-- 审批执行按钮会写入 `.AgentCowork/artifacts/*.md`、`.AgentCowork/audit/audit.jsonl` 和 `.AgentCowork/rollback/*.jsonl`，并把预览文件移动到 `Kimi_Cowork整理/<模板名>/`。
+- 审批执行按钮会写入 `.AgentCowork/artifacts/*.md`、`.AgentCowork/audit/audit.jsonl` 和 `.AgentCowork/rollback/*.jsonl`，并把预览文件移动到 `Agent_Cowork整理/<模板名>/`。
 - Developer Mode 按钮会打开模型/能力边界面板。
