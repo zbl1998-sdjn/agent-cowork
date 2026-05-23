@@ -124,7 +124,7 @@ async function main() {
   const healthUrl = runtime.ok ? `http://${runtime.value.host}:${runtime.value.port}/health` : null;
   const health = healthUrl ? await getHealth(healthUrl) : null;
   const pidAlive = runtime.ok && isPidAlive(runtime.value.pid);
-  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'kimi-cowork-host';
+  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'agent-cowork-host';
 
   const verification = readJson(verificationFile);
   const rendered = readJson(renderedFile);

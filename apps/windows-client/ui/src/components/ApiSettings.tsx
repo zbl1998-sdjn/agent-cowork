@@ -90,7 +90,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
               <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>取消</button>
               <button type="button" className="btn-primary" disabled={busy} onClick={() => void save(false)}>{busy ? '保存中…' : '保存'}</button>
             </div>
-            <p className="modal-note">密钥仅保存在本机 .KimiCowork/config.json，绝不回传或显示明文。</p>
+            <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
           </div>
         )}
       </div>

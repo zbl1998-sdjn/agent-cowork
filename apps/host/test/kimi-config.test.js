@@ -64,7 +64,7 @@ test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags
   });
 
   // Key is persisted to the gitignored config file.
-  const cfgPath = path.join(trustedRoot, '.KimiCowork', 'config.json');
+  const cfgPath = path.join(trustedRoot, '.AgentCowork', 'config.json');
   assert.ok(fs.existsSync(cfgPath), 'config.json was not written');
   const persisted = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   assert.equal(persisted.kimiApi.apiKey, SECRET);
@@ -73,9 +73,9 @@ test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags
 
 test('persisted config is reloaded on a fresh server boot (survives restart)', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-reload');
-  fs.mkdirSync(path.join(trustedRoot, '.KimiCowork'), { recursive: true });
+  fs.mkdirSync(path.join(trustedRoot, '.AgentCowork'), { recursive: true });
   fs.writeFileSync(
-    path.join(trustedRoot, '.KimiCowork', 'config.json'),
+    path.join(trustedRoot, '.AgentCowork', 'config.json'),
     JSON.stringify({ kimiApi: { apiKey: SECRET, baseUrl: 'https://x.example/v1', model: 'persisted-model' } }),
     'utf8',
   );

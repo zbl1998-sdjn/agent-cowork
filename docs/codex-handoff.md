@@ -60,7 +60,7 @@ grep -nP "\xEF\xBF\xBD" apps/windows-client/resources/app.js   # 应无输出
 
 - 背景: 三模块已是 Repository 形态接口, 现在用 JSON/JSONL 落盘。换成 SQLite, **不动调用方**。
 - **建议用 Node 内置 `node:sqlite`** (Node 22.5+ 实验性, 本机 Node 22.22 可用), 维持仓库 zero-deps 约定; 若不可用再退 `better-sqlite3` (需 native build, 注意 Windows + Defender)。
-- Schema 铁律 (见 `docs/kimi-cowork-scale-readiness.md` 3.2): 每表 `id TEXT PK (ULID)`, `tenant_id TEXT NOT NULL`, `created_at TEXT`, 联合索引 `(tenant_id, created_at DESC)`; 不用 SQLite 专有类型。
+- Schema 铁律 (见 `docs/agent-cowork-scale-readiness.md` 3.2): 每表 `id TEXT PK (ULID)`, `tenant_id TEXT NOT NULL`, `created_at TEXT`, 联合索引 `(tenant_id, created_at DESC)`; 不用 SQLite 专有类型。
 - 表: `runs_index`, `memory_facts`, `schedules` (+ `run_events` 可选, 替代内嵌 events[])。
 - 用迁移文件管理 schema (手写 `migrations/0001_init.sql` + 一个极简 runner 即可)。
 - 验收: 把 `RunsIndex` / scheduler store / memory store 各加一个 `sqlite` adapter, 通过 env 或 config 切换 (`KCW_STORE=sqlite|file`); 现有 6 个测试文件全绿不改; 新增 adapter 对等测试。
@@ -85,8 +85,8 @@ grep -nP "\xEF\xBF\xBD" apps/windows-client/resources/app.js   # 应无输出
 
 ### P2-A Tauri 迁移 + React 重写 (大工程, 周级)
 
-- 决策依据见 `docs/kimi-cowork-optimization-roadmap.md` 阶段 3.1 (选 Tauri: 安装包 ~10MB, Win 仍走 WebView2, Rust 侧 wrap 现有 Go local-agent)。
-- 步骤: ① React+Tailwind 重写 `apps/windows-client/resources` 的静态前端 (组件按 `docs/kimi-cowork-chat-ux-redesign.md` 第 4 节: MessageBubble/ProgressLine/PreviewCard/ApprovalActions/ArtifactCard/SourcesFooter/Composer/ClarificationCard); ② Tauri Rust 侧只做 IPC + 启动 Node host(sidecar) + 系统通知 + shell.open; ③ Node host (localhost API) 不变, 继续承担业务; ④ 旧 C/Win32 客户端归档到 `apps/windows-client-legacy`, 放弃 Defender ASR 战线。
+- 决策依据见 `docs/agent-cowork-optimization-roadmap.md` 阶段 3.1 (选 Tauri: 安装包 ~10MB, Win 仍走 WebView2, Rust 侧 wrap 现有 Go local-agent)。
+- 步骤: ① React+Tailwind 重写 `apps/windows-client/resources` 的静态前端 (组件按 `docs/agent-cowork-chat-ux-redesign.md` 第 4 节: MessageBubble/ProgressLine/PreviewCard/ApprovalActions/ArtifactCard/SourcesFooter/Composer/ClarificationCard); ② Tauri Rust 侧只做 IPC + 启动 Node host(sidecar) + 系统通知 + shell.open; ③ Node host (localhost API) 不变, 继续承担业务; ④ 旧 C/Win32 客户端归档到 `apps/windows-client-legacy`, 放弃 Defender ASR 战线。
 - 验收: Tauri dev 能起窗口、加载对话流前端、跑通"发送→SSE 进度→预览→审批→产物"全链路; 打包出 < 20MB 安装器。
 
 ### P2-B `#历史 run` picker (低优先级前端)

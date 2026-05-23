@@ -77,7 +77,7 @@ Agent 循环在 `kimi/agent-runner.js`。工具集由 `agent-tools.js` 装配，
 - **安全响应头**：`server.js` 的 `SECURITY_HEADERS` 对所有响应生效（nosniff / DENY 框架 / no-referrer / COOP / CORP）。
 - **路径策略**：`security/path-policy.js` 的 `assertTrustedPath` 拒绝受信根外与系统敏感目录（如 Temp/AppData）。
 - **CORS**：`isAllowedOrigin` 只放行 loopback 与 `tauri:`；恶意 Origin 不反射。
-- **密钥**：Kimi API Key 只存 `.KimiCowork/config.json`（已 gitignore），接口只回 `hasKey` 布尔，永不回显明文。
+- **密钥**：Kimi API Key 只存 `.AgentCowork/config.json`（已 gitignore），接口只回 `hasKey` 布尔，永不回显明文。
 - **CSP**：见 `src-tauri/tauri.conf.json`；PDF 内联预览依赖 `object-src/frame-src 'self' data:`。
 
 ## PostgreSQL 切换

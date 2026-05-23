@@ -10,7 +10,7 @@
       "identifier": "shell:allow-execute",
       "allow": [
         {
-          "name": "binaries/kimi-cowork-host",
+          "name": "binaries/agent-cowork-host",
           "sidecar": true
         }
       ]

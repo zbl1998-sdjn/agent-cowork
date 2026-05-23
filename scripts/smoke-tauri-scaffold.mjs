@@ -44,7 +44,7 @@ assert(config.build?.frontendDist === '../resources', 'Tauri frontendDist must r
 assert(config.app?.windows?.[0]?.label === 'main', 'Tauri main window label missing');
 assert(Boolean(config.app?.security?.csp), 'Tauri CSP must not be null');
 assert(config.bundle?.active === true, 'Tauri bundle must be active');
-assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/kimi-cowork-host']), 'Tauri bundle must declare host sidecar');
+assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/agent-cowork-host']), 'Tauri bundle must declare host sidecar');
 
 const cargoToml = fs.readFileSync(cargoPath, 'utf8');
 for (const crate of ['tauri =', 'tauri-plugin-shell', 'tauri-plugin-opener', 'tauri-plugin-notification']) {
@@ -56,7 +56,7 @@ for (const symbol of [
   'start_node_host',
   'host_status',
   'open_path',
-  '.sidecar("binaries/kimi-cowork-host")',
+  '.sidecar("binaries/agent-cowork-host")',
   'assert_trusted_path',
   'tauri_plugin_shell::init()',
   'tauri_plugin_opener::init()',
@@ -71,7 +71,7 @@ assert((capability.permissions || []).includes('opener:default'), 'Tauri capabil
 assert(!(capability.permissions || []).includes('shell:allow-open'), 'Tauri capability must not grant broad shell open');
 assert((capability.permissions || []).some((permission) => (
   permission?.identifier === 'shell:allow-execute'
-  && (permission.allow || []).some((item) => item.name === 'binaries/kimi-cowork-host' && item.sidecar === true)
+  && (permission.allow || []).some((item) => item.name === 'binaries/agent-cowork-host' && item.sidecar === true)
 )), 'Tauri capability must allow only the packaged host sidecar');
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

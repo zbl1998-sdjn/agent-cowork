@@ -32,7 +32,7 @@ MVP-1 必须面向普通 Windows 用户，而不是只面向已经安装 Kimi Co
 ## 2. Repository Layout
 
 ```text
-kimi-cowork/
+agent-cowork/
 ├── apps/
 │   ├── windows-client/
 │   │   ├── CMakeLists.txt
@@ -62,7 +62,7 @@ kimi-cowork/
 │   │       └── app.js
 │   └── local-agent/
 │       ├── go.mod
-│       ├── cmd/kimi-cowork-agent/main.go
+│       ├── cmd/agent-cowork-agent/main.go
 │       └── internal/
 │           ├── workspace/
 │           ├── tools/
@@ -108,7 +108,7 @@ cmake --build build/windows-client
 Expected:
 
 ```text
-KimiCowork.exe builds and opens a native Windows window.
+AgentCowork.exe builds and opens a native Windows window.
 ```
 
 ### Task W2: WebView2 Bridge
@@ -150,13 +150,13 @@ Client never grants full-disk access.
 
 **Files:**
 - Create: `apps/local-agent/go.mod`
-- Create: `apps/local-agent/cmd/kimi-cowork-agent/main.go`
+- Create: `apps/local-agent/cmd/agent-cowork-agent/main.go`
 
 Acceptance:
 
 ```powershell
 go test ./...
-go run ./cmd/kimi-cowork-agent --help
+go run ./cmd/agent-cowork-agent --help
 ```
 
 Expected:

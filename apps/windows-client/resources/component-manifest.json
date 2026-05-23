@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "target": "tauri-react",
-  "source": "docs/kimi-cowork-chat-ux-redesign.md#4",
+  "source": "docs/agent-cowork-chat-ux-redesign.md#4",
   "status": "component-contract",
   "components": [
     {

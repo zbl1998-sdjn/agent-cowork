@@ -48,7 +48,7 @@ async function main() {
   fs.writeFileSync(contractPath, 'Contract draft. Party A, Party B, renewal date, payment terms.', 'utf8');
   fs.writeFileSync(path.join(workspace, 'meeting-notes.md'), '# Weekly\n- Prepare summary', 'utf8');
 
-  const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'ui-smoke.jsonl');
+  const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'ui-smoke.jsonl');
   const server = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
@@ -102,10 +102,10 @@ async function main() {
       scriptBodies.push(asset.body);
     }
     const allScripts = scriptBodies.join('\n');
-    assert(allScripts.includes('window.KimiCoworkUtils'), 'utility module global missing');
-    assert(allScripts.includes('window.KimiCoworkApi'), 'API client module global missing');
-    assert(allScripts.includes('window.KimiCoworkRunEvents'), 'run-events module global missing');
-    assert(allScripts.includes('window.KimiCoworkComposerPopover'), 'composer popover module global missing');
+    assert(allScripts.includes('window.AgentCoworkUtils'), 'utility module global missing');
+    assert(allScripts.includes('window.AgentCoworkApi'), 'API client module global missing');
+    assert(allScripts.includes('window.AgentCoworkRunEvents'), 'run-events module global missing');
+    assert(allScripts.includes('window.AgentCoworkComposerPopover'), 'composer popover module global missing');
     assert(allScripts.includes('createComposerPopover'), 'composer popover factory missing');
     assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');
     assert(allScripts.includes('function appendAssistantMessage'), 'app scripts missing message bubble controller');
@@ -161,7 +161,7 @@ async function main() {
     const recipes = await (await fetch(`${baseUrl}/api/recipes`)).json();
     assert(recipes.recipes.length >= 8, 'UI recipe flow did not expose MVP templates');
 
-    const artifactPath = path.join(workspace, '.KimiCowork', 'artifacts', 'ui-smoke-plan.md');
+    const artifactPath = path.join(workspace, '.AgentCowork', 'artifacts', 'ui-smoke-plan.md');
     const operations = [
       {
         type: 'write',

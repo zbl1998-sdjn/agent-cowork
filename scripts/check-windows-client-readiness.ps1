@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $buildRoot = Join-Path $repoRoot "build"
-$exe = Join-Path $buildRoot "windows-client-vs\KimiCowork.exe"
+$exe = Join-Path $buildRoot "windows-client-vs\AgentCowork.exe"
 $reportPath = Join-Path $buildRoot "windows-client-readiness.json"
 $asrRuleId = "01443614-CD74-433A-B99E-2ECDC07BFC25"
 

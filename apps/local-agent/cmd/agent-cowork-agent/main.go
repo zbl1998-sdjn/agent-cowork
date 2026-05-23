@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"kimi-cowork/apps/local-agent/internal/journal"
-	"kimi-cowork/apps/local-agent/internal/tools"
+	"agent-cowork/apps/local-agent/internal/journal"
+	"agent-cowork/apps/local-agent/internal/tools"
 )
 
 const version = "0.1.0-v0.3"
@@ -33,14 +33,14 @@ type applyPayload struct {
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "kimi-cowork-agent: %v\n", err)
+		fmt.Fprintf(os.Stderr, "agent-cowork-agent: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return printJSON(healthPayload{OK: true, Service: "kimi-cowork-agent", Version: version})
+		return printJSON(healthPayload{OK: true, Service: "agent-cowork-agent", Version: version})
 	}
 	if args[0] == "-version" || args[0] == "--version" {
 		fmt.Println(version)
@@ -49,7 +49,7 @@ func run(args []string) error {
 
 	switch args[0] {
 	case "health":
-		return printJSON(healthPayload{OK: true, Service: "kimi-cowork-agent", Version: version})
+		return printJSON(healthPayload{OK: true, Service: "agent-cowork-agent", Version: version})
 	case "list":
 		return runList(args[1:])
 	case "read":

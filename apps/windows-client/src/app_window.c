@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <wchar.h>
 
-static const wchar_t *KCW_CLASS_NAME = L"KimiCoworkWindow";
+static const wchar_t *KCW_CLASS_NAME = L"AgentCoworkWindow";
 
 #define KCW_MAX_FILES 240
 #define KCW_CONTEXT_MAX_FILES 3
@@ -194,7 +194,7 @@ static void kcw_detect_initial_workspace(void) {
     }
 
     wchar_t env_workspace[MAX_PATH] = L"";
-    if (GetEnvironmentVariableW(L"KIMI_COWORK_WORKSPACE", env_workspace, (DWORD)(sizeof(env_workspace) / sizeof(env_workspace[0]))) > 0) {
+    if (GetEnvironmentVariableW(L"AGENT_COWORK_WORKSPACE", env_workspace, (DWORD)(sizeof(env_workspace) / sizeof(env_workspace[0]))) > 0) {
         wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), env_workspace, _TRUNCATE);
         return;
     }
@@ -208,7 +208,7 @@ static void kcw_detect_initial_workspace(void) {
     wchar_t current_dir[MAX_PATH] = L"";
     if (GetCurrentDirectoryW((DWORD)(sizeof(current_dir) / sizeof(current_dir[0])), current_dir) > 0) {
         wchar_t marker[MAX_PATH] = L"";
-        swprintf_s(marker, sizeof(marker) / sizeof(marker[0]), L"%s\\kimi-cowork.workspace", current_dir);
+        swprintf_s(marker, sizeof(marker) / sizeof(marker[0]), L"%s\\agent-cowork.workspace", current_dir);
         if (GetFileAttributesW(marker) != INVALID_FILE_ATTRIBUTES) {
             wcsncpy_s(g_initial_workspace, sizeof(g_initial_workspace) / sizeof(g_initial_workspace[0]), current_dir, _TRUNCATE);
         }
@@ -400,7 +400,7 @@ static bool kcw_has_text_summary_extension(const wchar_t *name) {
 static bool kcw_skip_directory(const wchar_t *name) {
     return _wcsicmp(name, L".git") == 0 || _wcsicmp(name, L"node_modules") == 0 ||
            _wcsicmp(name, L"build") == 0 || _wcsicmp(name, L"dist") == 0 ||
-           _wcsicmp(name, L".KimiCowork") == 0;
+           _wcsicmp(name, L".AgentCowork") == 0;
 }
 
 static void kcw_append_text(wchar_t *out, size_t out_len, const wchar_t *text) {
@@ -698,7 +698,7 @@ static bool kcw_prepare_app_directories(wchar_t *artifacts_dir, size_t artifacts
     }
 
     wchar_t app_dir[MAX_PATH];
-    swprintf_s(app_dir, sizeof(app_dir) / sizeof(app_dir[0]), L"%s\\.KimiCowork", g_app.trusted_root);
+    swprintf_s(app_dir, sizeof(app_dir) / sizeof(app_dir[0]), L"%s\\.AgentCowork", g_app.trusted_root);
     swprintf_s(artifacts_dir, artifacts_len, L"%s\\artifacts", app_dir);
     swprintf_s(audit_dir, audit_len, L"%s\\audit", app_dir);
     swprintf_s(rollback_dir, rollback_len, L"%s\\rollback", app_dir);
@@ -747,7 +747,7 @@ static bool kcw_write_approved_artifact(const wchar_t *plan_text, wchar_t *error
     wchar_t audit_dir[MAX_PATH];
     wchar_t rollback_dir[MAX_PATH];
     if (!kcw_prepare_app_directories(artifacts_dir, sizeof(artifacts_dir) / sizeof(artifacts_dir[0]), audit_dir, sizeof(audit_dir) / sizeof(audit_dir[0]), rollback_dir, sizeof(rollback_dir) / sizeof(rollback_dir[0]))) {
-        wcsncpy_s(error, error_len, L"无法创建 .KimiCowork 本地产物目录。", _TRUNCATE);
+        wcsncpy_s(error, error_len, L"无法创建 .AgentCowork 本地产物目录。", _TRUNCATE);
         return false;
     }
 
@@ -995,7 +995,7 @@ static void kcw_generate_plan(HWND window) {
 
 static void kcw_approve_plan(HWND window) {
     if (g_app.trusted_root[0] == L'\0') {
-        SetWindowTextW(g_app.artifact_edit, L"请先选择本地信任工作区。审批执行只会写入该工作区内的 .KimiCowork 安全产物目录。");
+        SetWindowTextW(g_app.artifact_edit, L"请先选择本地信任工作区。审批执行只会写入该工作区内的 .AgentCowork 安全产物目录。");
         kcw_set_status(L"审批被阻止：尚未选择信任工作区。");
         InvalidateRect(window, NULL, TRUE);
         return;

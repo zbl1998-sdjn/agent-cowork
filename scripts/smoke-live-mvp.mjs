@@ -162,7 +162,7 @@ function readRuntime() {
 }
 
 function listArtifacts(workspace) {
-  const artifactsDir = path.join(workspace, '.KimiCowork', 'artifacts');
+  const artifactsDir = path.join(workspace, '.AgentCowork', 'artifacts');
   if (!fs.existsSync(artifactsDir)) {
     return [];
   }
@@ -176,13 +176,13 @@ async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   const runtime = readRuntime();
   const health = await getJson(`http://${runtime.host}:${runtime.port}/health`, 5000);
-  assert(health.ok === true && health.service === 'kimi-cowork-host', 'live MVP health check failed');
+  assert(health.ok === true && health.service === 'agent-cowork-host', 'live MVP health check failed');
 
   const browserPath = findBrowser();
   assert(browserPath, 'No Edge or Chrome executable was found for live MVP smoke');
 
   const artifactBefore = new Set(listArtifacts(runtime.workspace));
-  const auditPath = runtime.auditPath || path.join(runtime.workspace, '.KimiCowork', 'audit', 'host-events.jsonl');
+  const auditPath = runtime.auditPath || path.join(runtime.workspace, '.AgentCowork', 'audit', 'host-events.jsonl');
   const auditSizeBefore = fs.existsSync(auditPath) ? fs.statSync(auditPath).size : 0;
 
   const debugPort = await getFreePort();

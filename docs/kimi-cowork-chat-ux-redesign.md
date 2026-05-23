@@ -1,7 +1,7 @@
 # Agent Cowork 对话流 UX 重构
 
 > 日期: 2026-05-20
-> 上游: `docs/kimi-cowork-optimization-roadmap.md` 阶段 0
+> 上游: `docs/agent-cowork-optimization-roadmap.md` 阶段 0
 > 触发: 当前 UI 是 dashboard 范式 (主输入 + 8 个并列面板), 跟 Claude Cowork 的对话流范式根本不同。这份文档定义目标范式 + 迁移步骤。
 
 ---
@@ -190,7 +190,7 @@ Cowork:
 - 断线重连用 `Last-Event-ID` query 参数从中断点继续 (跟 scale-readiness 文档里 relay 协议一致)
 - runs/*.json 仍然全量落盘, SSE 只是实时同步通道
 
-### 5.3 兼容现有 `.KimiCowork/runs/*.json`
+### 5.3 兼容现有 `.AgentCowork/runs/*.json`
 
 现有 runs/*.json 改为 event-sourced 结构:
 
@@ -208,13 +208,13 @@ Cowork:
 }
 ```
 
-历史会话打开时, 读 runs/<runId>.json 把 events[] 重放成对话气泡即可。这一改造同时跟 `docs/kimi-cowork-scale-readiness.md` 第 3.6 节的 event-sourced orchestrator 对齐, 一举两得。
+历史会话打开时, 读 runs/<runId>.json 把 events[] 重放成对话气泡即可。这一改造同时跟 `docs/agent-cowork-scale-readiness.md` 第 3.6 节的 event-sourced orchestrator 对齐, 一举两得。
 
 ---
 
 ## 6. 迁移路径 (跟优化路线图 阶段 0 合并)
 
-原来 `docs/kimi-cowork-optimization-roadmap.md` 阶段 0 是"澄清气泡 + 任务卡片 + 进度行"。建议把它升级为"**整体改对话流**, 包含这三件":
+原来 `docs/agent-cowork-optimization-roadmap.md` 阶段 0 是"澄清气泡 + 任务卡片 + 进度行"。建议把它升级为"**整体改对话流**, 包含这三件":
 
 ### Week 1: 对话流骨架
 

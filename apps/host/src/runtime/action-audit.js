@@ -6,7 +6,7 @@ import { AuditEventBus, createJsonlAuditSubscriber } from './audit-events.js';
 // Kept separate from the memory audit so a security review has a dedicated,
 // append-only trail of every side-effecting decision the agent made.
 
-const ACTION_AUDIT_FILE = path.join('.KimiCowork', 'audit', 'actions.jsonl');
+const ACTION_AUDIT_FILE = path.join('.AgentCowork', 'audit', 'actions.jsonl');
 const buses = new Map();
 
 export function actionAuditPath(trustedRoot) {

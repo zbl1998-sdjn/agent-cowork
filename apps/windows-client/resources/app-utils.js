@@ -107,7 +107,7 @@
     });
   }
 
-  window.KimiCoworkUtils = Object.freeze({
+  window.AgentCoworkUtils = Object.freeze({
     arrayBufferToBase64,
     basename,
     compactText,

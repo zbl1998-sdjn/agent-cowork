@@ -1014,7 +1014,7 @@ D:\Work\2025_ClientA_Contract.docx
 ## 15. 项目目录结构
 
 ```text
-kimi-cowork/
+agent-cowork/
   apps/
     windows-client/
       src/

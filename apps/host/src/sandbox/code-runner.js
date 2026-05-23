@@ -30,7 +30,7 @@ const EXT_BY_TOOL = Object.freeze({
   python3: 'py',
 });
 const EXT_RE = /^[a-z0-9]{1,8}$/i;
-const SCRIPT_DIR_SEGMENTS = ['.KimiCowork', 'scripts'];
+const SCRIPT_DIR_SEGMENTS = ['.AgentCowork', 'scripts'];
 
 function fail(message, statusCode = 400) {
   const error = new Error(`code runner: ${message}`);

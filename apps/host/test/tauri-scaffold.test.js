@@ -21,7 +21,7 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.equal(config.app.windows[0].label, 'main');
   assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
-  assert.deepEqual(config.bundle.externalBin, ['binaries/kimi-cowork-host']);
+  assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
 });
 
 test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
@@ -44,7 +44,7 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
     'host_status',
     'open_path',
     '.sidecar(',
-    'binaries/kimi-cowork-host',
+    'binaries/agent-cowork-host',
     'tauri_plugin_shell::init()',
     'tauri_plugin_opener::init()',
     'tauri_plugin_notification::init()',
@@ -64,7 +64,7 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   assert.equal(capability.permissions.includes('shell:allow-open'), false);
   assert.ok(capability.permissions.some((permission) => (
     permission.identifier === 'shell:allow-execute'
-    && permission.allow?.some((item) => item.name === 'binaries/kimi-cowork-host' && item.sidecar === true)
+    && permission.allow?.some((item) => item.name === 'binaries/agent-cowork-host' && item.sidecar === true)
   )));
 });
 

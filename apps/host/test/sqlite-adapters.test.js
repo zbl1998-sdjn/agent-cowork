@@ -160,7 +160,7 @@ test('SqliteScheduleStore persists schedules across Scheduler instances', { skip
 
 test('server storeBackend=sqlite wires memory, runs index, and schedules', { skip: !sqliteAvailable }, async () => {
   const trustedRoot = tempRoot();
-  const dbPath = path.join(trustedRoot, '.KimiCowork', 'state.sqlite');
+  const dbPath = path.join(trustedRoot, '.AgentCowork', 'state.sqlite');
   const server = createServer({
     trustedRoot,
     storeBackend: 'sqlite',
@@ -178,7 +178,7 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
     });
     assert.equal(fact.status, 200);
     await flushMemoryAuditEvents(trustedRoot);
-    const auditPath = path.join(trustedRoot, '.KimiCowork', 'audit', 'memory.jsonl');
+    const auditPath = path.join(trustedRoot, '.AgentCowork', 'audit', 'memory.jsonl');
     assert.ok(fs.existsSync(auditPath), 'sqlite memory writes must emit audit JSONL');
     const auditLines = fs.readFileSync(auditPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
     assert.ok(auditLines.some((line) => line.trace_id === 'trace_sqlite' && line.action === 'memory_fact_append'));

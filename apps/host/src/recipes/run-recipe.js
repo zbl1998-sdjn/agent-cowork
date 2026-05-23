@@ -92,7 +92,7 @@ export function runRecipe({
     const failRecord = {
       id: runId,
       type: 'recipe-run',
-      provider: 'kimi-cowork-host',
+      provider: 'agent-cowork-host',
       command: recipeId,
       recipeId,
       mode: 'cowork',
@@ -140,7 +140,7 @@ export function runRecipe({
   const record = {
     id: runId,
     type: 'recipe-run',
-    provider: 'kimi-cowork-host',
+    provider: 'agent-cowork-host',
     command: recipeId,
     recipeId,
     mode: 'cowork',

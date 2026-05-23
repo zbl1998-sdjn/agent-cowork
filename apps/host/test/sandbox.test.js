@@ -294,7 +294,7 @@ test('POST /api/sandbox/run-code runs inline code, writes the script, records a 
     assert.equal(first.body.result.ok, true);
     assert.equal(first.body.result.stdout, 'from-script:5');
     assert.match(first.body.runId, /^run_/);
-    assert.match(first.body.script, /^\.KimiCowork\/scripts\/run_[^/]+\.js$/);
+    assert.match(first.body.script, /^\.AgentCowork\/scripts\/run_[^/]+\.js$/);
 
     // the materialised script exists on disk inside the trusted root
     const scriptPath = path.join(trustedRoot, ...first.body.script.split('/'));
@@ -350,7 +350,7 @@ test('POST /api/sandbox/run-code rejects a tool outside the allowlist with 400 a
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /not in the allowlist/);
-    const scriptsDir = path.join(trustedRoot, '.KimiCowork', 'scripts');
+    const scriptsDir = path.join(trustedRoot, '.AgentCowork', 'scripts');
     const wrote = fs.existsSync(scriptsDir) ? fs.readdirSync(scriptsDir) : [];
     assert.equal(wrote.length, 0, 'an invalid tool must not leave a script behind');
   } finally {

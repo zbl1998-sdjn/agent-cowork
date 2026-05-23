@@ -68,7 +68,7 @@ test('memory routes: append fact, list notes, read back, inject in workspace inf
     assert.equal(noteRead.status, 200);
     assert.ok(noteRead.body.note.body.includes('Alpha'));
 
-    const audit = path.join(trustedRoot, '.KimiCowork', 'audit', 'memory.jsonl');
+    const audit = path.join(trustedRoot, '.AgentCowork', 'audit', 'memory.jsonl');
     await flushMemoryAuditEvents(trustedRoot);
     assert.ok(fs.existsSync(audit), 'memory audit JSONL must exist');
     const auditLines = fs.readFileSync(audit, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
@@ -234,7 +234,7 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     assert.equal(listOne.body.schedules.length, 1);
     assert.equal(listOne.body.schedules[0].name, 'weekly');
 
-    const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
@@ -437,7 +437,7 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     assert.equal(created.status, 200);
     const scheduleId = created.body.schedule.id;
 
-    const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');

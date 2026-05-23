@@ -93,7 +93,7 @@ async function main() {
 
   try {
     const health = await getHealth(`http://127.0.0.1:${port}/health`);
-    assert(health.ok === true && health.service === 'kimi-cowork-host', 'runtime health check failed');
+    assert(health.ok === true && health.service === 'agent-cowork-host', 'runtime health check failed');
     assert(fs.existsSync(runtimeFile), 'runtime file was not written by start:mvp');
     const runtime = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
     assert(runtime.pid === child.pid, 'runtime pid does not match child process');

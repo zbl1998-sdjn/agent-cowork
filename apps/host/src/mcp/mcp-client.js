@@ -9,7 +9,7 @@ import { JsonRpcClient } from './json-rpc.js';
 const PROTOCOL_VERSION = '2024-11-05';
 
 export class McpClient {
-  constructor({ transport, clientInfo = { name: 'kimi-cowork-host', version: '0.1.0' }, timeoutMs = 15_000 } = {}) {
+  constructor({ transport, clientInfo = { name: 'agent-cowork-host', version: '0.1.0' }, timeoutMs = 15_000 } = {}) {
     if (!transport) {
       throw new Error('McpClient: transport is required');
     }

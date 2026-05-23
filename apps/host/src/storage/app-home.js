@@ -3,16 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 function resolveDefaultHome() {
-  if (process.env.KIMI_COWORK_HOME) {
-    return path.resolve(process.env.KIMI_COWORK_HOME);
+  if (process.env.AGENT_COWORK_HOME) {
+    return path.resolve(process.env.AGENT_COWORK_HOME);
   }
 
   const fallbackCandidates = [];
   if (process.platform === 'win32' && process.env.APPDATA) {
-    fallbackCandidates.push(path.resolve(process.env.APPDATA, 'KimiCowork'));
+    fallbackCandidates.push(path.resolve(process.env.APPDATA, 'AgentCowork'));
   }
-  fallbackCandidates.push(path.resolve(process.cwd(), '.KimiCowork'));
-  fallbackCandidates.push(path.resolve(os.tmpdir(), 'KimiCowork'));
+  fallbackCandidates.push(path.resolve(process.cwd(), '.AgentCowork'));
+  fallbackCandidates.push(path.resolve(os.tmpdir(), 'AgentCowork'));
 
   for (const candidate of fallbackCandidates) {
     try {
@@ -23,7 +23,7 @@ function resolveDefaultHome() {
     }
   }
 
-  return path.resolve(process.cwd(), '.KimiCowork');
+  return path.resolve(process.cwd(), '.AgentCowork');
 }
 
 export function getAppHome() {

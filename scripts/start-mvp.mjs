@@ -53,7 +53,7 @@ const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
 const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
-const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'host-events.jsonl');
+const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'host-events.jsonl');
 const kimiApiPlanEnabled = Boolean(process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
 
 ensureDemoWorkspace(workspace);

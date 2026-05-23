@@ -1,3 +1,3 @@
 fn main() {
-    kimi_cowork_desktop::run();
+    agent_cowork_desktop::run();
 }

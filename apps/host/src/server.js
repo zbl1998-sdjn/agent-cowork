@@ -160,10 +160,10 @@ export function createServer(config = {}) {
     return false;
   }
   const kimiConfigFile = path.resolve(
-    config.kimiConfigFile || path.join(trustedRootDefault, '.KimiCowork', 'config.json'),
+    config.kimiConfigFile || path.join(trustedRootDefault, '.AgentCowork', 'config.json'),
   );
   const kimiApiConfig = resolveKimiApiConfig(config);
-  // Persisted overrides (.KimiCowork/config.json) win over env so a key entered
+  // Persisted overrides (.AgentCowork/config.json) win over env so a key entered
   // via the API settings panel survives restarts.
   applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
   function recomputeKimiEnabled() {
@@ -174,15 +174,15 @@ export function createServer(config = {}) {
   const kimiPlanRunner = config.kimiPlanRunner || runKimiApiPlan;
   const kimiChatRunner = config.kimiChatRunner || runKimiApiChat;
   const kimiChatStreamRunner = config.kimiChatStreamRunner || runKimiApiChatStream;
-  const runStoreRoot = path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.KimiCowork', 'runs'));
+  const runStoreRoot = path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.AgentCowork', 'runs'));
   const idempotencyStore = config.idempotencyStore || new Map();
-  const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.KimiCowork', 'index'));
+  const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.AgentCowork', 'index'));
   const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'file').toLowerCase();
   const storeBackend = storeRaw === 'sqlite' ? 'sqlite' : storeRaw === 'postgres' ? 'postgres' : 'file';
   const databaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
   const usePostgresState = storeBackend === 'postgres' && !!databaseUrl;
   const sqliteDbPath = path.resolve(
-    config.sqliteDbPath || process.env.KCW_SQLITE_PATH || path.join(trustedRootDefault, '.KimiCowork', 'state.sqlite'),
+    config.sqliteDbPath || process.env.KCW_SQLITE_PATH || path.join(trustedRootDefault, '.AgentCowork', 'state.sqlite'),
   );
   const runsIndex = config.runsIndex || (storeBackend === 'postgres'
     ? withSafeWrites(createPostgresRunsIndex({ connectionString: databaseUrl }))
@@ -240,7 +240,7 @@ export function createServer(config = {}) {
   // Set config.persistAuth=false / KCW_AUTH_PERSIST=false for ephemeral hosts
   // and tests that don't want to touch disk.
   const authDbPath = path.resolve(
-    config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.KimiCowork', 'auth.sqlite'),
+    config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.AgentCowork', 'auth.sqlite'),
   );
   const persistAuth = config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false');
   const authStore = config.authStore || (persistAuth ? createSqliteUserStore({ dbPath: authDbPath }) : createUserStore());
@@ -253,7 +253,7 @@ export function createServer(config = {}) {
   // Explicit config wins over the env fallback (so a test can force the gate
   // semantics regardless of the suite-wide KCW_TRUST_IDENTITY_HEADERS preload).
   const trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');
-  const scheduleStoreDir = path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.KimiCowork', 'schedules'));
+  const scheduleStoreDir = path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules'));
   const scheduler = config.scheduler || null;
   let activeScheduler = scheduler;
   if (!activeScheduler && config.enableScheduler !== false) {
@@ -561,7 +561,7 @@ export function createServer(config = {}) {
       }
 
       if (request.method === 'GET' && pathname === '/health') {
-        sendJson(response, 200, { ok: true, service: 'kimi-cowork-host' });
+        sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
         return;
       }
 
@@ -619,7 +619,7 @@ export function createServer(config = {}) {
         add('model-circuit', !breakers.some((b) => b.state === 'open'), breakers.length ? breakers.map((b) => `${b.name}:${b.state}`).join(', ') : '尚无模型调用');
         add('accepting-requests', !draining, draining ? '正在优雅停机' : '正常受理请求');
         sendJson(response, 200, {
-          service: 'kimi-cowork-host',
+          service: 'agent-cowork-host',
           time: new Date().toISOString(),
           security: {
             responseHeaders: Object.keys(SECURITY_HEADERS),

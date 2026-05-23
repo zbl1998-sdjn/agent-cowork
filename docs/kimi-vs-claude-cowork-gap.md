@@ -2,7 +2,7 @@
 
 > 日期: 2026-05-20
 > 对比基准:
-> - Agent Cowork: `plan/kimi-cowork-latest-product-plan-v0.3.md`, `docs/v0.3-implementation-status.md`, 当前仓库代码 (apps/host, apps/local-agent, apps/windows-client, services/*).
+> - Agent Cowork: `plan/agent-cowork-latest-product-plan-v0.3.md`, `docs/v0.3-implementation-status.md`, 当前仓库代码 (apps/host, apps/local-agent, apps/windows-client, services/*).
 > - Claude Cowork: 当前正在运行的 Cowork 桌面应用,基于 Claude Code + Claude Agent SDK,通过实际可见的工具/Skills/MCP/Artifacts/定时任务能力盘点。
 
 ## 0. 一句话定位差异
@@ -17,7 +17,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 |---|---|---|---|
 | 主交互形态 | 单一聊天 + 协作工作台 + 文件树; 主输入触发 plan/preview/approve handoff | 自由对话 + 自动 handoff 到 Skills/Plugins; 多种内联可视化 | 缺多模态原语 |
 | 澄清问题 | 无 (直接接受 prompt) | `AskUserQuestion` 多选题 (最多 4 题/4 选项, 自动带 Other, 支持 multiSelect + preview 卡片) | **缺结构化澄清** |
-| 任务追踪 | 仅 `.KimiCowork/runs/*.json` 后台落盘 + 协作页 runId | `TaskCreate/Update/List` 渲染成可视化任务卡片, in_progress 时显示 activeForm spinner | **缺前台任务卡片 UI** |
+| 任务追踪 | 仅 `.AgentCowork/runs/*.json` 后台落盘 + 协作页 runId | `TaskCreate/Update/List` 渲染成可视化任务卡片, in_progress 时显示 activeForm spinner | **缺前台任务卡片 UI** |
 | 文件分享 | preview + apply 后写入 artifacts/, UI 列出 | `present_files` 渲染可点击文件卡片, `.skill` 文件还附带"Save skill"安装按钮; `computer://` 链接直接打开 | **缺统一文件呈现原语** |
 | 内联可视化 | 无 (前端只有静态 HTML + 文本气泡) | `show_widget` 内联渲染 SVG / HTML / Chart.js / Mermaid / Grid.js, 自动暗色适配, 通过 `read_me` 模块化拉取规范 | **缺可视化原语** (图表/流程图/dashboard 都需要自己实现) |
 | 持久视图 | 无 | `create_artifact` 保存自包含 HTML 页, 跨会话存在, 每次打开自动从 connector 拉新数据 (`window.cowork.callMcpTool/askClaude/runScheduledTask`) | **缺 Artifacts 概念** |
@@ -84,7 +84,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 
 | 能力 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
-| 任务列表 | `.KimiCowork/runs/` 文件 | TaskCreate/Update/List/Get/Stop (有 blocks/blockedBy 依赖) + 渲染 widget | **缺任务依赖图 + 前台呈现** |
+| 任务列表 | `.AgentCowork/runs/` 文件 | TaskCreate/Update/List/Get/Stop (有 blocks/blockedBy 依赖) + 渲染 widget | **缺任务依赖图 + 前台呈现** |
 | 定时任务 | 无 | `scheduled-tasks:create/list/update` 支持 cron + 一次性 fireAt, 主动建议 ("Want me to run this each morning?") | **完全缺定时任务** |
 | 持久 Artifact | apply 后的 markdown/csv 落盘到 artifacts/ | `create_artifact` 持久 HTML 页, 跨会话可再开, 自动拉新数据 + 支持 localStorage 记住用户偏好 + 支持 askClaude 内联 LLM 调用 | **缺"活的" Artifact** (Kimi 的是死文件) |
 | 记忆系统 | 无 | productivity:memory-management (CLAUDE.md + memory/) + consolidate-memory 定期合并; system prompt 里读 working memory | **缺跨会话记忆** |
@@ -100,7 +100,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 | 桌面 stack 选型 | C/Win32 + Node host, 反思后倾向 Electron/Tauri + React/Tailwind (`open-cowork-reference-improvements.md`) | Electron (推测) + Anthropic Claude SDK + Claude Code + MCP host | **stack 还未迁移** |
 | 沙箱执行 | command-runner 默认关闭; 计划用 Docker/Hyper-V/WSL2 | 内置 Ubuntu 22 Linux sandbox (Python/Node 预装, 网络白名单), 每次 bash 独立无 cwd 继承 | **Kimi 几乎没有 sandbox 计算能力**, 只能跑 Node + Kimi CLI |
 | 文件路径映射 | trusted root 单一 | mount → bash path 自动映射 (outputs/uploads/mount/skills), 在 system prompt 明示 | Kimi 路径策略简单, **缺路径分层 + 自动映射** |
-| 持久化 | JSON 文件 (.KimiCowork/runs, audit, rollback, artifacts) | SQLite + 文件 (推测), Artifact 系统 + 定时任务 + memory 全跨会话 | **缺 SQLite + 跨会话状态** (status 文档明确未实现) |
+| 持久化 | JSON 文件 (.AgentCowork/runs, audit, rollback, artifacts) | SQLite + 文件 (推测), Artifact 系统 + 定时任务 + memory 全跨会话 | **缺 SQLite + 跨会话状态** (status 文档明确未实现) |
 | 安全模型 | trusted root + preview + approval + JSONL audit + rollback journal, 禁止 delete | system prompt 规则 (web 内容限制, 不绕过, escalate to chrome 工具); 工具级别审批由 client UI 处理 | Kimi 在 **强制审批/回滚** 这点上设计更扎实 |
 | 多用户/云端 | services/api + relay + orchestrator + kimi-gateway 全是骨架, 单元测试通过, 业务全 TODO | Anthropic 后端多租户 + OAuth + plan limits | **云端能力全骨架, 离可用差很远** |
 | Device Relay | WebSocket 未实现 | 不需要 (单设备客户端 + 云 API) | 差距大但路径不同 |
@@ -117,7 +117,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 - **审批 + 回滚 + 审计三件套设计扎实**: preview / apply / rollback journal / JSONL audit / no-overwrite / no-delete, 这套面向白领办公的安全语义比 Claude Cowork 默认更严。
 - **本地优先 + 信任目录边界明确**: trusted root + path-policy 比 Claude Cowork 的 mount 模型更"白领可解释"。
 - **rendered UI smoke + Windows readiness 诊断闭环**: `smoke:rendered-ui` / `verify:windows-readiness` / `audit:mvp` 这一整套验收编排是 Kimi 团队的工程长板, Claude Cowork 没有同等可见物。
-- **Kimi CLI 运行记录 `.KimiCowork/runs/*`**: 输入摘要、耗时、错误结构化落盘, 比 Claude Cowork 自带的可观察性更接近"审计级"。
+- **Kimi CLI 运行记录 `.AgentCowork/runs/*`**: 输入摘要、耗时、错误结构化落盘, 比 Claude Cowork 自带的可观察性更接近"审计级"。
 - **中文白领场景的产品定位**: v0.3 plan 的 8 个模板 (报销/会议纪要/合同/反馈/邮件) 比 Claude Cowork 默认 plugin 集 (偏 SaaS / 工程) 更贴中国白领日常。
 
 ---
@@ -129,7 +129,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 1. **8 个 MVP 模板真实落地**: status 文档里 8 个 `[MVP] [ ]` 全 TODO; 至少先做"会议纪要→行动项"和"Excel 清洗"两个真能出 xlsx 的; 调 python-docx/openpyxl 通过 Local Agent shell。
 2. **DOCX/XLSX/PPTX/PDF 抽取**: 这是阻塞绝大多数白领模板的硬伤; 接 `pypdf` / `python-docx` / `openpyxl` / `python-pptx`, 由 Go Local Agent 走 sandbox 子进程调。
 3. **AskUserQuestion 等价物**: 在前端加一个"澄清气泡" UI (单选/多选 + Other), 后端 Kimi CLI prompt 里加 "如果不确定就只问 1 个问题" 的 system, 把没指定的 input 显式问出来。
-4. **Task Card UI**: 把 `.KimiCowork/runs/*.json` 渲染成左侧或顶部的可视化任务列表, 状态 in_progress 时显示 spinner + activeForm; 这是 Claude Cowork 体验区分度最大的来源。
+4. **Task Card UI**: 把 `.AgentCowork/runs/*.json` 渲染成左侧或顶部的可视化任务列表, 状态 in_progress 时显示 spinner + activeForm; 这是 Claude Cowork 体验区分度最大的来源。
 5. **Electron/Tauri + React/Tailwind 迁移**: `open-cowork-reference-improvements.md` 已经记下方向, 但仍未动工; 当前 C/Win32 + WebView2 + ASR 拦截链路对终端用户安装太重, 建议先用 Tauri 跑出 v1, C 客户端留作后续高级模式。
 
 ### P1 (1-2 个月, 进入"产品" 阶段)

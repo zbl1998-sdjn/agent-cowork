@@ -47,7 +47,7 @@ async function main() {
   fs.writeFileSync(contractPath, 'Contract draft. Party A, Party B, renewal date, payment terms.', 'utf8');
   fs.writeFileSync(notePath, '# Weekly meeting\n- Follow up with procurement\n- Prepare summary', 'utf8');
 
-  const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'ops.jsonl');
+  const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'ops.jsonl');
   const server = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
@@ -62,7 +62,7 @@ async function main() {
   const baseUrl = `http://127.0.0.1:${address.port}`;
   try {
     const health = await (await fetch(`${baseUrl}/health`)).json();
-    assert(health.ok === true && health.service === 'kimi-cowork-host', 'health check failed');
+    assert(health.ok === true && health.service === 'agent-cowork-host', 'health check failed');
 
     const shell = await fetch(`${baseUrl}/`);
     assert(shell.status === 200, `preview shell returned ${shell.status}`);
@@ -85,7 +85,7 @@ async function main() {
     });
     assert(bundle.files.length === 2, `context bundle expected 2 files, got ${bundle.files.length}`);
 
-    const artifactPath = path.join(workspace, '.KimiCowork', 'artifacts', 'summary.md');
+    const artifactPath = path.join(workspace, '.AgentCowork', 'artifacts', 'summary.md');
     const renamedNotePath = path.join(workspace, 'notes', 'weekly-renamed.md');
     const movedContractPath = path.join(workspace, 'Kimi_Cowork整理', '合同审核', 'sample-contract.txt');
     const operations = [
@@ -112,7 +112,7 @@ async function main() {
     assert(fs.existsSync(movedContractPath), 'contract was not moved');
     assert(!fs.existsSync(contractPath), 'old contract path still exists after move');
 
-    const blockedTarget = path.join(workspace, '.KimiCowork', 'artifacts', 'blocked.md');
+    const blockedTarget = path.join(workspace, '.AgentCowork', 'artifacts', 'blocked.md');
     fs.writeFileSync(blockedTarget, 'existing target', 'utf8');
     const blocked = await requestJson(
       baseUrl,

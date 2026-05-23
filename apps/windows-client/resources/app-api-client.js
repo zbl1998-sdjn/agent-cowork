@@ -107,7 +107,7 @@
     return false;
   }
 
-  window.KimiCoworkApi = Object.freeze({
+  window.AgentCoworkApi = Object.freeze({
     HOST_BASE,
     resolveUrl,
     isDesktop,

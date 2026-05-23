@@ -2,12 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // Per-user conversation persistence. Each conversation is one JSON document under
-//   <trustedRoot>/.KimiCowork/conversations/<tenantId>/<userId>/<convId>.json
+//   <trustedRoot>/.AgentCowork/conversations/<tenantId>/<userId>/<convId>.json
 // so a signed-in user's history follows their account across devices/instances
 // that share the same data root. Guests (tenant_local/user_local) get the same
 // treatment, which keeps the desktop's offline experience intact.
 
-const ROOT_DIR = '.KimiCowork';
+const ROOT_DIR = '.AgentCowork';
 const CONV_DIR = 'conversations';
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BYTES = 1024 * 1024; // hard cap per conversation document

@@ -53,7 +53,7 @@ async function main() {
   const healthUrl = runtime ? `http://${runtime.host}:${runtime.port}/health` : null;
   const health = healthUrl ? await getHealth(healthUrl) : null;
   const pidAlive = runtime ? isPidAlive(runtime.pid) : false;
-  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'kimi-cowork-host';
+  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'agent-cowork-host';
   const status = {
     ok: Boolean(runtime && pidAlive && healthOk),
     runtimeFile,

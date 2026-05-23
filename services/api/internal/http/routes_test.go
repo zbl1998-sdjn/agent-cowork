@@ -18,7 +18,7 @@ func TestHealth(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if body["service"] != "kimi-cowork-api" {
+	if body["service"] != "agent-cowork-api" {
 		t.Fatalf("unexpected body: %#v", body)
 	}
 	if rec.Header().Get("x-trace-id") == "" {

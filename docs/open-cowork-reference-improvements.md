@@ -14,7 +14,7 @@
 
 1. **Kimi CLI 运行记录**
    - 每次 `POST /api/kimi/plan` 都生成 `runId`。
-   - 成功和失败都会写入 `.KimiCowork/runs/<runId>.json`。
+   - 成功和失败都会写入 `.AgentCowork/runs/<runId>.json`。
    - 记录内容包含模式、可信工作区、输入摘要、耗时、结果或错误。
 
 2. **运行记录 API**
@@ -24,7 +24,7 @@
 3. **前端可观察性**
    - 协作/代码面板显示 Kimi CLI 是否启用。
    - Kimi CLI 成功时显示运行记录短 ID 和耗时。
-   - Kimi CLI 失败降级时仍保留失败 runId，便于定位 `.KimiCowork/runs/*.json`。
+   - Kimi CLI 失败降级时仍保留失败 runId，便于定位 `.AgentCowork/runs/*.json`。
 
 4. **Cowork handoff**
    - 首页或“对话”页点击发送会自动切到“协作”工作台。
@@ -38,7 +38,7 @@
 
 6. **前台任务卡片**
    - 协作/代码面板直接拉取 `GET /api/runs`，展示最近 Kimi run 的类型、状态、耗时和短 ID。
-   - 发送任务后会刷新并高亮最新 run，不再只把运行记录藏在 `.KimiCowork/runs/*.json`。
+   - 发送任务后会刷新并高亮最新 run，不再只把运行记录藏在 `.AgentCowork/runs/*.json`。
    - 点击任务卡片会读取 `GET /api/runs/<runId>`，把输入摘要、Kimi 输出或错误展开到执行动态区。
 
 ## 下一批建议

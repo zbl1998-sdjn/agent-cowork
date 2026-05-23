@@ -275,7 +275,7 @@ test('schedule mutation routes are tenant scoped', async () => {
     });
     assert.equal(bobCancel.status, 404);
 
-    const file = path.join(trustedRoot, '.KimiCowork', 'schedules', `${scheduleId}.json`);
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');

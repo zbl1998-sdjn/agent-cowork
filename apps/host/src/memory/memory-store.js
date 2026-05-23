@@ -5,7 +5,7 @@ import { createUlid } from '../runtime/runs-index.js';
 import { createSqliteDatabase } from '../storage/sqlite.js';
 import { AuditEventBus, createJsonlAuditSubscriber } from '../runtime/audit-events.js';
 
-const MEMORY_DIR_NAME = '.KimiCowork';
+const MEMORY_DIR_NAME = '.AgentCowork';
 const MAIN_MEMORY_FILE = 'MEMORY.md';
 const NOTES_DIR = 'memory';
 const AUDIT_FILE = path.join('audit', 'memory.jsonl');

@@ -20,7 +20,7 @@ const state = {
   activeEventSource: null,
 };
 
-window.kimiCowork = state;
+window.agentCowork = state;
 
 const composer = document.querySelector(".composer textarea");
 const composerPopover = document.querySelector(".composer-popover");
@@ -77,9 +77,9 @@ const {
   runTypeText,
   shortRunId,
   uniqueStamp,
-} = window.KimiCoworkUtils;
-const { getJson, postJson } = window.KimiCoworkApi;
-const { renderRunEventPayload, subscribeRunEvents } = window.KimiCoworkRunEvents;
+} = window.AgentCoworkUtils;
+const { getJson, postJson } = window.AgentCoworkApi;
+const { renderRunEventPayload, subscribeRunEvents } = window.AgentCoworkRunEvents;
 
 function setStatus(text) {
   statusText.textContent = text;
@@ -340,7 +340,7 @@ async function searchLocalFiles(query) {
   return payload.results || [];
 }
 
-const composerPopoverController = window.KimiCoworkComposerPopover.createComposerPopover({
+const composerPopoverController = window.AgentCoworkComposerPopover.createComposerPopover({
   state,
   composer,
   composerPopover,
@@ -766,7 +766,7 @@ function addArtifactCard(message, title, description, pathText) {
   const copy = document.createElement("p");
   copy.textContent = description;
   const pathLine = document.createElement("p");
-  pathLine.textContent = pathText || ".KimiCowork/artifacts";
+  pathLine.textContent = pathText || ".AgentCowork/artifacts";
   card.append(header, copy, pathLine);
   message.body.append(card);
   scrollConversationToEnd();
@@ -1161,7 +1161,7 @@ async function runRecipePlan(prompt, recipe) {
     ? state.lastSources.map((source) => source.relativePath || basename(source.path)).join("、")
     : "无来源文件";
   const sourceExcerpt = compactText(state.lastSources.find((source) => source.excerpt)?.excerpt || "", 150);
-  const firstOutput = preview.operations[0]?.path?.replace(state.workspace, ".") || ".KimiCowork/artifacts";
+  const firstOutput = preview.operations[0]?.path?.replace(state.workspace, ".") || ".AgentCowork/artifacts";
   setArtifact(`${recipe.name} 已生成 ${preview.operations.length} 个操作；来源：${sourceCopy}${sourceExcerpt ? `；摘要：${sourceExcerpt}` : ""}`, firstOutput);
   setRunChip(`模板任务 · ${shortRunId(result.runId)}`, "ready");
   // Prefer the authoritative SSE timeline; fall back to a synchronous summary
@@ -1431,7 +1431,7 @@ async function generatePlan(options = {}) {
     : null;
   const now = new Date();
   const id = uniqueStamp(now);
-  const outputPath = joinWin(state.workspace, ".KimiCowork", "artifacts", `ui-plan-${id}.md`);
+  const outputPath = joinWin(state.workspace, ".AgentCowork", "artifacts", `ui-plan-${id}.md`);
   state.operations = [
     {
       type: "write",
@@ -1593,12 +1593,12 @@ async function approvePlan() {
   approveButton.textContent = "已审批";
   approveButton.classList.add("is-done");
   setArtifact(`已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`);
-  const artifactPathText = applied.applied[0]?.path?.replace?.(state.workspace, ".") || artifactPath.textContent || ".KimiCowork/artifacts";
+  const artifactPathText = applied.applied[0]?.path?.replace?.(state.workspace, ".") || artifactPath.textContent || ".AgentCowork/artifacts";
   addProgressLines(state.activeTaskMessage, [
     {
       state: "done",
       title: `执行完成：已应用 ${applied.applied.length} 个操作`,
-      meta: ".KimiCowork/audit/host-events.jsonl",
+      meta: ".AgentCowork/audit/host-events.jsonl",
     },
   ]);
   addArtifactCard(state.activeTaskMessage, "执行完成", `已在本机执行 ${applied.applied.length} 个审批操作，并写入审计日志。`, artifactPathText);
@@ -1610,7 +1610,7 @@ async function approvePlan() {
         state: "done",
         title: "执行完成",
         detail: `已应用 ${applied.applied.length} 个操作，产物和审计日志已写入可信工作区。`,
-        meta: ".KimiCowork/audit/host-events.jsonl",
+        meta: ".AgentCowork/audit/host-events.jsonl",
       },
     ],
     "执行完成",

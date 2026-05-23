@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"kimi-cowork/apps/local-agent/internal/tools"
+	"agent-cowork/apps/local-agent/internal/tools"
 )
 
 func TestCLIEndToEnd(t *testing.T) {
@@ -20,10 +20,10 @@ func TestCLIEndToEnd(t *testing.T) {
 
 	contractPath := filepath.Join(root, "contracts", "sample-contract.txt")
 	notePath := filepath.Join(root, "notes", "weekly.md")
-	artifactPath := filepath.Join(root, ".KimiCowork", "artifacts", "agent-summary.md")
+	artifactPath := filepath.Join(root, ".AgentCowork", "artifacts", "agent-summary.md")
 	renamedNotePath := filepath.Join(root, "notes", "weekly-renamed.md")
 	movedContractPath := filepath.Join(root, "Kimi_Cowork整理", "合同审核", "sample-contract.txt")
-	journalPath := filepath.Join(root, ".KimiCowork", "audit", "agent.jsonl")
+	journalPath := filepath.Join(root, ".AgentCowork", "audit", "agent.jsonl")
 	opsPath := filepath.Join(root, "ops.json")
 
 	mustWrite(t, contractPath, "Contract draft. Party A, Party B, renewal date, payment terms.")
@@ -37,7 +37,7 @@ func TestCLIEndToEnd(t *testing.T) {
 	if err := json.Unmarshal([]byte(healthOutput), &health); err != nil {
 		t.Fatalf("health JSON failed: %v\n%s", err, healthOutput)
 	}
-	if !health.OK || health.Service != "kimi-cowork-agent" {
+	if !health.OK || health.Service != "agent-cowork-agent" {
 		t.Fatalf("unexpected health payload: %+v", health)
 	}
 
@@ -85,7 +85,7 @@ func TestCLIEndToEnd(t *testing.T) {
 	assertExists(t, movedContractPath)
 	assertMissing(t, contractPath)
 
-	blockedTarget := filepath.Join(root, ".KimiCowork", "artifacts", "blocked.md")
+	blockedTarget := filepath.Join(root, ".AgentCowork", "artifacts", "blocked.md")
 	blockedOpsPath := filepath.Join(root, "blocked-ops.json")
 	mustWrite(t, blockedTarget, "existing target")
 	writeJSON(t, blockedOpsPath, []map[string]string{

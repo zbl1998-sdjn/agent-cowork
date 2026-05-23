@@ -126,7 +126,7 @@ C:\Users\Administrator\Desktop\agent cowork\
 │           ├── trust-store.ts
 │           └── command-policy.ts
 └── plugins\
-    └── kimi-cowork\
+    └── agent-cowork\
         ├── plugin.json
         └── scripts\
             └── session_summary.ts
@@ -137,7 +137,7 @@ C:\Users\Administrator\Desktop\agent cowork\
 Agent Cowork 自己的数据目录默认使用：
 
 ```text
-%APPDATA%\KimiCowork\
+%APPDATA%\AgentCowork\
 ├── config.json
 ├── trusted-roots.json
 ├── sessions\
@@ -153,7 +153,7 @@ Agent Cowork 自己的数据目录默认使用：
     └── host.log
 ```
 
-如果设置 `KIMI_COWORK_HOME`，则使用该目录替代 `%APPDATA%\KimiCowork`。Kimi Code CLI 自己的 runtime 仍使用 `~/.kimi` 或用户指定的 `KIMI_SHARE_DIR`，Agent Cowork 只通过公开 CLI/API 与它交互。
+如果设置 `AGENT_COWORK_HOME`，则使用该目录替代 `%APPDATA%\AgentCowork`。Kimi Code CLI 自己的 runtime 仍使用 `~/.kimi` 或用户指定的 `KIMI_SHARE_DIR`，Agent Cowork 只通过公开 CLI/API 与它交互。
 
 ## 4. Implementation Tasks
 
@@ -189,7 +189,7 @@ Write this exact root file:
 
 ```json
 {
-  "name": "kimi-cowork",
+  "name": "agent-cowork",
   "version": "0.1.0",
   "private": true,
   "description": "Kimi-only local cowork desktop and web shell",
@@ -244,7 +244,7 @@ dist/
 .env.*
 *.log
 coverage/
-KimiCoworkData/
+AgentCoworkData/
 ```
 
 - [ ] **Step 5: Install dependencies after approval**
@@ -283,7 +283,7 @@ git commit -m "chore: scaffold agent cowork workspace"
 
 ```json
 {
-  "name": "@kimi-cowork/shared",
+  "name": "@agent-cowork/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -428,7 +428,7 @@ Expected: both commands pass.
 
 ```json
 {
-  "name": "@kimi-cowork/host",
+  "name": "@agent-cowork/host",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -439,7 +439,7 @@ Expected: both commands pass.
     "lint": "eslint src tests"
   },
   "dependencies": {
-    "@kimi-cowork/shared": "0.1.0"
+    "@agent-cowork/shared": "0.1.0"
   },
   "devDependencies": {}
 }
@@ -569,14 +569,14 @@ Expected: parser test passes.
 import { join } from "node:path";
 
 export function getCoworkHome(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.KIMI_COWORK_HOME && env.KIMI_COWORK_HOME.trim().length > 0) {
-    return env.KIMI_COWORK_HOME;
+  if (env.AGENT_COWORK_HOME && env.AGENT_COWORK_HOME.trim().length > 0) {
+    return env.AGENT_COWORK_HOME;
   }
   const appData = env.APPDATA;
   if (!appData) {
-    throw new Error("APPDATA is not set and KIMI_COWORK_HOME was not provided");
+    throw new Error("APPDATA is not set and AGENT_COWORK_HOME was not provided");
   }
-  return join(appData, "KimiCowork");
+  return join(appData, "AgentCowork");
 }
 ```
 
@@ -590,10 +590,10 @@ export function getCoworkHome(env: NodeJS.ProcessEnv = process.env): string {
 
 - [ ] **Step 4: Test home override and redaction guard**
 
-Create tests that set `KIMI_COWORK_HOME` to a temp directory and verify:
+Create tests that set `AGENT_COWORK_HOME` to a temp directory and verify:
 
 ```text
-getCoworkHome({ KIMI_COWORK_HOME: "C:\\tmp\\kcw", APPDATA: "C:\\Users\\Administrator\\AppData\\Roaming" })
+getCoworkHome({ AGENT_COWORK_HOME: "C:\\tmp\\kcw", APPDATA: "C:\\Users\\Administrator\\AppData\\Roaming" })
 ```
 
 returns:
@@ -773,7 +773,7 @@ Reject untrusted workspace paths with HTTP 403:
 ```json
 {
   "ok": true,
-  "service": "kimi-cowork-host"
+  "service": "agent-cowork-host"
 }
 ```
 
@@ -870,8 +870,8 @@ npm install -D electron wait-on concurrently
 `npm --workspace apps/desktop run dev` must:
 
 ```text
-start @kimi-cowork/host
-start @kimi-cowork/web
+start @agent-cowork/host
+start @agent-cowork/web
 open Electron BrowserWindow to the local web UI
 ```
 
@@ -912,9 +912,9 @@ Start Kimi Web is disabled until a workspace is trusted
 ### Task 10: Add Kimi Skills And Plugin Integration
 
 **Files:**
-- Create: `.kimi\skills\kimi-cowork\SKILL.md`
-- Create: `plugins\kimi-cowork\plugin.json`
-- Create: `plugins\kimi-cowork\scripts\session_summary.ts`
+- Create: `.kimi\skills\agent-cowork\SKILL.md`
+- Create: `plugins\agent-cowork\plugin.json`
+- Create: `plugins\agent-cowork\scripts\session_summary.ts`
 - Create: `docs\kimi-extension-model.md`
 
 - [ ] **Step 1: Add project-level Skill**
@@ -935,7 +935,7 @@ emit concise session summaries
 
 ```json
 {
-  "name": "kimi-cowork",
+  "name": "agent-cowork",
   "version": "0.1.0",
   "description": "Local helpers for Agent Cowork session inspection",
   "tools": [
@@ -961,11 +961,11 @@ emit concise session summaries
 - [ ] **Step 3: Install plugin only after user approval**
 
 ```powershell
-kimi plugin install "C:\Users\Administrator\Desktop\agent cowork\plugins\kimi-cowork"
+kimi plugin install "C:\Users\Administrator\Desktop\agent cowork\plugins\agent-cowork"
 kimi plugin list
 ```
 
-Expected: plugin list includes `kimi-cowork`.
+Expected: plugin list includes `agent-cowork`.
 
 ### Task 11: Verification And Acceptance
 
@@ -996,7 +996,7 @@ Expected:
 ```text
 kimi, version 1.39.0
 wire protocol: 1.9
-host health endpoint returns {"ok":true,"service":"kimi-cowork-host"}
+host health endpoint returns {"ok":true,"service":"agent-cowork-host"}
 ```
 
 - [ ] **Step 3: Kimi Web launch verification**

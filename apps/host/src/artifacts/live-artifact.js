@@ -9,13 +9,13 @@ import { renderViz } from './viz.js';
 // Unlike a static viz, a live artifact is a self-contained page with a Refresh
 // button: on load it renders an inline data snapshot, and on Refresh it fetches
 // its own data endpoint and re-renders, so the same saved page stays current as
-// the underlying data changes. We persist two files under .KimiCowork/artifacts:
+// the underlying data changes. We persist two files under .AgentCowork/artifacts:
 //   <id>.html  -> the page itself
 //   <id>.json  -> a manifest { id, title, viz, dataUrl } the data endpoint reads
 //
 // Only cdnjs is used; all injected data is unicode-escaped for <script> safety.
 
-const ART_PARTS = ['.KimiCowork', 'artifacts'];
+const ART_PARTS = ['.AgentCowork', 'artifacts'];
 const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 const CHART_KINDS = new Set(['bar', 'line', 'pie', 'doughnut']);
 const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';

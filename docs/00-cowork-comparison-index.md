@@ -11,15 +11,15 @@
 |---|---|---|---|
 | 00 | `docs/00-cowork-comparison-index.md` (本文) | 全景索引 + 当前状态合并视图 + 下一步去哪一份 | 开头总览 / 不知道下一步该做什么 |
 | 01 | `docs/kimi-vs-claude-cowork-gap.md` | 三维度差距分析 (UX / 功能 / 架构) + 优势 + 优先级建议 | 想知道 "差什么 / 为什么差" |
-| 02 | `docs/kimi-cowork-optimization-roadmap.md` | 5 阶段优化路线 + 具体步骤 + 时间估 | 排期 / 把差距翻译成 task |
-| 03 | `docs/kimi-cowork-scale-readiness.md` | 单机本地 → 100k DAU → 1M DAU 不重写的架构准备 | 改 schema / 加新服务前必看 |
-| 04 | `docs/kimi-cowork-chat-ux-redesign.md` | dashboard → 对话流范式迁移 + 组件库 + SSE 协议 | 改前端、改 Composer、改 SSE 时 |
+| 02 | `docs/agent-cowork-optimization-roadmap.md` | 5 阶段优化路线 + 具体步骤 + 时间估 | 排期 / 把差距翻译成 task |
+| 03 | `docs/agent-cowork-scale-readiness.md` | 单机本地 → 100k DAU → 1M DAU 不重写的架构准备 | 改 schema / 加新服务前必看 |
+| 04 | `docs/agent-cowork-chat-ux-redesign.md` | dashboard → 对话流范式迁移 + 组件库 + SSE 协议 | 改前端、改 Composer、改 SSE 时 |
 | 05 | `docs/cowork-next-30-days.md` | 下一个 30 天 sprint 的可执行清单 (替代已完成的旧 30 天最小路径) | 排下一步活 |
 | 06 | `docs/codex-handoff.md` | 给接手编码 agent 的自包含工单 (剩余任务 + 验收 + 即用 prompt) | 交接 / 继续开发 |
 
 辅助上游 (Kimi 团队既有):
 
-- `plan/kimi-cowork-latest-product-plan-v0.3.md` — 产品规划基线 (v0.3)
+- `plan/agent-cowork-latest-product-plan-v0.3.md` — 产品规划基线 (v0.3)
 - `docs/v0.3-implementation-status.md` — Kimi 团队自维护的实现状态
 - `docs/merged-execution-baseline.md` — 执行基线
 - `docs/mvp-1-windows-c-cloud-architecture.md` — MVP-1 云端架构
@@ -82,8 +82,8 @@
 | 浏览器 Agent | ❌ | smoke:rendered-ui 是工程内用, 没产品化 |
 | Windows OS 自动化 MCP | ❌ | 客户端骨架在, 未对外暴露 |
 | 子 Agent / Plan mode 产品化 | ✅ | Subagent: agent 工具集内置 `Agent` 工具 (low-risk) 派生嵌套 `runAgentChat`; `/api/subagent/run` + `ToolsPanel` 计划构建器; `hooks-subagent` 测试覆盖。Plan mode: 后端 `ExitPlanMode`+计划闸门、前端开关+计划卡均已落地 (见上行), 端到端验证通过 |
-| 中心化审批策略 (ActionPolicy) | ✅ | `runAgentChat` 闸门改为 `mutating || risk==='high'` 一律审批 (修复 Write/Edit 绕过审批的漏洞); autoApprove 收紧: 只自动批准非高危改动, 高危(Shell/外部 MCP)始终强制逐次确认; 批准计划后计划内非高危改动免逐步审批, 高危仍确认; 每个副作用决策落 `.KimiCowork/audit/actions.jsonl` (`action-audit.js`); 外部 MCP 工具补 `mutating:true`; `approvals`/`plan-mode` 测试覆盖 |
-| 工具调用 Hooks (pre/post, 可拦截) | ✅ | `apps/host/src/runtime/hooks.js`: `createHookEngine` (pre_tool 可 block / post_tool) + `loadHooksConfig` 读 `.KimiCowork/hooks.json`; **默认 opt-in, 无文件即空引擎不挂任何 hook** (按用户要求, 由用户自行通过 cowork 添加); 已接入 `runAgentChat` 工具循环, `hooks-subagent` 测试覆盖 |
+| 中心化审批策略 (ActionPolicy) | ✅ | `runAgentChat` 闸门改为 `mutating || risk==='high'` 一律审批 (修复 Write/Edit 绕过审批的漏洞); autoApprove 收紧: 只自动批准非高危改动, 高危(Shell/外部 MCP)始终强制逐次确认; 批准计划后计划内非高危改动免逐步审批, 高危仍确认; 每个副作用决策落 `.AgentCowork/audit/actions.jsonl` (`action-audit.js`); 外部 MCP 工具补 `mutating:true`; `approvals`/`plan-mode` 测试覆盖 |
+| 工具调用 Hooks (pre/post, 可拦截) | ✅ | `apps/host/src/runtime/hooks.js`: `createHookEngine` (pre_tool 可 block / post_tool) + `loadHooksConfig` 读 `.AgentCowork/hooks.json`; **默认 opt-in, 无文件即空引擎不挂任何 hook** (按用户要求, 由用户自行通过 cowork 添加); 已接入 `runAgentChat` 工具循环, `hooks-subagent` 测试覆盖 |
 | 五层记忆体系 (enterprise→user→project→local→session) | ✅ | `apps/host/src/memory/memory-layers.js`: `loadLayeredMemory` 按 Claude Code CLAUDE.md 层级合并 5 层 (含字节上限/逐层截断), 注入 agent system prompt; `memory-layers` 测试覆盖 |
 | Skills 注入 agent | ✅ | skill registry 列表注入 system prompt + 工具集内置 `Skill` 工具; agent 可枚举/调用 skill |
 | Sources 引用规范 | ✅ | 模板产物末尾 + 气泡页脚 |
@@ -120,7 +120,7 @@
 | `npm run verify:windows-readiness` | ✅ | 只读诊断, 不修改 Defender |
 | `npm run audit:mvp` | ✅ | 聚合验收, Web/Host MVP 就绪 |
 | Tauri desktop scaffold | ✅ | `apps/windows-client/src-tauri` 已有 Tauri v2 配置、Rust command 入口、packaged sidecar 契约、safe opener、CSP、Node host dev 启动脚本、组件迁移清单和 scaffold smoke; 当前机器缺 `cargo`/`rustc`/`cargo tauri`, 尚不能验收 dev 窗口/安装器 |
-| Windows 原生客户端 GUI smoke | 🟡 | C/Win32 + WebView2 仍保留作 legacy 参考, 但 Defender ASR 仍卡 KimiCowork.exe; 新主线转向 Tauri scaffold |
+| Windows 原生客户端 GUI smoke | 🟡 | C/Win32 + WebView2 仍保留作 legacy 参考, 但 Defender ASR 仍卡 AgentCowork.exe; 新主线转向 Tauri scaffold |
 
 ---
 
@@ -174,7 +174,7 @@
 - **MEMORY.md 系统** (`apps/host/src/memory/memory-store.js`):
   - `/api/memory` (读全文 + notes 列表 + 限额), `/api/memory/facts` (追加事实, 走 Idempotency 上下文), `/api/memory/notes` (写笔记), `/api/memory/notes/<name>` (读笔记)。
   - Kimi plan/chat 调用前自动注入 MEMORY.md 前 4KB 作为 system 段 (`buildMemoryBlock`)。
-  - 所有写操作落 `.KimiCowork/audit/memory.jsonl`, 带 trace/tenant/user。
+  - 所有写操作落 `.AgentCowork/audit/memory.jsonl`, 带 trace/tenant/user。
   - UTF-8 安全裁剪 + 路径策略校验 (note 名 whitelist, 防 `../` 逃逸)。
   - 10 个单测覆盖。
 - **Runs 索引** (`apps/host/src/runtime/runs-index.js`):
@@ -437,7 +437,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 
 - **Tauri shell scaffold** (`apps/windows-client/src-tauri`):
   - `tauri.conf.json` 指向 `http://127.0.0.1:3017` devUrl, `frontendDist` 复用现有 `../resources` 静态前端。
-  - `bundle.externalBin = ["binaries/kimi-cowork-host"]`, Rust 侧 `start_node_host` 走 `ShellExt::sidecar("binaries/kimi-cowork-host")`, 不再依赖 PATH 上的 `node` 和源码相对路径。
+  - `bundle.externalBin = ["binaries/agent-cowork-host"]`, Rust 侧 `start_node_host` 走 `ShellExt::sidecar("binaries/agent-cowork-host")`, 不再依赖 PATH 上的 `node` 和源码相对路径。
   - Rust 侧注册 `host_status` / `start_node_host` / `open_path` command; `open_path` 先 canonicalize 并限制在 `KCW_TRUSTED_ROOT`/`KCW_REPO_ROOT`/当前目录内, 再走 opener 插件。
   - 初始化 `tauri-plugin-shell`、`tauri-plugin-opener` 和 `tauri-plugin-notification`; capability 只允许 packaged host sidecar execute, 不再给 broad `shell:allow-open`。
   - `tauri.conf.json` 已设置非空 CSP, 限制脚本/连接/图片来源。
@@ -597,12 +597,12 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 
 ## 19. 2026-05-22 本轮实现 (Artifact live pages)
 
-接续“打造完整 Claude Cowork 桌面产品”的目标, 本轮优先补齐一个最直接影响产品感的缺口: 让 `.KimiCowork/artifacts` 不再只是落盘死文件, 而是在桌面 UI 中可发现、可刷新、可打开为 Host 生成的安全 HTML 活页。
+接续“打造完整 Claude Cowork 桌面产品”的目标, 本轮优先补齐一个最直接影响产品感的缺口: 让 `.AgentCowork/artifacts` 不再只是落盘死文件, 而是在桌面 UI 中可发现、可刷新、可打开为 Host 生成的安全 HTML 活页。
 
 已落地:
 
 - **Artifact catalog 后端**:
-  - 新增 `apps/host/src/artifacts/artifact-catalog.js`, 只枚举 trusted workspace 下 `.KimiCowork/artifacts` 内的文件。
+  - 新增 `apps/host/src/artifacts/artifact-catalog.js`, 只枚举 trusted workspace 下 `.AgentCowork/artifacts` 内的文件。
   - 文本类产物 (`.md` / `.txt` / `.csv` / `.json` / `.html` / `.htm` / `.log`) 可渲染为 Host 生成的 HTML live page。
   - 原始文件内容全部转义, 即使源文件是 `.html` 或含 `<script>` 也不会在桌面页里执行。
 - **Artifact API**:
@@ -721,7 +721,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - 待办 (用户机器): `npm install && npm run build` 生成 `ui-dist`, 然后 `cargo tauri dev/build`。本 VM 无 npm/cargo, 无法构建/验证。
 
 **迭代 C — 任务模板/recipe 调沙箱跑代码** — 对位 Claude Cowork "把代码丢进沙箱跑出结果":
-- `apps/host/src/sandbox/code-runner.js`: `runCode({sandbox, sandboxLimits, tool, code, prompt, ext, timeoutMs, network, trustedRoot, runStoreRoot, runEvents, runsIndex, context})`。把内联源码物化为 trusted-root 内的脚本文件 `<root>/.KimiCowork/scripts/<runId>.<ext>` (`EXT_BY_TOOL={node:js,python:py,python3:py}`, 上限 256KB), 用相对路径作 argv 跨后端解析 (local cwd=root / docker `-w /work`), 经同一 `normalizeSandboxSpec` 跑沙箱; 先校验 spec 再落盘 (非法 tool 直接 400 不留脚本); 产出 `sandbox-code` run 记录 + `user_message→assistant_start→progress→sandbox_start→sandbox_end→assistant_end` 事件时间线, 与 recipe run 同形, 历史/时间线 UI 零改动。
+- `apps/host/src/sandbox/code-runner.js`: `runCode({sandbox, sandboxLimits, tool, code, prompt, ext, timeoutMs, network, trustedRoot, runStoreRoot, runEvents, runsIndex, context})`。把内联源码物化为 trusted-root 内的脚本文件 `<root>/.AgentCowork/scripts/<runId>.<ext>` (`EXT_BY_TOOL={node:js,python:py,python3:py}`, 上限 256KB), 用相对路径作 argv 跨后端解析 (local cwd=root / docker `-w /work`), 经同一 `normalizeSandboxSpec` 跑沙箱; 先校验 spec 再落盘 (非法 tool 直接 400 不留脚本); 产出 `sandbox-code` run 记录 + `user_message→assistant_start→progress→sandbox_start→sandbox_end→assistant_end` 事件时间线, 与 recipe run 同形, 历史/时间线 UI 零改动。
 - `POST /api/sandbox/run-code` (内联到现有 `sandbox-routes.js`, 不改 server.js / runRecipe): 强制 Idempotency-Key、trusted-root jail、入 runs 索引、幂等重放、退出码非零记 `failed`。返回 `{runId, runPath, backend, script, spec, result}` (`result.ok` 已折入)。
 - 5 个测试: 跑内联 node 出 stdout + 脚本落盘 + 记 `sandbox-code` + 幂等重放、退出码非零记 failed、tool 不在 allowlist→400 且不留脚本、缺 Idempotency-Key→428、空 code→400。
 
@@ -741,7 +741,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 
 **迭代 E — 内联可视化 + 活页 Artifact** — 对位 show_widget + create_artifact:
 - `src/artifacts/viz.js`: 纯函数 `renderViz(spec)` → 自包含 HTML。`bar/line/pie/doughnut`→Chart.js(cdnjs), `mermaid`→Mermaid(cdnjs), `table`→内联 HTML。所有文本 HTML 转义, 注入 `<script>` 的数据做 `<`/`>`/`&`/U+2028/U+2029 转义防 script-breakout (用 `String.fromCharCode` 常量根除字面行分隔符)。
-- `src/artifacts/live-artifact.js`: `buildLiveArtifact` 把 viz 写成 `.KimiCowork/artifacts/<id>.html`(活页, 带"刷新"按钮 + 客户端 DOM 渲染器, 用 textContent 喂数据杜绝注入)+ `<id>.json`(manifest)。刷新按钮回拉 `/api/artifacts/data/<id>` 重渲染, 保存的页面始终是新鲜的。`readArtifactManifest` / `readLiveArtifactHtml` (id 正则校验 + trusted-path)。
+- `src/artifacts/live-artifact.js`: `buildLiveArtifact` 把 viz 写成 `.AgentCowork/artifacts/<id>.html`(活页, 带"刷新"按钮 + 客户端 DOM 渲染器, 用 textContent 喂数据杜绝注入)+ `<id>.json`(manifest)。刷新按钮回拉 `/api/artifacts/data/<id>` 重渲染, 保存的页面始终是新鲜的。`readArtifactManifest` / `readLiveArtifactHtml` (id 正则校验 + trusted-path)。
 - `src/routes/viz-routes.js` + server 接线: `POST /api/viz/render` (幂等; 默认落盘活页, `persist:false` 只回内联 HTML 即 show_widget 形态) / `GET /api/artifacts/data/:id` (活页数据端点) / `GET /api/artifacts/live/:id` (serve 活页 text/html)。
 - 测试: `test/artifacts.test.js` (14) — viz 各类型/转义/未知 kind 400/script-breakout 中和/U+2028 转义, 活页落盘+manifest+刷新钩子, 坏 id 拒绝, 4 条路由集成 + 幂等 + persist:false + 404。
 
@@ -913,8 +913,8 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 
 ### 追加 (同日): 五层记忆 + skills 注入 agent + MCP/外部连接器接入 agent
 
-- **五层记忆体系 (参考 Claude Code CLAUDE.md 分层)**: `memory/memory-layers.js` `loadLayeredMemory` 读取并按优先级合并 enterprise(KCW_ENTERPRISE_MEMORY) → user(`~/.KimiCowork/MEMORY.md`) → project(`<root>/.KimiCowork/MEMORY.md`) → local(`MEMORY.local.md`) → session 五层; agent 系统提示注入合并后的记忆。`memory-layers.test.js` (2)。
+- **五层记忆体系 (参考 Claude Code CLAUDE.md 分层)**: `memory/memory-layers.js` `loadLayeredMemory` 读取并按优先级合并 enterprise(KCW_ENTERPRISE_MEMORY) → user(`~/.AgentCowork/MEMORY.md`) → project(`<root>/.AgentCowork/MEMORY.md`) → local(`MEMORY.local.md`) → session 五层; agent 系统提示注入合并后的记忆。`memory-layers.test.js` (2)。
 - **skills 注入 agent**: agent 系统提示列出已启用 skills(名称/触发场景) + 新增 `Skill` 工具(按 id 跑 recipe, 低风险只产出可审批计划)。
 - **MCP / 外部连接器接入 agent (修复 ❌)**: `buildAgentToolset` 把 toolRegistry 里 `mcp:*` 来源的工具(已连接的外部连接器)映射成 agent 工具(`risk:'high'` → 走审批), 模型可直接调用。之前 MCP 客户端只注册到 toolRegistry, 未暴露给 agent; 现已打通。
 - `agent-runner` 的 SYSTEM 改为 `buildSystemPrompt({memoryText, skills})`(并修正过时工具名为 Read/Write/Edit/Glob/Grep/Shell/WebFetch); `streamAgentChat` 从 server 注入 toolRegistry+skillRegistry, 组装"原生工具 + MCP 工具 + Skill 工具"完整工具集 + 分层记忆 + skills 列表。
-- 验收: host `node --test` **236 通过, 0 失败**; 真机实测: 写项目 `.KimiCowork/MEMORY.md` 规则(以『Derrick，』开头)→ agent 回复严格遵守, 证明五层记忆注入生效。
+- 验收: host `node --test` **236 通过, 0 失败**; 真机实测: 写项目 `.AgentCowork/MEMORY.md` 规则(以『Derrick，』开头)→ agent 回复严格遵守, 证明五层记忆注入生效。

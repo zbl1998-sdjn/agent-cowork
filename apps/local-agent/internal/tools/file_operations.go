@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"kimi-cowork/apps/local-agent/internal/journal"
-	"kimi-cowork/apps/local-agent/internal/policy"
+	"agent-cowork/apps/local-agent/internal/journal"
+	"agent-cowork/apps/local-agent/internal/policy"
 )
 
 type FileOperation struct {

@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Agent Cowork desktop shell permissions","local":true,"windows":["main"],"permissions":["core:default","notification:default",{"identifier":"shell:allow-execute","allow":[{"name":"binaries/kimi-cowork-host","sidecar":true}]}]}}
+{"default":{"identifier":"default","description":"Agent Cowork desktop shell permissions","local":true,"windows":["main"],"permissions":["core:default","notification:default",{"identifier":"shell:allow-execute","allow":[{"name":"binaries/agent-cowork-host","sidecar":true}]}]}}

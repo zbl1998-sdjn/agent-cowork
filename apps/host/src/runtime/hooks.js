@@ -6,7 +6,7 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 //   - pre_tool  : before a tool runs; a hook may BLOCK it ({ block:true, reason })
 //   - post_tool : after a tool runs (observe / log)
 // Hooks match by tool name (regex string, or '*' for all). Handlers are async
-// functions; loadHooksConfig builds shell-command hooks from .KimiCowork/hooks.json.
+// functions; loadHooksConfig builds shell-command hooks from .AgentCowork/hooks.json.
 
 function toolMatches(hook, name) {
   if (!hook.tool || hook.tool === '*') return true;
@@ -37,11 +37,11 @@ export function createHookEngine({ hooks = [] } = {}) {
   };
 }
 
-// Build a hook engine from <root>/.KimiCowork/hooks.json. Each entry:
+// Build a hook engine from <root>/.AgentCowork/hooks.json. Each entry:
 //   { "event": "pre_tool"|"post_tool", "tool": "Shell|Write", "command": "<shell cmd>" }
 // A pre_tool hook whose command exits non-zero BLOCKS the tool.
 export function loadHooksConfig({ trustedRoot, sandbox, sandboxLimits, configPath } = {}) {
-  const file = configPath || (trustedRoot ? path.join(trustedRoot, '.KimiCowork', 'hooks.json') : null);
+  const file = configPath || (trustedRoot ? path.join(trustedRoot, '.AgentCowork', 'hooks.json') : null);
   let raw = [];
   try {
     if (file && fs.existsSync(file)) {

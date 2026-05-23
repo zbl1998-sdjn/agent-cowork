@@ -216,7 +216,7 @@ async function main() {
           clientHeight: document.documentElement.clientHeight
         };
         const text = document.body.innerText;
-        const state = window.kimiCowork || {};
+        const state = window.agentCowork || {};
         return {
           title: document.title,
           protocol: window.location.protocol,

@@ -109,7 +109,7 @@ export async function runSubagent({
   const record = {
     id: runId,
     type: 'subagent-run',
-    provider: 'kimi-cowork-host',
+    provider: 'agent-cowork-host',
     command: 'subagent',
     mode: 'agent',
     trustedRoot: safeRoot,

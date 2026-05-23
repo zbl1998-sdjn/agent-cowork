@@ -914,7 +914,7 @@ audit_logs
 ### 13.2 本地目录
 
 ```text
-%APPDATA%\KimiCowork\
+%APPDATA%\AgentCowork\
 ├── config.json
 ├── trusted-roots.json
 ├── model-providers.json

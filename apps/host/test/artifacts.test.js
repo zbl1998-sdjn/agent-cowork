@@ -102,7 +102,7 @@ test('buildLiveArtifact writes a live page + manifest with a Refresh hook', () =
     viz: { kind: 'bar', data: { labels: ['Q1'], values: [9] } },
   });
   assert.match(out.id, /^viz_/);
-  assert.equal(out.relativePath, `.KimiCowork/artifacts/${out.id}.html`);
+  assert.equal(out.relativePath, `.AgentCowork/artifacts/${out.id}.html`);
   const html = fs.readFileSync(out.htmlPath, 'utf8');
   assert.match(html, /id="refresh"/);
   assert.match(html, /DATA_URL/);

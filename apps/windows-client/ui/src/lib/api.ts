@@ -320,7 +320,7 @@ export function liveArtifactUrl(viewUrl: string): string {
   return resolveUrl(viewUrl);
 }
 
-// ---- Artifacts catalog (.KimiCowork/artifacts) ----
+// ---- Artifacts catalog (.AgentCowork/artifacts) ----
 export interface ArtifactItem {
   path: string;
   name: string;
@@ -381,7 +381,7 @@ export interface SaveKimiConfigInput {
   clearKey?: boolean;
 }
 
-// Persist API settings on the host (.KimiCowork/config.json). The host never
+// Persist API settings on the host (.AgentCowork/config.json). The host never
 // echoes the key back — only a `hasKey` flag — so the panel can show whether a
 // key is set without ever exposing it.
 export async function saveKimiConfig(input: SaveKimiConfigInput): Promise<KimiInfo> {

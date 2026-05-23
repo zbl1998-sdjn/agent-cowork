@@ -28,7 +28,7 @@ test('health returns stable host metadata', async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
       ok: true,
-      service: 'kimi-cowork-host',
+      service: 'agent-cowork-host',
     });
   });
 });
@@ -316,7 +316,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
 
 test('apply endpoint replays duplicate idempotency key without applying twice', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
-  const target = path.join(trustedRoot, '.KimiCowork', 'artifacts', 'idem.txt');
+  const target = path.join(trustedRoot, '.AgentCowork', 'artifacts', 'idem.txt');
   const operations = [{ type: 'write', path: target, content: 'once' }];
 
   await withServer({ trustedRoot }, async (baseUrl) => {
@@ -342,7 +342,7 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
 
 test('artifact endpoints list local artifacts and render safe HTML views', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
-  const artifactDir = path.join(trustedRoot, '.KimiCowork', 'artifacts');
+  const artifactDir = path.join(trustedRoot, '.AgentCowork', 'artifacts');
   const artifactPath = path.join(artifactDir, 'report.md');
   fs.mkdirSync(artifactDir, { recursive: true });
   fs.writeFileSync(artifactPath, '# Report\n\n<script>alert("x")</script>\n', 'utf8');
@@ -353,7 +353,7 @@ test('artifact endpoints list local artifacts and render safe HTML views', async
     const body = await list.json();
     assert.equal(body.artifacts.length, 1);
     assert.equal(body.artifacts[0].name, 'report.md');
-    assert.equal(body.artifacts[0].relativePath, '.KimiCowork/artifacts/report.md');
+    assert.equal(body.artifacts[0].relativePath, '.AgentCowork/artifacts/report.md');
     assert.equal(body.artifacts[0].viewable, true);
 
     const view = await fetch(`${baseUrl}/api/artifacts/view?path=${encodeURIComponent(artifactPath)}`);
@@ -403,11 +403,11 @@ test('serves the local preview shell and assets', async () => {
   const staticRoot = makeTestWorkspace('kcw-static');
   fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>Agent Cowork</title>', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.css'), 'body { color: black; }', 'utf8');
-  fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.KimiCoworkUtils = {};', 'utf8');
-  fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.KimiCoworkApi = {};', 'utf8');
-  fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.KimiCoworkRunEvents = {};', 'utf8');
-  fs.writeFileSync(path.join(staticRoot, 'app-composer-popover.js'), 'window.KimiCoworkComposerPopover = {};', 'utf8');
-  fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.kimiCowork = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.AgentCoworkUtils = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.AgentCoworkApi = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.AgentCoworkRunEvents = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-composer-popover.js'), 'window.AgentCoworkComposerPopover = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
     const index = await fetch(`${baseUrl}/`);

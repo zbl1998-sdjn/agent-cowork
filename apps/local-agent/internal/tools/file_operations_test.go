@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kimi-cowork/apps/local-agent/internal/journal"
+	"agent-cowork/apps/local-agent/internal/journal"
 )
 
 func TestApplyOperationsForbidsDelete(t *testing.T) {

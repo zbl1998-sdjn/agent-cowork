@@ -4,9 +4,9 @@ import path from 'node:path';
 
 // Five-layer memory system (modeled on Claude Code's CLAUDE.md hierarchy):
 //   1. enterprise — org/managed policy        (KCW_ENTERPRISE_MEMORY or config)
-//   2. user       — ~/.KimiCowork/MEMORY.md    (personal, cross-project)
-//   3. project    — <root>/.KimiCowork/MEMORY.md (shared, source-controlled)
-//   4. local      — <root>/.KimiCowork/MEMORY.local.md (personal overrides, gitignored)
+//   2. user       — ~/.AgentCowork/MEMORY.md    (personal, cross-project)
+//   3. project    — <root>/.AgentCowork/MEMORY.md (shared, source-controlled)
+//   4. local      — <root>/.AgentCowork/MEMORY.local.md (personal overrides, gitignored)
 //   5. session    — ephemeral notes for the current run
 // Layers are concatenated lowest→highest precedence so later layers refine
 // earlier ones; the combined block is injected into the agent's system prompt.
@@ -39,10 +39,10 @@ export function loadLayeredMemory({
   maxBytes = 12000,
   perLayerBytes = 6000,
 } = {}) {
-  const projectDir = trustedRoot ? path.join(trustedRoot, '.KimiCowork') : null;
+  const projectDir = trustedRoot ? path.join(trustedRoot, '.AgentCowork') : null;
   const sources = {
     enterprise: enterprisePath || null,
-    user: path.join(userHome, '.KimiCowork', 'MEMORY.md'),
+    user: path.join(userHome, '.AgentCowork', 'MEMORY.md'),
     project: projectDir ? path.join(projectDir, 'MEMORY.md') : null,
     local: projectDir ? path.join(projectDir, 'MEMORY.local.md') : null,
     session: '(session)',

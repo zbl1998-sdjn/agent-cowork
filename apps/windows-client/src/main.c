@@ -76,7 +76,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     if (kcw_parse_workspace_argument(GetCommandLineW(), workspace, sizeof(workspace) / sizeof(workspace[0]))) {
         return kcw_run_app_with_workspace(instance, show_command, workspace);
     }
-    if (GetEnvironmentVariableW(L"KIMI_COWORK_WORKSPACE", workspace, (DWORD)(sizeof(workspace) / sizeof(workspace[0]))) > 0) {
+    if (GetEnvironmentVariableW(L"AGENT_COWORK_WORKSPACE", workspace, (DWORD)(sizeof(workspace) / sizeof(workspace[0]))) > 0) {
         return kcw_run_app_with_workspace(instance, show_command, workspace);
     }
 

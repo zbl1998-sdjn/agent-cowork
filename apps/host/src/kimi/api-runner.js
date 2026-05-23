@@ -14,7 +14,7 @@ function buildMemoryBlock(memory) {
     return '';
   }
   return [
-    '工作区记忆 (.KimiCowork/MEMORY.md, 用户已确认的长期事实, 严格遵守):',
+    '工作区记忆 (.AgentCowork/MEMORY.md, 用户已确认的长期事实, 严格遵守):',
     text,
     '工作区记忆结束。',
   ].join('\n');

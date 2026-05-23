@@ -267,5 +267,5 @@
     };
   }
 
-  window.KimiCoworkComposerPopover = { createComposerPopover };
+  window.AgentCoworkComposerPopover = { createComposerPopover };
 })();

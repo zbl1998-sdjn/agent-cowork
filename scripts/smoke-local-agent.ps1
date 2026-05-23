@@ -14,7 +14,7 @@ $env:GOTMPDIR = $goTmp
 
 Push-Location -LiteralPath $agentDir
 try {
-    go test -tags cli_smoke ./cmd/kimi-cowork-agent -run TestCLIEndToEnd -count=1 -v
+    go test -tags cli_smoke ./cmd/agent-cowork-agent -run TestCLIEndToEnd -count=1 -v
     if ($LASTEXITCODE -ne 0) {
         throw "Local Agent CLI smoke failed with exit code $LASTEXITCODE. If the error is Access is denied, check Microsoft Defender ASR events for a newly built Go test executable."
     }

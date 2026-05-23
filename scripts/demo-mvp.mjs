@@ -58,7 +58,7 @@ async function getRuntimeStatus() {
   const pidAlive = runtime ? isPidAlive(runtime.pid) : false;
   const healthUrl = runtime ? `http://${runtime.host}:${runtime.port}/health` : null;
   const health = healthUrl ? await getHealth(healthUrl) : null;
-  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'kimi-cowork-host';
+  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'agent-cowork-host';
   return {
     ok: Boolean(runtime && pidAlive && healthOk),
     runtimeFile,

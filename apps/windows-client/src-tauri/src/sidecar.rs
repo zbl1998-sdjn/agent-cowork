@@ -1,6 +1,6 @@
 //! Lifecycle management for the bundled Node host sidecar.
 //!
-//! The host is a packaged Node binary (`binaries/kimi-cowork-host`) that serves
+//! The host is a packaged Node binary (`binaries/agent-cowork-host`) that serves
 //! the local API + UI. This module owns its single child handle behind a mutex
 //! and exposes idempotent `start` / `stop` / `status` operations. Owning the
 //! lifecycle here (rather than inline in `lib.rs`) means the shell can cleanly
@@ -21,7 +21,7 @@ pub const EVENT_HOST_STARTED: &str = "kimi://host-started";
 /// Emitted to the webview when the host has been stopped.
 pub const EVENT_HOST_STOPPED: &str = "kimi://host-stopped";
 
-const SIDECAR_BIN: &str = "binaries/kimi-cowork-host";
+const SIDECAR_BIN: &str = "binaries/agent-cowork-host";
 
 /// Managed Tauri state holding the (optional) running host child.
 #[derive(Default)]

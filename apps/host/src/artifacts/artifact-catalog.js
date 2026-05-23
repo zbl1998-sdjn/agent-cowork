@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 
-const ARTIFACT_ROOT_PARTS = ['.KimiCowork', 'artifacts'];
+const ARTIFACT_ROOT_PARTS = ['.AgentCowork', 'artifacts'];
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.json', '.html', '.htm', '.log']);
 
 function artifactRoot(trustedRoot) {
@@ -19,7 +19,7 @@ function safeArtifactPath(trustedRoot, artifactPath) {
   const root = artifactRoot(safeRoot);
   const safe = assertTrustedPath(path.resolve(artifactPath), safeRoot);
   if (!isInside(root, safe)) {
-    throw new Error('artifact path must stay inside .KimiCowork/artifacts');
+    throw new Error('artifact path must stay inside .AgentCowork/artifacts');
   }
   return { root, safe };
 }
@@ -55,7 +55,7 @@ function artifactKind(filePath) {
 
 function artifactRelativePath(root, filePath) {
   const relative = path.relative(root, filePath).replace(/\\/g, '/');
-  return ['.KimiCowork', 'artifacts', relative].join('/');
+  return ['.AgentCowork', 'artifacts', relative].join('/');
 }
 
 function collectFiles(root, current, files, limit) {

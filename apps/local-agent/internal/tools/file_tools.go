@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"kimi-cowork/apps/local-agent/internal/policy"
+	"agent-cowork/apps/local-agent/internal/policy"
 )
 
 const DefaultMaxReadBytes int64 = 256 * 1024
@@ -106,7 +106,7 @@ func HashFile(path string, trustedRoot string) (string, error) {
 
 func shouldSkipDir(name string) bool {
 	switch strings.ToLower(name) {
-	case ".git", "node_modules", "dist", "build", ".kimicowork":
+	case ".git", "node_modules", "dist", "build", ".agentcowork":
 		return true
 	default:
 		return false

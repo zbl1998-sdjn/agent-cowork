@@ -10,7 +10,7 @@ function humanSize(n?: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Lists the work products the agent has saved under .KimiCowork/artifacts. Each
+// Lists the work products the agent has saved under .AgentCowork/artifacts. Each
 // can be opened in the OS, or previewed via the host's live-artifact page.
 export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [items, setItems] = useState<ArtifactItem[]>([]);

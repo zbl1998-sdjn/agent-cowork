@@ -20,7 +20,7 @@
 
 - [ ] **Step 1: Write the failing route test**
 
-Add a `server.test.js` test that creates `.KimiCowork/artifacts/report.md`, calls `GET /api/artifacts`, expects one catalog item, then calls `GET /api/artifacts/view?path=<encoded path>` and expects HTML containing the escaped Markdown content.
+Add a `server.test.js` test that creates `.AgentCowork/artifacts/report.md`, calls `GET /api/artifacts`, expects one catalog item, then calls `GET /api/artifacts/view?path=<encoded path>` and expects HTML containing the escaped Markdown content.
 
 - [ ] **Step 2: Run the focused test**
 
@@ -30,7 +30,7 @@ Expected before implementation: FAIL with `/api/artifacts` returning 404.
 
 - [ ] **Step 3: Implement catalog and route**
 
-Create `artifact-catalog.js` with `listArtifacts({ trustedRoot, limit })` and `renderArtifactHtml({ trustedRoot, artifactPath })`. The renderer must reject paths outside `.KimiCowork/artifacts`, escape HTML, and support `.md`, `.txt`, `.csv`, `.json`, `.html`, and binary files with a metadata-only fallback.
+Create `artifact-catalog.js` with `listArtifacts({ trustedRoot, limit })` and `renderArtifactHtml({ trustedRoot, artifactPath })`. The renderer must reject paths outside `.AgentCowork/artifacts`, escape HTML, and support `.md`, `.txt`, `.csv`, `.json`, `.html`, and binary files with a metadata-only fallback.
 
 - [ ] **Step 4: Wire server route**
 

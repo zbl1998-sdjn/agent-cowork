@@ -688,7 +688,7 @@ export function App() {
             {message.usage && message.usage.total_tokens ? <div className="usage-line">用量 {message.usage.total_tokens} tokens</div> : null}
             {message.operations.length > 0 && <TaskStatusBadge runId={message.runId} status={message.status} />}
             {message.approvalState === 'approved' && (
-              <ArtifactCard file={{ path: `${trustedRoot}/.KimiCowork/artifacts` }} metadata=".KimiCowork/artifacts" onOpen={(p) => void openPath(p)} />
+              <ArtifactCard file={{ path: `${trustedRoot}/.AgentCowork/artifacts` }} metadata=".AgentCowork/artifacts" onOpen={(p) => void openPath(p)} />
             )}
           </MessageBubble>
         ))}

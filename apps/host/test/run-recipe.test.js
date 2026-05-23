@@ -14,9 +14,9 @@ function tempRoot() {
 
 test('runRecipe produces operations, run record, events, and indexes the run', () => {
   const trustedRoot = tempRoot();
-  const runStoreRoot = path.join(trustedRoot, '.KimiCowork', 'runs');
+  const runStoreRoot = path.join(trustedRoot, '.AgentCowork', 'runs');
   const runEvents = new RunEventBus();
-  const runsIndex = new RunsIndex({ indexRoot: path.join(trustedRoot, '.KimiCowork', 'index') });
+  const runsIndex = new RunsIndex({ indexRoot: path.join(trustedRoot, '.AgentCowork', 'index') });
 
   const recipeId = listRecipes()[0].id;
   const result = runRecipe({
@@ -66,7 +66,7 @@ test('runRecipe throws 404 for unknown recipe', () => {
     () => runRecipe({
       recipeId: 'does-not-exist',
       trustedRoot,
-      runStoreRoot: path.join(trustedRoot, '.KimiCowork', 'runs'),
+      runStoreRoot: path.join(trustedRoot, '.AgentCowork', 'runs'),
     }),
     /Recipe not found/,
   );
@@ -79,7 +79,7 @@ test('runRecipe works without runEvents/runsIndex (events still numbered locally
     recipeId,
     trustedRoot,
     prompt: 'no deps',
-    runStoreRoot: path.join(trustedRoot, '.KimiCowork', 'runs'),
+    runStoreRoot: path.join(trustedRoot, '.AgentCowork', 'runs'),
   });
   assert.equal(result.ok, true);
   assert.ok(result.events.length >= 5);

@@ -144,7 +144,7 @@ export function Settings({ username, tenantId, theme, onSetTheme, onLogout, onCl
                     <span className="modal-actions-spacer" />
                     <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</button>
                   </div>
-                  <p className="modal-note">密钥仅保存在本机 .KimiCowork/config.json，绝不回传或显示明文。</p>
+                  <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
                 </div>
               )
             )}

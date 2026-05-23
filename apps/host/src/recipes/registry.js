@@ -86,7 +86,7 @@ function combinedText(sources) {
 }
 
 function artifactPath(trustedRoot, recipeId, filename) {
-  return path.join(trustedRoot, '.KimiCowork', 'artifacts', `${recipeId}-${stamp()}-${filename}`);
+  return path.join(trustedRoot, '.AgentCowork', 'artifacts', `${recipeId}-${stamp()}-${filename}`);
 }
 
 function markdownOperation(trustedRoot, recipeId, filename, content) {

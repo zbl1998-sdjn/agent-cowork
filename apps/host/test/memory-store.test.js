@@ -37,7 +37,7 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
   assert.match(body, /\*\*客户简称\*\* \(project\): 阿里 = 阿里巴巴中国区运营/);
   await flushMemoryAuditEvents(root);
   const auditLines = fs
-    .readFileSync(path.join(root, '.KimiCowork', 'audit', 'memory.jsonl'), 'utf8')
+    .readFileSync(path.join(root, '.AgentCowork', 'audit', 'memory.jsonl'), 'utf8')
     .trim()
     .split('\n');
   const event = JSON.parse(auditLines[0]);
@@ -67,14 +67,14 @@ test('appendMemoryFact normalizes scope to allowed values', () => {
   assert.match(body, /\(user\): d/);
 });
 
-test('writeMemoryNote stores file under .KimiCowork/memory/', () => {
+test('writeMemoryNote stores file under .AgentCowork/memory/', () => {
   const root = tempRoot();
   const file = writeMemoryNote(root, 'projects.md', '# Projects\n- A: alpha\n', {
     traceId: 't',
     tenantId: 'T',
     userId: 'U',
   });
-  assert.match(file, /\.KimiCowork[\\/]memory[\\/]projects\.md$/);
+  assert.match(file, /\.AgentCowork[\\/]memory[\\/]projects\.md$/);
   const note = readMemoryNote(root, 'projects.md');
   assert.match(note, /# Projects/);
   const notes = listMemoryNotes(root);

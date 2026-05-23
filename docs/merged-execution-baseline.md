@@ -8,7 +8,7 @@
 
 当前目录里的两个计划不能直接混成一个单一 MVP。
 
-- `plan/2026-05-20-kimi-cowork-implementation-plan.md`
+- `plan/2026-05-20-agent-cowork-implementation-plan.md`
   - 保留为 **MVP-0：Kimi CLI 本地原型计划**。
   - 用途：快速验证 Kimi-only、trusted workspace、本地文件树、上下文 bundle、diff/apply、审批、审计、Kimi Web 安全启动。
   - 限制：Node.js/TypeScript + React/Vite + Electron 不符合正式 C 前端方向；本地单机 host API 不符合多用户后端和千万级 QPS 目标。
@@ -111,7 +111,7 @@ apps/windows-client/
 
 ```text
 apps/local-agent/
-  cmd/kimi-cowork-agent/
+  cmd/agent-cowork-agent/
   internal/workspace/
   internal/tools/
   internal/journal/

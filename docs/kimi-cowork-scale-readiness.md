@@ -1,7 +1,7 @@
 # Agent Cowork 规模就绪 (Scale Readiness) 架构准备
 
 > 日期: 2026-05-20
-> 上游: `docs/kimi-vs-claude-cowork-gap.md`, `docs/kimi-cowork-optimization-roadmap.md`, `docs/mvp-1-windows-c-cloud-architecture.md`
+> 上游: `docs/kimi-vs-claude-cowork-gap.md`, `docs/agent-cowork-optimization-roadmap.md`, `docs/mvp-1-windows-c-cloud-architecture.md`
 > 目标: 当前阶段 Agent Cowork 仍是单机本地产品, 但所有不可逆的地基决策 (数据模型、接口、租户隔离、可观察性、消息边界) 必须现在做对, 让产品从 1 用户 → 100k DAU → 1M DAU 不重写, 1M+ 时只新增 region/分片不动业务代码。
 
 ---
@@ -130,7 +130,7 @@ StoragePort       LLMPort             SandboxPort
 ### 3.4 文件 / 对象存储
 
 - **铁律: 文件路径不进数据库**, 数据库只存 `blob_id`, 路径由 BlobStore.Resolve(blob_id) 返回。
-- 本地实现: `~/.KimiCowork/blobs/<sha256-prefix>/<sha256>`, 内容寻址 (CAS)。
+- 本地实现: `~/.AgentCowork/blobs/<sha256-prefix>/<sha256>`, 内容寻址 (CAS)。
 - 云端实现: S3-compatible, 同样按 sha256 作 key, 自带去重。
 - 上传走 presigned URL, 不让文件流过业务服务。
 
@@ -193,7 +193,7 @@ StoragePort       LLMPort             SandboxPort
 
 ### Phase A (现在 - 3 个月): 单机本地, 接口准备就绪
 
-- 完成 `docs/kimi-cowork-optimization-roadmap.md` 阶段 0/1/2 全部内容。
+- 完成 `docs/agent-cowork-optimization-roadmap.md` 阶段 0/1/2 全部内容。
 - 同时:
   - 所有业务代码迁到 `services/orchestrator/internal/domain/`, 用 Ports & Adapters 重构。
   - SQLite schema 用迁移工具 (`golang-migrate` 或 `goose`) 管理。

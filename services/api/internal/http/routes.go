@@ -11,7 +11,7 @@ import (
 
 type contextKey string
 
-const requestContextKey contextKey = "kimi-cowork-request-context"
+const requestContextKey contextKey = "agent-cowork-request-context"
 
 type RequestContext struct {
 	TraceID        string `json:"trace_id"`
@@ -23,7 +23,7 @@ type RequestContext struct {
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "service": "kimi-cowork-api"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "service": "agent-cowork-api"})
 	})
 	mux.HandleFunc("POST /v1/devices", accepted("device_registered"))
 	mux.HandleFunc("POST /v1/workspaces", accepted("workspace_registered"))

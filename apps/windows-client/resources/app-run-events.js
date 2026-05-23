@@ -1,6 +1,6 @@
 (function () {
   function renderRunEventPayload(type, payload, appendLine) {
-    const { progressStateFromIcon } = window.KimiCoworkUtils;
+    const { progressStateFromIcon } = window.AgentCoworkUtils;
     if (type === "progress") {
       appendLine(progressStateFromIcon(payload.icon), payload.text || "处理中", payload.meta);
       return true;
@@ -41,7 +41,7 @@
   function resolveAuthToken() {
     try {
       return (
-        window.KimiCoworkApi?.authToken ||
+        window.AgentCoworkApi?.authToken ||
         window.__KCW_TOKEN__ ||
         (window.localStorage && window.localStorage.getItem("kcw_token")) ||
         null
@@ -55,7 +55,7 @@
   // header, so under the auth gate it 401s and retries forever. fetch lets us
   // attach the bearer token and abort cleanly. Returns a handle with close().
   function subscribeRunEvents(message, runId, options = {}) {
-    const state = options.state || window.kimiCowork;
+    const state = options.state || window.agentCowork;
     const scrollConversationToEnd = options.scrollConversationToEnd || window.scrollConversationToEnd || function () {};
     if (!runId || typeof fetch === "undefined" || !message?.body) {
       return null;
@@ -73,8 +73,8 @@
     };
 
     const eventsPath = `/api/runs/${encodeURIComponent(runId)}/events`;
-    const eventsUrl = window.KimiCoworkApi?.resolveUrl
-      ? window.KimiCoworkApi.resolveUrl(eventsPath)
+    const eventsUrl = window.AgentCoworkApi?.resolveUrl
+      ? window.AgentCoworkApi.resolveUrl(eventsPath)
       : eventsPath;
     const controller = new AbortController();
     const seen = new Set();
@@ -139,7 +139,7 @@
     return handle;
   }
 
-  window.KimiCoworkRunEvents = Object.freeze({
+  window.AgentCoworkRunEvents = Object.freeze({
     renderRunEventPayload,
     subscribeRunEvents,
   });

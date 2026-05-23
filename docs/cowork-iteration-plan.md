@@ -43,7 +43,7 @@
 ### 迭代 B — 前端 React 组件化
 按 `component-manifest.json` 的 9 个组件契约重写, 退役 59KB 单体 app.js。
 - Vite + React + TS, 产物仍输出到 `resources/` 供 Tauri `frontendDist`。
-- 所有网络收口到 `KimiCoworkApi` (已就位), 不再裸 fetch。
+- 所有网络收口到 `AgentCoworkApi` (已就位), 不再裸 fetch。
 - 收益: 彻底解决"中文大文件截断"痛点 (组件文件小、可测、可维护)。
 
 ### 迭代 C — Skill / Recipe 注册表深化

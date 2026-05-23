@@ -170,7 +170,7 @@ async function main() {
   fs.writeFileSync(path.join(workspace, 'finance', 'invoices.csv'), 'vendor,amount\nMoonshot,1280\nOffice,360\n', 'utf8');
   fs.writeFileSync(path.join(workspace, 'meeting-notes.md'), '# Weekly\n- Prepare summary\n', 'utf8');
 
-  const auditPath = path.join(workspace, '.KimiCowork', 'audit', 'rendered-ui.jsonl');
+  const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'rendered-ui.jsonl');
   const host = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
@@ -428,7 +428,7 @@ async function main() {
     assert(interaction.afterApprove.doneClass === true, 'approve button did not enter done state');
     assert(interaction.afterApprove.stream.includes('执行完成'), 'approve interaction stream missing completion state');
 
-    const artifactsDir = path.join(workspace, '.KimiCowork', 'artifacts');
+    const artifactsDir = path.join(workspace, '.AgentCowork', 'artifacts');
     const artifacts = fs.existsSync(artifactsDir)
       ? fs.readdirSync(artifactsDir).filter((name) => name.endsWith('.md'))
       : [];

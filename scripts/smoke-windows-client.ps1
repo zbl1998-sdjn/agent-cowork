@@ -35,7 +35,7 @@ $buildRoot = Join-Path $repoRoot "build"
 $workspace = Join-Path $buildRoot "windows-client-smoke-workspace"
 $sourceDir = Join-Path $repoRoot "apps\windows-client"
 $buildDir = Join-Path $buildRoot "windows-client-vs"
-$exe = Join-Path $buildDir "KimiCowork.exe"
+$exe = Join-Path $buildDir "AgentCowork.exe"
 $vsDevShell = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\Launch-VsDevShell.ps1"
 
 if (-not (Test-Path -LiteralPath $buildRoot)) {
@@ -55,7 +55,7 @@ New-Item -ItemType Directory -Path (Join-Path $workspace "finance") | Out-Null
 Set-Content -LiteralPath (Join-Path $workspace "meeting-notes.md") -Encoding utf8 -Value "# Weekly meeting`n- Follow up with procurement`n- Prepare summary"
 Set-Content -LiteralPath (Join-Path $workspace "contracts\sample-contract.txt") -Encoding utf8 -Value "Contract draft. Party A, Party B, renewal date, payment terms."
 Set-Content -LiteralPath (Join-Path $workspace "finance\invoices.csv") -Encoding utf8 -Value "vendor,amount`nMoonshot,1280`nOffice,360"
-Set-Content -LiteralPath (Join-Path $workspace "kimi-cowork.workspace") -Encoding ascii -Value "smoke"
+Set-Content -LiteralPath (Join-Path $workspace "agent-cowork.workspace") -Encoding ascii -Value "smoke"
 
 Assert-True (Test-Path -LiteralPath $vsDevShell) "Visual Studio developer shell not found: $vsDevShell"
 & $vsDevShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation | Out-Null
@@ -64,7 +64,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $buildDir "build.ninja"))) {
     Invoke-Checked "cmake" "-S" $sourceDir "-B" $buildDir "-G" "Ninja"
 }
 Invoke-Checked "cmake" "--build" $buildDir "--config" "Debug"
-Assert-True (Test-Path -LiteralPath $exe) "KimiCowork.exe was not built: $exe"
+Assert-True (Test-Path -LiteralPath $exe) "AgentCowork.exe was not built: $exe"
 
 $nativeCode = @'
 using System;
@@ -133,7 +133,7 @@ function Wait-ForMainWindow {
         }
         Start-Sleep -Milliseconds 100
     }
-    throw "Timed out waiting for KimiCowork main window"
+    throw "Timed out waiting for AgentCowork main window"
 }
 
 function Get-Children {
@@ -206,7 +206,7 @@ function New-AsrBlockedMessage {
     }
 
     return @"
-KimiCowork.exe could not be launched. This machine currently appears to block locally built executables before the window can be tested.
+AgentCowork.exe could not be launched. This machine currently appears to block locally built executables before the window can be tested.
 
 Executable:
 $ExePath
@@ -284,9 +284,9 @@ try {
     Assert-True ($artifactText.Contains("approved_applied")) "Approval did not apply the approved artifact"
     Assert-True ($artifactText.Contains("move_applied")) "Approval did not apply the approved move operation"
 
-    $artifactDir = Join-Path $workspace ".KimiCowork\artifacts"
-    $auditPath = Join-Path $workspace ".KimiCowork\audit\audit.jsonl"
-    $rollbackDir = Join-Path $workspace ".KimiCowork\rollback"
+    $artifactDir = Join-Path $workspace ".AgentCowork\artifacts"
+    $auditPath = Join-Path $workspace ".AgentCowork\audit\audit.jsonl"
+    $rollbackDir = Join-Path $workspace ".AgentCowork\rollback"
     $artifactFiles = @(Get-ChildItem -LiteralPath $artifactDir -Filter "office-plan-*.md" -File -ErrorAction SilentlyContinue)
     $rollbackFiles = @(Get-ChildItem -LiteralPath $rollbackDir -Filter "rollback-*.jsonl" -File -ErrorAction SilentlyContinue)
     Assert-True ($artifactFiles.Count -eq 1) "Expected one generated Markdown artifact, got $($artifactFiles.Count)"
