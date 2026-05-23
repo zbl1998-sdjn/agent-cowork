@@ -3,7 +3,9 @@ build/
 dist/
 coverage/
 .KimiCowork/
+.AgentCowork/
 *.log
+*.log.err
 
 # secrets
 .env

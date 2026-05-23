@@ -290,7 +290,15 @@ export function App() {
     const uploaded = await uploadAttachments(meta.files);
     if (selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
 
-    if (chatEnabled) {
+    // chatEnabled is fetched once when the user resolves; if the host wasn't
+    // ready at that instant it can be stale-false and never refreshes. Re-check
+    // here so chat self-heals instead of wrongly showing the "configure API" hint.
+    let enabled = chatEnabled;
+    if (!enabled) {
+      try { const info = await getKimiInfo(); enabled = Boolean(info.chatEnabled); if (enabled) setChatEnabled(true); } catch { /* host unreachable */ }
+    }
+
+    if (enabled) {
       const prompt = uploaded.length ? `${text}\n\n[已上传文件]\n${uploaded.join('\n')}` : text;
       setStreamingId(assistantId);
       try {

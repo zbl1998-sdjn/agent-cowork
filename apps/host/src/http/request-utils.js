@@ -44,11 +44,17 @@ export function isAllowedOrigin(origin) {
   }
   try {
     const parsed = new URL(value);
+    // Tauri webview origins: `tauri://localhost` (macOS/Linux) and, on Windows,
+    // the custom-protocol origin surfaces as http(s)://tauri.localhost. Both are
+    // the desktop shell itself and must be allowed, otherwise the webview's
+    // cross-origin calls to the loopback host (incl. CORS preflight) are blocked
+    // and the app can't even log in.
     if (parsed.protocol === 'tauri:') {
       return true;
     }
+    const host = String(parsed.hostname || '').toLowerCase();
     return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && isLoopbackHostname(parsed.hostname);
+      && (isLoopbackHostname(host) || host === 'tauri.localhost');
   } catch {
     return false;
   }

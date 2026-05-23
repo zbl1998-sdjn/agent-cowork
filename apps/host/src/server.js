@@ -510,7 +510,13 @@ export function createServer(config = {}) {
         response.setHeader('access-control-allow-origin', requestOrigin);
         response.setHeader('vary', 'Origin');
         response.setHeader('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-        response.setHeader('access-control-allow-headers', 'content-type,idempotency-key,x-tenant-id,x-user-id,x-trace-id,last-event-id');
+        // `authorization` MUST be here: every authenticated request carries a
+        // Bearer token, which makes the browser send a CORS preflight asking to
+        // use the `authorization` header. If we don't echo it back in
+        // allow-headers, the webview silently blocks the request — guest login
+        // (no token) succeeds, but every signed-in call (kimi/info, workspace,
+        // conversations…) fails, surfacing as a misleading "configure API" hint.
+        response.setHeader('access-control-allow-headers', 'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,last-event-id');
         response.setHeader('access-control-max-age', '600');
       }
       if (request.method === 'OPTIONS') {
