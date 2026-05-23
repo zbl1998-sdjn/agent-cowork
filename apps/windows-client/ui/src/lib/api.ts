@@ -37,12 +37,13 @@ async function probeHealth(): Promise<boolean> {
 
 // Start the bundled host (desktop) and wait until /health is ready.
 export async function ensureHost(attempts = 40, intervalMs = 250): Promise<boolean> {
+  // The Rust shell starts the host natively in its `setup` hook, so the host is
+  // normally already listening by the time we get here. We still nudge it via
+  // `start_node_host` (idempotent) as a fallback, but FIRE-AND-FORGET: never
+  // `await` it. Awaiting a hung IPC bring-up previously froze the boot splash
+  // forever. The health probe below is the single source of truth for "ready".
   if (isDesktop()) {
-    try {
-      await invoke('start_node_host');
-    } catch {
-      // already running -> no-op on the Rust side; health probe decides.
-    }
+    void invoke('start_node_host').catch(() => { /* host autostarted in setup; probe decides */ });
   }
   for (let i = 0; i < attempts; i += 1) {
     if (await probeHealth()) return true;

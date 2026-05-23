@@ -31,41 +31,41 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   assert.match(cargoToml, /tauri-plugin-opener/);
   assert.match(cargoToml, /tauri-plugin-notification/);
 
-  // The shell is modular: integration points live across src/*.rs, so scan the
-  // whole crate source rather than assuming everything sits in lib.rs.
+  // Integration points live across src/*.rs, so scan the whole crate source.
   const srcDir = path.join(tauriRoot, 'src');
   const rust = fs
     .readdirSync(srcDir)
     .filter((name) => name.endsWith('.rs'))
     .map((name) => fs.readFileSync(path.join(srcDir, name), 'utf8'))
     .join('\n');
-  for (const symbol of [
+  // The bundled Node host is spawned directly via std::process::Command from the
+  // binary next to the desktop exe (resolved with current_exe). The Tauri shell
+  // sidecar helper spawned unreliably in packaged builds, so we no longer use it;
+  // the host is also started natively in the setup hook, not only via invoke.
+  const requiredSymbols = [
     'start_node_host',
     'host_status',
     'open_path',
-    '.sidecar(',
-    'binaries/agent-cowork-host',
-    'tauri_plugin_shell::init()',
-    'tauri_plugin_opener::init()',
-    'tauri_plugin_notification::init()',
+    'agent-cowork-host',
+    'Command::new',
+    'current_exe',
+    '.setup',
+    'tauri_plugin_opener::init',
+    'tauri_plugin_notification::init',
     'assert_trusted_path',
-  ]) {
+  ];
+  for (const symbol of requiredSymbols) {
     assert.ok(rust.includes(symbol), `missing ${symbol}`);
   }
-  assert.equal(rust.includes('Command::new("node")'), false, 'packaged Tauri app must use sidecar instead of PATH node');
+  // The packaged app must spawn the bundled host binary, never a PATH node.
+  assert.equal(rust.includes('Command::new("node")'), false, 'must not spawn PATH node');
 
   const capability = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8'));
-  // Hardened: the broad opener:default / shell:allow-open / shell:default grants
-  // are intentionally NOT present (they would let the webview open arbitrary
-  // paths/URLs or shell out). The "safe opener" is the custom open_path command
-  // above, which validates against the trusted root via assert_trusted_path.
+  // Hardened: broad opener:default / shell:allow-open / shell:default grants are
+  // intentionally absent; the safe opener is the custom open_path command above.
   assert.equal(capability.permissions.includes('opener:default'), false);
   assert.equal(capability.permissions.includes('shell:default'), false);
   assert.equal(capability.permissions.includes('shell:allow-open'), false);
-  assert.ok(capability.permissions.some((permission) => (
-    permission.identifier === 'shell:allow-execute'
-    && permission.allow?.some((item) => item.name === 'binaries/agent-cowork-host' && item.sidecar === true)
-  )));
 });
 
 test('component manifest covers the React rewrite component contract', () => {

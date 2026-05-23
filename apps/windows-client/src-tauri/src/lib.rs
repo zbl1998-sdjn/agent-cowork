@@ -9,9 +9,6 @@
 //! - [`security`] trusted-path enforcement shared by every fs-touching command
 //! - [`sidecar`]  Node host start/stop/status + graceful shutdown
 //! - [`commands`] thin `#[tauri::command]` wrappers delegating to the above
-//!
-//! Adding a feature is additive: define logic in (or alongside) a module, add
-//! a thin command, and register it in [`run`].
 
 mod commands;
 mod config;
@@ -25,8 +22,10 @@ use sidecar::HostSidecar;
 
 /// Build and run the desktop application.
 ///
-/// On exit we stop the host sidecar so closing the window never leaves an
-/// orphaned Node process behind.
+/// The Node host is started natively in the `setup` hook so a packaged build
+/// always brings it up at launch (the webview's `start_node_host` invoke is
+/// only a best-effort fallback). On exit we stop the sidecar so closing the
+/// window never leaves an orphaned Node process behind.
 pub fn run() {
     tauri::Builder::default()
         .manage(HostSidecar::default())
@@ -39,6 +38,16 @@ pub fn run() {
             commands::stop_node_host,
             commands::open_path,
         ])
+        .setup(|app| {
+            if let Some(state) = app.try_state::<HostSidecar>() {
+                if let Ok(root) = config::trusted_root() {
+                    if let Err(error) = state.start(&app.handle().clone(), &root.to_string_lossy()) {
+                        eprintln!("host sidecar autostart failed: {error}");
+                    }
+                }
+            }
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building Agent Cowork desktop")
         .run(|app_handle, event| {
