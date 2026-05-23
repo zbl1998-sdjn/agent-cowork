@@ -224,7 +224,7 @@ async function main() {
           status: document.querySelector(".status-pill")?.innerText.trim(),
           activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
           hasGreeting: text.includes("欢迎回来，Derrick"),
-          hasCowork: text.includes("Kimi Cowork"),
+          hasCowork: text.includes("Agent Cowork"),
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
@@ -234,7 +234,7 @@ async function main() {
         };
       })()`,
     );
-    assert(desktopLayout.title === 'Kimi Cowork', 'Windows resource title mismatch');
+    assert(desktopLayout.title === 'Agent Cowork', 'Windows resource title mismatch');
     assert(desktopLayout.protocol === 'file:', 'Windows resource smoke must load via file:// static resource mode');
     assert(desktopLayout.hostApi === false, 'Windows resource static preview should not call Host API');
     assert(desktopLayout.status === '静态预览', 'Windows resource did not enter static preview status');

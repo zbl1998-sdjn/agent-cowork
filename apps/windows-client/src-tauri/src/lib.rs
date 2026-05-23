@@ -1,4 +1,4 @@
-//! Kimi Cowork desktop shell (Tauri 2).
+//! Agent Cowork desktop shell (Tauri 2).
 //!
 //! This crate is intentionally thin: it owns the application window, manages
 //! the bundled Node host sidecar lifecycle, and exposes a small, typed IPC
@@ -40,7 +40,7 @@ pub fn run() {
             commands::open_path,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Kimi Cowork desktop")
+        .expect("error while building Agent Cowork desktop")
         .run(|app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 if let Some(state) = app_handle.try_state::<HostSidecar>() {

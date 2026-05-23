@@ -1,4 +1,4 @@
-# 扩展指南 (Extending Kimi Cowork)
+# 扩展指南 (Extending Agent Cowork)
 
 面向维护者：本项目的核心扩展点、契约与约定。目标是「加功能时只动一处、有清晰边界、有测试套路」。
 

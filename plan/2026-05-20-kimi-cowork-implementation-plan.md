@@ -1,8 +1,8 @@
-# Kimi Cowork Implementation Plan
+# Agent Cowork Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 `C:\Users\Administrator\Desktop\kimi cowork` 实现一个只面向 Kimi 的本地 Cowork 产品 MVP：用本机 Kimi Code CLI 提供 agent 能力，用本地桌面/网页壳提供本地文件工作台、会话、目录信任、审批、审计、插件与 Skills 管理。
+**Goal:** 在 `C:\Users\Administrator\Desktop\agent cowork` 实现一个只面向 Kimi 的本地 Cowork 产品 MVP：用本机 Kimi Code CLI 提供 agent 能力，用本地桌面/网页壳提供本地文件工作台、会话、目录信任、审批、审计、插件与 Skills 管理。
 
 **Architecture:** MVP 不复制 Claude 的私有二进制、目录格式、VM bundle 或服务协议，只做 clean-room 的功能复刻。第一阶段用本机 `kimi.exe`、`kimi web`、`kimi acp`/Wire 能力构建本地 session manager、文件树/文件上下文服务、diff/apply pipeline、command runner 和受控 Web UI；VM/Hyper-V 隔离放到第二阶段，等 MVP 的权限、审计和 Kimi 集成跑通后再加。
 
@@ -12,7 +12,7 @@
 
 ## 0. 当前本机事实
 
-- 目标项目目录：`C:\Users\Administrator\Desktop\kimi cowork`，当前为空。
+- 目标项目目录：`C:\Users\Administrator\Desktop\agent cowork`，当前为空。
 - 本机 Kimi CLI：`C:\Users\Administrator\.local\bin\kimi.exe`。
 - `kimi --version` 输出：`kimi, version 1.39.0`。
 - `kimi info` 输出：`kimi-cli version: 1.39.0`，`wire protocol: 1.9`，`python version: 3.13.13`。
@@ -28,7 +28,7 @@
 - 本地目录信任：用户选择的 workspace 默认不可信，必须显式信任后才能执行写入、shell、MCP、插件工具。
 - 本地文件工作台：用户可以选择/挂载本地文件夹，查看 trusted workspace 内文件树，搜索文件，把文件或子目录加入当前 session 上下文。
 - 受控文件读取：只读取 trusted workspace 内的文件；默认拦截凭据目录、隐藏敏感目录、大文件和二进制文件，用户确认后才允许加入上下文。
-- 会话管理：记录 Kimi Cowork 自己的 session 元数据、审计日志、上传/输出目录，不直接改写 `~/.kimi/sessions`。
+- 会话管理：记录 Agent Cowork 自己的 session 元数据、审计日志、上传/输出目录，不直接改写 `~/.kimi/sessions`。
 - Diff/apply pipeline：Kimi 生成的修改先进入 diff 预览，用户批准后才写入本地文件；每次 apply 记录变更摘要、文件路径、hash 和审批事件。
 - 本地 command runner：Kimi 可以提出在 trusted workspace 中运行命令；执行前必须审批，执行时有 timeout、输出截断和 audit 记录。
 - 审批流：默认禁止 `kimi --yolo`，把写文件、执行命令、网络访问、MCP 工具调用、插件工具调用做成可审计的审批事件。
@@ -48,7 +48,7 @@
 ## 2. Target File Structure
 
 ```text
-C:\Users\Administrator\Desktop\kimi cowork\
+C:\Users\Administrator\Desktop\agent cowork\
 ├── README.md
 ├── package.json
 ├── package-lock.json
@@ -134,7 +134,7 @@ C:\Users\Administrator\Desktop\kimi cowork\
 
 ## 3. Data Layout
 
-Kimi Cowork 自己的数据目录默认使用：
+Agent Cowork 自己的数据目录默认使用：
 
 ```text
 %APPDATA%\KimiCowork\
@@ -153,23 +153,23 @@ Kimi Cowork 自己的数据目录默认使用：
     └── host.log
 ```
 
-如果设置 `KIMI_COWORK_HOME`，则使用该目录替代 `%APPDATA%\KimiCowork`。Kimi Code CLI 自己的 runtime 仍使用 `~/.kimi` 或用户指定的 `KIMI_SHARE_DIR`，Kimi Cowork 只通过公开 CLI/API 与它交互。
+如果设置 `KIMI_COWORK_HOME`，则使用该目录替代 `%APPDATA%\KimiCowork`。Kimi Code CLI 自己的 runtime 仍使用 `~/.kimi` 或用户指定的 `KIMI_SHARE_DIR`，Agent Cowork 只通过公开 CLI/API 与它交互。
 
 ## 4. Implementation Tasks
 
 ### Task 1: Initialize The Workspace
 
 **Files:**
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\README.md`
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\package.json`
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\tsconfig.base.json`
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\.gitignore`
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\docs\architecture.md`
-- Create: `C:\Users\Administrator\Desktop\kimi cowork\docs\security-model.md`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\README.md`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\package.json`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\tsconfig.base.json`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\.gitignore`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\docs\architecture.md`
+- Create: `C:\Users\Administrator\Desktop\agent cowork\docs\security-model.md`
 
 - [ ] **Step 1: Initialize git and npm workspace**
 
-Run from `C:\Users\Administrator\Desktop\kimi cowork`:
+Run from `C:\Users\Administrator\Desktop\agent cowork`:
 
 ```powershell
 git init
@@ -268,7 +268,7 @@ found 0 vulnerabilities
 ```powershell
 git status --short
 git add README.md package.json package-lock.json tsconfig.base.json .gitignore docs
-git commit -m "chore: scaffold kimi cowork workspace"
+git commit -m "chore: scaffold agent cowork workspace"
 ```
 
 ### Task 2: Define Shared Types And Schemas
@@ -394,7 +394,7 @@ describe("shared schemas", () => {
   it("accepts valid trusted roots", () => {
     expect(() => assertTrustedRoot({
       id: "root-1",
-      path: "C:\\Users\\Administrator\\Desktop\\kimi cowork",
+      path: "C:\\Users\\Administrator\\Desktop\\agent cowork",
       state: "trusted",
       createdAt: "2026-05-20T00:00:00.000Z",
       lastUsedAt: null
@@ -655,9 +655,9 @@ unless a future explicit admin policy enables them. MVP admin policy default is 
 Test cases:
 
 ```text
-trusted root: C:\Users\Administrator\Desktop\kimi cowork\workspace
-allowed:      C:\Users\Administrator\Desktop\kimi cowork\workspace\src\a.ts
-denied:       C:\Users\Administrator\Desktop\kimi cowork-other\a.ts
+trusted root: C:\Users\Administrator\Desktop\agent cowork\workspace
+allowed:      C:\Users\Administrator\Desktop\agent cowork\workspace\src\a.ts
+denied:       C:\Users\Administrator\Desktop\agent cowork-other\a.ts
 denied:       C:\Users\Administrator\.kimi\credentials\provider.json
 ```
 
@@ -922,7 +922,7 @@ Start Kimi Web is disabled until a workspace is trusted
 The Skill should instruct Kimi agents inside this project to:
 
 ```text
-respect Kimi Cowork trust roots
+respect Agent Cowork trust roots
 avoid --yolo unless explicitly requested
 summarize file writes before asking approval
 avoid reading credentials directories
@@ -937,18 +937,18 @@ emit concise session summaries
 {
   "name": "kimi-cowork",
   "version": "0.1.0",
-  "description": "Local helpers for Kimi Cowork session inspection",
+  "description": "Local helpers for Agent Cowork session inspection",
   "tools": [
     {
       "name": "session_summary",
-      "description": "Summarize a Kimi Cowork session audit log",
+      "description": "Summarize a Agent Cowork session audit log",
       "command": ["node", "scripts/session_summary.js"],
       "parameters": {
         "type": "object",
         "properties": {
           "sessionId": {
             "type": "string",
-            "description": "Kimi Cowork session id"
+            "description": "Agent Cowork session id"
           }
         },
         "required": ["sessionId"]
@@ -961,7 +961,7 @@ emit concise session summaries
 - [ ] **Step 3: Install plugin only after user approval**
 
 ```powershell
-kimi plugin install "C:\Users\Administrator\Desktop\kimi cowork\plugins\kimi-cowork"
+kimi plugin install "C:\Users\Administrator\Desktop\agent cowork\plugins\kimi-cowork"
 kimi plugin list
 ```
 

@@ -279,7 +279,7 @@ async function main() {
           status: document.querySelector(".status-pill")?.innerText.trim(),
           activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
           hasGreeting: text.includes("欢迎回来，Derrick"),
-          hasCowork: text.includes("Kimi Cowork"),
+          hasCowork: text.includes("Agent Cowork"),
           hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
           hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
           hasQuickActions: text.includes("代码") && text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
@@ -290,10 +290,10 @@ async function main() {
         };
       })()`,
     );
-    assert(desktopLayout.title === 'Kimi Cowork', 'rendered page title mismatch');
+    assert(desktopLayout.title === 'Agent Cowork', 'rendered page title mismatch');
     assert(desktopLayout.activeMode === '对话', 'rendered page should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
-    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Kimi cowork quick actions');
+    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'rendered page missing Agent cowork quick actions');
     assert(desktopLayout.hasInteractionStream, 'rendered page missing cowork interaction stream');
     assert(desktopLayout.hasRunCards, 'rendered page missing task card panel');
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');

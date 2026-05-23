@@ -1,4 +1,4 @@
-# Kimi Cowork Host MVP-0 (Local, Kimi-only)
+# Agent Cowork Host MVP-0 (Local, Kimi-only)
 
 这个项目是一个零外部依赖的 Node.js MVP-0 本地 PoC 主机服务（host），用于验证 Kimi 工作流前置能力：
 
@@ -19,7 +19,7 @@
 ## 快速开始
 
 ```powershell
-cd "C:\Users\Administrator\Desktop\kimi cowork"
+cd "C:\Users\Administrator\Desktop\agent cowork"
 npm run demo:mvp
 ```
 
@@ -44,7 +44,7 @@ npm run smoke:host
 
 测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
-`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Kimi Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
+`npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Agent Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，确认前台任务卡片显示最新 Cowork run，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `KimiCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
 `npm run smoke:kimi-api` 会启动一个临时 Host API，真实调用 Kimi/Moonshot OpenAI-compatible API，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.KimiCowork/runs/*.json` 运行记录。该 smoke 依赖 `KIMI_API_KEY` 或 `MOONSHOT_API_KEY` 和可用网络，不放进默认 `verify:mvp` 的运行项。
@@ -53,10 +53,10 @@ npm run smoke:host
 `npm run verify:mvp` 会聚合语法检查、Node 单测、Host 操作 smoke、MVP runtime smoke、UI contract smoke 和 rendered browser smoke，并把可审计报告写到 `build/mvp-verification-report.json`。如果已经在 Defender/企业 ASR 策略中放行 Windows 客户端精确 exe 路径，可以运行 `node scripts/verify-mvp.mjs --windows-client` 把原生窗口级 smoke 纳入 `build/mvp-verification-report-windows.json`。
 `npm run audit:mvp` 会读取当前 runtime、verification、rendered UI、live MVP、runtime smoke、Windows 资源 smoke 和 Windows readiness 证据，汇总到 `build/mvp-acceptance-audit.json`；默认会在 Web/Host MVP 已就绪但原生窗口 smoke 被 Defender ASR 阻塞时正常生成报告，`npm run audit:mvp -- --strict` 会把任何未完成的完整目标作为非零退出。
 `npm run verify:windows-readiness` 是只读检查：它不会修改 Defender，只会检查 `KimiCowork.exe` 是否存在、是否已有精确 ASR-only 路径排除项、普通目录级 exclusion 是否仍被 ASR 绕过、最近是否有 ASR 阻断事件，并写出 `build/windows-client-readiness.json`。
-`npm run start:mvp` 会创建 `build/mvp-workspace` 演示工作区，启动本地服务并打开 Kimi Cowork UI。
+`npm run start:mvp` 会创建 `build/mvp-workspace` 演示工作区，启动本地服务并打开 Agent Cowork UI。
 `npm run status:mvp` 会读取 `build/mvp-runtime.json` 并检查 PID 与 `/health`；`npm run stop:mvp` 会根据 runtime 文件停止由 `start:mvp` 启动的服务。
 
-启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Kimi Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.KimiCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
+启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Agent Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.KimiCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
 Kimi API 计划生成功能默认只在配置服务端 API key 后启用，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时调用 Kimi API：
 
@@ -84,7 +84,7 @@ npm run start:mvp
 
 ```powershell
 $env:PORT = "3011"
-$env:TRUSTED_ROOT = "C:\Users\Administrator\Desktop\kimi cowork"
+$env:TRUSTED_ROOT = "C:\Users\Administrator\Desktop\agent cowork"
 npm start
 ```
 
@@ -107,7 +107,7 @@ Kimi Gateway 已实现 OpenAI-compatible 非流式 chat client，默认走 `POST
 Local Agent CLI 已经可直接提供本地文件能力：
 
 ```powershell
-cd "C:\Users\Administrator\Desktop\kimi cowork\apps\local-agent"
+cd "C:\Users\Administrator\Desktop\agent cowork\apps\local-agent"
 go run .\cmd\kimi-cowork-agent health
 go run .\cmd\kimi-cowork-agent list --root "C:\path\to\workspace"
 go run .\cmd\kimi-cowork-agent read --root "C:\path\to\workspace" --path "C:\path\to\workspace\notes.md"
@@ -137,7 +137,7 @@ cmake --build build/windows-client-vs --config Debug
 当前完整目标的最后一步需要原生窗口级 smoke。只有在你明确接受这个安全权衡后，才应添加精确路径排除项：
 
 ```powershell
-Add-MpPreference -AttackSurfaceReductionOnlyExclusions "C:\Users\Administrator\Desktop\kimi cowork\build\windows-client-vs\KimiCowork.exe"
+Add-MpPreference -AttackSurfaceReductionOnlyExclusions "C:\Users\Administrator\Desktop\agent cowork\build\windows-client-vs\KimiCowork.exe"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1
 node .\scripts\verify-mvp.mjs --windows-client
 npm run audit:mvp -- --strict
@@ -146,7 +146,7 @@ npm run audit:mvp -- --strict
 推荐的明确授权文字是：
 
 ```text
-同意为 C:\Users\Administrator\Desktop\kimi cowork\build\windows-client-vs\KimiCowork.exe 添加 Microsoft Defender ASR-only 精确路径排除项
+同意为 C:\Users\Administrator\Desktop\agent cowork\build\windows-client-vs\KimiCowork.exe 添加 Microsoft Defender ASR-only 精确路径排除项
 ```
 
 ### Windows 客户端操作烟测

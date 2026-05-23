@@ -107,7 +107,7 @@ function shutdown() {
 
 server.listen(port, host, () => {
   writeRuntimeFile();
-  console.log(`Kimi Cowork MVP running at ${url}`);
+  console.log(`Agent Cowork MVP running at ${url}`);
   console.log(`Trusted workspace: ${workspace}`);
   console.log(`Kimi API plan: ${kimiApiPlanEnabled ? 'enabled' : 'not configured'}`);
   console.log(`Runtime file: ${runtimeFile}`);
@@ -120,7 +120,7 @@ server.on('error', (error) => {
     console.error(`Port is busy: ${host}:${port}. Set PORT to a free port and retry.`);
     process.exit(1);
   }
-  console.error('Failed to start Kimi Cowork MVP:', error);
+  console.error('Failed to start Agent Cowork MVP:', error);
   process.exit(1);
 });
 

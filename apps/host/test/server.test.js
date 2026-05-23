@@ -401,7 +401,7 @@ test('kimi plan failures persist run record and expose run id', async () => {
 test('serves the local preview shell and assets', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   const staticRoot = makeTestWorkspace('kcw-static');
-  fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>Kimi Cowork</title>', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>Agent Cowork</title>', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.css'), 'body { color: black; }', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.KimiCoworkUtils = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.KimiCoworkApi = {};', 'utf8');
@@ -413,7 +413,7 @@ test('serves the local preview shell and assets', async () => {
     const index = await fetch(`${baseUrl}/`);
     assert.equal(index.status, 200);
     assert.match(index.headers.get('content-type'), /text\/html/);
-    assert.match(await index.text(), /Kimi Cowork/);
+    assert.match(await index.text(), /Agent Cowork/);
 
     const script = await fetch(`${baseUrl}/app.js`);
     assert.equal(script.status, 200);

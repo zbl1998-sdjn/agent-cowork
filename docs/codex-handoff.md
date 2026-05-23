@@ -1,4 +1,4 @@
-# Codex 交接文档 — Kimi Cowork 剩余实现
+# Codex 交接文档 — Agent Cowork 剩余实现
 
 > 日期: 2026-05-20
 > 入口/全景: 先读 `docs/00-cowork-comparison-index.md` 第 2 节状态矩阵 + 第 3 节"关键 4 件大事"。
@@ -14,7 +14,7 @@
 
 验收基线 (必须保持绿):
 ```
-cd "C:\Users\Administrator\Desktop\kimi cowork"
+cd "C:\Users\Administrator\Desktop\agent cowork"
 node --test                       # 当前 90 通过 / 0 失败
 npm run smoke:ui                  # UI 契约 + 本地操作链
 ```
@@ -99,7 +99,7 @@ grep -nP "\xEF\xBF\xBD" apps/windows-client/resources/app.js   # 应无输出
 ## 4. 给 Codex 的即用 prompt (复制即可)
 
 ```
-你接手 Kimi Cowork (Windows 本地办公 Agent, Node host + 静态前端 + Go services 骨架)。
+你接手 Agent Cowork (Windows 本地办公 Agent, Node host + 静态前端 + Go services 骨架)。
 先读 docs/codex-handoff.md 和 docs/00-cowork-comparison-index.md 全文。
 
 约束:

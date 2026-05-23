@@ -1,4 +1,4 @@
-# Kimi Cowork UI (React + Vite + TS)
+# Agent Cowork UI (React + Vite + TS)
 
 Component-ised rewrite of the desktop frontend, replacing the legacy static
 `resources/app.js`. Implements the 9 components in

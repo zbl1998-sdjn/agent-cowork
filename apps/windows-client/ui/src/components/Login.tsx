@@ -38,7 +38,7 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
     <div className="auth-screen">
       <aside className="auth-aside" aria-hidden="true">
         <div className="auth-aside-inner">
-          <span className="auth-logo"><span className="brand-dot auth-brand-dot" />Kimi Cowork</span>
+          <span className="auth-logo"><span className="brand-dot auth-brand-dot" />Agent Cowork</span>
           <h2>你的本地办公智能体</h2>
           <p>读写工作区文件、运行代码、连接你的工具——全部在本机完成，关键操作先经你批准。</p>
         </div>

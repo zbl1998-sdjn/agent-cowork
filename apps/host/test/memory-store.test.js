@@ -33,7 +33,7 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
   );
   assert.match(result.file, /MEMORY\.md$/);
   const body = readMainMemory(root);
-  assert.match(body, /# Kimi Cowork 项目记忆/);
+  assert.match(body, /# Agent Cowork 项目记忆/);
   assert.match(body, /\*\*客户简称\*\* \(project\): 阿里 = 阿里巴巴中国区运营/);
   await flushMemoryAuditEvents(root);
   const auditLines = fs

@@ -1,14 +1,14 @@
 # Open Cowork 参考改进记录
 
 > 日期：2026-05-20  
-> 目标：只吸收产品与工程模式，不复制 Open Cowork 的代码、协议或品牌资产；Kimi Cowork 继续保持 Kimi-only、本地可信工作区、审批后执行。
+> 目标：只吸收产品与工程模式，不复制 Open Cowork 的代码、协议或品牌资产；Agent Cowork 继续保持 Kimi-only、本地可信工作区、审批后执行。
 
 ## 参考点
 
 - OpenCoworkAI/open-cowork 强调多 Agent 聊天、MCP 工具、自定义 Skills/Recipes、可切换兼容 OpenAI API 的模型提供方。
 - opencowork.me 对同名 local-first runtime 的表达重点是结果优先、可配置模型、MCP、skills、recipes，以及本地运行。
 
-这些方向对 Kimi Cowork 的启发是：不要只做一个聊天壳，而要把每次任务运行变成可追踪、可复跑、可扩展的本地工作流单元。
+这些方向对 Agent Cowork 的启发是：不要只做一个聊天壳，而要把每次任务运行变成可追踪、可复跑、可扩展的本地工作流单元。
 
 ## 已落地
 

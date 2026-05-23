@@ -10,7 +10,7 @@ const root = makeTestWorkspace('kfcowork-reader');
 
 test('reads text file with sha256 and size metadata', () => {
   const p = path.join(root, 'note.txt');
-  const text = 'hello kimi cowork';
+  const text = 'hello agent cowork';
   fs.writeFileSync(p, text, 'utf8');
 
   const result = readTextFile(p, { trustedRoot: root, maxSize: 1024 });

@@ -1,4 +1,4 @@
-# Kimi Cowork 对话流 UX 重构
+# Agent Cowork 对话流 UX 重构
 
 > 日期: 2026-05-20
 > 上游: `docs/kimi-cowork-optimization-roadmap.md` 阶段 0

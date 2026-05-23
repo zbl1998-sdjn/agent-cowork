@@ -66,7 +66,7 @@ async function main() {
 
     const shell = await fetch(`${baseUrl}/`);
     assert(shell.status === 200, `preview shell returned ${shell.status}`);
-    assert((await shell.text()).includes('Kimi Cowork'), 'preview shell missing Kimi Cowork UI');
+    assert((await shell.text()).includes('Agent Cowork'), 'preview shell missing Agent Cowork UI');
 
     const defaultWorkspace = await (await fetch(`${baseUrl}/api/workspace`)).json();
     assert(defaultWorkspace.trustedRoot === workspace, 'workspace endpoint returned unexpected trusted root');
@@ -89,7 +89,7 @@ async function main() {
     const renamedNotePath = path.join(workspace, 'notes', 'weekly-renamed.md');
     const movedContractPath = path.join(workspace, 'Kimi_Cowork整理', '合同审核', 'sample-contract.txt');
     const operations = [
-      { type: 'write', path: artifactPath, content: '# Kimi Cowork Summary\n\n- Local operation smoke passed.\n' },
+      { type: 'write', path: artifactPath, content: '# Agent Cowork Summary\n\n- Local operation smoke passed.\n' },
       { type: 'rename', path: notePath, newName: 'weekly-renamed.md' },
       { type: 'move', from: contractPath, to: movedContractPath },
     ];

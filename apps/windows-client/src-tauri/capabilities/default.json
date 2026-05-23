@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Kimi Cowork desktop shell permissions",
+  "description": "Agent Cowork desktop shell permissions",
   "windows": ["main"],
   "permissions": [
     "core:default",

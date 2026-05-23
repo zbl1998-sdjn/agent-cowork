@@ -1,7 +1,7 @@
-# Kimi Cowork 合并执行基线
+# Agent Cowork 合并执行基线
 
 > 生成时间：2026-05-20  
-> 适用目录：`C:\Users\Administrator\Desktop\kimi cowork`  
+> 适用目录：`C:\Users\Administrator\Desktop\agent cowork`  
 > 当前结论：原 Node/Electron/Kimi CLI 计划只能作为 MVP-0 本地 PoC；正式 MVP-1 必须转向 Windows C 前端 + 本地 Agent + 可扩展多用户云端后端 + 长期千万级 QPS 架构。
 
 ## 1. 结论
@@ -53,7 +53,7 @@ MVP-0 不承担：
 MVP-1 的一句话定义：
 
 ```text
-Kimi Cowork for Windows 是一个 Kimi-only 的本地文件夹级 Cowork 产品：
+Agent Cowork for Windows 是一个 Kimi-only 的本地文件夹级 Cowork 产品：
 Windows C 客户端负责用户体验和本地授权，
 Local Agent 负责本机文件工具、路径安全、Journal 和回滚，
 Cloud Backend 负责多用户、多设备、任务编排、审批流和 Kimi Gateway。

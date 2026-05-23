@@ -1,4 +1,4 @@
-//! Error handling for the Kimi Cowork desktop shell.
+//! Error handling for the Agent Cowork desktop shell.
 //!
 //! Every fallible operation in the shell returns [`DesktopResult`]. The error
 //! type is intentionally small and serialisable so it can cross the Tauri IPC

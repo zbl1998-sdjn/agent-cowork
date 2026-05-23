@@ -1,4 +1,4 @@
-# Kimi Cowork 优化路线: 逼近 Claude Cowork 体验
+# Agent Cowork 优化路线: 逼近 Claude Cowork 体验
 
 > 日期: 2026-05-20
 > 上游: `docs/kimi-vs-claude-cowork-gap.md`
@@ -213,7 +213,7 @@ Week 3: 1.3 真实落地 2 个模板 (会议纪要 + Excel 清洗)
 Week 4: 2.1 SQLite + 2.4 MEMORY.md + 2.3 一个最小 cron 演示
 ```
 
-跳过 阶段 0.2 之外的 UI 大改 (Tauri 迁移挪到第二个 30 天), 跳过 MCP (放到第二个 30 天)。这 4 周末尾你拿到的产物是: 一个会反问、有任务卡片、能跑出真实 xlsx、记得你的偏好、可以定时跑的 Kimi Cowork — 已经能给真实白领用户演示, 而不是只能给开发者跑 smoke。
+跳过 阶段 0.2 之外的 UI 大改 (Tauri 迁移挪到第二个 30 天), 跳过 MCP (放到第二个 30 天)。这 4 周末尾你拿到的产物是: 一个会反问、有任务卡片、能跑出真实 xlsx、记得你的偏好、可以定时跑的 Agent Cowork — 已经能给真实白领用户演示, 而不是只能给开发者跑 smoke。
 
 ---
 

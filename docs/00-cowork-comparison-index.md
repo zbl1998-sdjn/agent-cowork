@@ -1,4 +1,4 @@
-# Kimi Cowork ↔ Claude Cowork 对照体系 · 索引
+# Agent Cowork ↔ Claude Cowork 对照体系 · 索引
 
 > 日期: 2026-05-20
 > 用途: 这一组 doc 的入口。先看本页, 再按需跳到下面 4 份详 doc。
@@ -126,7 +126,7 @@
 
 ## 3. 当前阶段一句话
 
-**Kimi Cowork 已经走过 "PoC + 单一 dashboard" 阶段, 进入 "对话流 MVP + 真实模板"**。本地审批/回滚/审计/runs 这套长板还在; UX 原语已覆盖 SSE、Composer `/`/`@`/`#`、Memory/Schedule/Runs SQLite adapter、Kimi API plan/chat 主链路、Kimi Gateway 流式/tool/vision、audit EventBus、持久 Artifact catalog / 安全 HTML live page 和关键本地 API 安全边界; 但 **MCP 生态、真实 React runtime、Tauri dev/window/installer、连接器驱动的活 Artifact** 仍是后续主线。
+**Agent Cowork 已经走过 "PoC + 单一 dashboard" 阶段, 进入 "对话流 MVP + 真实模板"**。本地审批/回滚/审计/runs 这套长板还在; UX 原语已覆盖 SSE、Composer `/`/`@`/`#`、Memory/Schedule/Runs SQLite adapter、Kimi API plan/chat 主链路、Kimi Gateway 流式/tool/vision、audit EventBus、持久 Artifact catalog / 安全 HTML live page 和关键本地 API 安全边界; 但 **MCP 生态、真实 React runtime、Tauri dev/window/installer、连接器驱动的活 Artifact** 仍是后续主线。
 
 距离 "像 Claude Cowork" 的关键 4 件大事 (按 ROI 排):
 

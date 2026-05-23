@@ -172,7 +172,7 @@ async function main() {
     screenshot.exists &&
     screenshotSize?.width === 1536 &&
     screenshotSize?.height === 900 &&
-    desktopLayout?.title === 'Kimi Cowork' &&
+    desktopLayout?.title === 'Agent Cowork' &&
     hasReferenceFunctionalShell(desktopLayout) &&
     desktopLayout?.hasFrameworkOverlay === false &&
     desktopLayout?.scroll?.width <= desktopLayout?.scroll?.clientWidth + 1 &&
@@ -201,7 +201,7 @@ async function main() {
   // Evidence integrity (strict mode): a release gate must never "pass" on stale
   // or foreign-repo evidence. Reject any contributing report that is older than
   // STALE_MS or whose recorded repoRoot points at a different checkout (e.g. an
-  // old `kimi cowork` tree). Reports without these fields are not penalised.
+  // old `agent cowork` tree). Reports without these fields are not penalised.
   const STALE_MS = 10 * 60 * 1000;
   const evidenceReports = [
     { label: 'mvp-runtime', value: runtime.value },
@@ -266,7 +266,7 @@ async function main() {
         liveMvpScreenshotSize?.height === 900 &&
         liveMvpSmoke.value?.runtime?.pid === runtime.value?.pid &&
         liveMvpSmoke.value?.runtime?.url === runtime.value?.url &&
-        liveMvpDesktopLayout?.title === 'Kimi Cowork' &&
+        liveMvpDesktopLayout?.title === 'Agent Cowork' &&
         liveMvpDesktopLayout?.workspace === runtime.value?.workspace &&
         liveMvpInteraction?.afterPlan?.status === '计划就绪' &&
         liveMvpInteraction?.afterPlan?.opCount >= 1 &&
@@ -305,7 +305,7 @@ async function main() {
         windowsResourceScreenshot.exists &&
         windowsResourceScreenshotSize?.width === 1536 &&
         windowsResourceScreenshotSize?.height === 900 &&
-        windowsResourceDesktopLayout?.title === 'Kimi Cowork' &&
+        windowsResourceDesktopLayout?.title === 'Agent Cowork' &&
         windowsResourceDesktopLayout?.protocol === 'file:' &&
         windowsResourceDesktopLayout?.hostApi === false &&
         hasReferenceFunctionalShell(windowsResourceDesktopLayout) &&

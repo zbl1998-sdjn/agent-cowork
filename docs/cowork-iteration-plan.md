@@ -1,4 +1,4 @@
-# Kimi Cowork 迭代优化计划 — 持续贴合 Claude Cowork
+# Agent Cowork 迭代优化计划 — 持续贴合 Claude Cowork
 
 > 日期: 2026-05-22
 > 形态已定: **桌面端 (Tauri 2)** + Node host sidecar + API 接入 (非 CLI)。不做网页端。
@@ -32,7 +32,7 @@
 ## 2. 迭代路线 (按 ROI + 依赖排序)
 
 ### 迭代 A — VM 沙箱执行 (本轮开始)
-让 Kimi Cowork 能"安全地跑工具/代码", 对位 Claude Cowork 的 Linux sandbox。
+让 Agent Cowork 能"安全地跑工具/代码", 对位 Claude Cowork 的 Linux sandbox。
 - 结构化执行规格 (SandboxSpec): 不传裸 shell, 而是 `{ tool, args[], cwd(jail 在 trusted root), timeoutMs, env 白名单, network:false }`。
 - Sandbox Port + 两个 adapter:
   - `LocalSubprocessSandbox` (本轮): 无 shell、arg 数组、cwd 限定、超时、输出上限、env 清洗、审计。

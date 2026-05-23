@@ -1,7 +1,7 @@
 [package]
 name = "kimi-cowork-desktop"
 version = "0.1.0"
-description = "Tauri shell for Kimi Cowork"
+description = "Tauri shell for Agent Cowork"
 edition = "2021"
 rust-version = "1.77"
 

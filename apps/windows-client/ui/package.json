@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Kimi Cowork desktop UI (React + Vite + TS). Builds to ../ui-dist for the Tauri shell.",
+  "description": "Agent Cowork desktop UI (React + Vite + TS). Builds to ../ui-dist for the Tauri shell.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

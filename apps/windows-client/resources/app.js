@@ -1,6 +1,6 @@
 const state = {
   view: "chat",
-  workspace: "C:\\Users\\Administrator\\Desktop\\kimi cowork",
+  workspace: "C:\\Users\\Administrator\\Desktop\\agent cowork",
   files: [],
   operations: [],
   approved: false,
@@ -57,7 +57,7 @@ const clarifyOptions = document.querySelector(".clarify-options");
 
 const placeholders = {
   chat: "今天想让 Kimi 做什么？",
-  cowork: "选择本地文件夹，描述要让 Kimi Cowork 在本机完成的操作",
+  cowork: "选择本地文件夹，描述要让 Agent Cowork 在本机完成的操作",
   code: "描述要让 Kimi 在本地检查的代码任务",
   projects: "搜索或打开一个项目",
   artifacts: "查找产物或审计日志",
@@ -193,7 +193,7 @@ function setWorkbenchCopy(view) {
     workbenchCopy.textContent = "读取当前项目上下文，生成代码任务计划，审批后写入本地产物。";
     return;
   }
-  workbenchTitle.textContent = "Kimi Cowork";
+  workbenchTitle.textContent = "Agent Cowork";
   workbenchCopy.textContent = "读取本地文件夹、生成操作预览、审批后在本机执行。";
 }
 
@@ -1437,7 +1437,7 @@ async function generatePlan(options = {}) {
       type: "write",
       path: outputPath,
       content: [
-        "# Kimi Cowork 界面计划",
+        "# Agent Cowork 界面计划",
         "",
         `- 模式: ${state.view}`,
         `- 指令: ${prompt}`,

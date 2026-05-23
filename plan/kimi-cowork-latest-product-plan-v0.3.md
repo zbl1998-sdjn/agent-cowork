@@ -1,4 +1,4 @@
-# Kimi Cowork 最新产品规划设计 v0.3
+# Agent Cowork 最新产品规划设计 v0.3
 
 > 日期：2026-05-20  
 > 定位：Kimi Desktop 与 Kimi CLI 之间的空白产品。面向白领、行政、运营、财务、HR、法务、助理等非技术用户，同时提供开发者模式，允许接入其他大模型、MCP、CLI、脚本和自定义工具。  
@@ -20,7 +20,7 @@
 
 ## 1. 一句话产品定义
 
-**Kimi Cowork 是一个 Windows 本地办公 Agent 工作台：普通用户用自然语言处理本地文件、Word、Excel、PPT、PDF、会议纪要、发票、合同、邮件草稿和行政流程；开发者模式可接入 Kimi CLI、Kimi API、MCP、LiteLLM、多模型和自定义工具。**
+**Agent Cowork 是一个 Windows 本地办公 Agent 工作台：普通用户用自然语言处理本地文件、Word、Excel、PPT、PDF、会议纪要、发票、合同、邮件草稿和行政流程；开发者模式可接入 Kimi CLI、Kimi API、MCP、LiteLLM、多模型和自定义工具。**
 
 它不是纯 Kimi Desktop，也不是纯 Kimi CLI，而是中间层：
 
@@ -29,7 +29,7 @@ Kimi Desktop / Web
   优点：易用、聊天、文档/网页/研究能力强
   缺口：对本地文件、Windows 工作区、本地流程、审批/回滚支持不足
 
-Kimi Cowork
+Agent Cowork
   目标：低门槛本地工作台 + 文件/流程/审批/交付物 + 可选开发者能力
 
 Kimi CLI / Kimi Code
@@ -1081,7 +1081,7 @@ MVP-0: Kimi CLI 本地验证版
 
 可选：
 
-- Kimi Coworker
+- Agent Coworker
 - Kimi Local Office
 - Kimi Workbench
 - Kimi Desk Agent

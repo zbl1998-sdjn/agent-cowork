@@ -54,7 +54,7 @@ async function main() {
   process.kill(runtime.pid, 'SIGTERM');
   const stopped = await waitForStop(runtime.pid);
   if (!stopped) {
-    throw new Error(`Timed out waiting for Kimi Cowork MVP process to stop: ${runtime.pid}`);
+    throw new Error(`Timed out waiting for Agent Cowork MVP process to stop: ${runtime.pid}`);
   }
 
   if (fs.existsSync(runtimeFile)) {

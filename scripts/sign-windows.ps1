@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Code-sign the Kimi Cowork Windows installers (MSI + NSIS setup.exe).
+  Code-sign the Agent Cowork Windows installers (MSI + NSIS setup.exe).
 
 .DESCRIPTION
   Production distribution should be signed with a certificate from a trusted CA
@@ -39,7 +39,7 @@ param(
 
   [string[]] $Files,
   [string] $TimestampUrl = 'http://timestamp.digicert.com',
-  [string] $Publisher = 'CN=Kimi Cowork (DEV SELF-SIGNED)'
+  [string] $Publisher = 'CN=Agent Cowork (DEV SELF-SIGNED)'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,8 +58,8 @@ function Find-SignTool {
 # Default to the two installers produced by `cargo tauri build`, copied into installers\.
 if (-not $Files -or $Files.Count -eq 0) {
   $Files = @(
-    (Join-Path $repoRoot 'installers\Kimi Cowork_0.1.0_x64-setup.exe'),
-    (Join-Path $repoRoot 'installers\Kimi Cowork_0.1.0_x64_en-US.msi')
+    (Join-Path $repoRoot 'installers\Agent Cowork_0.1.0_x64-setup.exe'),
+    (Join-Path $repoRoot 'installers\Agent Cowork_0.1.0_x64_en-US.msi')
   )
 }
 

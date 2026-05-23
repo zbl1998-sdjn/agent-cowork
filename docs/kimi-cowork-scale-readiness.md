@@ -1,8 +1,8 @@
-# Kimi Cowork 规模就绪 (Scale Readiness) 架构准备
+# Agent Cowork 规模就绪 (Scale Readiness) 架构准备
 
 > 日期: 2026-05-20
 > 上游: `docs/kimi-vs-claude-cowork-gap.md`, `docs/kimi-cowork-optimization-roadmap.md`, `docs/mvp-1-windows-c-cloud-architecture.md`
-> 目标: 当前阶段 Kimi Cowork 仍是单机本地产品, 但所有不可逆的地基决策 (数据模型、接口、租户隔离、可观察性、消息边界) 必须现在做对, 让产品从 1 用户 → 100k DAU → 1M DAU 不重写, 1M+ 时只新增 region/分片不动业务代码。
+> 目标: 当前阶段 Agent Cowork 仍是单机本地产品, 但所有不可逆的地基决策 (数据模型、接口、租户隔离、可观察性、消息边界) 必须现在做对, 让产品从 1 用户 → 100k DAU → 1M DAU 不重写, 1M+ 时只新增 region/分片不动业务代码。
 
 ---
 

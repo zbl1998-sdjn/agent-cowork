@@ -70,7 +70,7 @@ async function main() {
     assert(index.body.includes('class="approve-button"'), 'index missing approval control');
     assert(index.body.includes('data-artifact-list'), 'index missing artifact catalog container');
     assert(index.body.includes('data-action="refresh-artifacts"'), 'index missing artifact refresh control');
-    assert(index.body.includes('Kimi Cowork'), 'index missing Kimi Cowork copy');
+    assert(index.body.includes('Agent Cowork'), 'index missing Agent Cowork copy');
     for (const copy of ['对话', '协作', '代码', '新建会话', '项目', '产物', '自定义', '最近']) {
       assert(index.body.includes(copy), `index missing Image #1 functional copy: ${copy}`);
     }

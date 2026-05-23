@@ -104,7 +104,7 @@ static const wchar_t *KCW_NAV_ITEMS[KCW_NAV_COUNT] = {
     L"Agent 集群",
     L"Kimi Code",
     L"Kimi WebBridge",
-    L"Kimi Cowork",
+    L"Agent Cowork",
 };
 
 static const wchar_t *KCW_NAV_ICONS[KCW_NAV_COUNT] = {
@@ -773,7 +773,7 @@ static bool kcw_write_approved_artifact(const wchar_t *plan_text, wchar_t *error
     }
     fwprintf(
         artifact,
-        L"# Kimi Cowork Office Mode 产物\n\n"
+        L"# Agent Cowork Office Mode 产物\n\n"
         L"- Batch ID: %s\n"
         L"- Trusted Workspace: %s\n"
         L"- Template: %s\n"
@@ -899,7 +899,7 @@ static void kcw_show_workspace_ready(void) {
 static void kcw_select_workspace(HWND window) {
     BROWSEINFOW browse = {0};
     browse.hwndOwner = window;
-    browse.lpszTitle = L"选择 Kimi Cowork 信任工作区";
+    browse.lpszTitle = L"选择 Agent Cowork 信任工作区";
     browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
 
     PIDLIST_ABSOLUTE list = SHBrowseForFolderW(&browse);
@@ -959,7 +959,7 @@ static void kcw_generate_plan(HWND window) {
     swprintf_s(
         plan,
         sizeof(plan) / sizeof(plan[0]),
-        L"Kimi Cowork 执行计划\r\n\r\n"
+        L"Agent Cowork 执行计划\r\n\r\n"
         L"模式：Office Mode\r\n"
         L"模型：Kimi API 默认，Developer Mode 可切换 OpenAI-compatible Provider\r\n"
         L"信任工作区：%s\r\n"
@@ -1003,7 +1003,7 @@ static void kcw_approve_plan(HWND window) {
 
     wchar_t current[12000] = L"";
     GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
-    if (wcsstr(current, L"Kimi Cowork 执行计划") == NULL) {
+    if (wcsstr(current, L"Agent Cowork 执行计划") == NULL) {
         kcw_generate_plan(window);
         GetWindowTextW(g_app.artifact_edit, current, (int)(sizeof(current) / sizeof(current[0])));
     }
@@ -1141,7 +1141,7 @@ static void kcw_create_controls(HWND window) {
     g_app.artifact_edit = CreateWindowExW(
         0,
         L"EDIT",
-        L"选择一个信任工作区后，Kimi Cowork 会在这里显示计划、审批项、产物草稿和审计摘要。",
+        L"选择一个信任工作区后，Agent Cowork 会在这里显示计划、审批项、产物草稿和审计摘要。",
         WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
         0,
         0,
@@ -1575,7 +1575,7 @@ int kcw_run_app_with_workspace(HINSTANCE instance, int show_command, const wchar
     HWND window = CreateWindowExW(
         0,
         KCW_CLASS_NAME,
-        L"Kimi Cowork",
+        L"Agent Cowork",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,

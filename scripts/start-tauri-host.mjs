@@ -24,11 +24,11 @@ const server = createServer({
 });
 
 server.listen(port, host, () => {
-  console.log(`Kimi Cowork Tauri host listening on http://${host}:${port}`);
+  console.log(`Agent Cowork Tauri host listening on http://${host}:${port}`);
 });
 
 server.on('error', (error) => {
-  console.error('Kimi Cowork Tauri host failed to start:', error);
+  console.error('Agent Cowork Tauri host failed to start:', error);
   process.exit(1);
 });
 

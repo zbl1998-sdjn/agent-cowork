@@ -15,7 +15,7 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.equal(Object.keys(packageJson.devDependencies || {}).length, 0);
 
   const config = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8'));
-  assert.equal(config.productName, 'Kimi Cowork');
+  assert.equal(config.productName, 'Agent Cowork');
   assert.equal(config.build.devUrl, 'http://127.0.0.1:5173');
   assert.equal(config.build.frontendDist, '../ui-dist');
   assert.equal(config.app.windows[0].label, 'main');

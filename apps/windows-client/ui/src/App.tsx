@@ -506,7 +506,7 @@ export function App() {
   ], [theme, planMode, autoApprove, newConversation, toggleTheme, doLogout]);
 
   if (!authReady) {
-    return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Kimi Cowork…</div>;
+    return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
   }
   if (!user) {
     return <Login onAuthed={(u) => setUser(u)} onGuest={continueAsGuest} />;
@@ -546,7 +546,7 @@ export function App() {
       <div className="app-content">
       <header className="app-header">
         <span className="brand-dot" aria-hidden="true" />
-        <h1>Kimi Cowork</h1>
+        <h1>Agent Cowork</h1>
         <span className="workspace-path">{trustedRoot}</span>
         <nav className="header-actions">
           <button type="button" onClick={() => setCmdkOpen(true)} title="命令面板 (Ctrl/Cmd+K)">⌘K</button>
@@ -567,7 +567,7 @@ export function App() {
       <main className="timeline" role="log" ref={timelineRef}>
         {empty && (
           <div className="empty-state">
-            <strong>Kimi Cowork</strong>
+            <strong>Agent Cowork</strong>
             <p>直接和 Kimi 对话即可，它能读写工作区文件、运行代码。需要文件操作时会先请你批准。</p>
             <div className="starter-chips">
               {STARTERS.map((sug) => (

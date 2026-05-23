@@ -38,7 +38,7 @@ assert(fs.existsSync(capabilityPath), 'missing Tauri default capability');
 assert(fs.existsSync(manifestPath), 'missing component migration manifest');
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-assert(config.productName === 'Kimi Cowork', 'Tauri product name mismatch');
+assert(config.productName === 'Agent Cowork', 'Tauri product name mismatch');
 assert(config.build?.devUrl === 'http://127.0.0.1:3017', 'Tauri devUrl must target the Node host');
 assert(config.build?.frontendDist === '../resources', 'Tauri frontendDist must reuse static resources');
 assert(config.app?.windows?.[0]?.label === 'main', 'Tauri main window label missing');

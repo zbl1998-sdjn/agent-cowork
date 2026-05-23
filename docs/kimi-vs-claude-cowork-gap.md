@@ -1,19 +1,19 @@
-# Kimi Cowork vs Claude Cowork 差距分析
+# Agent Cowork vs Claude Cowork 差距分析
 
 > 日期: 2026-05-20
 > 对比基准:
-> - Kimi Cowork: `plan/kimi-cowork-latest-product-plan-v0.3.md`, `docs/v0.3-implementation-status.md`, 当前仓库代码 (apps/host, apps/local-agent, apps/windows-client, services/*).
+> - Agent Cowork: `plan/kimi-cowork-latest-product-plan-v0.3.md`, `docs/v0.3-implementation-status.md`, 当前仓库代码 (apps/host, apps/local-agent, apps/windows-client, services/*).
 > - Claude Cowork: 当前正在运行的 Cowork 桌面应用,基于 Claude Code + Claude Agent SDK,通过实际可见的工具/Skills/MCP/Artifacts/定时任务能力盘点。
 
 ## 0. 一句话定位差异
 
-Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI 计划"的 PoC 主机; Claude Cowork 是一个"以 Agent + Skills + MCP 生态 + 持久 Artifacts + 定时任务 + 多角色插件"为骨架的通用桌面 Agent 工作台。两者在"本地文件审批/回滚/审计"这一点上方向一致,但 Claude Cowork 在生态、可扩展性、UI 交互原语、Agent 编排上领先一个量级。
+Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI 计划"的 PoC 主机; Claude Cowork 是一个"以 Agent + Skills + MCP 生态 + 持久 Artifacts + 定时任务 + 多角色插件"为骨架的通用桌面 Agent 工作台。两者在"本地文件审批/回滚/审计"这一点上方向一致,但 Claude Cowork 在生态、可扩展性、UI 交互原语、Agent 编排上领先一个量级。
 
 ---
 
 ## 1. 用户体验与交互 (UX)
 
-| 能力 | Kimi Cowork 现状 | Claude Cowork 现状 | Kimi 差距 |
+| 能力 | Agent Cowork 现状 | Claude Cowork 现状 | Kimi 差距 |
 |---|---|---|---|
 | 主交互形态 | 单一聊天 + 协作工作台 + 文件树; 主输入触发 plan/preview/approve handoff | 自由对话 + 自动 handoff 到 Skills/Plugins; 多种内联可视化 | 缺多模态原语 |
 | 澄清问题 | 无 (直接接受 prompt) | `AskUserQuestion` 多选题 (最多 4 题/4 选项, 自动带 Other, 支持 multiSelect + preview 卡片) | **缺结构化澄清** |
@@ -28,7 +28,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 | 计算机链接 | 无 (前端用文件树) | `computer://` 协议链接直接从聊天打开本地文件 | **缺一键打开本地文件** |
 | 引用/Citation | 无 | system prompt 强制工具结果带 `Sources:` 章节, 自动 `[Title](URL)` | **缺统一引用规范** |
 
-**判断**: UX 层是 Kimi Cowork 当前差距最大的地方。Claude Cowork 的核心体验是一整套 "Agent 原语" (问、答、选、卡片、Widget、Artifact、Task Card、Source、computer://),Kimi Cowork 目前只有"聊天 + 文件树 + preview 弹窗"三件。
+**判断**: UX 层是 Agent Cowork 当前差距最大的地方。Claude Cowork 的核心体验是一整套 "Agent 原语" (问、答、选、卡片、Widget、Artifact、Task Card、Source、computer://),Agent Cowork 目前只有"聊天 + 文件树 + preview 弹窗"三件。
 
 ---
 
@@ -36,7 +36,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ### 2.1 文件 / 工作区类
 
-| 能力 | Kimi Cowork | Claude Cowork | 差距 |
+| 能力 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | 读文件 | Host API + Go local-agent CLI | `Read` 工具 (绝对路径, 支持 PDF 分页, ipynb, 图片) | Kimi 仅支持文本 + 摘要, **缺 PDF/图片/notebook 原生读** |
 | 写/编辑文件 | preview → apply (write/rename/move, 禁止 delete) | `Write` (覆盖确认) + `Edit` (精确替换, 必须先 Read) | Kimi 在 **审批回滚** 维度反而更强, 但在 **细粒度 Edit/replace_all** 上没有 |
@@ -48,7 +48,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ### 2.2 模型 / Agent
 
-| 能力 | Kimi Cowork | Claude Cowork | 差距 |
+| 能力 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | 主模型 | Kimi (CLI `--print --final-message-only` + Kimi Gateway OpenAI-compatible) | Claude Opus 4.6 / Sonnet 4.6 / Haiku 4.5 多档可选 | 模型层 Kimi 自己决定, **缺多档调度** |
 | 廉价二线推理 | 无 | Artifact 内 `window.cowork.askClaude(prompt, data)` 调 Haiku 做实时摘要/分类 | **缺 inline 廉价推理原语** |
@@ -58,7 +58,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ### 2.3 工具/连接器生态
 
-| 能力 | Kimi Cowork | Claude Cowork | 差距 |
+| 能力 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | MCP 客户端 | 规划中 (Developer Mode V1) | 完整 MCP host, 系统 prompt 列出连接中/已连接 server | **完全缺 MCP 实现** (v0.3 仅规划) |
 | 内置连接器 | 无 | Notion / Slack / Gmail / Google Calendar / Asana / Linear / Jira / ClickUp / Monday / GitHub / Figma / Datadog / PagerDuty / Intercom / Hubspot / Guru / Amplitude / BigQuery / Hex / Definite / Webflow / MS365 / Microsoft Docs / Context7 等 (角色 plugin 自带 OAuth) | **没有外部 SaaS 连接器** |
@@ -71,7 +71,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ### 2.4 Skills (声明式能力)
 
-| 类别 | Kimi Cowork | Claude Cowork | 差距 |
+| 类别 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | 概念 | 8 个 MVP "任务模板" 规划中 (整理文件/会议纪要/合同摘要/报销/反馈/总结/Excel 清洗/邮件), 均 `[MVP] [ ]` 未实现 | Skills = markdown + scripts 包, 按需 Read, 已预装 60+ 个 (跨办公/工程/数据/设计/HR/客服等) | **8 vs 60+, 而且 8 个全是 TODO** |
 | 文档生成 | TODO | docx/xlsx/pptx/pdf 全套 (调真实 python 库) + theme-factory 主题 + brand-guidelines | **缺真实办公产物生成** |
@@ -82,7 +82,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ### 2.5 任务编排与持久化
 
-| 能力 | Kimi Cowork | Claude Cowork | 差距 |
+| 能力 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | 任务列表 | `.KimiCowork/runs/` 文件 | TaskCreate/Update/List/Get/Stop (有 blocks/blockedBy 依赖) + 渲染 widget | **缺任务依赖图 + 前台呈现** |
 | 定时任务 | 无 | `scheduled-tasks:create/list/update` 支持 cron + 一次性 fireAt, 主动建议 ("Want me to run this each morning?") | **完全缺定时任务** |
@@ -94,7 +94,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ## 3. 底层架构与能力
 
-| 维度 | Kimi Cowork | Claude Cowork | 差距 |
+| 维度 | Agent Cowork | Claude Cowork | 差距 |
 |---|---|---|---|
 | 客户端形态 | Windows C/Win32 + WebView2 骨架, MSVC 编译, 被 Defender ASR 拦截待放行; 同时有 Node host 跑 web UI | 桌面客户端 (Electron 系) + 沙箱 VM, 直接挂载用户选择目录 | Kimi 选了更难的路 (原生 C/Win32). **WebView2 嵌入仍未完成, 安装器没做, ASR 仍卡** |
 | 桌面 stack 选型 | C/Win32 + Node host, 反思后倾向 Electron/Tauri + React/Tailwind (`open-cowork-reference-improvements.md`) | Electron (推测) + Anthropic Claude SDK + Claude Code + MCP host | **stack 还未迁移** |
@@ -112,7 +112,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ---
 
-## 4. Kimi Cowork 当前的优势 (不全是差距)
+## 4. Agent Cowork 当前的优势 (不全是差距)
 
 - **审批 + 回滚 + 审计三件套设计扎实**: preview / apply / rollback journal / JSONL audit / no-overwrite / no-delete, 这套面向白领办公的安全语义比 Claude Cowork 默认更严。
 - **本地优先 + 信任目录边界明确**: trusted root + path-policy 比 Claude Cowork 的 mount 模型更"白领可解释"。
@@ -151,7 +151,7 @@ Kimi Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CLI
 
 ## 6. 一句话总结
 
-**Kimi Cowork 当前是 Claude Cowork 的"安全核与本地审批核"半成品**: 在 trusted root / preview / apply / rollback / audit / runs / 验收编排上已经接近 Claude Cowork 的同水位甚至更严格; 但在 **Skills (60+ vs 8 TODO)**、**MCP 生态 (全套 vs 规划中)**、**Artifact + Scheduled Task + Memory 三件持久化**、**前端交互原语 (AskUser/Task Card/Widget/Source/computer://)** 这四块上差距是数量级。当前 P0 应该聚焦"把 8 个模板真实跑通 + 加 Task Card UI + 迁 Tauri/Electron", 而不是继续抠原生 C 客户端 + ASR 放行。
+**Agent Cowork 当前是 Claude Cowork 的"安全核与本地审批核"半成品**: 在 trusted root / preview / apply / rollback / audit / runs / 验收编排上已经接近 Claude Cowork 的同水位甚至更严格; 但在 **Skills (60+ vs 8 TODO)**、**MCP 生态 (全套 vs 规划中)**、**Artifact + Scheduled Task + Memory 三件持久化**、**前端交互原语 (AskUser/Task Card/Widget/Source/computer://)** 这四块上差距是数量级。当前 P0 应该聚焦"把 8 个模板真实跑通 + 加 Task Card UI + 迁 Tauri/Electron", 而不是继续抠原生 C 客户端 + ASR 放行。
 
 ---
 

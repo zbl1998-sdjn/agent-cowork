@@ -75,7 +75,7 @@ test('falls back to the legacy static UI when ui-dist is disabled', async () => 
     const root = await get(base, '/');
     // legacy resources/index.html still carries the old mode-switch markup
     assert.ok(root.type.includes('text/html'));
-    assert.match(root.body, /Kimi Cowork/);
+    assert.match(root.body, /Agent Cowork/);
   } finally {
     await new Promise((r) => server.close(r));
   }

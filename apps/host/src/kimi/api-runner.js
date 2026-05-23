@@ -60,7 +60,7 @@ export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }) {
   if (memoryBlock) {
     lines.push(memoryBlock);
   }
-  lines.push('你是 Kimi Cowork 的智能助手，用简洁、自然的中文与用户对话，像同事一样直接回答问题，不要套话。');
+  lines.push('你是 Agent Cowork 的智能助手，用简洁、自然的中文与用户对话，像同事一样直接回答问题，不要套话。');
   lines.push('日常聊天无需读写文件，也不要生成“执行计划/待审批操作”；只有当用户明确要整理或处理本地文件时，再提示可在左侧选择对应模板。');
   if (safeSummary) lines.push(`参考摘要：${safeSummary}`);
   lines.push(`用户：${userPrompt}`);

@@ -1,6 +1,6 @@
 # MVP-1 Windows C Client + Cloud Backend Implementation Plan
 
-> **Goal:** 把 Kimi Cowork 从本地 PoC 升级为正式 Windows 产品架构：C-first Windows 客户端、本地 Agent、多用户云端后端、任务编排、Kimi Gateway，并保留长期千万级 QPS 演进路径。
+> **Goal:** 把 Agent Cowork 从本地 PoC 升级为正式 Windows 产品架构：C-first Windows 客户端、本地 Agent、多用户云端后端、任务编排、Kimi Gateway，并保留长期千万级 QPS 演进路径。
 
 ## 1. Product Scope
 

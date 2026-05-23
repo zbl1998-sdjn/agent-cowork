@@ -3,7 +3,7 @@
 // -scoped. Tests inject a mock pool.
 import crypto from 'node:crypto';
 
-const MEMORY_HEADER = '# Kimi Cowork 项目记忆\n\n这份文件记录 Kimi 在本工作区需要长期记住的事实。每次对话开始时被注入到 system 段。\n\n';
+const MEMORY_HEADER = '# Agent Cowork 项目记忆\n\n这份文件记录 Kimi 在本工作区需要长期记住的事实。每次对话开始时被注入到 system 段。\n\n';
 const MAX_MEMORY_BYTES = 64 * 1024;
 const MAX_FACT_KEY_LENGTH = 96;
 const MAX_FACT_VALUE_LENGTH = 4 * 1024;

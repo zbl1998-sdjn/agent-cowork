@@ -270,7 +270,7 @@ try {
     [KcwSmokeWin32]::SendMessage($generatePlan.Hwnd, $bmClick, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 300
     $artifactText = [KcwSmokeWin32]::Text($artifact.Hwnd)
-    Assert-True ($artifactText.Contains("Kimi Cowork 执行计划")) "Generate plan did not update artifact panel"
+    Assert-True ($artifactText.Contains("Agent Cowork 执行计划")) "Generate plan did not update artifact panel"
     Assert-True ($artifactText.Contains("本地内容摘要")) "Generate plan did not include local content summary"
     Assert-True ($artifactText.Contains("已读取摘要文件")) "Generate plan did not include local read count"
     Assert-True ($artifactText.Contains("renewal date")) "Generate plan did not read trusted workspace file content"
@@ -296,7 +296,7 @@ try {
     $generatedArtifact = Get-Content -LiteralPath $artifactFiles[0].FullName -Raw
     $auditLog = Get-Content -LiteralPath $auditPath -Raw
     $rollbackLog = Get-Content -LiteralPath $rollbackFiles[0].FullName -Raw
-    Assert-True ($generatedArtifact.Contains("Kimi Cowork Office Mode 产物")) "Generated artifact content is missing title"
+    Assert-True ($generatedArtifact.Contains("Agent Cowork Office Mode 产物")) "Generated artifact content is missing title"
     Assert-True ($generatedArtifact.Contains("本地内容摘要")) "Generated artifact is missing local content summary"
     Assert-True ($auditLog.Contains('"event":"approval_apply"')) "Audit log does not contain approval_apply event"
     Assert-True ($auditLog.Contains('"event":"file_move_apply"')) "Audit log does not contain file_move_apply event"

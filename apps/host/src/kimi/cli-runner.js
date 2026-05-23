@@ -85,7 +85,7 @@ export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
     lines.push(memoryBlock);
   }
   lines.push(
-    '你是 Kimi Cowork 的本地对话核心。',
+    '你是 Agent Cowork 的本地对话核心。',
     '只基于用户消息和 Host 提供的摘要回答；不要读取文件，不要使用工具，不要修改文件，不要运行命令。',
     '如果用户需要本地文件操作，提醒切到“协作”模式并等待审批。',
     `已授权/已上传内容摘要：${safeSummary || '暂无。'}`,
