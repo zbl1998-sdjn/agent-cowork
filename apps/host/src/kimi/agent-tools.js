@@ -141,14 +141,37 @@ export function createAgentTools(ctx = {}) {
   ];
 
   if (sandbox) {
+    // On the local desktop backend, run the (user-approved) command through the
+    // OS shell so ordinary commands work — Windows: `cmd /d /s /c <cmd>`, POSIX:
+    // `sh -c <cmd>`. Previously every command was spawned as a bare argv against
+    // a node/python-only allowlist, so the model's `ls`/`find`/`dir` attempts all
+    // failed and it flailed across other tools. The structured allowlist still
+    // guards VM/server backends. Shell stays risk:'high' — every command is
+    // approval-gated and the cwd is jailed to the workspace root.
+    const isLocalBackend = !sandbox.backend || sandbox.backend === 'local-subprocess';
+    const isWindows = process.platform === 'win32';
     tools.push({
       name: 'Shell', mutating: true, risk: 'high',
-      description: '在隔离沙箱里运行一个命令（如 `node script.js`、`python x.py`），返回 stdout/stderr/退出码。默认无网络、cwd 限定工作区。',
+      description: isWindows
+        ? '在工作区目录里运行一条命令(经系统 shell)。优先用 Windows/PowerShell 命令(如 Get-ChildItem、dir、type)或 node/python 脚本；返回 stdout/stderr/退出码。每条命令都需用户确认。'
+        : '在隔离沙箱里运行一个命令（如 `node script.js`、`python x.py`），返回 stdout/stderr/退出码。默认无网络、cwd 限定工作区。',
       parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
       handler: async (args = {}) => {
-        const parts = String(args.command || '').trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 0) throw new Error('command is required');
-        const spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits);
+        const command = String(args.command || '').trim();
+        if (!command) throw new Error('command is required');
+        let spec;
+        if (isLocalBackend) {
+          const shellSpec = isWindows
+            ? { tool: 'cmd', args: ['/d', '/s', '/c', command] }
+            : { tool: 'sh', args: ['-c', command] };
+          // Permit the OS shell binary for this approval-gated wrapper; other
+          // backends keep their strict tool allowlist unchanged.
+          const limits = { ...sandboxLimits, allowTools: [...((sandboxLimits && sandboxLimits.allowTools) || []), shellSpec.tool] };
+          spec = normalizeSandboxSpec(shellSpec, limits);
+        } else {
+          const parts = command.split(/\s+/).filter(Boolean);
+          spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits);
+        }
         const result = await sandbox.exec(spec, { trustedRoot: root, context: ctx.context });
         return { exitCode: result.exitCode, stdout: clip(result.stdout, 4000), stderr: clip(result.stderr, 2000), timedOut: result.timedOut };
       },
