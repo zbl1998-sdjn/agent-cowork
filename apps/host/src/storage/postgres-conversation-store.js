@@ -1,6 +1,9 @@
 // PostgreSQL adapter for per-user conversation history — multi-instance mirror
 // of FileConversationStore. Async; `pg` lazily/optionally imported. Scoped by
-// (tenant_id, user_id). Tests inject a mock pool.
+// (tenant_id, user_id, workspace_key). Tests inject a mock pool.
+
+import crypto from 'node:crypto';
+import path from 'node:path';
 
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_TITLE = 200;
@@ -8,6 +11,11 @@ const MAX_TITLE = 200;
 function clampId(v, fb) { const t = String(v || '').trim(); return t ? t.slice(0, 96) : fb; }
 const normTenant = (v) => clampId(v, 'tenant_local');
 const normUser = (v) => clampId(v, 'user_local');
+
+function workspaceKey(trustedRoot) {
+  const root = path.resolve(String(trustedRoot || ''));
+  return crypto.createHash('sha256').update(root).digest('hex');
+}
 
 function cleanId(id) {
   const t = String(id || '').trim();
@@ -96,8 +104,8 @@ export class PostgresConversationStore {
       `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count,
               COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
               created_at, updated_at
-       FROM conversations WHERE tenant_id=$1 AND user_id=$2 ORDER BY updated_at DESC`,
-      [normTenant(context.tenantId), normUser(context.userId)],
+       FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 ORDER BY updated_at DESC`,
+      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot)],
     );
     return (r.rows || []).map(summariseRow);
   }
@@ -105,13 +113,14 @@ export class PostgresConversationStore {
   async query(trustedRoot, context = {}, { q = '', limit = 30, offset = 0 } = {}) {
     const tenantId = normTenant(context.tenantId);
     const userId = normUser(context.userId);
+    const wsKey = workspaceKey(trustedRoot);
     const lim = Math.min(Math.max(Number(limit) || 30, 1), 200);
     const off = Math.max(Number(offset) || 0, 0);
     const ql = String(q || '').trim();
     const where = ql
-      ? `tenant_id=$1 AND user_id=$2 AND title ILIKE $3`
-      : `tenant_id=$1 AND user_id=$2`;
-    const whereParams = ql ? [tenantId, userId, `%${ql}%`] : [tenantId, userId];
+      ? `tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND title ILIKE $4`
+      : `tenant_id=$1 AND user_id=$2 AND workspace_key=$3`;
+    const whereParams = ql ? [tenantId, userId, wsKey, `%${ql}%`] : [tenantId, userId, wsKey];
     const countRes = await this._query(`SELECT COUNT(*)::int AS total FROM conversations WHERE ${where}`, whereParams);
     const total = (countRes.rows && countRes.rows[0] && Number(countRes.rows[0].total)) || 0;
     const rowsRes = await this._query(
@@ -128,8 +137,10 @@ export class PostgresConversationStore {
     const hasLimit = typeof limit === 'number';
     const r = await this._query(
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
-       FROM conversations WHERE tenant_id=$1 AND user_id=$2 ORDER BY updated_at DESC${hasLimit ? ' LIMIT $3' : ''}`,
-      hasLimit ? [normTenant(context.tenantId), normUser(context.userId), Math.max(0, limit)] : [normTenant(context.tenantId), normUser(context.userId)],
+       FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 ORDER BY updated_at DESC${hasLimit ? ' LIMIT $4' : ''}`,
+      hasLimit
+        ? [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), Math.max(0, limit)]
+        : [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot)],
     );
     return (r.rows || []).map(fullRow);
   }
@@ -137,8 +148,8 @@ export class PostgresConversationStore {
   async get(trustedRoot, id, context = {}) {
     const r = await this._query(
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
-       FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND id=$3`,
-      [normTenant(context.tenantId), normUser(context.userId), cleanId(id)],
+       FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
+      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanId(id)],
     );
     const row = r.rows && r.rows[0];
     return row ? fullRow(row) : null;
@@ -148,6 +159,7 @@ export class PostgresConversationStore {
     const id = cleanId(conv && conv.id);
     const tenantId = normTenant(context.tenantId);
     const userId = normUser(context.userId);
+    const wsKey = workspaceKey(trustedRoot);
     const now = this._now().toISOString();
     const title = String((conv && conv.title) || '新对话').slice(0, MAX_TITLE);
     const pinned = Boolean(conv && conv.pinned);
@@ -158,15 +170,15 @@ export class PostgresConversationStore {
       ? requestedActive
       : branches[0]?.id || null;
     const r = await this._query(
-      `INSERT INTO conversations (tenant_id, user_id, id, title, pinned, messages, branches, active_branch_id, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)
-       ON CONFLICT (tenant_id, user_id, id) DO UPDATE SET
+      `INSERT INTO conversations (tenant_id, user_id, workspace_key, id, title, pinned, messages, branches, active_branch_id, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11)
+       ON CONFLICT (tenant_id, user_id, workspace_key, id) DO UPDATE SET
          title=EXCLUDED.title, pinned=EXCLUDED.pinned, messages=EXCLUDED.messages,
          branches=EXCLUDED.branches, active_branch_id=EXCLUDED.active_branch_id, updated_at=EXCLUDED.updated_at
        RETURNING id, title, pinned, jsonb_array_length(messages) AS message_count,
                  COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
                  created_at, updated_at`,
-      [tenantId, userId, id, title, pinned, JSON.stringify(messages), JSON.stringify(branches), activeBranchId, now, now],
+      [tenantId, userId, wsKey, id, title, pinned, JSON.stringify(messages), JSON.stringify(branches), activeBranchId, now, now],
     );
     const row = (r.rows && r.rows[0]) || {
       id, title, pinned, message_count: messages.length, branch_count: branches.length,
@@ -177,8 +189,8 @@ export class PostgresConversationStore {
 
   async remove(trustedRoot, id, context = {}) {
     const r = await this._query(
-      `DELETE FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND id=$3`,
-      [normTenant(context.tenantId), normUser(context.userId), cleanId(id)],
+      `DELETE FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
+      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanId(id)],
     );
     return (r.rowCount || 0) > 0;
   }

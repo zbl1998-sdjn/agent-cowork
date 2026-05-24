@@ -94,11 +94,12 @@ CREATE INDEX IF NOT EXISTS pending_approvals_run ON pending_approvals (run_id) W
 CREATE INDEX IF NOT EXISTS pending_approvals_created ON pending_approvals (created_at) WHERE status='pending';
 
 -- Per-user conversation history (mirror of FileConversationStore), scoped by
--- (tenant_id, user_id). messages kept as JSONB; title/pinned are columns for
--- search + ordering.
+-- (tenant_id, user_id, workspace_key). messages kept as JSONB; title/pinned are
+-- columns for search + ordering.
 CREATE TABLE IF NOT EXISTS conversations (
   tenant_id   TEXT NOT NULL DEFAULT 'tenant_local',
   user_id     TEXT NOT NULL DEFAULT 'user_local',
+  workspace_key TEXT NOT NULL DEFAULT 'legacy',
   id          TEXT NOT NULL,
   title       TEXT NOT NULL DEFAULT '新对话',
   pinned      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -107,6 +108,6 @@ CREATE TABLE IF NOT EXISTS conversations (
   active_branch_id TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (tenant_id, user_id, id)
+  PRIMARY KEY (tenant_id, user_id, workspace_key, id)
 );
-CREATE INDEX IF NOT EXISTS conversations_tenant_user_updated ON conversations (tenant_id, user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS conversations_tenant_user_workspace_updated ON conversations (tenant_id, user_id, workspace_key, updated_at DESC);

@@ -5,17 +5,17 @@ import { PostgresConversationStore } from '../src/storage/postgres-conversation-
 // In-memory mock pool that understands the store's SQL well enough to verify
 // isolation, search, pagination and upsert semantics.
 function convPool() {
-  const rows = new Map(); // tenant|user|id -> record
-  const key = (t, u, i) => `${t}|${u}|${i}`;
+  const rows = new Map(); // tenant|user|workspace|id -> record
+  const key = (t, u, w, i) => `${t}|${u}|${w}|${i}`;
   return {
     async query(text, params = []) {
       const t = text.replace(/\s+/g, ' ').trim();
       if (t.startsWith('INSERT INTO conversations')) {
-        const [tenant, user, id, title, pinned, messagesJson, branchesJson, activeBranchId, createdAt, updatedAt] = params;
-        const k = key(tenant, user, id);
+        const [tenant, user, workspace, id, title, pinned, messagesJson, branchesJson, activeBranchId, createdAt, updatedAt] = params;
+        const k = key(tenant, user, workspace, id);
         const existing = rows.get(k);
         const rec = {
-          tenant_id: tenant, user_id: user, id, title, pinned,
+          tenant_id: tenant, user_id: user, workspace_key: workspace, id, title, pinned,
           messages: JSON.parse(messagesJson),
           branches: JSON.parse(branchesJson),
           active_branch_id: activeBranchId,
@@ -33,40 +33,40 @@ function convPool() {
         };
       }
       if (t.startsWith('SELECT COUNT(*)')) {
-        const [tenant, user, like] = params;
-        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user);
+        const [tenant, user, workspace, like] = params;
+        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace);
         if (like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => (r.title || '').toLowerCase().includes(q)); }
         return { rows: [{ total: list.length }] };
       }
       if (t.includes('OFFSET')) { // paginated query items
-        const tenant = params[0], user = params[1];
+        const tenant = params[0], user = params[1], workspace = params[2];
         let like = null, lim, off;
-        if (params.length === 5) { like = params[2]; lim = params[3]; off = params[4]; }
-        else { lim = params[2]; off = params[3]; }
-        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user);
+        if (params.length === 6) { like = params[3]; lim = params[4]; off = params[5]; }
+        else { lim = params[3]; off = params[4]; }
+        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace);
         if (like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => (r.title || '').toLowerCase().includes(q)); }
         list.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
         list = list.slice(off, off + lim);
         return { rows: list.map((r) => ({ id: r.id, title: r.title, pinned: r.pinned, message_count: r.messages.length, branch_count: (r.branches || []).length, active_branch_id: r.active_branch_id, created_at: r.created_at, updated_at: r.updated_at })) };
       }
-      if (t.includes('AND id=$3') && t.startsWith('SELECT id, title, pinned, messages')) { // get
-        const r = rows.get(key(params[0], params[1], params[2]));
+      if (t.includes('AND id=$4') && t.startsWith('SELECT id, title, pinned, messages')) { // get
+        const r = rows.get(key(params[0], params[1], params[2], params[3]));
         return { rows: r ? [{ id: r.id, title: r.title, pinned: r.pinned, messages: r.messages, branches: r.branches, active_branch_id: r.active_branch_id, created_at: r.created_at, updated_at: r.updated_at }] : [] };
       }
       if (t.startsWith('SELECT id, title, pinned, messages')) { // listFull
-        const tenant = params[0], user = params[1];
-        const limit = params.length > 2 ? params[2] : undefined;
-        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+        const tenant = params[0], user = params[1], workspace = params[2];
+        const limit = params.length > 3 ? params[3] : undefined;
+        let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
         if (typeof limit === 'number') list = list.slice(0, limit);
         return { rows: list.map((r) => ({ id: r.id, title: r.title, pinned: r.pinned, messages: r.messages, branches: r.branches, active_branch_id: r.active_branch_id, created_at: r.created_at, updated_at: r.updated_at })) };
       }
       if (t.startsWith('SELECT id, title, pinned, jsonb_array_length')) { // list summaries
-        const tenant = params[0], user = params[1];
-        const list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+        const tenant = params[0], user = params[1], workspace = params[2];
+        const list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
         return { rows: list.map((r) => ({ id: r.id, title: r.title, pinned: r.pinned, message_count: r.messages.length, branch_count: (r.branches || []).length, active_branch_id: r.active_branch_id, created_at: r.created_at, updated_at: r.updated_at })) };
       }
       if (t.startsWith('DELETE FROM conversations')) {
-        const k = key(params[0], params[1], params[2]); const had = rows.has(k); rows.delete(k);
+        const k = key(params[0], params[1], params[2], params[3]); const had = rows.has(k); rows.delete(k);
         return { rowCount: had ? 1 : 0 };
       }
       return { rows: [] };
@@ -107,6 +107,25 @@ test('PG conversations: save/get/list/query/remove with tenant+user isolation', 
   assert.equal(await store.remove('/r', 'c1', a), true);
   assert.equal(await store.remove('/r', 'c1', a), false);
   assert.equal((await store.list('/r', a)).length, 1);
+});
+
+test('PG conversations: same tenant/user/id is isolated by workspace', async () => {
+  const store = new PostgresConversationStore({ pool: convPool() });
+  const ctx = { tenantId: 't1', userId: 'u1' };
+
+  await store.save('/r-a', { id: 'shared', title: 'Workspace A', messages: [{ role: 'user', text: 'a' }] }, ctx);
+
+  assert.equal(await store.get('/r-b', 'shared', ctx), null);
+  assert.equal((await store.list('/r-b', ctx)).length, 0);
+
+  await store.save('/r-b', { id: 'shared', title: 'Workspace B', messages: [{ role: 'user', text: 'b' }] }, ctx);
+
+  const fromA = await store.get('/r-a', 'shared', ctx);
+  const fromB = await store.get('/r-b', 'shared', ctx);
+  assert.equal(fromA.title, 'Workspace A');
+  assert.equal(fromB.title, 'Workspace B');
+  assert.equal((await store.query('/r-a', ctx, { q: 'Workspace', limit: 10, offset: 0 })).total, 1);
+  assert.equal((await store.query('/r-b', ctx, { q: 'Workspace', limit: 10, offset: 0 })).total, 1);
 });
 
 test('PG conversations preserve branch metadata', async () => {
