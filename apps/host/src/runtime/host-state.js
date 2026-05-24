@@ -21,6 +21,7 @@ import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule
 import { createConcurrencyLimiter } from './concurrency.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createApprovalRegistry } from './approvals.js';
+import { createFileOperationApprovalStore } from './file-operation-approvals.js';
 import { createClarificationStore } from './clarifications.js';
 import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
@@ -113,6 +114,9 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.approvalRegistry = config.approvalRegistry || (state.usePostgresState
     ? createPostgresApprovalStore({ connectionString: state.databaseUrl })
     : createApprovalRegistry());
+  state.fileOperationApprovals = config.fileOperationApprovals || createFileOperationApprovalStore({
+    ttlMs: config.fileOperationApprovalTtlMs,
+  });
   if (state.usePostgresState) {
     if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => {});
     if (state.runEvents?.start) Promise.resolve(state.runEvents.start()).catch(() => {});

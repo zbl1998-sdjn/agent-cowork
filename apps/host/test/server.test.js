@@ -309,8 +309,47 @@ test('document extraction, search, and recipe endpoints generate approval operat
     const body = await run.json();
     assert.match(body.runId, /^run_/);
     assert.equal(body.operations.length, 2);
+    assert.match(body.fileOperationApprovalId, /^fop_/);
     assert.equal(body.operations.some((op) => op.path.endsWith('.xlsx') && op.contentBase64), true);
     assert.equal(fs.existsSync(body.runPath), true);
+  });
+});
+
+test('file-ops apply requires a server-issued approval receipt', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const target = path.join(trustedRoot, '.AgentCowork', 'artifacts', 'approval-required.txt');
+  const operations = [{ type: 'write', path: target, content: 'approved' }];
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const rejected = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'missing-approval' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(rejected.status, 428);
+    assert.match((await rejected.json()).error, /approval/i);
+    assert.equal(fs.existsSync(target), false);
+
+    const preview = await fetch(`${baseUrl}/api/file-ops/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(preview.status, 200);
+    const previewBody = await preview.json();
+    assert.match(previewBody.fileOperationApprovalId, /^fop_/);
+
+    const applied = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'with-approval' },
+      body: JSON.stringify({
+        trustedRoot,
+        operations,
+        fileOperationApprovalId: previewBody.fileOperationApprovalId,
+      }),
+    });
+    assert.equal(applied.status, 200);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'approved');
   });
 });
 
@@ -320,10 +359,18 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
   const operations = [{ type: 'write', path: target, content: 'once' }];
 
   await withServer({ trustedRoot }, async (baseUrl) => {
+    const preview = await fetch(`${baseUrl}/api/file-ops/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(preview.status, 200);
+    const previewBody = await preview.json();
+
     const first = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'same-key' },
-      body: JSON.stringify({ trustedRoot, operations }),
+      body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: previewBody.fileOperationApprovalId }),
     });
     assert.equal(first.status, 200);
     assert.equal((await first.json()).applied.length, 1);
@@ -331,7 +378,7 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
     const second = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'same-key' },
-      body: JSON.stringify({ trustedRoot, operations }),
+      body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: previewBody.fileOperationApprovalId }),
     });
     assert.equal(second.status, 200);
     const replay = await second.json();
@@ -348,20 +395,38 @@ test('file-ops rollback endpoint restores an applied write', async () => {
   const operations = [{ type: 'write', path: target, content: 'after-route', overwrite: true }];
 
   await withServer({ trustedRoot }, async (baseUrl) => {
+    const previewResponse = await fetch(`${baseUrl}/api/file-ops/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(previewResponse.status, 200);
+    const preview = await previewResponse.json();
+
     const appliedResponse = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-apply' },
-      body: JSON.stringify({ trustedRoot, operations }),
+      body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: preview.fileOperationApprovalId }),
     });
     assert.equal(appliedResponse.status, 200);
     const applied = await appliedResponse.json();
     assert.equal(fs.readFileSync(target, 'utf8'), 'after-route');
     assert.equal(applied.applied[0].rollback.type, 'restore-backup');
+    assert.match(applied.rollbackApprovalId, /^fop_/);
+
+    const rollbackMissingApproval = await fetch(`${baseUrl}/api/file-ops/rollback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-missing-approval' },
+      body: JSON.stringify({ trustedRoot, applied: applied.applied }),
+    });
+    assert.equal(rollbackMissingApproval.status, 428);
+    assert.match((await rollbackMissingApproval.json()).error, /approval/i);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'after-route');
 
     const rollbackResponse = await fetch(`${baseUrl}/api/file-ops/rollback`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-apply-undo' },
-      body: JSON.stringify({ trustedRoot, applied: applied.applied }),
+      body: JSON.stringify({ trustedRoot, applied: applied.applied, rollbackApprovalId: applied.rollbackApprovalId }),
     });
     assert.equal(rollbackResponse.status, 200);
     const rollback = await rollbackResponse.json();

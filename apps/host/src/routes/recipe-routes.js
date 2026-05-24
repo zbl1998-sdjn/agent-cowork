@@ -1,5 +1,6 @@
 import { getRecipe, listRecipes } from '../recipes/registry.js';
 import { runRecipe } from '../recipes/run-recipe.js';
+import { previewFileOperations } from '../workspace/file-operations.js';
 import {
   bodyFingerprint,
   decodePathSegment,
@@ -21,6 +22,7 @@ export async function handleRecipeRoutes({
   requireIdempotencyKey,
   sendCachedOrStore,
   safeTrustedRoot,
+  fileOperationApprovals,
 }) {
   if (request.method === 'GET' && pathname === '/api/recipes') {
     sendJson(response, 200, {
@@ -61,6 +63,17 @@ export async function handleRecipeRoutes({
         runEvents,
         runsIndex,
       });
+      const preview = result.operations.length
+        ? previewFileOperations(result.operations, { trustedRoot: safeRoot })
+        : { operations: [] };
+      const fileOperationApprovalId = preview.operations.length
+        ? fileOperationApprovals.issue({
+          kind: 'file-ops:apply',
+          trustedRoot: safeRoot,
+          operations: preview.operations,
+          context: requestContext,
+        })
+        : null;
       sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         recipe: result.recipe,
         runId: result.runId,
@@ -68,6 +81,7 @@ export async function handleRecipeRoutes({
         context: requestContext,
         sources: result.sources,
         operations: result.operations,
+        fileOperationApprovalId,
         events: result.events,
       });
     });

@@ -137,7 +137,7 @@ export function App() {
       const res = await postJson<RecipeRunResponse>(`/api/recipes/${encodeURIComponent(recipeId)}/run`, {
         trustedRoot, prompt, files: uploaded.map((p) => ({ path: p })), idempotencyKey: newIdempotencyKey('recipe'),
       });
-      patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, operations: res.operations || [], sources: res.sources || [], status: 'awaiting_approval', approvalState: (res.operations || []).length ? 'awaiting' : 'idle' }));
+      patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, operations: res.operations || [], fileOperationApprovalId: res.fileOperationApprovalId || null, sources: res.sources || [], status: 'awaiting_approval', approvalState: (res.operations || []).length ? 'awaiting' : 'idle' }));
       wireEvents(assistantId, res.runId);
     } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
   }, [trustedRoot, patchAssistant, wireEvents]);
@@ -226,8 +226,13 @@ export function App() {
   }, [trustedRoot, patchAssistant, wireEvents]);
   const handleApprove = useCallback(async (message: AssistantMessage) => {
     try {
-      await postJson('/api/file-ops/apply', { trustedRoot, operations: message.operations, idempotencyKey: newIdempotencyKey('apply') });
-      patchAssistant(message.id, (m) => ({ ...m, approvalState: 'approved', status: 'done' }));
+      const applied = await postJson<{ rollbackApprovalId?: string | null }>('/api/file-ops/apply', {
+        trustedRoot,
+        operations: message.operations,
+        fileOperationApprovalId: message.fileOperationApprovalId,
+        idempotencyKey: newIdempotencyKey('apply'),
+      });
+      patchAssistant(message.id, (m) => ({ ...m, rollbackApprovalId: applied.rollbackApprovalId || null, approvalState: 'approved', status: 'done' }));
     } catch (error) { patchAssistant(message.id, (m) => ({ ...m, text: (error as Error).message })); }
   }, [trustedRoot, patchAssistant]);
 

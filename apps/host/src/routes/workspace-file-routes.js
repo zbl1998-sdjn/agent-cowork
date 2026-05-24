@@ -23,6 +23,7 @@ export async function handleWorkspaceFileRoutes({
   requireIdempotencyKey,
   sendCachedOrStore,
   safeTrustedRoot,
+  fileOperationApprovals,
 }) {
   if (request.method === 'POST' && pathname === '/api/files/tree') {
     await withJsonBody(request, response, async (body) => {
@@ -140,7 +141,15 @@ export async function handleWorkspaceFileRoutes({
     await withJsonBody(request, response, async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
       const preview = previewFileOperations(body.operations, { trustedRoot });
-      sendJson(response, 200, preview);
+      const fileOperationApprovalId = preview.operations.length
+        ? fileOperationApprovals.issue({
+          kind: 'file-ops:apply',
+          trustedRoot,
+          operations: preview.operations,
+          context: requestContext,
+        })
+        : null;
+      sendJson(response, 200, { ...preview, fileOperationApprovalId });
     });
     return true;
   }
@@ -156,12 +165,28 @@ export async function handleWorkspaceFileRoutes({
         return;
       }
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      const preview = previewFileOperations(body.operations, { trustedRoot });
+      fileOperationApprovals.consume(body.fileOperationApprovalId || body.approvalId, {
+        kind: 'file-ops:apply',
+        trustedRoot,
+        operations: preview.operations,
+        context: requestContext,
+      });
       const applied = applyFileOperations(body.operations, {
         trustedRoot,
         journalWriter: config.journalWriter,
       });
+      const rollbackApprovalId = applied.applied.length
+        ? fileOperationApprovals.issue({
+          kind: 'file-ops:rollback',
+          trustedRoot,
+          operations: applied.applied,
+          context: requestContext,
+        })
+        : null;
       sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         ...applied,
+        rollbackApprovalId,
         context: requestContext,
       });
     });
@@ -179,7 +204,14 @@ export async function handleWorkspaceFileRoutes({
         return;
       }
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const rollback = rollbackFileOperations(body.rollback || body.applied || body.operations, {
+      const entries = body.rollback || body.applied || body.operations;
+      fileOperationApprovals.consume(body.rollbackApprovalId || body.fileOperationApprovalId || body.approvalId, {
+        kind: 'file-ops:rollback',
+        trustedRoot,
+        operations: entries,
+        context: requestContext,
+      });
+      const rollback = rollbackFileOperations(entries, {
         trustedRoot,
         journalWriter: config.journalWriter,
       });

@@ -9,7 +9,13 @@ export interface FileOperation {
   type: 'write' | 'rename' | 'move' | string;
   path?: string;
   targetPath?: string;
+  from?: string;
+  to?: string;
+  newName?: string;
+  content?: string;
   contentBase64?: string;
+  encoding?: string;
+  overwrite?: boolean;
 }
 
 export interface SourceRef {

@@ -12,6 +12,8 @@ export interface AssistantMessage {
   reasoning?: string;
   progress: ProgressLineProps[];
   operations: FileOperation[];
+  fileOperationApprovalId?: string | null;
+  rollbackApprovalId?: string | null;
   sources: SourceRef[];
   todos?: TodoItem[];
   approvalState: ApprovalState;
@@ -46,4 +48,9 @@ export interface Conversation {
 export type SidePanel = 'none' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'schedules' | 'memory';
 
 export interface WorkspaceInfo { trustedRoot: string }
-export interface RecipeRunResponse { runId: string; operations: FileOperation[]; sources: SourceRef[] }
+export interface RecipeRunResponse {
+  runId: string;
+  operations: FileOperation[];
+  sources: SourceRef[];
+  fileOperationApprovalId?: string | null;
+}

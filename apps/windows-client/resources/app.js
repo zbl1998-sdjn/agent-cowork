@@ -15,6 +15,8 @@ const state = {
   selectedRecipeSource: "",
   lastSources: [],
   applyIdempotencyKey: "",
+  applyApprovalId: "",
+  rollbackApprovalId: "",
   activeTaskMessage: null,
   mentionedFiles: [],
   activeEventSource: null,
@@ -1153,6 +1155,7 @@ async function runRecipePlan(prompt, recipe) {
     trustedRoot: state.workspace,
     operations: state.operations,
   });
+  state.applyApprovalId = preview.fileOperationApprovalId || "";
   state.approved = false;
   approveButton.textContent = "审批执行";
   approveButton.classList.remove("is-done");
@@ -1461,6 +1464,7 @@ async function generatePlan(options = {}) {
     trustedRoot: state.workspace,
     operations: state.operations,
   });
+  state.applyApprovalId = preview.fileOperationApprovalId || "";
   state.approved = false;
   approveButton.textContent = "审批执行";
   approveButton.classList.remove("is-done");
@@ -1587,8 +1591,10 @@ async function approvePlan() {
   const applied = await postJson("/api/file-ops/apply", {
     trustedRoot: state.workspace,
     operations: state.operations,
+    fileOperationApprovalId: state.applyApprovalId,
     idempotencyKey: state.applyIdempotencyKey || idempotencyKey("apply"),
   });
+  state.rollbackApprovalId = applied.rollbackApprovalId || "";
   state.approved = true;
   approveButton.textContent = "已审批";
   approveButton.classList.add("is-done");

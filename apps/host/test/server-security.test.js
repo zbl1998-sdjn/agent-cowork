@@ -19,6 +19,10 @@ async function close(server) {
   await new Promise((resolve) => server.close(resolve));
 }
 
+function createSecurityServer(config = {}) {
+  return createServer({ requireAuth: false, trustIdentityHeaders: true, ...config });
+}
+
 async function jsonRequest(base, route, { method = 'GET', body, headers = {} } = {}) {
   const response = await fetch(`${base}${route}`, {
     method,
@@ -41,7 +45,7 @@ async function jsonRequest(base, route, { method = 'GET', body, headers = {} } =
 test('API rejects cross-origin mutating requests and text/plain JSON bodies', async () => {
   const trustedRoot = tempRoot();
   const target = path.join(trustedRoot, 'csrf.txt');
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const plain = await fetch(`${base}/api/file-ops/apply`, {
@@ -82,7 +86,7 @@ test('request-supplied trustedRoot cannot escape configured workspace', async ()
   const outsideSecret = path.join(outsideRoot, 'secret.txt');
   const outsideWrite = path.join(outsideRoot, 'write.txt');
   fs.writeFileSync(outsideSecret, 'outside-ok', 'utf8');
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const read = await jsonRequest(base, '/api/files/read', {
@@ -117,7 +121,7 @@ test('request-supplied trustedRoot cannot escape configured workspace', async ()
 
 test('run detail, task list, run list, and SSE history are tenant scoped', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
@@ -164,7 +168,7 @@ test('run detail, task list, run list, and SSE history are tenant scoped', async
 test('critical writes require Idempotency-Key and reject same key with different body', async () => {
   const trustedRoot = tempRoot();
   const target = path.join(trustedRoot, 'apply.txt');
-  const server = createServer({
+  const server = createSecurityServer({
     trustedRoot,
     enableScheduler: true,
     startScheduler: false,
@@ -238,7 +242,7 @@ test('critical writes require Idempotency-Key and reject same key with different
 test('schedule mutation routes are tenant scoped', async () => {
   const trustedRoot = tempRoot();
   const fired = [];
-  const server = createServer({
+  const server = createSecurityServer({
     trustedRoot,
     enableScheduler: true,
     startScheduler: false,

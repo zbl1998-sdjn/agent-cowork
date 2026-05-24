@@ -46,6 +46,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
     safeTrustedRoot: state.safeTrustedRoot,
+    fileOperationApprovals: state.fileOperationApprovals,
   })) return true;
   if (await handleMemoryRoutes({
     request,
@@ -91,6 +92,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
     safeTrustedRoot: state.safeTrustedRoot,
+    fileOperationApprovals: state.fileOperationApprovals,
   })) return true;
   if (await handleSandboxRoutes({
     request,
