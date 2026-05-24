@@ -5,8 +5,10 @@ import { assertTrustedPath } from '../security/path-policy.js';
 const ARTIFACT_ROOT_PARTS = ['.AgentCowork', 'artifacts'];
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.json', '.html', '.htm', '.log']);
 
-function artifactRoot(trustedRoot) {
-  return path.join(trustedRoot, ...ARTIFACT_ROOT_PARTS);
+function safeArtifactRoot(trustedRoot) {
+  const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
+  const root = assertTrustedPath(path.join(safeRoot, ...ARTIFACT_ROOT_PARTS), safeRoot);
+  return { safeRoot, root };
 }
 
 function isInside(parent, candidate) {
@@ -15,9 +17,8 @@ function isInside(parent, candidate) {
 }
 
 function safeArtifactPath(trustedRoot, artifactPath) {
-  const safeRoot = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
-  const root = artifactRoot(safeRoot);
-  const safe = assertTrustedPath(path.resolve(artifactPath), safeRoot);
+  const { root } = safeArtifactRoot(trustedRoot);
+  const safe = assertTrustedPath(path.resolve(artifactPath), root);
   if (!isInside(root, safe)) {
     throw new Error('artifact path must stay inside .AgentCowork/artifacts');
   }
@@ -111,8 +112,7 @@ export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
-  const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
-  const root = artifactRoot(safeRoot);
+  const { root } = safeArtifactRoot(trustedRoot);
   const files = [];
   collectFiles(root, root, files, Math.max(1, Math.min(Number(limit) || 20, 100)));
   return files

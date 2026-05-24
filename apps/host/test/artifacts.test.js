@@ -82,6 +82,7 @@ import {
   renderLivePage,
   refreshLiveArtifactData,
 } from '../src/artifacts/live-artifact.js';
+import { listArtifacts } from '../src/artifacts/artifact-catalog.js';
 import { createServer } from '../src/server.js';
 
 async function bind(server) {
@@ -168,6 +169,19 @@ test('buildLiveArtifact rejects file-json data sources outside trustedRoot', () 
       viz: { kind: 'table', data: { columns: ['a'], rows: [['1']] } },
       dataSource: { type: 'file-json', path: '../outside.json' },
     }),
+    /Path escaped trusted root/,
+  );
+});
+
+test('listArtifacts rejects a symlinked artifact root outside trustedRoot', () => {
+  const root = tempRoot();
+  const outside = tempRoot();
+  fs.writeFileSync(path.join(outside, 'leak.md'), 'outside', 'utf8');
+  fs.mkdirSync(path.join(root, '.AgentCowork'), { recursive: true });
+  fs.symlinkSync(outside, path.join(root, '.AgentCowork', 'artifacts'), process.platform === 'win32' ? 'junction' : 'dir');
+
+  assert.throws(
+    () => listArtifacts({ trustedRoot: root }),
     /Path escaped trusted root/,
   );
 });
