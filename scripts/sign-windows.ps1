@@ -57,10 +57,16 @@ function Find-SignTool {
 
 # Default to the two installers produced by `cargo tauri build`, copied into installers\.
 if (-not $Files -or $Files.Count -eq 0) {
-  $Files = @(
-    (Join-Path $repoRoot 'installers\Agent Cowork_0.1.0_x64-setup.exe'),
-    (Join-Path $repoRoot 'installers\Agent Cowork_0.1.0_x64_en-US.msi')
-  )
+  $installerDir = Join-Path $repoRoot 'installers'
+  $setup = Get-ChildItem -LiteralPath $installerDir -Filter 'Agent Cowork_*_x64-setup.exe' -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  $msi = Get-ChildItem -LiteralPath $installerDir -Filter 'Agent Cowork_*_x64_en-US.msi' -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  $Files = @($setup, $msi) |
+    Where-Object { $_ } |
+    ForEach-Object { $_.FullName }
 }
 
 $signtool = Find-SignTool
