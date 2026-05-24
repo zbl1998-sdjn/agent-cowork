@@ -53,6 +53,8 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
     'tauri_plugin_opener::init',
     'tauri_plugin_notification::init',
     'assert_trusted_path',
+    'assert_openable_path',
+    'hidden or sensitive path blocked',
   ];
   for (const symbol of requiredSymbols) {
     assert.ok(rust.includes(symbol), `missing ${symbol}`);
