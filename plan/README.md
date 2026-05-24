@@ -44,6 +44,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。
 - [ ] P1-A3 延后项:真实 Kimi/API key 环境下的用户工作区多文件任务端到端留档仍未完成,不得计作真实模型验收。
+- [x] 04-Q6(真实 Kimi API smoke 子项):`npm run smoke:kimi-api` 已修复 guest auth 并在真实 `KIMI_API_KEY` 环境下通过 `/api/kimi/plan`;证据见 `reports/kimi-api-smoke/kimi-api-smoke-20260524T221510Z.json`。该项只证明 Kimi API 通路,不替代 P1-A3 多文件端到端验收。
 - [x] FE-1:智能滚动代码+单测完成,并新增 `npm run smoke:react-scroll` 真实浏览器验收;覆盖长对话中翻看历史时流式新内容不强行拽回底部,以及"回到底部"按钮出现/点击回底。
 - [x] 03-B1a:活页 `live-artifact.js` 已按 spec/render/refresh 拆为独立模块,新增安全特征测试并通过门禁。
 - [x] 03-B1b(本地可测子项):活页 data endpoint 支持手动 refresh 工作区 `file-json` 数据源,并复用 trustedRoot jail 校验。
@@ -57,7 +58,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
 - [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装当前安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T221049Z.json`。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
-- [ ] 需真实环境的延期验收:真实 Kimi E2E、Office/OCR、installer/签名信任链相关验证。
+- [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、installer/签名信任链相关验证。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)

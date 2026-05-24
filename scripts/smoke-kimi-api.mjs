@@ -10,7 +10,7 @@ function assert(condition, message) {
   }
 }
 
-function requestJson(baseUrl, route, body) {
+function requestJson(baseUrl, route, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
     const request = http.request(
@@ -20,6 +20,7 @@ function requestJson(baseUrl, route, body) {
         headers: {
           'content-type': 'application/json',
           'content-length': Buffer.byteLength(payload),
+          ...headers,
         },
       },
       (response) => {
@@ -85,12 +86,16 @@ async function main() {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
+    const guest = await requestJson(baseUrl, '/api/auth/guest', {});
+    assert(guest.token, 'Kimi API smoke guest auth did not return a token');
+    const authHeaders = { authorization: `Bearer ${guest.token}` };
+
     const plan = await requestJson(baseUrl, '/api/kimi/plan', {
       trustedRoot: workspace,
       mode: 'cowork',
       summary: 'Contract draft. Party A, Party B, renewal date, payment terms.',
       prompt: '基于摘要输出三条中文整理建议。不要修改文件，不要运行命令。',
-    });
+    }, authHeaders);
 
     assert(plan.ok === true, 'Kimi API smoke did not return ok=true');
     assert(plan.provider === 'kimi-api', 'Kimi API smoke returned unexpected provider');
@@ -107,6 +112,9 @@ async function main() {
       durationMs: plan.durationMs,
       runId: plan.runId,
       runPath: plan.runPath,
+      auth: {
+        guestUserId: guest.userId,
+      },
       textPreview: plan.text.slice(0, 500),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');

@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-24T22:15:10.732Z",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kimi-api-smoke-workspace",
+  "baseUrl": "https://api.moonshot.cn/v1",
+  "model": "kimi-k2.6",
+  "durationMs": 31300,
+  "runId": "run_20260524221439_32cab570",
+  "runPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kimi-api-smoke-workspace\\.AgentCowork\\runs\\run_20260524221439_32cab570.json",
+  "auth": {
+    "guestUserId": "guest_e327cd9e3742"
+  },
+  "textPreview": "```markdown\n## 目标理解\n基于提供的合同草案摘要（核心要素：甲方 Party A、乙方 Party B、续约日期 renewal date、付款条款 payment terms），在不读取源文件、不执行任何系统命令的前提下，仅依据摘要信息输出结构化整理建议及审批前本地自查清单，帮助快速对齐关键条款、识别风险点并推进内部审批流。\n\n## 三条整理建议\n\n1. **主体信息对齐**：将 Party A 与 Party B 的法定全称、统一社会信用代码（或注册号）、授权代表及签约权限在本地笔记中逐一列示，核对是否与最新营业执照及授权委托书完全一致，避免主体错位或无权代理风险。\n2. **续约日期闭环**：把 renewal date 拆解为“生效基准日、续约起算日、届满日”三个字段，检查是否与既有合同到期日无缝衔接，并标注是否附条件自动续约，防止出现权利空档期或日期重叠。\n3. **付款条款颗粒化**：将 payment terms 细化为金额/计价币种、付款节点（预付款/进度款/尾款）、账期、逾期违约金及发票类型（增值税专用发票/普通发票），确保与预算科目、现金流预测及税务要"
+}
