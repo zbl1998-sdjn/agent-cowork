@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-24T20:48:19.090Z",
+  "durationMs": 464,
+  "baseUrl": "http://127.0.0.1:62841",
+  "browserPath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kcw-react-branches-JYYDa2",
+  "uiDistRoot": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\ui-dist",
+  "screenshotPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\react-branches-smoke-1280x760.png",
+  "reportPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\react-branches\\react-branches-2026-05-24T20-48-18-623Z.json",
+  "initialMain": {
+    "selected": "main",
+    "optionLabels": [
+      "主线",
+      "分支 1"
+    ],
+    "meta": "4 条消息",
+    "hasMain": true,
+    "hasBranch": false
+  },
+  "branchView": {
+    "selected": "b1",
+    "meta": "2 条共同上下文 · 2 条父线差异 · 2 条分支差异",
+    "hasMain": false,
+    "hasBranch": true,
+    "timeline": "D\nDerrick\nCOMMON_NODE_MARKER 共同节点：准备季度报告✎ 编辑\nK\nKimi\n\nCOMMON_ASSISTANT_MARKER 共同上下文：先确认受众和摘要结构。\n\n复制\n重新生成\nD\nDerrick\nBRANCH_ONLY_MARKER 分支继续：董事会版本✎ 编辑\nK\nKimi\n\nBRANCH_ASSISTANT_MARKER 分支回复：使用董事会版叙事。\n\n复制\n重新生成"
+  },
+  "returnedMain": {
+    "selected": "main",
+    "meta": "4 条消息",
+    "hasMain": true,
+    "hasBranch": false,
+    "timeline": "D\nDerrick\nCOMMON_NODE_MARKER 共同节点：准备季度报告✎ 编辑\nK\nKimi\n\nCOMMON_ASSISTANT_MARKER 共同上下文：先确认受众和摘要结构。\n\n复制\n重新生成\nD\nDerrick\nMAIN_ONLY_MARKER 主线继续：预算版本✎ 编辑\nK\nKimi\n\nMAIN_ASSISTANT_MARKER 主线回复：使用预算版叙事。\n\n复制\n重新生成"
+  }
+}
