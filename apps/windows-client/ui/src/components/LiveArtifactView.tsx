@@ -1,5 +1,9 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchLiveArtifactData, openPath, type LiveArtifactData } from '../lib/api';
+
+export const DEFAULT_AUTO_REFRESH_SECONDS = 5;
+export const MIN_AUTO_REFRESH_SECONDS = 1;
+export const MAX_AUTO_REFRESH_SECONDS = 60;
 
 export interface LiveArtifactViewModel {
   srcDoc?: string;
@@ -8,18 +12,32 @@ export interface LiveArtifactViewModel {
   busy?: boolean;
   refreshing?: boolean;
   error?: string;
+  autoRefresh?: boolean;
+  autoRefreshSeconds?: number;
+}
+
+export function normaliseAutoRefreshSeconds(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_AUTO_REFRESH_SECONDS;
+  return Math.min(MAX_AUTO_REFRESH_SECONDS, Math.max(MIN_AUTO_REFRESH_SECONDS, Math.floor(parsed)));
 }
 
 export function liveArtifactViewState(model: LiveArtifactViewModel) {
   const hasArtifact = Boolean(model.srcDoc);
   const canRefresh = hasArtifact && Boolean(model.dataUrl) && !model.busy && !model.refreshing;
+  const autoRefreshSeconds = normaliseAutoRefreshSeconds(model.autoRefreshSeconds);
+  const autoRefresh = Boolean(model.autoRefresh) && canRefresh;
   const canOpen = Boolean(model.filePath) && !model.busy;
   return {
     hasArtifact,
     canRefresh,
+    canAutoRefresh: hasArtifact && Boolean(model.dataUrl) && !model.busy,
+    autoRefresh,
+    autoRefreshSeconds,
     canOpen,
     isError: Boolean(model.error),
     refreshLabel: model.refreshing ? '刷新中...' : '刷新数据',
+    autoRefreshLabel: autoRefresh ? `自动刷新 ${autoRefreshSeconds}s` : '自动刷新',
     statusText: model.error || (hasArtifact ? '活页已就绪' : '尚未生成活页'),
   };
 }
@@ -42,9 +60,20 @@ export function LiveArtifactView({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [lastRefresh, setLastRefresh] = useState('');
-  const state = liveArtifactViewState({ srcDoc, dataUrl, filePath, busy, refreshing, error: refreshError || error });
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshSeconds, setAutoRefreshSeconds] = useState(DEFAULT_AUTO_REFRESH_SECONDS);
+  const state = liveArtifactViewState({
+    srcDoc,
+    dataUrl,
+    filePath,
+    busy,
+    refreshing,
+    error: refreshError || error,
+    autoRefresh,
+    autoRefreshSeconds,
+  });
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!state.canRefresh || !dataUrl) return;
     setRefreshing(true);
     setRefreshError('');
@@ -58,7 +87,15 @@ export function LiveArtifactView({
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [dataUrl, onRefreshed, state.canRefresh]);
+
+  useEffect(() => {
+    if (!state.autoRefresh || !state.canRefresh) return undefined;
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, state.autoRefreshSeconds * 1000);
+    return () => window.clearInterval(interval);
+  }, [refresh, state.autoRefresh, state.canRefresh, state.autoRefreshSeconds]);
 
   return (
     <div className="live-artifact-view">
@@ -66,6 +103,25 @@ export function LiveArtifactView({
         <strong>{title}</strong>
         <button type="button" disabled={!state.canRefresh} onClick={() => void refresh()}>{state.refreshLabel}</button>
         {filePath && <button type="button" disabled={!state.canOpen} onClick={() => void openPath(filePath)}>打开文件</button>}
+        <label className="live-artifact-auto">
+          <input
+            type="checkbox"
+            checked={autoRefresh}
+            disabled={!state.canAutoRefresh}
+            onChange={(event) => setAutoRefresh(event.target.checked)}
+          />
+          <span>{state.autoRefreshLabel}</span>
+        </label>
+        <input
+          className="live-artifact-interval"
+          aria-label="自动刷新间隔秒"
+          type="number"
+          min={MIN_AUTO_REFRESH_SECONDS}
+          max={MAX_AUTO_REFRESH_SECONDS}
+          value={autoRefreshSeconds}
+          disabled={!autoRefresh || !state.canAutoRefresh}
+          onChange={(event) => setAutoRefreshSeconds(normaliseAutoRefreshSeconds(event.target.value))}
+        />
       </div>
       <p className={state.isError ? 'panel-error' : 'panel-note'}>
         {state.statusText}{lastRefresh ? ` · ${new Date(lastRefresh).toLocaleString()}` : ''}

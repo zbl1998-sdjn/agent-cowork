@@ -15,6 +15,7 @@ export interface VizSpec {
   data?: unknown;
   options?: unknown;
   definition?: string;
+  dataSource?: { type?: string; path?: string };
 }
 
 export interface VizRenderResult {

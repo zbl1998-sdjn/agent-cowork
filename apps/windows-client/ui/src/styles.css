@@ -148,6 +148,9 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .live-artifact-view { margin-top: 8px; }
 .live-artifact-actions { align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
 .live-artifact-actions strong { font-size: 13px; color: #4a4e46; margin-right: auto; }
+.live-artifact-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #4a4e46; }
+.live-artifact-auto input { flex: 0 0 auto; width: 14px; height: 14px; padding: 0; }
+.live-artifact-interval { flex: 0 0 72px !important; width: 72px; min-width: 72px; }
 .connector-connected { margin-bottom: 12px; }
 .connector-connected label { display: block; font-size: 12px; color: #6b6f66; margin-bottom: 6px; }
 .connector-chips { display: flex; flex-wrap: wrap; gap: 6px; }
