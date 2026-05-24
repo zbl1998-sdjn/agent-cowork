@@ -1,3 +1,5 @@
+// @ts-check
+
 // Cancellation registry: lets long-running turns (streaming chat, future
 // agent runs) be interrupted by runId — the Claude Cowork "stop" button.
 //
@@ -7,9 +9,14 @@
 
 export class CancellationRegistry {
   constructor() {
+    /** @type {Map<string, AbortController>} */
     this._controllers = new Map(); // runId -> AbortController
   }
 
+  /**
+   * @param {string} runId
+   * @returns {AbortController}
+   */
   register(runId) {
     if (!runId) {
       throw new Error('CancellationRegistry.register: runId is required');
@@ -19,16 +26,29 @@ export class CancellationRegistry {
     return controller;
   }
 
+  /**
+   * @param {string} runId
+   * @returns {AbortSignal | null}
+   */
   signal(runId) {
     const controller = this._controllers.get(runId);
     return controller ? controller.signal : null;
   }
 
+  /**
+   * @param {string} runId
+   * @returns {boolean}
+   */
   isCancelled(runId) {
     const controller = this._controllers.get(runId);
     return controller ? controller.signal.aborted : false;
   }
 
+  /**
+   * @param {string} runId
+   * @param {string} [reason]
+   * @returns {boolean}
+   */
   cancel(runId, reason = 'cancelled') {
     const controller = this._controllers.get(runId);
     if (!controller) {
@@ -40,11 +60,19 @@ export class CancellationRegistry {
     return true;
   }
 
+  /**
+   * @param {string} runId
+   * @returns {boolean}
+   */
   done(runId) {
     return this._controllers.delete(runId);
   }
 
   // Abort every active run — used by graceful shutdown to drain in-flight SSE.
+  /**
+   * @param {string} [reason]
+   * @returns {number}
+   */
   cancelAll(reason = 'shutdown') {
     let n = 0;
     for (const [, controller] of this._controllers) {
@@ -53,11 +81,13 @@ export class CancellationRegistry {
     return n;
   }
 
+  /** @returns {string[]} */
   pending() {
     return [...this._controllers.keys()];
   }
 }
 
+/** @returns {CancellationRegistry} */
 export function createCancellationRegistry() {
   return new CancellationRegistry();
 }
