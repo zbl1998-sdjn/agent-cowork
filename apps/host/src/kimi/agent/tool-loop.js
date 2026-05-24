@@ -138,7 +138,7 @@ export async function runAgentChat({
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
     if (calls.length === 0) {
       finalText = message.content || '';
-      if (verify && didMutate && !verified && !planMode) {
+      if (verify && didMutate && !verified) {
         verified = true;
         emit('verify_start', {});
         audit('verify.start', {});

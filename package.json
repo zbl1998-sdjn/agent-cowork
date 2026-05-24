@@ -16,6 +16,7 @@
     "verify:windows-readiness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-client-readiness.ps1",
     "smoke:host": "node scripts/smoke-local-operations.mjs",
     "smoke:live-mvp": "node scripts/smoke-live-mvp.mjs",
+    "smoke:plan-loop": "node scripts/smoke-plan-closed-loop.mjs",
     "smoke:mvp-runtime": "node scripts/smoke-mvp-runtime.mjs",
     "smoke:kimi-api": "node scripts/smoke-kimi-api.mjs",
     "smoke:tauri-scaffold": "node scripts/smoke-tauri-scaffold.mjs",

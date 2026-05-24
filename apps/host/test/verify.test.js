@@ -34,6 +34,61 @@ test('verify=true: after a mutation, agent runs a read-only self-check round the
   assert.equal(out.text, '已核对，无误。', 'final text is the post-verification summary');
 });
 
+test('verify=true with plan mode runs self-check after approved plan execution', async () => {
+  const root = tmp();
+  const events = [];
+  let readBack = false;
+  const approvals = {
+    request(meta) {
+      events.push({ t: 'approval_requested', d: meta });
+      return { id: 'plan_1', promise: Promise.resolve('once') };
+    },
+  };
+  const tools = [
+    {
+      name: 'ExitPlanMode',
+      risk: 'safe',
+      mutating: false,
+      description: 'plan',
+      parameters: { type: 'object', properties: {} },
+      handler: async () => ({ ok: true }),
+    },
+    mut('Write', () => {}),
+    ro('Read', () => { readBack = true; }),
+  ];
+  let n = 0;
+  const modelCall = async () => {
+    n += 1;
+    if (n === 1) {
+      return {
+        content: '',
+        tool_calls: [{ id: 'p1', function: { name: 'ExitPlanMode', arguments: JSON.stringify({ plan: '1. 写报告\n2. 自检报告\n3. 收尾' }) } }],
+      };
+    }
+    if (n === 2) return { content: '', tool_calls: [{ id: 'w1', function: { name: 'Write', arguments: '{}' } }] };
+    if (n === 3) return { content: '初稿完成。' };
+    if (n === 4) return { content: '', tool_calls: [{ id: 'r1', function: { name: 'Read', arguments: '{}' } }] };
+    return { content: '已按批准计划完成并自检。' };
+  };
+  const out = await runAgentChat({
+    prompt: '计划后写报告',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    tools,
+    modelCall,
+    verify: true,
+    planMode: true,
+    approvals,
+    emit: (t, d) => events.push({ t, d }),
+    runStoreRoot: path.join(root, 'runs'),
+  });
+
+  assert.ok(events.some((e) => e.t === 'plan_proposed'), 'plan proposal emitted');
+  assert.ok(events.some((e) => e.t === 'verify_start'), 'verify_start emitted after approved plan mutation');
+  assert.equal(readBack, true, 'self-check read ran in plan mode');
+  assert.equal(out.text, '已按批准计划完成并自检。');
+});
+
 test('verify=true but nothing mutated: no verification round', async () => {
   const root = tmp();
   const tools = [ro('Read', () => {})];

@@ -116,6 +116,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-live-mvp.mjs')],
   },
   {
+    name: 'plan closed-loop smoke script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-plan-closed-loop.mjs')],
+  },
+  {
     name: 'ui contract smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-ui-contract.mjs')],
@@ -149,6 +154,11 @@ const checks = [
     name: 'mvp runtime lifecycle smoke',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
+  },
+  {
+    name: 'plan closed-loop smoke',
+    command: nodeBin,
+    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-plan-closed-loop.mjs')],
   },
   {
     name: 'ui to host api contract smoke',
