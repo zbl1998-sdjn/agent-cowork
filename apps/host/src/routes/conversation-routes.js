@@ -24,9 +24,18 @@ export async function handleConversationRoutes({
   }
 
   const resolveRoot = (raw) => assertTrustedPath(path.resolve(raw || trustedRootDefault), trustedRootDefault);
+  const resolveRootOrSend = (raw) => {
+    try {
+      return resolveRoot(raw);
+    } catch (err) {
+      sendJson(response, err.statusCode || 400, { error: err.message });
+      return null;
+    }
+  };
 
   if (request.method === 'GET' && pathname === '/api/conversations') {
-    const safeRoot = resolveRoot(requestUrl.searchParams.get('trustedRoot'));
+    const safeRoot = resolveRootOrSend(requestUrl.searchParams.get('trustedRoot'));
+    if (!safeRoot) return true;
     const params = requestUrl.searchParams;
     const full = params.get('full') === '1';
     const limitRaw = params.get('limit');
@@ -61,7 +70,8 @@ export async function handleConversationRoutes({
     }
 
     if (request.method === 'GET') {
-      const safeRoot = resolveRoot(requestUrl.searchParams.get('trustedRoot'));
+      const safeRoot = resolveRootOrSend(requestUrl.searchParams.get('trustedRoot'));
+      if (!safeRoot) return true;
       let conversation = null;
       try {
         conversation = await conversationStore.get(safeRoot, id, requestContext);
@@ -102,7 +112,8 @@ export async function handleConversationRoutes({
     }
 
     if (request.method === 'DELETE') {
-      const safeRoot = resolveRoot(requestUrl.searchParams.get('trustedRoot'));
+      const safeRoot = resolveRootOrSend(requestUrl.searchParams.get('trustedRoot'));
+      if (!safeRoot) return true;
       let deleted = false;
       try {
         deleted = await conversationStore.remove(safeRoot, id, requestContext);

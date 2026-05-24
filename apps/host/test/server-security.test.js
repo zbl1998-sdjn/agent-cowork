@@ -114,6 +114,47 @@ test('request-supplied trustedRoot cannot escape configured workspace', async ()
     });
     assert.equal(apply.status, 400);
     assert.equal(fs.existsSync(outsideWrite), false);
+
+    const rag = await jsonRequest(base, '/api/workspace/search', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, query: 'outside-ok' },
+    });
+    assert.equal(rag.status, 400);
+
+    const conversations = await jsonRequest(base, `/api/conversations?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(conversations.status, 400);
+
+    const conversation = await jsonRequest(base, `/api/conversations/escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(conversation.status, 400);
+
+    const memory = await jsonRequest(base, `/api/memory?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(memory.status, 400);
+
+    const artifacts = await jsonRequest(base, `/api/artifacts?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(artifacts.status, 400);
+
+    const artifactView = await jsonRequest(
+      base,
+      `/api/artifacts/view?trustedRoot=${encodeURIComponent(outsideRoot)}&path=${encodeURIComponent(outsideSecret)}`,
+    );
+    assert.equal(artifactView.status, 400);
+
+    const viz = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-escape-root' },
+      body: {
+        trustedRoot: outsideRoot,
+        kind: 'table',
+        data: { columns: ['secret'], rows: [['outside-ok']] },
+      },
+    });
+    assert.equal(viz.status, 400);
+
+    const liveData = await jsonRequest(base, `/api/artifacts/data/viz_escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(liveData.status, 400);
+
+    const livePage = await jsonRequest(base, `/api/artifacts/live/viz_escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(livePage.status, 400);
   } finally {
     await close(server);
   }

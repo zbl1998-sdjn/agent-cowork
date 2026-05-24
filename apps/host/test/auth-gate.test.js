@@ -31,6 +31,34 @@ test('unauthenticated /api is blocked; spoofed identity headers do not authentic
   });
 });
 
+test('new file and route surfaces are covered by the auth gate', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-authgate-surfaces');
+  await withServer({ trustedRoot, requireAuth: true, trustIdentityHeaders: false }, async (base) => {
+    const routes = [
+      ['/api/workspace/search', { method: 'POST', body: { trustedRoot, query: 'alpha' } }],
+      ['/api/file-ops/preview', { method: 'POST', body: { trustedRoot, operations: [] } }],
+      ['/api/conversations', { method: 'GET' }],
+      ['/api/conversations/branch-test', { method: 'PUT', body: { trustedRoot, title: 'x', branches: [] } }],
+      ['/api/artifacts', { method: 'GET' }],
+      ['/api/artifacts/rename', { method: 'POST', headers: { 'idempotency-key': 'rename-gate' }, body: { trustedRoot, path: 'x.md', newName: 'y.md' } }],
+      ['/api/viz/render', { method: 'POST', headers: { 'idempotency-key': 'viz-gate' }, body: { trustedRoot, kind: 'table', data: { columns: ['a'], rows: [[1]] } } }],
+      ['/api/prompt/refine', { method: 'POST', body: { trustedRoot, prompt: '改一下' } }],
+    ];
+
+    for (const [route, options] of routes) {
+      const response = await fetch(`${base}${route}`, {
+        method: options.method,
+        headers: {
+          ...(options.body ? { 'content-type': 'application/json' } : {}),
+          ...(options.headers || {}),
+        },
+        body: options.body == null ? undefined : JSON.stringify(options.body),
+      });
+      assert.equal(response.status, 401, `${options.method} ${route} should require auth`);
+    }
+  });
+});
+
 test('public auth routes work without a token, and the token then unlocks /api', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-2');
   await withServer({ trustedRoot, requireAuth: true }, async (base) => {

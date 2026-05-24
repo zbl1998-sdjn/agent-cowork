@@ -9,6 +9,15 @@ function safeMemoryRoot(value, trustedRootDefault) {
   return assertTrustedPath(trustedRoot, trustedRootDefault);
 }
 
+function safeMemoryRootOrSend(value, trustedRootDefault, response) {
+  try {
+    return safeMemoryRoot(value, trustedRootDefault);
+  } catch (err) {
+    sendJson(response, err.statusCode || 400, { error: err.message });
+    return null;
+  }
+}
+
 export async function handleMemoryRoutes({
   request,
   response,
@@ -19,7 +28,8 @@ export async function handleMemoryRoutes({
   memoryStore,
 }) {
   if (request.method === 'GET' && pathname === '/api/memory') {
-    const safeRoot = safeMemoryRoot(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    if (!safeRoot) return true;
     const main = await memoryStore.readMainMemory(safeRoot, requestContext);
     const notes = (await memoryStore.listMemoryNotes(safeRoot, requestContext)).map((note) => ({
       name: note.name,
@@ -40,7 +50,8 @@ export async function handleMemoryRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/api/memory/profile') {
-    const safeRoot = safeMemoryRoot(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    if (!safeRoot) return true;
     const profile = createUserProfile({ memoryStore });
     const loaded = await profile.load(safeRoot, requestContext);
     const recall = await profile.recall(safeRoot, {
@@ -115,7 +126,8 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: 'Invalid memory note name' });
       return true;
     }
-    const safeRoot = safeMemoryRoot(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    if (!safeRoot) return true;
     const body = await memoryStore.readMemoryNote(safeRoot, noteName, requestContext);
     if (body == null) {
       sendJson(response, 404, { error: 'Memory note not found' });
