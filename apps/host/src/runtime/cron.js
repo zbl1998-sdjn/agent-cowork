@@ -1,3 +1,5 @@
+// @ts-check
+
 // Minimal 5-field cron parser + next-fire calculator. Zero-dep.
 //
 // Fields (5): minute hour day-of-month month day-of-week
@@ -29,6 +31,26 @@ const FIELD_LIMITS = [
   { min: 0, max: 6 },
 ];
 
+/**
+ * @typedef {object} FieldLimit
+ * @property {number} min
+ * @property {number} max
+ *
+ * @typedef {object} ParsedCron
+ * @property {Set<number>} minute
+ * @property {Set<number>} hour
+ * @property {Set<number>} dayOfMonth
+ * @property {Set<number>} month
+ * @property {Set<number>} dayOfWeek
+ * @property {boolean} domStar
+ * @property {boolean} dowStar
+ */
+
+/**
+ * @param {string} token
+ * @param {FieldLimit} limit
+ * @returns {Set<number>}
+ */
 function parseField(token, { min, max }) {
   if (token === '*') {
     return rangeSet(min, max, 1);
@@ -74,6 +96,12 @@ function parseField(token, { min, max }) {
   return out;
 }
 
+/**
+ * @param {number} min
+ * @param {number} max
+ * @param {number} step
+ * @returns {Set<number>}
+ */
 function rangeSet(min, max, step) {
   const out = new Set();
   for (let v = min; v <= max; v += step) {
@@ -82,6 +110,7 @@ function rangeSet(min, max, step) {
   return out;
 }
 
+/** @param {string} expression */
 export function parseCron(expression) {
   if (typeof expression !== 'string') {
     throw new Error('cron: expression must be a string');
@@ -102,6 +131,10 @@ export function parseCron(expression) {
   };
 }
 
+/**
+ * @param {ParsedCron} parsed
+ * @param {Date} candidate
+ */
 function dateMatches(parsed, candidate) {
   if (!parsed.minute.has(candidate.getMinutes())) return false;
   if (!parsed.hour.has(candidate.getHours())) return false;
@@ -117,6 +150,11 @@ function dateMatches(parsed, candidate) {
   return domMatch || dowMatch;
 }
 
+/**
+ * @param {string} expression
+ * @param {Date} [fromDate]
+ * @returns {Date}
+ */
 export function nextFireAt(expression, fromDate = new Date()) {
   const parsed = parseCron(expression);
   // Advance to the next whole minute > fromDate.
@@ -134,12 +172,13 @@ export function nextFireAt(expression, fromDate = new Date()) {
   throw new Error(`cron: no fire time within 4 years for '${expression}'`);
 }
 
+/** @param {string} expression */
 export function describeCron(expression) {
   // Friendly hint, not a translation. Best-effort heuristics for common shapes.
   try {
     parseCron(expression);
   } catch (err) {
-    return `invalid: ${err.message}`;
+    return `invalid: ${err instanceof Error ? err.message : String(err)}`;
   }
   const tokens = expression.trim().split(/\s+/);
   const [m, h, dom, mo, dow] = tokens;

@@ -12,7 +12,11 @@
   },
   "files": [
     "apps/host/src/security/redaction.js",
+    "apps/host/src/runtime/circuit-breaker.js",
     "apps/host/src/runtime/concurrency.js",
+    "apps/host/src/runtime/cron.js",
+    "apps/host/src/runtime/rate-limit.js",
+    "apps/host/src/runtime/resilience.js",
     "apps/host/src/runtime/task-presenter.js",
     "apps/host/src/runtime/usage.js"
   ]

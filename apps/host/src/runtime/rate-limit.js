@@ -1,3 +1,5 @@
+// @ts-check
+
 // Per-tenant HTTP rate limiter (gap #1). concurrency.js caps how many agent
 // streams run *at once*; this caps how many requests a tenant may make *per
 // second*, which is the missing protection against request floods / abusive
@@ -9,14 +11,39 @@
 // while bounding the sustained rate (good protection). State is in-process — a
 // multi-instance deployment would back this with a shared store (Redis), same as
 // the concurrency limiter (see docs/01-scalability).
+
+/**
+ * @typedef {object} RateBucket
+ * @property {number} tokens
+ * @property {number} last
+ *
+ * @typedef {object} RateLimitOptions
+ * @property {number=} ratePerSec
+ * @property {number=} burst
+ * @property {() => number=} now
+ * @property {number=} maxTenants
+ *
+ * @typedef {object} RateLimitDecision
+ * @property {boolean} allowed
+ * @property {number} limit
+ * @property {number} remaining
+ * @property {number} retryAfterSec
+ */
+
+/** @param {RateLimitOptions} options */
 export function createRateLimiter({
   ratePerSec = 50,
   burst = 100,
   now = () => Date.now(),
   maxTenants = 50000,
 } = {}) {
+  /** @type {Map<string, RateBucket>} */
   const buckets = new Map(); // tenantId -> { tokens, last }
 
+  /**
+   * @param {RateBucket} bucket
+   * @param {number} t
+   */
   function refill(bucket, t) {
     const elapsedSec = Math.max(0, (t - bucket.last) / 1000);
     bucket.tokens = Math.min(burst, bucket.tokens + elapsedSec * ratePerSec);
@@ -35,6 +62,11 @@ export function createRateLimiter({
     if (oldest) buckets.delete(oldest[0]);
   }
 
+  /**
+   * @param {string} [tenantId]
+   * @param {number} [cost]
+   * @returns {RateLimitDecision}
+   */
   function take(tenantId = 'tenant_local', cost = 1) {
     const t = now();
     let bucket = buckets.get(tenantId);

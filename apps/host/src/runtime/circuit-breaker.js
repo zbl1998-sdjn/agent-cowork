@@ -1,3 +1,5 @@
+// @ts-check
+
 // Circuit breaker — protects callers from a flaky/slow dependency (e.g. the
 // upstream model API) by failing fast once it is clearly unhealthy, then probing
 // for recovery. This is the "stop hammering a broken backend" half of the
@@ -11,21 +13,35 @@
 //   half-open  after the cooldown, allow up to halfOpenMax trial calls. One
 //              success closes the circuit; any failure re-opens it.
 
+/**
+ * @typedef {'closed' | 'open' | 'half-open'} CircuitState
+ * @typedef {object} CircuitBreakerOptions
+ * @property {string=} name
+ * @property {number=} failureThreshold
+ * @property {number=} cooldownMs
+ * @property {number=} halfOpenMax
+ * @property {() => number=} now
+ */
+
 export class OpenCircuitError extends Error {
+  /** @param {string} name */
   constructor(name) {
     super(`circuit '${name}' is open`);
     this.name = 'OpenCircuitError';
+    /** @type {'CIRCUIT_OPEN'} */
     this.code = 'CIRCUIT_OPEN';
   }
 }
 
 export class CircuitBreaker {
+  /** @param {CircuitBreakerOptions} options */
   constructor({ name = 'breaker', failureThreshold = 5, cooldownMs = 10000, halfOpenMax = 1, now = () => Date.now() } = {}) {
     this.name = name;
     this.failureThreshold = Math.max(1, failureThreshold);
     this.cooldownMs = Math.max(0, cooldownMs);
     this.halfOpenMax = Math.max(1, halfOpenMax);
     this._now = now;
+    /** @type {CircuitState} */
     this._state = 'closed';
     this._failures = 0;
     this._openedAt = 0;
@@ -34,6 +50,7 @@ export class CircuitBreaker {
     this._trips = 0;
   }
 
+  /** @returns {CircuitState} */
   get state() {
     this._maybeHalfOpen();
     return this._state;
@@ -80,6 +97,11 @@ export class CircuitBreaker {
   }
 
   // Wrap an async call. Throws OpenCircuitError immediately when open.
+  /**
+   * @template T
+   * @param {() => Promise<T> | T} fn
+   * @returns {Promise<T>}
+   */
   async run(fn) {
     if (!this.canRequest()) throw new OpenCircuitError(this.name);
     if (this._state === 'half-open') this._halfOpenInFlight += 1;
@@ -93,11 +115,13 @@ export class CircuitBreaker {
     }
   }
 
+  /** @returns {{ name: string, state: CircuitState, failures: number, trips: number, successes: number }} */
   stats() {
     return { name: this.name, state: this.state, failures: this._failures, trips: this._trips, successes: this._successes };
   }
 }
 
+/** @param {CircuitBreakerOptions} options */
 export function createCircuitBreaker(options = {}) {
   return new CircuitBreaker(options);
 }
