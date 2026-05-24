@@ -1,7 +1,25 @@
+// @ts-check
+
 // Connector catalog + keyword suggest (the Claude Cowork "suggest connectors"
 // analog). A curated list of MCP connectors with command/install templates;
 // builtin:true means the capability already ships in this host.
 
+/**
+ * @typedef {{
+ *   id: string,
+ *   name: string,
+ *   description: string,
+ *   keywords: string[],
+ *   builtin?: boolean,
+ *   command?: string,
+ *   args?: string[],
+ *   install?: string,
+ *   score?: number
+ * }} ConnectorDescriptor
+ * @typedef {{ limit?: number }} SuggestConnectorOptions
+ */
+
+/** @type {ConnectorDescriptor[]} */
 const CONNECTORS = [
   {
     id: 'filesystem', name: '文件系统', description: '读取/列出本地目录, jail 在指定 root 内',
@@ -35,14 +53,24 @@ const CONNECTORS = [
   },
 ];
 
+/**
+ * @param {unknown} text
+ * @returns {string[]}
+ */
 function tokenize(text) {
   return String(text || '').toLowerCase().split(/[^a-z0-9一-鿿]+/).filter(Boolean);
 }
 
+/** @returns {ConnectorDescriptor[]} */
 export function listConnectors() {
   return CONNECTORS.map((c) => ({ ...c }));
 }
 
+/**
+ * @param {unknown} query
+ * @param {SuggestConnectorOptions} [options]
+ * @returns {ConnectorDescriptor[]}
+ */
 export function suggestConnectors(query, { limit = 5 } = {}) {
   const terms = tokenize(query);
   const all = listConnectors();

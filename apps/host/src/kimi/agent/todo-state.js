@@ -1,15 +1,43 @@
+// @ts-check
+
+/**
+ * @typedef {'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected'} TodoStatus
+ * @typedef {{ id: string, text: string, status: TodoStatus, detail?: string, kind?: string }} TodoItem
+ * @typedef {{ id?: unknown, text?: unknown, status?: unknown, detail?: unknown, kind?: unknown }} TodoItemInput
+ * @typedef {{ maxItems?: number }} TodoPlanOptions
+ * @typedef {(type: 'todo_update', payload: TodoItem) => void} TodoEmitter
+ * @typedef {{ id: string, finish(status: unknown): void }} ToolTodoHandle
+ * @typedef {{ start(name: unknown): ToolTodoHandle }} ToolTodoTracker
+ */
+
+/** @type {Set<TodoStatus>} */
 const VALID_STATUSES = new Set(['pending', 'running', 'done', 'failed', 'blocked', 'rejected']);
 
+/**
+ * @param {unknown} status
+ * @param {TodoStatus} [fallback]
+ * @returns {TodoStatus}
+ */
 function normalizeStatus(status, fallback = 'pending') {
   const value = String(status || '').toLowerCase();
-  return VALID_STATUSES.has(value) ? value : fallback;
+  const candidate = /** @type {TodoStatus} */ (value);
+  return VALID_STATUSES.has(candidate) ? candidate : fallback;
 }
 
+/**
+ * @param {unknown} text
+ * @param {string} fallback
+ * @returns {string}
+ */
 function normalizeText(text, fallback) {
   const value = String(text || '').replace(/\s+/g, ' ').trim();
   return value || fallback;
 }
 
+/**
+ * @param {TodoItemInput} [input]
+ * @returns {TodoItem}
+ */
 export function createTodoItem({ id, text, status = 'pending', detail, kind } = {}) {
   return {
     id: normalizeText(id, `todo-${Date.now()}`),
@@ -20,6 +48,10 @@ export function createTodoItem({ id, text, status = 'pending', detail, kind } = 
   };
 }
 
+/**
+ * @param {string} line
+ * @returns {string}
+ */
 function stripPlanMarker(line) {
   return line
     .replace(/^\s*(?:[-*+]\s+|\d+[.)、]\s*|\[[ xX]\]\s*)/, '')
@@ -27,6 +59,11 @@ function stripPlanMarker(line) {
     .trim();
 }
 
+/**
+ * @param {unknown} planText
+ * @param {TodoPlanOptions} [options]
+ * @returns {TodoItem[]}
+ */
 export function todoItemsFromPlan(planText, { maxItems = 8 } = {}) {
   const seen = new Set();
   return String(planText || '')
@@ -44,6 +81,10 @@ export function todoItemsFromPlan(planText, { maxItems = 8 } = {}) {
     .map((text, index) => createTodoItem({ id: `plan-${index + 1}`, text, status: 'pending', kind: 'plan' }));
 }
 
+/**
+ * @param {TodoEmitter} [emit]
+ * @returns {ToolTodoTracker}
+ */
 export function createToolTodoTracker(emit = () => {}) {
   let sequence = 0;
   return {
