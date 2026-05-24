@@ -60,6 +60,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装 v0.2.0 安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
 - [x] P2-A 启动探测真隔离:Host 启动探测 Docker/WSL;设置 `KCW_SANDBOX_DOCKER_IMAGE` 且 Docker daemon + 本地镜像可用时默认选择 `vm:docker` 并通过 `--network=none` 执行;否则回退 local 并在 `/api/sandbox/info` 与设置页自检中提示"本地不隔离网络"。新增 gated 集成测试 `sandbox-docker-integration.test.js`;本机用 `KCW_SANDBOX_REAL_DOCKER_IMAGE=postgres:16-alpine` 真实通过 Docker 联网阻断验收。
 - [x] P2-B1 验收补齐:连接器 catalog/管理面板/一键连接已存在;新增 `npm run smoke:react-connectors` 真实浏览器验收,覆盖打开连接器面板→一键连接内置 filesystem MCP→`mcp__fs__read_text` 进入工具 registry。
+- [x] P2-B3(本地 builtin 子项):连接器支持断开/撤销;断开 filesystem MCP 会关闭 client 并从工具 registry 移除 `mcp__fs__*`;`smoke:react-connectors` 已覆盖连接→断开→工具撤销。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
 

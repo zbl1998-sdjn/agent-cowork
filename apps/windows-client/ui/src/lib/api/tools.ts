@@ -85,8 +85,19 @@ export interface ConnectResult {
   mcpServers: string[];
 }
 
+export interface DisconnectResult {
+  name: string;
+  removed: boolean;
+  toolsRemoved: number;
+  mcpServers: string[];
+}
+
 export async function connectConnector(
   body: { id?: string; name?: string; command?: string; args?: string[]; trustedRoot?: string },
 ): Promise<ConnectResult> {
   return postJson('/api/connectors/connect', { ...body, idempotencyKey: newIdempotencyKey('conn') });
+}
+
+export async function disconnectConnector(body: { id: string }): Promise<DisconnectResult> {
+  return postJson('/api/connectors/disconnect', { ...body, idempotencyKey: newIdempotencyKey('conn') });
 }

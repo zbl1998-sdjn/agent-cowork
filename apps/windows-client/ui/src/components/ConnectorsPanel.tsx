@@ -3,6 +3,7 @@ import {
   listConnectors,
   suggestConnectors,
   connectConnector,
+  disconnectConnector,
   type ConnectorInfo,
 } from '../lib/api';
 
@@ -62,6 +63,23 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
     }
   };
 
+  const onDisconnect = async (connector: ConnectorInfo) => {
+    setBusyId(connector.id);
+    setMessage('');
+    try {
+      const res = await disconnectConnector({ id: connector.id });
+      setConnected(res.mcpServers || []);
+      setMessage(res.removed
+        ? `已断开 ${connector.name}（移除 ${res.toolsRemoved} 个工具）`
+        : `${connector.name} 当前未连接`);
+      onConnected?.(res.mcpServers || []);
+    } catch (error) {
+      setMessage(`断开失败：${(error as Error).message}`);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <section className="side-panel">
       <h2>连接器</h2>
@@ -91,14 +109,15 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
             <li key={c.id}>
               <code>{c.name}</code>
               {c.builtin && <span className="tool-src">内置</span>}
+              {isOn && <span className="tool-src">已连接</span>}
               <p>{c.description}</p>
               {c.builtin ? (
                 <button
                   type="button"
-                  disabled={busyId === c.id || isOn}
-                  onClick={() => void onConnect(c)}
+                  disabled={busyId === c.id}
+                  onClick={() => void (isOn ? onDisconnect(c) : onConnect(c))}
                 >
-                  {isOn ? '已连接' : busyId === c.id ? '连接中…' : '一键连接'}
+                  {busyId === c.id ? (isOn ? '断开中…' : '连接中…') : isOn ? '断开' : '一键连接'}
                 </button>
               ) : (
                 <code className="connector-install">{c.install}</code>

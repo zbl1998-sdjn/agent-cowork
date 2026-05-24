@@ -32,6 +32,43 @@ test('POST /api/connectors/connect (filesystem) connects fs MCP server, tools be
   }
 });
 
+test('POST /api/connectors/disconnect revokes filesystem MCP tools', async () => {
+  const root = tmp();
+  const server = createServer({ trustedRoot: root, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const conn = await J(base, '/api/connectors/connect', { method: 'POST', body: { id: 'filesystem', trustedRoot: root } });
+    assert.equal(conn.status, 200);
+    assert.ok(conn.body.mcpServers.includes('fs'));
+
+    const out = await J(base, '/api/connectors/disconnect', { method: 'POST', body: { id: 'filesystem' } });
+    assert.equal(out.status, 200);
+    assert.equal(out.body.name, 'fs');
+    assert.equal(out.body.removed, true);
+    assert.ok(out.body.toolsRemoved >= 1);
+    assert.deepEqual(out.body.mcpServers, []);
+
+    const tools = await J(base, '/api/tools');
+    assert.equal(tools.body.tools.some((t) => t.name === 'mcp__fs__read_text'), false);
+    const list = await J(base, '/api/connectors');
+    assert.deepEqual(list.body.connected, []);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('POST /api/connectors/disconnect rejects an unsupported connector id', async () => {
+  const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await J(base, '/api/connectors/disconnect', { method: 'POST', body: { id: 'sqlite' } });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /unsupported connector/i);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('POST /api/connectors/connect requires id or command', async () => {
   const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
   const base = await bind(server);

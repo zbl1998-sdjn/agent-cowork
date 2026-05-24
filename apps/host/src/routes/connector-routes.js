@@ -18,6 +18,11 @@ function buildConnectorSpec(id, { fsServerPath, trustedRoot }) {
   return null;
 }
 
+function connectorServerName(id) {
+  if (id === 'filesystem') return 'fs';
+  return null;
+}
+
 export async function handleConnectorRoutes({
   request, response, pathname, requestUrl, requestContext,
   connectMcp, toolRegistry, safeTrustedRoot, fsServerPath,
@@ -64,6 +69,23 @@ export async function handleConnectorRoutes({
       } catch (err) {
         sendJson(response, err.statusCode || 502, { error: err.message });
       }
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/connectors/disconnect') {
+    await withJsonBody(request, response, async (body) => {
+      const name = connectorServerName(body && body.id);
+      if (!name || !toolRegistry || typeof toolRegistry.unregisterMcpServer !== 'function') {
+        sendJson(response, 400, { error: 'unsupported connector: only host-defined builtins can be disconnected' });
+        return;
+      }
+      const out = toolRegistry.unregisterMcpServer(name);
+      sendJson(response, 200, {
+        context: requestContext,
+        ...out,
+        mcpServers: typeof toolRegistry.mcpServers === 'function' ? toolRegistry.mcpServers() : [],
+      });
     });
     return true;
   }

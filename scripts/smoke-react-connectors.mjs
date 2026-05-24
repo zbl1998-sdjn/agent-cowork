@@ -302,6 +302,54 @@ async function main() {
     const connectors = await getJson(`${baseUrl}/api/connectors`);
     assert(connectors.connected.includes('fs'), 'connector catalog did not report fs as connected');
 
+    await evaluate(
+      sendPage,
+      `(() => {
+        const filesystemItem = [...document.querySelectorAll('.tool-list li')]
+          .find((item) => item.innerText.includes('文件系统'));
+        if (!filesystemItem) throw new Error('filesystem connector item missing before disconnect');
+        const button = [...filesystemItem.querySelectorAll('button')]
+          .find((item) => item.innerText.trim() === '断开');
+        if (!button) throw new Error('filesystem disconnect button missing');
+        button.click();
+        return true;
+      })()`,
+    );
+
+    const afterDisconnect = await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 10000;
+        function snapshot() {
+          const filesystemItem = [...document.querySelectorAll('.tool-list li')]
+            .find((item) => item.innerText.includes('文件系统'));
+          return {
+            buttonText: filesystemItem
+              ? [...filesystemItem.querySelectorAll('button')].map((button) => button.innerText.trim()).join('|')
+              : '',
+            resultText: document.querySelector('.panel-result')?.innerText || '',
+            connectedText: document.querySelector('.connector-connected')?.innerText || '',
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (current.buttonText.includes('一键连接')
+            && current.resultText.includes('已断开')
+            && !current.connectedText.includes('fs')) resolve(current);
+          else if (Date.now() > deadline) reject(new Error('connector did not disconnect through the UI: ' + JSON.stringify(current)));
+          else setTimeout(tick, 100);
+        }
+        tick();
+      })`,
+    );
+    const toolsAfterDisconnect = await getJson(`${baseUrl}/api/tools/search?q=read_text&limit=10`);
+    assert(
+      !toolsAfterDisconnect.tools.some((tool) => tool.name === 'mcp__fs__read_text'),
+      'filesystem MCP read_text tool remained registered after disconnect',
+    );
+    const connectorsAfterDisconnect = await getJson(`${baseUrl}/api/connectors`);
+    assert(!connectorsAfterDisconnect.connected.includes('fs'), 'connector catalog still reported fs as connected');
+
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
@@ -317,11 +365,19 @@ async function main() {
       reportPath,
       beforeConnect,
       afterConnect,
+      afterDisconnect,
       registeredTool: 'mcp__fs__read_text',
       connected: connectors.connected,
+      disconnected: connectorsAfterDisconnect.connected,
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({ ok: true, reportPath, screenshotPath, connected: connectors.connected }, null, 2));
+    console.log(JSON.stringify({
+      ok: true,
+      reportPath,
+      screenshotPath,
+      connected: connectors.connected,
+      disconnected: connectorsAfterDisconnect.connected,
+    }, null, 2));
   } catch (error) {
     const report = {
       ok: false,

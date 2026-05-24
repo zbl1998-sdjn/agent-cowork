@@ -138,6 +138,31 @@ export class ToolRegistry {
     return tools.length;
   }
 
+  unregisterMcpServer(serverName) {
+    if (!serverName) {
+      throw new Error('unregisterMcpServer: serverName is required');
+    }
+    const client = this._mcpClients.get(serverName);
+    let removed = false;
+    if (client) {
+      try {
+        client.close();
+      } catch {
+        // ignore connector close errors; the registry state is still revoked
+      }
+      this._mcpClients.delete(serverName);
+      removed = true;
+    }
+    let toolsRemoved = 0;
+    for (const [name, entry] of this._tools.entries()) {
+      if (entry.source === `mcp:${serverName}`) {
+        this._tools.delete(name);
+        toolsRemoved += 1;
+      }
+    }
+    return { name: serverName, removed, toolsRemoved };
+  }
+
   mcpServers() {
     return [...this._mcpClients.keys()];
   }
