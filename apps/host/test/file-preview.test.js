@@ -72,6 +72,18 @@ test('oversized files are rejected with 413', () => {
   );
 });
 
+test('preview maxBytes is hard-capped and hidden files are blocked', () => {
+  const root = mkRoot();
+  fs.writeFileSync(path.join(root, 'huge.txt'), Buffer.alloc(8 * 1024 * 1024 + 1, 'x'));
+  fs.writeFileSync(path.join(root, '.npmrc'), 'token=secret', 'utf8');
+
+  assert.throws(
+    () => readFilePreview('huge.txt', { trustedRoot: root, maxBytes: Number.POSITIVE_INFINITY }),
+    (err) => err.statusCode === 413,
+  );
+  assert.throws(() => readFilePreview('.npmrc', { trustedRoot: root }), /blocked by policy/);
+});
+
 test('missing files are rejected with 404', () => {
   const root = mkRoot();
   assert.throws(

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import { assertTrustedPath, assertTrustedPathForCreate, isWorkspaceIgnoredPath } from '../security/path-policy.js';
 import { readTextFile } from '../workspace/file-reader.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
@@ -40,8 +40,8 @@ function walkFiles(root, current, out, limit) {
   if (out.length >= limit || !fs.existsSync(current)) return;
   for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
     if (out.length >= limit || entry.isSymbolicLink()) continue;
-    if (entry.name === 'node_modules' || entry.name === '.git') continue;
     const full = path.join(current, entry.name);
+    if (isWorkspaceIgnoredPath(full, root)) continue;
     if (entry.isDirectory()) walkFiles(root, full, out, limit);
     else if (entry.isFile()) out.push(path.relative(root, full).replace(/\\/g, '/'));
   }
@@ -124,7 +124,11 @@ export function createAgentTools(ctx = {}) {
           if (hits.length >= limit) break;
           if (fileRe && !fileRe.test(rel)) continue;
           let text;
-          try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { continue; }
+          try {
+            text = readTextFile(path.join(root, rel), { trustedRoot: root }).content;
+          } catch {
+            continue;
+          }
           const lines = text.split('\n');
           for (let i = 0; i < lines.length && hits.length < limit; i += 1) {
             if (re.test(lines[i])) hits.push({ file: rel, line: i + 1, text: lines[i].slice(0, 200) });

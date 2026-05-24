@@ -14,13 +14,18 @@ async function bind(s) { await new Promise((r) => s.listen(0, '127.0.0.1', r)); 
 test('native agent tools (Read/Write/Glob) are jailed to the workspace', async () => {
   const root = tmp();
   fs.writeFileSync(path.join(root, 'a.txt'), 'hello', 'utf8');
+  fs.writeFileSync(path.join(root, '.npmrc'), 'token=secret', 'utf8');
   const tools = createAgentTools({ trustedRoot: root });
   const byName = (n) => tools.find((t) => t.name === n);
   assert.deepEqual(tools.map((t) => t.name).sort(), ['AnalyzeDataFile', 'Edit', 'GitCommit', 'GitDiff', 'GitLog', 'GitStatus', 'Glob', 'Grep', 'PlanFileOrganization', 'Read', 'SearchWorkspace', 'WebFetch', 'Write']);
   const glob = await byName('Glob').handler({ pattern: '*.txt' });
   assert.ok(glob.matches.includes('a.txt'));
+  assert.equal(glob.matches.some((match) => match.includes('.npmrc')), false);
+  const grep = await byName('Grep').handler({ pattern: 'secret', maxResults: 5 });
+  assert.deepEqual(grep.hits, []);
   const read = await byName('Read').handler({ path: 'a.txt' });
   assert.equal(read.content, 'hello');
+  await assert.rejects(() => byName('Read').handler({ path: '.npmrc' }), /blocked by policy/);
   const wrote = await byName('Write').handler({ path: 'sub/b.txt', content: 'world' });
   assert.equal(wrote.ok, true);
   assert.equal(fs.readFileSync(path.join(root, 'sub', 'b.txt'), 'utf8'), 'world');

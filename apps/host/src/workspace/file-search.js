@@ -2,6 +2,14 @@ import path from 'node:path';
 import { listWorkspaceTree } from './file-tree.js';
 import { extractDocumentText, isExtractableDocument } from './document-extractor.js';
 
+const DEFAULT_MAX_CONTENT_BYTES = 1024 * 1024;
+
+function cap(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), min), max);
+}
+
 export function searchWorkspace(options = {}) {
   const trustedRoot = options.trustedRoot ?? options.root;
   if (!trustedRoot) {
@@ -13,6 +21,7 @@ export function searchWorkspace(options = {}) {
   }
   const maxResults = Math.min(Math.max(Number(options.maxResults || 20), 1), 100);
   const includeContent = options.includeContent === true;
+  const maxContentBytes = cap(options.maxContentBytes, DEFAULT_MAX_CONTENT_BYTES, 1024, DEFAULT_MAX_CONTENT_BYTES);
   const files = listWorkspaceTree(trustedRoot, {
     includeFiles: true,
     includeDirectories: false,
@@ -23,11 +32,11 @@ export function searchWorkspace(options = {}) {
     const nameHit = file.path.toLowerCase().includes(query);
     let contentHit = false;
     let excerpt = '';
-    if (includeContent && isExtractableDocument(file.fullPath) && file.size <= Number(options.maxContentBytes || 1024 * 1024)) {
+    if (includeContent && isExtractableDocument(file.fullPath) && file.size <= maxContentBytes) {
       try {
         const extracted = extractDocumentText(file.fullPath, {
           trustedRoot,
-          maxSize: options.maxContentBytes,
+          maxSize: maxContentBytes,
         });
         const content = extracted.content.toLowerCase();
         const index = content.indexOf(query);

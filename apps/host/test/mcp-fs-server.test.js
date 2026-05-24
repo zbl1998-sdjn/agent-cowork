@@ -12,6 +12,7 @@ const FS_SERVER = fileURLToPath(new URL('../mcp-servers/fs-server.mjs', import.m
 function seedRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-fsmcp-'));
   fs.writeFileSync(path.join(root, 'a.txt'), 'hello world', 'utf8');
+  fs.writeFileSync(path.join(root, '.npmrc'), 'token=secret', 'utf8');
   fs.mkdirSync(path.join(root, 'sub'));
   return root;
 }
@@ -38,6 +39,27 @@ test('fs-server exposes jailed filesystem tools over a real subprocess', async (
 
     const stat = await registry.call('mcp__fs__stat', { path: 'sub' });
     assert.equal(JSON.parse(stat.content[0].text).type, 'dir');
+  } finally {
+    closeMcpClients(out.clients);
+  }
+});
+
+test('fs-server blocks hidden and credential-like files inside the root', async () => {
+  const root = seedRoot();
+  const registry = createToolRegistry();
+  const out = await connectMcpServers({
+    registry,
+    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+  });
+  try {
+    await assert.rejects(
+      () => registry.call('mcp__fs__read_text', { path: '.npmrc' }),
+      /sensitive path blocked/,
+    );
+    await assert.rejects(
+      () => registry.call('mcp__fs__stat', { path: '.npmrc' }),
+      /sensitive path blocked/,
+    );
   } finally {
     closeMcpClients(out.clients);
   }

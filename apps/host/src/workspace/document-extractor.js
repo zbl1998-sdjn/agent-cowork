@@ -1,12 +1,18 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertReadableWorkspacePath } from '../security/path-policy.js';
 import { readTextFile } from './file-reader.js';
 import { readZipEntries } from './zip-utils.js';
 
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv', '.json', '.log']);
+
+function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(1, Math.floor(n)), DEFAULT_MAX_BYTES);
+}
 
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -174,8 +180,8 @@ export function extractDocumentText(filePath, options = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
-  const maxBytes = Number(options.maxSize ?? DEFAULT_MAX_BYTES);
-  const safePath = assertTrustedPath(filePath, trustedRoot);
+  const maxBytes = cappedMaxBytes(options.maxSize ?? DEFAULT_MAX_BYTES);
+  const safePath = assertReadableWorkspacePath(filePath, trustedRoot);
   const stat = fs.statSync(safePath);
   if (!stat.isFile()) {
     throw new Error('Path is not a file');

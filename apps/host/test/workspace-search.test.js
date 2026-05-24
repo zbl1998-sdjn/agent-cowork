@@ -26,6 +26,7 @@ test('workspace search route returns chunks with source line references', async 
   const trustedRoot = makeTestWorkspace('workspace-search');
   const doc = path.join(trustedRoot, 'notes.md');
   fs.writeFileSync(doc, 'Intro\nLocal RAG cites sources\nDone\n', 'utf8');
+  fs.writeFileSync(path.join(trustedRoot, '.npmrc'), 'rag sources secret token\n', 'utf8');
 
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/workspace/search`, {

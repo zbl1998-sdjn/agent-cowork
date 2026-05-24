@@ -1,18 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath, isSensitivePath } from '../security/path-policy.js';
-
-const DEFAULT_SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-]);
-
-function isSkippableName(name) {
-  if (name === '') return true;
-  if (name.startsWith('.')) return true;
-  return DEFAULT_SKIP_DIRS.has(name);
-}
+import { assertTrustedPath, isWorkspaceIgnoredPath } from '../security/path-policy.js';
 
 export function listWorkspaceTree(trustedRoot, options = {}) {
   const root = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
@@ -47,7 +35,7 @@ export function listWorkspaceTree(trustedRoot, options = {}) {
       const name = entry.name;
       const next = path.join(absPath, name);
 
-      if (isSkippableName(name) || isSensitivePath(next)) {
+      if (isWorkspaceIgnoredPath(next, root)) {
         continue;
       }
       if (entry.isSymbolicLink()) {

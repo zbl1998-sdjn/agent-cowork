@@ -26,10 +26,22 @@ test('throws on oversized files', () => {
   const blob = 'x'.repeat(1024 * 1024);
   fs.writeFileSync(p, blob, 'utf8');
   assert.throws(() => readTextFile(p, { trustedRoot: root, maxSize: 16 }));
+  assert.throws(() => readTextFile(p, { trustedRoot: root, maxSize: Number.POSITIVE_INFINITY }), /max read size/);
 });
 
 test('throws on binary-like content', () => {
   const p = path.join(root, 'bin.bin');
   fs.writeFileSync(p, Buffer.from([0x00, 0x01, 0x02, 0x03]));
   assert.throws(() => readTextFile(p, { trustedRoot: root }));
+});
+
+test('blocks hidden and credential-like files even inside trusted root', () => {
+  const npmrc = path.join(root, '.npmrc');
+  const gitConfig = path.join(root, '.git', 'config');
+  fs.writeFileSync(npmrc, '//registry.example/:_authToken=secret', 'utf8');
+  fs.mkdirSync(path.dirname(gitConfig), { recursive: true });
+  fs.writeFileSync(gitConfig, '[remote]\nurl=https://token@example.invalid/repo.git\n', 'utf8');
+
+  assert.throws(() => readTextFile(npmrc, { trustedRoot: root }), /blocked by policy/);
+  assert.throws(() => readTextFile(gitConfig, { trustedRoot: root }), /blocked by policy/);
 });

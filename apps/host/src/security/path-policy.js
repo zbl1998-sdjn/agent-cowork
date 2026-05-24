@@ -2,6 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SENSITIVE_SEGMENTS = new Set([
+  '.aws',
+  '.azure',
+  '.docker',
+  '.git',
+  '.gnupg',
+  '.kube',
   '.ssh',
   '.env',
   'appdata',
@@ -11,13 +17,18 @@ const SENSITIVE_SEGMENTS = new Set([
 
 const SENSITIVE_FILENAMES = new Set([
   '.env',
+  '.netrc',
+  '.npmrc',
+  '.pypirc',
+  'credentials.json',
   'id_rsa',
   'id_dsa',
   'id_ecdsa',
   'id_ed25519',
 ]);
 
-const SENSITIVE_EXTENSIONS = new Set(['.pem', '.key']);
+const SENSITIVE_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx']);
+const WORKSPACE_IGNORED_SEGMENTS = new Set(['node_modules', 'dist', 'build', 'coverage']);
 
 function isWindows() {
   return process.platform === 'win32';
@@ -69,6 +80,18 @@ function splitSegments(p) {
     .filter(Boolean);
 }
 
+function segmentsBelowRoot(inputPath, relativeTo = null) {
+  const normalized = normalizeForCompare(inputPath);
+  if (!relativeTo) return normalized.split('/').filter(Boolean);
+  const normRoot = normalizeForCompare(relativeTo);
+  const rootWithSep = normRoot.endsWith('/') ? normRoot : `${normRoot}/`;
+  if (normalized === normRoot) return [];
+  if (normalized.startsWith(rootWithSep)) {
+    return normalized.slice(rootWithSep.length).split('/').filter(Boolean);
+  }
+  return normalized.split('/').filter(Boolean);
+}
+
 export function resolveWithinRoot(candidatePath, trustedRoot) {
   return path.isAbsolute(candidatePath)
     ? path.resolve(candidatePath)
@@ -104,19 +127,7 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   }
 
   // Scope the directory-segment checks to below the trusted root when provided.
-  let scope = normalized;
-  if (relativeTo) {
-    const normRoot = normalizeForCompare(relativeTo);
-    const rootWithSep = normRoot.endsWith('/') ? normRoot : `${normRoot}/`;
-    if (normalized === normRoot) {
-      scope = '';
-    } else if (normalized.startsWith(rootWithSep)) {
-      scope = normalized.slice(rootWithSep.length);
-    }
-    // If not inside the root, leave scope = full path (defensive; the caller's
-    // escape check should already have rejected it).
-  }
-  const segments = scope.split('/').filter(Boolean);
+  const segments = segmentsBelowRoot(normalized, relativeTo);
 
   for (const segment of segments) {
     // Sensitive directory names (appdata/.ssh/credentials/.kimi) are matched
@@ -134,6 +145,28 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   }
 
   return false;
+}
+
+export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
+  const segments = segmentsBelowRoot(inputPath, relativeTo);
+  for (const segment of segments) {
+    const lower = segment.toLowerCase();
+    if (lower.startsWith('.')) {
+      return true;
+    }
+    if (WORKSPACE_IGNORED_SEGMENTS.has(lower)) {
+      return true;
+    }
+  }
+  return isSensitivePath(inputPath, relativeTo);
+}
+
+export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
+  const safe = assertTrustedPath(candidatePath, trustedRoot);
+  if (isWorkspaceIgnoredPath(safe, trustedRoot)) {
+    throw new Error(`Workspace ignored or sensitive path blocked by policy: ${candidatePath}`);
+  }
+  return safe;
 }
 
 export function assertTrustedPath(candidatePath, trustedRoot) {

@@ -1,8 +1,15 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertReadableWorkspacePath } from '../security/path-policy.js';
 
 const DEFAULT_MAX_BYTES = 256 * 1024;
+const HARD_MAX_BYTES = 256 * 1024;
+
+function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(1, Math.floor(n)), HARD_MAX_BYTES);
+}
 
 function isLikelyBinary(buffer) {
   let zeroCount = 0;
@@ -24,14 +31,14 @@ function isLikelyBinary(buffer) {
 }
 
 export function readTextFile(filePath, options = {}) {
-  const maxBytes = Number(options.maxSize ?? DEFAULT_MAX_BYTES);
+  const maxBytes = cappedMaxBytes(options.maxSize ?? DEFAULT_MAX_BYTES);
   const trustedRoot = options.trustedRoot ?? options.root;
 
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
 
-  const safePath = assertTrustedPath(filePath, trustedRoot);
+  const safePath = assertReadableWorkspacePath(filePath, trustedRoot);
   const stat = fs.statSync(safePath);
   if (!stat.isFile()) {
     throw new Error('Path is not a file');

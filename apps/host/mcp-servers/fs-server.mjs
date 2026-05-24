@@ -22,6 +22,10 @@ function normalizeForCompare(p) {
 
 const ROOT = realpath(path.resolve(process.argv[2] || process.cwd()));
 const MAX_READ = 256 * 1024;
+const IGNORED_SEGMENTS = new Set(['node_modules', 'dist', 'build', 'coverage']);
+const SENSITIVE_SEGMENTS = new Set(['.aws', '.azure', '.docker', '.git', '.gnupg', '.kube', '.ssh', '.env', '.kimi', 'appdata', 'credentials']);
+const SENSITIVE_FILENAMES = new Set(['.env', '.netrc', '.npmrc', '.pypirc', 'credentials.json', 'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519']);
+const SENSITIVE_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx']);
 
 function isInsideRoot(candidate) {
   const rootNorm = normalizeForCompare(ROOT);
@@ -34,6 +38,36 @@ function escapeError(target) {
   const err = new Error(`path escapes root: ${target}`);
   err.code = -32001;
   return err;
+}
+
+function segmentsBelowRoot(candidate) {
+  const relative = path.relative(ROOT, candidate).replace(/\\/g, '/');
+  if (!relative || relative === '.') return [];
+  return relative.split('/').filter(Boolean);
+}
+
+function isBlockedWorkspacePath(candidate) {
+  const base = path.basename(candidate).toLowerCase();
+  const ext = path.extname(base).toLowerCase();
+  if (base.startsWith('id_rsa') || SENSITIVE_FILENAMES.has(base) || SENSITIVE_EXTENSIONS.has(ext)) {
+    return true;
+  }
+  for (const segment of segmentsBelowRoot(candidate)) {
+    const lower = segment.toLowerCase();
+    if (lower.startsWith('.') || IGNORED_SEGMENTS.has(lower) || SENSITIVE_SEGMENTS.has(lower) || lower.startsWith('.env')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function assertReadable(candidate, original) {
+  if (isBlockedWorkspacePath(candidate)) {
+    const err = new Error(`workspace ignored or sensitive path blocked: ${original || candidate}`);
+    err.code = -32002;
+    throw err;
+  }
+  return candidate;
 }
 
 function inside(target) {
@@ -56,22 +90,24 @@ const TOOLS = [
 
 function callTool(name, args = {}) {
   if (name === 'list_dir') {
-    const dir = inside(args.path);
-    const entries = fs.readdirSync(dir, { withFileTypes: true }).map((e) => ({
-      name: e.name,
-      type: e.isDirectory() ? 'dir' : e.isFile() ? 'file' : 'other',
-    }));
+    const dir = assertReadable(inside(args.path), args.path);
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => !isBlockedWorkspacePath(path.join(dir, e.name)))
+      .map((e) => ({
+        name: e.name,
+        type: e.isDirectory() ? 'dir' : e.isFile() ? 'file' : 'other',
+      }));
     return { content: [{ type: 'text', text: JSON.stringify(entries) }] };
   }
   if (name === 'read_text') {
-    const file = inside(args.path);
+    const file = assertReadable(inside(args.path), args.path);
     const stat = fs.statSync(file);
     if (!stat.isFile()) throw new Error('not a file');
     if (stat.size > MAX_READ) throw new Error(`file too large (max ${MAX_READ} bytes)`);
     return { content: [{ type: 'text', text: fs.readFileSync(file, 'utf8') }] };
   }
   if (name === 'stat') {
-    const target = inside(args.path);
+    const target = assertReadable(inside(args.path), args.path);
     const s = fs.statSync(target);
     return { content: [{ type: 'text', text: JSON.stringify({ size: s.size, type: s.isDirectory() ? 'dir' : 'file', mtime: s.mtime.toISOString() }) }] };
   }

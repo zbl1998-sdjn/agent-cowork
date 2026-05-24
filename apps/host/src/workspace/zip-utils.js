@@ -1,5 +1,10 @@
 import zlib from 'node:zlib';
 
+const DEFAULT_MAX_ENTRIES = 1000;
+const DEFAULT_MAX_ENTRY_BYTES = 8 * 1024 * 1024;
+const DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES = 16 * 1024 * 1024;
+const DEFAULT_MAX_COMPRESSION_RATIO = 200;
+
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i += 1) {
   let c = i;
@@ -35,14 +40,25 @@ function normalizeZipName(name) {
   return normalized;
 }
 
-export function readZipEntries(buffer) {
+export function readZipEntries(buffer, options = {}) {
+  const maxEntries = Math.min(Math.max(Number(options.maxEntries || DEFAULT_MAX_ENTRIES), 1), DEFAULT_MAX_ENTRIES);
+  const maxEntryBytes = Math.min(Math.max(Number(options.maxEntryBytes || DEFAULT_MAX_ENTRY_BYTES), 1), DEFAULT_MAX_ENTRY_BYTES);
+  const maxTotalUncompressedBytes = Math.min(
+    Math.max(Number(options.maxTotalUncompressedBytes || DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES), 1),
+    DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES,
+  );
+  const maxCompressionRatio = Math.min(Math.max(Number(options.maxCompressionRatio || DEFAULT_MAX_COMPRESSION_RATIO), 1), DEFAULT_MAX_COMPRESSION_RATIO);
   if (!Buffer.isBuffer(buffer)) {
     throw new Error('ZIP input must be a Buffer');
   }
   const eocdOffset = findEndOfCentralDirectory(buffer);
   const entryCount = buffer.readUInt16LE(eocdOffset + 10);
+  if (entryCount > maxEntries) {
+    throw new Error(`ZIP has too many entries (${entryCount}; max ${maxEntries})`);
+  }
   const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
   const entries = [];
+  let totalUncompressed = 0;
   let offset = centralDirectoryOffset;
 
   for (let i = 0; i < entryCount; i += 1) {
@@ -59,6 +75,16 @@ export function readZipEntries(buffer) {
     const localHeaderOffset = buffer.readUInt32LE(offset + 42);
     const name = normalizeZipName(buffer.subarray(offset + 46, offset + 46 + nameLength).toString('utf8'));
     offset += 46 + nameLength + extraLength + commentLength;
+    totalUncompressed += uncompressedSize;
+    if (uncompressedSize > maxEntryBytes) {
+      throw new Error(`ZIP entry too large for ${name} (${uncompressedSize}; max ${maxEntryBytes})`);
+    }
+    if (totalUncompressed > maxTotalUncompressedBytes) {
+      throw new Error(`ZIP total uncompressed size exceeds max ${maxTotalUncompressedBytes}`);
+    }
+    if (compressedSize > 0 && uncompressedSize / compressedSize > maxCompressionRatio) {
+      throw new Error(`ZIP entry compression ratio too high for ${name}`);
+    }
 
     if (buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
       throw new Error(`Invalid ZIP local header for ${name}`);
@@ -71,7 +97,7 @@ export function readZipEntries(buffer) {
     if (method === 0) {
       content = Buffer.from(compressed);
     } else if (method === 8) {
-      content = zlib.inflateRawSync(compressed);
+      content = zlib.inflateRawSync(compressed, { maxOutputLength: maxEntryBytes });
     } else {
       throw new Error(`Unsupported ZIP compression method ${method} for ${name}`);
     }

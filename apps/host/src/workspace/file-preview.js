@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertReadableWorkspacePath } from '../security/path-policy.js';
 
 // Safe, bounded file preview for the UI: images/PDF come back as base64 data the
 // client can render via a data: URL (the desktop CSP allows img-src data:), and
@@ -8,6 +8,7 @@ import { assertTrustedPath } from '../security/path-policy.js';
 // root by assertTrustedPath, and a byte cap stops huge files from being loaded.
 
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024; // 8MB
+const HARD_MAX_BYTES = 8 * 1024 * 1024;
 
 const IMAGE_MIME = {
   '.png': 'image/png',
@@ -25,6 +26,12 @@ const TEXT_EXT = new Set([
   '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.css', '.py', '.sh', '.toml', '.ini',
   '.diff', '.patch',
 ]);
+
+function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(1, Math.floor(n)), HARD_MAX_BYTES);
+}
 
 function splitDelimitedLine(line, delimiter) {
   const cells = [];
@@ -63,15 +70,16 @@ export function readFilePreview(filePath, { trustedRoot, maxBytes = DEFAULT_MAX_
   }
   const root = path.resolve(trustedRoot || process.cwd());
   const resolved = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
-  const safe = assertTrustedPath(resolved, root);
+  const safe = assertReadableWorkspacePath(resolved, root);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
     const err = new Error('file not found');
     err.statusCode = 404;
     throw err;
   }
   const size = fs.statSync(safe).size;
-  if (size > maxBytes) {
-    const err = new Error(`file too large to preview (${size} bytes; max ${maxBytes})`);
+  const byteLimit = cappedMaxBytes(maxBytes);
+  if (size > byteLimit) {
+    const err = new Error(`file too large to preview (${size} bytes; max ${byteLimit})`);
     err.statusCode = 413;
     throw err;
   }
