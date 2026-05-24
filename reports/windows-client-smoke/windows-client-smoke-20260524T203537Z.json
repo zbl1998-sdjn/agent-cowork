@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "mode": "source-build",
+  "generatedAt": "2026-05-24T20:35:41.5989636Z",
+  "windowTitle": "Agent Cowork",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace",
+  "scannedFiles": 3,
+  "generatePlan": "passed",
+  "approve": "passed",
+  "artifactPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace\\.AgentCowork\\artifacts\\office-plan-20260525-063540-919.md",
+  "movedFilePath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace\\Agent_Cowork整理\\文件夹整理\\sample-contract.txt",
+  "auditPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace\\.AgentCowork\\audit\\audit.jsonl",
+  "rollbackPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace\\.AgentCowork\\rollback\\rollback-20260525-063540-919.jsonl",
+  "developerMode": "passed",
+  "liveReplyConfigured": false
+}

@@ -55,9 +55,9 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [ ] 05-B1b 延后项:真实浏览器分支切换/回到节点体验验证尚未完成,不得计作完整体验验收。
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
-- [x] 04-R5(证据链子项):`smoke-windows-client.ps1` 支持 JSON 报告;已生成 dry-run 证据 `reports/windows-client-smoke/dryrun-test.json`。
-- [ ] 04-R5 延后项:安装版真实启动、真实回复、installer/签名信任链仍未验收。
-- [ ] 需真实环境的延期验收:真实 Kimi E2E、安装版冒烟、浏览器/Office/OCR/installer/签名相关验证。
+- [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
+- [ ] 04-R5 延后项:安装版安装/已安装 exe 启动、真实 Kimi 回复、installer/签名信任链仍未验收。
+- [ ] 需真实环境的延期验收:真实 Kimi E2E、Office/OCR、installer/签名相关验证。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)
