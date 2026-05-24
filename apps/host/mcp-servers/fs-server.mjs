@@ -11,19 +11,41 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ROOT = path.resolve(process.argv[2] || process.cwd());
+function realpath(p) {
+  return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
+}
+
+function normalizeForCompare(p) {
+  const normalized = path.resolve(p).replace(/\\/g, '/');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+const ROOT = realpath(path.resolve(process.argv[2] || process.cwd()));
 const MAX_READ = 256 * 1024;
+
+function isInsideRoot(candidate) {
+  const rootNorm = normalizeForCompare(ROOT);
+  const targetNorm = normalizeForCompare(candidate);
+  const rootWithSep = rootNorm.endsWith('/') ? rootNorm : `${rootNorm}/`;
+  return targetNorm === rootNorm || targetNorm.startsWith(rootWithSep);
+}
+
+function escapeError(target) {
+  const err = new Error(`path escapes root: ${target}`);
+  err.code = -32001;
+  return err;
+}
 
 function inside(target) {
   const resolved = path.resolve(ROOT, target || '.');
-  const rel = path.relative(ROOT, resolved);
-  if (rel === '' ) return resolved;
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    const err = new Error(`path escapes root: ${target}`);
-    err.code = -32001;
-    throw err;
+  if (!isInsideRoot(resolved)) {
+    throw escapeError(target);
   }
-  return resolved;
+  const realTarget = realpath(resolved);
+  if (isInsideRoot(realTarget)) {
+    return realTarget;
+  }
+  throw escapeError(target);
 }
 
 const TOOLS = [

@@ -59,3 +59,34 @@ test('fs-server rejects path traversal outside the root', async () => {
     closeMcpClients(out.clients);
   }
 });
+
+test('fs-server rejects symlink or junction escapes outside the root', async (t) => {
+  const root = seedRoot();
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-fsmcp-outside-'));
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'outside-secret', 'utf8');
+  const link = path.join(root, 'escape');
+  try {
+    fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch {
+    t.skip('cannot create directory link on this filesystem');
+    return;
+  }
+
+  const registry = createToolRegistry();
+  const out = await connectMcpServers({
+    registry,
+    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+  });
+  try {
+    await assert.rejects(
+      () => registry.call('mcp__fs__read_text', { path: 'escape/secret.txt' }),
+      /escapes root/,
+    );
+    await assert.rejects(
+      () => registry.call('mcp__fs__list_dir', { path: 'escape' }),
+      /escapes root/,
+    );
+  } finally {
+    closeMcpClients(out.clients);
+  }
+});
