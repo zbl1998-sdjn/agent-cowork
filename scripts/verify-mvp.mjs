@@ -136,6 +136,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
   },
   {
+    name: 'react artifacts panel smoke script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-artifacts-panel.mjs')],
+  },
+  {
     name: 'windows client resource smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
@@ -179,6 +184,11 @@ const checks = [
     name: 'react timeline scroll smoke',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
+  },
+  {
+    name: 'react artifacts panel smoke',
+    command: nodeBin,
+    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-artifacts-panel.mjs')],
   },
   {
     name: 'windows client static resource smoke',

@@ -49,8 +49,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 03-B1b(本地可测子项):活页 data endpoint 支持手动 refresh 工作区 `file-json` 数据源,并复用 trustedRoot jail 校验。
 - [x] 03-B1c(本地可测子项):前端新增 `LiveArtifactView`,支持活页预览、手动刷新数据、重开活页与打开产物文件;UI 单测通过。
 - [ ] 03-B1 延后项:可选定时刷新、连接器数据源与真实活页前端体验尚未验收。
-- [x] 03-B2(本地可测子项):产物面板已卡片化,支持打开、重命名;后端 `/api/artifacts/rename` 复用 trustedRoot jail 与幂等键,host/UI 单测通过。
-- [ ] 03-B2 延后项:真实浏览器产物面板交互验收尚未完成,不得计作完整体验验收。
+- [x] 03-B2:产物面板已卡片化,支持打开、重命名;后端 `/api/artifacts/rename` 复用 trustedRoot jail 与幂等键,host/UI 单测通过,并新增 `npm run smoke:react-artifacts` 真实浏览器验收(产物列表→重命名→磁盘同步)。
 - [x] 05-B1a:对话消息树/分支模型 + 历史消息编辑 fork 已实现;file/PG 存储和迁移已补测试。
 - [x] 05-B1b(本地可测子项):分支切换控件、分支差异摘要与 hook 同步已实现,host/UI 单测通过。
 - [ ] 05-B1b 延后项:真实浏览器分支切换/回到节点体验验证尚未完成,不得计作完整体验验收。
