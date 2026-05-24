@@ -34,7 +34,7 @@ test('release is idempotent and never drives counts negative', () => {
 test('E2E: agent stream returns 429 when the limiter is full', async () => {
   const root = tmp();
   const agentConcurrency = { tryAcquire: () => null, stats: () => ({}) };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall: async () => ({ content: 'hi' }), agentConcurrency });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall: async () => ({ content: 'hi' }), agentConcurrency });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }) });
@@ -47,7 +47,7 @@ test('E2E: agent stream returns 429 when the limiter is full', async () => {
 test('E2E: a normal run acquires then releases its slot (capacity restored)', async () => {
   const root = tmp();
   const lim = createConcurrencyLimiter({ maxConcurrent: 2, maxPerTenant: 2 });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall: async () => ({ content: '完成。' }), agentConcurrency: lim });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall: async () => ({ content: '完成。' }), agentConcurrency: lim });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }) });

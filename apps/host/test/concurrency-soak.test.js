@@ -23,7 +23,7 @@ test('N concurrent awaiting streams all disconnect -> registries drain to zero (
   const agentConcurrency = createConcurrencyLimiter({ maxConcurrent: 1000, maxPerTenant: 1000 });
   // Every run immediately asks a question and then awaits the user.
   const agentModelCall = async () => ({ content: '', tool_calls: [{ id: 'q', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '继续?', options: ['a', 'b'] }) } }] });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall, approvalRegistry, cancellation, agentConcurrency });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall, approvalRegistry, cancellation, agentConcurrency });
   const base = await bind(server);
   const N = 40;
   const controllers = [];

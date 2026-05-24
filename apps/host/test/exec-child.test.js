@@ -37,7 +37,7 @@ test('runConstrainedChild: high-output command is truncated to the cap, exit cod
   const res = await runConstrainedChild({
     spawn: childProcess.spawn,
     command: process.execPath, // node
-    args: ['-e', "process.stdout.write('x'.repeat(1000000)); process.exit(0)"],
+    args: ['-e', "process.stdout.write('x'.repeat(1000000), () => process.exit(0))"],
     cwd: process.cwd(),
     env: process.env,
     timeoutMs: 10000,

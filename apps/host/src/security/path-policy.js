@@ -119,10 +119,16 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   const segments = scope.split('/').filter(Boolean);
 
   for (const segment of segments) {
-    if (SENSITIVE_SEGMENTS.has(segment)) {
+    // Sensitive directory names (appdata/.ssh/credentials/.kimi) are matched
+    // case-INSENSITIVELY. `normalizeForCompare` only lower-cases on Windows, so
+    // without this a path containing `AppData` (capital A) would slip past the
+    // lowercase `SENSITIVE_SEGMENTS` on a case-sensitive (Linux) host. The
+    // containment/escape check elsewhere stays case-sensitive on purpose.
+    const seg = segment.toLowerCase();
+    if (SENSITIVE_SEGMENTS.has(seg)) {
       return true;
     }
-    if (segment === '.env' || segment.startsWith('.env')) {
+    if (seg === '.env' || seg.startsWith('.env')) {
       return true;
     }
   }
