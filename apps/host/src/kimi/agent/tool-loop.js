@@ -158,7 +158,7 @@ export async function runAgentChat({
       const isMutating = !!(tool && tool.mutating === true);
       const needsApproval = toolNeedsApproval(tool);
       if (await runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call })) continue;
-      const planResult = await handleExitPlanMode({ name, args, hasApprovals, autoApprove, approvals, runId, emit, audit, steps, messages, call });
+      const planResult = await handleExitPlanMode({ name, args, hasApprovals, autoApprove, approvals, runId, emit, audit, steps, messages, call, context });
       if (planResult.handled) {
         if (planResult.planApproved) planApproved = true;
         continue;
@@ -166,7 +166,7 @@ export async function runAgentChat({
       if (blockUntilPlanApproved({ planMode, planApproved, needsApproval, name, tool, steps, audit, emit, messages, call })) continue;
       if (await requestToolApproval({
         needsApproval, hasApprovals, sessionApproved, name, args, tool, runId,
-        approvals, emit, audit, messages, call, autoApprove, planMode, planApproved, steps,
+        approvals, emit, audit, messages, call, autoApprove, planMode, planApproved, steps, context,
       })) continue;
 
       const todo = toolTodos.start(name);

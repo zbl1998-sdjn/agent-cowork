@@ -41,14 +41,15 @@ export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = 
   if (!agentDeps) return tools;
 
   const baseTools = tools.slice();
-  if (agentDeps.approvals) tools.push(createAskUserQuestionTool(agentDeps));
+  if (agentDeps.approvals) tools.push(createAskUserQuestionTool(agentDeps, ctx));
   if (agentDeps.scheduler) tools.push(createScheduleTaskTool(ctx, agentDeps));
   tools.push(createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }));
   return tools;
 }
 
-function createAskUserQuestionTool(agentDeps) {
+function createAskUserQuestionTool(agentDeps, ctx) {
   const emit = typeof agentDeps.emit === 'function' ? agentDeps.emit : () => {};
+  const context = (ctx && ctx.context) || {};
   return {
     name: 'AskUserQuestion',
     risk: 'safe',
@@ -62,7 +63,14 @@ function createAskUserQuestionTool(agentDeps) {
         .slice(0, 8)
         .map((o) => (typeof o === 'string' ? { label: o } : { label: String((o && o.label) || ''), description: (o && o.description) || '' }))
         .filter((o) => o.label);
-      const { id, promise } = agentDeps.approvals.request({ kind: 'question', question, options, runId: agentDeps.runId });
+      const { id, promise } = agentDeps.approvals.request({
+        kind: 'question',
+        question,
+        options,
+        runId: agentDeps.runId,
+        ...(context.tenantId ? { tenantId: context.tenantId } : {}),
+        ...(context.userId ? { userId: context.userId } : {}),
+      });
       emit('question', { id, question, options });
       const answer = await promise;
       return { answer: typeof answer === 'string' ? answer : String(answer == null ? '' : answer) };

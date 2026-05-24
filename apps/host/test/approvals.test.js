@@ -35,6 +35,15 @@ test('approval registry resolves a pending request with a decision', async () =>
   assert.equal(reg.resolve('ghost', 'once'), false);
 });
 
+test('approval registry rejects resolve attempts from the wrong tenant/user scope', async () => {
+  const reg = createApprovalRegistry();
+  const { id, promise } = reg.request({ name: 'Shell', tenantId: 'tenant_a', userId: 'user_a' });
+  assert.equal(reg.resolve(id, 'once', { tenantId: 'tenant_b', userId: 'user_a' }), false);
+  assert.equal(reg.respond(id, 'ok', { tenantId: 'tenant_a', userId: 'user_b' }), false);
+  assert.equal(reg.resolve(id, 'once', { tenantId: 'tenant_a', userId: 'user_a' }), true);
+  assert.equal(await promise, 'once');
+});
+
 test('high-risk tool is gated behind approval (approve once)', async () => {
   let executed = false;
   const approvals = createApprovalRegistry();
@@ -123,6 +132,64 @@ test('POST /api/agent/chat/stream gates Shell, proceeds after POST /api/approval
     assert.ok(aprId, 'Shell triggered an approval_request');
     const ap = await fetch(`${base}/api/approvals/${aprId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'once' }) });
     assert.equal((await ap.json()).ok, true);
+    for (;;) { const { value, done } = await reader.read(); if (done) break; all += dec.decode(value, { stream: true }); }
+    assert.match(all, /event: done/);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('POST /api/approvals/:id rejects a different tenant before resolving a tool approval', async () => {
+  const root = tmp();
+  const agentModelCall = callThenAnswer('Shell', { command: 'node -e "process.stdout.write(String(1+1))"' });
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    requireAuth: true,
+    trustIdentityHeaders: true,
+    kimiChatRunner: async () => ({}),
+    agentModelCall,
+  });
+  const base = await bind(server);
+  try {
+    const ownerHeaders = {
+      'content-type': 'application/json',
+      'x-tenant-id': 'tenant_a',
+      'x-user-id': 'user_a',
+    };
+    const res = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: ownerHeaders,
+      body: JSON.stringify({ prompt: '跑个命令' }),
+    });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let all = '';
+    let aprId = null;
+    while (!aprId) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      all += dec.decode(value, { stream: true });
+      const m = /event: approval_request\r?\ndata: (\{.*\})/.exec(all);
+      if (m) aprId = JSON.parse(m[1]).id;
+    }
+    assert.ok(aprId, 'Shell triggered an approval_request');
+
+    const wrong = await fetch(`${base}/api/approvals/${aprId}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+      body: JSON.stringify({ decision: 'once' }),
+    });
+    assert.equal(wrong.status, 404, 'different tenant cannot resolve the approval');
+    assert.equal((await wrong.json()).ok, false);
+
+    const owner = await fetch(`${base}/api/approvals/${aprId}`, {
+      method: 'POST',
+      headers: ownerHeaders,
+      body: JSON.stringify({ decision: 'once' }),
+    });
+    assert.equal(owner.status, 200);
+    assert.equal((await owner.json()).ok, true);
     for (;;) { const { value, done } = await reader.read(); if (done) break; all += dec.decode(value, { stream: true }); }
     assert.match(all, /event: done/);
   } finally {

@@ -15,6 +15,16 @@ import crypto from 'node:crypto';
 
 const DECISIONS = new Set(['once', 'session', 'reject']);
 
+function sameScope(meta = {}, context = null) {
+  const tenantId = meta.tenantId || '';
+  const userId = meta.userId || '';
+  if (!tenantId && !userId) return true;
+  if (!context) return false;
+  if (tenantId && context.tenantId !== tenantId) return false;
+  if (userId && context.userId !== userId) return false;
+  return true;
+}
+
 export function createApprovalRegistry({ ttlMs = 15 * 60 * 1000, maxPending = 10000 } = {}) {
   const pending = new Map(); // id -> { resolve, meta, ts }
 
@@ -48,9 +58,10 @@ export function createApprovalRegistry({ ttlMs = 15 * 60 * 1000, maxPending = 10
       pending.set(id, { resolve, meta, ts: Date.now() });
       return { id, promise };
     },
-    resolve(id, decision) {
+    resolve(id, decision, context = null) {
       const entry = pending.get(id);
       if (!entry) return false;
+      if (!sameScope(entry.meta, context)) return false;
       pending.delete(id);
       entry.resolve(DECISIONS.has(decision) ? decision : 'reject');
       return true;
@@ -58,9 +69,10 @@ export function createApprovalRegistry({ ttlMs = 15 * 60 * 1000, maxPending = 10
     // Resolve a pending request with an arbitrary free-form value (used by
     // AskUserQuestion, where the answer is the chosen option text, not a
     // fixed approve/reject decision).
-    respond(id, value) {
+    respond(id, value, context = null) {
       const entry = pending.get(id);
       if (!entry) return false;
+      if (!sameScope(entry.meta, context)) return false;
       pending.delete(id);
       entry.resolve(value);
       return true;

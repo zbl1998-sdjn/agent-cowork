@@ -23,6 +23,13 @@ export function toolNeedsApproval(tool) {
   return !!(tool && (tool.mutating === true || tool.risk === 'high'));
 }
 
+function approvalScope(context = {}) {
+  return {
+    ...(context.tenantId ? { tenantId: context.tenantId } : {}),
+    ...(context.userId ? { userId: context.userId } : {}),
+  };
+}
+
 export async function runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call }) {
   if (!hooks) return false;
   const blockedByHook = hooks.blocked(await hooks.run('pre_tool', { name, args }));
@@ -47,12 +54,13 @@ export async function handleExitPlanMode({
   steps,
   messages,
   call,
+  context,
 }) {
   if (name !== 'ExitPlanMode') return { handled: false, planApproved: false };
   const plan = String((args && (args.plan || args.text)) || '').trim();
   let approved = true;
   if (hasApprovals && !autoApprove) {
-    const { id, promise } = approvals.request({ kind: 'plan', plan, runId });
+    const { id, promise } = approvals.request({ kind: 'plan', plan, runId, ...approvalScope(context) });
     emit('plan_proposed', { id, plan });
     audit('plan.proposed', { chars: plan.length });
     approved = await promise !== 'reject';
@@ -109,6 +117,7 @@ export async function requestToolApproval({
   autoApprove,
   planMode,
   planApproved,
+  context,
 }) {
   if (!needsApproval || !hasApprovals || sessionApproved.has(name)) return false;
   const planAuthorized = planMode && planApproved;
@@ -116,7 +125,7 @@ export async function requestToolApproval({
     audit('tool.auto_approved', { tool: name, risk: tool.risk, via: autoApprove ? 'auto' : 'plan' });
     return false;
   }
-  const { id, promise } = approvals.request({ name, args, risk: tool.risk, runId });
+  const { id, promise } = approvals.request({ name, args, risk: tool.risk, runId, ...approvalScope(context) });
   emit('approval_request', { id, name, args, risk: tool.risk });
   const decision = await promise;
   if (decision === 'session') sessionApproved.add(name);

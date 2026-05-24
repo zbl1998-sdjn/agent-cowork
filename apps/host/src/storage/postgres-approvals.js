@@ -16,6 +16,10 @@ function defaultId() {
   return `apr_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
+function sameTenant(meta = {}, context = null) {
+  return !meta.tenantId || !!(context && context.tenantId === meta.tenantId);
+}
+
 export class PostgresApprovalStore {
   constructor({ client = null, pool = null, channel = 'kcw_approvals', generateId = defaultId } = {}) {
     // `client` is the dedicated LISTEN connection; `pool` runs queries. In tests
@@ -23,7 +27,7 @@ export class PostgresApprovalStore {
     this._client = client;
     this._pool = pool || client;
     this._channel = channel;
-    this._local = new Map(); // id -> resolver for promises awaited on THIS instance
+    this._local = new Map(); // id -> { resolve, meta } for promises awaited on THIS instance
     this._generateId = generateId;
     this._started = false;
   }
@@ -34,8 +38,8 @@ export class PostgresApprovalStore {
     this._client.on('notification', (msg) => {
       let data;
       try { data = JSON.parse(msg.payload); } catch { return; }
-      const resolver = this._local.get(data.id);
-      if (resolver) { this._local.delete(data.id); resolver(data.decision); }
+      const entry = this._local.get(data.id);
+      if (entry) { this._local.delete(data.id); entry.resolve(data.decision); }
     });
     await this._client.query(`LISTEN ${this._channel}`);
   }
@@ -44,7 +48,7 @@ export class PostgresApprovalStore {
     const id = this._generateId();
     let resolve;
     const promise = new Promise((r) => { resolve = r; });
-    this._local.set(id, resolve);
+    this._local.set(id, { resolve, meta });
     // Persist so another instance can resolve it; fire-and-forget (id is already
     // known, so the local resolver works regardless of insert latency).
     Promise.resolve(this._pool.query(
@@ -55,26 +59,34 @@ export class PostgresApprovalStore {
     return { id, promise };
   }
 
-  async _resolveRow(id, decision) {
+  async _resolveRow(id, decision, context = null) {
+    const params = [id, decision];
+    const tenantClause = context && context.tenantId
+      ? ` AND (tenant_id IS NULL OR tenant_id=$${params.push(context.tenantId)})`
+      : ' AND tenant_id IS NULL';
     const r = await this._pool.query(
       `UPDATE pending_approvals SET status='resolved', decision=$2, resolved_at=NOW()
-       WHERE id=$1 AND status='pending'`,
-      [id, decision],
+       WHERE id=$1 AND status='pending'${tenantClause}`,
+      params,
     );
-    await this._pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
+    const rowMatched = Number(r.rowCount || 0) > 0;
+    if (rowMatched) {
+      await this._pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
+    }
     // Local fast-path (same instance also awaiting).
     const local = this._local.get(id);
-    if (local) { this._local.delete(id); local(decision); }
-    return Number(r.rowCount || 0) > 0 || !!local;
+    const localMatched = !!(local && sameTenant(local.meta, context));
+    if (localMatched) { this._local.delete(id); local.resolve(decision); }
+    return rowMatched || localMatched;
   }
 
-  async resolve(id, decision) {
+  async resolve(id, decision, context = null) {
     const DEC = new Set(['once', 'session', 'reject']);
-    return this._resolveRow(id, DEC.has(decision) ? decision : 'reject');
+    return this._resolveRow(id, DEC.has(decision) ? decision : 'reject', context);
   }
 
-  async respond(id, value) {
-    return this._resolveRow(id, value);
+  async respond(id, value, context = null) {
+    return this._resolveRow(id, value, context);
   }
 
   async cancelByRun(runId, decision = 'reject') {
@@ -88,7 +100,7 @@ export class PostgresApprovalStore {
     for (const id of ids) {
       await this._pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
       const local = this._local.get(id);
-      if (local) { this._local.delete(id); local(decision); }
+      if (local) { this._local.delete(id); local.resolve(decision); }
     }
     return Number(rows.rowCount || ids.length || 0);
   }
@@ -109,7 +121,7 @@ export class PostgresApprovalStore {
     const ids = (rows.rows || []).map((row) => row.id);
     for (const id of ids) {
       const local = this._local.get(id);
-      if (local) { this._local.delete(id); local('reject'); }
+      if (local) { this._local.delete(id); local.resolve('reject'); }
     }
     return ids.length;
   }

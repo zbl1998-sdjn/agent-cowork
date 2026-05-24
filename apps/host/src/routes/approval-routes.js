@@ -8,8 +8,8 @@ export async function handleApprovalRoutes({ request, response, pathname, reques
     const id = pathname.split('/')[3];
     const hasAnswer = body && typeof body.answer !== 'undefined';
     const ok = hasAnswer
-      ? await approvalRegistry.respond(id, body.answer)
-      : await approvalRegistry.resolve(id, body && body.decision);
+      ? await approvalRegistry.respond(id, body.answer, requestContext)
+      : await approvalRegistry.resolve(id, body && body.decision, requestContext);
     sendJson(response, ok ? 200 : 404, {
       context: requestContext,
       id,

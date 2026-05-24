@@ -23,9 +23,12 @@ function mockCluster() {
           return { rowCount: 1 };
         }
         if (t.startsWith("UPDATE pending_approvals SET status='resolved'") && t.includes('WHERE id=')) {
-          const [id, decision] = params;
+          const [id, decision, tenantId] = params;
           const r = rows.get(id);
-          if (r && r.status === 'pending') { r.status = 'resolved'; r.decision = decision; return { rowCount: 1 }; }
+          const tenantOk = tenantId ? r.tenant_id == null || r.tenant_id === tenantId : r.tenant_id == null;
+          if (r && r.status === 'pending' && tenantOk) {
+            r.status = 'resolved'; r.decision = decision; return { rowCount: 1 };
+          }
           return { rowCount: 0 };
         }
         if (t.includes('WHERE run_id=') && t.includes('RETURNING id')) {
@@ -54,11 +57,37 @@ test('cross-instance: an approval requested on A is resolved by B (via NOTIFY)',
   const B = new PostgresApprovalStore({ client: cluster.makeClient() });
   await A.start();
   await B.start();
-  const { id, promise } = A.request({ runId: 'r1', tenantId: 't1', kind: 'approval' });
+  const { id, promise } = A.request({ runId: 'r1', kind: 'approval' });
   await new Promise((r) => setTimeout(r, 5)); // let the fire-and-forget INSERT land
   const ok = await B.resolve(id, 'once');
   assert.equal(ok, true);
   assert.equal(await promise, 'once', 'A\'s awaiting promise resolved by B across instances');
+});
+
+test('cross-instance: tenant-scoped resolve rejects the wrong tenant', async () => {
+  const cluster = mockCluster();
+  const A = new PostgresApprovalStore({ client: cluster.makeClient() });
+  const B = new PostgresApprovalStore({ client: cluster.makeClient() });
+  await A.start();
+  await B.start();
+  const { id, promise } = A.request({ runId: 'r1', tenantId: 't1', kind: 'approval' });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(await B.resolve(id, 'once', { tenantId: 't2' }), false);
+  assert.equal(await B.resolve(id, 'once', { tenantId: 't1' }), true);
+  assert.equal(await promise, 'once');
+});
+
+test('cross-instance: tenant-scoped resolve also rejects missing tenant context', async () => {
+  const cluster = mockCluster();
+  const A = new PostgresApprovalStore({ client: cluster.makeClient() });
+  const B = new PostgresApprovalStore({ client: cluster.makeClient() });
+  await A.start();
+  await B.start();
+  const { id, promise } = A.request({ runId: 'r1', tenantId: 't1', kind: 'approval' });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(await B.resolve(id, 'once'), false);
+  assert.equal(await B.resolve(id, 'once', { tenantId: 't1' }), true);
+  assert.equal(await promise, 'once');
 });
 
 test('cross-instance: AskUserQuestion answer text flows from B back to A', async () => {
