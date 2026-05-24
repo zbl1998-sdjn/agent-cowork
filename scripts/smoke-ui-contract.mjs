@@ -52,6 +52,8 @@ async function main() {
   const server = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
+    requireAuth: false,
+    uiDist: false,
   });
 
   await new Promise((resolve, reject) => {
@@ -112,7 +114,7 @@ async function main() {
     assert(allScripts.includes('function handleComposerSend'), 'app scripts missing composer send router');
     assert(allScripts.includes('[data-quick]'), 'app scripts missing quick action handlers');
     assert(allScripts.includes('function subscribeRunEvents'), 'app scripts missing SSE run-event subscriber');
-    assert(allScripts.includes('new EventSource('), 'app scripts missing EventSource client');
+    assert(allScripts.includes('fetch(eventsUrl') && allScripts.includes('text/event-stream'), 'app scripts missing SSE fetch client');
     assert(allScripts.includes('/events`'), 'app scripts missing SSE /events route usage');
     assert(allScripts.includes('function handleComposerInput'), 'app scripts missing composer popover input handler');
     assert(allScripts.includes('detectComposerTrigger'), 'app scripts missing slash/at trigger detection');

@@ -4,7 +4,15 @@
   // In dev the webview is served from this same origin, so the prefix is a
   // harmless no-op. Static assets are loaded by the webview itself and never
   // pass through this client, so prefixing API routes here is safe in both.
-  const HOST_BASE = "http://127.0.0.1:3017";
+  function defaultHostBase() {
+    const loc = window.location;
+    if ((loc.protocol === "http:" || loc.protocol === "https:") && loc.port !== "5173") {
+      return loc.origin;
+    }
+    return "http://127.0.0.1:3017";
+  }
+
+  const HOST_BASE = window.__KCW_HOST_BASE__ || defaultHostBase();
 
   function resolveUrl(route) {
     if (/^https?:\/\//i.test(route)) {

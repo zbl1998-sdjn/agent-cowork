@@ -174,6 +174,8 @@ async function main() {
   const host = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
+    requireAuth: false,
+    uiDist: false,
     kimiPlanRunner: async ({ prompt, summary, mode }) => ({
       ok: true,
       provider: 'kimi-api',

@@ -136,9 +136,9 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-local-operations.mjs')],
   },
   {
-    name: 'node unit tests',
+    name: 'ci static and unit gates',
     command: nodeBin,
-    commandArgs: ['--test', '--test-isolation=none'],
+    commandArgs: [path.join(repoRoot, 'scripts', 'ci.mjs')],
   },
   {
     name: 'host local operation smoke',

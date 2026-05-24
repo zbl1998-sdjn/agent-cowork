@@ -1,6 +1,14 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 
-const HOST_BASE = 'http://127.0.0.1:3017';
+function defaultHostBase(): string {
+  if (typeof window !== 'undefined') {
+    const { origin, port, protocol } = window.location;
+    if ((protocol === 'http:' || protocol === 'https:') && port !== '5173') return origin;
+  }
+  return 'http://127.0.0.1:3017';
+}
+
+const HOST_BASE = defaultHostBase();
 const AUTH_TOKEN_KEY = 'kcw.authToken';
 
 export function resolveUrl(route: string): string {

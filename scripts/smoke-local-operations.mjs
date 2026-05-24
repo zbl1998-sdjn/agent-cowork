@@ -51,6 +51,7 @@ async function main() {
   const server = createServer({
     trustedRoot: workspace,
     journalWriter: new JsonlWriter(auditPath),
+    requireAuth: false,
   });
 
   await new Promise((resolve, reject) => {
