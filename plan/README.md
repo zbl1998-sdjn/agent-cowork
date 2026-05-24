@@ -39,7 +39,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 
 ## 当前状态快照(2026-05-25)
 - [x] `03/04/05` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
-- [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 18 个纯/叶子/安全链路模块,并加入 host Node 内建最小类型声明;已接入 `npm run check`。
+- [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 19 个纯/叶子/安全链路模块(新增 file-preview 预览安全边界),并加入 host Node 内建最小类型声明;已接入 `npm run check`。
 - [ ] P0-T10 延后项:完整 Node 类型覆盖、更多 L0/L1 模块纳入仍在推进;逐文件 `.ts` 转换尚未开始;不改 Node host 语言栈、不重写。
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。

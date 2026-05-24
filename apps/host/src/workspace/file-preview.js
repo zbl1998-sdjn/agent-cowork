@@ -1,3 +1,5 @@
+// @ts-check
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
@@ -10,6 +12,7 @@ import { assertReadableWorkspacePath } from '../security/path-policy.js';
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const HARD_MAX_BYTES = 8 * 1024 * 1024;
 
+/** @type {Record<string, string>} */
 const IMAGE_MIME = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -27,12 +30,55 @@ const TEXT_EXT = new Set([
   '.diff', '.patch',
 ]);
 
+/**
+ * @typedef {{ headers: string[], rows: string[][], truncated: boolean }} TablePreview
+ * @typedef {{
+ *   kind: 'image' | 'pdf',
+ *   mime: string,
+ *   name: string,
+ *   size: number,
+ *   base64: string
+ * }} BinaryPreview
+ * @typedef {{
+ *   kind: 'markdown' | 'text' | 'diff',
+ *   mime: string,
+ *   name: string,
+ *   size: number,
+ *   text: string
+ * }} TextPreview
+ * @typedef {{
+ *   kind: 'table',
+ *   mime: string,
+ *   name: string,
+ *   size: number,
+ *   text: string,
+ *   table: TablePreview
+ * }} DelimitedPreview
+ * @typedef {{
+ *   kind: 'other',
+ *   mime: string,
+ *   name: string,
+ *   size: number
+ * }} OtherPreview
+ * @typedef {BinaryPreview | TextPreview | DelimitedPreview | OtherPreview} FilePreview
+ */
+
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
 function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(1, Math.floor(n)), HARD_MAX_BYTES);
 }
 
+/**
+ * @param {string} line
+ * @param {',' | '\t'} delimiter
+ * @returns {string[]}
+ */
 function splitDelimitedLine(line, delimiter) {
   const cells = [];
   let cell = '';
@@ -55,6 +101,11 @@ function splitDelimitedLine(line, delimiter) {
   return cells.map((value) => value.trim());
 }
 
+/**
+ * @param {string} text
+ * @param {',' | '\t'} delimiter
+ * @returns {TablePreview}
+ */
 function tablePreview(text, delimiter) {
   const rows = String(text || '')
     .split(/\r?\n/)
@@ -64,6 +115,22 @@ function tablePreview(text, delimiter) {
   return { headers: rows[0] || [], rows: rows.slice(1), truncated: rows.length > 100 };
 }
 
+/**
+ * @param {number} statusCode
+ * @param {string} message
+ * @returns {Error & { statusCode: number }}
+ */
+function httpError(statusCode, message) {
+  const err = /** @type {Error & { statusCode: number }} */ (new Error(message));
+  err.statusCode = statusCode;
+  return err;
+}
+
+/**
+ * @param {string} filePath
+ * @param {{ trustedRoot?: string, maxBytes?: number }} [options]
+ * @returns {FilePreview}
+ */
 export function readFilePreview(filePath, { trustedRoot, maxBytes = DEFAULT_MAX_BYTES } = {}) {
   if (!filePath || typeof filePath !== 'string') {
     throw new Error('path is required');
@@ -72,16 +139,12 @@ export function readFilePreview(filePath, { trustedRoot, maxBytes = DEFAULT_MAX_
   const resolved = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
   const safe = assertReadableWorkspacePath(resolved, root);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
-    const err = new Error('file not found');
-    err.statusCode = 404;
-    throw err;
+    throw httpError(404, 'file not found');
   }
   const size = fs.statSync(safe).size;
   const byteLimit = cappedMaxBytes(maxBytes);
   if (size > byteLimit) {
-    const err = new Error(`file too large to preview (${size} bytes; max ${byteLimit})`);
-    err.statusCode = 413;
-    throw err;
+    throw httpError(413, `file too large to preview (${size} bytes; max ${byteLimit})`);
   }
   const ext = path.extname(safe).toLowerCase();
   const name = path.basename(safe);

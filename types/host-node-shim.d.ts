@@ -13,6 +13,7 @@ declare const Buffer: {
 
 declare const process: {
   platform: string;
+  cwd(): string;
 };
 
 declare module 'node:crypto' {
@@ -52,6 +53,7 @@ declare module 'node:fs' {
   export function existsSync(path: string): boolean;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
   export function readFileSync(path: string): Buffer;
+  export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
   export function statSync(path: string): Stats;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;

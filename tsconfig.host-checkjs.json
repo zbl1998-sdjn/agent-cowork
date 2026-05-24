@@ -27,6 +27,7 @@
     "apps/host/src/runtime/task-presenter.js",
     "apps/host/src/runtime/usage.js",
     "apps/host/src/workspace/context-bundle.js",
+    "apps/host/src/workspace/file-preview.js",
     "apps/host/src/workspace/file-reader.js",
     "apps/host/src/workspace/file-tree.js",
     "apps/host/src/workspace/index/chunk.js"
