@@ -55,8 +55,9 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
-- [ ] 04-R5 延后项:安装版安装/已安装 exe 启动、真实 Kimi 回复、installer/签名信任链仍未验收。
-- [ ] 需真实环境的延期验收:真实 Kimi E2E、Office/OCR、installer/签名相关验证。
+- [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`,已对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T212300Z.json`。
+- [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
+- [ ] 需真实环境的延期验收:真实 Kimi E2E、Office/OCR、installer/签名信任链相关验证。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)

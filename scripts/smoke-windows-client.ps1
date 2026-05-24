@@ -257,12 +257,29 @@ function Wait-ForMainWindow {
 
 function Get-Children {
     param([Parameter(Mandatory = $true)][IntPtr]$Window)
-    return [KcwSmokeWin32]::Children($Window)
+    return @([KcwSmokeWin32]::Children($Window))
+}
+
+function Wait-ForChildren {
+    param(
+        [Parameter(Mandatory = $true)][IntPtr]$Window,
+        [int]$TimeoutSeconds = 10
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $children = @(Get-Children -Window $Window)
+        if ($children.Count -gt 0) {
+            return $children
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "Timed out waiting for AgentCowork child controls"
 }
 
 function Find-Child {
     param(
-        [Parameter(Mandatory = $true)]$Children,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()]$Children,
         [Parameter(Mandatory = $true)][string]$ClassName,
         [string]$TextContains
     )
@@ -353,9 +370,7 @@ catch {
 
 try {
     $window = Wait-ForMainWindow -Process $process
-    Start-Sleep -Milliseconds 500
-
-    $children = Get-Children -Window $window
+    $children = Wait-ForChildren -Window $window
 
     $newChat = Find-Child -Children $children -ClassName "Button" -TextContains "新建会话"
     $chooseWorkspace = Find-Child -Children $children -ClassName "Button" -TextContains "选择本地文件夹"
