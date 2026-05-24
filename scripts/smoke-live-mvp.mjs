@@ -227,10 +227,33 @@ async function main() {
     await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {
-        const deadline = Date.now() + 5000;
+        const deadline = Date.now() + 8000;
         function tick() {
-          if (document.readyState === "complete" && document.body.innerText.includes("欢迎回来，Derrick")) resolve(true);
+          const shell = document.querySelector(".app-shell");
+          const guest = document.querySelector(".auth-guest");
+          if (document.readyState === "complete" && (shell || guest)) resolve({ shell: Boolean(shell), authGate: Boolean(guest) });
           else if (Date.now() > deadline) reject(new Error("live MVP page did not render"));
+          else setTimeout(tick, 50);
+        }
+        tick();
+      })`,
+    );
+    const auth = await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        const guest = document.querySelector(".auth-guest");
+        if (!guest) {
+          resolve({ usedGuest: false, alreadyAuthed: Boolean(document.querySelector(".app-shell")) });
+          return;
+        }
+        guest.click();
+        const deadline = Date.now() + 8000;
+        function tick() {
+          const shell = document.querySelector(".app-shell");
+          const token = localStorage.getItem("kcw.authToken");
+          const user = document.querySelector(".header-user")?.innerText.trim();
+          if (shell && token && user) resolve({ usedGuest: true, user });
+          else if (Date.now() > deadline) reject(new Error("live MVP guest login did not reach shell"));
           else setTimeout(tick, 50);
         }
         tick();
@@ -240,13 +263,40 @@ async function main() {
       { send: sendPage },
       `new Promise((resolve, reject) => {
         const expectedWorkspace = ${JSON.stringify(runtime.workspace)};
-        const deadline = Date.now() + 5000;
+        const deadline = Date.now() + 8000;
         function tick() {
-          const status = document.querySelector(".status-pill")?.innerText.trim();
-          const workspace = document.querySelector(".workspace-card > strong")?.innerText.trim();
-          if (status === "本地 Agent 就绪" && workspace === expectedWorkspace) resolve(true);
+          const workspace = document.querySelector(".workspace-path")?.innerText.trim();
+          const ready = Boolean(document.querySelector(".timeline") && document.querySelector(".composer textarea"));
+          if (ready && workspace === expectedWorkspace) resolve(true);
           else if (Date.now() > deadline) reject(new Error("live MVP workspace did not synchronize with runtime"));
           else setTimeout(tick, 50);
+        }
+        tick();
+      })`,
+    );
+    await evaluate(
+      { send: sendPage },
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000;
+        function token() { return localStorage.getItem("kcw.authToken"); }
+        function tick() {
+          const bearer = token();
+          if (!bearer) {
+            if (Date.now() > deadline) reject(new Error("live MVP auth token missing"));
+            else setTimeout(tick, 50);
+            return;
+          }
+          fetch("/api/recipes", { headers: { authorization: "Bearer " + bearer } })
+            .then((response) => response.ok ? response.json() : Promise.reject(new Error("recipes returned " + response.status)))
+            .then((body) => {
+              if (Array.isArray(body.recipes) && body.recipes.length > 0) resolve(body.recipes.length);
+              else if (Date.now() > deadline) reject(new Error("live MVP recipes did not load"));
+              else setTimeout(tick, 100);
+            })
+            .catch((error) => {
+              if (Date.now() > deadline) reject(error);
+              else setTimeout(tick, 100);
+            });
         }
         tick();
       })`,
@@ -262,19 +312,20 @@ async function main() {
           clientHeight: document.documentElement.clientHeight
         };
         const text = document.body.innerText;
+        const buttons = [...document.querySelectorAll("button")].map((button) => button.innerText.trim()).filter(Boolean);
         return {
           title: document.title,
           location: window.location.href,
-          status: document.querySelector(".status-pill")?.innerText.trim(),
-          workspace: document.querySelector(".workspace-card > strong")?.innerText.trim(),
-          activeMode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
-          hasGreeting: text.includes("欢迎回来，Derrick"),
+          workspace: document.querySelector(".workspace-path")?.innerText.trim(),
+          user: document.querySelector(".header-user")?.innerText.trim(),
+          hasShell: Boolean(document.querySelector(".app-shell")),
+          hasTimeline: Boolean(document.querySelector(".timeline")),
+          hasComposer: Boolean(document.querySelector(".composer textarea")),
+          hasEmptyState: Boolean(document.querySelector(".empty-state")),
           hasCowork: text.includes("Agent Cowork"),
-          hasModeTabs: text.includes("对话") && text.includes("协作") && text.includes("代码"),
-          hasSidebarActions: text.includes("新建会话") && text.includes("项目") && text.includes("产物") && text.includes("自定义"),
-          hasQuickActions: text.includes("学习") && text.includes("写作") && text.includes("Kimi 推荐") && text.includes("上传文件夹"),
-          hasInteractionStream: document.querySelector(".interaction-stream")?.textContent.includes("执行动态") === true,
-          hasRunCards: document.querySelector(".run-history-panel")?.textContent.includes("任务卡片") === true,
+          hasConversationRail: Boolean(document.querySelector(".conversation-rail")),
+          hasHeaderActions: ["工具", "可视化", "连接器", "产物", "定时任务", "记忆"].every((label) => buttons.includes(label)),
+          hasQuickActions: document.querySelectorAll(".starter-chip").length >= 4 && text.includes("整理工作区"),
           scroll
         };
       })()`,
@@ -282,11 +333,9 @@ async function main() {
     assert(desktopLayout.title === 'Agent Cowork', 'live MVP title mismatch');
     assert(desktopLayout.location.startsWith(runtime.url), 'live MVP did not load runtime URL');
     assert(desktopLayout.workspace === runtime.workspace, 'live MVP workspace does not match runtime workspace');
-    assert(desktopLayout.activeMode === '对话', 'live MVP should default to 对话 mode');
-    assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'live MVP missing Image #1 functional shell');
-    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing Kimi quick actions');
-    assert(desktopLayout.hasInteractionStream, 'live MVP missing cowork interaction stream');
-    assert(desktopLayout.hasRunCards, 'live MVP missing task card panel');
+    assert(desktopLayout.hasShell && desktopLayout.hasTimeline && desktopLayout.hasComposer, 'live MVP missing React functional shell');
+    assert(desktopLayout.hasConversationRail && desktopLayout.hasHeaderActions, 'live MVP missing navigation/actions');
+    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing starter actions');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -296,13 +345,12 @@ async function main() {
     const interaction = await evaluate(
       { send: sendPage },
       `new Promise((resolve, reject) => {
-        document.querySelector('[data-mode="cowork"]').click();
         const textarea = document.querySelector(".composer textarea");
         const send = document.querySelector(".send-button");
-        const approve = document.querySelector(".approve-button");
-        if (!textarea || !send || !approve) reject(new Error("required controls missing"));
-        textarea.value = "live smoke: 读取当前运行工作区并生成可审批产物";
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        if (!textarea || !send) reject(new Error("required controls missing"));
+        const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+        setValue.call(textarea, "live smoke: 读取当前运行工作区并生成可审批产物");
+        textarea.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: textarea.value }));
         send.click();
 
         const waitFor = (predicate, timeoutMs) => new Promise((ok, fail) => {
@@ -319,47 +367,43 @@ async function main() {
           tick();
         });
 
-        waitFor(() => document.querySelector(".status-pill")?.innerText.includes("计划就绪"), ${planTimeoutMs})
+        waitFor(() => document.querySelectorAll(".preview-op").length > 0 && [...document.querySelectorAll("button")].some((button) => button.innerText.trim() === "审批执行"), ${planTimeoutMs})
           .then(() => {
+            const approve = [...document.querySelectorAll("button")].find((button) => button.innerText.trim() === "审批执行");
             const afterPlan = {
-              status: document.querySelector(".status-pill")?.innerText.trim(),
-              artifact: document.querySelector(".artifact-preview p")?.innerText,
-              opCount: document.querySelectorAll(".diff-row").length,
-              stream: document.querySelector(".interaction-stream")?.innerText,
-              runCardCount: document.querySelectorAll(".run-card:not(.is-empty)").length,
-              activeRunCard: document.querySelector(".run-card.is-active")?.innerText || ""
+              preview: document.querySelector(".preview-card")?.innerText || "",
+              opCount: document.querySelectorAll(".preview-op").length,
+              timeline: document.querySelector(".timeline")?.innerText || "",
+              bubbleCount: document.querySelectorAll(".bubble").length,
+              approveText: approve?.innerText.trim() || ""
             };
             approve.click();
-            return waitFor(() => document.querySelector(".status-pill")?.innerText.includes("已在本机执行"), 5000)
+            return waitFor(() => document.querySelector(".approval-done")?.innerText.includes("已审批"), 5000)
               .then(() => ({
                 afterPlan,
                 afterApprove: {
-                  status: document.querySelector(".status-pill")?.innerText.trim(),
-                  artifact: document.querySelector(".artifact-preview p")?.innerText,
-                  approve: document.querySelector(".approve-button")?.innerText.trim(),
-                  doneClass: document.querySelector(".approve-button")?.classList.contains("is-done"),
-                  stream: document.querySelector(".interaction-stream")?.innerText
+                  approval: document.querySelector(".approval-done")?.innerText.trim(),
+                  timeline: document.querySelector(".timeline")?.innerText || "",
+                  artifactCards: document.querySelectorAll(".artifact-card").length
                 }
               }));
           })
           .then(resolve, reject);
       })`,
     );
-    assert(interaction.afterPlan.status === '计划就绪', 'live MVP send did not reach 计划就绪');
     assert(interaction.afterPlan.opCount >= 1, 'live MVP did not render any operation preview');
-    assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'live MVP stream missing planning steps');
-    assert(interaction.afterPlan.stream.includes('等待审批'), 'live MVP stream missing approval wait state');
-    assert(interaction.afterPlan.runCardCount >= 1, 'live MVP did not render a task card after planning');
-    assert(interaction.afterPlan.activeRunCard.includes('协作'), 'live MVP latest task card did not show cowork type');
-    assert(interaction.afterApprove.status === '已在本机执行', 'live MVP approve did not reach 已在本机执行');
-    assert(interaction.afterApprove.doneClass === true, 'live MVP approve button did not enter done state');
-    assert(interaction.afterApprove.stream.includes('执行完成'), 'live MVP stream missing completion state');
+    assert(interaction.afterPlan.preview.includes('操作预览'), 'live MVP preview card missing');
+    assert(interaction.afterPlan.approveText === '审批执行', 'live MVP approval button missing');
+    assert(interaction.afterApprove.approval.includes('已审批'), 'live MVP approve did not reach approved state');
+    assert(interaction.afterApprove.artifactCards >= 1, 'live MVP did not show artifact card after approval');
 
     const artifactAfter = listArtifacts(runtime.workspace);
     const newArtifacts = artifactAfter.filter((artifactPath) => !artifactBefore.has(artifactPath));
     assert(newArtifacts.length > 0, 'live MVP did not write a new artifact');
-    const artifactContent = fs.readFileSync(newArtifacts[0], 'utf8');
-    assert(artifactContent.includes('来源摘要'), 'live MVP artifact missing source summary');
+    const markdownArtifact = newArtifacts.find((artifactPath) => artifactPath.toLowerCase().endsWith('.md'));
+    assert(markdownArtifact, 'live MVP did not write a Markdown artifact');
+    const artifactContent = fs.readFileSync(markdownArtifact, 'utf8');
+    assert(artifactContent.includes('会议纪要行动项') && artifactContent.includes('live smoke'), 'live MVP Markdown artifact missing expected content');
     assert(fs.existsSync(auditPath), 'live MVP audit log missing');
     const auditSizeAfter = fs.statSync(auditPath).size;
     assert(auditSizeAfter > auditSizeBefore, 'live MVP audit log did not grow after approval');
@@ -371,6 +415,7 @@ async function main() {
       health,
       browserPath,
       screenshotPath,
+      auth,
       desktopLayout,
       interaction,
       artifacts: newArtifacts,

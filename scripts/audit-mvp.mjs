@@ -108,6 +108,43 @@ function hasReferenceFunctionalShell(layout) {
   return newShell || legacyShell;
 }
 
+function hasReactLiveShell(layout) {
+  if (!layout) {
+    return false;
+  }
+  return (
+    layout.title === 'Agent Cowork' &&
+    layout.hasShell === true &&
+    layout.hasTimeline === true &&
+    layout.hasComposer === true &&
+    layout.hasConversationRail === true &&
+    layout.hasHeaderActions === true &&
+    layout.hasQuickActions === true &&
+    layout.scroll?.width <= layout.scroll?.clientWidth + 1
+  );
+}
+
+function liveInteractionPassed(interaction) {
+  if (!interaction) {
+    return false;
+  }
+
+  const legacyPassed =
+    interaction.afterPlan?.status === '计划就绪' &&
+    interaction.afterPlan?.opCount >= 1 &&
+    interaction.afterApprove?.status === '已在本机执行' &&
+    interaction.afterApprove?.doneClass === true;
+
+  const reactPassed =
+    interaction.afterPlan?.preview?.includes('操作预览') === true &&
+    interaction.afterPlan?.opCount >= 1 &&
+    interaction.afterPlan?.approveText === '审批执行' &&
+    interaction.afterApprove?.approval?.includes('已审批') === true &&
+    interaction.afterApprove?.artifactCards >= 1;
+
+  return legacyPassed || reactPassed;
+}
+
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
 
@@ -268,10 +305,8 @@ async function main() {
         liveMvpSmoke.value?.runtime?.url === runtime.value?.url &&
         liveMvpDesktopLayout?.title === 'Agent Cowork' &&
         liveMvpDesktopLayout?.workspace === runtime.value?.workspace &&
-        liveMvpInteraction?.afterPlan?.status === '计划就绪' &&
-        liveMvpInteraction?.afterPlan?.opCount >= 1 &&
-        liveMvpInteraction?.afterApprove?.status === '已在本机执行' &&
-        liveMvpInteraction?.afterApprove?.doneClass === true &&
+        (hasReferenceFunctionalShell(liveMvpDesktopLayout) || hasReactLiveShell(liveMvpDesktopLayout)) &&
+        liveInteractionPassed(liveMvpInteraction) &&
         liveMvpArtifactEvidence.length > 0 &&
         liveMvpArtifactEvidence.every((artifact) => artifact.exists && artifact.bytes > 0) &&
         liveMvpAuditEvidence?.exists === true &&
