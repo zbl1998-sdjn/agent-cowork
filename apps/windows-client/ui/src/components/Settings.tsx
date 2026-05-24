@@ -180,6 +180,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
                     </ul>
                     <p className="modal-note">
                       存储后端：{selfCheck.storage.backend}{selfCheck.storage.postgres ? '（多实例）' : ''} ·
+                      沙箱 {selfCheck.sandbox.backend || '关闭'}（{selfCheck.sandbox.networkIsolated ? '网络已隔离' : '本地不隔离网络'}） ·
                       并发 {selfCheck.resilience.concurrency.active}/{selfCheck.resilience.concurrency.maxConcurrent} ·
                       限流 {selfCheck.resilience.rateLimit.enabled ? `${selfCheck.resilience.rateLimit.ratePerSec}/s` : '关'}
                     </p>

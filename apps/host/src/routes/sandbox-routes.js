@@ -26,6 +26,7 @@ export async function handleSandboxRoutes({
   sandbox,
   sandboxEnabled,
   sandboxLimits,
+  sandboxStartup,
   runStoreRoot,
   runsIndex,
   runEvents,
@@ -41,6 +42,7 @@ export async function handleSandboxRoutes({
       enabled: Boolean(sandboxEnabled),
       backend: sandbox ? sandbox.backend : null,
       networkIsolated: sandbox ? Boolean(sandbox.networkIsolated) : false,
+      startup: sandboxStartup || null,
       allowTools: sandboxLimits.allowTools || null,
       maxTimeoutMs: sandboxLimits.maxTimeoutMs || null,
     });

@@ -102,6 +102,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     sandbox: state.sandbox,
     sandboxEnabled: state.sandboxEnabled,
     sandboxLimits: state.sandboxLimits,
+    sandboxStartup: state.sandboxStartup.info,
     runStoreRoot: state.runStoreRoot,
     runsIndex: state.runsIndex,
     runEvents: state.runEvents,

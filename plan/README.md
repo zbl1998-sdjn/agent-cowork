@@ -35,7 +35,7 @@
 - 每个任务遵循 `01` 的 DoD;每个里程碑打 tag + 出离线快照(git bundle)+ 归档安装包到 `releases/<ver>/`。
 
 ## 当前执行顺序
-P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → v0.2.0 发布 → P2 连接器 + 启动探测真隔离。
+P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → v0.2.0 发布 → P2-A 启动探测真隔离 → P2-B 连接器。
 
 ## 当前状态快照(2026-05-25)
 - [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
@@ -58,6 +58,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
 - [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装 v0.2.0 安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
+- [x] P2-A 启动探测真隔离:Host 启动探测 Docker/WSL;设置 `KCW_SANDBOX_DOCKER_IMAGE` 且 Docker daemon + 本地镜像可用时默认选择 `vm:docker` 并通过 `--network=none` 执行;否则回退 local 并在 `/api/sandbox/info` 与设置页自检中提示"本地不隔离网络"。新增 gated 集成测试 `sandbox-docker-integration.test.js`;本机用 `KCW_SANDBOX_REAL_DOCKER_IMAGE=postgres:16-alpine` 真实通过 Docker 联网阻断验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
 
@@ -68,4 +69,4 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 前端优化专项线(FE,聚焦交互修复/架构分层+错误空态/流式性能;设计系统暂缓)
 - [x] 4 个开放问题按默认锁成 D1–D4
 - [x] 已开工:P0 地基、03/04/05 多个本地可测切片已完成并纳入 CI
-- [ ] 继续:深度优先推进 P2 连接器 + 启动探测真隔离;P1-A3 真实 Kimi 多文件留档、03-B1 连接器数据源、05-A2 Office 深操作等仍按延期验收清单处理。
+- [ ] 继续:深度优先推进 P2-B 连接器;P1-A3 真实 Kimi 多文件留档、03-B1 连接器数据源、05-A2 Office 深操作等仍按延期验收清单处理。

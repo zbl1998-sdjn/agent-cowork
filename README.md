@@ -16,7 +16,9 @@
 - 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头等
 
 **已知限制：**
-- 本地后端（`LocalSubprocessSandbox`）运行在宿主机普通子进程中，Windows 无按进程网络命名空间，`networkIsolated === false`。真正的网络隔离需要 VM 后端（Docker `--network=none` / WSL netns），代码和契约测试已在 `wsl-docker-runner.js` 预留，此限制有专项测试锁定（`sandbox.test.js` 第 26 条）。
+- Host 启动时会探测 Docker/WSL。设置 `KCW_SANDBOX_DOCKER_IMAGE` 指向一个本地已有镜像后，如果 Docker daemon 和镜像都可用，默认选择 Docker VM 后端，并用 `--network=none` 执行 sandbox 工具。
+- 本地后端（`LocalSubprocessSandbox`）运行在宿主机普通子进程中，Windows 无按进程网络命名空间，`networkIsolated === false`。当 Docker/镜像不可用时会回退本地，并在 `/api/sandbox/info`、设置页自检里明确提示“本地不隔离网络”。WSL 会被探测但默认不声明网络隔离保证。
+- 真实 Docker 联网阻断验收可用本地镜像运行：`$env:KCW_SANDBOX_REAL_DOCKER_IMAGE='postgres:16-alpine'; npm run test:host`；本机已用该镜像验证 `--network=none` 下访问 `1.1.1.1` 返回 `Network unreachable`。
 
 ## 快速开始
 

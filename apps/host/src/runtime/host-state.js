@@ -27,6 +27,7 @@ import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
 import { sendJson } from '../http/request-utils.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
+import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import {
   defaultStaticRoot,
   defaultUiDistRoot,
@@ -92,10 +93,14 @@ export function createHostState(config = {}, { hostSrcDir }) {
     : new RunEventBus());
 
   state.sandboxEnabled = config.enableSandbox !== false;
-  state.sandbox = config.sandbox || createSandbox({
-    backend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'local',
-    ...(config.sandboxOptions || {}),
+  state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup({
+    requestedBackend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'auto',
+    sandboxOptions: config.sandboxOptions || {},
+    env: process.env,
+    spawnSync: config.sandboxProbeSpawnSync,
+    timeoutMs: config.sandboxProbeTimeoutMs,
   });
+  state.sandbox = config.sandbox || createSandbox(state.sandboxStartup.options);
   state.sandboxLimits = {
     allowTools: config.sandboxAllowTools || DEFAULT_ALLOW_TOOLS,
     allowEnv: config.sandboxAllowEnv || [],

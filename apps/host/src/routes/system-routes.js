@@ -54,6 +54,11 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
     add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
     add('rate-limit', Boolean(state.rateLimiter), state.rateLimiter ? `${rateLimit.ratePerSec}/s · burst ${rateLimit.burst}` : '限流未启用');
     add('model-circuit', !breakers.some((b) => b.state === 'open'), breakers.length ? breakers.map((b) => `${b.name}:${b.state}`).join(', ') : '尚无模型调用');
+    add(
+      'sandbox-network-isolation',
+      Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
+      state.sandboxStartup?.info?.userMessage || (state.sandbox?.networkIsolated ? '网络默认隔离' : '本地不隔离网络'),
+    );
     add('accepting-requests', !state.draining, state.draining ? '正在优雅停机' : '正常受理请求');
     sendJson(response, 200, {
       service: 'agent-cowork-host',
@@ -71,6 +76,12 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
         draining: state.draining,
       },
       storage: { backend: state.storeBackend, postgres: state.usePostgresState },
+      sandbox: {
+        enabled: Boolean(state.sandboxEnabled),
+        backend: state.sandbox ? state.sandbox.backend : null,
+        networkIsolated: state.sandbox ? Boolean(state.sandbox.networkIsolated) : false,
+        startup: state.sandboxStartup?.info || null,
+      },
       checks,
     });
     return true;

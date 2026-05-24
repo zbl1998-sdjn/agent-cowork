@@ -22,6 +22,17 @@ export interface SelfCheckResult {
     draining: boolean;
   };
   storage: { backend: string; postgres: boolean };
+  sandbox: {
+    enabled: boolean;
+    backend: string | null;
+    networkIsolated: boolean;
+    startup?: {
+      selectedBackend: string;
+      fallback: boolean;
+      userMessage: string;
+      fallbackReason?: string | null;
+    } | null;
+  };
   checks: SelfCheckItem[];
 }
 

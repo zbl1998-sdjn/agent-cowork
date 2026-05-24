@@ -8,6 +8,7 @@ import { normalizeSandboxSpec } from '../src/sandbox/sandbox-spec.js';
 import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
 import { VmSandbox } from '../src/sandbox/vm-sandbox.js';
 import { createSandbox, DEFAULT_ALLOW_TOOLS } from '../src/sandbox/index.js';
+import { resolveSandboxStartup } from '../src/sandbox/startup-probe.js';
 import { createServer } from '../src/server.js';
 
 function tempRoot() {
@@ -28,6 +29,15 @@ async function jsonRequest(base, route, { method = 'GET', body, headers = {} } =
   });
   const text = await response.text();
   return { status: response.status, body: text ? JSON.parse(text) : null };
+}
+
+function fakeProbeSpawnSync(handlers) {
+  return (command, args = []) => {
+    const key = [command, ...args].join(' ');
+    const handler = handlers[key];
+    if (!handler) return { status: 1, stdout: '', stderr: `${command} not available` };
+    return { status: handler.status ?? 0, stdout: handler.stdout || '', stderr: handler.stderr || '' };
+  };
 }
 
 // ---- spec validation ----
@@ -129,6 +139,50 @@ test('VmSandbox.exec rejects with 501 until a runner is injected', async () => {
   await assert.rejects(() => sandbox.exec(spec, { trustedRoot: tempRoot() }), /not provisioned/);
 });
 
+// ---- startup isolation probe ----
+
+test('resolveSandboxStartup selects docker by default when daemon and local image are available', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: { image: 'python:3.12-slim' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'docker image inspect python:3.12-slim': { stdout: '[]\n' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'docker');
+  assert.equal(startup.options.image, 'python:3.12-slim');
+  assert.equal(startup.info.selectedBackend, 'docker');
+  assert.equal(startup.info.networkIsolated, true);
+  assert.equal(startup.info.fallback, false);
+  assert.equal(startup.info.backends.docker.usable, true);
+  assert.equal(startup.info.backends.docker.imagePresent, true);
+});
+
+test('resolveSandboxStartup falls back to local when no true isolated backend is usable', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: { image: 'python:3.12-slim' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'docker image inspect python:3.12-slim': { status: 1, stderr: 'No such image' },
+      'wsl.exe --status': { stdout: 'Default Version: 2\n' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'local');
+  assert.equal(startup.info.selectedBackend, 'local');
+  assert.equal(startup.info.networkIsolated, false);
+  assert.equal(startup.info.fallback, true);
+  assert.match(startup.info.userMessage, /本地不隔离网络/);
+  assert.equal(startup.info.backends.docker.available, true);
+  assert.equal(startup.info.backends.docker.usable, false);
+  assert.equal(startup.info.backends.wsl.available, true);
+  assert.equal(startup.info.backends.wsl.networkIsolated, false);
+});
+
 // ---- route integration ----
 
 test('GET /api/sandbox/info reports capabilities', async () => {
@@ -141,6 +195,55 @@ test('GET /api/sandbox/info reports capabilities', async () => {
     assert.equal(info.body.enabled, true);
     assert.equal(info.body.backend, 'local-subprocess');
     assert.deepEqual(info.body.allowTools, DEFAULT_ALLOW_TOOLS);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/sandbox/info exposes the startup isolation probe and docker selection', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: false,
+    sandboxOptions: { image: 'python:3.12-slim' },
+    sandboxProbeSpawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'docker image inspect python:3.12-slim': { stdout: '[]\n' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+  const base = await bind(server);
+  try {
+    const info = await jsonRequest(base, '/api/sandbox/info');
+    assert.equal(info.status, 200);
+    assert.equal(info.body.backend, 'vm:docker');
+    assert.equal(info.body.networkIsolated, true);
+    assert.equal(info.body.startup.selectedBackend, 'docker');
+    assert.equal(info.body.startup.fallback, false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/selfcheck warns when startup falls back to the local sandbox', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: false,
+    sandboxProbeSpawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { status: 1, stderr: 'docker unavailable' },
+      'wsl.exe --status': { status: 1, stderr: 'wsl unavailable' },
+    }),
+  });
+  const base = await bind(server);
+  try {
+    const selfcheck = await jsonRequest(base, '/api/selfcheck');
+    assert.equal(selfcheck.status, 200);
+    assert.equal(selfcheck.body.sandbox.backend, 'local-subprocess');
+    assert.equal(selfcheck.body.sandbox.networkIsolated, false);
+    const sandboxCheck = selfcheck.body.checks.find((c) => c.id === 'sandbox-network-isolation');
+    assert.equal(sandboxCheck.status, 'warn');
+    assert.match(sandboxCheck.detail, /本地不隔离网络/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
