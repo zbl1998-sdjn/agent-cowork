@@ -44,8 +44,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。
 - [ ] P1-A3 延后项:真实 Kimi/API key 环境下的用户工作区多文件任务端到端留档仍未完成,不得计作真实模型验收。
-- [x] FE-1 判定口径:代码+单测完成、真实滚动验证延后。
-- [ ] FE-1 延后项:真实浏览器滚动验证尚未完成,不得计作真实体验验收。
+- [x] FE-1:智能滚动代码+单测完成,并新增 `npm run smoke:react-scroll` 真实浏览器验收;覆盖长对话中翻看历史时流式新内容不强行拽回底部,以及"回到底部"按钮出现/点击回底。
 - [x] 03-B1a:活页 `live-artifact.js` 已按 spec/render/refresh 拆为独立模块,新增安全特征测试并通过门禁。
 - [x] 03-B1b(本地可测子项):活页 data endpoint 支持手动 refresh 工作区 `file-json` 数据源,并复用 trustedRoot jail 校验。
 - [x] 03-B1c(本地可测子项):前端新增 `LiveArtifactView`,支持活页预览、手动刷新数据、重开活页与打开产物文件;UI 单测通过。
@@ -68,4 +67,4 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 前端优化专项线(FE,聚焦交互修复/架构分层+错误空态/流式性能;设计系统暂缓)
 - [x] 4 个开放问题按默认锁成 D1–D4
 - [x] 已开工:P0 地基、03/04/05 多个本地可测切片已完成并纳入 CI
-- [ ] 继续:按未完成清单推进 P0-T10/Q9 host 类型护栏、P1-A3 真实 Kimi 留档、FE 真实滚动验证、03-B1 定时/连接器/浏览器验收尾项、05-B1b 体验尾项、05-A2 Office 深操作等
+- [ ] 继续:按未完成清单推进 P0-T10/Q9 host 类型护栏、P1-A3 真实 Kimi 留档、03-B1 定时/连接器/浏览器验收尾项、05-B1b 体验尾项、05-A2 Office 深操作等

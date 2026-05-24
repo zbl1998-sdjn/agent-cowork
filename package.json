@@ -21,6 +21,7 @@
     "smoke:kimi-api": "node scripts/smoke-kimi-api.mjs",
     "smoke:tauri-scaffold": "node scripts/smoke-tauri-scaffold.mjs",
     "smoke:rendered-ui": "node scripts/smoke-rendered-ui.mjs",
+    "smoke:react-scroll": "node scripts/smoke-react-scroll.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:e2e": "node scripts/e2e-smoke.mjs",
     "bench": "node scripts/bench.mjs",

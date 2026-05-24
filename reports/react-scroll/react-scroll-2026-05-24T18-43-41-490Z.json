@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-24T18:43:43.978Z",
+  "durationMs": 2485,
+  "baseUrl": "http://127.0.0.1:54145",
+  "browserPath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kcw-react-scroll-cetrQj",
+  "uiDistRoot": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\ui-dist",
+  "screenshotPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\react-scroll-smoke-1280x760.png",
+  "reportPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\react-scroll\\react-scroll-2026-05-24T18-43-41-490Z.json",
+  "initial": {
+    "scrollTop": 9792,
+    "scrollHeight": 10257,
+    "clientHeight": 465,
+    "distanceFromBottom": 0,
+    "bubbleCount": 72
+  },
+  "scrolledAway": {
+    "scrollTop": 0,
+    "distanceFromBottom": 9792,
+    "buttonVisible": false
+  },
+  "afterStream": {
+    "scrollTop": 0,
+    "scrollHeight": 11411,
+    "clientHeight": 465,
+    "distanceFromBottom": 10946,
+    "jumpVisible": true,
+    "hasStartMarker": true,
+    "hasDoneMarker": true,
+    "buttonText": "回到底部 ↓",
+    "bubbleCount": 74
+  },
+  "afterJump": {
+    "scrollTop": 10946,
+    "scrollHeight": 11411,
+    "clientHeight": 465,
+    "distanceFromBottom": 0,
+    "jumpVisible": false
+  }
+}

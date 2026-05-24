@@ -113,7 +113,7 @@ export function Timeline({
         ))}
       </main>
       {hasNewContent && !isAtBottom && (
-        <button type="button" className="jump-to-bottom" onClick={onScrollToBottom} title="回到底部">回到底部 ↓</button>
+        <button type="button" className="jump-to-bottom" onClick={() => onScrollToBottom()} title="回到底部">回到底部 ↓</button>
       )}
     </>
   );

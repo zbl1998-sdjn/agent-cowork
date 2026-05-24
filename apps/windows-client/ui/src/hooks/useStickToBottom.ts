@@ -20,6 +20,15 @@ export function shouldFlagNewContent(wasAtBottom: boolean, previousScrollHeight:
   return !wasAtBottom && nextScrollHeight > previousScrollHeight + 1;
 }
 
+export function shouldResetScroll(lastResetKey: unknown, resetKey: unknown, previousScrollHeight: number): boolean {
+  return lastResetKey !== resetKey || previousScrollHeight <= 0;
+}
+
+function forceBottom(el: HTMLElement, previousHeightRef: { current: number }) {
+  previousHeightRef.current = el.scrollHeight;
+  el.scrollTop = el.scrollHeight;
+}
+
 export function useStickToBottom(
   contentVersion: unknown,
   resetKey: unknown,
@@ -29,6 +38,7 @@ export function useStickToBottom(
   const containerRef = useRef<HTMLElement | null>(null);
   const stickRef = useRef(true);
   const previousHeightRef = useRef(0);
+  const lastResetKeyRef = useRef<unknown>(undefined);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [hasNewContent, setHasNewContent] = useState(false);
 
@@ -44,11 +54,21 @@ export function useStickToBottom(
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = containerRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior });
+    const top = el.scrollHeight;
+    try {
+      el.scrollTo({ top, behavior });
+    } catch {
+      el.scrollTop = top;
+    }
+    if (behavior === 'smooth') {
+      setTimeout(() => {
+        if (!isNearBottom(el, thresholdPx)) el.scrollTop = el.scrollHeight;
+      }, 650);
+    }
     stickRef.current = true;
     setIsAtBottom(true);
     setHasNewContent(false);
-  }, []);
+  }, [thresholdPx]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -56,17 +76,31 @@ export function useStickToBottom(
     updateStickState();
     el.addEventListener('scroll', updateStickState, { passive: true });
     return () => el.removeEventListener('scroll', updateStickState);
-  }, [updateStickState]);
+  });
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    if (!shouldResetScroll(lastResetKeyRef.current, resetKey, previousHeightRef.current)) return;
+    lastResetKeyRef.current = resetKey;
     stickRef.current = true;
-    previousHeightRef.current = el.scrollHeight;
-    el.scrollTop = el.scrollHeight;
+    forceBottom(el, previousHeightRef);
+    if (typeof requestAnimationFrame === 'function') {
+      const settlingResetKey = resetKey;
+      const startedAt = Date.now();
+      const settle = () => {
+        if (lastResetKeyRef.current !== settlingResetKey) return;
+        stickRef.current = true;
+        forceBottom(el, previousHeightRef);
+        setIsAtBottom(true);
+        setHasNewContent(false);
+        if (Date.now() - startedAt < 650) requestAnimationFrame(settle);
+      };
+      requestAnimationFrame(settle);
+    }
     setIsAtBottom(true);
     setHasNewContent(false);
-  }, [resetKey]);
+  });
 
   useLayoutEffect(() => {
     const el = containerRef.current;

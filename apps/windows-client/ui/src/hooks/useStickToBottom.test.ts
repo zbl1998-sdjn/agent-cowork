@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isNearBottom, shouldFlagNewContent } from './useStickToBottom';
+import { isNearBottom, shouldFlagNewContent, shouldResetScroll } from './useStickToBottom';
 
 describe('useStickToBottom helpers', () => {
   it('treats positions inside the threshold as stuck to bottom', () => {
@@ -11,5 +11,11 @@ describe('useStickToBottom helpers', () => {
     expect(shouldFlagNewContent(false, 1000, 1050)).toBe(true);
     expect(shouldFlagNewContent(true, 1000, 1050)).toBe(false);
     expect(shouldFlagNewContent(false, 1000, 1000)).toBe(false);
+  });
+
+  it('resets scroll when the timeline element appears after the auth gate', () => {
+    expect(shouldResetScroll('conversation-1', 'conversation-1', 0)).toBe(true);
+    expect(shouldResetScroll('conversation-1', 'conversation-1', 1200)).toBe(false);
+    expect(shouldResetScroll('conversation-1', 'conversation-2', 1200)).toBe(true);
   });
 });

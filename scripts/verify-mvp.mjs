@@ -131,6 +131,11 @@ const checks = [
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
   },
   {
+    name: 'react scroll smoke script syntax',
+    command: nodeBin,
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
+  },
+  {
     name: 'windows client resource smoke script syntax',
     command: nodeBin,
     commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
@@ -169,6 +174,11 @@ const checks = [
     name: 'rendered browser ui smoke',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
+  },
+  {
+    name: 'react timeline scroll smoke',
+    command: nodeBin,
+    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
   },
   {
     name: 'windows client static resource smoke',
