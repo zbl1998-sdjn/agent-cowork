@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import { createCredentialStore } from '../apps/host/src/security/credential-store.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -20,6 +21,24 @@ const screenshotPath = path.join(buildDir, 'react-connectors-smoke-1280x760.png'
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function smokeProtector() {
+  return {
+    protect(text) {
+      return `sealed:${Buffer.from(String(text), 'utf8').toString('base64')}`;
+    },
+    unprotect(text) {
+      return Buffer.from(String(text).slice('sealed:'.length), 'base64').toString('utf8');
+    },
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 function findBrowser() {
@@ -45,12 +64,12 @@ async function getFreePort() {
   });
 }
 
-async function getJson(url, timeoutMs = 5000) {
+async function getJson(url, timeoutMs = 5000, headers = {}) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     try {
       return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
+        const request = http.get(url, { headers }, (response) => {
           let body = '';
           response.setEncoding('utf8');
           response.on('data', (chunk) => { body += chunk; });
@@ -144,6 +163,33 @@ async function main() {
 
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-react-connectors-'));
   fs.writeFileSync(path.join(workspace, 'connector-smoke.txt'), 'filesystem connector smoke\n', 'utf8');
+  const oauthToken = ['gho', 'smoke', 'connector', 'token'].join('_');
+  const credentialStore = createCredentialStore({
+    filePath: path.join(workspace, '.AgentCowork', 'credentials.json'),
+    protector: smokeProtector(),
+  });
+  const oauthFetch = async (url, init = {}) => {
+    const href = String(url);
+    if (href.endsWith('/login/device/code')) {
+      assert(String(init.body || '').includes('client_id=smoke-client'), 'OAuth start did not send the configured client id');
+      return jsonResponse({
+        device_code: 'device-smoke-code',
+        user_code: 'SMOKE-1234',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 900,
+        interval: 1,
+      });
+    }
+    if (href.endsWith('/login/oauth/access_token')) {
+      assert(String(init.body || '').includes('device_code=device-smoke-code'), 'OAuth complete did not send the device code');
+      return jsonResponse({ access_token: oauthToken, token_type: 'bearer', scope: 'read:user' });
+    }
+    if (href.endsWith('/user')) {
+      assert(init.headers.authorization === `Bearer ${oauthToken}`, 'OAuth user lookup did not use the stored token');
+      return jsonResponse({ login: 'octocat', id: 1 });
+    }
+    throw new Error(`unexpected OAuth fetch: ${href}`);
+  };
 
   const host = createServer({
     trustedRoot: workspace,
@@ -151,6 +197,9 @@ async function main() {
     persistAuth: false,
     enableScheduler: false,
     uiDistRoot,
+    credentialStore,
+    oauthFetch,
+    oauthConfig: { github: { clientId: 'smoke-client' } },
   });
 
   const startedAt = Date.now();
@@ -205,6 +254,7 @@ async function main() {
     });
 
     await sendPage('Page.navigate', { url: baseUrl });
+    await evaluate(sendPage, 'window.open = () => null; true');
     await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
@@ -350,6 +400,133 @@ async function main() {
     const connectorsAfterDisconnect = await getJson(`${baseUrl}/api/connectors`);
     assert(!connectorsAfterDisconnect.connected.includes('fs'), 'connector catalog still reported fs as connected');
 
+    await evaluate(
+      sendPage,
+      `(() => {
+        const githubItem = [...document.querySelectorAll('.tool-list li')]
+          .find((item) => item.innerText.includes('GitHub'));
+        if (!githubItem) throw new Error('GitHub OAuth connector item missing');
+        const button = [...githubItem.querySelectorAll('button')]
+          .find((item) => item.innerText.trim() === '开始授权');
+        if (!button) throw new Error('GitHub start OAuth button missing');
+        button.click();
+        return true;
+      })()`,
+    );
+    const afterOAuthStart = await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 10000;
+        function snapshot() {
+          const githubItem = [...document.querySelectorAll('.tool-list li')]
+            .find((item) => item.innerText.includes('GitHub'));
+          return {
+            buttonText: githubItem
+              ? [...githubItem.querySelectorAll('button')].map((button) => button.innerText.trim()).join('|')
+              : '',
+            resultText: document.querySelector('.panel-result')?.innerText || '',
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (current.buttonText.includes('完成授权') && current.resultText.includes('SMOKE-1234')) resolve(current);
+          else if (Date.now() > deadline) reject(new Error('GitHub OAuth start did not render the device code: ' + JSON.stringify(current)));
+          else setTimeout(tick, 100);
+        }
+        tick();
+      })`,
+    );
+
+    await evaluate(
+      sendPage,
+      `(() => {
+        const githubItem = [...document.querySelectorAll('.tool-list li')]
+          .find((item) => item.innerText.includes('GitHub'));
+        const button = [...githubItem.querySelectorAll('button')]
+          .find((item) => item.innerText.trim() === '完成授权');
+        if (!button) throw new Error('GitHub complete OAuth button missing');
+        button.click();
+        return true;
+      })()`,
+    );
+    const afterOAuthComplete = await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 10000;
+        function snapshot() {
+          const githubItem = [...document.querySelectorAll('.tool-list li')]
+            .find((item) => item.innerText.includes('GitHub'));
+          return {
+            itemText: githubItem?.innerText || '',
+            buttonText: githubItem
+              ? [...githubItem.querySelectorAll('button')].map((button) => button.innerText.trim()).join('|')
+              : '',
+            resultText: document.querySelector('.panel-result')?.innerText || '',
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (current.buttonText.includes('撤销授权')
+            && current.itemText.includes('已连接')
+            && current.resultText.includes('已授权 GitHub')) resolve(current);
+          else if (Date.now() > deadline) reject(new Error('GitHub OAuth complete did not mark the connector connected: ' + JSON.stringify(current)));
+          else setTimeout(tick, 100);
+        }
+        tick();
+      })`,
+    );
+    const authToken = await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`);
+    assert(authToken, 'guest auth token missing after OAuth connector login');
+    const authHeader = { authorization: `Bearer ${authToken}` };
+    const oauthStatus = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    assert(oauthStatus.connected === true, 'GitHub OAuth status did not become connected');
+    assert(!JSON.stringify(oauthStatus).includes(oauthToken), 'OAuth status leaked the access token');
+
+    await evaluate(
+      sendPage,
+      `(() => {
+        const githubItem = [...document.querySelectorAll('.tool-list li')]
+          .find((item) => item.innerText.includes('GitHub'));
+        const button = [...githubItem.querySelectorAll('button')]
+          .find((item) => item.innerText.trim() === '撤销授权');
+        if (!button) throw new Error('GitHub revoke OAuth button missing');
+        button.click();
+        return true;
+      })()`,
+    );
+    const afterOAuthRevoke = await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 10000;
+        function snapshot() {
+          const githubItem = [...document.querySelectorAll('.tool-list li')]
+            .find((item) => item.innerText.includes('GitHub'));
+          return {
+            itemText: githubItem?.innerText || '',
+            buttonText: githubItem
+              ? [...githubItem.querySelectorAll('button')].map((button) => button.innerText.trim()).join('|')
+              : '',
+            resultText: document.querySelector('.panel-result')?.innerText || '',
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (current.buttonText.includes('开始授权')
+            && !current.itemText.includes('已连接')
+            && current.resultText.includes('已撤销 GitHub')) resolve(current);
+          else if (Date.now() > deadline) reject(new Error('GitHub OAuth revoke did not clear the connector state: ' + JSON.stringify(current)));
+          else setTimeout(tick, 100);
+        }
+        tick();
+      })`,
+    );
+    const oauthStatusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    assert(oauthStatusAfterRevoke.connected === false, 'GitHub OAuth status remained connected after revoke');
+    assert(
+      fs.readFileSync(path.join(workspace, '.AgentCowork', 'credentials.json'), 'utf8').includes(oauthToken) === false,
+      'credential store leaked the OAuth token',
+    );
+
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
@@ -366,9 +543,14 @@ async function main() {
       beforeConnect,
       afterConnect,
       afterDisconnect,
+      afterOAuthStart,
+      afterOAuthComplete,
+      afterOAuthRevoke,
       registeredTool: 'mcp__fs__read_text',
       connected: connectors.connected,
       disconnected: connectorsAfterDisconnect.connected,
+      oauthConnected: oauthStatus.connected,
+      oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify({
@@ -377,6 +559,8 @@ async function main() {
       screenshotPath,
       connected: connectors.connected,
       disconnected: connectorsAfterDisconnect.connected,
+      oauthConnected: oauthStatus.connected,
+      oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
     }, null, 2));
   } catch (error) {
     const report = {

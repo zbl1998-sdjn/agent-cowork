@@ -245,6 +245,48 @@ describe('JSON requests', () => {
     });
     expect(forgotten.removed).toBe(1);
   });
+
+  it('posts OAuth connector device-flow requests without putting tokens in the client payload', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/connectors/oauth/start')) {
+        return jsonResponse({
+          provider: 'github',
+          sessionId: 'session-1',
+          userCode: 'ABCD-1234',
+          verificationUri: 'https://github.com/login/device',
+          interval: 5,
+          scopes: ['read:user'],
+        });
+      }
+      if (url.endsWith('/api/connectors/oauth/complete')) {
+        return jsonResponse({ provider: 'github', connected: true, account: { login: 'octocat' } });
+      }
+      if (url.includes('/api/connectors/oauth/status')) {
+        return jsonResponse({ provider: 'github', connected: true, accounts: [{ accountId: 'octocat' }] });
+      }
+      if (url.endsWith('/api/connectors/oauth/revoke')) {
+        return jsonResponse({ provider: 'github', removed: 1 });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const started = await api.startOAuthConnector({ id: 'github', scopes: ['read:user'] });
+    const completed = await api.completeOAuthConnector({ id: 'github', sessionId: started.sessionId });
+    const status = await api.getOAuthConnectorStatus('github');
+    const revoked = await api.revokeOAuthConnector({ id: 'github' });
+
+    expect(started.userCode).toBe('ABCD-1234');
+    expect(completed.account?.login).toBe('octocat');
+    expect(status.connected).toBe(true);
+    expect(revoked.removed).toBe(1);
+    expect(JSON.stringify(calls)).not.toContain('access_token');
+    expect(JSON.parse(String(calls.find((call) => call.url.endsWith('/api/connectors/oauth/start'))?.init?.body))).toEqual({
+      id: 'github',
+      scopes: ['read:user'],
+      idempotencyKey: expect.stringMatching(/^conn-/),
+    });
+  });
 });
 
 describe('host readiness', () => {

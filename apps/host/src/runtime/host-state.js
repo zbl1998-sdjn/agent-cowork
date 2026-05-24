@@ -25,6 +25,8 @@ import { createFileOperationApprovalStore } from './file-operation-approvals.js'
 import { createClarificationStore } from './clarifications.js';
 import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
+import { createCredentialStore } from '../security/credential-store.js';
+import { getAppHome } from '../storage/app-home.js';
 import { sendJson } from '../http/request-utils.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
@@ -138,6 +140,12 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.authStore = config.authStore || ((config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false'))
     ? createSqliteUserStore({ dbPath: path.resolve(config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.AgentCowork', 'auth.sqlite')) })
     : createUserStore());
+  state.credentialStore = config.credentialStore || createCredentialStore({
+    filePath: path.resolve(config.credentialStorePath || process.env.KCW_CREDENTIAL_STORE || path.join(getAppHome(), 'credentials.json')),
+  });
+  state.oauthSessions = config.oauthSessions || new Map();
+  state.oauthFetch = config.oauthFetch || fetch;
+  state.oauthConfig = config.oauthConfig || {};
   state.jwtSecret = config.jwtSecret || process.env.KCW_JWT_SECRET || null;
   state.requireAuth = config.requireAuth ?? (process.env.KCW_REQUIRE_AUTH !== 'false');
   state.trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');

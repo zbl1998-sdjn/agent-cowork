@@ -61,6 +61,7 @@ export interface ConnectorInfo {
   description: string;
   keywords?: string[];
   builtin?: boolean;
+  auth?: { type: string; provider: string; scopes?: string[] };
   command?: string;
   args?: string[];
   install?: string;
@@ -100,4 +101,63 @@ export async function connectConnector(
 
 export async function disconnectConnector(body: { id: string }): Promise<DisconnectResult> {
   return postJson('/api/connectors/disconnect', { ...body, idempotencyKey: newIdempotencyKey('conn') });
+}
+
+export interface OAuthAccountSummary {
+  provider: string;
+  accountId: string;
+  scopes?: string[];
+  account?: { login?: string; id?: number | string; name?: string; email?: string } | null;
+  updatedAt?: string;
+}
+
+export interface OAuthStatusResult {
+  provider: string;
+  connected: boolean;
+  configured?: boolean;
+  accounts: OAuthAccountSummary[];
+}
+
+export interface OAuthStartResult {
+  provider: string;
+  sessionId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt?: string;
+  interval?: number;
+  scopes?: string[];
+}
+
+export interface OAuthCompleteResult {
+  provider: string;
+  connected?: boolean;
+  status?: 'pending';
+  interval?: number;
+  account?: { login?: string; id?: number | string; name?: string; email?: string };
+  credential?: OAuthAccountSummary;
+}
+
+export interface OAuthRevokeResult {
+  provider: string;
+  removed: number;
+}
+
+export async function getOAuthConnectorStatus(id: string): Promise<OAuthStatusResult> {
+  return getJson(`/api/connectors/oauth/status?id=${encodeURIComponent(id)}`);
+}
+
+export async function startOAuthConnector(body: {
+  id: string;
+  scopes?: string[];
+  clientId?: string;
+}): Promise<OAuthStartResult> {
+  return postJson('/api/connectors/oauth/start', { ...body, idempotencyKey: newIdempotencyKey('conn') });
+}
+
+export async function completeOAuthConnector(body: { id: string; sessionId: string }): Promise<OAuthCompleteResult> {
+  return postJson('/api/connectors/oauth/complete', { ...body, idempotencyKey: newIdempotencyKey('conn') });
+}
+
+export async function revokeOAuthConnector(body: { id: string }): Promise<OAuthRevokeResult> {
+  return postJson('/api/connectors/oauth/revoke', { ...body, idempotencyKey: newIdempotencyKey('conn') });
 }

@@ -4,7 +4,12 @@ import {
   suggestConnectors,
   connectConnector,
   disconnectConnector,
+  startOAuthConnector,
+  completeOAuthConnector,
+  getOAuthConnectorStatus,
+  revokeOAuthConnector,
   type ConnectorInfo,
+  type OAuthStartResult,
 } from '../lib/api';
 
 interface ConnectorsPanelProps {
@@ -20,14 +25,35 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
   const [query, setQuery] = useState('');
   const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
   const [connected, setConnected] = useState<string[]>([]);
+  const [oauthStatus, setOauthStatus] = useState<Record<string, { connected: boolean; accounts: string[]; configured?: boolean }>>({});
+  const [oauthSessions, setOauthSessions] = useState<Record<string, OAuthStartResult>>({});
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
+
+  const refreshOAuthStatus = async (items: ConnectorInfo[]) => {
+    const oauthItems = items.filter((connector) => connector.auth?.type === 'oauth-device');
+    const next: Record<string, { connected: boolean; accounts: string[]; configured?: boolean }> = {};
+    await Promise.all(oauthItems.map(async (connector) => {
+      try {
+        const status = await getOAuthConnectorStatus(connector.id);
+        next[connector.id] = {
+          connected: status.connected,
+          configured: status.configured,
+          accounts: (status.accounts || []).map((account) => account.accountId),
+        };
+      } catch {
+        next[connector.id] = { connected: false, accounts: [] };
+      }
+    }));
+    setOauthStatus(next);
+  };
 
   const refresh = async () => {
     try {
       const res = await listConnectors();
       setConnectors(res.connectors);
       setConnected(res.connected || []);
+      await refreshOAuthStatus(res.connectors);
     } catch (error) {
       setMessage(`错误：${(error as Error).message}`);
     }
@@ -80,6 +106,71 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
     }
   };
 
+  const onStartOAuth = async (connector: ConnectorInfo) => {
+    setBusyId(connector.id);
+    setMessage('');
+    try {
+      const res = await startOAuthConnector({ id: connector.id, scopes: connector.auth?.scopes });
+      setOauthSessions((current) => ({ ...current, [connector.id]: res }));
+      if (typeof window !== 'undefined' && typeof window.open === 'function') {
+        window.open(res.verificationUri, '_blank', 'noopener,noreferrer');
+      }
+      setMessage(`打开 ${res.verificationUri}，输入 ${res.userCode} 后点击完成授权`);
+    } catch (error) {
+      setMessage(`授权失败：${(error as Error).message}`);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const onCompleteOAuth = async (connector: ConnectorInfo) => {
+    const session = oauthSessions[connector.id];
+    if (!session) {
+      await onStartOAuth(connector);
+      return;
+    }
+    setBusyId(connector.id);
+    setMessage('');
+    try {
+      const res = await completeOAuthConnector({ id: connector.id, sessionId: session.sessionId });
+      if (res.status === 'pending') {
+        setMessage(`${connector.name} 仍在等待授权确认`);
+        return;
+      }
+      setOauthSessions((current) => {
+        const next = { ...current };
+        delete next[connector.id];
+        return next;
+      });
+      await refreshOAuthStatus(connectors);
+      const login = res.account?.login || res.credential?.accountId || connector.name;
+      setMessage(`已授权 ${connector.name}：${login}`);
+    } catch (error) {
+      setMessage(`授权确认失败：${(error as Error).message}`);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const onRevokeOAuth = async (connector: ConnectorInfo) => {
+    setBusyId(connector.id);
+    setMessage('');
+    try {
+      const res = await revokeOAuthConnector({ id: connector.id });
+      setOauthSessions((current) => {
+        const next = { ...current };
+        delete next[connector.id];
+        return next;
+      });
+      await refreshOAuthStatus(connectors);
+      setMessage(`已撤销 ${connector.name}（移除 ${res.removed} 个账户）`);
+    } catch (error) {
+      setMessage(`撤销失败：${(error as Error).message}`);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <section className="side-panel">
       <h2>连接器</h2>
@@ -104,14 +195,33 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
 
       <ul className="tool-list">
         {connectors.map((c) => {
-          const isOn = connected.includes(c.id) || connected.includes(c.name) || (c.id === 'filesystem' && connected.includes('fs'));
+          const oauth = oauthStatus[c.id];
+          const isOAuth = c.auth?.type === 'oauth-device';
+          const hasOAuthSession = Boolean(oauthSessions[c.id]);
+          const isOn = connected.includes(c.id)
+            || connected.includes(c.name)
+            || (c.id === 'filesystem' && connected.includes('fs'))
+            || Boolean(oauth?.connected);
           return (
             <li key={c.id}>
               <code>{c.name}</code>
               {c.builtin && <span className="tool-src">内置</span>}
+              {isOAuth && <span className="tool-src">OAuth</span>}
               {isOn && <span className="tool-src">已连接</span>}
               <p>{c.description}</p>
-              {c.builtin ? (
+              {isOAuth ? (
+                <button
+                  type="button"
+                  disabled={busyId === c.id}
+                  onClick={() => void (oauth?.connected
+                    ? onRevokeOAuth(c)
+                    : hasOAuthSession ? onCompleteOAuth(c) : onStartOAuth(c))}
+                >
+                  {busyId === c.id
+                    ? (oauth?.connected ? '撤销中…' : hasOAuthSession ? '确认中…' : '授权中…')
+                    : oauth?.connected ? '撤销授权' : hasOAuthSession ? '完成授权' : '开始授权'}
+                </button>
+              ) : c.builtin ? (
                 <button
                   type="button"
                   disabled={busyId === c.id}

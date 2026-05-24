@@ -12,6 +12,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 - Added a gated real Docker integration test for `--network=none` outbound network blocking (`KCW_SANDBOX_REAL_DOCKER_IMAGE=<local-image-with-sh-wget>`).
 - Added a real React connectors smoke test that opens the connector panel, one-click connects the builtin filesystem MCP server, and verifies the imported `mcp__fs__read_text` tool.
 - Added connector disconnect support so host-defined MCP connectors can be revoked and their imported tools removed from the registry.
+- Added a GitHub OAuth device-flow connector prototype with server-side device-code sessions, protected credential storage, redacted status/revoke routes, and React connector-panel start/complete/revoke controls.
 - Added the local `npm run ci` gate for architecture checks, file-size checks, host tests, and UI tests.
 - Added a dry-run-first release skeleton for SemVer validation, VERSION planning, git bundle planning, installer signing/archive planning, and tag planning.
 - Added testing and release checklist documentation for milestone gates.

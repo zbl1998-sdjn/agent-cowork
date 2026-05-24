@@ -11,6 +11,7 @@
  *   description: string,
  *   keywords: string[],
  *   builtin?: boolean,
+ *   auth?: { type: string, provider: string, scopes?: string[] },
  *   command?: string,
  *   args?: string[],
  *   install?: string,
@@ -35,6 +36,12 @@ const CONNECTORS = [
     id: 'memory', name: '长期记忆', description: '工作区长期事实与笔记 (内置 Memory)',
     keywords: ['memory', '记忆', 'notes', 'facts', '笔记'],
     builtin: true,
+  },
+  {
+    id: 'github', name: 'GitHub', description: '通过 OAuth 授权读取 GitHub 用户资料,后续接 issue/repo 工具',
+    keywords: ['github', 'repo', 'issue', 'pull request', 'oauth', '代码仓库'],
+    builtin: true,
+    auth: { type: 'oauth-device', provider: 'github', scopes: ['read:user'] },
   },
   {
     id: 'sqlite', name: 'SQLite', description: '查询本地 SQLite 数据库',

@@ -1,10 +1,12 @@
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { listConnectors, suggestConnectors } from '../connectors/catalog.js';
+import { handleConnectorOAuthRoutes } from './connector-oauth-routes.js';
 
 // Connector catalog routes (suggest + one-click connect).
 //   GET  /api/connectors            -> full catalog + currently connected servers
 //   GET  /api/connectors/suggest?q= -> keyword-ranked suggestions
 //   POST /api/connectors/connect    -> connect a HOST-DEFINED builtin (by id only)
+//   POST /api/connectors/oauth/*    -> OAuth device-flow for host-defined providers
 
 // SECURITY (P0): the connect endpoint must NEVER spawn a client-supplied command.
 // Allowing `{ command, args }` from the request body is arbitrary program
@@ -25,7 +27,8 @@ function connectorServerName(id) {
 
 export async function handleConnectorRoutes({
   request, response, pathname, requestUrl, requestContext,
-  connectMcp, toolRegistry, safeTrustedRoot, fsServerPath,
+  connectMcp, toolRegistry, credentialStore, oauthSessions, oauthFetch, oauthConfig,
+  safeTrustedRoot, fsServerPath,
 }) {
   if (request.method === 'GET' && pathname === '/api/connectors') {
     sendJson(response, 200, {
@@ -41,6 +44,20 @@ export async function handleConnectorRoutes({
     const limit = Math.max(1, Math.min(Number(requestUrl.searchParams.get('limit') || 5), 20));
     sendJson(response, 200, { context: requestContext, query, connectors: suggestConnectors(query, { limit }) });
     return true;
+  }
+
+  if (pathname.startsWith('/api/connectors/oauth/')) {
+    return handleConnectorOAuthRoutes({
+      request,
+      response,
+      pathname,
+      requestUrl,
+      requestContext,
+      credentialStore,
+      oauthSessions,
+      oauthFetch,
+      oauthConfig,
+    });
   }
 
   if (request.method === 'POST' && pathname === '/api/connectors/connect') {
