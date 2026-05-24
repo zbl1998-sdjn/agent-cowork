@@ -1,3 +1,5 @@
+// @ts-check
+
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
@@ -5,12 +7,26 @@ import { assertReadableWorkspacePath } from '../security/path-policy.js';
 const DEFAULT_MAX_BYTES = 256 * 1024;
 const HARD_MAX_BYTES = 256 * 1024;
 
+/**
+ * @typedef {{ root?: string, trustedRoot?: string, maxSize?: number }} ReadTextFileOptions
+ * @typedef {{ path: string, size: number, sha256: string, content: string }} ReadTextFileResult
+ */
+
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
 function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(1, Math.floor(n)), HARD_MAX_BYTES);
 }
 
+/**
+ * @param {Buffer} buffer
+ * @returns {boolean}
+ */
 function isLikelyBinary(buffer) {
   let zeroCount = 0;
   for (const byte of buffer.values()) {
@@ -30,6 +46,11 @@ function isLikelyBinary(buffer) {
   return false;
 }
 
+/**
+ * @param {string} filePath
+ * @param {ReadTextFileOptions} [options]
+ * @returns {ReadTextFileResult}
+ */
 export function readTextFile(filePath, options = {}) {
   const maxBytes = cappedMaxBytes(options.maxSize ?? DEFAULT_MAX_BYTES);
   const trustedRoot = options.trustedRoot ?? options.root;

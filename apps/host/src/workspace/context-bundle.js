@@ -1,9 +1,44 @@
+// @ts-check
+
 import path from 'node:path';
 import { readTextFile } from './file-reader.js';
 import { listWorkspaceTree } from './file-tree.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import fs from 'node:fs';
 
+/**
+ * @typedef {{ path: string, size: number, sha256: string, content: string }} BundledTextFile
+ * @typedef {{ path: string, reason: string }} SkippedPath
+ * @typedef {{
+ *   root?: string,
+ *   trustedRoot?: string,
+ *   paths?: string[],
+ *   maxTextSize?: number,
+ *   maxTotalBytes?: number,
+ *   maxFiles?: number,
+ *   fsStatFn?: (candidate: string) => import('node:fs').Stats
+ * }} ContextBundleInput
+ * @typedef {{
+ *   root: string,
+ *   files: BundledTextFile[],
+ *   skipped: SkippedPath[],
+ *   generatedAt: string,
+ *   count: number
+ * }} ContextBundle
+ */
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * @param {ContextBundleInput} input
+ * @returns {ContextBundle}
+ */
 export function buildContextBundle(input) {
   const trustedRoot = input.root ?? input.trustedRoot;
   const paths = input.paths ?? [];
@@ -17,7 +52,9 @@ export function buildContextBundle(input) {
     throw new Error('trustedRoot is required');
   }
 
+  /** @type {Set<string>} */
   const fileTargets = new Set();
+  /** @type {SkippedPath[]} */
   const skipped = [];
 
   for (const raw of paths) {
@@ -25,7 +62,7 @@ export function buildContextBundle(input) {
     try {
       resolved = assertTrustedPath(raw, trustedRoot);
     } catch (err) {
-      skipped.push({ path: raw, reason: err.message });
+      skipped.push({ path: raw, reason: errorMessage(err) });
       continue;
     }
 
@@ -33,7 +70,7 @@ export function buildContextBundle(input) {
     try {
       stats = fsStat(resolved);
     } catch (err) {
-      skipped.push({ path: resolved, reason: err.message });
+      skipped.push({ path: resolved, reason: errorMessage(err) });
       continue;
     }
     const isDirectory = stats ? stats.isDirectory() : false;
@@ -66,11 +103,11 @@ export function buildContextBundle(input) {
       continue;
     }
     try {
-      const file = readTextFile(filePath, { trustedRoot, maxSize: maxTextSize });
+      const file = /** @type {BundledTextFile} */ (readTextFile(filePath, { trustedRoot, maxSize: maxTextSize }));
       totalBytes += Buffer.byteLength(file.content || '', 'utf8');
       files.push(file);
     } catch (err) {
-      skipped.push({ path: filePath, reason: err.message });
+      skipped.push({ path: filePath, reason: errorMessage(err) });
     }
   }
 

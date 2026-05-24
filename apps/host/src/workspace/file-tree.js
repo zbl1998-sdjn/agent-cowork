@@ -1,7 +1,22 @@
+// @ts-check
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, isWorkspaceIgnoredPath } from '../security/path-policy.js';
 
+/**
+ * @typedef {{ includeFiles?: boolean, includeDirectories?: boolean, maxDepth?: number, maxEntries?: number }} WorkspaceTreeOptions
+ * @typedef {{ path: string, fullPath: string, kind: 'directory' }} WorkspaceDirectoryEntry
+ * @typedef {{ path: string, fullPath: string, kind: 'file', size: number, mtimeMs: number }} WorkspaceFileEntry
+ * @typedef {WorkspaceDirectoryEntry | WorkspaceFileEntry} WorkspaceTreeEntry
+ * @typedef {{ absPath: string, depth: number }} PendingTreeNode
+ */
+
+/**
+ * @param {string} trustedRoot
+ * @param {WorkspaceTreeOptions} [options]
+ * @returns {WorkspaceTreeEntry[]}
+ */
 export function listWorkspaceTree(trustedRoot, options = {}) {
   const root = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
   const includeFiles = options.includeFiles !== false;
@@ -10,13 +25,17 @@ export function listWorkspaceTree(trustedRoot, options = {}) {
   // UI (the listing is unbounded otherwise). Caller-overridable, hard-capped.
   const maxDepth = Math.min(Math.max(1, Number(options.maxDepth ?? 8)), 20);
   const maxEntries = Math.min(Math.max(1, Number(options.maxEntries ?? 5000)), 20000);
+  /** @type {WorkspaceTreeEntry[]} */
   const results = [];
 
+  /** @type {PendingTreeNode[]} */
   const stack = [{ absPath: root, depth: 0 }];
 
   while (stack.length > 0) {
     if (results.length >= maxEntries) break;
-    const { absPath, depth } = stack.pop();
+    const nextNode = stack.pop();
+    if (!nextNode) break;
+    const { absPath, depth } = nextNode;
     const stat = fs.statSync(absPath);
     if (!stat.isDirectory()) {
       throw new Error(`Expected workspace root directory, got file: ${absPath}`);

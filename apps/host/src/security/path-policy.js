@@ -1,3 +1,5 @@
+// @ts-check
+
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,19 +32,23 @@ const SENSITIVE_FILENAMES = new Set([
 const SENSITIVE_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx']);
 const WORKSPACE_IGNORED_SEGMENTS = new Set(['node_modules', 'dist', 'build', 'coverage']);
 
+/** @returns {boolean} */
 function isWindows() {
   return process.platform === 'win32';
 }
 
+/** @param {string} p @returns {string} */
 function normalizeForCompare(p) {
   const replaced = path.resolve(p).replace(/[\\]/g, '/');
   return isWindows() ? replaced.toLowerCase() : replaced;
 }
 
+/** @param {string} p @returns {string} */
 function realpath(p) {
   return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
 }
 
+/** @param {string} input @returns {string} */
 export function canonicalizePath(input) {
   const resolved = path.resolve(input);
   try {
@@ -55,7 +61,7 @@ export function canonicalizePath(input) {
     // nearest EXISTING ancestor (canonicalizing the prefix) and re-append the
     // missing tail so not-yet-created paths compare correctly.
     let cur = resolved;
-    const missing = [];
+    const missing = /** @type {string[]} */ ([]);
     let guard = 0;
     while (guard < 4096) {
       const parent = path.dirname(cur);
@@ -74,12 +80,7 @@ export function canonicalizePath(input) {
   }
 }
 
-function splitSegments(p) {
-  return normalizeForCompare(p)
-    .split('/')
-    .filter(Boolean);
-}
-
+/** @param {string} inputPath @param {string | null} [relativeTo] @returns {string[]} */
 function segmentsBelowRoot(inputPath, relativeTo = null) {
   const normalized = normalizeForCompare(inputPath);
   if (!relativeTo) return normalized.split('/').filter(Boolean);
@@ -92,6 +93,7 @@ function segmentsBelowRoot(inputPath, relativeTo = null) {
   return normalized.split('/').filter(Boolean);
 }
 
+/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function resolveWithinRoot(candidatePath, trustedRoot) {
   return path.isAbsolute(candidatePath)
     ? path.resolve(candidatePath)
@@ -110,6 +112,7 @@ export function resolveWithinRoot(candidatePath, trustedRoot) {
 // target itself, since those describe the file being created regardless of
 // where the workspace sits. Called WITHOUT relativeTo, behaviour is unchanged
 // (whole-path inspection) for direct callers and back-compat.
+/** @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
 export function isSensitivePath(inputPath, relativeTo = null) {
   const normalized = normalizeForCompare(inputPath);
   const lowerBase = path.basename(normalized).toLowerCase();
@@ -147,6 +150,7 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   return false;
 }
 
+/** @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
 export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
   const segments = segmentsBelowRoot(inputPath, relativeTo);
   for (const segment of segments) {
@@ -161,6 +165,7 @@ export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
   return isSensitivePath(inputPath, relativeTo);
 }
 
+/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
   const safe = assertTrustedPath(candidatePath, trustedRoot);
   if (isWorkspaceIgnoredPath(safe, trustedRoot)) {
@@ -169,6 +174,7 @@ export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
   return safe;
 }
 
+/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function assertTrustedPath(candidatePath, trustedRoot) {
   const candidate = resolveWithinRoot(candidatePath, trustedRoot);
   const root = canonicalizePath(trustedRoot);
@@ -199,12 +205,13 @@ export function assertTrustedPath(candidatePath, trustedRoot) {
 // Here we walk up to the nearest EXISTING ancestor and canonicalize THAT,
 // resolving any junction/symlink, then require the real parent to live inside the
 // real root. Returns the safe absolute path (real parent + missing segments).
+/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function assertTrustedPathForCreate(candidatePath, trustedRoot) {
   const candidate = resolveWithinRoot(candidatePath, trustedRoot);
   const rootReal = canonicalizePath(trustedRoot);
 
   let cur = candidate;
-  const missing = [];
+  const missing = /** @type {string[]} */ ([]);
   let guard = 0;
   while (!fs.existsSync(cur) && guard < 4096) {
     missing.unshift(path.basename(cur));
@@ -230,6 +237,7 @@ export function assertTrustedPathForCreate(candidatePath, trustedRoot) {
   return finalPath;
 }
 
+/** @param {string} candidatePath @param {string} trustedRoot @returns {boolean} */
 export function isTrustedPath(candidatePath, trustedRoot) {
   try {
     assertTrustedPath(candidatePath, trustedRoot);

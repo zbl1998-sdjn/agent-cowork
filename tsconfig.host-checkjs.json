@@ -11,7 +11,9 @@
     "types": []
   },
   "files": [
+    "types/host-node-shim.d.ts",
     "apps/host/src/security/redaction.js",
+    "apps/host/src/security/path-policy.js",
     "apps/host/src/runtime/circuit-breaker.js",
     "apps/host/src/runtime/cancellation.js",
     "apps/host/src/runtime/concurrency.js",
@@ -19,6 +21,9 @@
     "apps/host/src/runtime/rate-limit.js",
     "apps/host/src/runtime/resilience.js",
     "apps/host/src/runtime/task-presenter.js",
-    "apps/host/src/runtime/usage.js"
+    "apps/host/src/runtime/usage.js",
+    "apps/host/src/workspace/context-bundle.js",
+    "apps/host/src/workspace/file-reader.js",
+    "apps/host/src/workspace/file-tree.js"
   ]
 }
