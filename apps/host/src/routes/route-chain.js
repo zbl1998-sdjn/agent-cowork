@@ -109,6 +109,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
     safeTrustedRoot: state.safeTrustedRoot,
+    allowUnsafeDirectSandboxRoutes: state.config.allowUnsafeDirectSandboxRoutes === true,
   })) return true;
   if (await handleToolRoutes({
     request,

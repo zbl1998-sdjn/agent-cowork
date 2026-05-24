@@ -33,6 +33,7 @@ export async function handleSandboxRoutes({
   requireIdempotencyKey,
   sendCachedOrStore,
   safeTrustedRoot,
+  allowUnsafeDirectSandboxRoutes = false,
 }) {
   if (request.method === 'GET' && pathname === '/api/sandbox/info') {
     sendJson(response, 200, {
@@ -53,6 +54,12 @@ export async function handleSandboxRoutes({
         return;
       }
       if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      if (!allowUnsafeDirectSandboxRoutes) {
+        sendJson(response, 428, {
+          error: 'Direct sandbox execution requires agent approval; call the sandbox tool through the approved agent flow.',
+        });
         return;
       }
       const fingerprint = bodyFingerprint(body);
@@ -155,6 +162,12 @@ export async function handleSandboxRoutes({
         return;
       }
       if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      if (!allowUnsafeDirectSandboxRoutes) {
+        sendJson(response, 428, {
+          error: 'Direct sandbox execution requires agent approval; call the sandbox tool through the approved agent flow.',
+        });
         return;
       }
       const fingerprint = bodyFingerprint(body);

@@ -148,7 +148,7 @@ test('GET /api/sandbox/info reports capabilities', async () => {
 
 test('POST /api/sandbox/exec runs a tool, records a run, and is idempotent', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sbx-1' };
@@ -176,9 +176,26 @@ test('POST /api/sandbox/exec runs a tool, records a run, and is idempotent', asy
   }
 });
 
-test('POST /api/sandbox/exec rejects a tool outside the allowlist with 400', async () => {
+test('POST /api/sandbox/exec rejects direct execution by default', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/sandbox/exec', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'sbx-direct-blocked' },
+      body: { spec: { tool: 'node', args: ['-e', 'process.stdout.write("blocked")'], timeoutMs: 1000 } },
+    });
+    assert.equal(res.status, 428);
+    assert.match(res.body.error, /agent approval/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/sandbox/exec rejects a tool outside the allowlist with 400', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/sandbox/exec', {
@@ -284,7 +301,7 @@ test('createSandbox provisions a docker VM sandbox when given an image + spawn',
 
 test('POST /api/sandbox/run-code runs inline code, writes the script, records a sandbox-code run, and is idempotent', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_carol', 'x-user-id': 'user_carol', 'idempotency-key': 'code-1' };
@@ -318,9 +335,26 @@ test('POST /api/sandbox/run-code runs inline code, writes the script, records a 
   }
 });
 
-test('POST /api/sandbox/run-code records a failed run when the script exits non-zero', async () => {
+test('POST /api/sandbox/run-code rejects direct execution by default', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/sandbox/run-code', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'sbx-code-direct-blocked' },
+      body: { tool: 'node', code: 'process.stdout.write("blocked")' },
+    });
+    assert.equal(res.status, 428);
+    assert.match(res.body.error, /agent approval/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/sandbox/run-code records a failed run when the script exits non-zero', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_dan', 'idempotency-key': 'code-fail' };
@@ -341,7 +375,7 @@ test('POST /api/sandbox/run-code records a failed run when the script exits non-
 
 test('POST /api/sandbox/run-code rejects a tool outside the allowlist with 400 and writes no script', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/sandbox/run-code', {
@@ -376,7 +410,7 @@ test('POST /api/sandbox/run-code requires an Idempotency-Key', async () => {
 
 test('POST /api/sandbox/run-code rejects an empty code body with 400', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/sandbox/run-code', {
