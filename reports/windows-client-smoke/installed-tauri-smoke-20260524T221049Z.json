@@ -1,0 +1,75 @@
+{
+  "ok": true,
+  "mode": "installed-tauri",
+  "generatedAt": "2026-05-24T22:10:49.4872215Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "installer": ".\\installers\\Agent Cowork_0.1.0_x64-setup.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace",
+  "checks": {
+    "installedExeExists": true,
+    "sidecarExists": true,
+    "mainWindow": "passed",
+    "sidecarHealth": "passed",
+    "authRoundTrip": "passed"
+  },
+  "deferred": [
+    "deep WebView UI interaction",
+    "real Kimi reply",
+    "production signing trust chain"
+  ],
+  "installDir": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork",
+  "sidecar": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe",
+  "signatures": {
+    "installedExe": {
+      "status": "NotSigned",
+      "subject": null,
+      "thumbprint": null
+    },
+    "installer": {
+      "status": "UnknownError",
+      "subject": "CN=Agent Cowork (DEV SELF-SIGNED)",
+      "thumbprint": "182B75EA1A59C4F3D6013C21B24DBA2C743C9A09"
+    }
+  },
+  "uninstallEntry": {
+    "DisplayName": "Agent Cowork",
+    "DisplayVersion": "0.1.0",
+    "InstallLocation": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\"",
+    "UninstallString": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\uninstall.exe\""
+  },
+  "liveReplyConfigured": false,
+  "process": {
+    "pid": 109432,
+    "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+    "window": {
+      "handle": 55777320,
+      "title": "Agent Cowork"
+    }
+  },
+  "host": {
+    "url": "http://127.0.0.1:3017",
+    "health": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "portOwner": {
+      "pid": 2460,
+      "processName": "agent-cowork-host",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe"
+    }
+  },
+  "auth": {
+    "guestUserId": "guest_9960b2980246",
+    "meUserId": "guest_9960b2980246",
+    "tenantId": "tenant_guest_9960b2980246"
+  },
+  "kimi": {
+    "configured": false,
+    "provider": "kimi-api",
+    "model": "kimi-k2.6"
+  },
+  "cleanup": {
+    "closedDesktop": true,
+    "hostStoppedAfterClose": true
+  }
+}
