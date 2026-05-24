@@ -1,7 +1,7 @@
 {
   "name": "agent-cowork-ui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Agent Cowork desktop UI (React + Vite + TS). Builds to ../ui-dist for the Tauri shell.",
   "scripts": {

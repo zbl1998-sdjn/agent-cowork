@@ -21,8 +21,12 @@ Set-Location "$root\apps\windows-client"; cargo tauri build *>> $log; if($LASTEX
 Log 'STEP 5 copy + sign'
 $base="$root\apps\windows-client\src-tauri\target\release\bundle"; $dest="$root\installers"
 Remove-Item "$dest\*" -Force -ErrorAction SilentlyContinue
-Copy-Item "$base\msi\Agent Cowork_0.1.0_x64_en-US.msi" $dest -Force
-Copy-Item "$base\nsis\Agent Cowork_0.1.0_x64-setup.exe" $dest -Force
+$msi = Get-ChildItem -LiteralPath "$base\msi" -Filter 'Agent Cowork_*_x64_en-US.msi' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$nsis = Get-ChildItem -LiteralPath "$base\nsis" -Filter 'Agent Cowork_*_x64-setup.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if(-not $msi){Fail 'msi'}
+if(-not $nsis){Fail 'nsis'}
+Copy-Item $msi.FullName $dest -Force
+Copy-Item $nsis.FullName $dest -Force
 & pwsh -NoProfile -ExecutionPolicy Bypass -File "$root\scripts\sign-windows.ps1" -SelfSigned *>> $log
 Log 'STEP 6 host test suite'
 Set-Location "$root\apps\host"
