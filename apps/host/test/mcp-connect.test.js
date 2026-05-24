@@ -78,8 +78,8 @@ test('server.connectMcpServers exposes MCP tools through the HTTP routes', async
       headers: { 'idempotency-key': 'mcp-call-1' },
       body: { name: 'mcp__mock__add', args: { a: 4, b: 6 } },
     });
-    assert.equal(call.status, 200);
-    assert.equal(call.body.result.content[0].text, '10');
+    assert.equal(call.status, 428);
+    assert.match(call.body.error, /requires agent approval/i);
   } finally {
     server.closeMcp();
     await new Promise((resolve) => server.close(resolve));

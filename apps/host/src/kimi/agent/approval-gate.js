@@ -20,7 +20,8 @@ export function makeAudit(auditBus, context) {
 }
 
 export function toolNeedsApproval(tool) {
-  return !!(tool && (tool.mutating === true || tool.risk === 'high'));
+  const risk = String(tool?.risk || '').toLowerCase();
+  return !!(tool && (tool.requiresApproval === true || tool.mutating === true || risk === 'high' || risk === 'critical'));
 }
 
 function approvalScope(context = {}) {

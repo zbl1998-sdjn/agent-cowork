@@ -83,6 +83,8 @@ test('ToolRegistry.registerMcpClient imports namespaced tools and forwards calls
   assert.equal(count, 1);
   assert.equal(fakeMcp.connected, true);
   assert.equal(registry.has('mcp__demo__echo'), true);
+  assert.equal(registry.descriptor('mcp__demo__echo').requiresApproval, true);
+  assert.equal(registry.descriptor('mcp__demo__echo').risk, 'high');
   assert.deepEqual(registry.mcpServers(), ['demo']);
   const result = await registry.call('mcp__demo__echo', { text: 'hi' });
   assert.equal(result.content[0].text, 'echo:hi');

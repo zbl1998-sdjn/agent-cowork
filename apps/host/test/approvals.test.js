@@ -70,6 +70,46 @@ test('rejected high-risk tool does not run', async () => {
   assert.ok(out.steps.some((s) => s.tool === 'Shell' && s.rejected));
 });
 
+test('requiresApproval and critical risk tools are gated even when not mutating', async () => {
+  const root = tmp();
+  const approvals = createApprovalRegistry();
+  let gatedRan = false;
+  let criticalRan = false;
+  let asked = 0;
+  const out = await runAgentChat({
+    prompt: 'x',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    runStoreRoot: path.join(root, 'runs'),
+    tools: [
+      { name: 'NeedsReceipt', risk: 'low', requiresApproval: true, description: 'receipt', parameters: { type: 'object', properties: {} }, handler: async () => { gatedRan = true; return { ok: true }; } },
+      { name: 'CriticalRead', risk: 'critical', mutating: false, description: 'critical', parameters: { type: 'object', properties: {} }, handler: async () => { criticalRan = true; return { ok: true }; } },
+    ],
+    modelCall: callThenAnswer('NeedsReceipt'),
+    approvals,
+    emit: (t, d) => { if (t === 'approval_request') { asked += 1; approvals.resolve(d.id, 'reject'); } },
+  });
+  assert.equal(asked, 1);
+  assert.equal(gatedRan, false);
+  assert.equal(criticalRan, false);
+  assert.ok(out.steps.some((s) => s.tool === 'NeedsReceipt' && s.rejected));
+
+  const approvals2 = createApprovalRegistry();
+  await runAgentChat({
+    prompt: 'x',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    runStoreRoot: path.join(root, 'runs2'),
+    tools: [
+      { name: 'CriticalRead', risk: 'critical', mutating: false, description: 'critical', parameters: { type: 'object', properties: {} }, handler: async () => { criticalRan = true; return { ok: true }; } },
+    ],
+    modelCall: callThenAnswer('CriticalRead'),
+    approvals: approvals2,
+    emit: (t, d) => { if (t === 'approval_request') approvals2.resolve(d.id, 'reject'); },
+  });
+  assert.equal(criticalRan, false);
+});
+
 test('low-risk tool runs WITHOUT approval (better UX)', async () => {
   let executed = false;
   const approvals = createApprovalRegistry();

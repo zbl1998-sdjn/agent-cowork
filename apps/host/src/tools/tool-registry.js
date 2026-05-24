@@ -129,6 +129,9 @@ export class ToolRegistry {
         description: tool.description || '',
         source: `mcp:${serverName}`,
         inputSchema: tool.inputSchema || null,
+        risk: 'high',
+        mutating: true,
+        requiresApproval: true,
         handler: (args) => client.callTool(tool.name, args),
       });
     }
