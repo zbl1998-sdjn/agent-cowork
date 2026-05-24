@@ -1,3 +1,5 @@
+// @ts-check
+
 // Stateless JWT (HS256) verification with zero dependencies (node:crypto).
 //
 // Opaque server-side sessions don't scale across instances; a signed JWT lets
@@ -6,13 +8,49 @@
 // request context's tenantId/userId, overriding the header defaults.
 import crypto from 'node:crypto';
 
+/**
+ * @typedef {Record<string, unknown> & {
+ *   exp?: number,
+ *   nbf?: number,
+ *   tenant_id?: unknown,
+ *   tid?: unknown,
+ *   org?: unknown,
+ *   user_id?: unknown,
+ *   uid?: unknown,
+ *   sub?: unknown,
+ * }} JwtPayload
+ *
+ * @typedef {{ expiresInSec?: number }} SignJwtOptions
+ * @typedef {{ now?: number, clockToleranceSec?: number }} VerifyJwtOptions
+ *
+ * @typedef {object} JwtIdentity
+ * @property {string | null} tenantId
+ * @property {string | null} userId
+ * @property {JwtPayload} claims
+ */
+
+/**
+ * @param {string} str
+ * @returns {Buffer}
+ */
 function b64urlDecode(str) {
   return Buffer.from(String(str).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
+
+/**
+ * @param {Buffer | string} buf
+ * @returns {string}
+ */
 function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string} secret
+ * @param {SignJwtOptions} [options]
+ * @returns {string}
+ */
 export function signJwtHS256(payload, secret, { expiresInSec } = {}) {
   if (!secret) throw new Error('signJwtHS256: secret is required');
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -23,18 +61,26 @@ export function signJwtHS256(payload, secret, { expiresInSec } = {}) {
   return `${data}.${sig}`;
 }
 
+/**
+ * @param {unknown} token
+ * @param {string} secret
+ * @param {VerifyJwtOptions} [options]
+ * @returns {JwtPayload | null}
+ */
 export function verifyJwtHS256(token, secret, { now = Math.floor(Date.now() / 1000), clockToleranceSec = 30 } = {}) {
   if (!token || typeof token !== 'string' || !secret) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [h, p, sig] = parts;
+  /** @type {{ alg?: unknown } | null} */
   let header;
+  /** @type {JwtPayload | null} */
   let payload;
   try {
-    header = JSON.parse(b64urlDecode(h).toString('utf8'));
-    payload = JSON.parse(b64urlDecode(p).toString('utf8'));
+    header = /** @type {{ alg?: unknown }} */ (JSON.parse(b64urlDecode(h).toString('utf8')));
+    payload = /** @type {JwtPayload} */ (JSON.parse(b64urlDecode(p).toString('utf8')));
   } catch { return null; }
-  if (!header || header.alg !== 'HS256') return null;
+  if (!header || header.alg !== 'HS256' || !payload || typeof payload !== 'object') return null;
   const expected = b64url(crypto.createHmac('sha256', secret).update(`${h}.${p}`).digest());
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
@@ -46,6 +92,12 @@ export function verifyJwtHS256(token, secret, { now = Math.floor(Date.now() / 10
 
 // Map verified claims to an identity. Accepts common claim names so it works
 // with tokens minted by typical IdPs (tenant_id/tid/org, user_id/uid/sub).
+/**
+ * @param {unknown} token
+ * @param {string} secret
+ * @param {VerifyJwtOptions} [opts]
+ * @returns {JwtIdentity | null}
+ */
 export function resolveJwtIdentity(token, secret, opts) {
   const payload = verifyJwtHS256(token, secret, opts);
   if (!payload) return null;
