@@ -10,6 +10,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 - Added P2-A sandbox startup probing: Docker/WSL are detected at host boot, Docker is selected automatically when a configured image is present locally, and local fallback is reported through `/api/sandbox/info` and `/api/selfcheck`.
 - Added a gated real Docker integration test for `--network=none` outbound network blocking (`KCW_SANDBOX_REAL_DOCKER_IMAGE=<local-image-with-sh-wget>`).
+- Added a real React connectors smoke test that opens the connector panel, one-click connects the builtin filesystem MCP server, and verifies the imported `mcp__fs__read_text` tool.
 - Added the local `npm run ci` gate for architecture checks, file-size checks, host tests, and UI tests.
 - Added a dry-run-first release skeleton for SemVer validation, VERSION planning, git bundle planning, installer signing/archive planning, and tag planning.
 - Added testing and release checklist documentation for milestone gates.

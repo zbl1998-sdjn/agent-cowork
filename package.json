@@ -25,6 +25,7 @@
     "smoke:react-artifacts": "node scripts/smoke-react-artifacts-panel.mjs",
     "smoke:react-live-artifact": "node scripts/smoke-react-live-artifact.mjs",
     "smoke:react-branches": "node scripts/smoke-react-branches.mjs",
+    "smoke:react-connectors": "node scripts/smoke-react-connectors.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:e2e": "node scripts/e2e-smoke.mjs",
     "bench": "node scripts/bench.mjs",

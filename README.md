@@ -37,6 +37,7 @@ npm run smoke:live-mvp
 npm run smoke:plan-loop
 npm run build:ui
 npm run smoke:react-scroll
+npm run smoke:react-connectors
 npm test
 npm run verify:mvp
 npm run verify:windows-readiness
@@ -54,6 +55,7 @@ npm run smoke:host
 `npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Agent Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:react-scroll` 会启动临时 Host API，真实加载构建后的 React UI，预置长对话并发送一条流式回复，确认用户翻看历史时不会被新内容拽回底部，且“回到底部”按钮可出现并返回底部；报告和截图写入 `build/react-scroll-smoke-report.json` 与 `build/react-scroll-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。
 `npm run smoke:react-artifacts` 会启动临时 Host API，真实加载构建后的 React UI，预置 `.AgentCowork/artifacts` 产物，打开“产物”面板并执行重命名，确认 UI 与磁盘文件同步更新；报告和截图写入 `build/react-artifacts-smoke-report.json` 与 `build/react-artifacts-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。
+`npm run smoke:react-connectors` 会启动临时 Host API，真实加载构建后的 React UI，打开“连接器”面板，一键连接内置文件系统 MCP，并确认 `mcp__fs__read_text` 进入工具 registry；报告和截图写入 `build/react-connectors-smoke-report.json` 与 `build/react-connectors-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。
 `npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，确认前台任务卡片显示最新 Cowork run，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:plan-loop` 会启动临时 Host API，用脚本化模型跑一次计划模式闭环：只读研究两个文件、提交计划、审批后写两个产物、触发自检读回、最后收尾；报告写入 `build/plan-closed-loop-smoke-report.json`，用于覆盖 P1-A3 的本地可复现验收。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `AgentCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
