@@ -20,6 +20,8 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
   const [goal, setGoal] = useState('');
 
   const parseArgs = (): Record<string, unknown> => (argsText.trim() ? (JSON.parse(argsText) as Record<string, unknown>) : {});
+  const selectedTool = tools.find((tool) => tool.name === selected);
+  const selectedRequiresApproval = selectedTool?.requiresApproval === true || selectedTool?.mutating === true || selectedTool?.risk === 'high' || selectedTool?.risk === 'critical';
 
   const onSearch = async () => {
     try {
@@ -91,9 +93,10 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
           <label>调用 <code>{selected}</code> · 参数 (JSON)</label>
           <textarea value={argsText} rows={3} spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
           <div className="panel-row">
-            <button type="button" disabled={busy} onClick={() => void onCall()}>{busy ? '调用中…' : '调用'}</button>
-            <button type="button" onClick={onAddStep}>加入计划</button>
+            <button type="button" disabled={busy || selectedRequiresApproval} onClick={() => void onCall()}>{busy ? '调用中…' : '调用'}</button>
+            <button type="button" disabled={selectedRequiresApproval} onClick={onAddStep}>加入计划</button>
           </div>
+          {selectedRequiresApproval && <p className="panel-note">该工具需经 Agent 审批流执行。</p>}
           {result && <pre className="panel-result">{result}</pre>}
         </div>
       )}

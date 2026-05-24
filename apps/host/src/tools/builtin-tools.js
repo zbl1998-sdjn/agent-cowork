@@ -30,6 +30,9 @@ export function createBuiltinTools({
       name: 'sandbox.exec',
       description: '在沙箱里运行一个结构化命令 (tool + args), 默认无网络, cwd 限定 trusted root',
       source: 'builtin',
+      risk: 'high',
+      mutating: true,
+      requiresApproval: true,
       handler: async (args, ctx = {}) => {
         const spec = normalizeSandboxSpec(args?.spec || args, sandboxLimits);
         return sandbox.exec(spec, { trustedRoot: ctx.trustedRoot, context: ctx.context });
@@ -40,6 +43,9 @@ export function createBuiltinTools({
       name: 'sandbox.run-code',
       description: '在沙箱里运行一段内联代码 (node / python), 物化为脚本文件后执行并产出 run 记录',
       source: 'builtin',
+      risk: 'high',
+      mutating: true,
+      requiresApproval: true,
       handler: async (args = {}, ctx = {}) =>
         runCode({
           sandbox,
@@ -64,6 +70,8 @@ export function createBuiltinTools({
       name: 'web.fetch',
       description: '抓取一个 http(s) 网址, 返回状态码、content-type 和截断后的文本 (联网研究用)',
       source: 'builtin',
+      risk: 'high',
+      requiresApproval: true,
       inputSchema: { type: 'object', properties: { url: { type: 'string' }, maxBytes: { type: 'number' }, timeoutMs: { type: 'number' } }, required: ['url'] },
       handler: async (args = {}) =>
         webFetch({ url: args.url, timeoutMs: args.timeoutMs, maxBytes: args.maxBytes, allowInternal: args.allowInternal === true, fetchImpl }),
@@ -74,6 +82,8 @@ export function createBuiltinTools({
     name: 'SearchWorkspace',
     description: '在当前 trusted workspace 内做本地关键词/RAG 检索，返回相关文本块和来源行号。',
     source: 'builtin',
+    risk: 'low',
+    mutating: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -100,6 +110,8 @@ export function createBuiltinTools({
     name: 'data.profile',
     description: '只读：剖析工作区内 CSV/TSV 数据文件，返回列类型、缺失值、数值统计和图表建议。',
     source: 'builtin',
+    risk: 'low',
+    mutating: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -116,6 +128,8 @@ export function createBuiltinTools({
     name: 'file.plan-organize',
     description: '只读：为批量整理/改名/去重生成文件操作预览，实际执行仍需走审批 apply。',
     source: 'builtin',
+    risk: 'low',
+    mutating: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -134,6 +148,8 @@ export function createBuiltinTools({
       name: `recipe.${recipe.id}`,
       description: [recipe.name, recipe.description].filter(Boolean).join(' — '),
       source: 'recipe',
+      risk: 'low',
+      mutating: false,
       handler: async (args = {}, ctx = {}) =>
         runRecipe({
           recipeId: recipe.id,

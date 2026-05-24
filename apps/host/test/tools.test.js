@@ -31,14 +31,21 @@ async function jsonRequest(base, route, { method = 'GET', body, headers = {} } =
   return { status: response.status, body: text ? JSON.parse(text) : null };
 }
 
+function createToolsServer(config = {}) {
+  return createServer({ requireAuth: false, trustIdentityHeaders: true, ...config });
+}
+
 // ---- registry ----
 
 test('ToolRegistry.list returns descriptors without leaking handlers', () => {
   const registry = new ToolRegistry();
-  registry.register({ name: 'a.tool', description: 'does a', handler: () => 1 });
+  registry.register({ name: 'a.tool', description: 'does a', risk: 'high', mutating: true, requiresApproval: true, handler: () => 1 });
   const list = registry.list();
   assert.equal(list.length, 1);
   assert.equal(list[0].name, 'a.tool');
+  assert.equal(list[0].risk, 'high');
+  assert.equal(list[0].mutating, true);
+  assert.equal(list[0].requiresApproval, true);
   assert.equal('handler' in list[0], false);
 });
 
@@ -92,6 +99,7 @@ test('createBuiltinTools exposes sandbox + recipe tools and sandbox.exec actuall
   assert.equal(registry.has('sandbox.exec'), true);
   assert.equal(registry.has('sandbox.run-code'), true);
   assert.equal(registry.has('recipe.meeting-actions'), true);
+  assert.equal(registry.descriptor('sandbox.exec').requiresApproval, true);
   const result = await registry.call(
     'sandbox.exec',
     { tool: 'node', args: ['-e', 'process.stdout.write("agent-ok")'], timeoutMs: 5000 },
@@ -165,7 +173,7 @@ test('runSubagent rejects an unknown tool with 400', async () => {
 
 test('GET /api/tools lists built-in tools (sandbox + recipes)', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/tools');
@@ -181,7 +189,7 @@ test('GET /api/tools lists built-in tools (sandbox + recipes)', async () => {
 
 test('GET /api/tools/search ranks matching tools', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/tools/search?q=sandbox&limit=5');
@@ -194,17 +202,18 @@ test('GET /api/tools/search ranks matching tools', async () => {
   }
 });
 
-test('POST /api/tools/call invokes a tool, is idempotent, and 404s unknown tools', async () => {
+test('POST /api/tools/call invokes a read-only tool, is idempotent, and 404s unknown tools', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  fs.writeFileSync(path.join(trustedRoot, 'notes.txt'), 'tool-ok search target', 'utf8');
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_call', 'idempotency-key': 'call-1' };
-    const body = { name: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("tool-ok")'], timeoutMs: 5000 } };
+    const body = { name: 'SearchWorkspace', args: { query: 'tool-ok', limit: 3 } };
     const first = await jsonRequest(base, '/api/tools/call', { method: 'POST', headers, body });
     assert.equal(first.status, 200);
-    assert.equal(first.body.name, 'sandbox.exec');
-    assert.equal(first.body.result.stdout, 'tool-ok');
+    assert.equal(first.body.name, 'SearchWorkspace');
+    assert.ok(first.body.result.chunks.length >= 1);
 
     const second = await jsonRequest(base, '/api/tools/call', { method: 'POST', headers, body });
     assert.equal(second.body.idempotentReplay, true);
@@ -220,9 +229,26 @@ test('POST /api/tools/call invokes a tool, is idempotent, and 404s unknown tools
   }
 });
 
+test('POST /api/tools/call rejects approval-gated tools', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/tools/call', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'call-gated' },
+      body: { name: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("blocked")'], timeoutMs: 5000 } },
+    });
+    assert.equal(res.status, 428);
+    assert.match(res.body.error, /requires agent approval/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('POST /api/tools/call requires an Idempotency-Key', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const res = await jsonRequest(base, '/api/tools/call', {
@@ -237,22 +263,24 @@ test('POST /api/tools/call requires an Idempotency-Key', async () => {
 
 test('POST /api/subagent/run executes a multi-step plan and records a subagent-run', async () => {
   const trustedRoot = tempRoot();
-  const server = createServer({ trustedRoot, enableScheduler: false });
+  fs.writeFileSync(path.join(trustedRoot, 'a.txt'), 'alpha route target', 'utf8');
+  fs.writeFileSync(path.join(trustedRoot, 'b.txt'), 'beta route target', 'utf8');
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_agent', 'idempotency-key': 'agent-1' };
     const body = {
-      goal: '跑两段代码',
+      goal: '检索两段文本',
       steps: [
-        { tool: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("a")'], timeoutMs: 5000 } },
-        { tool: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("b")'], timeoutMs: 5000 } },
+        { tool: 'SearchWorkspace', args: { query: 'alpha', limit: 3 } },
+        { tool: 'SearchWorkspace', args: { query: 'beta', limit: 3 } },
       ],
     };
     const res = await jsonRequest(base, '/api/subagent/run', { method: 'POST', headers, body });
     assert.equal(res.status, 200);
     assert.equal(res.body.ok, true);
     assert.equal(res.body.steps.length, 2);
-    assert.equal(res.body.steps[0].summary.exitCode, 0);
+    assert.ok(res.body.steps[0].summary.keys.includes('chunks'));
     assert.match(res.body.runId, /^run_/);
 
     const index = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_agent' } });
@@ -262,6 +290,28 @@ test('POST /api/subagent/run executes a multi-step plan and records a subagent-r
     const replay = await jsonRequest(base, '/api/subagent/run', { method: 'POST', headers, body });
     assert.equal(replay.body.idempotentReplay, true);
     assert.equal(replay.body.runId, res.body.runId);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/subagent/run rejects approval-gated steps', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/subagent/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'agent-gated' },
+      body: {
+        goal: 'blocked sandbox',
+        steps: [
+          { tool: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("blocked")'], timeoutMs: 5000 } },
+        ],
+      },
+    });
+    assert.equal(res.status, 428);
+    assert.match(res.body.error, /requires agent approval/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

@@ -4,6 +4,9 @@ export interface ToolDescriptor {
   name: string;
   description: string;
   source: string;
+  risk?: string;
+  mutating?: boolean;
+  requiresApproval?: boolean;
   inputSchema?: unknown;
   score?: number;
 }

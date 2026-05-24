@@ -98,10 +98,12 @@ async function main() {
     const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
     assert(preview.operations.length === 3, `preview expected 3 operations, got ${preview.operations.length}`);
     assert(preview.operations.map((op) => op.type).join(',') === 'write,rename,move', 'preview operation order changed');
+    assert(/^fop_/.test(preview.fileOperationApprovalId || ''), 'preview did not issue a file operation approval id');
 
     const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
       trustedRoot: workspace,
       operations,
+      fileOperationApprovalId: preview.fileOperationApprovalId,
       idempotencyKey: 'local-ops-apply',
     });
     assert(applied.applied.length === 3, `apply expected 3 operations, got ${applied.applied.length}`);

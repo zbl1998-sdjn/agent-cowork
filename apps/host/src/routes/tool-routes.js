@@ -11,6 +11,16 @@ import { runSubagent } from '../runtime/subagent.js';
 // Mutating routes require an Idempotency-Key and replay through the same cache
 // the recipe/sandbox routes use, so a retried request never double-executes.
 
+function approvalRequiredForTool(tool) {
+  return tool?.requiresApproval === true || tool?.mutating === true || ['high', 'critical'].includes(String(tool?.risk || '').toLowerCase());
+}
+
+function rejectApprovalRequired(response, name) {
+  sendJson(response, 428, {
+    error: `Tool "${name}" requires agent approval and cannot be called directly from this route`,
+  });
+}
+
 export async function handleToolRoutes({
   request,
   response,
@@ -64,6 +74,11 @@ export async function handleToolRoutes({
         sendJson(response, 404, { error: `Unknown tool: ${name}` });
         return;
       }
+      const descriptor = toolRegistry.descriptor(name);
+      if (approvalRequiredForTool(descriptor)) {
+        rejectApprovalRequired(response, name);
+        return;
+      }
       const fingerprint = bodyFingerprint(body);
       const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
@@ -93,6 +108,15 @@ export async function handleToolRoutes({
         return;
       }
       const trustedRoot = safeTrustedRoot(body?.trustedRoot);
+      const steps = Array.isArray(body?.steps) ? body.steps : [];
+      for (const step of steps) {
+        const toolName = typeof step?.tool === 'string' ? step.tool.trim() : '';
+        const descriptor = toolRegistry.descriptor(toolName);
+        if (approvalRequiredForTool(descriptor)) {
+          rejectApprovalRequired(response, toolName);
+          return;
+        }
+      }
       let outcome;
       try {
         outcome = await runSubagent({

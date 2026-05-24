@@ -54,6 +54,7 @@ test('web.fetch is exposed as a built-in tool', async () => {
   try {
     const registry = new ToolRegistry().registerMany(createBuiltinTools({}));
     assert.equal(registry.has('web.fetch'), true);
+    assert.equal(registry.descriptor('web.fetch').requiresApproval, true);
     const res = await registry.call('web.fetch', { url: `http://127.0.0.1:${port}/`, allowInternal: true });
     assert.equal(res.status, 200);
     assert.match(res.text, /"k":1/);

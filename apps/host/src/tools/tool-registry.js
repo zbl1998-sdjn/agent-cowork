@@ -55,6 +55,9 @@ export class ToolRegistry {
       description: entry.description || '',
       source: entry.source || 'builtin',
       inputSchema: entry.inputSchema || null,
+      risk: entry.risk || 'low',
+      mutating: entry.mutating === true,
+      requiresApproval: entry.requiresApproval === true,
       handler: entry.handler,
     });
     return this;

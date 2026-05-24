@@ -43,21 +43,24 @@ test('buildPlan requires a goal', async () => {
 });
 
 test('POST /api/plan proposes steps, then they execute via /api/subagent/run', async () => {
-  const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
+  const trustedRoot = tmp();
+  fs.writeFileSync(path.join(trustedRoot, 'plan-notes.txt'), 'plan route searchable fixture', 'utf8');
+  const server = createServer({ trustedRoot, enableScheduler: false, requireAuth: false, trustIdentityHeaders: true });
   const base = await bind(server);
   try {
-    const plan = await J(base, '/api/plan', { method: 'POST', body: { goal: 'sandbox' } });
+    const plan = await J(base, '/api/plan', { method: 'POST', body: { goal: 'SearchWorkspace' } });
     assert.equal(plan.status, 200);
     assert.ok(plan.body.steps.length >= 1);
-    assert.ok(plan.body.steps.some((s) => s.tool.startsWith('sandbox') || s.tool.startsWith('recipe')));
+    assert.ok(plan.body.steps.some((s) => s.tool === 'SearchWorkspace'));
 
-    // Approve + execute a concrete one-step plan
+    // Execute a concrete read-only step; approval-gated tools use the Agent approval flow.
     const run = await J(base, '/api/subagent/run', {
       method: 'POST', headers: { 'idempotency-key': 'plan-exec-1' },
-      body: { goal: 'sandbox', steps: [{ tool: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("p")'], timeoutMs: 5000 } }] },
+      body: { goal: 'workspace search', steps: [{ tool: 'SearchWorkspace', args: { query: 'searchable fixture', limit: 3 } }] },
     });
     assert.equal(run.status, 200);
     assert.equal(run.body.ok, true);
+    assert.ok(run.body.steps[0].summary.keys.includes('chunks'));
   } finally {
     await new Promise((r) => server.close(r));
   }

@@ -124,6 +124,7 @@ async function main() {
     assert(allScripts.includes('replayRunEvents'), 'app scripts missing history run event replay');
     assert(allScripts.includes('/api/artifacts'), 'app scripts missing artifact catalog route');
     assert(allScripts.includes('/api/artifacts/view'), 'app scripts missing artifact live page route');
+    assert(allScripts.includes('fileOperationApprovalId'), 'app scripts missing file operation approval token flow');
     assert(index.body.includes('class="composer-popover"'), 'index missing composer popover container');
     for (const route of [
       '/api/workspace',
@@ -173,10 +174,12 @@ async function main() {
     ];
     const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
     assert(preview.operations.length === 1 && preview.operations[0].type === 'write', 'UI preview flow did not produce write preview');
+    assert(/^fop_/.test(preview.fileOperationApprovalId || ''), 'UI preview flow did not issue an approval id');
 
     const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
       trustedRoot: workspace,
       operations,
+      fileOperationApprovalId: preview.fileOperationApprovalId,
       idempotencyKey: 'ui-smoke-apply',
     });
     assert(applied.applied.length === 1 && applied.applied[0].status === 'applied', 'UI apply flow did not apply write operation');
