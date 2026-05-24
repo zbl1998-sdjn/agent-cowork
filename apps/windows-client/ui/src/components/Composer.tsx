@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import type { PromptRefineResult } from '../lib/api/prompt';
+import { MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { RefinePreview } from './chat/RefinePreview';
 
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
@@ -22,6 +25,8 @@ export interface ComposerProps {
   slashCommands?: Array<{ id: string; label: string; run: () => void }>;
   models?: string[];
   defaultModel?: string;
+  autoClarify?: boolean;
+  onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
 }
 
 type Mode = 'template' | 'mention' | 'history';
@@ -55,6 +60,8 @@ export function Composer({
   slashCommands = [],
   models = [],
   defaultModel = '',
+  autoClarify = false,
+  onRefinePrompt,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,22 +76,90 @@ export function Composer({
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
   const [listening, setListening] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [refineOriginal, setRefineOriginal] = useState('');
+  const [refineResult, setRefineResult] = useState<PromptRefineResult | null>(null);
+  const [refineNotice, setRefineNotice] = useState('');
   const searchToken = useRef(0);
+  const skipRefineFor = useRef('');
+  const mentionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
 
   function close() {
+    if (mentionTimer.current) clearTimeout(mentionTimer.current);
+    mentionTimer.current = null;
     setMode(null);
     setItems([]);
     setActive(0);
   }
 
-  function send() {
+  function clearRefine() {
+    setRefineOriginal('');
+    setRefineResult(null);
+  }
+
+  async function fetchRefine(text: string, showError: boolean): Promise<PromptRefineResult | null> {
+    if (!onRefinePrompt) return null;
+    setRefining(true);
+    if (showError) setRefineNotice('');
+    try {
+      return await onRefinePrompt(text);
+    } catch {
+      if (showError) setRefineNotice('提示优化暂不可用，请稍后重试');
+      return null;
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function refineCurrent() {
+    const text = value.trim();
+    if (!text || !onRefinePrompt) return;
+    const result = await fetchRefine(text, true);
+    if (!result) return;
+    if (result.changed || result.missing.length > 0) {
+      setRefineOriginal(text);
+      setRefineResult(result);
+      setRefineNotice('');
+      return;
+    }
+    clearRefine();
+    setRefineNotice('当前提示已足够明确');
+  }
+
+  function resolvePreview(prompt: string) {
+    const next = prompt.trim();
+    setValue(next);
+    skipRefineFor.current = next;
+    clearRefine();
+    setRefineNotice('');
+    ref.current?.focus();
+  }
+
+  async function send() {
     const text = value.trim();
     if (!text && attachments.length === 0) return;
-    onSend(text, { files: attachments, model: model || defaultModel, thinking });
+    let finalText = text;
+    if (shouldRefineBeforeSend(autoClarify, text) && skipRefineFor.current !== text) {
+      const result = await fetchRefine(text, false);
+      if (result) {
+        const decision = resolveRefineSendDecision(text, result);
+        if (decision.action === 'preview') {
+          setRefineOriginal(text);
+          setRefineResult(decision.result);
+          setRefineNotice('');
+          return;
+        }
+        finalText = decision.text;
+      }
+    }
+    onSend(finalText, { files: attachments, model: model || defaultModel, thinking });
+    skipRefineFor.current = '';
     setValue('');
     setAttachments([]);
+    clearRefine();
+    setRefineNotice('');
     close();
   }
 
@@ -148,8 +223,19 @@ export function Composer({
     setActive(0);
   }
 
+  function scheduleMentions(query: string) {
+    if (mentionTimer.current) clearTimeout(mentionTimer.current);
+    mentionTimer.current = setTimeout(() => {
+      mentionTimer.current = null;
+      void refreshMentions(query);
+    }, MENTION_SEARCH_DEBOUNCE_MS);
+  }
+
   function onChange(next: string, caret: number) {
     setValue(next);
+    if (next.trim() !== skipRefineFor.current) skipRefineFor.current = '';
+    if (refineResult) clearRefine();
+    if (refineNotice) setRefineNotice('');
     const before = next.slice(0, caret);
     const slash = before.match(/(?:^|\n)\/([^\s/]*)$/);
     if (slash) {
@@ -171,7 +257,7 @@ export function Composer({
     if (at) {
       setMode('mention');
       setTriggerStart(before.length - at[1].length - 1);
-      if (at[1]) void refreshMentions(at[1]); else close();
+      if (shouldDebounceMentionSearch(at[1])) scheduleMentions(at[1]); else close();
       return;
     }
     close();
@@ -186,7 +272,7 @@ export function Composer({
     }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      send();
+      void send();
     }
   }
 
@@ -263,6 +349,15 @@ export function Composer({
         </div>
       )}
 
+      {refineResult && (
+        <RefinePreview
+          original={refineOriginal}
+          result={refineResult}
+          onResolve={(_action, prompt) => resolvePreview(prompt)}
+        />
+      )}
+      {refineNotice && <div className="composer-refine-notice">{refineNotice}</div>}
+
       <textarea
         ref={ref}
         value={value}
@@ -277,6 +372,7 @@ export function Composer({
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           <button type="button" className="tool-button" title="上传文件" onClick={() => fileRef.current?.click()}>上传</button>
           <button type="button" className={`tool-button${listening ? ' is-active' : ''}`} title="语音输入" onClick={toggleVoice}>语音</button>
+          <button type="button" className="tool-button" title="优化提示" disabled={!value.trim() || refining || !onRefinePrompt} onClick={() => void refineCurrent()}>{refining ? '优化中…' : '优化提示'}</button>
           {modelOptions.length > 0 && (
             <select className="model-select" value={model || defaultModel} onChange={(e) => setModel(e.target.value)} title="模型">
               {modelOptions.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -286,7 +382,7 @@ export function Composer({
             {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
           </select>
         </div>
-        <button type="button" className="send-button" onClick={send}>发送</button>
+        <button type="button" className="send-button" onClick={() => void send()} disabled={refining}>发送</button>
       </div>
     </div>
   );

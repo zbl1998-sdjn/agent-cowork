@@ -1,5 +1,5 @@
-import { listArtifacts, renderArtifactHtml } from '../artifacts/artifact-catalog.js';
-import { sendJson } from '../http/request-utils.js';
+import { listArtifacts, renameArtifact, renderArtifactHtml } from '../artifacts/artifact-catalog.js';
+import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 
 function sendHtml(response, status, body) {
   response.writeHead(status, {
@@ -18,6 +18,9 @@ export async function handleArtifactRoutes({
   requestContext,
   trustedRootDefault,
   safeTrustedRoot,
+  cacheKeyFor,
+  requireIdempotencyKey,
+  sendCachedOrStore,
 }) {
   if (request.method === 'GET' && pathname === '/api/artifacts') {
     try {
@@ -42,6 +45,30 @@ export async function handleArtifactRoutes({
     } catch (err) {
       sendJson(response, err.statusCode || 400, { error: err.message });
     }
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/artifacts/rename') {
+    await withJsonBody(request, response, async (body) => {
+      if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      const fingerprint = bodyFingerprint(body);
+      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+        return;
+      }
+      const trustedRoot = safeTrustedRoot(body.trustedRoot || trustedRootDefault);
+      const artifact = renameArtifact({
+        trustedRoot,
+        artifactPath: body.path,
+        newName: body.newName,
+      });
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
+        artifact,
+        context: requestContext,
+      });
+    });
     return true;
   }
 

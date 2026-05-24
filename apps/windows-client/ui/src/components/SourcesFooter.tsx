@@ -18,6 +18,11 @@ export function SourcesFooter({ sources }: SourcesFooterProps) {
           {sources.map((source, index) => (
             <li key={index}>
               <code>{source.relativePath || source.path}</code>
+              {source.startLine && (
+                <small>
+                  L{source.startLine}{source.endLine && source.endLine !== source.startLine ? `-L${source.endLine}` : ''}
+                </small>
+              )}
               {source.excerpt && <span>{source.excerpt}</span>}
             </li>
           ))}

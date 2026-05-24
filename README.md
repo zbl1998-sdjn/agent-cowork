@@ -1,20 +1,22 @@
-# Agent Cowork Host MVP-0 (Local, Kimi-only)
+# Agent Cowork
 
-这个项目是一个零外部依赖的 Node.js MVP-0 本地 PoC 主机服务（host），用于验证 Kimi 工作流前置能力：
+一个生产级 Agentic Cowork 系统，让 AI Agent 真正帮你完成本地文件操作、代码执行和跨工具协作任务。
 
-- 文件树枚举（仅限 trusted root）
-- 文件 / 文件夹导入（复制到 trusted root 下的 `Agent_Cowork上传/`）
-- 文本文件读取与上下文打包
-- 文件操作预览 / 申请执行（write / rename / move，禁止 delete）
-- 可控命令运行（默认关闭）
-- Kimi API 对话 / 计划运行记录（`.AgentCowork/runs/*.json`）
-- Cowork 执行动态信息流（用户指令、读取上下文、Kimi 计划、等待审批、执行完成）
-- 前台任务卡片（最近 Kimi run、状态、耗时、点击查看 run 详情）
-- 最小 HTTP API
+**核心能力：**
+- **Agentic tool-calling loop**：模型自主决策调用 Read/Write/Edit/Glob/Grep/Shell/WebFetch 工具，多步完成复杂任务
+- **Plan Mode**：生成可审批的执行计划，用户批准后才执行写操作
+- **MCP 协议栈**：完整四层实现（StdioTransport → JsonRpc → McpClient → connect），命名空间 `mcp__<server>__<tool>`
+- **生产级稳定性**：CircuitBreaker 三态机（closed/open/half-open）+ Token Bucket 限流 + ApprovalRegistry TTL 防挂起
+- **双存储后端**：SQLite（单机）/ PostgreSQL（多实例，含 LISTEN/NOTIFY 跨实例 approval）
+- **安全边界**：path-policy trusted root jail + 敏感段黑名单 + symlink 解析 + redaction 脱敏 + JWT 鉴权
+- **全栈**：Node.js 后端（98 个源文件）+ React/TypeScript 前端（23 个组件）+ Tauri 2 桌面端 + Node SEA 打包
 
-当前产品基准是 `plan/agent-cowork-latest-product-plan-v0.3.md`。
+**测试覆盖：**
+- 后端 87 个测试文件（364 个测试用例），前端 6 个测试文件（34 个测试用例），共 **398 个测试，全部通过**
+- 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头等
 
-注意：这是纯本地 Kimi-only PoC host，不是正式 MVP-1 产品主线。正式方向见 `docs/merged-execution-baseline.md`、`docs/mvp-1-windows-c-cloud-architecture.md` 和 `docs/v0.3-implementation-status.md`：Windows C 客户端、Go Local Agent、Cloud Backend、Device Relay、Task Orchestrator、Kimi Gateway、Office Mode、Developer Mode 和长期 QPS scaling。
+**已知限制：**
+- 本地后端（`LocalSubprocessSandbox`）运行在宿主机普通子进程中，Windows 无按进程网络命名空间，`networkIsolated === false`。真正的网络隔离需要 VM 后端（Docker `--network=none` / WSL netns），代码和契约测试已在 `wsl-docker-runner.js` 预留，此限制有专项测试锁定（`sandbox.test.js` 第 26 条）。
 
 ## 快速开始
 

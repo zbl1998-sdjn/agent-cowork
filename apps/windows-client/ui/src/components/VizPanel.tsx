@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { renderViz, liveArtifactUrl, fetchArtifactHtml, openPath } from '../lib/api';
+import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../lib/api';
+import { LiveArtifactView } from './LiveArtifactView';
 
 interface VizPanelProps {
   trustedRoot: string;
@@ -16,6 +17,8 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
   const [specText, setSpecText] = useState(SAMPLE);
   const [srcDoc, setSrcDoc] = useState('');
   const [filePath, setFilePath] = useState('');
+  const [dataUrl, setDataUrl] = useState('');
+  const [viewUrl, setViewUrl] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +31,14 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
       const res = await renderViz(spec, true, trustedRoot);
       // Fetch the live artifact HTML WITH the token, then render it in a
       // sandboxed iframe via srcDoc (an iframe src can't carry the bearer token).
-      if (res.viewUrl) setSrcDoc(await fetchArtifactHtml(liveArtifactUrl(res.viewUrl)));
+      if (res.viewUrl) {
+        const resolvedViewUrl = liveArtifactUrl(res.viewUrl);
+        setViewUrl(resolvedViewUrl);
+        setSrcDoc(await fetchArtifactHtml(resolvedViewUrl));
+      } else {
+        setViewUrl('');
+      }
+      setDataUrl(res.dataUrl || '');
       setFilePath(res.relativePath ? `${trustedRoot}/${res.relativePath}` : '');
     } catch (e) {
       setError((e as Error).message);
@@ -43,10 +53,10 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
       <textarea value={specText} rows={8} spellCheck={false} onChange={(e) => setSpecText(e.target.value)} />
       <div className="panel-row">
         <button type="button" disabled={busy} onClick={() => void onRender()}>{busy ? '渲染中…' : '渲染活页'}</button>
-        {filePath && <button type="button" onClick={() => void openPath(filePath)}>打开文件</button>}
+        {viewUrl && <button type="button" onClick={() => void fetchArtifactHtml(viewUrl).then(setSrcDoc).catch((e) => setError((e as Error).message))}>重开活页</button>}
       </div>
       {error && <p className="panel-error">{error}</p>}
-      {srcDoc && <iframe className="viz-frame" title="活页 Artifact" srcDoc={srcDoc} sandbox="allow-scripts" />}
+      <LiveArtifactView srcDoc={srcDoc} dataUrl={dataUrl} filePath={filePath} busy={busy} />
     </section>
   );
 }

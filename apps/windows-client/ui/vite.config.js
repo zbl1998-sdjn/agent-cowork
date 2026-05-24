@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 // Builds the React UI into ../ui-dist so the Tauri shell can point its
 // `frontendDist` there once the migration is verified. Dev server runs on
@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react';
 // client (absolute URL), so the host and UI dev servers coexist.
 export default defineConfig({
     plugins: [react()],
+    test: {
+        include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    },
     server: { port: 5173, strictPort: true },
     build: {
         outDir: '../ui-dist',

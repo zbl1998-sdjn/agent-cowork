@@ -74,7 +74,14 @@ test('VIZ_KINDS lists the supported kinds', () => {
 
 // ---- live artifact builder ----
 
-import { buildLiveArtifact, readArtifactManifest, readLiveArtifactHtml, createArtifactId } from '../src/artifacts/live-artifact.js';
+import {
+  buildLiveArtifact,
+  readArtifactManifest,
+  readLiveArtifactHtml,
+  createArtifactId,
+  renderLivePage,
+  refreshLiveArtifactData,
+} from '../src/artifacts/live-artifact.js';
 import { createServer } from '../src/server.js';
 
 async function bind(server) {
@@ -112,10 +119,57 @@ test('buildLiveArtifact writes a live page + manifest with a Refresh hook', () =
   assert.equal(manifest.dataUrl, `/api/artifacts/data/${out.id}`);
 });
 
+test('renderLivePage escapes title and script-sensitive data while preserving refresh wiring', () => {
+  const html = renderLivePage({
+    id: 'viz_escape',
+    title: '<script>alert(1)</script>',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['</script><img src=x>']] } },
+    dataUrl: '/api/artifacts/data/viz_escape',
+  });
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<h1><script>/);
+  assert.doesNotMatch(html, /<\/script><img/);
+  assert.match(html, /DATA_URL = "\/api\/artifacts\/data\/viz_escape"/);
+  assert.match(html, /agent-cowork:live-artifact-data/);
+});
+
 test('readArtifactManifest / readLiveArtifactHtml reject bad ids and missing artifacts', () => {
   const root = tempRoot();
   assert.throws(() => readArtifactManifest({ trustedRoot: root, id: '../etc' }), (e) => { assert.equal(e.statusCode, 400); return true; });
   assert.throws(() => readLiveArtifactHtml({ trustedRoot: root, id: createArtifactId() }), (e) => { assert.equal(e.statusCode, 404); return true; });
+});
+
+test('refreshLiveArtifactData reads a workspace file-json data source on demand', () => {
+  const root = tempRoot();
+  const sourceRel = 'data/live-viz.json';
+  const sourcePath = path.join(root, sourceRel);
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['before']] } } }), 'utf8');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '动态表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'file-json', path: sourceRel },
+  });
+
+  fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['after']] } } }), 'utf8');
+  const data = refreshLiveArtifactData({ trustedRoot: root, id: out.id, now: new Date('2026-01-02T03:04:05.000Z') });
+  assert.equal(data.refreshedAt, '2026-01-02T03:04:05.000Z');
+  assert.equal(data.dataSource.type, 'file-json');
+  assert.deepEqual(data.viz.data.rows, [['after']]);
+});
+
+test('buildLiveArtifact rejects file-json data sources outside trustedRoot', () => {
+  const root = tempRoot();
+  assert.throws(
+    () => buildLiveArtifact({
+      trustedRoot: root,
+      title: '越界',
+      viz: { kind: 'table', data: { columns: ['a'], rows: [['1']] } },
+      dataSource: { type: 'file-json', path: '../outside.json' },
+    }),
+    /Path escaped trusted root/,
+  );
 });
 
 // ---- viz / artifact routes ----
@@ -143,6 +197,61 @@ test('POST /api/viz/render persists a live artifact and is idempotent', async ()
     const replay = await jsonRequest(base, '/api/viz/render', { method: 'POST', headers, body });
     assert.equal(replay.body.idempotentReplay, true);
     assert.equal(replay.body.id, first.body.id);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/viz/render persists a live artifact with a refreshable file-json data source', async () => {
+  const trustedRoot = tempRoot();
+  const sourceRel = 'data/refresh.json';
+  const sourcePath = path.join(trustedRoot, sourceRel);
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'bar', data: { labels: ['old'], values: [1] } } }), 'utf8');
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-refresh-source' },
+      body: {
+        title: '可刷新图',
+        kind: 'bar',
+        data: { labels: ['initial'], values: [0] },
+        dataSource: { type: 'file-json', path: sourceRel },
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.persisted, true);
+
+    fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'bar', data: { labels: ['new'], values: [9] } } }), 'utf8');
+    const data = await jsonRequest(base, res.body.dataUrl);
+    assert.equal(data.status, 200);
+    assert.equal(data.body.dataSource.type, 'file-json');
+    assert.deepEqual(data.body.viz.data.labels, ['new']);
+    assert.deepEqual(data.body.viz.data.values, [9]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/viz/render rejects a file-json data source outside trustedRoot', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-refresh-escape' },
+      body: {
+        title: 'bad',
+        kind: 'table',
+        data: { columns: ['a'], rows: [['1']] },
+        dataSource: { type: 'file-json', path: '../outside.json' },
+      },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /Path escaped trusted root/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

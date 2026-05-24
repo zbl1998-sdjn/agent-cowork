@@ -83,7 +83,14 @@ export async function handleConversationRoutes({
         try {
           const summary = await conversationStore.save(
             safeRoot,
-            { id, title: body && body.title, pinned: body && body.pinned, messages: body && body.messages },
+            {
+              id,
+              title: body && body.title,
+              pinned: body && body.pinned,
+              messages: body && body.messages,
+              activeBranchId: body && body.activeBranchId,
+              branches: body && body.branches,
+            },
             requestContext,
           );
           sendJson(response, 200, { conversation: summary });

@@ -340,6 +340,36 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
   });
 });
 
+test('file-ops rollback endpoint restores an applied write', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  const target = path.join(trustedRoot, '.AgentCowork', 'artifacts', 'rollback-route.txt');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, 'before-route', 'utf8');
+  const operations = [{ type: 'write', path: target, content: 'after-route', overwrite: true }];
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const appliedResponse = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-apply' },
+      body: JSON.stringify({ trustedRoot, operations }),
+    });
+    assert.equal(appliedResponse.status, 200);
+    const applied = await appliedResponse.json();
+    assert.equal(fs.readFileSync(target, 'utf8'), 'after-route');
+    assert.equal(applied.applied[0].rollback.type, 'restore-backup');
+
+    const rollbackResponse = await fetch(`${baseUrl}/api/file-ops/rollback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-apply-undo' },
+      body: JSON.stringify({ trustedRoot, applied: applied.applied }),
+    });
+    assert.equal(rollbackResponse.status, 200);
+    const rollback = await rollbackResponse.json();
+    assert.equal(rollback.rolledBack.length, 1);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'before-route');
+  });
+});
+
 test('artifact endpoints list local artifacts and render safe HTML views', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   const artifactDir = path.join(trustedRoot, '.AgentCowork', 'artifacts');
@@ -364,6 +394,33 @@ test('artifact endpoints list local artifacts and render safe HTML views', async
     assert.match(html, /Report/);
     assert.match(html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
     assert.doesNotMatch(html, /<script>alert/);
+
+    const rename = await fetch(`${baseUrl}/api/artifacts/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'artifact-rename-1' },
+      body: JSON.stringify({
+        trustedRoot,
+        path: artifactPath,
+        newName: 'report-final.md',
+      }),
+    });
+    assert.equal(rename.status, 200);
+    const renamed = await rename.json();
+    assert.equal(renamed.artifact.name, 'report-final.md');
+    assert.equal(renamed.artifact.relativePath, '.AgentCowork/artifacts/report-final.md');
+    assert.equal(fs.existsSync(path.join(artifactDir, 'report-final.md')), true);
+    assert.equal(fs.existsSync(artifactPath), false);
+
+    const escape = await fetch(`${baseUrl}/api/artifacts/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'artifact-rename-escape' },
+      body: JSON.stringify({
+        trustedRoot,
+        path: path.join(artifactDir, 'report-final.md'),
+        newName: '../escape.md',
+      }),
+    });
+    assert.equal(escape.status, 400);
   });
 });
 

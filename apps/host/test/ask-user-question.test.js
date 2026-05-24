@@ -27,7 +27,17 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
     captured = messages[messages.length - 1]; // the tool result message
     return { content: '好的，按方案B执行。' };
   };
-  const out = await runAgentChat({ prompt: '帮我选', kimiConfig: {}, trustedRoot: root, tools, modelCall, approvals, emit, runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({
+    prompt: '请在 README.md 里的方案A和方案B之间帮我选择一个导出方案',
+    kimiConfig: {},
+    trustedRoot: root,
+    tools,
+    modelCall,
+    approvals,
+    emit,
+    clarifyBeforeModel: true,
+    runStoreRoot: path.join(root, 'runs'),
+  });
 
   const q = events.find((e) => e.t === 'question');
   assert.ok(q, 'question frame emitted');
@@ -35,6 +45,70 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
   assert.deepEqual(q.d.options.map((o) => o.label), ['方案A', '方案B']);
   assert.match(captured.content, /方案B/, 'chosen answer fed back to the model');
   assert.equal(out.text, '好的，按方案B执行。');
+});
+
+test('clarification-first preflights vague prompts before the first model call', async () => {
+  const root = tmp();
+  const approvals = createApprovalRegistry();
+  const events = [];
+  const emit = (t, d) => {
+    events.push({ t, d });
+    if (t === 'question') approvals.respond(d.id, '请审查 README.md 并列出风险');
+  };
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: {}, modelCall: async () => ({}), approvals, emit } });
+
+  let firstUserMessage = null;
+  const modelCall = async ({ messages }) => {
+    firstUserMessage = messages.find((m) => m.role === 'user');
+    return { content: '收到，我会按 README 审查风险。' };
+  };
+  const out = await runAgentChat({
+    prompt: '帮我处理一下',
+    kimiConfig: {},
+    trustedRoot: root,
+    tools,
+    modelCall,
+    approvals,
+    emit,
+    clarifyBeforeModel: true,
+    runStoreRoot: path.join(root, 'runs'),
+  });
+
+  const question = events.find((e) => e.t === 'question');
+  assert.ok(question, 'vague prompt should ask a clarification question');
+  assert.match(question.d.question, /缺少/);
+  assert.match(firstUserMessage.content, /帮我处理一下/);
+  assert.match(firstUserMessage.content, /用户澄清/);
+  assert.match(firstUserMessage.content, /README\.md/);
+  assert.equal(out.text, '收到，我会按 README 审查风险。');
+});
+
+test('clarification-first skips already explicit prompts', async () => {
+  const root = tmp();
+  const approvals = createApprovalRegistry();
+  const events = [];
+  const emit = (t, d) => { events.push({ t, d }); };
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: {}, modelCall: async () => ({}), approvals, emit } });
+
+  let firstUserMessage = null;
+  const modelCall = async ({ messages }) => {
+    firstUserMessage = messages.find((m) => m.role === 'user');
+    return { content: '开始审查。' };
+  };
+  await runAgentChat({
+    prompt: '请审查 README.md 的安装说明并列出具体问题',
+    kimiConfig: {},
+    trustedRoot: root,
+    tools,
+    modelCall,
+    approvals,
+    emit,
+    clarifyBeforeModel: true,
+    runStoreRoot: path.join(root, 'runs'),
+  });
+
+  assert.equal(events.some((e) => e.t === 'question'), false);
+  assert.doesNotMatch(firstUserMessage.content, /用户澄清/);
 });
 
 test('E2E /api/agent/chat/stream: question frame over SSE, POST { answer } resumes the run', async () => {

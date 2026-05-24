@@ -6,7 +6,7 @@ import { readFilePreview } from '../workspace/file-preview.js';
 import { extractDocumentText } from '../workspace/document-extractor.js';
 import { searchWorkspace } from '../workspace/file-search.js';
 import { buildContextBundle } from '../workspace/context-bundle.js';
-import { previewFileOperations, applyFileOperations } from '../workspace/file-operations.js';
+import { previewFileOperations, applyFileOperations, rollbackFileOperations } from '../workspace/file-operations.js';
 import { importUploadedFiles } from '../workspace/uploads.js';
 import { buildAttachmentContext } from '../workspace/attachment-context.js';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -162,6 +162,29 @@ export async function handleWorkspaceFileRoutes({
       });
       sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         ...applied,
+        context: requestContext,
+      });
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/file-ops/rollback') {
+    await withJsonBody(request, response, async (body) => {
+      if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      const fingerprint = bodyFingerprint(body);
+      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+        return;
+      }
+      const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      const rollback = rollbackFileOperations(body.rollback || body.applied || body.operations, {
+        trustedRoot,
+        journalWriter: config.journalWriter,
+      });
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
+        ...rollback,
         context: requestContext,
       });
     });

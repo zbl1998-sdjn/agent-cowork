@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   title       TEXT NOT NULL DEFAULT '新对话',
   pinned      BOOLEAN NOT NULL DEFAULT FALSE,
   messages    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  branches    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  active_branch_id TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (tenant_id, user_id, id)

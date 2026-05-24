@@ -55,26 +55,20 @@ function readJsonl(file) {
     .filter(Boolean);
 }
 
-function normaliseTenantId(value) {
+function normaliseId(value, fallback) {
   const text = String(value || '').trim();
   if (!text) {
-    return 'tenant_local';
+    return fallback;
   }
-  if (text.length > 96) {
-    return text.slice(0, 96);
-  }
-  return text;
+  return text.length > 96 ? text.slice(0, 96) : text;
+}
+
+function normaliseTenantId(value) {
+  return normaliseId(value, 'tenant_local');
 }
 
 function normaliseUserId(value) {
-  const text = String(value || '').trim();
-  if (!text) {
-    return 'user_local';
-  }
-  if (text.length > 96) {
-    return text.slice(0, 96);
-  }
-  return text;
+  return normaliseId(value, 'user_local');
 }
 
 function normaliseRecord(record) {
@@ -290,9 +284,7 @@ export class SqliteRunsIndex {
   }
 
   get(id, { tenantId } = {}) {
-    const row = this.db
-      .prepare('SELECT record_json FROM runs_index WHERE id = ?')
-      .get(id);
+    const row = this.db.prepare('SELECT record_json FROM runs_index WHERE id = ?').get(id);
     if (!row) {
       return null;
     }
@@ -350,27 +342,17 @@ export class SqliteRunsIndex {
       params.push(normaliseTenantId(tenantId));
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const totalRow = this.db.prepare(`
-      SELECT COUNT(*) AS count
-      FROM runs_index
-      ${whereSql}
-    `).get(...params);
+    const totalRow = this.db.prepare(`SELECT COUNT(*) AS count FROM runs_index ${whereSql}`).get(...params);
     const byStatus = Object.create(null);
     const byType = Object.create(null);
     const statusRows = this.db.prepare(`
-      SELECT status, COUNT(*) AS count
-      FROM runs_index
-      ${whereSql}
-      GROUP BY status
+      SELECT status, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY status
     `).all(...params);
     for (const row of statusRows) {
       byStatus[row.status] = Number(row.count) || 0;
     }
     const typeRows = this.db.prepare(`
-      SELECT type, COUNT(*) AS count
-      FROM runs_index
-      ${whereSql}
-      GROUP BY type
+      SELECT type, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY type
     `).all(...params);
     for (const row of typeRows) {
       byType[row.type] = Number(row.count) || 0;
@@ -380,16 +362,11 @@ export class SqliteRunsIndex {
 }
 
 export function createRunsIndex({ backend = 'file', indexRoot, dbPath, db, now } = {}) {
-  if (backend === 'sqlite') {
-    return new SqliteRunsIndex({ dbPath, db, now });
-  }
-  return new RunsIndex({ indexRoot, now });
+  return backend === 'sqlite' ? new SqliteRunsIndex({ dbPath, db, now }) : new RunsIndex({ indexRoot, now });
 }
 
 export function summariseRunForIndex(runRecord, context = {}) {
-  if (!runRecord || typeof runRecord !== 'object') {
-    throw new Error('summariseRunForIndex: runRecord required');
-  }
+  if (!runRecord || typeof runRecord !== 'object') throw new Error('summariseRunForIndex: runRecord required');
   const promptText = typeof runRecord.input?.prompt === 'string' ? runRecord.input.prompt : '';
   return {
     id: runRecord.id,

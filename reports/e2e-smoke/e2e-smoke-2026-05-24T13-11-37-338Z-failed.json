@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "mode": "dry-run",
+  "generatedAt": "2026-05-24T13:11:37.338Z",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\e2e-smoke\\workspace",
+  "error": "Error: /api/agent/chat/stream returned 503\n    at assert (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/e2e-smoke.mjs:14:25)\n    at runAgentStream (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/e2e-smoke.mjs:86:3)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async main (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/e2e-smoke.mjs:196:20)"
+}

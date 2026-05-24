@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
 
-type Tab = 'account' | 'appearance' | 'model' | 'api' | 'selfcheck';
+type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'selfcheck';
 
 interface SettingsProps {
   username: string;
   tenantId: string;
   theme: 'light' | 'dark';
+  autoClarify: boolean;
+  onSetAutoClarify: (enabled: boolean) => void;
   onSetTheme: (t: 'light' | 'dark') => void;
   onLogout: () => void;
   onClose: () => void;
@@ -16,7 +18,7 @@ interface SettingsProps {
 // Unified settings center (kimi.exe style): account / appearance / model / API /
 // self-check tabs in one modal. The API key is shown only as a `hasKey` flag and
 // never echoed back; saving an empty key keeps the existing one.
-export function Settings({ username, tenantId, theme, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
+export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
   const [tab, setTab] = useState<Tab>('account');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -96,6 +98,7 @@ export function Settings({ username, tenantId, theme, onSetTheme, onLogout, onCl
             <button type="button" className={tab === 'account' ? 'is-active' : ''} onClick={() => setTab('account')}>账户</button>
             <button type="button" className={tab === 'appearance' ? 'is-active' : ''} onClick={() => setTab('appearance')}>外观</button>
             <button type="button" className={tab === 'model' ? 'is-active' : ''} onClick={() => setTab('model')}>模型</button>
+            <button type="button" className={tab === 'input' ? 'is-active' : ''} onClick={() => setTab('input')}>输入</button>
             <button type="button" className={tab === 'api' ? 'is-active' : ''} onClick={() => setTab('api')}>API</button>
             <button type="button" className={tab === 'selfcheck' ? 'is-active' : ''} onClick={() => setTab('selfcheck')}>自检</button>
           </nav>
@@ -125,6 +128,15 @@ export function Settings({ username, tenantId, theme, onSetTheme, onLogout, onCl
                 <div className="modal-actions">
                   <span className="modal-actions-spacer" />
                   <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ model: model.trim() || undefined }, '模型已保存')}>保存</button>
+                </div>
+              </div>
+            )}
+            {tab === 'input' && (
+              <div className="set-row">
+                <span className="set-label">发送前澄清</span>
+                <div className="seg">
+                  <button type="button" className={!autoClarify ? 'is-active' : ''} onClick={() => onSetAutoClarify(false)}>关闭</button>
+                  <button type="button" className={autoClarify ? 'is-active' : ''} onClick={() => onSetAutoClarify(true)}>开启</button>
                 </div>
               </div>
             )}

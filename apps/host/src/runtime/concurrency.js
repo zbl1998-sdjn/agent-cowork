@@ -1,13 +1,28 @@
-// In-process concurrency guard for long-running agent streams.
-//
-// Each active agent stream holds an upstream LLM connection plus working memory,
-// so an unbounded number of concurrent streams can exhaust a host instance. This
-// limiter caps the global active count and a per-tenant count, returning a
-// release handle (or null when over the limit, so the route can reply 429). It is
-// the in-process first line of defense; a multi-instance deployment would back
-// the same contract with a shared store (Redis) — see docs/01-scalability.
+/**
+ * @typedef {() => void} ReleaseHandle
+ * @typedef {{ maxConcurrent?: number, maxPerTenant?: number }} ConcurrencyLimiterOptions
+ * @typedef {{
+ *   tryAcquire(tenantId?: string): ReleaseHandle | null,
+ *   stats(): { active: number, tenants: number, maxConcurrent: number, maxPerTenant: number }
+ * }} ConcurrencyLimiter
+ */
+
+/**
+ * In-process concurrency guard for long-running agent streams.
+ *
+ * Each active agent stream holds an upstream LLM connection plus working memory,
+ * so an unbounded number of concurrent streams can exhaust a host instance. This
+ * limiter caps the global active count and a per-tenant count, returning a
+ * release handle (or null when over the limit, so the route can reply 429). It is
+ * the in-process first line of defense; a multi-instance deployment would back
+ * the same contract with a shared store (Redis) — see docs/01-scalability.
+ *
+ * @param {ConcurrencyLimiterOptions} [options]
+ * @returns {ConcurrencyLimiter}
+ */
 export function createConcurrencyLimiter({ maxConcurrent = 64, maxPerTenant = 8 } = {}) {
   let active = 0;
+  /** @type {Map<string, number>} */
   const perTenant = new Map(); // tenantId -> count
 
   return {

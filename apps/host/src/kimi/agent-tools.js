@@ -2,11 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { readTextFile } from '../workspace/file-reader.js';
+import { searchWorkspaceIndex } from '../workspace/index/search.js';
+import { planFileOrganization } from '../workspace/file-organizer.js';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { webFetch } from '../tools/web-fetch.js';
+import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
+import { profileDataFile } from '../tools/data/profile.js';
 
 // Agent tools aligned with the Kimi CLI / Claude Code native tool set:
-//   Read, Write, Edit, Glob, Grep, Shell, WebFetch.
+//   Read, Write, Edit, Glob, Grep, Shell, WebFetch, git helpers.
 // Mutating tools (Write/Edit/Shell) carry `mutating: true` so the agent loop
 // can gate them behind an approval prompt. All file paths are jailed to the
 // trusted workspace root.
@@ -130,6 +134,41 @@ export function createAgentTools(ctx = {}) {
       },
     },
     {
+      name: 'SearchWorkspace', mutating: false, risk: 'safe',
+      description: '在工作区内做本地关键词/RAG 检索，返回相关文本块、来源文件和行号。适合回答“在我的资料里找/根据项目资料回答”。',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] },
+      handler: async (args = {}) => searchWorkspaceIndex({ root, query: args.query, limit: args.limit }),
+    },
+    {
+      name: 'PlanFileOrganization', mutating: false, risk: 'safe',
+      description: '为批量整理/改名/去重生成文件操作预览；不会直接移动文件，实际执行必须交给审批后的文件操作。mode: byExtension/rename/dedupe。',
+      parameters: {
+        type: 'object',
+        properties: {
+          files: { type: 'array', items: { type: 'string' } },
+          mode: { type: 'string' },
+          targetDir: { type: 'string' },
+          renamePrefix: { type: 'string' },
+        },
+        required: ['files'],
+      },
+      handler: async (args = {}) => planFileOrganization({ trustedRoot: root, ...args }),
+    },
+    {
+      name: 'AnalyzeDataFile', mutating: false, risk: 'safe',
+      description: '剖析工作区内 CSV/TSV 数据文件，返回列类型、缺失值、数值统计和图表建议；不会修改文件。',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          maxRows: { type: 'number' },
+          maxBytes: { type: 'number' },
+        },
+        required: ['path'],
+      },
+      handler: async (args = {}) => profileDataFile({ trustedRoot: root, ...args }),
+    },
+    {
       name: 'WebFetch', mutating: false, risk: 'safe',
       description: '抓取一个 http(s) 网址的文本内容（联网检索）。',
       parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
@@ -138,6 +177,28 @@ export function createAgentTools(ctx = {}) {
         return { status: r.status, contentType: r.contentType, text: clip(r.text) };
       },
     },
+    {
+      ...createGitStatusTool(),
+      name: 'GitStatus',
+      mutating: false,
+      risk: 'safe',
+      parameters: createGitStatusTool().inputSchema,
+    },
+    {
+      ...createGitDiffTool(),
+      name: 'GitDiff',
+      mutating: false,
+      risk: 'safe',
+      parameters: createGitDiffTool().inputSchema,
+    },
+    {
+      ...createGitLogTool(),
+      name: 'GitLog',
+      mutating: false,
+      risk: 'safe',
+      parameters: createGitLogTool().inputSchema,
+    },
+    createGitCommitTool(),
   ];
 
   if (sandbox) {

@@ -4,8 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runRecipe } from '../src/recipes/run-recipe.js';
+import { captureRun } from '../src/recipes/capture.js';
 import { RunEventBus } from '../src/runtime/run-events.js';
 import { RunsIndex } from '../src/runtime/runs-index.js';
+import { writeRunRecord } from '../src/runtime/run-store.js';
 import { listRecipes } from '../src/recipes/registry.js';
 
 function tempRoot() {
@@ -84,4 +86,71 @@ test('runRecipe works without runEvents/runsIndex (events still numbered locally
   assert.equal(result.ok, true);
   assert.ok(result.events.length >= 5);
   assert.equal(result.events[0].seq, 1);
+});
+
+test('captureRun extracts a redacted reusable recipe draft from an agent run', async () => {
+  const root = tempRoot();
+  const runStoreRoot = path.join(root, 'runs');
+  const runId = 'run_capture_agent';
+  const secret = 'sk-ABCDEFGHIJ1234567890';
+  writeRunRecord(runStoreRoot, {
+    id: runId,
+    type: 'agent-chat',
+    provider: 'kimi-api',
+    mode: 'agent',
+    status: 'succeeded',
+    startedAt: '2026-05-24T00:00:00.000Z',
+    finishedAt: '2026-05-24T00:00:01.000Z',
+    input: { prompt: `写报告 api_key=${secret}` },
+    result: { ok: true, text: `done ${secret}`, steps: [{ tool: 'Write', ok: true }] },
+    events: [
+      { type: 'tool_call', name: 'Write', args: { path: 'report.md', content: `token ${secret}` } },
+      { type: 'tool_result', name: 'Write', status: 'succeeded', result: { path: path.join(root, 'report.md') } },
+      { type: 'file_written', path: path.join(root, 'report.md') },
+    ],
+  });
+
+  const draft = (await captureRun({ runId, runStoreRoot })).recipe;
+
+  assert.equal(draft.draft, true);
+  assert.equal(draft.sourceRunId, runId);
+  assert.equal(draft.prompt.includes(secret), false);
+  assert.equal(JSON.stringify(draft).includes(secret), false);
+  assert.equal(draft.steps.length, 1);
+  assert.equal(draft.steps[0].tool, 'Write');
+  assert.equal(draft.steps[0].status, 'succeeded');
+  assert.equal(draft.artifacts.length, 1);
+  assert.match(draft.artifacts[0].path, /report\.md$/);
+  assert.equal(draft.redacted, true);
+});
+
+test('captureRun falls back to runsIndex runPath when runStoreRoot has no record', async () => {
+  const root = tempRoot();
+  const primaryRunStore = path.join(root, 'primary-runs');
+  const indexedRunStore = path.join(root, 'indexed-runs');
+  const runsIndex = new RunsIndex({ indexRoot: path.join(root, 'index') });
+  const runId = 'run_capture_indexed';
+  const runPath = writeRunRecord(indexedRunStore, {
+    id: runId,
+    type: 'recipe-run',
+    provider: 'agent-cowork-host',
+    recipeId: 'summary-report',
+    status: 'succeeded',
+    startedAt: '2026-05-24T00:00:00.000Z',
+    input: { prompt: '总结材料' },
+    result: { ok: true, text: '生成总结报告' },
+    events: [
+      {
+        type: 'preview',
+        operations: [{ type: 'write', path: path.join(root, '.AgentCowork', 'artifacts', 'summary.md') }],
+      },
+    ],
+  });
+  runsIndex.upsert({ id: runId, runPath, type: 'recipe-run', status: 'succeeded' });
+
+  const draft = (await captureRun({ runId, runStoreRoot: primaryRunStore, runsIndex })).recipe;
+
+  assert.equal(draft.name, 'Captured summary-report');
+  assert.equal(draft.steps[0].tool, 'recipe.operation');
+  assert.equal(draft.artifacts[0].source, 'preview');
 });

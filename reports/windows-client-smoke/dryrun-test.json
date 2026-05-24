@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "mode": "dry-run",
+  "generatedAt": "2026-05-24T15:19:05.0437687Z",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\windows-client-smoke-workspace",
+  "sourceBuildSmoke": true,
+  "installer": {
+    "path": "",
+    "provided": false,
+    "exists": false,
+    "signatureStatus": null
+  },
+  "installedExe": {
+    "path": "",
+    "provided": false,
+    "exists": false,
+    "selected": false
+  },
+  "liveReplyConfigured": false,
+  "deferred": [
+    "real installed executable launch",
+    "real Kimi reply",
+    "installer signature trust"
+  ]
+}

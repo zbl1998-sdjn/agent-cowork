@@ -23,7 +23,39 @@ const TEXT_EXT = new Set([
   '.md', '.markdown', '.txt', '.text', '.log', '.csv', '.tsv',
   '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
   '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.css', '.py', '.sh', '.toml', '.ini',
+  '.diff', '.patch',
 ]);
+
+function splitDelimitedLine(line, delimiter) {
+  const cells = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"' && line[i + 1] === '"') {
+      cell += '"';
+      i += 1;
+    } else if (ch === '"') {
+      quoted = !quoted;
+    } else if (ch === delimiter && !quoted) {
+      cells.push(cell);
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell);
+  return cells.map((value) => value.trim());
+}
+
+function tablePreview(text, delimiter) {
+  const rows = String(text || '')
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .slice(0, 101)
+    .map((line) => splitDelimitedLine(line, delimiter));
+  return { headers: rows[0] || [], rows: rows.slice(1), truncated: rows.length > 100 };
+}
 
 export function readFilePreview(filePath, { trustedRoot, maxBytes = DEFAULT_MAX_BYTES } = {}) {
   if (!filePath || typeof filePath !== 'string') {
@@ -57,8 +89,15 @@ export function readFilePreview(filePath, { trustedRoot, maxBytes = DEFAULT_MAX_
     return { kind: 'pdf', mime: 'application/pdf', name, size, base64: fs.readFileSync(safe).toString('base64') };
   }
   if (TEXT_EXT.has(ext)) {
+    const text = fs.readFileSync(safe, 'utf8');
     const isMarkdown = ext === '.md' || ext === '.markdown';
-    return { kind: isMarkdown ? 'markdown' : 'text', mime: 'text/plain', name, size, text: fs.readFileSync(safe, 'utf8') };
+    if (ext === '.csv' || ext === '.tsv') {
+      return { kind: 'table', mime: 'text/plain', name, size, text, table: tablePreview(text, ext === '.tsv' ? '\t' : ',') };
+    }
+    if (ext === '.diff' || ext === '.patch') {
+      return { kind: 'diff', mime: 'text/x-diff', name, size, text };
+    }
+    return { kind: isMarkdown ? 'markdown' : 'text', mime: 'text/plain', name, size, text };
   }
   return { kind: 'other', mime: 'application/octet-stream', name, size };
 }

@@ -1,6 +1,12 @@
 [CmdletBinding()]
 param(
-    [switch]$KeepOpen
+    [switch]$KeepOpen,
+    [switch]$DryRun,
+    [string]$InstallerPath = $env:KCW_INSTALLER_PATH,
+    [string]$InstalledExePath = $env:KCW_INSTALLED_EXE,
+    [string]$ReportPath = $env:KCW_WINDOWS_SMOKE_REPORT_PATH,
+    [switch]$UseInstalledExe,
+    [switch]$SkipSourceBuildSmoke
 )
 
 Set-StrictMode -Version Latest
@@ -29,6 +35,62 @@ function Assert-True {
     }
 }
 
+function Write-SmokePlan {
+    param(
+        [string]$Installer,
+        [string]$InstalledExe,
+        [string]$WorkspacePath
+    )
+
+    Write-Host "Windows client smoke plan"
+    Write-Host "- create isolated workspace: $WorkspacePath"
+    Write-Host "- source-build smoke: $(-not $SkipSourceBuildSmoke)"
+    if (-not [string]::IsNullOrWhiteSpace($Installer)) {
+        Write-Host "- installer candidate: $Installer"
+        Write-Host "- installer exists: $(Test-Path -LiteralPath $Installer)"
+        if (Test-Path -LiteralPath $Installer) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $Installer
+            Write-Host "- installer signature: $($signature.Status)"
+        }
+    }
+    else {
+        Write-Host "- installer candidate: not provided; set KCW_INSTALLER_PATH or pass -InstallerPath"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InstalledExe)) {
+        Write-Host "- installed executable candidate: $InstalledExe"
+        Write-Host "- installed executable exists: $(Test-Path -LiteralPath $InstalledExe)"
+    }
+    else {
+        Write-Host "- installed executable candidate: not provided; set KCW_INSTALLED_EXE or pass -InstalledExePath"
+    }
+    Write-Host "- installed-app live reply requires KIMI_API_KEY or MOONSHOT_API_KEY: $([bool]($env:KIMI_API_KEY -or $env:MOONSHOT_API_KEY))"
+}
+
+function New-SmokeReportPath {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+    $dir = Join-Path $RepoRoot "reports\windows-client-smoke"
+    if (-not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir | Out-Null
+    }
+    return (Join-Path $dir "windows-client-smoke-$stamp.json")
+}
+
+function Write-SmokeReport {
+    param(
+        [Parameter(Mandatory = $true)]$Report,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $dir = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir | Out-Null
+    }
+    $Report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Path -Encoding utf8
+    Write-Host "- smoke report: $Path"
+}
+
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $buildRoot = Join-Path $repoRoot "build"
@@ -37,6 +99,52 @@ $sourceDir = Join-Path $repoRoot "apps\windows-client"
 $buildDir = Join-Path $buildRoot "windows-client-vs"
 $exe = Join-Path $buildDir "AgentCowork.exe"
 $vsDevShell = "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\Launch-VsDevShell.ps1"
+
+if ([string]::IsNullOrWhiteSpace($ReportPath)) {
+    $ReportPath = New-SmokeReportPath -RepoRoot $repoRoot
+}
+
+if ($DryRun) {
+    Write-SmokePlan -Installer $InstallerPath -InstalledExe $InstalledExePath -WorkspacePath $workspace
+    $installerExists = $false
+    $installerSignature = $null
+    if (-not [string]::IsNullOrWhiteSpace($InstallerPath)) {
+        $installerExists = Test-Path -LiteralPath $InstallerPath
+        if ($installerExists) {
+            $installerSignature = (Get-AuthenticodeSignature -LiteralPath $InstallerPath).Status.ToString()
+        }
+    }
+    $installedExeExists = $false
+    if (-not [string]::IsNullOrWhiteSpace($InstalledExePath)) {
+        $installedExeExists = Test-Path -LiteralPath $InstalledExePath
+    }
+    Write-SmokeReport -Path $ReportPath -Report ([ordered]@{
+        ok = $true
+        mode = "dry-run"
+        generatedAt = (Get-Date).ToUniversalTime().ToString("o")
+        workspace = $workspace
+        sourceBuildSmoke = -not $SkipSourceBuildSmoke
+        installer = [ordered]@{
+            path = $InstallerPath
+            provided = -not [string]::IsNullOrWhiteSpace($InstallerPath)
+            exists = $installerExists
+            signatureStatus = $installerSignature
+        }
+        installedExe = [ordered]@{
+            path = $InstalledExePath
+            provided = -not [string]::IsNullOrWhiteSpace($InstalledExePath)
+            exists = $installedExeExists
+            selected = $UseInstalledExe -or (-not [string]::IsNullOrWhiteSpace($InstalledExePath))
+        }
+        liveReplyConfigured = [bool]($env:KIMI_API_KEY -or $env:MOONSHOT_API_KEY)
+        deferred = @(
+            "real installed executable launch",
+            "real Kimi reply",
+            "installer signature trust"
+        )
+    })
+    return
+}
 
 if (-not (Test-Path -LiteralPath $buildRoot)) {
     New-Item -ItemType Directory -Path $buildRoot | Out-Null
@@ -57,13 +165,24 @@ Set-Content -LiteralPath (Join-Path $workspace "contracts\sample-contract.txt") 
 Set-Content -LiteralPath (Join-Path $workspace "finance\invoices.csv") -Encoding utf8 -Value "vendor,amount`nMoonshot,1280`nOffice,360"
 Set-Content -LiteralPath (Join-Path $workspace "agent-cowork.workspace") -Encoding ascii -Value "smoke"
 
-Assert-True (Test-Path -LiteralPath $vsDevShell) "Visual Studio developer shell not found: $vsDevShell"
-& $vsDevShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation | Out-Null
-
-if (-not (Test-Path -LiteralPath (Join-Path $buildDir "build.ninja"))) {
-    Invoke-Checked "cmake" "-S" $sourceDir "-B" $buildDir "-G" "Ninja"
+if ($UseInstalledExe -or (-not [string]::IsNullOrWhiteSpace($InstalledExePath))) {
+    Assert-True (-not [string]::IsNullOrWhiteSpace($InstalledExePath)) "Installed executable path is required when using installed smoke mode"
+    Assert-True (Test-Path -LiteralPath $InstalledExePath) "Installed AgentCowork.exe not found: $InstalledExePath"
+    $exe = (Resolve-Path -LiteralPath $InstalledExePath).Path
+    $buildDir = Split-Path -Parent $exe
 }
-Invoke-Checked "cmake" "--build" $buildDir "--config" "Debug"
+elseif (-not $SkipSourceBuildSmoke) {
+    Assert-True (Test-Path -LiteralPath $vsDevShell) "Visual Studio developer shell not found: $vsDevShell"
+    & $vsDevShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation | Out-Null
+
+    if (-not (Test-Path -LiteralPath (Join-Path $buildDir "build.ninja"))) {
+        Invoke-Checked "cmake" "-S" $sourceDir "-B" $buildDir "-G" "Ninja"
+    }
+    Invoke-Checked "cmake" "--build" $buildDir "--config" "Debug"
+}
+else {
+    Assert-True (Test-Path -LiteralPath $exe) "Source build smoke was skipped and no existing build exe was found: $exe"
+}
 Assert-True (Test-Path -LiteralPath $exe) "AgentCowork.exe was not built: $exe"
 
 $nativeCode = @'
@@ -314,18 +433,24 @@ try {
     $artifactText = [KcwSmokeWin32]::Text($artifact.Hwnd)
     Assert-True ($artifactText.Contains("Developer Mode")) "Developer Mode did not update artifact panel"
 
-    [pscustomobject]@{
-        WindowTitle = $process.MainWindowTitle
-        Workspace = $workspace
-        ScannedFiles = $fileCount
-        GeneratePlan = "passed"
-        Approve = "passed"
-        ArtifactPath = $artifactFiles[0].FullName
-        MovedFilePath = $movedFilePath
-        AuditPath = $auditPath
-        RollbackPath = $rollbackFiles[0].FullName
-        DeveloperMode = "passed"
+    $successReport = [ordered]@{
+        ok = $true
+        mode = if ($UseInstalledExe -or (-not [string]::IsNullOrWhiteSpace($InstalledExePath))) { "installed-exe" } else { "source-build" }
+        generatedAt = (Get-Date).ToUniversalTime().ToString("o")
+        windowTitle = $process.MainWindowTitle
+        workspace = $workspace
+        scannedFiles = $fileCount
+        generatePlan = "passed"
+        approve = "passed"
+        artifactPath = $artifactFiles[0].FullName
+        movedFilePath = $movedFilePath
+        auditPath = $auditPath
+        rollbackPath = $rollbackFiles[0].FullName
+        developerMode = "passed"
+        liveReplyConfigured = [bool]($env:KIMI_API_KEY -or $env:MOONSHOT_API_KEY)
     }
+    Write-SmokeReport -Path $ReportPath -Report $successReport
+    [pscustomobject]$successReport
 }
 finally {
     if (-not $KeepOpen) {

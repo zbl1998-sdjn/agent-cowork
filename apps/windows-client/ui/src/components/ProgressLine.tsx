@@ -1,9 +1,13 @@
+import { progressStatusFromIcon, type ProgressStatus } from '../lib/app-logic';
+
 export interface ProgressLineProps {
-  status?: 'pending' | 'running' | 'done' | 'failed' | 'wait';
+  status?: ProgressStatus;
   icon?: string;
   text: string;
   duration?: string;
 }
+
+export { progressStatusFromIcon };
 
 export function ProgressLine({ status = 'wait', text, duration }: ProgressLineProps) {
   return (
@@ -12,10 +16,4 @@ export function ProgressLine({ status = 'wait', text, duration }: ProgressLinePr
       {duration && <span className="progress-meta">{duration}</span>}
     </div>
   );
-}
-
-export function progressStatusFromIcon(icon?: string): ProgressLineProps['status'] {
-  if (icon === 'check') return 'done';
-  if (icon === 'loader') return 'running';
-  return 'wait';
 }

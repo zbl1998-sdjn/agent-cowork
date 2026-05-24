@@ -1,0 +1,190 @@
+{
+  "ok": true,
+  "mode": "dry-run",
+  "generatedAt": "2026-05-24T13:36:22.453Z",
+  "durationMs": 38,
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\e2e-smoke\\workspace",
+  "baseUrl": "http://127.0.0.1:61224",
+  "outputPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\e2e-smoke\\workspace\\e2e-output.md",
+  "summary": {
+    "start": true,
+    "toolCallCount": 4,
+    "toolResultCount": 4,
+    "approvals": 2,
+    "fileWritten": true,
+    "done": true,
+    "errors": []
+  },
+  "events": [
+    {
+      "event": "start",
+      "data": {
+        "runId": "run_20260524133622_96ca0899"
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Read",
+        "args": {
+          "path": "input.txt"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Read",
+        "status": "succeeded",
+        "result": {
+          "path": "input.txt",
+          "size": 102,
+          "content": "Agent Cowork E2E fixture. Please read, summarize, write e2e-output.md, and run a harmless shell check."
+        }
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Write",
+        "args": {
+          "path": "e2e-output.md",
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        }
+      }
+    },
+    {
+      "event": "approval_request",
+      "data": {
+        "id": "apr_1af9170808b8",
+        "name": "Write",
+        "args": {
+          "path": "e2e-output.md",
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        },
+        "risk": "write"
+      }
+    },
+    {
+      "event": "file_written",
+      "data": {
+        "path": "e2e-output.md"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Write",
+        "status": "succeeded",
+        "result": {
+          "ok": true,
+          "path": "e2e-output.md",
+          "bytes": 71
+        }
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Shell",
+        "args": {
+          "command": "node -e \"process.stdout.write('shell-ok')\""
+        }
+      }
+    },
+    {
+      "event": "approval_request",
+      "data": {
+        "id": "apr_3c1570895d12",
+        "name": "Shell",
+        "args": {
+          "command": "node -e \"process.stdout.write('shell-ok')\""
+        },
+        "risk": "high"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Shell",
+        "status": "failed",
+        "result": {
+          "error": "spawn EPERM"
+        }
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Read",
+        "args": {
+          "path": "e2e-output.md"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Read",
+        "status": "succeeded",
+        "result": {
+          "path": "e2e-output.md",
+          "size": 71,
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        }
+      }
+    },
+    {
+      "event": "token",
+      "data": {
+        "delta": "E2E dry-run smoke completed."
+      }
+    },
+    {
+      "event": "verify_start",
+      "data": {}
+    },
+    {
+      "event": "token",
+      "data": {
+        "delta": "E2E dry-run smoke completed."
+      }
+    },
+    {
+      "event": "done",
+      "data": {
+        "runId": "run_20260524133622_96ca0899",
+        "text": "E2E dry-run smoke completed.",
+        "steps": [
+          {
+            "tool": "Read",
+            "ok": true
+          },
+          {
+            "tool": "Write",
+            "ok": true
+          },
+          {
+            "tool": "Shell",
+            "ok": false
+          },
+          {
+            "tool": "Read",
+            "ok": true
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "total_tokens": 0
+        }
+      }
+    }
+  ],
+  "livePrerequisites": {
+    "requested": false,
+    "hasApiKey": false,
+    "baseUrl": null,
+    "model": null
+  }
+}

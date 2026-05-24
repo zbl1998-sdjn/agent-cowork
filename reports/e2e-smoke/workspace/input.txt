@@ -1,0 +1,1 @@
+Agent Cowork E2E fixture. Please read, summarize, write e2e-output.md, and run a harmless shell check.

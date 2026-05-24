@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": [
+    "apps/host/src/security/redaction.js",
+    "apps/host/src/runtime/concurrency.js",
+    "apps/host/src/runtime/task-presenter.js",
+    "apps/host/src/runtime/usage.js"
+  ]
+}

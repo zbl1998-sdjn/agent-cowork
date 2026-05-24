@@ -39,6 +39,25 @@ test('pdf comes back as base64 (kind=pdf)', () => {
   assert.ok(r.base64.length > 0);
 });
 
+test('csv comes back as a bounded table preview', () => {
+  const root = mkRoot();
+  fs.writeFileSync(path.join(root, 'data.csv'), 'name,amount\nA,12\n"B,B",34\n');
+  const r = readFilePreview('data.csv', { trustedRoot: root });
+  assert.equal(r.kind, 'table');
+  assert.deepEqual(r.table.headers, ['name', 'amount']);
+  assert.deepEqual(r.table.rows, [['A', '12'], ['B,B', '34']]);
+  assert.match(r.text, /amount/);
+});
+
+test('diff files keep a dedicated preview kind', () => {
+  const root = mkRoot();
+  fs.writeFileSync(path.join(root, 'change.diff'), '--- a/a.txt\n+++ b/a.txt\n+new\n');
+  const r = readFilePreview('change.diff', { trustedRoot: root });
+  assert.equal(r.kind, 'diff');
+  assert.equal(r.mime, 'text/x-diff');
+  assert.match(r.text, /\+new/);
+});
+
 test('path traversal outside the trusted root is rejected', () => {
   const root = mkRoot();
   assert.throws(() => readFilePreview('../escape.png', { trustedRoot: root }));

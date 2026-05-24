@@ -1,6 +1,6 @@
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { renderViz } from '../artifacts/viz.js';
-import { buildLiveArtifact, readArtifactManifest, readLiveArtifactHtml } from '../artifacts/live-artifact.js';
+import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactData } from '../artifacts/live-artifact.js';
 
 // Inline-viz + live-artifact routes.
 //
@@ -67,7 +67,7 @@ export async function handleVizRoutes({
         const trustedRoot = safeTrustedRoot(body?.trustedRoot);
         let artifact;
         try {
-          artifact = buildLiveArtifact({ trustedRoot, id: body?.id, title: viz.title, viz });
+          artifact = buildLiveArtifact({ trustedRoot, id: body?.id, title: viz.title, viz, dataSource: body?.dataSource });
         } catch (err) {
           sendJson(response, err.statusCode || 400, { error: err.message });
           return;
@@ -89,13 +89,10 @@ export async function handleVizRoutes({
     const id = decodeURIComponent(pathname.slice(DATA_PREFIX.length));
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
-      const manifest = readArtifactManifest({ trustedRoot, id });
+      const artifactData = refreshLiveArtifactData({ trustedRoot, id });
       sendJson(response, 200, {
         context: requestContext,
-        id: manifest.id,
-        title: manifest.title,
-        viz: manifest.viz,
-        refreshedAt: new Date().toISOString(),
+        ...artifactData,
       });
     } catch (err) {
       sendJson(response, err.statusCode || 400, { error: err.message });

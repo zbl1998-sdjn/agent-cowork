@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { previewFileOperations, applyFileOperations } from '../src/workspace/file-operations.js';
+import { previewFileOperations, applyFileOperations, rollbackFileOperations } from '../src/workspace/file-operations.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const root = makeTestWorkspace('kfcowork-ops');
@@ -46,6 +46,31 @@ test('applies binary write operations from base64 content', () => {
   assert.deepEqual(fs.readFileSync(target), bytes);
 });
 
+test('rolls back a newly created file only when the expected hash still matches', () => {
+  const target = path.join(root, 'rollback-created.txt');
+  const applied = applyFileOperations([{ type: 'write', path: target, content: 'created-for-rollback' }], { trustedRoot: root });
+  assert.equal(fs.existsSync(target), true);
+
+  const rolledBack = rollbackFileOperations(applied.applied, { trustedRoot: root });
+  assert.equal(rolledBack.rolledBack.length, 1);
+  assert.equal(rolledBack.rolledBack[0].status, 'rolled_back');
+  assert.equal(fs.existsSync(target), false);
+});
+
+test('restores overwritten file content from a jailed rollback backup', () => {
+  const target = path.join(root, 'rollback-overwrite.txt');
+  fs.writeFileSync(target, 'before', 'utf8');
+  const applied = applyFileOperations(
+    [{ type: 'write', path: target, content: 'after', overwrite: true }],
+    { trustedRoot: root, rollbackBatchId: 'test-overwrite' },
+  );
+  assert.equal(fs.readFileSync(target, 'utf8'), 'after');
+  assert.match(applied.applied[0].rollback.backupPath, /[\\/]rollback[\\/]test-overwrite[\\/]/);
+
+  rollbackFileOperations(applied.applied, { trustedRoot: root });
+  assert.equal(fs.readFileSync(target, 'utf8'), 'before');
+});
+
 test('forbids rename when target already exists', () => {
   const source = path.join(root, 'rename-source.txt');
   const target = path.join(root, 'rename-target.txt');
@@ -81,4 +106,18 @@ test('forbids move when target directory already exists', () => {
     () => previewFileOperations([{ type: 'move', from: source, to: target }], { trustedRoot: root }),
     /target already exists/i,
   );
+});
+
+test('rolls back move operations in reverse order', () => {
+  const source = path.join(root, 'rollback-move-source.txt');
+  const target = path.join(root, 'rollback', 'rollback-move-target.txt');
+  fs.writeFileSync(source, 'move-me-back', 'utf8');
+
+  const applied = applyFileOperations([{ type: 'move', from: source, to: target }], { trustedRoot: root });
+  assert.equal(fs.existsSync(source), false);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'move-me-back');
+
+  rollbackFileOperations(applied.applied, { trustedRoot: root });
+  assert.equal(fs.readFileSync(source, 'utf8'), 'move-me-back');
+  assert.equal(fs.existsSync(target), false);
 });

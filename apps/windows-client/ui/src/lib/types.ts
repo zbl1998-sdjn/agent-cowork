@@ -3,6 +3,7 @@
 export type RunStatus = 'pending' | 'planning' | 'awaiting_approval' | 'applying' | 'done' | 'failed';
 export type MessageRole = 'user' | 'assistant';
 export type ApprovalState = 'idle' | 'awaiting' | 'approved' | 'rejected';
+export type TodoStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected';
 
 export interface FileOperation {
   type: 'write' | 'rename' | 'move' | string;
@@ -14,6 +15,8 @@ export interface FileOperation {
 export interface SourceRef {
   path: string;
   relativePath?: string;
+  startLine?: number;
+  endLine?: number;
   excerpt?: string;
   error?: string;
 }
@@ -22,6 +25,14 @@ export interface ArtifactFile {
   path: string;
   relativePath?: string;
   size?: number;
+}
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  status: TodoStatus;
+  detail?: string;
+  kind?: string;
 }
 
 // SSE event payloads emitted by the host run bus.
@@ -38,7 +49,10 @@ export interface RunEvent {
     | 'assistant_end'
     | 'sandbox_start'
     | 'sandbox_end'
-    | 'tool_result';
+    | 'tool_result'
+    | 'todo_snapshot'
+    | 'todo_update';
+  id?: string;
   text?: string;
   icon?: 'check' | 'loader' | string;
   status?: string;
@@ -46,6 +60,9 @@ export interface RunEvent {
   operations?: FileOperation[];
   count?: number;
   items?: SourceRef[];
+  todos?: TodoItem[];
+  detail?: string;
+  kind?: string;
   [key: string]: unknown;
 }
 

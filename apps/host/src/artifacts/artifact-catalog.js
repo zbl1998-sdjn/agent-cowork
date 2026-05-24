@@ -58,6 +58,35 @@ function artifactRelativePath(root, filePath) {
   return ['.AgentCowork', 'artifacts', relative].join('/');
 }
 
+function artifactItem(root, filePath) {
+  const stat = fs.statSync(filePath);
+  const name = path.basename(filePath);
+  return {
+    path: filePath,
+    name,
+    relativePath: artifactRelativePath(root, filePath),
+    extension: path.extname(name).toLowerCase(),
+    kind: artifactKind(filePath),
+    size: stat.size,
+    mtime: stat.mtime.toISOString(),
+    viewable: true,
+  };
+}
+
+function safeArtifactName(newName) {
+  const name = String(newName || '').trim();
+  if (!name) {
+    throw new Error('artifact newName is required');
+  }
+  if (name !== path.basename(name) || /[\\/]/.test(name)) {
+    throw new Error('artifact newName must be a file name only');
+  }
+  if (name === '.' || name === '..') {
+    throw new Error('artifact newName is invalid');
+  }
+  return name;
+}
+
 function collectFiles(root, current, files, limit) {
   if (files.length >= limit || !fs.existsSync(current)) {
     return;
@@ -74,17 +103,7 @@ function collectFiles(root, current, files, limit) {
     if (!entry.isFile()) {
       continue;
     }
-    const stat = fs.statSync(fullPath);
-    files.push({
-      path: fullPath,
-      name: entry.name,
-      relativePath: artifactRelativePath(root, fullPath),
-      extension: path.extname(entry.name).toLowerCase(),
-      kind: artifactKind(fullPath),
-      size: stat.size,
-      mtime: stat.mtime.toISOString(),
-      viewable: true,
-    });
+    files.push(artifactItem(root, fullPath));
   }
 }
 
@@ -99,6 +118,35 @@ export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
   return files
     .sort((a, b) => b.mtime.localeCompare(a.mtime))
     .slice(0, Math.max(1, Math.min(Number(limit) || 20, 100)));
+}
+
+export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
+  if (!trustedRoot) {
+    throw new Error('trustedRoot is required');
+  }
+  if (!artifactPath) {
+    throw new Error('artifact path is required');
+  }
+  const { root, safe } = safeArtifactPath(trustedRoot, artifactPath);
+  if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
+    const err = new Error('artifact not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const target = path.join(path.dirname(safe), safeArtifactName(newName));
+  if (!isInside(root, target)) {
+    throw new Error('artifact rename target must stay inside .AgentCowork/artifacts');
+  }
+  if (target === safe) {
+    return artifactItem(root, safe);
+  }
+  if (fs.existsSync(target)) {
+    const err = new Error('artifact target already exists');
+    err.statusCode = 409;
+    throw err;
+  }
+  fs.renameSync(safe, target);
+  return artifactItem(root, target);
 }
 
 export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 * 1024 } = {}) {

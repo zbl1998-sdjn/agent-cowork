@@ -43,6 +43,10 @@ const SENSITIVE_PATHS = [
   /[\\/]AppData[\\/][^\s\\/]*/gi,
 ];
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function maskAssignments(text) {
   let t = text.replace(ASSIGNMENT_RE, (_match, label) => `${label}[REDACTED]`);
   t = t.replace(AUTH_HEADER_RE, (_match, label) => `${label}[REDACTED]`);
@@ -50,15 +54,27 @@ function maskAssignments(text) {
   return t;
 }
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function maskPaths(text) {
   return SENSITIVE_PATHS.reduce((acc, re) => acc.replace(re, '[REDACTED_PATH]'), text);
 }
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function maskTokens(text) {
   return SENSITIVE_TOKENS.reduce((acc, re) => acc.replace(re, '[REDACTED]'), text);
 }
 
-// Redact a single string. Returns non-strings (null/undefined/number) untouched.
+/**
+ * Redact a single value. Null/undefined pass through; other values are stringified.
+ * @param {unknown} value
+ * @returns {string | null | undefined}
+ */
 export function redactText(value) {
   if (value === undefined || value === null) return value;
   let text = String(value);
@@ -68,14 +84,18 @@ export function redactText(value) {
   return text;
 }
 
-// Recursively redact every string inside an object/array — handy for scrubbing
-// structured audit payloads or error objects before persisting them.
+/**
+ * Recursively redact every string inside an object/array.
+ * @param {unknown} value
+ * @returns {unknown}
+ */
 export function redactValue(value) {
   if (typeof value === 'string') return redactText(value);
   if (Array.isArray(value)) return value.map(redactValue);
   if (value && typeof value === 'object') {
-    const out = {};
-    for (const key of Object.keys(value)) out[key] = redactValue(value[key]);
+    const source = /** @type {Record<string, unknown>} */ (value);
+    const out = /** @type {Record<string, unknown>} */ ({});
+    for (const key of Object.keys(source)) out[key] = redactValue(source[key]);
     return out;
   }
   return value;

@@ -55,6 +55,24 @@ export function FilePreview({ path, trustedRoot, onClose }: FilePreviewProps) {
           {data?.kind === 'text' && data.text != null && (
             <pre className="preview-text">{data.text}</pre>
           )}
+          {data?.kind === 'diff' && data.text != null && (
+            <pre className="preview-text preview-diff">{data.text}</pre>
+          )}
+          {data?.kind === 'table' && data.table && (
+            <div className="preview-table-wrap">
+              <table className="preview-table">
+                <thead>
+                  <tr>{data.table.headers.map((cell, i) => <th key={i}>{cell}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {data.table.rows.map((row, r) => (
+                    <tr key={r}>{row.map((cell, c) => <td key={c}>{cell}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+              {data.table.truncated && <p className="modal-note">仅显示前 100 行。</p>}
+            </div>
+          )}
           {data?.kind === 'pdf' && data.base64 && (
             <div className="preview-pdf-wrap">
               {/* Use an <iframe> (governed by CSP frame-src) rather than <embed>

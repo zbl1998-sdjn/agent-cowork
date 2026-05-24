@@ -94,6 +94,36 @@ test('upsert preserves createdAt and updates title/messages', async () => {
   });
 });
 
+test('conversation storage preserves branch metadata and active branch', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-conv-branches');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const token = await registerUser(baseUrl, 'dana');
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const branches = [
+      { id: 'main', title: '主线', messages: [{ id: 'u1', role: 'user', text: '原问题' }, { id: 'a1', role: 'assistant', text: '原回答' }] },
+      { id: 'b1', title: '分支 1', parentBranchId: 'main', baseMessageId: 'u1', messages: [{ id: 'u2', role: 'user', text: '新问题' }] },
+    ];
+
+    let res = await fetch(`${baseUrl}/api/conversations/branched`, {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({ title: '有分支', messages: branches[1].messages, activeBranchId: 'b1', branches }),
+    });
+    assert.equal(res.status, 200);
+    const summary = (await res.json()).conversation;
+    assert.equal(summary.branchCount, 2);
+    assert.equal(summary.activeBranchId, 'b1');
+
+    res = await fetch(`${baseUrl}/api/conversations/branched`, { headers: auth });
+    assert.equal(res.status, 200);
+    const full = (await res.json()).conversation;
+    assert.equal(full.activeBranchId, 'b1');
+    assert.equal(full.branches.length, 2);
+    assert.deepEqual(full.branches.map((branch) => branch.id), ['main', 'b1']);
+    assert.equal(full.branches[0].messages.length, 2);
+  });
+});
+
 test('FileConversationStore rejects path-traversal ids and isolates by tenant', () => {
   const trustedRoot = makeTestWorkspace('kcw-conv-unit');
   const store = new FileConversationStore();

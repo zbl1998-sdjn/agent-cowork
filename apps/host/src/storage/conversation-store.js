@@ -46,12 +46,34 @@ function sanitizeMessages(messages) {
   return messages.slice(-200);
 }
 
+function safeOptionalId(value) {
+  const text = String(value || '').trim();
+  return ID_RE.test(text) ? text : '';
+}
+
+function sanitizeBranches(branches) {
+  if (!Array.isArray(branches)) return [];
+  return branches.slice(-12).map((branch, index) => {
+    const id = safeOptionalId(branch && branch.id) || (index === 0 ? 'main' : `branch-${index}`);
+    return {
+      id,
+      title: String((branch && branch.title) || (index === 0 ? '主线' : `分支 ${index}`)).slice(0, MAX_TITLE),
+      ...(safeOptionalId(branch && branch.parentBranchId) ? { parentBranchId: String(branch.parentBranchId) } : {}),
+      ...(branch && branch.baseMessageId ? { baseMessageId: String(branch.baseMessageId).slice(0, 96) } : {}),
+      ...(branch && branch.createdAt ? { createdAt: String(branch.createdAt).slice(0, 64) } : {}),
+      messages: sanitizeMessages(branch && branch.messages),
+    };
+  });
+}
+
 function summarise(conv) {
   return {
     id: conv.id,
     title: conv.title || '新对话',
     pinned: Boolean(conv.pinned),
     messageCount: Array.isArray(conv.messages) ? conv.messages.length : 0,
+    branchCount: Array.isArray(conv.branches) ? conv.branches.length : 0,
+    activeBranchId: conv.activeBranchId,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
   };
@@ -115,11 +137,17 @@ export class FileConversationStore {
     const file = path.join(dir, `${id}.json`);
     const existing = fs.existsSync(file) ? this.get(trustedRoot, id, context) : null;
     const now = this.now().toISOString();
+    const branches = sanitizeBranches(conv && conv.branches);
+    const requestedActive = safeOptionalId(conv && conv.activeBranchId);
+    const activeBranchId = branches.some((branch) => branch.id === requestedActive)
+      ? requestedActive
+      : branches[0]?.id;
     const record = {
       id,
       title: String((conv && conv.title) || '新对话').slice(0, MAX_TITLE),
       pinned: Boolean(conv && conv.pinned),
       messages: sanitizeMessages(conv && conv.messages),
+      ...(branches.length ? { activeBranchId, branches } : {}),
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };

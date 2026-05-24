@@ -1,3 +1,27 @@
+/**
+ * @typedef {{
+ *   id: string,
+ *   status?: string,
+ *   prompt?: string,
+ *   mode?: string,
+ *   type?: string,
+ *   provider?: string,
+ *   startedAt?: string,
+ *   finishedAt?: string,
+ *   durationMs?: number,
+ *   summary?: string
+ * }} RunSummary
+ *
+ * @typedef {RunSummary & {
+ *   status: 'done' | 'failed' | 'in_progress',
+ *   activeForm: string
+ * }} TaskSummary
+ */
+
+/**
+ * @param {RunSummary} run
+ * @returns {TaskSummary}
+ */
 export function taskFromRun(run) {
   const status = run.status === 'succeeded' ? 'done' : run.status === 'failed' ? 'failed' : 'in_progress';
   return {

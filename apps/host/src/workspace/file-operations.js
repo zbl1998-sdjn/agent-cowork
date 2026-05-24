@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import { createRollbackBatchId, rollbackEntryForMove, rollbackEntryForWrite, rollbackFileOperations as rollbackEntries } from './file-rollback.js';
+
+export { rollbackEntries as rollbackFileOperations };
 
 function normalizeOp(op) {
   if (!op || typeof op !== 'object') {
@@ -160,10 +163,17 @@ function applyMove(op) {
 export function applyFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   const journalWriter = options.journalWriter;
+  const rollbackBatchId = options.rollbackBatchId || createRollbackBatchId();
   const preview = previewFileOperations(operations, { trustedRoot });
   const results = [];
 
   for (const op of preview.operations) {
+    let rollback = null;
+    if (op.type === 'write') {
+      rollback = rollbackEntryForWrite(op, { trustedRoot, rollbackBatchId });
+    } else if (op.type === 'rename' || op.type === 'move') {
+      rollback = rollbackEntryForMove(op);
+    }
     const event = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       at: new Date().toISOString(),
@@ -172,6 +182,7 @@ export function applyFileOperations(operations, options = {}) {
       targetPath: op.targetPath,
       beforeHash: op.beforeHash,
       afterHash: op.afterHash,
+      rollback,
       status: 'pending',
     };
     if (journalWriter?.append) {
@@ -184,6 +195,7 @@ export function applyFileOperations(operations, options = {}) {
       const afterStat = fs.statSync(op.path);
       event.status = 'applied';
       event.afterHash = hashFile(op.path);
+      event.rollback.expectedHash = event.afterHash;
       event.size = afterStat.size;
       if (journalWriter?.append) {
         journalWriter.append({ ...event, stage: 'after' });

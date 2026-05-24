@@ -16,7 +16,7 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
   fs.writeFileSync(path.join(root, 'a.txt'), 'hello', 'utf8');
   const tools = createAgentTools({ trustedRoot: root });
   const byName = (n) => tools.find((t) => t.name === n);
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['Edit', 'Glob', 'Grep', 'Read', 'WebFetch', 'Write']);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['AnalyzeDataFile', 'Edit', 'GitCommit', 'GitDiff', 'GitLog', 'GitStatus', 'Glob', 'Grep', 'PlanFileOrganization', 'Read', 'SearchWorkspace', 'WebFetch', 'Write']);
   const glob = await byName('Glob').handler({ pattern: '*.txt' });
   assert.ok(glob.matches.includes('a.txt'));
   const read = await byName('Read').handler({ path: 'a.txt' });
@@ -27,6 +27,12 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
   // Write/Edit are flagged mutating (gated by approval in the loop)
   assert.equal(byName('Write').mutating, true);
   assert.equal(byName('Read').mutating, false);
+  assert.equal(byName('SearchWorkspace').mutating, false);
+  assert.equal(byName('PlanFileOrganization').mutating, false);
+  assert.equal(byName('AnalyzeDataFile').mutating, false);
+  assert.equal(byName('GitStatus').mutating, false);
+  assert.equal(byName('GitCommit').mutating, true);
+  assert.equal(byName('GitCommit').risk, 'high');
   await assert.rejects(() => byName('Write').handler({ path: '../escape.txt', content: 'x' }), /escaped|Sensitive|outside/i);
 });
 
@@ -43,14 +49,17 @@ test('Edit replaces a string in a workspace file', async () => {
 
 test('runAgentChat executes a Write tool call then returns a final answer', async () => {
   const root = tmp();
+  const events = [];
   let calls = 0;
   const modelCall = async () => {
     calls += 1;
     if (calls === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: JSON.stringify({ path: 'out.txt', content: 'hello agent' }) } }] };
     return { content: '已为你创建 out.txt。' };
   };
-  const out = await runAgentChat({ prompt: '创建 out.txt', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({ prompt: '创建 out.txt', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, emit: (type, payload) => events.push({ type, payload }), runStoreRoot: path.join(root, 'runs') });
   assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'hello agent');
+  assert.ok(events.some((e) => e.type === 'todo_update' && e.payload.status === 'running' && e.payload.text === '调用 Write'), 'tool todo starts running');
+  assert.ok(events.some((e) => e.type === 'todo_update' && e.payload.status === 'done' && e.payload.text === '调用 Write'), 'tool todo finishes done');
   assert.equal(out.text, '已为你创建 out.txt。');
 });
 
@@ -69,6 +78,7 @@ test('POST /api/agent/chat/stream (autoApprove) writes the file and records an a
     assert.equal(res.status, 200);
     const text = await res.text();
     assert.match(text, /event: tool_call/);
+    assert.match(text, /event: todo_update/);
     assert.match(text, /event: done/);
     assert.equal(fs.readFileSync(path.join(root, 'note.md'), 'utf8'), '# 标题\n内容');
     const idx = await (await fetch(`${base}/api/runs/index`)).json();
@@ -101,6 +111,7 @@ test('plan mode blocks writes until ExitPlanMode is approved, then executes', as
   assert.ok(out.steps.some((s) => s.tool === 'Write' && s.planBlocked), 'early write blocked');
   // A plan was proposed (frontend onPlanProposed) and approved.
   assert.ok(events.some((e) => e.type === 'plan_proposed'), 'plan_proposed emitted');
+  assert.ok(events.some((e) => e.type === 'todo_snapshot' && e.payload.todos?.[0]?.text === '写 out.txt'), 'plan todo snapshot emitted');
   assert.ok(out.steps.some((s) => s.tool === 'ExitPlanMode' && s.plan && s.approved), 'plan approved');
   // After approval the second Write executed with the approved content.
   assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'APPROVED');

@@ -6,6 +6,8 @@ import test from 'node:test';
 import {
   appendMemoryFact,
   buildMemorySystemBlock,
+  createMemoryStore,
+  FileMemoryStore,
   listMemoryNotes,
   loadMemoryContext,
   readMainMemory,
@@ -118,4 +120,12 @@ test('loadMemoryContext disabled when MEMORY.md absent', () => {
   const ctx = loadMemoryContext(root);
   assert.equal(ctx.enabled, false);
   assert.equal(ctx.bytes, 0);
+});
+
+test('createMemoryStore keeps the default file backend compatible', () => {
+  const root = tempRoot();
+  const store = createMemoryStore();
+  assert.ok(store instanceof FileMemoryStore);
+  store.appendMemoryFact(root, { key: '默认后端', value: 'file memory store' });
+  assert.match(store.readMainMemory(root), /默认后端/);
 });

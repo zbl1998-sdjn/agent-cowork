@@ -2,7 +2,11 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
 import { runRecipe } from '../recipes/run-recipe.js';
 import { listRecipes } from '../recipes/registry.js';
+import { searchWorkspaceIndex } from '../workspace/index/search.js';
+import { planFileOrganization } from '../workspace/file-organizer.js';
 import { webFetch } from './web-fetch.js';
+import { createGitReadOnlyBuiltinTools } from './dev/git.js';
+import { profileDataFile } from './data/profile.js';
 
 // Built-in tools wired to the host's existing capabilities. These are plain
 // descriptors with handlers; the registry stays decoupled from the concrete
@@ -65,6 +69,65 @@ export function createBuiltinTools({
         webFetch({ url: args.url, timeoutMs: args.timeoutMs, maxBytes: args.maxBytes, allowInternal: args.allowInternal === true, fetchImpl }),
     });
   }
+
+  tools.push({
+    name: 'SearchWorkspace',
+    description: '在当前 trusted workspace 内做本地关键词/RAG 检索，返回相关文本块和来源行号。',
+    source: 'builtin',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'number' },
+        maxFiles: { type: 'number' },
+        maxFileBytes: { type: 'number' },
+      },
+      required: ['query'],
+    },
+    handler: async (args = {}, ctx = {}) =>
+      searchWorkspaceIndex({
+        root: ctx.trustedRoot,
+        query: args.query,
+        limit: args.limit,
+        maxFiles: args.maxFiles,
+        maxFileBytes: args.maxFileBytes,
+      }),
+  });
+
+  tools.push(...createGitReadOnlyBuiltinTools());
+
+  tools.push({
+    name: 'data.profile',
+    description: '只读：剖析工作区内 CSV/TSV 数据文件，返回列类型、缺失值、数值统计和图表建议。',
+    source: 'builtin',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        maxRows: { type: 'number' },
+        maxBytes: { type: 'number' },
+      },
+      required: ['path'],
+    },
+    handler: async (args = {}, ctx = {}) => profileDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
+  });
+
+  tools.push({
+    name: 'file.plan-organize',
+    description: '只读：为批量整理/改名/去重生成文件操作预览，实际执行仍需走审批 apply。',
+    source: 'builtin',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' } },
+        mode: { type: 'string', enum: ['byExtension', 'rename', 'dedupe'] },
+        targetDir: { type: 'string' },
+        renamePrefix: { type: 'string' },
+      },
+      required: ['files'],
+    },
+    handler: async (args = {}, ctx = {}) => planFileOrganization({ trustedRoot: ctx.trustedRoot, ...args }),
+  });
 
   for (const recipe of listRecipes()) {
     tools.push({

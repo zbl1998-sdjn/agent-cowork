@@ -17,12 +17,38 @@ function cleanId(id) {
 function sanitizeMessages(messages) {
   return Array.isArray(messages) ? messages.slice(-200) : [];
 }
+function safeOptionalId(value) {
+  const t = String(value || '').trim();
+  return ID_RE.test(t) ? t : '';
+}
+function sanitizeBranches(branches) {
+  if (!Array.isArray(branches)) return [];
+  return branches.slice(-12).map((branch, index) => {
+    const id = safeOptionalId(branch && branch.id) || (index === 0 ? 'main' : `branch-${index}`);
+    return {
+      id,
+      title: String((branch && branch.title) || (index === 0 ? '主线' : `分支 ${index}`)).slice(0, MAX_TITLE),
+      ...(safeOptionalId(branch && branch.parentBranchId) ? { parentBranchId: String(branch.parentBranchId) } : {}),
+      ...(branch && branch.baseMessageId ? { baseMessageId: String(branch.baseMessageId).slice(0, 96) } : {}),
+      ...(branch && branch.createdAt ? { createdAt: String(branch.createdAt).slice(0, 64) } : {}),
+      messages: sanitizeMessages(branch && branch.messages),
+    };
+  });
+}
+function parseBranches(row) {
+  const b = row.branches;
+  if (Array.isArray(b)) return b;
+  if (typeof b === 'string') { try { return JSON.parse(b); } catch { return []; } }
+  return [];
+}
 function summariseRow(row) {
   return {
     id: row.id,
     title: row.title || '新对话',
     pinned: Boolean(row.pinned),
     messageCount: Number(row.message_count) || 0,
+    branchCount: Number(row.branch_count) || 0,
+    activeBranchId: row.active_branch_id || undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
@@ -39,6 +65,8 @@ function fullRow(row) {
     title: row.title || '新对话',
     pinned: Boolean(row.pinned),
     messages: parseMessages(row),
+    activeBranchId: row.active_branch_id || undefined,
+    branches: parseBranches(row),
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
@@ -65,7 +93,9 @@ export class PostgresConversationStore {
 
   async list(trustedRoot, context = {}) {
     const r = await this._query(
-      `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count, created_at, updated_at
+      `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count,
+              COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
+              created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 ORDER BY updated_at DESC`,
       [normTenant(context.tenantId), normUser(context.userId)],
     );
@@ -85,7 +115,9 @@ export class PostgresConversationStore {
     const countRes = await this._query(`SELECT COUNT(*)::int AS total FROM conversations WHERE ${where}`, whereParams);
     const total = (countRes.rows && countRes.rows[0] && Number(countRes.rows[0].total)) || 0;
     const rowsRes = await this._query(
-      `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count, created_at, updated_at
+      `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count,
+              COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
+              created_at, updated_at
        FROM conversations WHERE ${where} ORDER BY updated_at DESC LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`,
       [...whereParams, lim, off],
     );
@@ -95,7 +127,7 @@ export class PostgresConversationStore {
   async listFull(trustedRoot, context = {}, { limit } = {}) {
     const hasLimit = typeof limit === 'number';
     const r = await this._query(
-      `SELECT id, title, pinned, messages, created_at, updated_at
+      `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 ORDER BY updated_at DESC${hasLimit ? ' LIMIT $3' : ''}`,
       hasLimit ? [normTenant(context.tenantId), normUser(context.userId), Math.max(0, limit)] : [normTenant(context.tenantId), normUser(context.userId)],
     );
@@ -104,7 +136,7 @@ export class PostgresConversationStore {
 
   async get(trustedRoot, id, context = {}) {
     const r = await this._query(
-      `SELECT id, title, pinned, messages, created_at, updated_at
+      `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND id=$3`,
       [normTenant(context.tenantId), normUser(context.userId), cleanId(id)],
     );
@@ -120,15 +152,26 @@ export class PostgresConversationStore {
     const title = String((conv && conv.title) || '新对话').slice(0, MAX_TITLE);
     const pinned = Boolean(conv && conv.pinned);
     const messages = sanitizeMessages(conv && conv.messages);
+    const branches = sanitizeBranches(conv && conv.branches);
+    const requestedActive = safeOptionalId(conv && conv.activeBranchId);
+    const activeBranchId = branches.some((branch) => branch.id === requestedActive)
+      ? requestedActive
+      : branches[0]?.id || null;
     const r = await this._query(
-      `INSERT INTO conversations (tenant_id, user_id, id, title, pinned, messages, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)
+      `INSERT INTO conversations (tenant_id, user_id, id, title, pinned, messages, branches, active_branch_id, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)
        ON CONFLICT (tenant_id, user_id, id) DO UPDATE SET
-         title=EXCLUDED.title, pinned=EXCLUDED.pinned, messages=EXCLUDED.messages, updated_at=EXCLUDED.updated_at
-       RETURNING id, title, pinned, jsonb_array_length(messages) AS message_count, created_at, updated_at`,
-      [tenantId, userId, id, title, pinned, JSON.stringify(messages), now, now],
+         title=EXCLUDED.title, pinned=EXCLUDED.pinned, messages=EXCLUDED.messages,
+         branches=EXCLUDED.branches, active_branch_id=EXCLUDED.active_branch_id, updated_at=EXCLUDED.updated_at
+       RETURNING id, title, pinned, jsonb_array_length(messages) AS message_count,
+                 COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
+                 created_at, updated_at`,
+      [tenantId, userId, id, title, pinned, JSON.stringify(messages), JSON.stringify(branches), activeBranchId, now, now],
     );
-    const row = (r.rows && r.rows[0]) || { id, title, pinned, message_count: messages.length, created_at: now, updated_at: now };
+    const row = (r.rows && r.rows[0]) || {
+      id, title, pinned, message_count: messages.length, branch_count: branches.length,
+      active_branch_id: activeBranchId, created_at: now, updated_at: now,
+    };
     return summariseRow(row);
   }
 
