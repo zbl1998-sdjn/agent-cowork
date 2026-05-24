@@ -10,8 +10,8 @@
 
 在 `installers\` 目录里任选其一:
 
-- **`Agent Cowork_0.1.0_x64-setup.exe`** —— 双击安装(NSIS,普通用户首选)。
-- **`Agent Cowork_0.1.0_x64_en-US.msi`** —— 企业/批量部署用。
+- **`Agent Cowork_0.2.0_x64-setup.exe`** —— 双击安装(NSIS,普通用户首选)。
+- **`Agent Cowork_0.2.0_x64_en-US.msi`** —— 企业/批量部署用。
 
 双击后按提示下一步完成,桌面 / 开始菜单会出现 **Agent Cowork** 图标。
 

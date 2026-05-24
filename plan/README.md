@@ -1,6 +1,6 @@
 # Agent Cowork v1.0 计划总览(导航 + 决策记录)
 
-基线 = **v0.1.0**(`releases/v0.1.0/`)。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
+基线 = **v0.1.0**(`releases/v0.1.0/`)；当前可试版本 = **v0.2.0**(`releases/v0.2.0/`)。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
 
 ## 文档导航(每份小而专)
 | 文档 | 作用 | 何时看 |
@@ -35,9 +35,10 @@
 - 每个任务遵循 `01` 的 DoD;每个里程碑打 tag + 出离线快照(git bundle)+ 归档安装包到 `releases/<ver>/`。
 
 ## 当前执行顺序
-P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → P1-A 计划闭环+可见 Todo。
+P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → v0.2.0 发布 → P2 连接器 + 启动探测真隔离。
 
 ## 当前状态快照(2026-05-25)
+- [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
 - [x] `03/04/05` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
 - [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 19 个纯/叶子/安全链路模块(新增 file-preview 预览安全边界),并加入 host Node 内建最小类型声明;已接入 `npm run check`。
 - [ ] P0-T10 延后项:完整 Node 类型覆盖、更多 L0/L1 模块纳入仍在推进;逐文件 `.ts` 转换尚未开始;不改 Node host 语言栈、不重写。
@@ -56,9 +57,9 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
-- [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装当前安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T221049Z.json`。
+- [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装 v0.2.0 安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
-- [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、installer/签名信任链相关验证。
+- [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)
@@ -67,4 +68,4 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 前端优化专项线(FE,聚焦交互修复/架构分层+错误空态/流式性能;设计系统暂缓)
 - [x] 4 个开放问题按默认锁成 D1–D4
 - [x] 已开工:P0 地基、03/04/05 多个本地可测切片已完成并纳入 CI
-- [ ] 继续:按未完成清单推进 P0-T10/Q9 host 类型护栏、P1-A3 真实 Kimi 留档、03-B1 定时/连接器/浏览器验收尾项、05-A2 Office 深操作等
+- [ ] 继续:深度优先推进 P2 连接器 + 启动探测真隔离;P1-A3 真实 Kimi 多文件留档、03-B1 连接器数据源、05-A2 Office 深操作等仍按延期验收清单处理。
