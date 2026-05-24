@@ -46,6 +46,21 @@ test('applies binary write operations from base64 content', () => {
   assert.deepEqual(fs.readFileSync(target), bytes);
 });
 
+test('applies each write using its corresponding content and jailed target', () => {
+  const target = path.join(root, 'same-target.txt');
+  const applied = applyFileOperations(
+    [
+      { type: 'write', path: target, content: 'first' },
+      { type: 'write', path: path.join(root, '.', 'same-target.txt'), content: 'second' },
+    ],
+    { trustedRoot: root },
+  );
+
+  assert.equal(applied.applied.length, 2);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'second');
+  assert.equal(path.resolve(applied.applied[1].path), target);
+});
+
 test('rolls back a newly created file only when the expected hash still matches', () => {
   const target = path.join(root, 'rollback-created.txt');
   const applied = applyFileOperations([{ type: 'write', path: target, content: 'created-for-rollback' }], { trustedRoot: root });

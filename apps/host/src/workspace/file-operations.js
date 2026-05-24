@@ -164,10 +164,12 @@ export function applyFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   const journalWriter = options.journalWriter;
   const rollbackBatchId = options.rollbackBatchId || createRollbackBatchId();
-  const preview = previewFileOperations(operations, { trustedRoot });
+  const requestedOperations = Array.isArray(operations) ? operations.map(normalizeOp) : operations;
+  const preview = previewFileOperations(requestedOperations, { trustedRoot });
   const results = [];
 
-  for (const op of preview.operations) {
+  for (const [index, op] of preview.operations.entries()) {
+    const requested = requestedOperations[index] || {};
     let rollback = null;
     if (op.type === 'write') {
       rollback = rollbackEntryForWrite(op, { trustedRoot, rollbackBatchId });
@@ -190,8 +192,7 @@ export function applyFileOperations(operations, options = {}) {
     }
 
     if (op.type === 'write') {
-      const original = operations.find((o) => o.type === 'write' && path.resolve(o.path) === op.path);
-      applyWrite(Object.assign(op, original || {}));
+      applyWrite({ ...requested, path: op.path });
       const afterStat = fs.statSync(op.path);
       event.status = 'applied';
       event.afterHash = hashFile(op.path);
