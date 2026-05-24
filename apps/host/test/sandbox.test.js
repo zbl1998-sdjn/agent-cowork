@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -387,5 +388,29 @@ test('POST /api/sandbox/run-code rejects an empty code body with 400', async () 
     assert.match(res.body.error, /code is required/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('local sandbox does NOT isolate the network (documented limitation, locked by this test)', async () => {
+  // Loopback server the sandboxed child will try to reach. Loopback keeps this
+  // deterministic (no real internet needed) while still proving the child can
+  // open a socket. The local backend runs a plain host subprocess and therefore
+  // CANNOT enforce network isolation — it must say so honestly. For a real
+  // no-network guarantee, use the VM backend (docker --network=none / wsl netns),
+  // whose isolation contract is covered by the tests above. If the local backend
+  // ever starts (wrongly) claiming isolation, this test flips and warns us.
+  const srv = http.createServer((req, res) => { res.end('REACHED'); });
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  const { port } = srv.address();
+  try {
+    const sandbox = createSandbox({ backend: 'local' });
+    const code = `const http=require('http');http.get('http://127.0.0.1:${port}/',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d));}).on('error',e=>process.stdout.write('ERR '+e.message));`;
+    const spec = normalizeSandboxSpec({ tool: 'node', args: ['-e', code], timeoutMs: 8000, network: false }, { allowTools: ['node'] });
+    const res = await sandbox.exec(spec, { trustedRoot: tempRoot() });
+    assert.equal(res.networkIsolated, false, 'local backend must not claim network isolation');
+    assert.ok(res.warnings.some((w) => /network/i.test(w)), 'local backend must warn it cannot isolate the network');
+    assert.match(res.stdout, /REACHED/, 'sandboxed process can reach the network on the local backend (no isolation) — use the vm backend to truly block it');
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
   }
 });
