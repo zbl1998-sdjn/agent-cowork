@@ -150,6 +150,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requestContext,
     toolRegistry: state.toolRegistry,
     credentialStore: state.credentialStore,
+    oauthPermissionApprovals: state.oauthPermissionApprovals,
     oauthSessions: state.oauthSessions,
     oauthFetch: state.oauthFetch,
     oauthConfig: state.oauthConfig,

@@ -157,6 +157,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .tool-list li button { margin-top: 8px; padding: 5px 12px; border: 1px solid #c96442; background: #c96442; color: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; }
 .tool-list li button[disabled] { opacity: .55; cursor: default; background: #8a8f84; border-color: #8a8f84; }
 .connector-install { display: block; margin-top: 8px; font-size: 11px; color: #6b6f66; background: #f0f1ec; border-radius: 6px; padding: 6px 8px; word-break: break-all; cursor: text; }
+.connector-permissions { margin-top: 8px; display: grid; gap: 6px; }
+.connector-permissions label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4f554c; cursor: pointer; }
+.connector-permissions input { width: 14px; height: 14px; accent-color: #c96442; }
+.connector-permissions em { margin-left: auto; color: #9a3d2c; font-size: 11px; font-style: normal; }
 .plan-card { background: #f5f7f2; border: 1px solid #b8c2ad; border-left: 3px solid #6b8e4e; border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
 .plan-card-head { font-size: 12px; font-weight: 600; color: #4a6b33; letter-spacing: .02em; margin-bottom: 6px; }
 .plan-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -233,6 +237,10 @@ s { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .tool-list li button { margin-top: 8px; padding: 5px 12px; border: 1px solid #c96442; background: #c96442; color: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; }
 .tool-list li button[disabled] { opacity: .55; cursor: default; background: #8a8f84; border-color: #8a8f84; }
 .connector-install { display: block; margin-top: 8px; font-size: 11px; color: #6b6f66; background: #f0f1ec; border-radius: 6px; padding: 6px 8px; word-break: break-all; }
+.connector-permissions { margin-top: 8px; display: grid; gap: 6px; }
+.connector-permissions label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4f554c; cursor: pointer; }
+.connector-permissions input { width: 14px; height: 14px; accent-color: #c96442; }
+.connector-permissions em { margin-left: auto; color: #9a3d2c; font-size: 11px; font-style: normal; }
 .panel-result { background: #20211f; color: #e8eadf; border-radius: 8px; padding: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-word; margin-top: 10px; }
 .question-card { border: 1px solid #c96442; border-radius: 12px; padding: 12px; margin: 8px 0; background: #fff8f6; }
 .question-q { font-size: 14px; color: #3a3e36; margin-bottom: 10px; }

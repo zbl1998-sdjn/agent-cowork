@@ -11,7 +11,7 @@
  *   description: string,
  *   keywords: string[],
  *   builtin?: boolean,
- *   auth?: { type: string, provider: string, scopes?: string[] },
+ *   auth?: { type: string, provider: string, scopes?: string[], permissions?: Array<{ id: string, label: string, description?: string, risk?: string, default?: boolean }> },
  *   command?: string,
  *   args?: string[],
  *   install?: string,
@@ -41,7 +41,27 @@ const CONNECTORS = [
     id: 'github', name: 'GitHub', description: '通过 OAuth 授权读取 GitHub 用户资料,后续接 issue/repo 工具',
     keywords: ['github', 'repo', 'issue', 'pull request', 'oauth', '代码仓库'],
     builtin: true,
-    auth: { type: 'oauth-device', provider: 'github', scopes: ['read:user'] },
+    auth: {
+      type: 'oauth-device',
+      provider: 'github',
+      scopes: ['read:user'],
+      permissions: [
+        {
+          id: 'read:user',
+          label: '读取 GitHub 用户资料',
+          description: '读取账号登录名、公开资料和邮箱摘要',
+          risk: 'low',
+          default: true,
+        },
+        {
+          id: 'repo',
+          label: '读取私有仓库',
+          description: '允许后续仓库/issue 工具访问私有仓库范围',
+          risk: 'high',
+          default: false,
+        },
+      ],
+    },
   },
   {
     id: 'sqlite', name: 'SQLite', description: '查询本地 SQLite 数据库',
@@ -71,6 +91,15 @@ function tokenize(text) {
 /** @returns {ConnectorDescriptor[]} */
 export function listConnectors() {
   return CONNECTORS.map((c) => ({ ...c }));
+}
+
+/**
+ * @param {unknown} id
+ * @returns {ConnectorDescriptor | null}
+ */
+export function getConnector(id) {
+  const key = String(id || '').toLowerCase();
+  return listConnectors().find((connector) => connector.id.toLowerCase() === key) || null;
 }
 
 /**

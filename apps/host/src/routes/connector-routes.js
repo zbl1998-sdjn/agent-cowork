@@ -27,7 +27,7 @@ function connectorServerName(id) {
 
 export async function handleConnectorRoutes({
   request, response, pathname, requestUrl, requestContext,
-  connectMcp, toolRegistry, credentialStore, oauthSessions, oauthFetch, oauthConfig,
+  connectMcp, toolRegistry, credentialStore, oauthPermissionApprovals, oauthSessions, oauthFetch, oauthConfig,
   safeTrustedRoot, fsServerPath,
 }) {
   if (request.method === 'GET' && pathname === '/api/connectors') {
@@ -54,6 +54,7 @@ export async function handleConnectorRoutes({
       requestUrl,
       requestContext,
       credentialStore,
+      oauthPermissionApprovals,
       oauthSessions,
       oauthFetch,
       oauthConfig,

@@ -406,9 +406,47 @@ async function main() {
         const githubItem = [...document.querySelectorAll('.tool-list li')]
           .find((item) => item.innerText.includes('GitHub'));
         if (!githubItem) throw new Error('GitHub OAuth connector item missing');
+        if (!githubItem.innerText.includes('读取 GitHub 用户资料')) throw new Error('GitHub OAuth permission checkbox missing');
+        const button = [...githubItem.querySelectorAll('button')]
+          .find((item) => item.innerText.trim() === '审批权限');
+        if (!button) throw new Error('GitHub approve OAuth permissions button missing');
+        button.click();
+        return true;
+      })()`,
+    );
+    const afterOAuthApproval = await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 10000;
+        function snapshot() {
+          const githubItem = [...document.querySelectorAll('.tool-list li')]
+            .find((item) => item.innerText.includes('GitHub'));
+          return {
+            itemText: githubItem?.innerText || '',
+            buttonText: githubItem
+              ? [...githubItem.querySelectorAll('button')].map((button) => button.innerText.trim()).join('|')
+              : '',
+            resultText: document.querySelector('.panel-result')?.innerText || '',
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (current.buttonText.includes('开始授权') && current.resultText.includes('已审批 GitHub 权限')) resolve(current);
+          else if (Date.now() > deadline) reject(new Error('GitHub OAuth permission approval did not render: ' + JSON.stringify(current)));
+          else setTimeout(tick, 100);
+        }
+        tick();
+      })`,
+    );
+
+    await evaluate(
+      sendPage,
+      `(() => {
+        const githubItem = [...document.querySelectorAll('.tool-list li')]
+          .find((item) => item.innerText.includes('GitHub'));
         const button = [...githubItem.querySelectorAll('button')]
           .find((item) => item.innerText.trim() === '开始授权');
-        if (!button) throw new Error('GitHub start OAuth button missing');
+        if (!button) throw new Error('GitHub start OAuth button missing after permission approval');
         button.click();
         return true;
       })()`,
@@ -511,7 +549,7 @@ async function main() {
         }
         function tick() {
           const current = snapshot();
-          if (current.buttonText.includes('开始授权')
+          if (current.buttonText.includes('审批权限')
             && !current.itemText.includes('已连接')
             && current.resultText.includes('已撤销 GitHub')) resolve(current);
           else if (Date.now() > deadline) reject(new Error('GitHub OAuth revoke did not clear the connector state: ' + JSON.stringify(current)));
@@ -543,6 +581,7 @@ async function main() {
       beforeConnect,
       afterConnect,
       afterDisconnect,
+      afterOAuthApproval,
       afterOAuthStart,
       afterOAuthComplete,
       afterOAuthRevoke,

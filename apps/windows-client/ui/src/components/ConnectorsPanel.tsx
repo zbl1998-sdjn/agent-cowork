@@ -4,11 +4,13 @@ import {
   suggestConnectors,
   connectConnector,
   disconnectConnector,
+  approveOAuthConnector,
   startOAuthConnector,
   completeOAuthConnector,
   getOAuthConnectorStatus,
   revokeOAuthConnector,
   type ConnectorInfo,
+  type OAuthPermission,
   type OAuthStartResult,
 } from '../lib/api';
 
@@ -27,8 +29,34 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
   const [connected, setConnected] = useState<string[]>([]);
   const [oauthStatus, setOauthStatus] = useState<Record<string, { connected: boolean; accounts: string[]; configured?: boolean }>>({});
   const [oauthSessions, setOauthSessions] = useState<Record<string, OAuthStartResult>>({});
+  const [oauthApprovals, setOauthApprovals] = useState<Record<string, { approvalId: string; scopes: string[] }>>({});
+  const [oauthScopes, setOauthScopes] = useState<Record<string, string[]>>({});
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
+
+  const connectorPermissions = (connector: ConnectorInfo): OAuthPermission[] => (
+    connector.auth?.permissions || (connector.auth?.scopes || []).map((scope) => ({
+      id: scope,
+      label: scope,
+      risk: 'low',
+      default: true,
+    }))
+  );
+
+  const defaultScopes = (connector: ConnectorInfo) => {
+    const defaults = connectorPermissions(connector)
+      .filter((permission) => permission.default !== false)
+      .map((permission) => permission.id);
+    return defaults.length ? defaults : connector.auth?.scopes || [];
+  };
+
+  const selectedScopes = (connector: ConnectorInfo) => oauthScopes[connector.id] || defaultScopes(connector);
+  const scopeKey = (scopes: string[]) => [...scopes].sort().join('\n');
+  const matchingOAuthApproval = (connector: ConnectorInfo) => {
+    const approval = oauthApprovals[connector.id];
+    if (!approval) return null;
+    return scopeKey(approval.scopes) === scopeKey(selectedScopes(connector)) ? approval : null;
+  };
 
   const refreshOAuthStatus = async (items: ConnectorInfo[]) => {
     const oauthItems = items.filter((connector) => connector.auth?.type === 'oauth-device');
@@ -107,10 +135,16 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
   };
 
   const onStartOAuth = async (connector: ConnectorInfo) => {
+    const approval = matchingOAuthApproval(connector);
+    if (!approval) {
+      setMessage(`请先审批 ${connector.name} 权限`);
+      return;
+    }
     setBusyId(connector.id);
     setMessage('');
     try {
-      const res = await startOAuthConnector({ id: connector.id, scopes: connector.auth?.scopes });
+      const scopes = selectedScopes(connector);
+      const res = await startOAuthConnector({ id: connector.id, scopes, approvalId: approval.approvalId });
       setOauthSessions((current) => ({ ...current, [connector.id]: res }));
       if (typeof window !== 'undefined' && typeof window.open === 'function') {
         window.open(res.verificationUri, '_blank', 'noopener,noreferrer');
@@ -118,6 +152,28 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
       setMessage(`打开 ${res.verificationUri}，输入 ${res.userCode} 后点击完成授权`);
     } catch (error) {
       setMessage(`授权失败：${(error as Error).message}`);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const onApproveOAuth = async (connector: ConnectorInfo) => {
+    const scopes = selectedScopes(connector);
+    if (scopes.length === 0) {
+      setMessage(`请选择 ${connector.name} 权限`);
+      return;
+    }
+    setBusyId(connector.id);
+    setMessage('');
+    try {
+      const res = await approveOAuthConnector({ id: connector.id, scopes });
+      setOauthApprovals((current) => ({
+        ...current,
+        [connector.id]: { approvalId: res.approvalId, scopes: res.scopes },
+      }));
+      setMessage(`已审批 ${connector.name} 权限：${res.scopes.join('、')}`);
+    } catch (error) {
+      setMessage(`审批失败：${(error as Error).message}`);
     } finally {
       setBusyId('');
     }
@@ -142,6 +198,11 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
         delete next[connector.id];
         return next;
       });
+      setOauthApprovals((current) => {
+        const next = { ...current };
+        delete next[connector.id];
+        return next;
+      });
       await refreshOAuthStatus(connectors);
       const login = res.account?.login || res.credential?.accountId || connector.name;
       setMessage(`已授权 ${connector.name}：${login}`);
@@ -162,6 +223,11 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
         delete next[connector.id];
         return next;
       });
+      setOauthApprovals((current) => {
+        const next = { ...current };
+        delete next[connector.id];
+        return next;
+      });
       await refreshOAuthStatus(connectors);
       setMessage(`已撤销 ${connector.name}（移除 ${res.removed} 个账户）`);
     } catch (error) {
@@ -169,6 +235,21 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
     } finally {
       setBusyId('');
     }
+  };
+
+  const onToggleOAuthScope = (connector: ConnectorInfo, scope: string, enabled: boolean) => {
+    setOauthScopes((current) => {
+      const currentScopes = current[connector.id] || defaultScopes(connector);
+      const nextScopes = enabled
+        ? [...new Set([...currentScopes, scope])]
+        : currentScopes.filter((item) => item !== scope);
+      return { ...current, [connector.id]: nextScopes };
+    });
+    setOauthApprovals((current) => {
+      const next = { ...current };
+      delete next[connector.id];
+      return next;
+    });
   };
 
   return (
@@ -198,6 +279,8 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
           const oauth = oauthStatus[c.id];
           const isOAuth = c.auth?.type === 'oauth-device';
           const hasOAuthSession = Boolean(oauthSessions[c.id]);
+          const approved = matchingOAuthApproval(c);
+          const scopes = selectedScopes(c);
           const isOn = connected.includes(c.id)
             || connected.includes(c.name)
             || (c.id === 'filesystem' && connected.includes('fs'))
@@ -209,17 +292,33 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
               {isOAuth && <span className="tool-src">OAuth</span>}
               {isOn && <span className="tool-src">已连接</span>}
               <p>{c.description}</p>
+              {isOAuth && !oauth?.connected && (
+                <div className="connector-permissions">
+                  {connectorPermissions(c).map((permission) => (
+                    <label key={permission.id}>
+                      <input
+                        type="checkbox"
+                        checked={scopes.includes(permission.id)}
+                        disabled={busyId === c.id || hasOAuthSession}
+                        onChange={(event) => onToggleOAuthScope(c, permission.id, event.currentTarget.checked)}
+                      />
+                      <span>{permission.label}</span>
+                      {permission.risk === 'high' && <em>高风险</em>}
+                    </label>
+                  ))}
+                </div>
+              )}
               {isOAuth ? (
                 <button
                   type="button"
                   disabled={busyId === c.id}
                   onClick={() => void (oauth?.connected
                     ? onRevokeOAuth(c)
-                    : hasOAuthSession ? onCompleteOAuth(c) : onStartOAuth(c))}
+                    : hasOAuthSession ? onCompleteOAuth(c) : approved ? onStartOAuth(c) : onApproveOAuth(c))}
                 >
                   {busyId === c.id
-                    ? (oauth?.connected ? '撤销中…' : hasOAuthSession ? '确认中…' : '授权中…')
-                    : oauth?.connected ? '撤销授权' : hasOAuthSession ? '完成授权' : '开始授权'}
+                    ? (oauth?.connected ? '撤销中…' : hasOAuthSession ? '确认中…' : approved ? '授权中…' : '审批中…')
+                    : oauth?.connected ? '撤销授权' : hasOAuthSession ? '完成授权' : approved ? '开始授权' : '审批权限'}
                 </button>
               ) : c.builtin ? (
                 <button

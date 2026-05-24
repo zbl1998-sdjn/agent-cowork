@@ -5,6 +5,12 @@ import {
   fetchGitHubViewer,
   startGitHubDeviceFlow,
 } from '../connectors/oauth-github.js';
+import { getConnector } from '../connectors/catalog.js';
+import {
+  normalizeOAuthScopes,
+  oauthPermissions,
+  selectedOAuthPermissions,
+} from '../connectors/oauth-permissions.js';
 
 function isGitHub(id) {
   return String(id || '').toLowerCase() === 'github';
@@ -37,9 +43,19 @@ function oauthFilter(requestContext, provider) {
   };
 }
 
+function githubConnector() {
+  const connector = getConnector('github');
+  if (!connector) {
+    const err = new Error('GitHub connector is not registered');
+    err.statusCode = 500;
+    throw err;
+  }
+  return connector;
+}
+
 export async function handleConnectorOAuthRoutes({
   request, response, pathname, requestUrl, requestContext,
-  credentialStore, oauthSessions, oauthFetch, oauthConfig,
+  credentialStore, oauthPermissionApprovals, oauthSessions, oauthFetch, oauthConfig,
 }) {
   if (request.method === 'GET' && pathname === '/api/connectors/oauth/status') {
     const id = requestUrl.searchParams.get('id') || requestUrl.searchParams.get('provider') || '';
@@ -54,6 +70,37 @@ export async function handleConnectorOAuthRoutes({
       connected: accounts.length > 0,
       accounts,
       configured: Boolean(githubClientId({}, oauthConfig)),
+      permissions: oauthPermissions(githubConnector()),
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/connectors/oauth/approve') {
+    await withJsonBody(request, response, async (body) => {
+      if (!isGitHub(body && body.id) || !oauthPermissionApprovals) {
+        sendJson(response, 400, { error: 'unsupported OAuth connector' });
+        return;
+      }
+      try {
+        const connector = githubConnector();
+        const scopes = normalizeOAuthScopes(connector, body && body.scopes);
+        const approval = oauthPermissionApprovals.issue({
+          connectorId: 'github',
+          provider: 'github',
+          scopes,
+          context: requestContext,
+        });
+        sendJson(response, 200, {
+          context: requestContext,
+          provider: 'github',
+          approvalId: approval.id,
+          expiresAt: new Date(approval.expiresAt).toISOString(),
+          scopes,
+          permissions: selectedOAuthPermissions(connector, scopes),
+        });
+      } catch (err) {
+        sendJson(response, err.statusCode || 400, { error: err.message });
+      }
     });
     return true;
   }
@@ -69,10 +116,18 @@ export async function handleConnectorOAuthRoutes({
         return;
       }
       try {
+        const connector = githubConnector();
         const clientId = githubClientId(body, oauthConfig);
+        const scopes = normalizeOAuthScopes(connector, body && body.scopes);
+        oauthPermissionApprovals.consume(body && (body.approvalId || body.oauthApprovalId), {
+          connectorId: 'github',
+          provider: 'github',
+          scopes,
+          context: requestContext,
+        });
         const started = await startGitHubDeviceFlow({
           clientId,
-          scopes: body && body.scopes,
+          scopes,
           fetchImpl: oauthFetch,
         });
         const sessionId = crypto.randomUUID();
@@ -82,6 +137,7 @@ export async function handleConnectorOAuthRoutes({
           clientId,
           deviceCode: started.deviceCode,
           scopes: started.scopes,
+          permissions: selectedOAuthPermissions(connector, started.scopes),
           tenantId: requestContext.tenantId,
           userId: requestContext.userId,
           expiresAtMs,
@@ -150,6 +206,7 @@ export async function handleConnectorOAuthRoutes({
           connected: true,
           account,
           credential: summary,
+          permissions: session.permissions || [],
         });
       } catch (err) {
         sendJson(response, err.statusCode || 502, { error: err.message });

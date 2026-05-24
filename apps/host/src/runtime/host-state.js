@@ -22,6 +22,7 @@ import { createConcurrencyLimiter } from './concurrency.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createApprovalRegistry } from './approvals.js';
 import { createFileOperationApprovalStore } from './file-operation-approvals.js';
+import { createOAuthPermissionApprovalStore } from './oauth-permission-approvals.js';
 import { createClarificationStore } from './clarifications.js';
 import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
@@ -123,6 +124,9 @@ export function createHostState(config = {}, { hostSrcDir }) {
     : createApprovalRegistry());
   state.fileOperationApprovals = config.fileOperationApprovals || createFileOperationApprovalStore({
     ttlMs: config.fileOperationApprovalTtlMs,
+  });
+  state.oauthPermissionApprovals = config.oauthPermissionApprovals || createOAuthPermissionApprovalStore({
+    ttlMs: config.oauthPermissionApprovalTtlMs,
   });
   if (state.usePostgresState) {
     if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => {});

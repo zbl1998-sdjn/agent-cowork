@@ -84,9 +84,14 @@ test('GitHub OAuth device flow stores the token sealed and returns only safe con
   });
   const base = await bind(server);
   try {
-    const start = await J(base, '/api/connectors/oauth/start', {
+    const approval = await J(base, '/api/connectors/oauth/approve', {
       method: 'POST',
       body: { id: 'github', scopes: ['read:user'] },
+    });
+    assert.equal(approval.status, 200);
+    const start = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: { id: 'github', scopes: ['read:user'], approvalId: approval.body.approvalId },
     });
     assert.equal(start.status, 200);
     assert.equal(start.body.provider, 'github');
@@ -144,7 +149,12 @@ test('GitHub OAuth complete reports pending authorization without storing a toke
   });
   const base = await bind(server);
   try {
-    const start = await J(base, '/api/connectors/oauth/start', { method: 'POST', body: { id: 'github' } });
+    const approval = await J(base, '/api/connectors/oauth/approve', { method: 'POST', body: { id: 'github' } });
+    assert.equal(approval.status, 200);
+    const start = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: { id: 'github', approvalId: approval.body.approvalId },
+    });
     const complete = await J(base, '/api/connectors/oauth/complete', {
       method: 'POST',
       body: { id: 'github', sessionId: start.body.sessionId },
@@ -202,6 +212,89 @@ test('GitHub OAuth routes reject client secrets and cross-identity sessions', as
     });
     assert.equal(complete.status, 403);
     assert.equal(fetchCalled, false);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('GitHub OAuth start requires approved connector scopes', async () => {
+  const root = tmp();
+  const credentialStore = createCredentialStore({
+    filePath: path.join(root, 'credentials.json'),
+    protector: testProtector(),
+  });
+  const calls = [];
+  const oauthFetch = async (url, init = {}) => {
+    calls.push({ url: String(url), body: String(init.body || '') });
+    if (String(url).endsWith('/login/device/code')) {
+      return jsonResponse({
+        device_code: 'device-with-approved-scopes',
+        user_code: 'SCOP-1234',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 900,
+        interval: 5,
+      });
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  };
+  const server = createServer({
+    trustedRoot: root,
+    requireAuth: false,
+    enableScheduler: false,
+    credentialStore,
+    oauthFetch,
+    oauthConfig: { github: { clientId: 'test-client' } },
+  });
+  const base = await bind(server);
+  try {
+    const blocked = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: { id: 'github', scopes: ['read:user', 'repo'] },
+    });
+    assert.equal(blocked.status, 428);
+    assert.match(blocked.body.error, /approval/i);
+    assert.equal(calls.length, 0);
+
+    const rejected = await J(base, '/api/connectors/oauth/approve', {
+      method: 'POST',
+      body: { id: 'github', scopes: ['delete_repo'] },
+    });
+    assert.equal(rejected.status, 400);
+    assert.equal(calls.length, 0);
+
+    const approved = await J(base, '/api/connectors/oauth/approve', {
+      method: 'POST',
+      body: { id: 'github', scopes: ['repo', 'read:user'] },
+    });
+    assert.equal(approved.status, 200);
+    assert.ok(approved.body.approvalId);
+    assert.deepEqual(approved.body.scopes, ['read:user', 'repo']);
+    assert.ok(approved.body.permissions.some((permission) => permission.id === 'repo' && permission.risk === 'high'));
+
+    const started = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: {
+        id: 'github',
+        scopes: ['read:user', 'repo'],
+        approvalId: approved.body.approvalId,
+      },
+    });
+    assert.equal(started.status, 200);
+    assert.equal(started.body.userCode, 'SCOP-1234');
+    assert.equal(started.body.scopes.join(' '), 'read:user repo');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].body, /scope=read%3Auser\+repo/);
+
+    const replay = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: {
+        id: 'github',
+        scopes: ['read:user', 'repo'],
+        approvalId: approved.body.approvalId,
+      },
+    });
+    assert.equal(replay.status, 403);
+    assert.equal(calls.length, 1);
   } finally {
     await closeTestServer(server);
   }

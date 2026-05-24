@@ -249,6 +249,13 @@ describe('JSON requests', () => {
   it('posts OAuth connector device-flow requests without putting tokens in the client payload', async () => {
     const { api, calls } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/connectors/oauth/approve')) {
+        return jsonResponse({
+          approvalId: 'oauth_apr_1',
+          scopes: ['read:user'],
+          permissions: [{ id: 'read:user', risk: 'low' }],
+        });
+      }
       if (url.endsWith('/api/connectors/oauth/start')) {
         return jsonResponse({
           provider: 'github',
@@ -271,19 +278,27 @@ describe('JSON requests', () => {
       return jsonResponse({ ok: true });
     });
 
-    const started = await api.startOAuthConnector({ id: 'github', scopes: ['read:user'] });
+    const approval = await api.approveOAuthConnector({ id: 'github', scopes: ['read:user'] });
+    const started = await api.startOAuthConnector({ id: 'github', scopes: ['read:user'], approvalId: approval.approvalId });
     const completed = await api.completeOAuthConnector({ id: 'github', sessionId: started.sessionId });
     const status = await api.getOAuthConnectorStatus('github');
     const revoked = await api.revokeOAuthConnector({ id: 'github' });
 
+    expect(approval.approvalId).toBe('oauth_apr_1');
     expect(started.userCode).toBe('ABCD-1234');
     expect(completed.account?.login).toBe('octocat');
     expect(status.connected).toBe(true);
     expect(revoked.removed).toBe(1);
     expect(JSON.stringify(calls)).not.toContain('access_token');
+    expect(JSON.parse(String(calls.find((call) => call.url.endsWith('/api/connectors/oauth/approve'))?.init?.body))).toEqual({
+      id: 'github',
+      scopes: ['read:user'],
+      idempotencyKey: expect.stringMatching(/^conn-/),
+    });
     expect(JSON.parse(String(calls.find((call) => call.url.endsWith('/api/connectors/oauth/start'))?.init?.body))).toEqual({
       id: 'github',
       scopes: ['read:user'],
+      approvalId: 'oauth_apr_1',
       idempotencyKey: expect.stringMatching(/^conn-/),
     });
   });

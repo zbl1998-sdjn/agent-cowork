@@ -61,7 +61,7 @@ export interface ConnectorInfo {
   description: string;
   keywords?: string[];
   builtin?: boolean;
-  auth?: { type: string; provider: string; scopes?: string[] };
+  auth?: { type: string; provider: string; scopes?: string[]; permissions?: OAuthPermission[] };
   command?: string;
   args?: string[];
   install?: string;
@@ -116,6 +116,23 @@ export interface OAuthStatusResult {
   connected: boolean;
   configured?: boolean;
   accounts: OAuthAccountSummary[];
+  permissions?: OAuthPermission[];
+}
+
+export interface OAuthPermission {
+  id: string;
+  label: string;
+  description?: string;
+  risk?: string;
+  default?: boolean;
+}
+
+export interface OAuthApprovalResult {
+  provider: string;
+  approvalId: string;
+  expiresAt?: string;
+  scopes: string[];
+  permissions?: OAuthPermission[];
 }
 
 export interface OAuthStartResult {
@@ -146,9 +163,17 @@ export async function getOAuthConnectorStatus(id: string): Promise<OAuthStatusRe
   return getJson(`/api/connectors/oauth/status?id=${encodeURIComponent(id)}`);
 }
 
+export async function approveOAuthConnector(body: {
+  id: string;
+  scopes?: string[];
+}): Promise<OAuthApprovalResult> {
+  return postJson('/api/connectors/oauth/approve', { ...body, idempotencyKey: newIdempotencyKey('conn') });
+}
+
 export async function startOAuthConnector(body: {
   id: string;
   scopes?: string[];
+  approvalId?: string;
   clientId?: string;
 }): Promise<OAuthStartResult> {
   return postJson('/api/connectors/oauth/start', { ...body, idempotencyKey: newIdempotencyKey('conn') });
