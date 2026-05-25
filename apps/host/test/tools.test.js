@@ -6,6 +6,7 @@ import test from 'node:test';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { runSubagent } from '../src/runtime/subagent.js';
+import { runSubagentsParallel } from '../src/runtime/subagent-parallel.js';
 import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
 import { DEFAULT_ALLOW_TOOLS } from '../src/sandbox/index.js';
 import { readRunRecord } from '../src/runtime/run-store.js';
@@ -191,6 +192,72 @@ test('runSubagent rejects over-budget context before executing steps', async () 
   assert.equal(called, false);
 });
 
+test('runSubagentsParallel runs child agents concurrently and records an aggregate run', async () => {
+  const root = tempRoot();
+  const runStoreRoot = path.join(root, 'runs');
+  const registry = new ToolRegistry();
+  let active = 0;
+  let maxActive = 0;
+  registry.register({
+    name: 'slow.read',
+    description: '',
+    risk: 'low',
+    mutating: false,
+    handler: async (args) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      active -= 1;
+      return { label: args.label };
+    },
+  });
+
+  const out = await runSubagentsParallel({
+    goal: '并行分析',
+    agents: ['a', 'b', 'c'].map((label) => ({
+      goal: `分析 ${label}`,
+      steps: [{ tool: 'slow.read', args: { label } }],
+    })),
+    registry,
+    trustedRoot: root,
+    runStoreRoot,
+    maxConcurrency: 3,
+    context: { tenantId: 'tenant_parallel', userId: 'user_parallel' },
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.children.length, 3);
+  assert.ok(maxActive > 1, `expected concurrent child agents, saw maxActive=${maxActive}`);
+  assert.deepEqual(out.children.map((child) => child.status), ['succeeded', 'succeeded', 'succeeded']);
+
+  const record = readRunRecord(runStoreRoot, out.runId);
+  assert.equal(record.type, 'subagent-parallel-run');
+  assert.equal(record.result.children.length, 3);
+});
+
+test('runSubagentsParallel rejects an over-budget child before executing any child agent', async () => {
+  const root = tempRoot();
+  const registry = new ToolRegistry();
+  let called = false;
+  registry.register({ name: 'safe.read', description: '', handler: () => { called = true; return { ok: true }; } });
+
+  await assert.rejects(
+    () => runSubagentsParallel({
+      goal: '并行预算',
+      agents: [
+        { goal: 'ok', steps: [{ tool: 'safe.read', args: { q: 'alpha' } }] },
+        { goal: 'x'.repeat(128), steps: [{ tool: 'safe.read', args: { q: 'beta' } }] },
+      ],
+      registry,
+      trustedRoot: root,
+      runStoreRoot: path.join(root, 'runs'),
+      contextBudgetBytes: 64,
+    }),
+    (err) => { assert.equal(err.statusCode, 413); return true; },
+  );
+  assert.equal(called, false);
+});
+
 // ---- route integration ----
 
 test('GET /api/tools lists built-in tools (sandbox + recipes)', async () => {
@@ -356,6 +423,86 @@ test('POST /api/subagent/run rejects over-budget plans before executing any tool
     });
     assert.equal(res.status, 413);
     assert.match(res.body.error, /context budget exceeded/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/subagent/parallel runs child agents concurrently and records an aggregate run', async () => {
+  const trustedRoot = tempRoot();
+  const registry = new ToolRegistry();
+  let active = 0;
+  let maxActive = 0;
+  registry.register({
+    name: 'parallel.read',
+    description: '',
+    risk: 'low',
+    mutating: false,
+    handler: async (args) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      active -= 1;
+      return { label: args.label };
+    },
+  });
+  const server = createToolsServer({ trustedRoot, enableScheduler: false, toolRegistry: registry });
+  const base = await bind(server);
+  try {
+    const body = {
+      goal: '并行分析三个目录',
+      agents: ['one', 'two', 'three'].map((label) => ({
+        goal: `分析 ${label}`,
+        steps: [{ tool: 'parallel.read', args: { label } }],
+      })),
+    };
+    const res = await jsonRequest(base, '/api/subagent/parallel', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_parallel_route', 'idempotency-key': 'agent-parallel' },
+      body,
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.children.length, 3);
+    assert.ok(maxActive > 1, `expected concurrent route execution, saw maxActive=${maxActive}`);
+
+    const index = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_parallel_route' } });
+    assert.ok(index.body.runs.some((run) => run.type === 'subagent-parallel-run'));
+
+    const replay = await jsonRequest(base, '/api/subagent/parallel', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_parallel_route', 'idempotency-key': 'agent-parallel' },
+      body,
+    });
+    assert.equal(replay.body.idempotentReplay, true);
+    assert.equal(replay.body.runId, res.body.runId);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/subagent/parallel rejects approval-gated child steps', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/subagent/parallel', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'agent-parallel-gated' },
+      body: {
+        goal: 'blocked parallel sandbox',
+        agents: [
+          {
+            goal: 'blocked',
+            steps: [
+              { tool: 'sandbox.exec', args: { tool: 'node', args: ['-e', 'process.stdout.write("blocked")'], timeoutMs: 5000 } },
+            ],
+          },
+        ],
+      },
+    });
+    assert.equal(res.status, 428);
+    assert.match(res.body.error, /requires agent approval/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

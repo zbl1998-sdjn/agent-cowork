@@ -15,7 +15,9 @@ import { summariseRunForIndex } from './runs-index.js';
 const DEFAULT_CONTEXT_BUDGET_BYTES = 32 * 1024;
 const DEFAULT_MAX_STEPS = 20;
 
-function makeHttpError(statusCode, message, payload = {}) {
+export { DEFAULT_CONTEXT_BUDGET_BYTES, DEFAULT_MAX_STEPS };
+
+export function makeHttpError(statusCode, message, payload = {}) {
   const err = new Error(message);
   err.statusCode = statusCode;
   err.payload = payload;
@@ -34,7 +36,7 @@ function contextSnapshot({ goal, steps }) {
   };
 }
 
-function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps }) {
+export function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps }) {
   const stepLimit = Math.max(1, Number(maxSteps) || DEFAULT_MAX_STEPS);
   if (steps.length > stepLimit) {
     throw makeHttpError(400, `runSubagent: too many steps; max ${stepLimit}`, { maxSteps: stepLimit });
@@ -49,6 +51,26 @@ function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxStep
     });
   }
   return { contextBytes, contextBudgetBytes: budget, maxSteps: stepLimit };
+}
+
+export function validateSubagentSteps({ steps, registry }) {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    const err = new Error('runSubagent: steps must be a non-empty array');
+    err.statusCode = 400;
+    throw err;
+  }
+  steps.forEach((step, i) => {
+    if (!step || typeof step.tool !== 'string' || !step.tool.trim()) {
+      const err = new Error(`runSubagent: steps[${i}].tool is required`);
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!registry.has(step.tool)) {
+      const err = new Error(`runSubagent: unknown tool "${step.tool}"`);
+      err.statusCode = 400;
+      throw err;
+    }
+  });
 }
 
 function summariseResult(result) {
@@ -90,23 +112,7 @@ export async function runSubagent({
   if (!runStoreRoot) {
     throw new Error('runSubagent: runStoreRoot is required');
   }
-  if (!Array.isArray(steps) || steps.length === 0) {
-    const err = new Error('runSubagent: steps must be a non-empty array');
-    err.statusCode = 400;
-    throw err;
-  }
-  steps.forEach((step, i) => {
-    if (!step || typeof step.tool !== 'string' || !step.tool.trim()) {
-      const err = new Error(`runSubagent: steps[${i}].tool is required`);
-      err.statusCode = 400;
-      throw err;
-    }
-    if (!registry.has(step.tool)) {
-      const err = new Error(`runSubagent: unknown tool "${step.tool}"`);
-      err.statusCode = 400;
-      throw err;
-    }
-  });
+  validateSubagentSteps({ steps, registry });
   const limits = enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps });
 
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));

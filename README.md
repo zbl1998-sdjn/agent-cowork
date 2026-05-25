@@ -12,7 +12,7 @@
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
 **测试覆盖：**
-- 后端 105 个测试文件（467 个测试用例，466 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 13 个测试文件（63 个测试用例），常规门禁通过
+- 后端 105 个测试文件（472 个测试用例，471 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 13 个测试文件（63 个测试用例），常规门禁通过
 - 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头等
 
 **已知限制：**
@@ -58,7 +58,7 @@ npm run smoke:host
 `npm run smoke:react-connectors` 会启动临时 Host API，真实加载构建后的 React UI，打开“连接器”面板，一键连接内置文件系统 MCP，确认 `mcp__fs__read_text` 进入工具 registry，再断开并确认工具被撤销；同一 smoke 还会用本地 mock GitHub device-flow 跑通 OAuth scope 审批、开始授权、完成授权、凭证状态查询和撤销，并确认凭证文件不泄漏 access token。活页后端也支持用已连接的受控 connector tool 作为数据源刷新，并用 host 测试覆盖未连接/高风险工具拒绝。报告和截图写入 `build/react-connectors-smoke-report.json` 与 `build/react-connectors-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。
 `npm run smoke:live-mvp` 会读取当前 `build/mvp-runtime.json`，直接打开正在运行的 MVP URL，完成发送/审批，确认执行动态信息流包含 Kimi 计划和审批状态，确认前台任务卡片显示最新 Cowork run，并确认当前 runtime workspace 里新增 artifact 且 audit 增长；报告和截图写入 `build/live-mvp-smoke-report.json` 与 `build/live-mvp-smoke-1536x900.png`。
 `npm run smoke:plan-loop` 会启动临时 Host API，用脚本化模型跑一次计划模式闭环：只读研究两个文件、提交计划、审批后写两个产物、触发自检读回、最后收尾；报告写入 `build/plan-closed-loop-smoke-report.json`，用于覆盖 P1-A3 的本地可复现验收。
-`/api/subagent/run` 是 P1-B 子代理执行接口:只允许直接执行无需审批的只读/低风险工具,高风险/写入型工具仍必须走 agent 审批流;每个子代理计划有独立上下文预算和步数上限,超预算会在任何工具运行前返回 413。
+`/api/subagent/run` 和 `/api/subagent/parallel` 是 P1-B 子代理执行接口:只允许直接执行无需审批的只读/低风险工具,高风险/写入型工具仍必须走 agent 审批流;每个子代理计划有独立上下文预算和步数上限,超预算会在任何工具运行前返回 413。主 agent 也可通过低风险 `AgentParallel` 工具并发派发多个子任务,按子任务返回摘要并受最大任务数、并发数和上下文预算约束。
 `npm run smoke:windows-resources` 会用 headless Edge/Chrome 通过 `file://` 直接加载 Windows C 客户端资源，验证截图风格、1366x768 边界和静态预览/审批交互；它不会启动 `AgentCowork.exe`，因此可在 Defender ASR 阻塞 exe 时继续提供资源级验收。
 `npm run smoke:kimi-api` 会启动一个临时 Host API，真实调用 Kimi/Moonshot OpenAI-compatible API，验证 `/api/kimi/plan` 可以基于 Host 提供的本地摘要生成中文计划，并落盘 `.AgentCowork/runs/*.json` 运行记录。该 smoke 依赖 `KIMI_API_KEY` 或 `MOONSHOT_API_KEY` 和可用网络，不放进默认 `verify:mvp` 的运行项。
 `npm run smoke:mvp-runtime` 会启动一个临时 MVP 服务、检查健康状态和 runtime 文件、调用 `status:mvp`、调用 `stop:mvp`，确认本地产品入口可被明确启动和关闭；报告写入 `build/mvp-runtime-smoke-report.json`。

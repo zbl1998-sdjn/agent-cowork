@@ -55,6 +55,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 05-B1a:对话消息树/分支模型 + 历史消息编辑 fork 已实现;file/PG 存储和迁移已补测试。
 - [x] 05-B1b:分支切换控件、分支差异摘要与 hook 同步已实现;新增 `npm run smoke:react-branches` 真实浏览器验收,覆盖主线→分支→回到主线时的时间线与差异摘要更新;证据见 `reports/react-branches/react-branches-2026-05-24T20-48-18-623Z.json`。
 - [x] P1-B1(本地可测子项):`/api/subagent/run` 子代理接口已有 run 记录/时间线;本批补独立上下文预算与步数上限,过大计划返回 413 且不会执行任何工具;直接子代理路由继续拒绝高风险/写入型工具,需走 agent 审批流。
+- [x] P1-B2(代码+单测完成):新增 `/api/subagent/parallel` 并行子代理路由与主 agent `AgentParallel` 低风险工具,支持并发上限、子 run 汇总、聚合 run 记录和子任务摘要;所有子任务会在执行前统一校验审批风险与上下文预算,超预算或高风险/写入型步骤不会启动任何子代理。`npm run test:host` 已通过(472 tests,471 pass,1 skip);真实三文件夹端到端性能对比留到 P1-B 后续验收。
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。

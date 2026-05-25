@@ -44,3 +44,31 @@ test('Agent tool spawns a nested sub-agent and returns its result', async () => 
   const res = await agentTool.handler({ task: '整理一下' });
   assert.equal(res.text, '子任务完成');
 });
+
+test('AgentParallel tool dispatches nested sub-agents concurrently and summarizes results', async () => {
+  const root = tmp();
+  let active = 0;
+  let maxActive = 0;
+  const runAgentChat = async ({ prompt }) => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    active -= 1;
+    return { text: `完成:${prompt}`, steps: [{ tool: 'none' }] };
+  };
+  const tools = buildAgentToolset({
+    ctx: { trustedRoot: root, context: {} },
+    agentDeps: { kimiConfig: { model: 'fake' }, modelCall: async () => ({}), runAgentChat, approvals: null, autoApprove: true, hooks: null, emit: () => {} },
+    runDeps: { runStoreRoot: path.join(root, 'runs') },
+  });
+  const parallelTool = tools.find((t) => t.name === 'AgentParallel');
+  assert.ok(parallelTool, 'AgentParallel tool present');
+
+  const res = await parallelTool.handler({ tasks: ['审查 A', '审查 B', '审查 C'], maxConcurrency: 3 });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.children.length, 3);
+  assert.ok(maxActive > 1, `expected concurrent child agents, saw maxActive=${maxActive}`);
+  assert.deepEqual(res.children.map((child) => child.text), ['完成:审查 A', '完成:审查 B', '完成:审查 C']);
+  assert.match(res.summary, /审查 A/);
+});

@@ -1,5 +1,6 @@
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { runSubagent } from '../runtime/subagent.js';
+import { runSubagentsParallel } from '../runtime/subagent-parallel.js';
 
 // Tool + sub-agent routes.
 //
@@ -7,6 +8,7 @@ import { runSubagent } from '../runtime/subagent.js';
 //   GET  /api/tools/search?q=   -> keyword-ranked tools (ToolSearch analog)
 //   POST /api/tools/call        -> invoke one tool (idempotent, trusted-root jail)
 //   POST /api/subagent/run      -> run a plan (sequence of tool calls), recorded
+//   POST /api/subagent/parallel -> run multiple sub-agent plans concurrently
 //
 // Mutating routes require an Idempotency-Key and replay through the same cache
 // the recipe/sandbox routes use, so a retried request never double-executes.
@@ -141,6 +143,59 @@ export async function handleToolRoutes({
         ok: outcome.ok,
         goal: outcome.goal,
         steps: outcome.steps,
+      });
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/subagent/parallel') {
+    await withJsonBody(request, response, async (body) => {
+      if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      const fingerprint = bodyFingerprint(body);
+      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+        return;
+      }
+      const trustedRoot = safeTrustedRoot(body?.trustedRoot);
+      const agents = Array.isArray(body?.agents) ? body.agents : [];
+      for (const agent of agents) {
+        const steps = Array.isArray(agent?.steps) ? agent.steps : [];
+        for (const step of steps) {
+          const toolName = typeof step?.tool === 'string' ? step.tool.trim() : '';
+          const descriptor = toolRegistry.descriptor(toolName);
+          if (approvalRequiredForTool(descriptor)) {
+            rejectApprovalRequired(response, toolName);
+            return;
+          }
+        }
+      }
+      let outcome;
+      try {
+        outcome = await runSubagentsParallel({
+          goal: body?.goal,
+          agents,
+          registry: toolRegistry,
+          trustedRoot,
+          runStoreRoot,
+          runEvents,
+          runsIndex,
+          context: requestContext,
+          stopOnError: body?.stopOnError !== false,
+          maxConcurrency: body?.maxConcurrency,
+        });
+      } catch (err) {
+        sendJson(response, err.statusCode || 502, { error: err.message, ...(err.payload || {}) });
+        return;
+      }
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
+        context: requestContext,
+        runId: outcome.runId,
+        runPath: outcome.runPath,
+        ok: outcome.ok,
+        goal: outcome.goal,
+        children: outcome.children,
       });
     });
     return true;
