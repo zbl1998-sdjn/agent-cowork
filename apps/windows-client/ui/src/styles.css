@@ -54,6 +54,20 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .todo-item.is-done::before { background: #19c37d; }
 .todo-item.is-failed::before, .todo-item.is-blocked::before, .todo-item.is-rejected::before { background: #a32d2d; }
 
+.subtask-groups { border: 1px solid var(--border); border-radius: 8px; background: #fbfaf7; margin: 8px 0; padding: 8px 10px; }
+.subtask-groups-head { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.subtask-groups-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.subtask-item { min-height: 30px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+.subtask-index { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #eeece5; color: var(--muted); font-size: 11px; }
+.subtask-goal { min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.subtask-status { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.subtask-meta { grid-column: 2 / 4; display: flex; gap: 8px; align-items: center; min-height: 14px; color: var(--muted); font-size: 11px; }
+.subtask-meta code { color: var(--muted); font-size: 11px; }
+.subtask-meta em { color: #a32d2d; font-style: normal; overflow-wrap: anywhere; }
+.subtask-item.is-running .subtask-index { background: #fff3e0; color: #8a5a00; }
+.subtask-item.is-done .subtask-index { background: #e7f6ee; color: #0f6e56; }
+.subtask-item.is-failed .subtask-index { background: #fdecec; color: #a32d2d; }
+
 .preview-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .preview-card header { display: flex; align-items: center; margin-bottom: 8px; }
 .preview-card header em { margin-left: auto; font-style: normal; font-size: 12px; background: #fff3e0; color: #8a5a00; padding: 2px 8px; border-radius: 6px; }
@@ -413,7 +427,7 @@ body { font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, "PingFa
 [data-theme="dark"] .conv-item:hover, [data-theme="dark"] .conv-act:hover, [data-theme="dark"] .cmdk-item.is-active, [data-theme="dark"] .popover-item:hover, [data-theme="dark"] .popover-item.is-active { background: #2f2f29; }
 [data-theme="dark"] .side-drawer { background: #1f1f1c; }
 [data-theme="dark"] .composer, [data-theme="dark"] .composer-popover { background: var(--surface); border-color: #44443a; }
-[data-theme="dark"] .toolcall, [data-theme="dark"] .reasoning, [data-theme="dark"] .plan-card, [data-theme="dark"] .question-card, [data-theme="dark"] .todo-list { background: #26261f; }
+[data-theme="dark"] .toolcall, [data-theme="dark"] .reasoning, [data-theme="dark"] .plan-card, [data-theme="dark"] .question-card, [data-theme="dark"] .todo-list, [data-theme="dark"] .subtask-groups { background: #26261f; }
 [data-theme="dark"] .header-actions button, [data-theme="dark"] .msg-act, [data-theme="dark"] .conv-search, [data-theme="dark"] .starter-chip, [data-theme="dark"] .artifact-card, [data-theme="dark"] .new-conv-btn, [data-theme="dark"] .tool-list li { background: #232320; color: var(--text); }
 [data-theme="dark"] .message-text code { background: #2f2f29; }
 [data-theme="dark"] .message-text a { color: #ff8a72; }

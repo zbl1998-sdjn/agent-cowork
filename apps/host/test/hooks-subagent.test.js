@@ -72,3 +72,28 @@ test('AgentParallel tool dispatches nested sub-agents concurrently and summarize
   assert.deepEqual(res.children.map((child) => child.text), ['完成:审查 A', '完成:审查 B', '完成:审查 C']);
   assert.match(res.summary, /审查 A/);
 });
+
+test('AgentParallel emits child lifecycle events for UI grouping', async () => {
+  const root = tmp();
+  const events = [];
+  const tools = buildAgentToolset({
+    ctx: { trustedRoot: root, context: { tenantId: 'tenant_ui' } },
+    agentDeps: {
+      emit: (type, payload) => events.push({ type, payload }),
+      runAgentChat: async ({ prompt }) => ({ text: `完成:${prompt}`, steps: [] }),
+    },
+    runDeps: { runStoreRoot: path.join(root, 'runs') },
+  });
+  const parallelTool = tools.find((t) => t.name === 'AgentParallel');
+  assert.ok(parallelTool, 'AgentParallel tool present');
+  await parallelTool.handler({ tasks: ['审查 A', '审查 B'], maxConcurrency: 2 });
+
+  assert.deepEqual(events.map((event) => event.type), [
+    'child_start',
+    'child_start',
+    'child_end',
+    'child_end',
+  ]);
+  assert.equal(events[0].payload.goal, '审查 A');
+  assert.equal(events[3].payload.status, 'succeeded');
+});

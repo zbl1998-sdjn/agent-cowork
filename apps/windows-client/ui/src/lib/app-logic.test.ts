@@ -102,6 +102,34 @@ describe('reduceAssistantRunEvent', () => {
       { id: 'plan-2', text: '运行测试', status: 'pending' },
     ]);
   });
+
+  it('groups parallel child lifecycle events by child index', () => {
+    const first = reduceAssistantRunEvent(baseMessage(), event({
+      type: 'child_start',
+      index: 0,
+      goal: '审查 A 文件夹',
+      stepCount: 2,
+    }));
+    const second = reduceAssistantRunEvent(first, event({
+      type: 'child_start',
+      index: 1,
+      goal: '审查 B 文件夹',
+      stepCount: 1,
+    }));
+    const done = reduceAssistantRunEvent(second, event({
+      type: 'child_end',
+      index: 0,
+      runId: 'run_child_a',
+      status: 'succeeded',
+    }));
+
+    expect(done).toMatchObject({
+      subtasks: [
+        { index: 0, goal: '审查 A 文件夹', status: 'done', runId: 'run_child_a', stepCount: 2 },
+        { index: 1, goal: '审查 B 文件夹', status: 'running', stepCount: 1 },
+      ],
+    });
+  });
 });
 
 describe('mergeTodoUpdate', () => {

@@ -15,6 +15,8 @@ const RUN_EVENT_TYPES = new Set<string>([
   'tool_result',
   'todo_snapshot',
   'todo_update',
+  'child_start',
+  'child_end',
 ]);
 
 export function subscribeRunEvents(runId: string, onEvent: (event: RunEvent) => void): () => void {

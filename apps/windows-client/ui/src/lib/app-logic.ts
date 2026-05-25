@@ -1,4 +1,4 @@
-import type { ApprovalState, RunEvent, SourceRef, TodoItem, TodoStatus } from './types';
+import type { ApprovalState, RunEvent, SourceRef, SubtaskGroupItem, SubtaskStatus, TodoItem, TodoStatus } from './types';
 
 export type ProgressStatus = 'pending' | 'running' | 'done' | 'failed' | 'wait';
 
@@ -14,6 +14,7 @@ export interface AssistantRunState {
   progress: ProgressEntry[];
   sources: SourceRef[];
   todos?: TodoItem[];
+  subtasks?: SubtaskGroupItem[];
   approvalState: ApprovalState;
 }
 
@@ -52,6 +53,51 @@ export function mergeTodoUpdate(current: TodoItem[] = [], update: unknown): Todo
   return current.map((existing, i) => (i === index ? { ...existing, ...item } : existing));
 }
 
+function numberFromUnknown(value: unknown): number | null {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(num) && num >= 0 ? num : null;
+}
+
+function stringFromUnknown(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function subtaskStatusFromRunStatus(status: unknown): SubtaskStatus {
+  if (status === 'failed') return 'failed';
+  if (status === 'succeeded' || status === 'done') return 'done';
+  return 'running';
+}
+
+export function mergeSubtaskEvent(current: SubtaskGroupItem[] = [], event: RunEvent): SubtaskGroupItem[] {
+  const index = numberFromUnknown(event.index);
+  if (index == null) return current;
+  const existing = current.find((item) => item.index === index);
+  const goal = stringFromUnknown(event.goal) || existing?.goal || `子任务 ${index + 1}`;
+  const stepCount = numberFromUnknown(event.stepCount) ?? existing?.stepCount;
+  const runId = stringFromUnknown(event.runId);
+  const error = stringFromUnknown(event.error);
+  const patch: SubtaskGroupItem = event.type === 'child_end'
+    ? {
+      index,
+      goal,
+      status: subtaskStatusFromRunStatus(event.status),
+      ...(typeof stepCount === 'number' ? { stepCount } : {}),
+      ...(runId ? { runId } : {}),
+      ...(error ? { error } : {}),
+    }
+    : {
+      index,
+      goal,
+      status: 'running',
+      ...(typeof stepCount === 'number' ? { stepCount } : {}),
+      ...(runId ? { runId } : {}),
+    };
+  const next = existing
+    ? current.map((item) => (item.index === index ? { ...item, ...patch } : item))
+    : [...current, patch];
+  return next.slice().sort((a, b) => a.index - b.index);
+}
+
 export function reduceAssistantRunEvent<T extends AssistantRunState>(message: T, event: RunEvent): T {
   const next = { ...message };
   if (event.type === 'progress') {
@@ -68,6 +114,8 @@ export function reduceAssistantRunEvent<T extends AssistantRunState>(message: T,
     next.todos = event.todos.map(todoFromUnknown).filter((item): item is TodoItem => Boolean(item));
   } else if (event.type === 'todo_update') {
     next.todos = mergeTodoUpdate(message.todos || [], event);
+  } else if (event.type === 'child_start' || event.type === 'child_end') {
+    next.subtasks = mergeSubtaskEvent(message.subtasks || [], event);
   } else if (event.type === 'awaiting_approval') {
     next.status = 'awaiting_approval';
     next.approvalState = 'awaiting';

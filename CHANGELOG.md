@@ -17,6 +17,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 - Added live artifact connector data sources for connected filesystem MCP reads, with tests for disconnected and high-risk connector tool rejection.
 - Added sub-agent context-budget enforcement so over-large plans are rejected before any tool runs, while direct sub-agent routes remain read-only/approval-isolated.
 - Added parallel sub-agent dispatch via `/api/subagent/parallel` and the `AgentParallel` model tool, including aggregate run records, configurable concurrency, child context budgets, and approval-gated route rejection.
+- Added child-agent lifecycle events and React subtask grouping for `AgentParallel` runs.
 - Expanded the host `checkJs`/JSDoc type guard to cover live artifact specs, viz rendering, OAuth permissions, JSON stores, and the tool registry.
 - Added the local `npm run ci` gate for architecture checks, file-size checks, host tests, and UI tests.
 - Added a dry-run-first release skeleton for SemVer validation, VERSION planning, git bundle planning, installer signing/archive planning, and tag planning.

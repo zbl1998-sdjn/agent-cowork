@@ -4,6 +4,7 @@ export type RunStatus = 'pending' | 'planning' | 'awaiting_approval' | 'applying
 export type MessageRole = 'user' | 'assistant';
 export type ApprovalState = 'idle' | 'awaiting' | 'approved' | 'rejected';
 export type TodoStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected';
+export type SubtaskStatus = 'running' | 'done' | 'failed';
 
 export interface FileOperation {
   type: 'write' | 'rename' | 'move' | string;
@@ -41,6 +42,15 @@ export interface TodoItem {
   kind?: string;
 }
 
+export interface SubtaskGroupItem {
+  index: number;
+  goal: string;
+  status: SubtaskStatus;
+  stepCount?: number;
+  runId?: string;
+  error?: string;
+}
+
 // SSE event payloads emitted by the host run bus.
 export interface RunEvent {
   seq: number;
@@ -57,7 +67,9 @@ export interface RunEvent {
     | 'sandbox_end'
     | 'tool_result'
     | 'todo_snapshot'
-    | 'todo_update';
+    | 'todo_update'
+    | 'child_start'
+    | 'child_end';
   id?: string;
   text?: string;
   icon?: 'check' | 'loader' | string;

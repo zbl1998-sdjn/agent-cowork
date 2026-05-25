@@ -1,5 +1,5 @@
 import type { ProgressLineProps } from '../components/ProgressLine';
-import type { ApprovalState, FileOperation, SourceRef, TodoItem } from './types';
+import type { ApprovalState, FileOperation, SourceRef, SubtaskGroupItem, TodoItem } from './types';
 
 export interface PendingApproval { id: string; name: string }
 
@@ -16,6 +16,7 @@ export interface AssistantMessage {
   rollbackApprovalId?: string | null;
   sources: SourceRef[];
   todos?: TodoItem[];
+  subtasks?: SubtaskGroupItem[];
   approvalState: ApprovalState;
   approval?: PendingApproval;
   plan?: { id: string; text: string };

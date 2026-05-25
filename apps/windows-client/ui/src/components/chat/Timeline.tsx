@@ -13,6 +13,7 @@ import { TaskStatusBadge } from '../TaskStatusBadge';
 import { ToolCallCard } from '../ToolCallCard';
 import { MessageActions } from '../MessageActions';
 import { TodoList } from '../TodoList';
+import { SubtaskGroups } from '../SubtaskGroups';
 
 interface TimelineProps {
   editText: string;
@@ -137,6 +138,7 @@ function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandle
       {(message.status === 'thinking' || message.status === 'streaming') && !message.text && <div className="turn-status">{message.reasoning ? '思考中' : '正在响应'}<span className="typing-dots" aria-hidden="true"><i /><i /><i /></span></div>}
       {message.reasoning && <details className="reasoning" open={!message.text}><summary>思考过程</summary><div className="reasoning-body">{message.reasoning}</div></details>}
       {message.todos && message.todos.length > 0 && <TodoList items={message.todos} />}
+      {message.subtasks && message.subtasks.length > 0 && <SubtaskGroups items={message.subtasks} />}
       {message.progress.map((p, i) => <ProgressLine key={i} {...p} />)}
       {message.tools && message.tools.length > 0 && <div className="toolcalls">{message.tools.map((t, i) => <ToolCallCard key={i} call={t} />)}</div>}
       {message.plan && <PlanCard message={message} trustedRoot={trustedRoot} onPatchAssistant={onPatchAssistant} />}
