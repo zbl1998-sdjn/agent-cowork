@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
+import { buildRuntimeDependencyInstallPlan } from '../src/runtime/dependency-install-plan.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 async function withServer(config, fn) {
@@ -49,4 +50,29 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
     assert.equal(byId.proxy.status, 'configured');
     assert.equal(byId.proxy.detail, 'http://proxy-user:[REDACTED]@127.0.0.1:7890');
   });
+});
+
+test('runtime dependency install plan blocks downloads when disk space is insufficient', () => {
+  const plan = buildRuntimeDependencyInstallPlan({
+    selectedIds: ['data-science', 'playwright-chromium'],
+    freeBytes: 250 * 1024 * 1024,
+  });
+
+  assert.equal(plan.ok, false);
+  assert.equal(plan.disk.availableBytes, 250 * 1024 * 1024);
+  assert.ok(plan.disk.requiredBytes > plan.disk.availableBytes);
+  assert.match(plan.disk.message, /磁盘空间不足/);
+  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium']);
+  assert.equal(plan.components.every((item) => item.installMode === 'on-demand'), true);
+});
+
+test('runtime dependency install plan accepts required bundled defaults without optional downloads', () => {
+  const plan = buildRuntimeDependencyInstallPlan({
+    selectedIds: ['node', 'python-embedded', 'cjk-fonts'],
+    freeBytes: 400 * 1024 * 1024,
+  });
+
+  assert.equal(plan.ok, true);
+  assert.equal(plan.disk.requiredBytes, 0);
+  assert.equal(plan.disk.status, 'ok');
 });

@@ -7,6 +7,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Node runtime',
     required: true,
     installMode: 'bundled',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'webview2',
@@ -14,6 +15,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'WebView2 runtime',
     required: true,
     installMode: 'system',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'python-embedded',
@@ -21,6 +23,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Embedded Python',
     required: true,
     installMode: 'bundled',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'cjk-fonts',
@@ -28,6 +31,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'CJK fonts',
     required: true,
     installMode: 'bundled',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'vc-runtime',
@@ -35,6 +39,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'VC++ redistributable',
     required: true,
     installMode: 'system',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'sqlite',
@@ -42,6 +47,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'SQLite runtime',
     required: true,
     installMode: 'bundled',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'proxy',
@@ -49,6 +55,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Proxy configuration',
     required: false,
     installMode: 'environment',
+    estimatedDownloadBytes: 0,
   },
   {
     id: 'data-science',
@@ -56,6 +63,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Data science packages',
     required: false,
     installMode: 'on-demand',
+    estimatedDownloadBytes: 200 * 1024 * 1024,
   },
   {
     id: 'playwright-chromium',
@@ -63,6 +71,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Playwright Chromium',
     required: false,
     installMode: 'on-demand',
+    estimatedDownloadBytes: 150 * 1024 * 1024,
   },
   {
     id: 'tesseract-ocr',
@@ -70,6 +79,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Tesseract OCR',
     required: false,
     installMode: 'on-demand',
+    estimatedDownloadBytes: 120 * 1024 * 1024,
   },
   {
     id: 'pandoc',
@@ -77,6 +87,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'Pandoc',
     required: false,
     installMode: 'on-demand',
+    estimatedDownloadBytes: 80 * 1024 * 1024,
   },
   {
     id: 'mingit',
@@ -84,6 +95,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'MinGit',
     required: false,
     installMode: 'on-demand',
+    estimatedDownloadBytes: 80 * 1024 * 1024,
   },
   {
     id: 'sandbox-isolation',
@@ -91,6 +103,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     label: 'WSL2 or Docker sandbox isolation',
     required: false,
     installMode: 'system',
+    estimatedDownloadBytes: 0,
   },
 ]);
 
