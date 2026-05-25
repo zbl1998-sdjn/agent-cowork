@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
 import { renderViz, type VizSpec } from '../lib/api';
+import { ErrorState, Loading } from './ui/StateViews';
+
+export function InlineVizErrorState({ error }: { error: string }) {
+  if (!error) return null;
+  return <ErrorState title="图表渲染失败" message={error} />;
+}
+
+export function InlineVizLoadingState() {
+  return <Loading message="渲染图表中…" />;
+}
 
 // Renders a viz spec inline in the conversation by asking the host to render it
 // (persist:false) and embedding the returned self-contained HTML in an iframe.
@@ -19,7 +29,7 @@ export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, trustedRoot]);
 
-  if (error) return <div className="panel-error">图表渲染失败：{error}</div>;
-  if (!html) return <div className="inline-viz-loading">渲染图表中…</div>;
+  if (error) return <InlineVizErrorState error={error} />;
+  if (!html) return <InlineVizLoadingState />;
   return <iframe className="inline-viz-frame" title="inline-viz" srcDoc={html} sandbox="allow-scripts" />;
 }
