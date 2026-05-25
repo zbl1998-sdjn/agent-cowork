@@ -5,6 +5,7 @@ import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createBudgetGuard } from '../runtime/budget-guard.js';
+import { createSeededIdSource } from '../util/ids.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
 import { sse } from '../kimi/agent/finalize.js';
@@ -86,6 +87,17 @@ function createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs }) {
   });
 }
 
+function createAgentRunIdentity(body) {
+  const seed = body && (body.runSeed || body.seed);
+  if (!seed) {
+    const startedAt = new Date();
+    return { runId: createRunId(startedAt), startedAt };
+  }
+  const ids = createSeededIdSource(seed);
+  const startedAt = ids.date();
+  return { runId: createRunId(startedAt, { randomHex: ids.randomHex }), startedAt };
+}
+
 export async function streamAgentChat({
   response,
   requestContext,
@@ -111,8 +123,7 @@ export async function streamAgentChat({
     'cache-control': 'no-store',
     connection: 'keep-alive',
   });
-  const runId = createRunId();
-  const startedAt = new Date();
+  const { runId, startedAt } = createAgentRunIdentity(body);
   const controller = cancellation ? cancellation.register(runId) : null;
   sse(response, 'start', { runId });
 

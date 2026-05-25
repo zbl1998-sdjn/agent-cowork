@@ -102,6 +102,8 @@ D1 完成记录(2026-05-25):新增 `runtime/run-checkpoint.js` 与 agent 层 `ch
 
 D2 完成记录(2026-05-25):新增 `runtime/run-resume.js` 将最新检查点规范化为 `resumeState`;`tool-loop` 可从检查点的 `messages/usage/approvedTools/todos` 继续运行。前置特征测试覆盖"工具已执行并写入检查点后进程崩溃"场景:续跑时模型收到已完成工具的 tool result,handler 不再执行,文件副作用只出现一次,usage 从检查点继续累计。
 
+D4 完成记录(2026-05-25):新增 L0 `util/ids.js` seedable ID 源,提供 deterministic random/hex/bytes/date;`createRunId` 与 `createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现的 start `runId`。单测覆盖同 seed 的 runId/ULID 复现和 SSE start runId 稳定。
+
 ---
 
 ## E · 可观测与归因 — 让结果可解释、可追溯

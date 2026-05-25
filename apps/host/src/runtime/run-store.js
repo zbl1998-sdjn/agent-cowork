@@ -4,9 +4,11 @@ import path from 'node:path';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
-export function createRunId(now = new Date()) {
+export function createRunId(now = new Date(), { randomHex } = {}) {
   const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  const suffix = typeof randomHex === 'function'
+    ? randomHex(8)
+    : crypto.randomUUID().replace(/-/g, '').slice(0, 8);
   return `run_${timestamp}_${suffix}`;
 }
 

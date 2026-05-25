@@ -45,6 +45,7 @@
     "apps/host/src/runtime/usage.js",
     "apps/host/src/storage/json-store.js",
     "apps/host/src/tools/tool-registry.js",
+    "apps/host/src/util/ids.js",
     "apps/host/src/workspace/context-bundle.js",
     "apps/host/src/workspace/file-preview.js",
     "apps/host/src/workspace/file-reader.js",

@@ -21,8 +21,8 @@ function timestampPart(ms) {
   return out.join('');
 }
 
-export function createUlid(now = Date.now()) {
-  const rand = crypto.randomBytes(16);
+export function createUlid(now = Date.now(), { randomBytes = crypto.randomBytes } = {}) {
+  const rand = randomBytes(16);
   const randomPart = Array.from(rand, pickAlphabet).join('');
   return `${ID_PREFIX}_${timestampPart(now)}${randomPart}`;
 }

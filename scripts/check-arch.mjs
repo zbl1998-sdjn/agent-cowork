@@ -8,7 +8,7 @@ const UI_ROOT = path.join(ROOT, 'apps', 'windows-client', 'ui', 'src');
 const WINDOWS_CLIENT_ROOT = path.join(ROOT, 'apps', 'windows-client');
 
 const HOST_LAYERS = [
-  { name: 'L0', rank: 0, prefixes: ['security/', 'http/'] },
+  { name: 'L0', rank: 0, prefixes: ['security/', 'http/', 'util/'] },
   {
     name: 'L1',
     rank: 1,
