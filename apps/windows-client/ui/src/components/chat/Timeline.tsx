@@ -133,6 +133,8 @@ interface AssistantTurnProps {
 }
 
 function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandleApprove, onOpenOrPreview, onPatchAssistant, onQuickSend, onRegenerate }: AssistantTurnProps) {
+  const canShowActions = Boolean(message.text && (message.status === 'done' || message.status === 'failed' || message.status === 'cancelled'));
+  const canContinue = message.status === 'failed' || message.status === 'cancelled';
   return (
     <MessageBubble role="assistant" status="" runId={message.runId}>
       {(message.status === 'thinking' || message.status === 'streaming') && !message.text && <div className="turn-status">{message.reasoning ? '思考中' : '正在响应'}<span className="typing-dots" aria-hidden="true"><i /><i /><i /></span></div>}
@@ -149,7 +151,7 @@ function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandle
       {message.operations.length > 0 && <PreviewCard operations={message.operations} />}
       {message.operations.length > 0 && <ApprovalActions runId={message.runId || ''} operations={message.operations} approvalState={message.approvalState} onApprove={() => onHandleApprove(message)} onReject={() => onPatchAssistant(message.id, (m) => ({ ...m, approvalState: 'rejected' }))} />}
       <SourcesFooter sources={message.sources} />
-      {message.status === 'done' && message.text && <MessageActions onCopy={() => onCopyText(extractSuggestions(message.text || '').text)} onRegenerate={() => onRegenerate(message.id)} />}
+      {canShowActions && <MessageActions onCopy={() => onCopyText(extractSuggestions(message.text || '').text)} onContinue={canContinue ? () => onQuickSend('继续') : undefined} onRegenerate={() => onRegenerate(message.id)} />}
       {message.usage && message.usage.total_tokens ? <div className="usage-line">用量 {message.usage.total_tokens} tokens</div> : null}
       {message.operations.length > 0 && <TaskStatusBadge runId={message.runId} status={message.status} />}
       {message.approvalState === 'approved' && <ArtifactCard file={{ path: `${trustedRoot}/.AgentCowork/artifacts` }} metadata=".AgentCowork/artifacts" onOpen={(p) => void openPath(p)} />}

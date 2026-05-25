@@ -1,6 +1,6 @@
 // Shared domain types for the UI, aligned with the host's run/event shapes.
 
-export type RunStatus = 'pending' | 'planning' | 'awaiting_approval' | 'applying' | 'done' | 'failed';
+export type RunStatus = 'pending' | 'planning' | 'awaiting_approval' | 'applying' | 'done' | 'failed' | 'cancelled';
 export type MessageRole = 'user' | 'assistant';
 export type ApprovalState = 'idle' | 'awaiting' | 'approved' | 'rejected';
 export type TodoStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected';

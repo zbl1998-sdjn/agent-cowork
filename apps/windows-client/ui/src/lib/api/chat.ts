@@ -73,6 +73,7 @@ export interface AgentStreamHandlers {
   onQuestion?: (id: string, question: string, options: Array<{ label: string; description?: string }>) => void;
   onStart?: (runId: string) => void;
   onDone?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
+  onCancelled?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
   onError?: (message: string) => void;
 }
 
@@ -170,8 +171,12 @@ export async function agentChatStream(
     else if (type === 'verify_start') handlers.onVerifyStart?.();
     else if (type === 'question') {
       handlers.onQuestion?.(str(data, 'id') || '', str(data, 'question') || '', questionOptions(data));
-    } else if (type === 'done' || type === 'cancelled') {
+    } else if (type === 'done') {
       handlers.onDone?.({ text: str(data, 'text') || '', runId: str(data, 'runId'), usage: usage(data) });
+    } else if (type === 'cancelled') {
+      const full = { text: str(data, 'text') || '', runId: str(data, 'runId'), usage: usage(data) };
+      if (handlers.onCancelled) handlers.onCancelled(full);
+      else handlers.onDone?.(full);
     } else if (type === 'error') handlers.onError?.(str(data, 'error') || 'agent error');
   });
 }

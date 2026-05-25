@@ -205,7 +205,8 @@ export function App() {
         onQuestion: (id, question, options) => patchAssistant(assistantId, (m) => ({ ...m, status: 'awaiting_approval', question: { id, question, options } })),
         onPlanProposed: (id, plan) => patchAssistant(assistantId, (m) => ({ ...m, status: 'awaiting_approval', plan: { id, text: plan } })),
         onToken: (delta) => patchAssistant(assistantId, (m) => ({ ...m, status: 'streaming', text: (m.text || '') + delta })),
-        onDone: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'done', verifying: false, text: full.text || m.text || '', runId: full.runId, usage: full.usage })); },
+        onDone: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'done', verifying: false, text: full.text || m.text || '', runId: full.runId || m.runId, usage: full.usage || m.usage })); },
+        onCancelled: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'cancelled', verifying: false, text: full.text || m.text || '已取消本轮运行。可点击继续发起下一轮。', runId: full.runId || m.runId, usage: full.usage || m.usage })); },
         onError: (msg) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: msg })); },
       });
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
@@ -235,8 +236,9 @@ export function App() {
     if (!streamingId) return;
     const msg = messages.find((m) => m.id === streamingId && m.role === 'assistant') as AssistantMessage | undefined;
     if (msg && msg.runId) void cancelRun(msg.runId);
+    patchAssistant(streamingId, (m) => ({ ...m, status: 'cancelled', verifying: false, text: m.text || '正在取消本轮运行。可点击继续发起下一轮。' }));
     setStreamingId(null);
-  }, [streamingId, messages]);
+  }, [streamingId, messages, patchAssistant]);
   const handleRunSubagent = useCallback(async (goal: string, steps: SubagentStep[]) => {
     if (!steps.length) return;
     setMessages((list) => [...list, { id: nextMessageId(), role: 'user', text: goal || `运行子任务 (${steps.length} 步)` }]);

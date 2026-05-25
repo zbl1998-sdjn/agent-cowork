@@ -62,6 +62,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P1-B3(代码+单测完成):`AgentParallel` 现在向执行流发出 `child_start/child_end` 子任务生命周期事件;前端执行动态新增子任务分组,按 index/目标/状态/步数展示并行子任务进度。聚焦 host/UI 单测通过,`npm run test:host` 已通过(473 tests,472 pass,1 skip),`npm run test:ui` 已通过(14 files,65 tests);真实三文件夹端到端性能与安装版视觉深验仍留到后续验收。
 - [x] P1-C1(代码+单测完成):`summary-report` recipe 现在会同时生成 Markdown、DOCX、PPTX、PDF 产物;DOCX/PPTX/PDF writer 全部本地实现并纳入 host `checkJs`,产物 catalog 会把 `.docx/.pptx/.xlsx/.pdf` 显式标成 Word/演示/表格/PDF。`npm run test:host` 已通过(478 tests,477 pass,1 skip),`npm run check` 已通过;真实 Office 打开、OCR 与安装版深交互仍留到延期验收。
 - [x] P1-D2(代码+单测完成):工具调用卡片现在展示状态、耗时、失败原因,并保留可展开参数/结果;host `tool_result` 事件补充 `durationMs`,前端也有本地耗时兜底。新增 host/UI 单测覆盖执行耗时事件与卡片可读失败信息。
+- [x] P1-D3(代码+单测完成):`cancelled` SSE 不再被前端当作 `done`,停止运行会落到 `cancelled` 状态并显示可继续收尾文案;失败/取消回答补"继续"入口,状态徽标补齐"已取消"。新增 UI 单测覆盖取消帧路由、继续入口和取消态徽标;后端断点续跑 HTTP 接线与真实长任务视觉验收留到后续。
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。

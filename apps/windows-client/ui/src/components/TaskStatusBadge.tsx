@@ -13,10 +13,11 @@ const LABEL: Record<string, string> = {
   applying: '执行中',
   done: '完成',
   failed: '失败',
+  cancelled: '已取消',
 };
 
 export function TaskStatusBadge({ status, activeForm }: TaskStatusBadgeProps) {
-  const variant = status === 'failed' ? 'failed' : status === 'done' ? 'done'
+  const variant = status === 'failed' ? 'failed' : status === 'done' ? 'done' : status === 'cancelled' ? 'warn'
     : status === 'awaiting_approval' ? 'warn' : 'active';
   return (
     <span className={`task-badge badge-${variant}`}>

@@ -481,6 +481,33 @@ describe('SSE streams', () => {
     expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });
   });
 
+  it('routes cancelled agent frames without marking the run done', async () => {
+    const { api } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/agent/chat/stream')) {
+        return sseResponse([
+          'event: start',
+          'data: {"runId":"run_cancel"}',
+          '',
+          'event: cancelled',
+          'data: {"text":"已取消","runId":"run_cancel","usage":{"total_tokens":5}}',
+          '',
+        ].join('\n'));
+      }
+      return jsonResponse({ ok: true });
+    });
+    let done = 0;
+    let cancelled: unknown = null;
+
+    await api.agentChatStream('停止', {}, {
+      onDone: () => { done += 1; },
+      onCancelled: (full) => { cancelled = full; },
+    });
+
+    expect(done).toBe(0);
+    expect(cancelled).toEqual({ text: '已取消', runId: 'run_cancel', usage: { total_tokens: 5 } });
+  });
+
   it('passes tool result duration metadata to agent stream handlers', async () => {
     const { api } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });

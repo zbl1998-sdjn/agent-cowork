@@ -2,12 +2,12 @@ import { useState } from 'react';
 
 interface MessageActionsProps {
   onCopy: () => void;
+  onContinue?: () => void;
   onRegenerate?: () => void;
 }
 
-// Hover/inline actions under an assistant message: copy the text, or regenerate
-// the response — the Claude Cowork message-affordance pattern.
-export function MessageActions({ onCopy, onRegenerate }: MessageActionsProps) {
+// Inline actions under a completed assistant message.
+export function MessageActions({ onCopy, onContinue, onRegenerate }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="msg-actions">
@@ -18,6 +18,9 @@ export function MessageActions({ onCopy, onRegenerate }: MessageActionsProps) {
       >
         {copied ? '已复制' : '复制'}
       </button>
+      {onContinue && (
+        <button type="button" className="msg-act" onClick={onContinue}>继续</button>
+      )}
       {onRegenerate && (
         <button type="button" className="msg-act" onClick={onRegenerate}>重新生成</button>
       )}
