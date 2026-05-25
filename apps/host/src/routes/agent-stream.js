@@ -6,6 +6,7 @@ import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createBudgetGuard } from '../runtime/budget-guard.js';
 import { createSeededIdSource } from '../util/ids.js';
+import { createRunTrace } from '../runtime/run-trace.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
 import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
@@ -177,6 +178,7 @@ export async function streamAgentChat({
     const memory = loadLayeredMemory({ trustedRoot, userHome });
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, kimiConfig);
     const budgetGuard = createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs });
+    const runTrace = createRunTrace({ runId, runEvents });
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
       : [];
@@ -211,6 +213,7 @@ export async function streamAgentChat({
       budgetGuard,
       runTimeoutMs,
       checkpointer: runStoreRoot ? createRunCheckpointer({ root: runStoreRoot }) : null,
+      runTrace,
     });
     if (controller && controller.signal.aborted) {
       status = 'cancelled';

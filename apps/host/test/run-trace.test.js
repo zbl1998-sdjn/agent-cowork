@@ -6,6 +6,7 @@ import {
   createRunTrace,
   replayRunTraceEvents,
 } from '../src/runtime/run-trace.js';
+import { runAgentChat } from '../src/kimi/agent/tool-loop.js';
 
 test('RunTrace appends sanitized entries and publishes replayable run events', () => {
   const bus = new RunEventBus();
@@ -103,4 +104,62 @@ test('buildDecisionTraceFromMessages links model context, tool decisions, why te
   assert.equal(step.results[0].callId, 'call_read');
   assert.equal(step.results[0].status, 'succeeded');
   assert.equal(step.results[0].result.ok, true);
+});
+
+test('runAgentChat publishes model context, tool decisions, and tool results to RunTrace', async () => {
+  const bus = new RunEventBus();
+  const runId = 'run_trace_live';
+  const runTrace = createRunTrace({ runId, runEvents: bus, maxTextChars: 160 });
+  let callCount = 0;
+
+  const result = await runAgentChat({
+    prompt: 'Read note.md before answering.',
+    trustedRoot: process.cwd(),
+    kimiConfig: { model: 'test-model' },
+    runId,
+    runEvents: bus,
+    runTrace,
+    tools: [{
+      name: 'ReadNote',
+      description: 'Read a note file.',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' }, apiKey: { type: 'string' } },
+        required: ['path'],
+      },
+      handler: async (args) => ({ ok: true, text: `read ${args.path} with sk-RESULTSECRET12345` }),
+    }],
+    modelCall: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          content: 'I will read the note.',
+          reasoning_content: 'Need inspect note.md first.',
+          tool_calls: [{
+            id: 'call_read_note',
+            function: {
+              name: 'ReadNote',
+              arguments: JSON.stringify({ path: 'note.md', apiKey: 'sk-ARGSECRET12345' }),
+            },
+          }],
+          usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+        };
+      }
+      return {
+        content: 'Done.',
+        usage: { prompt_tokens: 8, completion_tokens: 1, total_tokens: 9 },
+      };
+    },
+  });
+
+  assert.equal(result.text, 'Done.');
+  const entries = replayRunTraceEvents(bus.replay(runId, 0));
+  assert.deepEqual(entries.slice(0, 3).map((entry) => entry.kind), ['model_context', 'tool_decision', 'tool_result']);
+  assert.equal(entries.filter((entry) => entry.kind === 'model_context').length, 2);
+  assert.equal(entries[0].modelSaw.tools[0].name, 'ReadNote');
+  assert.equal(entries[1].decisions[0].tool, 'ReadNote');
+  assert.equal(entries[1].decisions[0].args.apiKey, '[REDACTED]');
+  assert.equal(entries[2].tool, 'ReadNote');
+  assert.equal(entries[2].status, 'succeeded');
+  assert.ok(!JSON.stringify(entries).includes('SECRET'), 'live trace leaked a secret');
 });

@@ -95,6 +95,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-E2 前端成本/可观测面板:新增 `ObservabilityPanel` 与 `/api/runs` typed helpers,展示 token、成本、工具为什么、耗时、模型/配置归因和来源跳转。UI 测试通过(25 files,114 tests),本机 5173 UI + 3017 host 烟测可打开面板。
 - [x] 07-E3 版本归因:新增 `runtime/run-attribution.js`,所有 `writeRunRecord` 持久化记录都会自动带 `attribution`(输入 prompt 哈希、system-prompt 版本、prompt builder、provider/model/mode/baseUrl 与脱敏配置快照);agent stream 记录只写入安全配置摘要。`npm run test:host` 当前 539 tests,538 pass,1 skip。
 - [x] 07-E4 决策 trace:新增 `runtime/run-trace.js`/`run-trace-normalizers.js`,可结构化记录模型上下文、工具决策、why、工具结果并通过 `run-events` 回放;也可从现有 messages 构建决策轨迹。聚焦 `run-trace.test.js` 通过,`npm run check` 通过。
+- [x] 07-E4b 真实运行 trace 接入:`agent-stream` 为每个 run 创建 `RunTrace`,`tool-loop` 在模型调用前、工具决策后、工具结果后发布 `run_trace` 事件;trace 记录走脱敏/截断,失败不影响主循环,可通过 run events 回放真实执行轨迹。
 - [x] 07-G1 InjectionGuard:新增 `kimi/safety/untrusted-content.js`,工具结果回灌前统一包成不可信数据区;检测到 prompt injection/tool hijack/exfiltration/approval bypass 模式时发 `untrusted_content_flagged`,并用 tool-loop 注入用例锁定恶意工具输出不会诱导 Shell。
 - [x] 07-G2 工具参数 schema 校验:新增 `kimi/agent/arg-validator.js`,tool-loop 在 handler/hook/审批前校验模型工具参数;缺字段/类型错会发 `tool_args_invalid` 并回灌错误,不会执行 handler。
 - [x] 07-G3 红队 eval 回归护栏:复用 A7 redteam 任务集覆盖危险 Shell、路径穿越、间接提示注入、绕审批删除/外传等场景;`npm run eval` 当前 28/28 passed。

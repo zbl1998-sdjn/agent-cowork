@@ -24,6 +24,7 @@ import { validateToolArguments } from './arg-validator.js';
 import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 import { createCheckpointRecorder } from './checkpoint-state.js';
+import { traceModelContext, traceToolDecision, traceToolResult } from './run-trace-events.js';
 
 function addLazySearchTool(agentTools, lazyTools) {
   const activeNames = new Set(agentTools.map((t) => t.name));
@@ -125,6 +126,7 @@ export async function runAgentChat({
   runTimeoutMs = 0,
   checkpointer = null,
   resumeState = null,
+  runTrace = null,
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -223,11 +225,13 @@ export async function runAgentChat({
         });
       }
     }
+    const toolSpecs = buildToolSpecs();
+    traceModelContext(runTrace, stepNumber, messages, toolSpecs);
     let message;
     try {
       message = await callModelResilient(modelCall, {
         messages,
-        tools: buildToolSpecs(),
+        tools: toolSpecs,
         kimiConfig,
         fetchImpl,
         signal: runTimeout.signal,
@@ -267,6 +271,7 @@ export async function runAgentChat({
     }
 
     messages.push({ role: 'assistant', content: message.content || '', tool_calls: calls, ...(message.reasoning_content ? { reasoning_content: message.reasoning_content } : {}) });
+    traceToolDecision(runTrace, stepNumber, message);
     saveCheckpoint('assistant_tool_calls', stepNumber);
     for (const call of calls) {
       const { name, args } = parseToolCall(call);
@@ -279,6 +284,7 @@ export async function runAgentChat({
         audit('tool.args_invalid', { tool: name, errors: argValidation.errors });
         emit('tool_args_invalid', { name, errors: argValidation.errors });
         emit('tool_result', { name, status: 'failed', result });
+        traceToolResult(runTrace, stepNumber, call, name, 'failed', result);
         const formatted = activeContextManager.formatToolResult(result, { toolName: name });
         messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
         saveCheckpoint('tool_result', stepNumber);
@@ -333,6 +339,7 @@ export async function runAgentChat({
       if (needsApproval) audit('tool.execute', { tool: name, risk: tool.risk, ok });
       todo.finish(ok ? 'done' : 'failed');
       emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result, durationMs });
+      traceToolResult(runTrace, stepNumber, call, name, ok ? 'succeeded' : 'failed', result);
       const formatted = activeContextManager.formatToolResult(result, { toolName: name });
       if (formatted.summarized) {
         emit('tool_result_summary', {

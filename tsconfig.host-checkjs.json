@@ -22,6 +22,7 @@
     "apps/host/src/kimi/agent/arg-validator.js",
     "apps/host/src/kimi/agent/checkpoint-state.js",
     "apps/host/src/kimi/agent/loop-guard.js",
+    "apps/host/src/kimi/agent/run-trace-events.js",
     "apps/host/src/kimi/agent/run-timeout.js",
     "apps/host/src/kimi/agent/todo-state.js",
     "apps/host/src/kimi/agent/tool-retry.js",
