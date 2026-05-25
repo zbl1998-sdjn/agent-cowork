@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAgentChatStreamOptions,
+  hasSessionModelAccess,
   mergeTodoUpdate,
   progressStatusFromIcon,
   reconcileChatEnabled,
@@ -164,5 +166,56 @@ describe('reconcileChatEnabled', () => {
       enabled: false,
       shouldUpdateState: false,
     });
+  });
+});
+
+describe('buildAgentChatStreamOptions', () => {
+  it('passes per-session model config only when present', () => {
+    expect(buildAgentChatStreamOptions({
+      trustedRoot: 'C:/work',
+      model: 'moonshot-v1',
+      thinking: 'standard',
+      autoApprove: false,
+      planMode: true,
+      images: ['C:/work/a.png'],
+    })).not.toHaveProperty('modelConfig');
+
+    expect(buildAgentChatStreamOptions({
+      trustedRoot: 'C:/work',
+      model: 'gpt-4.1',
+      modelConfig: {
+        provider: 'openai',
+        model: 'gpt-4.1',
+        baseUrl: 'https://api.openai.test/v1',
+        apiKey: 'sk-session',
+      },
+      thinking: 'deep',
+      autoApprove: true,
+      planMode: false,
+      images: [],
+    })).toMatchObject({
+      trustedRoot: 'C:/work',
+      model: 'gpt-4.1',
+      modelConfig: {
+        provider: 'openai',
+        model: 'gpt-4.1',
+        baseUrl: 'https://api.openai.test/v1',
+        apiKey: 'sk-session',
+      },
+      thinking: 'deep',
+      autoApprove: true,
+      planMode: false,
+      images: [],
+    });
+  });
+});
+
+describe('hasSessionModelAccess', () => {
+  it('allows BYO-key and local OpenAI-compatible session models through the chat gate', () => {
+    expect(hasSessionModelAccess({ apiKey: ' sk-session ' })).toBe(true);
+    expect(hasSessionModelAccess({ provider: 'openai/local', model: 'local-model' })).toBe(true);
+    expect(hasSessionModelAccess({ provider: 'local-openai', model: 'local-model' })).toBe(true);
+    expect(hasSessionModelAccess({ provider: 'openai', model: 'gpt-4.1' })).toBe(false);
+    expect(hasSessionModelAccess()).toBe(false);
   });
 });

@@ -226,10 +226,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .tool-button:hover { background: #f0f2ec; }
 .tool-button.is-active { border-color: #c96442; color: #c96442; }
 .tool-button:disabled { opacity: .55; cursor: not-allowed; background: #f8f9f5; }
-.model-select, .thinking-select {
+.provider-select, .model-select, .model-input, .base-url-input, .api-key-input, .thinking-select {
   border: 1px solid #d9ded5; background: #fff; border-radius: 8px; padding: 6px 8px;
-  font-size: 13px; color: #3a3e36; cursor: pointer; max-width: 180px;
+  font-size: 13px; color: #3a3e36; max-width: 180px; min-width: 86px;
 }
+.provider-select, .model-select, .thinking-select { cursor: pointer; }
+.base-url-input { min-width: 180px; }
+.api-key-input { min-width: 132px; }
 
 /* ---- assistant markdown ---- */
 .message-text.markdown { line-height: 1.6; }

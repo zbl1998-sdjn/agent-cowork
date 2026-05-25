@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from './composer-logic';
+import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from './composer-logic';
 import type { PromptRefineResult } from './api/prompt';
 
 const base: PromptRefineResult = {
@@ -32,5 +32,34 @@ describe('composer refine send logic', () => {
     expect(MENTION_SEARCH_DEBOUNCE_MS).toBeGreaterThan(50);
     expect(shouldDebounceMentionSearch('readme')).toBe(true);
     expect(shouldDebounceMentionSearch('   ')).toBe(false);
+  });
+
+  it('builds per-session model config only from explicit overrides', () => {
+    expect(buildSessionModelConfig({
+      provider: 'kimi-api',
+      model: 'moonshot-v1',
+      baseUrl: 'https://api.moonshot.test/v1/',
+      apiKey: '   ',
+    }, {
+      provider: 'kimi-api',
+      model: 'moonshot-v1',
+      baseUrl: 'https://api.moonshot.test/v1',
+    })).toBeUndefined();
+
+    expect(buildSessionModelConfig({
+      provider: 'openai',
+      model: 'gpt-4.1',
+      baseUrl: ' https://api.openai.test/v1/ ',
+      apiKey: ' sk-session ',
+    }, {
+      provider: 'kimi-api',
+      model: 'moonshot-v1',
+      baseUrl: 'https://api.moonshot.test/v1',
+    })).toEqual({
+      provider: 'openai',
+      model: 'gpt-4.1',
+      baseUrl: 'https://api.openai.test/v1',
+      apiKey: 'sk-session',
+    });
   });
 });

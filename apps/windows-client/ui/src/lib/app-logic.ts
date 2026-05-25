@@ -1,4 +1,5 @@
 import type { ApprovalState, RunEvent, SourceRef, SubtaskGroupItem, SubtaskStatus, TodoItem, TodoStatus } from './types';
+import type { ModelRunConfig } from './api/chat';
 
 export type ProgressStatus = 'pending' | 'running' | 'done' | 'failed' | 'wait';
 
@@ -132,4 +133,31 @@ export function reconcileChatEnabled(
   if (current) return { enabled: true, shouldUpdateState: false };
   const enabled = Boolean(refreshed?.chatEnabled);
   return { enabled, shouldUpdateState: enabled };
+}
+
+export function buildAgentChatStreamOptions(input: {
+  trustedRoot?: string;
+  model?: string;
+  modelConfig?: ModelRunConfig;
+  thinking?: string;
+  autoApprove?: boolean;
+  planMode?: boolean;
+  images?: string[];
+}) {
+  return {
+    trustedRoot: input.trustedRoot,
+    model: input.model,
+    ...(input.modelConfig ? { modelConfig: input.modelConfig } : {}),
+    thinking: input.thinking,
+    autoApprove: input.autoApprove,
+    planMode: input.planMode,
+    images: input.images,
+  };
+}
+
+export function hasSessionModelAccess(config?: ModelRunConfig): boolean {
+  if (!config) return false;
+  if (typeof config.apiKey === 'string' && config.apiKey.trim()) return true;
+  const provider = typeof config.provider === 'string' ? config.provider.trim().toLowerCase() : '';
+  return provider === 'openai/local' || provider === 'local-openai';
 }

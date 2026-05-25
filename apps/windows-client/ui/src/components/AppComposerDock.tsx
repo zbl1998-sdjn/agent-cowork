@@ -4,7 +4,9 @@ import type { PromptRefineResult } from '../lib/api/prompt';
 
 interface AppComposerDockProps {
   commands: Command[];
+  defaultBaseUrl?: string;
   defaultModel: string;
+  defaultProvider?: string;
   history: HistoryRun[];
   models: string[];
   recipes: Recipe[];
@@ -21,7 +23,9 @@ interface AppComposerDockProps {
 
 export function AppComposerDock({
   commands,
+  defaultBaseUrl,
   defaultModel,
+  defaultProvider,
   history,
   models,
   recipes,
@@ -45,6 +49,8 @@ export function AppComposerDock({
         searchFiles={onSearchFiles}
         models={models}
         defaultModel={defaultModel}
+        defaultProvider={defaultProvider}
+        defaultBaseUrl={defaultBaseUrl}
         autoClarify={autoClarify}
         slashCommands={commands}
         onSend={onSend}

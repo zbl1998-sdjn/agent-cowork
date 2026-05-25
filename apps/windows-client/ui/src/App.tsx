@@ -4,7 +4,7 @@ import {
   logout as apiLogout, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents,
   type AuthIdentity, type SubagentStep,
 } from './lib/api';
-import { mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
+import { buildAgentChatStreamOptions, hasSessionModelAccess, mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { AUTO_CLARIFY_KEY, GUEST_KEY, loadConversations, nextMessageId, PREVIEWABLE_RE, STARTERS } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel, WorkspaceInfo } from './lib/app-types';
 import { ONBOARDING_DONE_KEY } from './lib/onboarding';
@@ -30,6 +30,8 @@ export function App() {
   const [panel, setPanel] = useState<SidePanel>('none');
   const [models, setModels] = useState<string[]>([]);
   const [defaultModel, setDefaultModel] = useState('');
+  const [defaultProvider, setDefaultProvider] = useState('kimi-api');
+  const [defaultBaseUrl, setDefaultBaseUrl] = useState('');
   const [chatEnabled, setChatEnabled] = useState(false);
   const [autoApprove, setAutoApprove] = useState(false);
   const [autoClarify, setAutoClarify] = useState(() => {
@@ -93,6 +95,8 @@ export function App() {
       try {
         const info = await getKimiInfo();
         setChatEnabled(Boolean(info.chatEnabled));
+        setDefaultProvider(info.provider || 'kimi-api');
+        setDefaultBaseUrl(info.baseUrl || '');
         if (info.model) { setDefaultModel(info.model); setModels([info.model]); }
       } catch { /* ignore */ }
     })();
@@ -162,7 +166,8 @@ export function App() {
     const uploaded = await uploadAttachments(meta.files);
     if (selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
 
-    let enabled = chatEnabled;
+    const sessionModelAccess = hasSessionModelAccess(meta.modelConfig);
+    let enabled = chatEnabled || sessionModelAccess;
     if (!enabled) {
       try {
         const reconciled = reconcileChatEnabled(chatEnabled, await getKimiInfo());
@@ -179,7 +184,15 @@ export function App() {
     const prompt = uploaded.length ? `${text}\n\n[已上传文件]\n${uploaded.join('\n')}` : text;
     setStreamingId(assistantId);
     try {
-      await agentChatStream(prompt, { trustedRoot, model: meta.model, thinking: meta.thinking, autoApprove, planMode, images: uploaded.filter((p) => isImagePath(p)) }, {
+      await agentChatStream(prompt, buildAgentChatStreamOptions({
+        trustedRoot,
+        model: meta.model,
+        modelConfig: meta.modelConfig,
+        thinking: meta.thinking,
+        autoApprove,
+        planMode,
+        images: uploaded.filter((p) => isImagePath(p)),
+      }), {
         onStart: (rid) => patchAssistant(assistantId, (m) => ({ ...m, runId: rid })),
         onReasoning: (delta) => patchAssistant(assistantId, (m) => ({ ...m, reasoning: (m.reasoning || '') + delta })),
         onToolCall: (name, args) => patchAssistant(assistantId, (m) => ({ ...m, status: 'running', tools: [...(m.tools || []), { name, args, status: 'running', startedAt: Date.now() }] })),
@@ -276,10 +289,10 @@ export function App() {
       <div className="app-content">
         <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
         <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={(m) => void handleApprove(m)} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
-        <AppComposerDock commands={commands} defaultModel={defaultModel} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
+        <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); setDefaultProvider(info.provider || 'kimi-api'); setDefaultBaseUrl(info.baseUrl || ''); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
     </div>
   );
 }

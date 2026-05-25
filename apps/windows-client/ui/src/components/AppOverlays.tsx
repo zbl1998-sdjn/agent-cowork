@@ -1,4 +1,4 @@
-import type { AuthIdentity } from '../lib/api';
+import type { AuthIdentity, KimiInfo } from '../lib/api';
 import type { Command } from './CommandPalette';
 import { CommandPalette } from './CommandPalette';
 import { FilePreview } from './FilePreview';
@@ -21,7 +21,7 @@ interface AppOverlaysProps {
   onCloseSettings: () => void;
   onOpenSettingsFromOnboarding: () => void;
   onLogout: () => void;
-  onSettingsSaved: (info: { chatEnabled?: boolean; model?: string }) => void;
+  onSettingsSaved: (info: KimiInfo) => void;
   onSetAutoClarify: (enabled: boolean) => void;
   onSetTheme: (theme: 'light' | 'dark') => void;
 }

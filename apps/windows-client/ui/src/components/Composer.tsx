@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
-import { MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { ComposerModelControls } from './ComposerModelControls';
 import { RefinePreview } from './chat/RefinePreview';
-
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
-
 export type ThinkingLevel = 'fast' | 'standard' | 'deep';
 export interface ComposerMeta {
   files: File[];
   model: string;
+  modelConfig?: ModelRunConfig;
   thinking: ThinkingLevel;
 }
 
@@ -25,19 +26,18 @@ export interface ComposerProps {
   slashCommands?: Array<{ id: string; label: string; run: () => void }>;
   models?: string[];
   defaultModel?: string;
+  defaultProvider?: string;
+  defaultBaseUrl?: string;
   autoClarify?: boolean;
   onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
 }
-
 type Mode = 'template' | 'mention' | 'history';
 interface Item { key: string; title: string; detail?: string; apply: () => void }
-
 const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [
   { value: 'fast', label: '快速' },
   { value: 'standard', label: '标准' },
   { value: 'deep', label: '深度' },
 ];
-
 // Minimal shape of the Web Speech API recognizer (no @types dependency).
 type SpeechRecognitionLike = {
   lang: string;
@@ -49,7 +49,6 @@ type SpeechRecognitionLike = {
   onend: (() => void) | null;
   onerror: (() => void) | null;
 };
-
 export function Composer({
   recipes,
   historyRuns,
@@ -60,6 +59,8 @@ export function Composer({
   slashCommands = [],
   models = [],
   defaultModel = '',
+  defaultProvider = 'kimi-api',
+  defaultBaseUrl = '',
   autoClarify = false,
   onRefinePrompt,
 }: ComposerProps) {
@@ -72,7 +73,10 @@ export function Composer({
   const [active, setActive] = useState(0);
   const [triggerStart, setTriggerStart] = useState(0);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [model, setModel] = useState(defaultModel);
+  const [model, setModel] = useState('');
+  const [provider, setProvider] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
   const [listening, setListening] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -85,6 +89,8 @@ export function Composer({
   const mentionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
+  const currentModel = model.trim() || defaultModel;
+  const currentProvider = provider || defaultProvider || 'kimi-api';
 
   function close() {
     if (mentionTimer.current) clearTimeout(mentionTimer.current);
@@ -154,7 +160,11 @@ export function Composer({
         finalText = decision.text;
       }
     }
-    onSend(finalText, { files: attachments, model: model || defaultModel, thinking });
+    const modelConfig = buildSessionModelConfig(
+      { provider: currentProvider, model: currentModel, baseUrl, apiKey },
+      { provider: defaultProvider, model: defaultModel, baseUrl: defaultBaseUrl },
+    );
+    onSend(finalText, { files: attachments, model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
     skipRefineFor.current = '';
     setValue('');
     setAttachments([]);
@@ -373,11 +383,7 @@ export function Composer({
           <button type="button" className="tool-button" title="上传文件" onClick={() => fileRef.current?.click()}>上传</button>
           <button type="button" className={`tool-button${listening ? ' is-active' : ''}`} title="语音输入" onClick={toggleVoice}>语音</button>
           <button type="button" className="tool-button" title="优化提示" disabled={!value.trim() || refining || !onRefinePrompt} onClick={() => void refineCurrent()}>{refining ? '优化中…' : '优化提示'}</button>
-          {modelOptions.length > 0 && (
-            <select className="model-select" value={model || defaultModel} onChange={(e) => setModel(e.target.value)} title="模型">
-              {modelOptions.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          )}
+          <ComposerModelControls model={model} modelOptions={modelOptions} provider={currentProvider} defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl} baseUrl={baseUrl} apiKey={apiKey} onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey} />
           <select className="thinking-select" value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)} title="思考强度">
             {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
           </select>
