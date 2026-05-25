@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRunRecord, listRunRecords, openPath } from '../lib/api';
 import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../lib/run-observability';
 import type { RunRecord } from '../lib/types';
+import { Empty, ErrorState } from './ui/StateViews';
 
 function runTitle(record: RunRecord): string {
   return record.promptPreview || record.prompt || record.id;
@@ -11,8 +12,17 @@ function runMeta(record: RunRecord): string {
   return [record.type, record.status, record.startedAt ? new Date(record.startedAt).toLocaleString() : ''].filter(Boolean).join(' · ');
 }
 
+export function ObservabilityEmptyState({ title, message }: { title: string; message?: string }) {
+  return <Empty title={title} message={message} />;
+}
+
+export function ObservabilityErrorState({ error, onRetry }: { error: string; onRetry?: () => void }) {
+  if (!error) return null;
+  return <ErrorState title="运行记录加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
+}
+
 function Rows({ empty, rows }: { empty: string; rows: ObservabilityRow[] }) {
-  if (!rows.length) return <p className="panel-empty">{empty}</p>;
+  if (!rows.length) return <ObservabilityEmptyState title={empty} />;
   return (
     <dl className="observe-rows">
       {rows.map((item) => (
@@ -84,7 +94,7 @@ export function ObservabilityPanel() {
         <h2>成本 / 可观测</h2>
         <button type="button" onClick={() => void loadRuns()} disabled={loading}>{loading ? '刷新中' : '刷新'}</button>
       </div>
-      {error && <p className="panel-error">{error}</p>}
+      <ObservabilityErrorState error={error} onRetry={() => void loadRuns()} />
       <div className="observe-layout">
         <ul className="observe-run-list">
           {records.map((record) => (
@@ -95,7 +105,11 @@ export function ObservabilityPanel() {
               </button>
             </li>
           ))}
-          {!records.length && <li className="panel-empty">暂无运行记录</li>}
+          {!records.length && (
+            <li className="panel-empty">
+              <ObservabilityEmptyState title="暂无运行记录" message="完成一次 agent 运行后会显示在这里。" />
+            </li>
+          )}
         </ul>
 
         <div className="observe-detail" aria-busy={detailBusy}>
@@ -119,7 +133,7 @@ export function ObservabilityPanel() {
               <h3>工具</h3>
               <div className="observe-chips">
                 {view.toolNames.map((name) => <code key={name}>{name}</code>)}
-                {!view.toolNames.length && <span className="panel-empty">未记录工具调用</span>}
+                {!view.toolNames.length && <ObservabilityEmptyState title="未记录工具调用" />}
               </div>
               <Rows rows={view.toolReasonRows} empty="未记录工具调用原因" />
 
@@ -136,7 +150,7 @@ export function ObservabilityPanel() {
               <Rows rows={view.sourceRows} empty="未记录来源" />
             </>
           ) : (
-            <p className="panel-empty">选择一条运行记录查看明细</p>
+            <ObservabilityEmptyState title="选择一条运行记录查看明细" message="运行记录列表加载后可查看成本、工具和来源。" />
           )}
         </div>
       </div>
