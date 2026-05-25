@@ -121,6 +121,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P2-B2(client id 来源收紧):GitHub OAuth start 不再接受客户端 body 覆盖 `clientId`,只允许 host `oauthConfig` 或 `KCW_GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_ID`;缺配置时即使 body 传入 client id 也 fail-fast 且保留一次性 approval,避免把 OAuth App 身份变成 UI/API 输入面。
 - [x] P2-B3(本地可测子项):连接器支持断开/撤销;断开 filesystem MCP 会关闭 client 并从工具 registry 移除 `mcp__fs__*`;OAuth 连接器支持 allowlist scope 审批、单次 approval receipt、高风险 scope 标记与前端审批控件;`smoke:react-connectors` 已覆盖连接→断开→工具撤销→GitHub OAuth scope 审批→授权→撤销。
 - [x] P3-A1 OpenAI-compatible provider 基础接入:provider registry 已注册 `openai` 与 `openai/local`,复用现有 chat-completions/SSE 解析链路;OpenAI provider 无 key fail-closed,本地 OpenAI-compatible provider 支持无 key baseUrl/model 调用。新增 fake fetch 单测覆盖请求体、鉴权头、流式解析和本地 provider 不发送 authorization;真实多 provider 任务切换、fallback 和统一 BYO-key 设置仍留给 P3 后续子项。
+- [x] P3-A2 provider 配置选择与运行留痕:`resolveKimiApiConfig` 支持 `KCW_MODEL_PROVIDER`/`KIMI_PROVIDER` 与 host `kimiProvider/modelProvider`, `/api/kimi/config` 可持久化 provider 且不回显 key;agent/chat/plan run record 与 agent config snapshot 均记录 provider,便于后续 P3-B fallback 与 P3-C 成本按 provider 归因。新增配置 API 与 agent stream E2E 覆盖 provider 持久化、重启加载和 run record 留痕。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。

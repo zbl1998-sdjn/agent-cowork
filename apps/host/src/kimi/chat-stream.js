@@ -10,6 +10,10 @@ function sse(response, event, data) {
   response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+function modelProvider(kimiConfig) {
+  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+}
+
 export async function streamChat({
   response,
   requestContext,
@@ -37,7 +41,7 @@ export async function streamChat({
     const base = {
       id: runId,
       type: 'kimi-chat',
-      provider: 'kimi-api',
+      provider: modelProvider(kimiConfig),
       mode: 'chat',
       trustedRoot,
       startedAt: startedAt.toISOString(),
@@ -66,6 +70,7 @@ export async function streamChat({
       apiKey: kimiConfig.apiKey,
       baseUrl: kimiConfig.baseUrl,
       model: body.model || kimiConfig.model,
+      provider: modelProvider(kimiConfig),
       timeoutMs: kimiConfig.timeoutMs,
       maxTokens: kimiConfig.maxTokens,
       userAgent: kimiConfig.userAgent,

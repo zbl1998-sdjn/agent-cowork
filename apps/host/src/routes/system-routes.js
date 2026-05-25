@@ -12,6 +12,10 @@ function objectBody(body) {
   return body && typeof body === 'object' && !Array.isArray(body) ? body : {};
 }
 
+function modelProvider(kimiConfig) {
+  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+}
+
 function dependencyPlanOptions(body, state) {
   const input = objectBody(body);
   const appDataRoot = input.appDataRoot || state.config.runtimeDependencyAppDataRoot;
@@ -145,7 +149,7 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
       trustedRoot: state.trustedRootDefault,
       context: requestContext,
       kimiApi: {
-        provider: 'kimi-api',
+        provider: modelProvider(state.kimiApiConfig),
         configured: state.kimiApiConfig.configured,
         planEnabled: state.kimiApiEnabled,
         chatEnabled: state.kimiApiEnabled,

@@ -14,6 +14,10 @@ import { buildAgentToolset } from '../kimi/agent/toolset-builder.js';
 import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
 import { resolveAgentRunStart } from './agent-resume.js';
 
+function modelProvider(kimiConfig) {
+  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+}
+
 function recordAgentRun({
   runStoreRoot,
   runsIndex,
@@ -32,7 +36,7 @@ function recordAgentRun({
   const record = {
     id: runId,
     type: 'agent-chat',
-    provider: 'kimi-api',
+    provider: modelProvider(kimiConfig),
     model: kimiConfig.model,
     systemPromptVersion: SYSTEM_PROMPT_VERSION,
     promptBuilder: 'agent-system-prompt',

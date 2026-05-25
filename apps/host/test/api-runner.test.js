@@ -55,6 +55,18 @@ test('resolveKimiApiConfig reads Kimi and Moonshot env names without exposing ke
   assert.equal(config.maxTokens, 321);
 });
 
+test('resolveKimiApiConfig reads model provider from env/config', () => {
+  const envConfig = resolveKimiApiConfig({}, {
+    KCW_MODEL_PROVIDER: 'OPENAI',
+    KIMI_API_KEY: 'secret-key',
+    KIMI_MODEL: 'gpt-test',
+  });
+  assert.equal(envConfig.provider, 'openai');
+
+  const explicitConfig = resolveKimiApiConfig({ kimiProvider: 'openai/local' }, {});
+  assert.equal(explicitConfig.provider, 'openai/local');
+});
+
 test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
   let captured;
   const result = await runKimiApiPlan({

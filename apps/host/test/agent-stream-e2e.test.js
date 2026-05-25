@@ -59,6 +59,40 @@ test('E2E /api/agent/chat/stream: inline chart fenced block streams through to t
   }
 });
 
+test('E2E /api/agent/chat/stream records configured model provider', async () => {
+  const root = tmp();
+  const agentModelCall = async () => ({ content: 'provider recorded' });
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    kimiProvider: 'openai',
+    kimiApiKey: 'test-key-provider',
+    kimiBaseUrl: 'https://api.openai.test/v1',
+    kimiModel: 'gpt-test',
+    kimiChatRunner: async () => ({}),
+    agentModelCall,
+  });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: '记录 provider' }),
+    });
+    assert.equal(res.status, 200);
+    const all = await readStream(res);
+    assert.match(all, /event: done/);
+    const runId = JSON.parse(/event: start\s+data: ([^\n]+)/.exec(all)[1]).runId;
+    const record = JSON.parse(fs.readFileSync(path.join(root, '.AgentCowork', 'runs', `${runId}.json`), 'utf8'));
+    assert.equal(record.provider, 'openai');
+    assert.equal(record.model, 'gpt-test');
+    assert.equal(record.configSnapshot.provider, 'openai');
+    assert.equal(record.configSnapshot.apiKey, undefined);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden until search_tools activates them', async () => {
   const root = tmp();
   fs.writeFileSync(path.join(root, 'hi.txt'), 'hi', 'utf8');

@@ -1,12 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+function cleanProvider(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 export function applyPersistedKimiConfig(file, target) {
   try {
     if (!fs.existsSync(file)) return;
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     const kimi = raw && typeof raw === 'object' ? (raw.kimiApi || raw.kimi || raw) : null;
     if (!kimi || typeof kimi !== 'object') return;
+    if (typeof kimi.provider === 'string' && kimi.provider.trim()) target.provider = cleanProvider(kimi.provider);
     if (typeof kimi.apiKey === 'string' && kimi.apiKey.trim()) target.apiKey = kimi.apiKey.trim();
     if (typeof kimi.baseUrl === 'string' && kimi.baseUrl.trim()) {
       target.baseUrl = kimi.baseUrl.trim().replace(/\/+$/, '');
@@ -24,6 +29,7 @@ export function persistKimiConfig(file, source) {
       apiKey: source.apiKey || '',
       baseUrl: source.baseUrl || '',
       model: source.model || '',
+      provider: source.provider || 'kimi-api',
     },
   };
   fs.mkdirSync(path.dirname(file), { recursive: true });

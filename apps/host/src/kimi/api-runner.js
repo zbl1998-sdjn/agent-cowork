@@ -9,6 +9,11 @@ function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
 }
 
+function cleanProvider(value, fallback = 'kimi-api') {
+  const provider = String(value || '').trim().toLowerCase();
+  return provider || fallback;
+}
+
 function buildMemoryBlock(memory) {
   const text = cleanText(memory).slice(0, 4096);
   if (!text) {
@@ -69,6 +74,7 @@ export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }) {
 }
 
 export function resolveKimiApiConfig(config = {}, env = process.env) {
+  const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
   const apiKey = String(config.kimiApiKey || env.KIMI_API_KEY || env.MOONSHOT_API_KEY || '').trim();
   const baseUrl = String(config.kimiBaseUrl || env.KIMI_BASE_URL || env.MOONSHOT_BASE_URL || DEFAULT_BASE_URL).trim();
   const model = String(config.kimiModel || env.KIMI_MODEL || DEFAULT_MODEL).trim();
@@ -78,7 +84,7 @@ export function resolveKimiApiConfig(config = {}, env = process.env) {
   const tempRaw = config.kimiTemperature != null ? config.kimiTemperature : env.KIMI_TEMPERATURE;
   const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
   return {
-    provider: 'kimi-api',
+    provider,
     configured: Boolean(apiKey),
     apiKey,
     baseUrl: baseUrl.replace(/\/+$/, ''),
@@ -122,6 +128,7 @@ async function runKimiApiText({
   apiKey,
   baseUrl = DEFAULT_BASE_URL,
   model = DEFAULT_MODEL,
+  provider = 'kimi-api',
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxTokens = DEFAULT_MAX_TOKENS,
   fetchImpl = globalThis.fetch,
@@ -179,7 +186,7 @@ async function runKimiApiText({
 
     return {
       ok: true,
-      provider: 'kimi-api',
+      provider: cleanProvider(provider),
       model: String(model || DEFAULT_MODEL),
       mode: resultMode || (mode === 'code' ? 'code' : 'cowork'),
       text,
@@ -222,6 +229,7 @@ export async function runKimiApiChatStream({
   apiKey,
   baseUrl = DEFAULT_BASE_URL,
   model = DEFAULT_MODEL,
+  provider = 'kimi-api',
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxTokens = DEFAULT_MAX_TOKENS,
   fetchImpl = globalThis.fetch,
@@ -300,7 +308,7 @@ export async function runKimiApiChatStream({
         }
       }
     }
-    return { ok: true, provider: 'kimi-api', model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
+    return { ok: true, provider: cleanProvider(provider), model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
   } catch (error) {
     if (error && error.name === 'AbortError') {
       throw new Error(`Kimi API timed out after ${timeoutMs}ms`);

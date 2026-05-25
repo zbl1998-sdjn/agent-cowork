@@ -1,6 +1,7 @@
 import { getJson, postJson } from './transport';
 
 export interface KimiInfo {
+  provider?: string;
   configured: boolean;
   chatEnabled: boolean;
   planEnabled: boolean;
@@ -14,6 +15,7 @@ export async function getKimiInfo(): Promise<KimiInfo> {
 }
 
 export interface SaveKimiConfigInput {
+  provider?: string;
   apiKey?: string;
   baseUrl?: string;
   model?: string;

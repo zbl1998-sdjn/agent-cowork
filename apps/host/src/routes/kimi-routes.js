@@ -6,13 +6,15 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 
 const KIMI_NOT_CONFIGURED = KIMI_API_NOT_CONFIGURED_MESSAGE;
 
+function modelProvider(kimiConfig) { return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api'; }
+
 async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summary, runner, response, context }) {
   const runId = createRunId();
   const startedAt = new Date();
   const baseRecord = {
     id: runId,
     type,
-    provider: 'kimi-api',
+    provider: modelProvider(state.kimiApiConfig),
     model: state.kimiApiConfig.model,
     baseUrl: state.kimiApiConfig.baseUrl,
     mode,
@@ -38,6 +40,7 @@ async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summar
       timeoutMs: state.kimiApiConfig.timeoutMs,
       maxTokens: state.kimiApiConfig.maxTokens,
       model: state.kimiApiConfig.model,
+      provider: modelProvider(state.kimiApiConfig),
       userAgent: state.kimiApiConfig.userAgent,
       temperature: state.kimiApiConfig.temperature,
       fetchImpl: state.config.fetchImpl,
@@ -107,7 +110,7 @@ async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summar
 
 function sendKimiInfo(response, state) {
   sendJson(response, 200, {
-    provider: 'kimi-api',
+    provider: modelProvider(state.kimiApiConfig),
     configured: state.kimiApiConfig.configured,
     planEnabled: state.kimiApiEnabled,
     chatEnabled: state.kimiApiEnabled,
@@ -123,9 +126,8 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
       const next = body && typeof body === 'object' ? body : {};
       if (next.clearKey === true) state.kimiApiConfig.apiKey = '';
       else if (typeof next.apiKey === 'string' && next.apiKey.trim()) state.kimiApiConfig.apiKey = next.apiKey.trim();
-      if (typeof next.baseUrl === 'string' && next.baseUrl.trim()) {
-        state.kimiApiConfig.baseUrl = next.baseUrl.trim().replace(/\/+$/, '');
-      }
+      if (typeof next.provider === 'string' && next.provider.trim()) state.kimiApiConfig.provider = modelProvider(next);
+      if (typeof next.baseUrl === 'string' && next.baseUrl.trim()) state.kimiApiConfig.baseUrl = next.baseUrl.trim().replace(/\/+$/, '');
       if (typeof next.model === 'string' && next.model.trim()) state.kimiApiConfig.model = next.model.trim();
       state.kimiApiConfig.configured = Boolean(state.kimiApiConfig.apiKey);
       state.recomputeKimiEnabled();

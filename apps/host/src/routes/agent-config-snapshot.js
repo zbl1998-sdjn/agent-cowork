@@ -12,12 +12,13 @@ function finiteNumber(value) {
 /**
  * @param {unknown} body
  * @param {unknown} kimiConfig
- * @returns {{ baseUrl: unknown, model: unknown, timeoutMs: unknown, maxTokens: unknown, temperature: number | undefined, planMode: boolean, developerMode: boolean, verify: boolean, maxSteps: number }}
+ * @returns {{ provider: unknown, baseUrl: unknown, model: unknown, timeoutMs: unknown, maxTokens: unknown, temperature: number | undefined, planMode: boolean, developerMode: boolean, verify: boolean, maxSteps: number }}
  */
 export function buildAgentConfigSnapshot(body, kimiConfig) {
   const requestBody = body && typeof body === 'object' ? /** @type {Record<string, unknown>} */ (body) : {};
   const config = kimiConfig && typeof kimiConfig === 'object' ? /** @type {Record<string, unknown>} */ (kimiConfig) : {};
   return {
+    provider: config.provider,
     baseUrl: config.baseUrl,
     model: config.model,
     timeoutMs: config.timeoutMs,

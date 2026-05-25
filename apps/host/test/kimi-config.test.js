@@ -89,6 +89,42 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
   });
 });
 
+test('POST /api/kimi/config stores provider without echoing the key', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-kimicfg-provider');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/api/kimi/config`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'OPENAI',
+        apiKey: SECRET,
+        baseUrl: 'https://api.openai.test/v1/',
+        model: 'gpt-test',
+      }),
+    });
+    assert.equal(res.status, 200);
+    const raw = await res.text();
+    assert.ok(!raw.includes(SECRET), 'config response leaked the API key');
+    const body = JSON.parse(raw);
+    assert.equal(body.provider, 'openai');
+    assert.equal(body.hasKey, true);
+    assert.equal(body.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(body.model, 'gpt-test');
+  });
+
+  const cfgPath = path.join(trustedRoot, '.AgentCowork', 'config.json');
+  const persisted = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+  assert.equal(persisted.kimiApi.provider, 'openai');
+  assert.equal(persisted.kimiApi.apiKey, SECRET);
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const info = await (await fetch(`${baseUrl}/api/kimi/info`)).json();
+    assert.equal(info.provider, 'openai');
+    assert.equal(info.hasKey, true);
+    assert.equal(info.model, 'gpt-test');
+  });
+});
+
 test('clearKey wipes the stored key and disables the API', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-clear');
   await withServer({ trustedRoot }, async (baseUrl) => {
