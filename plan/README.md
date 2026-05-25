@@ -96,6 +96,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-D1 Checkpointer:新增 `runtime/run-checkpoint.js` 与 agent checkpoint 注入器;SSE agent 运行会在模型工具调用、工具结果、验证请求、完成和预算/超时/循环停止边界写入 `runStoreRoot/checkpoints/<runId>.json`,完整保存 messages/step/usage/approvedTools/todos/metadata 并可读回。
 - [x] 07-D2 run-resume:新增 `runtime/run-resume.js`,可从最新检查点生成 `resumeState`;`tool-loop` 支持从检查点消息、usage、已批准工具和 todo 续跑。已用崩溃后续跑测试锁定已完成工具 handler 不重复执行、文件副作用不重复。
 - [x] 07-D2b HTTP/SSE 续跑入口:`/api/agent/chat/stream` 支持 `resumeRunId`,从 checkpoint 读回 `resumeState` 后沿用原 runId 继续 SSE;缺 checkpoint 返回 404。E2E 覆盖写入后崩溃再续跑,确认不会重放已完成写操作。
+- [x] 07-D3 ModelRecorder/Replayer 状态闭环:`runtime/model-recorder.js` 已支持脱敏 model-call 录制、JSONL 持久化与确定性回放,`eval/replay-backend.js` 默认复用该回放后端;replay miss fail-closed,失败记录不参与回放,API key/token/callback/signal 不落盘。聚焦 `model-recorder.test.js`、`eval-replay-backend.test.js` 与 `npm run eval` 验证通过。
 - [x] 07-D4 seed 注入:新增 L0 `util/ids.js` seedable ID 源;`createRunId`/`createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现 start `runId`,便于 replay/debug 对齐轨迹。
 - [x] 07-E1 RunMetrics:新增 `runtime/run-metrics.js`,所有 `writeRunRecord` 持久化记录都会自动带 `metrics`(token/估算成本/耗时/步骤/工具调用/失败率);agent stream 记录已持久化聚合 usage。`npm run test:host` 当前 536 tests,535 pass,1 skip。
 - [x] 07-E2 前端成本/可观测面板:新增 `ObservabilityPanel` 与 `/api/runs` typed helpers,展示 token、成本、工具为什么、耗时、模型/配置归因和来源跳转。UI 测试通过(25 files,114 tests),本机 5173 UI + 3017 host 烟测可打开面板。
