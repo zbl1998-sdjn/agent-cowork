@@ -1,23 +1,42 @@
+// @ts-check
+
 const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';
 
+/**
+ * @typedef {Error & { statusCode?: number, payload?: unknown }} OAuthError
+ */
+
+/**
+ * @param {unknown} clientId
+ * @returns {string}
+ */
 function requireClientId(clientId) {
   const value = String(clientId || '').trim();
   if (!value) {
-    const err = new Error('GitHub OAuth client id is required. Set KCW_GITHUB_OAUTH_CLIENT_ID or pass clientId.');
+    const err = /** @type {OAuthError} */ (new Error('GitHub OAuth client id is required. Set KCW_GITHUB_OAUTH_CLIENT_ID or pass clientId.'));
     err.statusCode = 400;
     throw err;
   }
   return value;
 }
 
+/**
+ * @param {unknown} scopes
+ * @returns {string[]}
+ */
 function normalizeScopes(scopes) {
   const list = Array.isArray(scopes) ? scopes : String(scopes || 'read:user').split(/\s+/);
   const clean = list.map((s) => String(s).trim()).filter(Boolean);
   return clean.length ? clean : ['read:user'];
 }
 
+/**
+ * @param {Response} response
+ * @param {string} label
+ * @returns {Promise<Record<string, unknown>>}
+ */
 async function jsonFrom(response, label) {
   let payload = null;
   try {
@@ -26,7 +45,9 @@ async function jsonFrom(response, label) {
     payload = {};
   }
   if (!response.ok) {
-    const err = new Error(`${label} failed: ${payload.error_description || payload.error || response.status}`);
+    const description = typeof payload.error_description === 'string' ? payload.error_description : '';
+    const error = typeof payload.error === 'string' ? payload.error : '';
+    const err = /** @type {OAuthError} */ (new Error(`${label} failed: ${description || error || response.status}`));
     err.statusCode = response.status >= 400 && response.status < 500 ? response.status : 502;
     err.payload = payload;
     throw err;
@@ -34,6 +55,10 @@ async function jsonFrom(response, label) {
   return payload;
 }
 
+/**
+ * @param {Record<string, unknown>} values
+ * @returns {URLSearchParams}
+ */
 function formBody(values) {
   const body = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
@@ -42,6 +67,10 @@ function formBody(values) {
   return body;
 }
 
+/**
+ * @param {Record<string, string>} [extra]
+ * @returns {Record<string, string>}
+ */
 function headers(extra = {}) {
   return {
     accept: 'application/json',
@@ -51,6 +80,27 @@ function headers(extra = {}) {
   };
 }
 
+/**
+ * @typedef {object} StartGitHubDeviceFlowOptions
+ * @property {unknown} [clientId]
+ * @property {unknown} [scopes]
+ * @property {typeof fetch} [fetchImpl]
+ * @property {string} [deviceCodeUrl]
+ *
+ * @typedef {object} GitHubDeviceFlowStart
+ * @property {'github'} provider
+ * @property {string} deviceCode
+ * @property {string} userCode
+ * @property {string} verificationUri
+ * @property {number} expiresIn
+ * @property {number} interval
+ * @property {string[]} scopes
+ */
+
+/**
+ * @param {StartGitHubDeviceFlowOptions} [options]
+ * @returns {Promise<GitHubDeviceFlowStart>}
+ */
 export async function startGitHubDeviceFlow({
   clientId,
   scopes,
@@ -65,7 +115,7 @@ export async function startGitHubDeviceFlow({
   });
   const payload = await jsonFrom(response, 'GitHub device flow start');
   if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
-    const err = new Error('GitHub device flow start returned an incomplete response');
+    const err = /** @type {OAuthError} */ (new Error('GitHub device flow start returned an incomplete response'));
     err.statusCode = 502;
     throw err;
   }
@@ -80,6 +130,29 @@ export async function startGitHubDeviceFlow({
   };
 }
 
+/**
+ * @typedef {object} CompleteGitHubDeviceFlowOptions
+ * @property {unknown} [clientId]
+ * @property {unknown} [deviceCode]
+ * @property {typeof fetch} [fetchImpl]
+ * @property {string} [accessTokenUrl]
+ *
+ * @typedef {object} GitHubDeviceFlowPending
+ * @property {'pending'} status
+ * @property {string} error
+ * @property {number} interval
+ *
+ * @typedef {object} GitHubDeviceFlowConnected
+ * @property {'connected'} status
+ * @property {string} accessToken
+ * @property {string} tokenType
+ * @property {string} scope
+ */
+
+/**
+ * @param {CompleteGitHubDeviceFlowOptions} [options]
+ * @returns {Promise<GitHubDeviceFlowPending | GitHubDeviceFlowConnected>}
+ */
 export async function completeGitHubDeviceFlow({
   clientId,
   deviceCode,
@@ -104,12 +177,14 @@ export async function completeGitHubDeviceFlow({
     };
   }
   if (payload.error) {
-    const err = new Error(`GitHub OAuth failed: ${payload.error_description || payload.error}`);
+    const description = typeof payload.error_description === 'string' ? payload.error_description : '';
+    const error = typeof payload.error === 'string' ? payload.error : '';
+    const err = /** @type {OAuthError} */ (new Error(`GitHub OAuth failed: ${description || error}`));
     err.statusCode = 400;
     throw err;
   }
   if (!payload.access_token) {
-    const err = new Error('GitHub OAuth did not return an access token');
+    const err = /** @type {OAuthError} */ (new Error('GitHub OAuth did not return an access token'));
     err.statusCode = 502;
     throw err;
   }
@@ -121,6 +196,23 @@ export async function completeGitHubDeviceFlow({
   };
 }
 
+/**
+ * @typedef {object} FetchGitHubViewerOptions
+ * @property {unknown} [accessToken]
+ * @property {typeof fetch} [fetchImpl]
+ * @property {string} [userUrl]
+ *
+ * @typedef {object} GitHubViewer
+ * @property {string} login
+ * @property {unknown} id
+ * @property {unknown} name
+ * @property {unknown} email
+ */
+
+/**
+ * @param {FetchGitHubViewerOptions} [options]
+ * @returns {Promise<GitHubViewer>}
+ */
 export async function fetchGitHubViewer({
   accessToken,
   fetchImpl = fetch,
