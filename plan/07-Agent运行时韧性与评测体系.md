@@ -69,6 +69,8 @@ B2 完成记录(2026-05-25):新增 `kimi/context/history-compactor.js` 纯 `Hist
 
 B3 完成记录(2026-05-25):新增 `kimi/context/tool-result-summarizer.js` 纯 `ToolResultSummarizer`,用 token 预算替代 `JSON.stringify(result).slice(0,8000)` 式硬截断前置能力;小结果保持可读原样,大结构化/文本结果压缩成含关键要点、来源与预览的摘要,并优先保留与关键要点绑定的 source。大结果不撑窗、要点不丢与 source-like 行保留均有单测锁定。已纳入 host `checkJs` 类型护栏。
 
+B4 完成记录(2026-05-25):新增 `kimi/context/context-manager.js` 组合 B1 TokenEstimator、B2 HistoryCompactor 与 B3 ToolResultSummarizer,并接入 `kimi/agent/tool-loop.js`;每轮模型调用前按 ContextManager 压缩消息,工具结果回灌前按 token 预算摘要,摘要时额外发出 `tool_result_summary` 事件。已补 `tool-loop` 热点特征测试,锁定大工具结果进入下一轮模型前不再硬截断,且关键要点/source 保留。
+
 ---
 
 ## C · 任务循环韧性 — 敢长时间放手跑的前提

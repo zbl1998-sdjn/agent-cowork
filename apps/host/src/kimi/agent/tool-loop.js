@@ -18,6 +18,7 @@ import {
 import { clarifyPromptBeforeModel } from './clarification.js';
 import { callModelResilient } from './model-resilience.js';
 import { createToolTodoTracker } from './todo-state.js';
+import { createContextManager } from '../context/context-manager.js';
 
 function addLazySearchTool(agentTools, lazyTools) {
   const activeNames = new Set(agentTools.map((t) => t.name));
@@ -92,6 +93,8 @@ export async function runAgentChat({
   runId = null,
   userContent = null,
   clarifyBeforeModel = false,
+  contextManager = null,
+  contextOptions = {},
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -108,7 +111,8 @@ export async function runAgentChat({
   const userMessage = (Array.isArray(userContent) && userContent.length)
     ? { role: 'user', content: userContent }
     : { role: 'user', content: clarified.prompt };
-  const messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
+  const activeContextManager = contextManager || createContextManager(contextOptions);
+  let messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
   const steps = [];
   const sessionApproved = new Set();
   const hasApprovals = !!approvals;
@@ -125,6 +129,17 @@ export async function runAgentChat({
     if (signal && signal.aborted) break;
     let streamedContent = false;
     let streamedReasoning = false;
+    const prepared = activeContextManager.prepareMessages(messages);
+    if (Array.isArray(prepared.messages)) {
+      messages = prepared.messages;
+      if (prepared.compacted) {
+        emit('context_compacted', {
+          beforeTokens: prepared.beforeTokens,
+          afterTokens: prepared.afterTokens,
+          keyFacts: prepared.keyFacts || [],
+        });
+      }
+    }
     const message = await callModelResilient(modelCall, {
       messages,
       tools: buildToolSpecs(),
@@ -183,7 +198,16 @@ export async function runAgentChat({
       if (needsApproval) audit('tool.execute', { tool: name, risk: tool.risk, ok });
       todo.finish(ok ? 'done' : 'failed');
       emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result });
-      messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result).slice(0, 8000) });
+      const formatted = activeContextManager.formatToolResult(result);
+      if (formatted.summarized) {
+        emit('tool_result_summary', {
+          name,
+          beforeTokens: formatted.beforeTokens,
+          afterTokens: formatted.afterTokens,
+          sources: formatted.sources || [],
+        });
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
       if (hooks) await hooks.run('post_tool', { name, result, ok });
     }
   }
