@@ -13,6 +13,7 @@ import {
   type OAuthPermission,
   type OAuthStartResult,
 } from '../lib/api';
+import { Empty, ErrorState } from './ui/StateViews';
 
 type OAuthStatusView = {
   connected: boolean;
@@ -25,6 +26,37 @@ type OAuthStatusView = {
 interface ConnectorsPanelProps {
   trustedRoot: string;
   onConnected?: (servers: string[]) => void;
+}
+
+const CONNECTOR_ERROR_PREFIXES = [
+  '错误：',
+  '部分失败：',
+  '连接失败：',
+  '断开失败：',
+  '授权失败：',
+  '审批失败：',
+  '授权确认失败：',
+  '撤销失败：',
+];
+
+export function isConnectorErrorMessage(message: string): boolean {
+  return CONNECTOR_ERROR_PREFIXES.some((prefix) => message.startsWith(prefix));
+}
+
+export function ConnectorsPanelEmptyState() {
+  return <Empty title="没有匹配的连接器" message="调整关键词或刷新连接器目录。" />;
+}
+
+export function ConnectorsPanelMessageState({ message }: { message: string }) {
+  if (!message) return null;
+  if (isConnectorErrorMessage(message)) {
+    const detail = CONNECTOR_ERROR_PREFIXES.reduce(
+      (current, prefix) => current.replace(new RegExp(`^${prefix}`), ''),
+      message,
+    );
+    return <ErrorState title="连接器操作失败" message={detail} />;
+  }
+  return <pre className="panel-result">{message}</pre>;
 }
 
 // Connector catalog + one-click MCP connect. Mirrors Claude Cowork's "suggest
@@ -350,10 +382,14 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
             </li>
           );
         })}
-        {connectors.length === 0 && <li className="panel-empty">没有匹配的连接器</li>}
+        {connectors.length === 0 && (
+          <li className="panel-empty">
+            <ConnectorsPanelEmptyState />
+          </li>
+        )}
       </ul>
 
-      {message && <pre className="panel-result">{message}</pre>}
+      <ConnectorsPanelMessageState message={message} />
     </section>
   );
 }
