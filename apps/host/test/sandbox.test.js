@@ -495,6 +495,132 @@ test('runCode does not let embedded Python bypass the sandbox allowlist', async 
   );
 });
 
+test('runCode prefers the host Node runtime on the local backend', async () => {
+  const trustedRoot = tempRoot();
+  const nodeExecPath = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'node.exe' : 'node');
+  let capturedSpec = null;
+  const sandbox = {
+    backend: 'local-subprocess',
+    exec: async (spec) => {
+      capturedSpec = spec;
+      return {
+        backend: 'local-subprocess',
+        exitCode: 0,
+        timedOut: false,
+        stdout: 'ok',
+        stderr: '',
+        durationMs: 1,
+      };
+    },
+  };
+
+  await runCode({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS },
+    runtimeEnv: {},
+    nodeExecPath,
+    tool: 'node',
+    code: 'process.stdout.write("ok")',
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+  });
+
+  assert.equal(capturedSpec.tool, path.basename(nodeExecPath));
+  assert.equal(capturedSpec.env.PATH, path.dirname(nodeExecPath));
+});
+
+test('runCode keeps VM Node tools inside the VM image', async () => {
+  const trustedRoot = tempRoot();
+  const nodeExecPath = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'node.exe' : 'node');
+  let capturedSpec = null;
+  const sandbox = {
+    backend: 'vm:docker',
+    exec: async (spec) => {
+      capturedSpec = spec;
+      return {
+        backend: 'vm:docker',
+        exitCode: 0,
+        timedOut: false,
+        stdout: 'ok',
+        stderr: '',
+        durationMs: 1,
+      };
+    },
+  };
+
+  await runCode({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS },
+    runtimeEnv: {},
+    nodeExecPath,
+    tool: 'node',
+    code: 'process.stdout.write("ok")',
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+  });
+
+  assert.equal(capturedSpec.tool, 'node');
+  assert.deepEqual(capturedSpec.env, {});
+});
+
+test('runCode does not let local Node runtime bypass the sandbox allowlist', async () => {
+  const trustedRoot = tempRoot();
+  const nodeExecPath = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'node.exe' : 'node');
+  const sandbox = {
+    backend: 'local-subprocess',
+    exec: async () => {
+      throw new Error('sandbox.exec should not be called');
+    },
+  };
+
+  await assert.rejects(
+    () => runCode({
+      sandbox,
+      sandboxLimits: { allowTools: ['python3'] },
+      runtimeEnv: {},
+      nodeExecPath,
+      tool: 'node',
+      code: 'process.stdout.write("ok")',
+      trustedRoot,
+      runStoreRoot: path.join(trustedRoot, 'runs'),
+    }),
+    /not in the allowlist/,
+  );
+});
+
+test('runCode ignores relative Node runtime configuration', async () => {
+  const trustedRoot = tempRoot();
+  let capturedSpec = null;
+  const sandbox = {
+    backend: 'local-subprocess',
+    exec: async (spec) => {
+      capturedSpec = spec;
+      return {
+        backend: 'local-subprocess',
+        exitCode: 0,
+        timedOut: false,
+        stdout: 'ok',
+        stderr: '',
+        durationMs: 1,
+      };
+    },
+  };
+
+  await runCode({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS },
+    runtimeEnv: { KCW_NODE_HOME: '..\\not-absolute' },
+    nodeExecPath: path.join(trustedRoot, 'agent-cowork-host.exe'),
+    tool: 'node',
+    code: 'process.stdout.write("ok")',
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+  });
+
+  assert.equal(capturedSpec.tool, 'node');
+  assert.deepEqual(capturedSpec.env, {});
+});
+
 test('POST /api/sandbox/run-code runs inline code, writes the script, records a sandbox-code run, and is idempotent', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });

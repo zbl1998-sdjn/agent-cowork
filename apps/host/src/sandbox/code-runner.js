@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { normalizeSandboxSpec } from './index.js';
-import { resolveEmbeddedPython, withEmbeddedPythonLimits } from './embedded-python.js';
+import { resolveLocalRuntimeTool, withLocalRuntimeToolLimits } from './local-runtime-tools.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 
@@ -48,6 +48,7 @@ export async function runCode({
   sandbox,
   sandboxLimits = {},
   runtimeEnv = process.env,
+  nodeExecPath = process.execPath,
   tool,
   code,
   prompt = '',
@@ -103,22 +104,22 @@ export async function runCode({
     throw err;
   }
 
-  const embeddedPython = resolveEmbeddedPython(toolName, sandbox, runtimeEnv);
+  const localRuntime = resolveLocalRuntimeTool(toolName, sandbox, runtimeEnv, nodeExecPath);
 
   // Validate the spec *before* writing anything: an unknown tool or a budget
   // violation should 400 without leaving a stray script behind.
   let spec;
   try {
-    if (embeddedPython) {
+    if (localRuntime) {
       spec = normalizeSandboxSpec(
         {
-          tool: embeddedPython.tool,
+          tool: localRuntime.tool,
           args: requestedSpec.args,
           timeoutMs: requestedSpec.timeoutMs,
           network: requestedSpec.network,
-          env: { PATH: embeddedPython.pathPrefix },
+          env: { PATH: localRuntime.pathPrefix },
         },
-        withEmbeddedPythonLimits(sandboxLimits, embeddedPython.tool),
+        withLocalRuntimeToolLimits(sandboxLimits, localRuntime.tool),
       );
     } else {
       spec = requestedSpec;
