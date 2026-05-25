@@ -1,10 +1,11 @@
 import type { RefObject } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { AssistantMessage, UserMessage } from '../../lib/app-types';
+import type { AssistantMessage, Message, UserMessage } from '../../lib/app-types';
 import {
   Timeline,
   assistantTurnPropsEqual,
+  computeTimelineWindow,
   userEditTurnPropsEqual,
   userTurnPropsEqual,
   type AssistantTurnProps,
@@ -67,7 +68,7 @@ function userEditTurnProps(overrides: Partial<UserEditTurnProps> = {}): UserEdit
   };
 }
 
-function renderTimeline(messages: AssistantMessage[] | AssistantMessage): string {
+function renderTimeline(messages: Message[] | Message): string {
   return renderToStaticMarkup(
     <Timeline
       editText=""
@@ -148,5 +149,33 @@ describe('Timeline', () => {
     expect(userEditTurnPropsEqual(props, { ...props })).toBe(true);
     expect(userEditTurnPropsEqual(props, { ...props, editText: '新内容' })).toBe(false);
     expect(userEditTurnPropsEqual(props, { ...props, onSubmitEdit: vi.fn() })).toBe(false);
+  });
+
+  it('windows long timelines around the bottom when the view is stuck', () => {
+    const messages: Message[] = Array.from({ length: 180 }, (_, index) => ({
+      id: `u${index}`,
+      role: 'user',
+      text: `消息 ${index}`,
+    }));
+    const win = computeTimelineWindow(messages, { scrollTop: 0, viewportHeight: 720 }, true);
+
+    expect(win.virtualized).toBe(true);
+    expect(win.startIndex).toBeGreaterThan(0);
+    expect(win.endIndex).toBe(179);
+    expect(win.messages.at(-1)?.id).toBe('u179');
+    expect(win.topSpacer).toBeGreaterThan(0);
+  });
+
+  it('renders only the active message window for long conversations', () => {
+    const messages: Message[] = Array.from({ length: 180 }, (_, index) => ({
+      id: `u${index}`,
+      role: 'user',
+      text: `长会话消息 ${index}`,
+    }));
+    const html = renderTimeline(messages);
+
+    expect(html).toContain('data-virtualized="true"');
+    expect(html).toContain('长会话消息 179');
+    expect(html).not.toContain('长会话消息 0');
   });
 });

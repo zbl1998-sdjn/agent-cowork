@@ -1,6 +1,7 @@
-import type { RefObject } from 'react';
+import { useCallback, useMemo, useState, type RefObject, type UIEvent } from 'react';
 import { respondApprovals } from '../../lib/api';
 import type { AssistantMessage, Message } from '../../lib/app-types';
+import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
 import { AssistantTurn, UserEditTurn, UserTurn } from './TimelineTurns';
 
 export {
@@ -41,6 +42,51 @@ interface PendingApprovalRef {
   id: string;
 }
 
+const TIMELINE_VIRTUALIZE_AFTER = 120;
+const TIMELINE_ESTIMATED_ROW_HEIGHT = 132;
+const TIMELINE_VIEWPORT_FALLBACK = 720;
+const TIMELINE_OVERSCAN = 8;
+
+interface TimelineScrollMetrics {
+  scrollTop: number;
+  viewportHeight: number;
+}
+
+export interface TimelineWindow {
+  virtualized: boolean;
+  startIndex: number;
+  endIndex: number;
+  topSpacer: number;
+  bottomSpacer: number;
+  messages: Message[];
+}
+
+export function computeTimelineWindow(messages: Message[], metrics: TimelineScrollMetrics, isAtBottom: boolean): TimelineWindow {
+  if (messages.length <= TIMELINE_VIRTUALIZE_AFTER) {
+    return { virtualized: false, startIndex: 0, endIndex: messages.length - 1, topSpacer: 0, bottomSpacer: 0, messages };
+  }
+
+  const viewportHeight = Math.max(1, metrics.viewportHeight || TIMELINE_VIEWPORT_FALLBACK);
+  const totalHeight = messages.length * TIMELINE_ESTIMATED_ROW_HEIGHT;
+  const scrollTop = isAtBottom ? Math.max(0, totalHeight - viewportHeight) : Math.max(0, metrics.scrollTop);
+  const win = computeVirtualWindow({
+    scrollTop,
+    viewportHeight,
+    itemHeight: TIMELINE_ESTIMATED_ROW_HEIGHT,
+    count: messages.length,
+    overscan: TIMELINE_OVERSCAN,
+  });
+  const renderedHeight = win.visibleCount * TIMELINE_ESTIMATED_ROW_HEIGHT;
+  return {
+    virtualized: true,
+    startIndex: win.startIndex,
+    endIndex: win.endIndex,
+    topSpacer: win.offsetTop,
+    bottomSpacer: Math.max(0, win.totalHeight - win.offsetTop - renderedHeight),
+    messages: messages.slice(win.startIndex, win.endIndex + 1),
+  };
+}
+
 export function Timeline({
   editText,
   editingMsgId,
@@ -64,6 +110,23 @@ export function Timeline({
   onSetEditText,
   onSubmitEdit,
 }: TimelineProps) {
+  const [scrollMetrics, setScrollMetrics] = useState<TimelineScrollMetrics>({
+    scrollTop: 0,
+    viewportHeight: TIMELINE_VIEWPORT_FALLBACK,
+  });
+  const timelineWindow = useMemo(
+    () => computeTimelineWindow(messages, scrollMetrics, isAtBottom),
+    [messages, scrollMetrics, isAtBottom],
+  );
+  const onTimelineScroll = useCallback((event: UIEvent<HTMLElement>) => {
+    const nextScrollTop = event.currentTarget.scrollTop;
+    const nextViewportHeight = event.currentTarget.clientHeight || TIMELINE_VIEWPORT_FALLBACK;
+    setScrollMetrics((current) => (
+      current.scrollTop === nextScrollTop && current.viewportHeight === nextViewportHeight
+        ? current
+        : { scrollTop: nextScrollTop, viewportHeight: nextViewportHeight }
+    ));
+  }, []);
   const pendingApprovalIds = new Set<string>();
   const pendingApprovals = messages.flatMap((message): PendingApprovalRef[] => {
     if (message.role !== 'assistant' || !message.approval) return [];
@@ -74,7 +137,7 @@ export function Timeline({
   });
   return (
     <>
-      <main className="timeline" role="log" ref={timelineRef}>
+      <main className="timeline" role="log" ref={timelineRef} onScroll={onTimelineScroll}>
         {empty && (
           <div className="empty-state">
             <strong>Agent Cowork</strong>
@@ -85,33 +148,37 @@ export function Timeline({
           </div>
         )}
         {pendingApprovals.length > 1 && <BatchApprovalBar pendingApprovals={pendingApprovals} onPatchAssistant={onPatchAssistant} />}
-        {messages.map((message) => message.role === 'user' ? (
-          editingMsgId === message.id ? (
-            <UserEditTurn
-              key={message.id}
-              editText={editText}
-              message={message}
-              onSetEditingMsgId={onSetEditingMsgId}
-              onSetEditText={onSetEditText}
-              onSubmitEdit={onSubmitEdit}
-            />
+        <div className="timeline-window" data-virtualized={timelineWindow.virtualized ? 'true' : undefined}>
+          {timelineWindow.topSpacer > 0 && <div aria-hidden="true" className="timeline-window-spacer" style={{ height: timelineWindow.topSpacer }} />}
+          {timelineWindow.messages.map((message) => message.role === 'user' ? (
+            editingMsgId === message.id ? (
+              <UserEditTurn
+                key={message.id}
+                editText={editText}
+                message={message}
+                onSetEditingMsgId={onSetEditingMsgId}
+                onSetEditText={onSetEditText}
+                onSubmitEdit={onSubmitEdit}
+              />
+            ) : (
+              <UserTurn key={message.id} message={message} streamingId={streamingId} onBeginEdit={onBeginEdit} />
+            )
           ) : (
-            <UserTurn key={message.id} message={message} streamingId={streamingId} onBeginEdit={onBeginEdit} />
-          )
-        ) : (
-          <AssistantTurn
-            key={message.id}
-            message={message}
-            streamingId={streamingId}
-            trustedRoot={trustedRoot}
-            onCopyText={onCopyText}
-            onHandleApprove={onHandleApprove}
-            onOpenOrPreview={onOpenOrPreview}
-            onPatchAssistant={onPatchAssistant}
-            onQuickSend={onQuickSend}
-            onRegenerate={onRegenerate}
-          />
-        ))}
+            <AssistantTurn
+              key={message.id}
+              message={message}
+              streamingId={streamingId}
+              trustedRoot={trustedRoot}
+              onCopyText={onCopyText}
+              onHandleApprove={onHandleApprove}
+              onOpenOrPreview={onOpenOrPreview}
+              onPatchAssistant={onPatchAssistant}
+              onQuickSend={onQuickSend}
+              onRegenerate={onRegenerate}
+            />
+          ))}
+          {timelineWindow.bottomSpacer > 0 && <div aria-hidden="true" className="timeline-window-spacer" style={{ height: timelineWindow.bottomSpacer }} />}
+        </div>
       </main>
       {hasNewContent && !isAtBottom && (
         <button type="button" className="jump-to-bottom" onClick={() => onScrollToBottom()} title="回到底部">回到底部 ↓</button>
