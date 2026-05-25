@@ -18,6 +18,8 @@ import {
 import { clarifyPromptBeforeModel } from './clarification.js';
 import { callModelResilient } from './model-resilience.js';
 import { createToolTodoTracker } from './todo-state.js';
+import { createLoopGuard } from './loop-guard.js';
+import { createRetryPolicy } from './tool-retry.js';
 import { createContextManager } from '../context/context-manager.js';
 
 function addLazySearchTool(agentTools, lazyTools) {
@@ -95,6 +97,10 @@ export async function runAgentChat({
   clarifyBeforeModel = false,
   contextManager = null,
   contextOptions = {},
+  loopGuard = null,
+  loopGuardOptions = {},
+  retryPolicy = null,
+  retryOptions = {},
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -112,6 +118,8 @@ export async function runAgentChat({
     ? { role: 'user', content: userContent }
     : { role: 'user', content: clarified.prompt };
   const activeContextManager = contextManager || createContextManager(contextOptions);
+  const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions);
+  const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions);
   let messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
   const steps = [];
   const sessionApproved = new Set();
@@ -125,8 +133,10 @@ export async function runAgentChat({
   const toolTodos = createToolTodoTracker(emit);
 
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
+  let stopForLoopGuard = false;
   for (let i = 0; i < stepBudget; i += 1) {
     if (signal && signal.aborted) break;
+    if (stopForLoopGuard) break;
     let streamedContent = false;
     let streamedReasoning = false;
     const prepared = activeContextManager.prepareMessages(messages);
@@ -187,9 +197,18 @@ export async function runAgentChat({
       const todo = toolTodos.start(name);
       let result;
       try {
-        result = tool ? await tool.handler(args, toolCtx) : { error: `unknown tool: ${name}` };
+        result = await activeRetryPolicy.run(async () => (
+          tool ? tool.handler(args, toolCtx) : { error: `unknown tool: ${name}` }
+        ));
       } catch (err) {
         result = { error: err.message };
+      }
+      if (activeRetryPolicy.lastRun.retried) {
+        emit('tool_retry', {
+          name,
+          attempts: activeRetryPolicy.lastRun.attempts,
+          errors: activeRetryPolicy.lastRun.errors,
+        });
       }
       const ok = !(result && result.error);
       if (ok && needsApproval) didMutate = true;
@@ -209,6 +228,18 @@ export async function runAgentChat({
       }
       messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
       if (hooks) await hooks.run('post_tool', { name, result, ok });
+      const guardDecision = activeLoopGuard.observe({ name, args }, ok);
+      if (guardDecision.shouldBreak) {
+        stopForLoopGuard = true;
+        emit('loop_guard_break', {
+          name,
+          reason: guardDecision.reason,
+          repeatCount: guardDecision.repeatCount,
+          consecutiveFailures: guardDecision.consecutiveFailures,
+        });
+        messages.push({ role: 'user', content: `循环护栏已停止当前路径：${guardDecision.reason}` });
+        break;
+      }
     }
   }
 
