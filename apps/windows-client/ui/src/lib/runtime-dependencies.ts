@@ -1,4 +1,8 @@
-import type { RuntimeDependency, RuntimeDependencyResponse } from './api/runtimeDependencies';
+import type {
+  RuntimeDependency,
+  RuntimeDependencyInstallPlanResponse,
+  RuntimeDependencyResponse,
+} from './api/runtimeDependencies';
 
 export type RuntimeDependencySeverity = 'ok' | 'warn' | 'error' | 'muted';
 
@@ -28,6 +32,20 @@ export interface RuntimeDependencyViewModel {
   };
   requiredIssues: RuntimeDependencyViewItem[];
   sections: RuntimeDependencySection[];
+  installPlanCandidateIds: string[];
+  installPlanCandidateLabel: string;
+}
+
+export interface RuntimeDependencyInstallPlanViewModel {
+  ok: boolean;
+  title: string;
+  diskMessage: string;
+  diskSeverity: RuntimeDependencySeverity;
+  componentCount: number;
+  requiredBytesLabel: string;
+  missingBytesLabel: string;
+  componentLabels: string[];
+  unknownIds: string[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -85,6 +103,10 @@ function toViewItem(item: RuntimeDependency): RuntimeDependencyViewItem {
   };
 }
 
+function shouldPlanInstall(item: RuntimeDependencyViewItem): boolean {
+  return item.installMode === 'on-demand' && item.needsAttention;
+}
+
 export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse): RuntimeDependencyViewModel {
   const items = response.dependencies.map(toViewItem);
   const sectionMap = new Map<string, RuntimeDependencyViewItem[]>();
@@ -98,6 +120,7 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
     title: `计划 ${id}`,
     items: sectionItems,
   }));
+  const installPlanCandidates = items.filter(shouldPlanInstall);
   return {
     summary: {
       total: response.summary.total || items.length,
@@ -108,5 +131,33 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
     },
     requiredIssues: items.filter((item) => item.required && item.needsAttention),
     sections,
+    installPlanCandidateIds: installPlanCandidates.map((item) => item.id),
+    installPlanCandidateLabel: installPlanCandidates.length
+      ? installPlanCandidates.map((item) => item.label).join('、')
+      : '暂无需要预检的按需组件',
+  };
+}
+
+function diskSeverity(status: string): RuntimeDependencySeverity {
+  if (status === 'ok') return 'ok';
+  if (status === 'insufficient') return 'error';
+  return 'warn';
+}
+
+export function toRuntimeDependencyInstallPlanViewModel(
+  plan: RuntimeDependencyInstallPlanResponse,
+): RuntimeDependencyInstallPlanViewModel {
+  const requiredBytes = plan.disk.requiredBytes || 0;
+  const missingBytes = plan.disk.missingBytes || 0;
+  return {
+    ok: plan.ok,
+    title: plan.ok ? '安装计划预检通过' : '安装计划需要处理',
+    diskMessage: plan.disk.message,
+    diskSeverity: diskSeverity(plan.disk.status),
+    componentCount: plan.components.length,
+    requiredBytesLabel: formatDependencyBytes(requiredBytes, 'on-demand'),
+    missingBytesLabel: missingBytes > 0 ? formatDependencyBytes(missingBytes, 'on-demand') : '0 B',
+    componentLabels: plan.components.map((item) => item.label),
+    unknownIds: plan.unknownIds,
   };
 }

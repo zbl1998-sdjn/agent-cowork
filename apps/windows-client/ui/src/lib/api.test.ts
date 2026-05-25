@@ -147,6 +147,42 @@ describe('JSON requests', () => {
     expect(calls.some((call) => call.url.endsWith('/api/runtime/dependencies'))).toBe(true);
   });
 
+  it('loads runtime dependency install plan through the typed helper', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/runtime/dependencies/install-plan')) {
+        return jsonResponse({
+          ok: true,
+          components: [{
+            id: 'data-science',
+            section: 'B1',
+            label: '数据分析组件',
+            installMode: 'on-demand',
+            required: false,
+            estimatedDownloadBytes: 209715200,
+            needsDownload: true,
+          }],
+          unknownIds: [],
+          disk: {
+            status: 'unknown',
+            availableBytes: null,
+            requiredBytes: 209715200,
+            missingBytes: 0,
+            message: '未提供可用磁盘空间，安装前仍需预检。',
+          },
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const result = await api.getRuntimeDependencyInstallPlan({ selectedIds: ['data-science'] });
+
+    expect(result.components[0].id).toBe('data-science');
+    const request = calls.find((call) => call.url.endsWith('/api/runtime/dependencies/install-plan'));
+    expect(request?.init?.method).toBe('POST');
+    expect(JSON.parse(String(request?.init?.body))).toEqual({ selectedIds: ['data-science'] });
+  });
+
   it('injects the Bearer token on GET requests after host readiness', async () => {
     const { api, calls } = await importApi();
     api.setAuthToken(' token-123 ');

@@ -1,15 +1,57 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getRuntimeDependencies, type RuntimeDependencyResponse } from '../lib/api';
-import { toRuntimeDependencyViewModel, type RuntimeDependencyViewModel } from '../lib/runtime-dependencies';
+import {
+  getRuntimeDependencies,
+  getRuntimeDependencyInstallPlan,
+  type RuntimeDependencyInstallPlanResponse,
+  type RuntimeDependencyResponse,
+} from '../lib/api';
+import {
+  toRuntimeDependencyInstallPlanViewModel,
+  toRuntimeDependencyViewModel,
+  type RuntimeDependencyInstallPlanViewModel,
+  type RuntimeDependencyViewModel,
+} from '../lib/runtime-dependencies';
+
+export function RuntimeDependencyInstallPlanPreview({ plan }: { plan: RuntimeDependencyInstallPlanViewModel }) {
+  return (
+    <section className={`runtime-install-plan runtime-install-plan-${plan.diskSeverity}`} aria-label="安装计划预检">
+      <div className="runtime-install-plan-head">
+        <strong>{plan.title}</strong>
+        <span>{plan.componentCount} 个组件</span>
+      </div>
+      <p>{plan.diskMessage}</p>
+      <div className="runtime-install-plan-meta">
+        <span>预计下载 {plan.requiredBytesLabel}</span>
+        <span>缺口 {plan.missingBytesLabel}</span>
+      </div>
+      {plan.componentLabels.length > 0 && (
+        <ul>
+          {plan.componentLabels.map((label) => (
+            <li key={label}>{label}</li>
+          ))}
+        </ul>
+      )}
+      {plan.unknownIds.length > 0 && (
+        <p className="runtime-install-plan-unknown">未知组件：{plan.unknownIds.join('、')}</p>
+      )}
+    </section>
+  );
+}
 
 export function RuntimeDependenciesPanel() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [data, setData] = useState<RuntimeDependencyResponse | null>(null);
   const [error, setError] = useState('');
+  const [planStatus, setPlanStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const [installPlan, setInstallPlan] = useState<RuntimeDependencyInstallPlanResponse | null>(null);
+  const [planError, setPlanError] = useState('');
 
   const load = () => {
     setStatus('loading');
     setError('');
+    setPlanStatus('idle');
+    setPlanError('');
+    setInstallPlan(null);
     getRuntimeDependencies()
       .then((next) => {
         setData(next);
@@ -27,6 +69,25 @@ export function RuntimeDependenciesPanel() {
     () => (data ? toRuntimeDependencyViewModel(data) : null),
     [data],
   );
+  const planVm = useMemo(
+    () => (installPlan ? toRuntimeDependencyInstallPlanViewModel(installPlan) : null),
+    [installPlan],
+  );
+
+  const loadInstallPlan = () => {
+    if (!vm || vm.installPlanCandidateIds.length === 0) return;
+    setPlanStatus('loading');
+    setPlanError('');
+    getRuntimeDependencyInstallPlan({ selectedIds: vm.installPlanCandidateIds })
+      .then((next) => {
+        setInstallPlan(next);
+        setPlanStatus('ready');
+      })
+      .catch((err) => {
+        setPlanError((err as Error).message || '安装计划预检失败');
+        setPlanStatus('failed');
+      });
+  };
 
   return (
     <div className="runtime-deps">
@@ -55,6 +116,23 @@ export function RuntimeDependenciesPanel() {
             </div>
           )}
 
+          <section className="runtime-deps-plan">
+            <div>
+              <strong>安装计划预检</strong>
+              <span>{vm.installPlanCandidateLabel}</span>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={planStatus === 'loading' || vm.installPlanCandidateIds.length === 0}
+              onClick={loadInstallPlan}
+            >
+              {planStatus === 'loading' ? '生成中…' : '生成计划'}
+            </button>
+          </section>
+          {planError && <div className="auth-error" role="alert">{planError}</div>}
+          {planVm && <RuntimeDependencyInstallPlanPreview plan={planVm} />}
+
           <div className="runtime-deps-sections">
             {vm.sections.map((section) => (
               <section key={section.id} className="runtime-deps-section">
@@ -80,7 +158,7 @@ export function RuntimeDependenciesPanel() {
           </div>
 
           <p className="modal-note">
-            这里只展示检测结果；真实安装/下载会走后续按需组件流程，并在下载前做磁盘空间预检与来源校验。
+            这里只展示检测结果和可审查安装计划；真实安装/下载会走后续按需组件流程，不会在此处执行。
           </p>
         </>
       )}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatDependencyBytes, toRuntimeDependencyViewModel } from './runtime-dependencies';
+import {
+  formatDependencyBytes,
+  toRuntimeDependencyInstallPlanViewModel,
+  toRuntimeDependencyViewModel,
+} from './runtime-dependencies';
 import type { RuntimeDependencyResponse } from './api/runtimeDependencies';
 
 function response(dependencies: RuntimeDependencyResponse['dependencies']): RuntimeDependencyResponse {
@@ -56,5 +60,38 @@ describe('runtime dependency view model', () => {
       downloadLabel: '约 80MB',
     });
     expect(vm.summary.onDemandCount).toBe(2);
+    expect(vm.installPlanCandidateIds).toEqual(['pandoc', 'mingit']);
+    expect(vm.installPlanCandidateLabel).toBe('文档转换组件、Git 轻量运行时');
+  });
+
+  it('summarizes install plan precheck results for the panel', () => {
+    const vm = toRuntimeDependencyInstallPlanViewModel({
+      ok: false,
+      components: [
+        {
+          id: 'data-science',
+          section: 'B1',
+          label: '数据分析组件',
+          installMode: 'on-demand',
+          required: false,
+          estimatedDownloadBytes: 200 * 1024 * 1024,
+          needsDownload: true,
+        },
+      ],
+      unknownIds: [],
+      disk: {
+        status: 'insufficient',
+        availableBytes: 100 * 1024 * 1024,
+        requiredBytes: 200 * 1024 * 1024,
+        missingBytes: 100 * 1024 * 1024,
+        message: '磁盘空间不足，还需要至少 104857600 字节。',
+      },
+    });
+
+    expect(vm.title).toBe('安装计划需要处理');
+    expect(vm.diskSeverity).toBe('error');
+    expect(vm.requiredBytesLabel).toBe('约 200MB');
+    expect(vm.missingBytesLabel).toBe('约 100MB');
+    expect(vm.componentLabels).toEqual(['数据分析组件']);
   });
 });
