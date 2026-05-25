@@ -141,6 +141,8 @@ G1 完成记录(2026-05-25):新增 `kimi/safety/untrusted-content.js` 纯 `Injec
 
 G2 完成记录(2026-05-25):新增 `kimi/agent/arg-validator.js` 纯工具参数校验器,支持常用 JSON Schema 的 object/required/properties/array/items/enum/number/integer/string/boolean/null 与 `additionalProperties:false`;`tool-loop` 在 handler/hook/审批前校验模型给出的工具参数,非法时发出 `tool_args_invalid`,回灌 `invalid tool arguments` 错误并跳过 handler。已补纯函数测试与 tool-loop 特征测试,锁定缺字段/类型错不会执行工具。
 
+G3 完成记录(2026-05-25):回路安全红队护栏复用 A7 `eval/tasks/redteam/core.json`,当前覆盖危险 Shell、路径穿越、敏感文件覆盖、间接提示注入、Office macro、批量删除绕审批、分支历史外传等场景,并由 `eval-redteam.test.js` 锁定每个 redteam 任务必须包含阻断型断言。`npm run eval` 已验证 28/28 passed(100.0%),红队任务退化会在 eval/scorer/CI 门禁中体现为失败。
+
 ---
 
 ## 排期建议(强标准下的推进顺序)
