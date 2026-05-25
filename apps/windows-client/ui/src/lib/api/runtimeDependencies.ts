@@ -62,6 +62,39 @@ export interface RuntimeDependencyInstallPlanResponse {
   disk: RuntimeDependencyInstallPlanDisk;
 }
 
+export interface RuntimeDependencyCleanupPlanRequest extends PostBody {
+  selectedIds?: string[];
+  keepUserData?: boolean;
+}
+
+export interface RuntimeDependencyCleanupPlanTarget {
+  id: string;
+  label: string;
+  relativePath?: string;
+  path: string;
+  action: 'remove' | string;
+  kind: string;
+  requiresConfirmation?: boolean;
+}
+
+export interface RuntimeDependencyCleanupPlanRetained {
+  id: string;
+  label: string;
+  path: string;
+  reason?: string;
+}
+
+export interface RuntimeDependencyCleanupPlanResponse {
+  ok: boolean;
+  mode: 'preserve-user-data' | 'remove-user-data' | string;
+  appDataRoot: string;
+  keepUserData: boolean;
+  unknownIds: string[];
+  targets: RuntimeDependencyCleanupPlanTarget[];
+  retained: RuntimeDependencyCleanupPlanRetained[];
+  warnings: string[];
+}
+
 export function getRuntimeDependencies(): Promise<RuntimeDependencyResponse> {
   return getJson<RuntimeDependencyResponse>('/api/runtime/dependencies');
 }
@@ -70,4 +103,10 @@ export function getRuntimeDependencyInstallPlan(
   request: RuntimeDependencyInstallPlanRequest,
 ): Promise<RuntimeDependencyInstallPlanResponse> {
   return postJson<RuntimeDependencyInstallPlanResponse>('/api/runtime/dependencies/install-plan', request);
+}
+
+export function getRuntimeDependencyCleanupPlan(
+  request: RuntimeDependencyCleanupPlanRequest,
+): Promise<RuntimeDependencyCleanupPlanResponse> {
+  return postJson<RuntimeDependencyCleanupPlanResponse>('/api/runtime/dependencies/cleanup-plan', request);
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatDependencyBytes,
+  toRuntimeDependencyCleanupPlanViewModel,
   toRuntimeDependencyInstallPlanViewModel,
   toRuntimeDependencyViewModel,
 } from './runtime-dependencies';
@@ -93,5 +94,44 @@ describe('runtime dependency view model', () => {
     expect(vm.requiredBytesLabel).toBe('约 200MB');
     expect(vm.missingBytesLabel).toBe('约 100MB');
     expect(vm.componentLabels).toEqual(['数据分析组件']);
+  });
+
+  it('summarizes cleanup plan precheck results for the panel', () => {
+    const vm = toRuntimeDependencyCleanupPlanViewModel({
+      ok: false,
+      mode: 'remove-user-data',
+      appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+      keepUserData: false,
+      unknownIds: ['unknown-component'],
+      targets: [
+        {
+          id: 'runtime-cache',
+          label: '运行时下载缓存',
+          relativePath: 'cache',
+          path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\cache',
+          action: 'remove',
+          kind: 'download-cache',
+        },
+        {
+          id: 'user-data',
+          label: '本机用户数据',
+          relativePath: '.',
+          path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+          action: 'remove',
+          kind: 'user-data',
+          requiresConfirmation: true,
+        },
+      ],
+      retained: [],
+      warnings: ['将删除本机 AgentCowork 用户数据，必须在卸载界面二次确认。'],
+    });
+
+    expect(vm.title).toBe('清理计划需要二次确认');
+    expect(vm.modeLabel).toBe('删除用户数据');
+    expect(vm.requiresConfirmation).toBe(true);
+    expect(vm.targetCount).toBe(2);
+    expect(vm.targetLabels[0]).toContain('运行时下载缓存');
+    expect(vm.warnings[0]).toContain('二次确认');
+    expect(vm.unknownIds).toEqual(['unknown-component']);
   });
 });

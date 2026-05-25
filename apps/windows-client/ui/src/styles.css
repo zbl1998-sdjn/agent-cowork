@@ -806,6 +806,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 }
 .runtime-deps-plan strong { display: block; font-size: 12.5px; line-height: 1.3; }
 .runtime-deps-plan span { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+.runtime-deps-plan-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .runtime-install-plan {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -854,6 +855,54 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 .runtime-install-plan-warn { border-color: #f1c38c; }
 .runtime-install-plan-error { border-color: #e8a5a5; }
 .runtime-install-plan-unknown { color: #9a4d12; }
+.runtime-cleanup-plan {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+.runtime-cleanup-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.runtime-cleanup-plan-head strong { font-size: 12.5px; }
+.runtime-cleanup-plan-head span,
+.runtime-cleanup-plan p { color: var(--muted); }
+.runtime-cleanup-plan p { margin: 6px 0; overflow-wrap: anywhere; }
+.runtime-cleanup-warning { color: #9a4d12 !important; }
+.runtime-cleanup-plan ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #9a4d12;
+}
+.runtime-cleanup-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+.runtime-cleanup-list > span {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.runtime-cleanup-list code {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  background: var(--surface);
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.runtime-cleanup-plan-ok { border-color: #9fd8c1; }
+.runtime-cleanup-plan-warn { border-color: #f1c38c; }
+.runtime-cleanup-plan-error { border-color: #e8a5a5; }
 .runtime-deps-sections { max-height: 360px; overflow: auto; padding-right: 2px; display: grid; gap: 10px; }
 .runtime-deps-section h3 { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: 0; }
 .runtime-deps-section ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -890,6 +939,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 @media (max-width: 720px) {
   .runtime-deps-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .runtime-deps-plan { grid-template-columns: 1fr; }
+  .runtime-deps-plan-actions { justify-content: flex-start; }
   .runtime-dep { grid-template-columns: 1fr; }
   .runtime-dep-meta { justify-content: flex-start; max-width: none; }
 }

@@ -1,5 +1,6 @@
 import type {
   RuntimeDependency,
+  RuntimeDependencyCleanupPlanResponse,
   RuntimeDependencyInstallPlanResponse,
   RuntimeDependencyResponse,
 } from './api/runtimeDependencies';
@@ -34,6 +35,8 @@ export interface RuntimeDependencyViewModel {
   sections: RuntimeDependencySection[];
   installPlanCandidateIds: string[];
   installPlanCandidateLabel: string;
+  cleanupPlanCandidateIds: string[];
+  cleanupPlanCandidateLabel: string;
 }
 
 export interface RuntimeDependencyInstallPlanViewModel {
@@ -46,6 +49,19 @@ export interface RuntimeDependencyInstallPlanViewModel {
   missingBytesLabel: string;
   componentLabels: string[];
   unknownIds: string[];
+}
+
+export interface RuntimeDependencyCleanupPlanViewModel {
+  ok: boolean;
+  title: string;
+  modeLabel: string;
+  appDataRoot: string;
+  targetCount: number;
+  targetLabels: string[];
+  retainedLabels: string[];
+  warnings: string[];
+  unknownIds: string[];
+  requiresConfirmation: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -107,6 +123,10 @@ function shouldPlanInstall(item: RuntimeDependencyViewItem): boolean {
   return item.installMode === 'on-demand' && item.needsAttention;
 }
 
+function shouldPlanCleanup(item: RuntimeDependencyViewItem): boolean {
+  return item.installMode === 'on-demand';
+}
+
 export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse): RuntimeDependencyViewModel {
   const items = response.dependencies.map(toViewItem);
   const sectionMap = new Map<string, RuntimeDependencyViewItem[]>();
@@ -121,6 +141,7 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
     items: sectionItems,
   }));
   const installPlanCandidates = items.filter(shouldPlanInstall);
+  const cleanupPlanCandidates = items.filter(shouldPlanCleanup);
   return {
     summary: {
       total: response.summary.total || items.length,
@@ -135,6 +156,10 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
     installPlanCandidateLabel: installPlanCandidates.length
       ? installPlanCandidates.map((item) => item.label).join('、')
       : '暂无需要预检的按需组件',
+    cleanupPlanCandidateIds: cleanupPlanCandidates.map((item) => item.id),
+    cleanupPlanCandidateLabel: cleanupPlanCandidates.length
+      ? cleanupPlanCandidates.map((item) => item.label).join('、')
+      : '暂无可清理的按需组件',
   };
 }
 
@@ -159,5 +184,29 @@ export function toRuntimeDependencyInstallPlanViewModel(
     missingBytesLabel: missingBytes > 0 ? formatDependencyBytes(missingBytes, 'on-demand') : '0 B',
     componentLabels: plan.components.map((item) => item.label),
     unknownIds: plan.unknownIds,
+  };
+}
+
+function cleanupModeLabel(mode: string, keepUserData: boolean): string {
+  if (mode === 'preserve-user-data' || keepUserData) return '保留用户数据';
+  if (mode === 'remove-user-data') return '删除用户数据';
+  return mode || '未知清理模式';
+}
+
+export function toRuntimeDependencyCleanupPlanViewModel(
+  plan: RuntimeDependencyCleanupPlanResponse,
+): RuntimeDependencyCleanupPlanViewModel {
+  const requiresConfirmation = plan.targets.some((item) => item.requiresConfirmation);
+  return {
+    ok: plan.ok,
+    title: requiresConfirmation ? '清理计划需要二次确认' : plan.ok ? '清理计划预检通过' : '清理计划需要处理',
+    modeLabel: cleanupModeLabel(plan.mode, plan.keepUserData),
+    appDataRoot: plan.appDataRoot,
+    targetCount: plan.targets.length,
+    targetLabels: plan.targets.map((item) => `${item.label} · ${item.path}`),
+    retainedLabels: plan.retained.map((item) => `${item.label} · ${item.reason || item.path}`),
+    warnings: plan.warnings,
+    unknownIds: plan.unknownIds,
+    requiresConfirmation,
   };
 }

@@ -183,6 +183,46 @@ describe('JSON requests', () => {
     expect(JSON.parse(String(request?.init?.body))).toEqual({ selectedIds: ['data-science'] });
   });
 
+  it('loads runtime dependency cleanup plan through the typed helper', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/runtime/dependencies/cleanup-plan')) {
+        return jsonResponse({
+          ok: false,
+          mode: 'remove-user-data',
+          appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+          keepUserData: false,
+          unknownIds: [],
+          targets: [{
+            id: 'user-data',
+            label: '本机用户数据',
+            relativePath: '.',
+            path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+            action: 'remove',
+            kind: 'user-data',
+            requiresConfirmation: true,
+          }],
+          retained: [],
+          warnings: ['将删除本机 AgentCowork 用户数据，必须在卸载界面二次确认。'],
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const result = await api.getRuntimeDependencyCleanupPlan({
+      selectedIds: ['data-science'],
+      keepUserData: false,
+    });
+
+    expect(result.targets[0].requiresConfirmation).toBe(true);
+    const request = calls.find((call) => call.url.endsWith('/api/runtime/dependencies/cleanup-plan'));
+    expect(request?.init?.method).toBe('POST');
+    expect(JSON.parse(String(request?.init?.body))).toEqual({
+      selectedIds: ['data-science'],
+      keepUserData: false,
+    });
+  });
+
   it('injects the Bearer token on GET requests after host readiness', async () => {
     const { api, calls } = await importApi();
     api.setAuthToken(' token-123 ');

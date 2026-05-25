@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   getRuntimeDependencies,
+  getRuntimeDependencyCleanupPlan,
   getRuntimeDependencyInstallPlan,
+  type RuntimeDependencyCleanupPlanResponse,
   type RuntimeDependencyInstallPlanResponse,
   type RuntimeDependencyResponse,
 } from '../lib/api';
 import {
+  toRuntimeDependencyCleanupPlanViewModel,
   toRuntimeDependencyInstallPlanViewModel,
   toRuntimeDependencyViewModel,
+  type RuntimeDependencyCleanupPlanViewModel,
   type RuntimeDependencyInstallPlanViewModel,
   type RuntimeDependencyViewModel,
 } from '../lib/runtime-dependencies';
@@ -38,6 +42,39 @@ export function RuntimeDependencyInstallPlanPreview({ plan }: { plan: RuntimeDep
   );
 }
 
+export function RuntimeDependencyCleanupPlanPreview({ plan }: { plan: RuntimeDependencyCleanupPlanViewModel }) {
+  return (
+    <section className={`runtime-cleanup-plan runtime-cleanup-plan-${plan.requiresConfirmation ? 'warn' : plan.ok ? 'ok' : 'error'}`} aria-label="清理计划预检">
+      <div className="runtime-cleanup-plan-head">
+        <strong>{plan.title}</strong>
+        <span>{plan.modeLabel} · {plan.targetCount} 个目标</span>
+      </div>
+      <p>AppData 根目录：{plan.appDataRoot}</p>
+      {plan.requiresConfirmation && <p className="runtime-cleanup-warning">删除用户数据需要卸载界面二次确认。</p>}
+      {plan.warnings.length > 0 && (
+        <ul>
+          {plan.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+      {plan.targetLabels.length > 0 && (
+        <div className="runtime-cleanup-list">
+          <span>将清理</span>
+          {plan.targetLabels.map((label) => <code key={label}>{label}</code>)}
+        </div>
+      )}
+      {plan.retainedLabels.length > 0 && (
+        <div className="runtime-cleanup-list">
+          <span>将保留</span>
+          {plan.retainedLabels.map((label) => <code key={label}>{label}</code>)}
+        </div>
+      )}
+      {plan.unknownIds.length > 0 && <p className="runtime-install-plan-unknown">未知组件：{plan.unknownIds.join('、')}</p>}
+    </section>
+  );
+}
+
 export function RuntimeDependenciesPanel() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [data, setData] = useState<RuntimeDependencyResponse | null>(null);
@@ -45,6 +82,9 @@ export function RuntimeDependenciesPanel() {
   const [planStatus, setPlanStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const [installPlan, setInstallPlan] = useState<RuntimeDependencyInstallPlanResponse | null>(null);
   const [planError, setPlanError] = useState('');
+  const [cleanupStatus, setCleanupStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const [cleanupPlan, setCleanupPlan] = useState<RuntimeDependencyCleanupPlanResponse | null>(null);
+  const [cleanupError, setCleanupError] = useState('');
 
   const load = () => {
     setStatus('loading');
@@ -52,6 +92,9 @@ export function RuntimeDependenciesPanel() {
     setPlanStatus('idle');
     setPlanError('');
     setInstallPlan(null);
+    setCleanupStatus('idle');
+    setCleanupError('');
+    setCleanupPlan(null);
     getRuntimeDependencies()
       .then((next) => {
         setData(next);
@@ -69,10 +112,8 @@ export function RuntimeDependenciesPanel() {
     () => (data ? toRuntimeDependencyViewModel(data) : null),
     [data],
   );
-  const planVm = useMemo(
-    () => (installPlan ? toRuntimeDependencyInstallPlanViewModel(installPlan) : null),
-    [installPlan],
-  );
+  const planVm = useMemo(() => (installPlan ? toRuntimeDependencyInstallPlanViewModel(installPlan) : null), [installPlan]);
+  const cleanupVm = useMemo(() => (cleanupPlan ? toRuntimeDependencyCleanupPlanViewModel(cleanupPlan) : null), [cleanupPlan]);
 
   const loadInstallPlan = () => {
     if (!vm || vm.installPlanCandidateIds.length === 0) return;
@@ -86,6 +127,21 @@ export function RuntimeDependenciesPanel() {
       .catch((err) => {
         setPlanError((err as Error).message || '安装计划预检失败');
         setPlanStatus('failed');
+      });
+  };
+
+  const loadCleanupPlan = (keepUserData: boolean) => {
+    if (!vm || vm.cleanupPlanCandidateIds.length === 0) return;
+    setCleanupStatus('loading');
+    setCleanupError('');
+    getRuntimeDependencyCleanupPlan({ selectedIds: vm.cleanupPlanCandidateIds, keepUserData })
+      .then((next) => {
+        setCleanupPlan(next);
+        setCleanupStatus('ready');
+      })
+      .catch((err) => {
+        setCleanupError((err as Error).message || '清理计划预检失败');
+        setCleanupStatus('failed');
       });
   };
 
@@ -115,23 +171,33 @@ export function RuntimeDependenciesPanel() {
               核心依赖需要处理：{vm.requiredIssues.map((item) => item.label).join('、')}
             </div>
           )}
-
           <section className="runtime-deps-plan">
             <div>
               <strong>安装计划预检</strong>
               <span>{vm.installPlanCandidateLabel}</span>
             </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={planStatus === 'loading' || vm.installPlanCandidateIds.length === 0}
-              onClick={loadInstallPlan}
-            >
+            <button type="button" className="btn-secondary" disabled={planStatus === 'loading' || vm.installPlanCandidateIds.length === 0} onClick={loadInstallPlan}>
               {planStatus === 'loading' ? '生成中…' : '生成计划'}
             </button>
           </section>
           {planError && <div className="auth-error" role="alert">{planError}</div>}
           {planVm && <RuntimeDependencyInstallPlanPreview plan={planVm} />}
+          <section className="runtime-deps-plan">
+            <div>
+              <strong>清理计划预检</strong>
+              <span>{vm.cleanupPlanCandidateLabel}</span>
+            </div>
+            <div className="runtime-deps-plan-actions">
+              <button type="button" className="btn-secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => loadCleanupPlan(true)}>
+                {cleanupStatus === 'loading' ? '生成中…' : '保留数据'}
+              </button>
+              <button type="button" className="btn-secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => loadCleanupPlan(false)}>
+                删除数据
+              </button>
+            </div>
+          </section>
+          {cleanupError && <div className="auth-error" role="alert">{cleanupError}</div>}
+          {cleanupVm && <RuntimeDependencyCleanupPlanPreview plan={cleanupVm} />}
 
           <div className="runtime-deps-sections">
             {vm.sections.map((section) => (
@@ -158,7 +224,7 @@ export function RuntimeDependenciesPanel() {
           </div>
 
           <p className="modal-note">
-            这里只展示检测结果和可审查安装计划；真实安装/下载会走后续按需组件流程，不会在此处执行。
+            这里只展示检测结果和可审查安装/清理计划；真实安装、下载、删除会走后续按需组件或卸载流程，不会在此处执行。
           </p>
         </>
       )}
