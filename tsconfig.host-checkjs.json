@@ -13,6 +13,7 @@
   "files": [
     "types/host-node-shim.d.ts",
     "apps/host/src/auth/jwt.js",
+    "apps/host/src/artifacts/office-writers.js",
     "apps/host/src/artifacts/live-spec.js",
     "apps/host/src/artifacts/viz.js",
     "apps/host/src/connectors/catalog.js",

@@ -187,6 +187,22 @@ test('listArtifacts rejects a symlinked artifact root outside trustedRoot', () =
   );
 });
 
+test('listArtifacts labels Office artifact kinds explicitly', () => {
+  const root = tempRoot();
+  const dir = path.join(root, '.AgentCowork', 'artifacts');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const name of ['report.docx', 'data.xlsx', 'slides.pptx', 'memo.pdf']) {
+    fs.writeFileSync(path.join(dir, name), 'x');
+  }
+
+  const byName = Object.fromEntries(listArtifacts({ trustedRoot: root, limit: 10 }).map((item) => [item.name, item.kind]));
+
+  assert.equal(byName['report.docx'], 'word');
+  assert.equal(byName['data.xlsx'], 'spreadsheet');
+  assert.equal(byName['slides.pptx'], 'presentation');
+  assert.equal(byName['memo.pdf'], 'pdf');
+});
+
 // ---- viz / artifact routes ----
 
 test('POST /api/viz/render persists a live artifact and is idempotent', async () => {

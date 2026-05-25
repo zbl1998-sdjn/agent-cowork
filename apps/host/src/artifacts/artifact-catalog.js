@@ -45,6 +45,18 @@ function artifactKind(filePath) {
   if (ext === '.csv') {
     return 'table';
   }
+  if (ext === '.xlsx') {
+    return 'spreadsheet';
+  }
+  if (ext === '.docx') {
+    return 'word';
+  }
+  if (ext === '.pptx') {
+    return 'presentation';
+  }
+  if (ext === '.pdf') {
+    return 'pdf';
+  }
   if (ext === '.json') {
     return 'json';
   }

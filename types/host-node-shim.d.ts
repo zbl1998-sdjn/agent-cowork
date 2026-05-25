@@ -1,14 +1,22 @@
 interface Buffer extends Iterable<number> {
   readonly length: number;
   readonly [index: number]: number;
+  readUInt16LE(offset: number): number;
+  readUInt32LE(offset: number): number;
   slice(start?: number, end?: number): Buffer;
+  subarray(start?: number, end?: number): Buffer;
+  writeUInt16LE(value: number, offset: number): number;
+  writeUInt32LE(value: number, offset: number): number;
   values(): IterableIterator<number>;
   toString(encoding?: string): string;
 }
 
 declare const Buffer: {
+  alloc(size: number): Buffer;
   byteLength(value: string, encoding?: string): number;
+  concat(list: readonly Buffer[]): Buffer;
   from(value: Buffer | string, encoding?: string): Buffer;
+  isBuffer(value: unknown): value is Buffer;
 };
 
 declare const process: {
@@ -73,4 +81,8 @@ declare module 'node:path' {
   export function join(...paths: string[]): string;
   export function relative(from: string, to: string): string;
   export function resolve(...paths: string[]): string;
+}
+
+declare module 'node:zlib' {
+  export function inflateRawSync(buffer: Buffer, options?: { maxOutputLength?: number }): Buffer;
 }

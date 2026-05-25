@@ -1,4 +1,12 @@
+// @ts-check
+
 import zlib from 'node:zlib';
+
+/**
+ * @typedef {{ maxEntries?: number, maxEntryBytes?: number, maxTotalUncompressedBytes?: number, maxCompressionRatio?: number }} ZipReadOptions
+ * @typedef {{ name: string, method: number, compressedSize: number, uncompressedSize: number, crc32: number, content: Buffer }} ZipReadEntry
+ * @typedef {{ name: string, content: Buffer | string }} ZipCreateEntry
+ */
 
 const DEFAULT_MAX_ENTRIES = 1000;
 const DEFAULT_MAX_ENTRY_BYTES = 8 * 1024 * 1024;
@@ -14,6 +22,10 @@ for (let i = 0; i < 256; i += 1) {
   CRC_TABLE[i] = c >>> 0;
 }
 
+/**
+ * @param {Buffer} buffer
+ * @returns {number}
+ */
 export function crc32(buffer) {
   let crc = 0xffffffff;
   for (const byte of buffer) {
@@ -22,6 +34,10 @@ export function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+/**
+ * @param {Buffer} buffer
+ * @returns {number}
+ */
 function findEndOfCentralDirectory(buffer) {
   const minOffset = Math.max(0, buffer.length - 0xffff - 22);
   for (let offset = buffer.length - 22; offset >= minOffset; offset -= 1) {
@@ -32,6 +48,10 @@ function findEndOfCentralDirectory(buffer) {
   throw new Error('ZIP end of central directory not found');
 }
 
+/**
+ * @param {unknown} name
+ * @returns {string}
+ */
 function normalizeZipName(name) {
   const normalized = String(name || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!normalized || normalized.includes('../')) {
@@ -40,6 +60,11 @@ function normalizeZipName(name) {
   return normalized;
 }
 
+/**
+ * @param {Buffer} buffer
+ * @param {ZipReadOptions} [options]
+ * @returns {ZipReadEntry[]}
+ */
 export function readZipEntries(buffer, options = {}) {
   const maxEntries = Math.min(Math.max(Number(options.maxEntries || DEFAULT_MAX_ENTRIES), 1), DEFAULT_MAX_ENTRIES);
   const maxEntryBytes = Math.min(Math.max(Number(options.maxEntryBytes || DEFAULT_MAX_ENTRY_BYTES), 1), DEFAULT_MAX_ENTRY_BYTES);
@@ -57,6 +82,7 @@ export function readZipEntries(buffer, options = {}) {
     throw new Error(`ZIP has too many entries (${entryCount}; max ${maxEntries})`);
   }
   const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  /** @type {ZipReadEntry[]} */
   const entries = [];
   let totalUncompressed = 0;
   let offset = centralDirectoryOffset;
@@ -117,11 +143,17 @@ export function readZipEntries(buffer, options = {}) {
   return entries;
 }
 
+/**
+ * @param {ZipCreateEntry[]} entries
+ * @returns {Buffer}
+ */
 export function createZip(entries) {
   if (!Array.isArray(entries)) {
     throw new Error('entries must be an array');
   }
+  /** @type {Buffer[]} */
   const localParts = [];
+  /** @type {Buffer[]} */
   const centralParts = [];
   let offset = 0;
 

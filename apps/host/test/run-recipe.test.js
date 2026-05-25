@@ -9,6 +9,7 @@ import { RunEventBus } from '../src/runtime/run-events.js';
 import { RunsIndex } from '../src/runtime/runs-index.js';
 import { writeRunRecord } from '../src/runtime/run-store.js';
 import { listRecipes } from '../src/recipes/registry.js';
+import { readZipEntries } from '../src/workspace/zip-utils.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-recipe-'));
@@ -86,6 +87,34 @@ test('runRecipe works without runEvents/runsIndex (events still numbered locally
   assert.equal(result.ok, true);
   assert.ok(result.events.length >= 5);
   assert.equal(result.events[0].seq, 1);
+});
+
+test('summary-report recipe produces Office document artifacts', () => {
+  const trustedRoot = tempRoot();
+  const source = path.join(trustedRoot, 'notes.md');
+  fs.writeFileSync(source, '# 项目状态\n- 已完成 P0\n- 风险：真实验收待补\n', 'utf8');
+
+  const result = runRecipe({
+    recipeId: 'summary-report',
+    trustedRoot,
+    prompt: '生成一页管理摘要',
+    files: [source],
+    runStoreRoot: path.join(trustedRoot, '.AgentCowork', 'runs'),
+  });
+  const paths = result.operations.map((op) => op.path);
+
+  assert.ok(paths.some((item) => item.endsWith('.md')));
+  assert.ok(paths.some((item) => item.endsWith('.docx')));
+  assert.ok(paths.some((item) => item.endsWith('.pptx')));
+  assert.ok(paths.some((item) => item.endsWith('.pdf')));
+  for (const ext of ['.docx', '.pptx', '.pdf']) {
+    const op = result.operations.find((item) => item.path.endsWith(ext));
+    assert.ok(op?.contentBase64, `${ext} operation carries base64 content`);
+  }
+
+  const docx = Buffer.from(result.operations.find((op) => op.path.endsWith('.docx')).contentBase64, 'base64');
+  const documentXml = readZipEntries(docx).find((entry) => entry.name === 'word/document.xml')?.content.toString('utf8') || '';
+  assert.match(documentXml, /项目状态/);
 });
 
 test('captureRun extracts a redacted reusable recipe draft from an agent run', async () => {

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { createDocxDocument, createPdfDocument, createPptxPresentation } from '../artifacts/office-writers.js';
 import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
 
 const RECIPES = [
@@ -48,7 +49,7 @@ const RECIPES = [
     id: 'summary-report',
     name: '总结报告',
     description: '把本地材料整理成结构化周报、项目总结或管理摘要。',
-    output: 'Markdown',
+    output: 'Markdown + DOCX + PPTX + PDF',
     riskLevel: 'safe-write',
   },
   {
@@ -98,11 +99,15 @@ function markdownOperation(trustedRoot, recipeId, filename, content) {
 }
 
 function xlsxOperation(trustedRoot, recipeId, filename, workbook) {
+  return binaryOperation(trustedRoot, recipeId, filename, workbook);
+}
+
+function binaryOperation(trustedRoot, recipeId, filename, buffer) {
   return {
     type: 'write',
     path: artifactPath(trustedRoot, recipeId, filename),
     encoding: 'base64',
-    contentBase64: workbook.toString('base64'),
+    contentBase64: buffer.toString('base64'),
   };
 }
 
@@ -310,6 +315,23 @@ function reimbursementRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
+function summaryReportRecipe(trustedRoot, recipe, prompt, sources) {
+  const markdown = genericMarkdown(recipe, prompt, sources);
+  const text = combinedText(sources);
+  const bullets = (text || prompt || '请确认来源是否完整')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*#\d.\s]+/, '').trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  const title = prompt || recipe.name;
+  return [
+    markdownOperation(trustedRoot, recipe.id, `${recipe.name}.md`, markdown),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title, paragraphs: bullets })),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pptx`, createPptxPresentation({ title, slides: [{ title, bullets }] })),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork Summary Report', lines: [prompt, ...bullets] })),
+  ];
+}
+
 export function listRecipes() {
   return RECIPES.map((recipe) => ({ ...recipe }));
 }
@@ -331,6 +353,9 @@ export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sour
   }
   if (recipe.id === 'reimbursement') {
     return reimbursementRecipe(trustedRoot, recipe, prompt, sources);
+  }
+  if (recipe.id === 'summary-report') {
+    return summaryReportRecipe(trustedRoot, recipe, prompt, sources);
   }
   return [markdownOperation(trustedRoot, recipe.id, `${recipe.name}.md`, genericMarkdown(recipe, prompt, sources))];
 }

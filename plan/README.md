@@ -40,7 +40,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 ## 当前状态快照(2026-05-25)
 - [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
 - [x] `03/04/05` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
-- [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 24 个纯/叶子/安全链路模块(新增 file-preview、live artifact spec/viz、OAuth permissions、JSON store、tool registry 等边界),并加入 host Node 内建最小类型声明;已接入 `npm run check`。
+- [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 25 个纯/叶子/安全链路模块(新增 file-preview、live artifact spec/viz、OAuth permissions、JSON store、tool registry、Office writer 等边界),并加入 host Node 内建最小类型声明;已接入 `npm run check`。
 - [ ] P0-T10 延后项:完整 Node 类型覆盖、更多 L0/L1 模块纳入仍在推进;逐文件 `.ts` 转换尚未开始,需先明确直接 Node 运行下的导入/打包路径;不改 Node host 语言栈、不重写。
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。
@@ -57,6 +57,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P1-B1(本地可测子项):`/api/subagent/run` 子代理接口已有 run 记录/时间线;本批补独立上下文预算与步数上限,过大计划返回 413 且不会执行任何工具;直接子代理路由继续拒绝高风险/写入型工具,需走 agent 审批流。
 - [x] P1-B2(代码+单测完成):新增 `/api/subagent/parallel` 并行子代理路由与主 agent `AgentParallel` 低风险工具,支持并发上限、子 run 汇总、聚合 run 记录和子任务摘要;所有子任务会在执行前统一校验审批风险与上下文预算,超预算或高风险/写入型步骤不会启动任何子代理。`npm run test:host` 已通过(473 tests,472 pass,1 skip);真实三文件夹端到端性能对比留到 P1-B 后续验收。
 - [x] P1-B3(代码+单测完成):`AgentParallel` 现在向执行流发出 `child_start/child_end` 子任务生命周期事件;前端执行动态新增子任务分组,按 index/目标/状态/步数展示并行子任务进度。聚焦 host/UI 单测通过,`npm run test:host` 已通过(473 tests,472 pass,1 skip),`npm run test:ui` 已通过(14 files,65 tests);真实三文件夹端到端性能与安装版视觉深验仍留到后续验收。
+- [x] P1-C1(代码+单测完成):`summary-report` recipe 现在会同时生成 Markdown、DOCX、PPTX、PDF 产物;DOCX/PPTX/PDF writer 全部本地实现并纳入 host `checkJs`,产物 catalog 会把 `.docx/.pptx/.xlsx/.pdf` 显式标成 Word/演示/表格/PDF。`npm run test:host` 已通过(478 tests,477 pass,1 skip),`npm run check` 已通过;真实 Office 打开、OCR 与安装版深交互仍留到延期验收。
 - [x] 05-A2d(本地可测子项):批量文件操作已有 preview/apply/rollback 路由,回滚备份受 trustedRoot jail 保护并补单测。
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/verify-mvp.mjs --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
@@ -76,4 +77,4 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 前端优化专项线(FE,聚焦交互修复/架构分层+错误空态/流式性能;设计系统暂缓)
 - [x] 4 个开放问题按默认锁成 D1–D4
 - [x] 已开工:P0 地基、03/04/05 多个本地可测切片已完成并纳入 CI
-- [ ] 继续:深度优先收尾 P2-B OAuth 真实外部验收;P1-A3 真实 Kimi 多文件留档、05-A2 Office 深操作等仍按延期验收清单处理。
+- [ ] 继续:深度优先收尾 P2-B OAuth 真实外部验收;P1-A3 真实 Kimi 多文件留档、05-A2 Office 深操作/真实打开等仍按延期验收清单处理。
