@@ -10,6 +10,7 @@ export async function fetchArtifactHtml(viewUrl: string): Promise<string> {
 export type VizKind = 'bar' | 'line' | 'pie' | 'doughnut' | 'mermaid' | 'table';
 
 export interface VizSpec {
+  id?: string;
   title?: string;
   kind: VizKind;
   data?: unknown;
@@ -28,6 +29,14 @@ export interface VizRenderResult {
   viewUrl?: string;
 }
 
+export interface VizRenderPreview {
+  id: string;
+  relativePath: string;
+  dataUrl: string;
+  viewUrl: string;
+  fileOperationApprovalId: string;
+}
+
 export interface LiveArtifactData {
   id: string;
   title?: string;
@@ -36,8 +45,23 @@ export interface LiveArtifactData {
   dataSource?: { type?: string; path?: string };
 }
 
+export async function previewVizRender(spec: VizSpec, trustedRoot?: string): Promise<VizRenderPreview> {
+  return postJson('/api/viz/render/preview', { ...spec, trustedRoot });
+}
+
 export async function renderViz(spec: VizSpec, persist = true, trustedRoot?: string): Promise<VizRenderResult> {
-  return postJson('/api/viz/render', { ...spec, persist, trustedRoot, idempotencyKey: newIdempotencyKey('viz') });
+  if (!persist) {
+    return postJson('/api/viz/render', { ...spec, persist: false, trustedRoot, idempotencyKey: newIdempotencyKey('viz') });
+  }
+  const preview = await previewVizRender(spec, trustedRoot);
+  return postJson('/api/viz/render', {
+    ...spec,
+    id: preview.id,
+    persist: true,
+    trustedRoot,
+    fileOperationApprovalId: preview.fileOperationApprovalId,
+    idempotencyKey: newIdempotencyKey('viz'),
+  });
 }
 
 export async function fetchLiveArtifactData(dataUrl: string): Promise<LiveArtifactData> {

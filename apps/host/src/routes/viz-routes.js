@@ -1,6 +1,7 @@
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { renderViz } from '../artifacts/viz.js';
 import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync } from '../artifacts/live-artifact.js';
+import { artifactPaths, normalizeLiveArtifactSpec, resolveLiveArtifactDataSourcePath } from '../artifacts/live-spec.js';
 
 // Inline-viz + live-artifact routes.
 //
@@ -15,6 +16,7 @@ import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync }
 
 const DATA_PREFIX = '/api/artifacts/data/';
 const LIVE_PREFIX = '/api/artifacts/live/';
+const VIZ_RENDER_APPROVAL_KIND = 'viz:render';
 
 function sendHtml(response, status, body) {
   response.writeHead(status, {
@@ -23,6 +25,49 @@ function sendHtml(response, status, body) {
     'cache-control': 'no-store',
   });
   response.end(body);
+}
+
+function vizFromBody(body) {
+  return {
+    title: body?.title,
+    kind: body?.kind,
+    data: body?.data,
+    options: body?.options,
+    code: body?.code,
+    definition: body?.definition,
+  };
+}
+
+function buildVizRenderApprovalPlan({ trustedRoot, body, viz }) {
+  const spec = normalizeLiveArtifactSpec({
+    id: body?.id,
+    title: viz.title,
+    viz,
+    dataSource: body?.dataSource,
+  });
+  renderViz(spec.viz);
+  if (spec.dataSource?.type === 'file-json') {
+    resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });
+  }
+  const paths = artifactPaths({ trustedRoot, id: spec.id });
+  const operationBase = {
+    artifactId: spec.id,
+    title: spec.title,
+    kind: spec.kind,
+    dataUrl: spec.dataUrl,
+    viz: spec.viz,
+    dataSource: spec.dataSource || null,
+  };
+  return {
+    id: spec.id,
+    relativePath: paths.relativePath,
+    dataUrl: spec.dataUrl,
+    viewUrl: `${LIVE_PREFIX}${spec.id}`,
+    operations: [
+      { ...operationBase, type: 'viz-artifact-html', path: paths.htmlPath },
+      { ...operationBase, type: 'viz-artifact-manifest', path: paths.manifestPath },
+    ],
+  };
 }
 
 export async function handleVizRoutes({
@@ -37,7 +82,34 @@ export async function handleVizRoutes({
   requireIdempotencyKey,
   sendCachedOrStore,
   toolRegistry,
+  fileOperationApprovals,
 }) {
+  if (request.method === 'POST' && pathname === '/api/viz/render/preview') {
+    await withJsonBody(request, response, async (body) => {
+      const trustedRoot = safeTrustedRoot(body?.trustedRoot);
+      const viz = vizFromBody(body);
+      let plan;
+      try {
+        plan = buildVizRenderApprovalPlan({ trustedRoot, body, viz });
+      } catch (err) {
+        sendJson(response, err.statusCode || 400, { error: err.message });
+        return;
+      }
+      const fileOperationApprovalId = fileOperationApprovals.issue({
+        kind: VIZ_RENDER_APPROVAL_KIND,
+        trustedRoot,
+        operations: plan.operations,
+        context: requestContext,
+      });
+      sendJson(response, 200, {
+        context: requestContext,
+        ...plan,
+        fileOperationApprovalId,
+      });
+    });
+    return true;
+  }
+
   if (request.method === 'POST' && pathname === '/api/viz/render') {
     await withJsonBody(request, response, async (body) => {
       if (!requireIdempotencyKey(response, requestContext)) {
@@ -48,14 +120,7 @@ export async function handleVizRoutes({
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
         return;
       }
-      const viz = {
-        title: body?.title,
-        kind: body?.kind,
-        data: body?.data,
-        options: body?.options,
-        code: body?.code,
-        definition: body?.definition,
-      };
+      const viz = vizFromBody(body);
       let html;
       try {
         html = renderViz(viz);
@@ -66,9 +131,16 @@ export async function handleVizRoutes({
       const payload = { context: requestContext, kind: String(viz.kind || '').toLowerCase(), html };
       if (body?.persist !== false) {
         const trustedRoot = safeTrustedRoot(body?.trustedRoot);
+        const approvalPlan = buildVizRenderApprovalPlan({ trustedRoot, body, viz });
+        fileOperationApprovals.consume(body.fileOperationApprovalId || body.approvalId, {
+          kind: VIZ_RENDER_APPROVAL_KIND,
+          trustedRoot,
+          operations: approvalPlan.operations,
+          context: requestContext,
+        });
         let artifact;
         try {
-          artifact = buildLiveArtifact({ trustedRoot, id: body?.id, title: viz.title, viz, dataSource: body?.dataSource });
+          artifact = buildLiveArtifact({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: body?.dataSource });
         } catch (err) {
           sendJson(response, err.statusCode || 400, { error: err.message });
           return;

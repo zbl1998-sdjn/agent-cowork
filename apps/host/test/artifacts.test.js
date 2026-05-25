@@ -103,6 +103,21 @@ async function jsonRequest(base, route, { method = 'GET', body, headers = {} } =
   return { status: response.status, type, body: type.includes('json') && text ? JSON.parse(text) : text };
 }
 
+async function approveVizRender(base, body) {
+  const preview = await jsonRequest(base, '/api/viz/render/preview', {
+    method: 'POST',
+    body,
+  });
+  assert.equal(preview.status, 200);
+  assert.match(preview.body.fileOperationApprovalId, /^fop_/);
+  assert.match(preview.body.id, /^viz_|^viz[-_a-zA-Z0-9]+/);
+  return {
+    ...body,
+    id: preview.body.id,
+    fileOperationApprovalId: preview.body.fileOperationApprovalId,
+  };
+}
+
 test('buildLiveArtifact writes a live page + manifest with a Refresh hook', () => {
   const root = tempRoot();
   const out = buildLiveArtifact({
@@ -212,7 +227,8 @@ test('POST /api/viz/render persists a live artifact and is idempotent', async ()
   try {
     const headers = { 'idempotency-key': 'viz-1' };
     const body = { title: '季度', kind: 'bar', data: { labels: ['Q1', 'Q2'], values: [3, 7] } };
-    const first = await jsonRequest(base, '/api/viz/render', { method: 'POST', headers, body });
+    const approvedBody = await approveVizRender(base, body);
+    const first = await jsonRequest(base, '/api/viz/render', { method: 'POST', headers, body: approvedBody });
     assert.equal(first.status, 200);
     assert.equal(first.body.persisted, true);
     assert.match(first.body.viewUrl, /^\/api\/artifacts\/live\/viz_/);
@@ -225,9 +241,55 @@ test('POST /api/viz/render persists a live artifact and is idempotent', async ()
     const data = await jsonRequest(base, first.body.dataUrl);
     assert.equal(data.body.viz.kind, 'bar');
 
-    const replay = await jsonRequest(base, '/api/viz/render', { method: 'POST', headers, body });
+    const replay = await jsonRequest(base, '/api/viz/render', { method: 'POST', headers, body: approvedBody });
     assert.equal(replay.body.idempotentReplay, true);
     assert.equal(replay.body.id, first.body.id);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/viz/render persistent writes require a scoped approval receipt', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const body = { id: 'viz_requires_approval', kind: 'table', data: { columns: ['a'], rows: [['1']] } };
+    const rejected = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-missing-approval' },
+      body,
+    });
+    assert.equal(rejected.status, 428);
+    assert.match(rejected.body.error, /approval/i);
+    assert.equal(fs.existsSync(path.join(trustedRoot, '.AgentCowork', 'artifacts', 'viz_requires_approval.html')), false);
+
+    const childRoot = path.join(trustedRoot, 'child');
+    fs.mkdirSync(childRoot, { recursive: true });
+    const childBody = {
+      trustedRoot: childRoot,
+      id: 'viz_child_root',
+      kind: 'table',
+      data: { columns: ['a'], rows: [['2']] },
+    };
+    const approvedChild = await approveVizRender(base, childBody);
+    const wrongRoot = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-wrong-root' },
+      body: { ...approvedChild, trustedRoot },
+    });
+    assert.equal(wrongRoot.status, 403);
+    assert.match(wrongRoot.body.error, /approval/i);
+
+    const accepted = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-with-approval' },
+      body: approvedChild,
+    });
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.persisted, true);
+    assert.equal(fs.existsSync(path.join(childRoot, '.AgentCowork', 'artifacts', 'viz_child_root.html')), true);
+    assert.equal(fs.existsSync(path.join(childRoot, '.AgentCowork', 'artifacts', 'viz_child_root.json')), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -242,15 +304,17 @@ test('POST /api/viz/render persists a live artifact with a refreshable file-json
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
+    const body = {
+      title: '可刷新图',
+      kind: 'bar',
+      data: { labels: ['initial'], values: [0] },
+      dataSource: { type: 'file-json', path: sourceRel },
+    };
+    const approvedBody = await approveVizRender(base, body);
     const res = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
       headers: { 'idempotency-key': 'viz-refresh-source' },
-      body: {
-        title: '可刷新图',
-        kind: 'bar',
-        data: { labels: ['initial'], values: [0] },
-        dataSource: { type: 'file-json', path: sourceRel },
-      },
+      body: approvedBody,
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.persisted, true);
@@ -282,19 +346,21 @@ test('POST /api/viz/render refreshes from a connected filesystem connector data 
     });
     assert.equal(connected.status, 200);
 
+    const body = {
+      title: '连接器活页',
+      kind: 'table',
+      data: { columns: ['name'], rows: [['initial']] },
+      dataSource: {
+        type: 'connector-tool',
+        tool: 'mcp__fs__read_text',
+        args: { path: sourceRel },
+      },
+    };
+    const approvedBody = await approveVizRender(base, body);
     const res = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
       headers: { 'idempotency-key': 'viz-connector-source' },
-      body: {
-        title: '连接器活页',
-        kind: 'table',
-        data: { columns: ['name'], rows: [['initial']] },
-        dataSource: {
-          type: 'connector-tool',
-          tool: 'mcp__fs__read_text',
-          args: { path: sourceRel },
-        },
-      },
+      body: approvedBody,
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.persisted, true);
@@ -316,19 +382,21 @@ test('GET /api/artifacts/data rejects connector data sources before the connecto
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
+    const body = {
+      title: '未连接数据源',
+      kind: 'table',
+      data: { columns: ['name'], rows: [['initial']] },
+      dataSource: {
+        type: 'connector-tool',
+        tool: 'mcp__fs__read_text',
+        args: { path: 'data/live.json' },
+      },
+    };
+    const approvedBody = await approveVizRender(base, body);
     const res = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
       headers: { 'idempotency-key': 'viz-connector-missing-source' },
-      body: {
-        title: '未连接数据源',
-        kind: 'table',
-        data: { columns: ['name'], rows: [['initial']] },
-        dataSource: {
-          type: 'connector-tool',
-          tool: 'mcp__fs__read_text',
-          args: { path: 'data/live.json' },
-        },
-      },
+      body: approvedBody,
     });
     assert.equal(res.status, 200);
 
@@ -357,19 +425,21 @@ test('GET /api/artifacts/data rejects high-risk MCP tools as connector data sour
   const server = createServer({ trustedRoot, enableScheduler: false, toolRegistry });
   const base = await bind(server);
   try {
+    const body = {
+      title: '危险数据源',
+      kind: 'table',
+      data: { columns: ['name'], rows: [['initial']] },
+      dataSource: {
+        type: 'connector-tool',
+        tool: 'mcp__demo__danger',
+        args: {},
+      },
+    };
+    const approvedBody = await approveVizRender(base, body);
     const res = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
       headers: { 'idempotency-key': 'viz-danger-connector-source' },
-      body: {
-        title: '危险数据源',
-        kind: 'table',
-        data: { columns: ['name'], rows: [['initial']] },
-        dataSource: {
-          type: 'connector-tool',
-          tool: 'mcp__demo__danger',
-          args: {},
-        },
-      },
+      body: approvedBody,
     });
     assert.equal(res.status, 200);
 

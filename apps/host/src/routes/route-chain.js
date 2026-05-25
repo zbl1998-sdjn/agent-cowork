@@ -141,6 +141,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
     toolRegistry: state.toolRegistry,
+    fileOperationApprovals: state.fileOperationApprovals,
   })) return true;
   if (await handleSkillRoutes({ request, response, pathname, requestContext, skillRegistry: state.skillRegistry })) return true;
   if (await handlePlanRoutes({ request, response, pathname, requestContext, toolRegistry: state.toolRegistry, planner: state.config.planner })) return true;

@@ -379,6 +379,70 @@ describe('JSON requests', () => {
     expect(forgotten.removed).toBe(1);
   });
 
+  it('previews persisted viz renders before sending the write request', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/viz/render/preview')) {
+        return jsonResponse({
+          id: 'viz_approved',
+          relativePath: '.AgentCowork/artifacts/viz_approved.html',
+          dataUrl: '/api/artifacts/data/viz_approved',
+          viewUrl: '/api/artifacts/live/viz_approved',
+          fileOperationApprovalId: 'fop_1',
+        });
+      }
+      if (url.endsWith('/api/viz/render')) {
+        return jsonResponse({
+          kind: 'table',
+          html: '<table></table>',
+          persisted: true,
+          id: 'viz_approved',
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    await api.renderViz({ kind: 'table', data: { columns: ['a'], rows: [[1]] } }, true, 'C:/work');
+
+    const previewBody = JSON.parse(String(calls.find((call) => call.url.endsWith('/api/viz/render/preview'))?.init?.body));
+    const renderBody = JSON.parse(String(calls.find((call) => call.url.endsWith('/api/viz/render'))?.init?.body));
+    expect(previewBody).toEqual({
+      kind: 'table',
+      data: { columns: ['a'], rows: [[1]] },
+      trustedRoot: 'C:/work',
+    });
+    expect(renderBody).toEqual({
+      kind: 'table',
+      data: { columns: ['a'], rows: [[1]] },
+      id: 'viz_approved',
+      persist: true,
+      trustedRoot: 'C:/work',
+      fileOperationApprovalId: 'fop_1',
+      idempotencyKey: expect.stringMatching(/^viz-/),
+    });
+  });
+
+  it('keeps inline viz renders approval-free', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/viz/render')) {
+        return jsonResponse({ kind: 'table', html: '<table></table>', persisted: false });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    await api.renderViz({ kind: 'table', data: { columns: ['a'], rows: [[1]] } }, false, 'C:/work');
+
+    expect(calls.some((call) => call.url.endsWith('/api/viz/render/preview'))).toBe(false);
+    expect(JSON.parse(String(calls.find((call) => call.url.endsWith('/api/viz/render'))?.init?.body))).toEqual({
+      kind: 'table',
+      data: { columns: ['a'], rows: [[1]] },
+      persist: false,
+      trustedRoot: 'C:/work',
+      idempotencyKey: expect.stringMatching(/^viz-/),
+    });
+  });
+
   it('posts OAuth connector device-flow requests without putting tokens in the client payload', async () => {
     const { api, calls } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });

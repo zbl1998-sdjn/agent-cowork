@@ -41,6 +41,7 @@ test('new file and route surfaces are covered by the auth gate', async () => {
       ['/api/conversations/branch-test', { method: 'PUT', body: { trustedRoot, title: 'x', branches: [] } }],
       ['/api/artifacts', { method: 'GET' }],
       ['/api/artifacts/rename', { method: 'POST', headers: { 'idempotency-key': 'rename-gate' }, body: { trustedRoot, path: 'x.md', newName: 'y.md' } }],
+      ['/api/viz/render/preview', { method: 'POST', body: { trustedRoot, kind: 'table', data: { columns: ['a'], rows: [[1]] } } }],
       ['/api/viz/render', { method: 'POST', headers: { 'idempotency-key': 'viz-gate' }, body: { trustedRoot, kind: 'table', data: { columns: ['a'], rows: [[1]] } } }],
       ['/api/prompt/refine', { method: 'POST', body: { trustedRoot, prompt: '改一下' } }],
       ['/api/runtime/dependencies', { method: 'GET' }],
