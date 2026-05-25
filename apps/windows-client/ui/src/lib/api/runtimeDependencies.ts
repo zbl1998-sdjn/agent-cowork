@@ -6,6 +6,7 @@ export interface RuntimeDependency {
   id: string;
   section: string;
   label: string;
+  description?: string;
   required: boolean;
   installMode: string;
   estimatedDownloadBytes: number;

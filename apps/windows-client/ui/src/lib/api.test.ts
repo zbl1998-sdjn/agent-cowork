@@ -123,7 +123,16 @@ describe('JSON requests', () => {
           generatedAt: '2026-05-25T00:00:00.000Z',
           platform: 'win32',
           arch: 'x64',
-          dependencies: [{ id: 'node', section: 'A4', label: 'Node runtime', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' }],
+          dependencies: [{
+            id: 'node',
+            section: 'A4',
+            label: 'Node.js 运行时',
+            description: '随应用提供的本地 Node 执行环境。',
+            required: true,
+            installMode: 'bundled',
+            estimatedDownloadBytes: 0,
+            status: 'available',
+          }],
           summary: { total: 1, requiredMissing: 0, byStatus: { available: 1 } },
         });
       }
@@ -133,6 +142,7 @@ describe('JSON requests', () => {
     const result = await api.getRuntimeDependencies();
 
     expect(result.dependencies[0].id).toBe('node');
+    expect(result.dependencies[0].description).toContain('本地 Node');
     expect(result.summary.byStatus.available).toBe(1);
     expect(calls.some((call) => call.url.endsWith('/api/runtime/dependencies'))).toBe(true);
   });

@@ -7,6 +7,8 @@ export interface RuntimeDependencyViewItem extends RuntimeDependency {
   severity: RuntimeDependencySeverity;
   installModeLabel: string;
   downloadLabel: string;
+  purposeLabel: string;
+  detailLabel: string;
   needsAttention: boolean;
 }
 
@@ -77,6 +79,8 @@ function toViewItem(item: RuntimeDependency): RuntimeDependencyViewItem {
     severity,
     installModeLabel: INSTALL_MODE_LABELS[item.installMode] || item.installMode,
     downloadLabel: formatDependencyBytes(item.estimatedDownloadBytes, item.installMode),
+    purposeLabel: item.description || '暂无用途说明',
+    detailLabel: item.detail || '暂无检测说明',
     needsAttention: severity === 'error' || severity === 'warn',
   };
 }

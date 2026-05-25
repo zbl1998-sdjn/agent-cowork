@@ -4,7 +4,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'node',
     section: 'A4',
-    label: 'Node runtime',
+    label: 'Node.js 运行时',
+    description: '随应用提供的本地 Node 执行环境，用于启动 host 与内置脚本。',
     required: true,
     installMode: 'bundled',
     estimatedDownloadBytes: 0,
@@ -12,7 +13,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'webview2',
     section: 'A1',
-    label: 'WebView2 runtime',
+    label: 'Microsoft Edge WebView2',
+    description: 'Windows 桌面外壳渲染界面所需的系统运行时。',
     required: true,
     installMode: 'system',
     estimatedDownloadBytes: 0,
@@ -20,7 +22,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'python-embedded',
     section: 'A2',
-    label: 'Embedded Python',
+    label: '内置 Python',
+    description: '随包提供的 Python 环境，用于可选数据处理与脚本能力。',
     required: true,
     installMode: 'bundled',
     estimatedDownloadBytes: 0,
@@ -28,7 +31,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'cjk-fonts',
     section: 'A3',
-    label: 'CJK fonts',
+    label: '中日韩字体包',
+    description: '确保中文、日文、韩文内容在安装版中正常显示。',
     required: true,
     installMode: 'bundled',
     estimatedDownloadBytes: 0,
@@ -36,7 +40,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'vc-runtime',
     section: 'A5',
-    label: 'VC++ redistributable',
+    label: 'Visual C++ 运行库',
+    description: 'Windows 原生依赖所需的 VC++ 运行库。',
     required: true,
     installMode: 'system',
     estimatedDownloadBytes: 0,
@@ -44,7 +49,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'sqlite',
     section: 'F2',
-    label: 'SQLite runtime',
+    label: 'SQLite 存储运行时',
+    description: '用于本地会话、记录与轻量索引存储。',
     required: true,
     installMode: 'bundled',
     estimatedDownloadBytes: 0,
@@ -52,7 +58,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'proxy',
     section: 'F1',
-    label: 'Proxy configuration',
+    label: '网络代理配置',
+    description: '读取系统或环境代理，用于模型调用和连接器访问外网。',
     required: false,
     installMode: 'environment',
     estimatedDownloadBytes: 0,
@@ -60,7 +67,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'data-science',
     section: 'B1',
-    label: 'Data science packages',
+    label: '数据分析组件',
+    description: '按需安装的 Python 数据处理依赖，用于表格、统计和分析工作流。',
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 200 * 1024 * 1024,
@@ -69,7 +77,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'playwright-chromium',
     section: 'B2',
-    label: 'Playwright Chromium',
+    label: '浏览器自动化组件',
+    description: '按需安装 Chromium 浏览器，用于网页自动化和截图验收。',
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 150 * 1024 * 1024,
@@ -78,7 +87,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'tesseract-ocr',
     section: 'B3',
-    label: 'Tesseract OCR',
+    label: 'OCR 文字识别组件',
+    description: '按需安装 OCR 引擎，用于图片和扫描件文字提取。',
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 120 * 1024 * 1024,
@@ -87,7 +97,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'pandoc',
     section: 'B4',
-    label: 'Pandoc',
+    label: '文档转换组件',
+    description: '按需安装 Pandoc，用于 Office、Markdown 等文档转换链路。',
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 80 * 1024 * 1024,
@@ -96,7 +107,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'mingit',
     section: 'B6',
-    label: 'MinGit',
+    label: 'Git 轻量运行时',
+    description: '按需安装 MinGit，用于仓库连接器和本地版本控制操作。',
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 80 * 1024 * 1024,
@@ -105,7 +117,8 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'sandbox-isolation',
     section: 'C1',
-    label: 'WSL2 or Docker sandbox isolation',
+    label: '沙箱隔离运行时',
+    description: '使用 WSL2 或 Docker 为工具执行提供网络和文件隔离。',
     required: false,
     installMode: 'system',
     estimatedDownloadBytes: 0,
@@ -142,41 +155,41 @@ function detectDependency(item, options) {
     return {
       status: 'available',
       version: process.version,
-      detail: process.execPath ? 'host process runtime' : 'process runtime',
+      detail: process.execPath ? 'host 进程正在使用该运行时' : '当前进程运行时可用',
     };
   }
 
   if (item.id === 'sqlite') {
     return process.versions?.sqlite
-      ? { status: 'available', version: process.versions.sqlite, detail: 'node:sqlite available' }
-      : { status: 'unknown', detail: 'sqlite binding not probed by this endpoint' };
+      ? { status: 'available', version: process.versions.sqlite, detail: 'node:sqlite 可用' }
+      : { status: 'unknown', detail: '当前端点未探测 SQLite 绑定' };
   }
 
   if (item.id === 'webview2') {
     const configured = envValue(env, ['KCW_WEBVIEW2_MODE', 'WEBVIEW2_RELEASE_CHANNEL_PREFERENCE']);
-    if (configured) return { status: 'configured', source: configured.key, detail: configured.value };
+    if (configured) return { status: 'configured', source: configured.key, detail: `WebView2 模式: ${configured.value}` };
     return platform === 'win32'
-      ? { status: 'unknown', detail: 'installer or Windows runtime probe required' }
-      : { status: 'not_applicable', detail: 'Windows-only dependency' };
+      ? { status: 'unknown', detail: '需要安装器或 Windows 运行时探测确认' }
+      : { status: 'not_applicable', detail: '仅 Windows 需要' };
   }
 
   if (item.id === 'python-embedded') {
-    return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], 'embedded Python path configured');
+    return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], '内置 Python 路径已配置');
   }
 
   if (item.id === 'cjk-fonts') {
-    return configuredFromEnv(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT'], 'CJK font bundle path configured');
+    return configuredFromEnv(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT'], '字体包路径已配置');
   }
 
   if (item.id === 'vc-runtime') {
     return platform === 'win32'
-      ? { status: 'unknown', detail: 'installer runtime probe required' }
-      : { status: 'not_applicable', detail: 'Windows-only dependency' };
+      ? { status: 'unknown', detail: '需要安装器探测 VC++ 运行库' }
+      : { status: 'not_applicable', detail: '仅 Windows 需要' };
   }
 
   if (item.id === 'proxy') {
     const proxy = envValue(env, ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']);
-    if (!proxy) return { status: 'unknown', detail: 'no proxy environment variable configured' };
+    if (!proxy) return { status: 'unknown', detail: '未配置代理环境变量' };
     return { status: 'configured', source: proxy.key, detail: redactProxyUrl(proxy.value) };
   }
 
@@ -187,12 +200,12 @@ function detectDependency(item, options) {
         detail: redactText(sandboxStartup.info.userMessage || sandboxStartup.info.backend),
       };
     }
-    return { status: 'unknown', detail: 'sandbox startup probe not attached' };
+    return { status: 'unknown', detail: '尚未接入沙箱启动探测' };
   }
 
   const marker = envValue(env, [`KCW_${item.id.toUpperCase().replace(/-/g, '_')}_HOME`]);
-  if (marker) return { status: 'configured', source: marker.key, detail: `${item.label} path configured` };
-  return { status: 'missing', detail: 'optional on-demand component is not installed' };
+  if (marker) return { status: 'configured', source: marker.key, detail: `${item.label} 路径已配置` };
+  return { status: 'missing', detail: '可选按需组件尚未安装' };
 }
 
 function summarize(dependencies) {

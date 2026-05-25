@@ -17,14 +17,19 @@ function response(dependencies: RuntimeDependencyResponse['dependencies']): Runt
 describe('runtime dependency view model', () => {
   it('highlights required missing or degraded dependencies', () => {
     const vm = toRuntimeDependencyViewModel(response([
-      { id: 'node', section: 'A4', label: 'Node runtime', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' },
-      { id: 'python-embedded', section: 'A2', label: 'Embedded Python', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'missing' },
-      { id: 'sandbox-isolation', section: 'C1', label: 'Sandbox isolation', required: false, installMode: 'system', estimatedDownloadBytes: 0, status: 'degraded' },
+      { id: 'node', section: 'A4', label: 'Node.js 运行时', description: '启动 host', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available', detail: 'host 进程正在使用该运行时' },
+      { id: 'python-embedded', section: 'A2', label: '内置 Python', description: '脚本能力', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'missing' },
+      { id: 'sandbox-isolation', section: 'C1', label: '沙箱隔离运行时', description: '隔离工具执行', required: false, installMode: 'system', estimatedDownloadBytes: 0, status: 'degraded' },
     ]));
 
     expect(vm.summary.readyCount).toBe(1);
     expect(vm.requiredIssues.map((item) => item.id)).toEqual(['python-embedded']);
     expect(vm.requiredIssues[0].severity).toBe('error');
+    expect(vm.sections[0].items[0]).toMatchObject({
+      label: 'Node.js 运行时',
+      purposeLabel: '启动 host',
+      detailLabel: 'host 进程正在使用该运行时',
+    });
     expect(vm.summary.optionalMissing).toBe(1);
   });
 
@@ -36,14 +41,16 @@ describe('runtime dependency view model', () => {
 
   it('keeps section grouping in catalog order', () => {
     const vm = toRuntimeDependencyViewModel(response([
-      { id: 'node', section: 'A4', label: 'Node runtime', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' },
-      { id: 'pandoc', section: 'B4', label: 'Pandoc', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'missing' },
-      { id: 'mingit', section: 'B6', label: 'MinGit', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'unknown' },
+      { id: 'node', section: 'A4', label: 'Node.js 运行时', description: '启动 host', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' },
+      { id: 'pandoc', section: 'B4', label: '文档转换组件', description: '转换 Office 和 Markdown', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'missing' },
+      { id: 'mingit', section: 'B6', label: 'Git 轻量运行时', description: '仓库连接器', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'unknown' },
     ]));
 
     expect(vm.sections.map((section) => section.id)).toEqual(['A4', 'B4', 'B6']);
     expect(vm.sections[1].items[0]).toMatchObject({
       id: 'pandoc',
+      label: '文档转换组件',
+      purposeLabel: '转换 Office 和 Markdown',
       statusLabel: '缺失',
       installModeLabel: '按需下载',
       downloadLabel: '约 80MB',

@@ -64,7 +64,8 @@ export function RuntimeDependenciesPanel() {
                     <li key={item.id} className={`runtime-dep runtime-dep-${item.severity}`}>
                       <div>
                         <strong>{item.label}</strong>
-                        <span>{item.detail || '暂无说明'}</span>
+                        <span>{item.purposeLabel}</span>
+                        <span className="runtime-dep-detail">{item.detailLabel}</span>
                       </div>
                       <div className="runtime-dep-meta">
                         <span>{item.statusLabel}</span>

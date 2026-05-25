@@ -57,10 +57,18 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
 
     const byId = Object.fromEntries(body.dependencies.map((item) => [item.id, item]));
     assert.equal(byId.node.status, 'available');
+    assert.equal(byId.node.label, 'Node.js 运行时');
+    assert.match(byId.node.description, /本地 Node/);
+    assert.match(byId.node.detail, /host 进程/);
     assert.match(byId.node.version, /^v\d+\./);
     assert.equal(byId.node.required, true);
     assert.equal(byId.webview2.installMode, 'system');
+    assert.equal(byId.webview2.label, 'Microsoft Edge WebView2');
+    assert.match(byId.webview2.description, /桌面外壳/);
+    assert.match(byId['data-science'].label, /数据分析/);
+    assert.match(byId['data-science'].description, /按需安装/);
     assert.equal(byId['python-embedded'].status, 'configured');
+    assert.equal(byId['python-embedded'].detail, '内置 Python 路径已配置');
     assert.equal(byId.proxy.status, 'configured');
     assert.equal(byId.proxy.detail, 'http://proxy-user:[REDACTED]@127.0.0.1:7890');
   });
