@@ -29,6 +29,7 @@
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:windows-paths": "node scripts/smoke-windows-paths.mjs",
     "smoke:sqlite-runtime": "node scripts/smoke-sqlite-runtime.mjs",
+    "smoke:runtime-update": "node scripts/smoke-runtime-update-preservation.mjs",
     "smoke:e2e": "node scripts/e2e-smoke.mjs",
     "bench": "node scripts/bench.mjs",
     "eval": "node scripts/eval.mjs",

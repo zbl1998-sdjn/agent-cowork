@@ -4,6 +4,7 @@ import { createServer } from '../src/server.js';
 import {
   buildRuntimeDependencyCleanupPlan,
   buildRuntimeDependencyInstallPlan,
+  buildRuntimeDependencyUpdatePlan,
 } from '../src/runtime/dependency-install-plan.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
@@ -118,4 +119,38 @@ test('runtime dependency cleanup plan refuses non-AgentCowork roots', () => {
     () => buildRuntimeDependencyCleanupPlan({ appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming' }),
     /must end with AgentCowork/,
   );
+});
+
+test('runtime dependency update plan preserves AppData components, venv and user data', () => {
+  const root = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
+  const plan = buildRuntimeDependencyUpdatePlan({
+    appDataRoot: root,
+    currentVersion: '0.2.0',
+    targetVersion: '0.2.1',
+    selectedIds: ['data-science', 'playwright-chromium'],
+  });
+
+  assert.equal(plan.ok, true);
+  assert.equal(plan.mode, 'preserve-on-update');
+  assert.equal(plan.destructiveActions.length, 0);
+  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium']);
+  assert.ok(plan.retained.some((item) => item.id === 'user-data' && item.path === plan.appDataRoot));
+  assert.ok(plan.retained.some((item) => item.id === 'python-venv' && item.path.endsWith('\\venv')));
+  assert.ok(plan.retained.some((item) => item.id === 'components-root' && item.path.endsWith('\\components')));
+  for (const target of [...plan.retained, ...plan.components]) {
+    assert.equal(target.action, 'preserve');
+    assert.ok(target.path === plan.appDataRoot || target.path.startsWith(`${plan.appDataRoot}\\`), `${target.path} escaped update root`);
+  }
+});
+
+test('runtime dependency update plan reports unknown components without destructive fallback', () => {
+  const plan = buildRuntimeDependencyUpdatePlan({
+    appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+    selectedIds: ['data-science', 'unknown-component'],
+  });
+
+  assert.equal(plan.ok, false);
+  assert.deepEqual(plan.unknownIds, ['unknown-component']);
+  assert.equal(plan.destructiveActions.length, 0);
+  assert.equal(plan.components[0].action, 'preserve');
 });

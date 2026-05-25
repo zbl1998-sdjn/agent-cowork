@@ -1,0 +1,84 @@
+{
+  "ok": true,
+  "mode": "preserve-on-update",
+  "generatedAt": "2026-05-25T18:03:30.683Z",
+  "appDataRoot": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork",
+  "sentinels": [
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\components\\data-science\\.installed",
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\components\\playwright-chromium\\.installed",
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\venv\\pyvenv.cfg",
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\config.json",
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\state.sqlite",
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\cache\\download.lock"
+  ],
+  "plan": {
+    "ok": true,
+    "mode": "preserve-on-update",
+    "currentVersion": "0.2.0",
+    "targetVersion": "0.2.1",
+    "appDataRoot": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork",
+    "unknownIds": [],
+    "components": [
+      {
+        "id": "data-science",
+        "section": "B1",
+        "label": "Data science packages",
+        "relativePath": "components/data-science",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\components\\data-science",
+        "action": "preserve",
+        "kind": "downloaded-component",
+        "reason": "升级应用本体时保留已下载组件，避免重复下载。"
+      },
+      {
+        "id": "playwright-chromium",
+        "section": "B2",
+        "label": "Playwright Chromium",
+        "relativePath": "components/playwright-chromium",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\components\\playwright-chromium",
+        "action": "preserve",
+        "kind": "downloaded-component",
+        "reason": "升级应用本体时保留已下载组件，避免重复下载。"
+      }
+    ],
+    "retained": [
+      {
+        "id": "user-data",
+        "label": "本机用户数据",
+        "relativePath": ".",
+        "kind": "user-data",
+        "reason": "保留对话、记忆、鉴权、配置和本地状态。",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork",
+        "action": "preserve"
+      },
+      {
+        "id": "python-venv",
+        "label": "Python 虚拟环境",
+        "relativePath": "venv",
+        "kind": "python-venv",
+        "reason": "保留按需安装的 Python 运行环境和 wheel 缓存。",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\venv",
+        "action": "preserve"
+      },
+      {
+        "id": "components-root",
+        "label": "按需组件目录",
+        "relativePath": "components",
+        "kind": "downloaded-components-root",
+        "reason": "保留 OCR、Chromium、Pandoc、MinGit 等按需组件。",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\components",
+        "action": "preserve"
+      },
+      {
+        "id": "runtime-cache",
+        "label": "运行时下载缓存",
+        "relativePath": "cache",
+        "kind": "download-cache",
+        "reason": "保留可复用下载缓存，减少升级后的重复下载。",
+        "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\runtime-update-preservation\\AgentCowork\\cache",
+        "action": "preserve"
+      }
+    ],
+    "destructiveActions": [],
+    "installerInvariant": "更新只替换安装目录中的应用本体，不删除 AppData\\AgentCowork。"
+  }
+}
