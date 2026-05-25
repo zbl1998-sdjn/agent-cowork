@@ -1,3 +1,5 @@
+// @ts-check
+
 // Inline visualization renderer (the show_widget analog).
 //
 // renderViz(spec) -> a self-contained HTML document string for one of:
@@ -15,12 +17,23 @@ const MERMAID_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/merma
 const LINE_SEP = new RegExp(String.fromCharCode(0x2028), "g");
 const PARA_SEP = new RegExp(String.fromCharCode(0x2029), "g");
 
+/**
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ kind?: string, title?: string, data?: any, options?: any, code?: string, definition?: string, [key: string]: any }} VizSpec
+ */
+
+/**
+ * @param {string} message
+ * @param {number} [statusCode]
+ * @returns {HttpError}
+ */
 function fail(message, statusCode = 400) {
-  const error = new Error(`viz: ${message}`);
+  const error = /** @type {HttpError} */ (new Error(`viz: ${message}`));
   error.statusCode = statusCode;
   return error;
 }
 
+/** @param {unknown} value */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -31,6 +44,7 @@ function escapeHtml(value) {
 }
 
 // JSON safe to embed inside a <script> tag.
+/** @param {unknown} value */
 function safeJson(value) {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
@@ -40,6 +54,7 @@ function safeJson(value) {
     .replace(PARA_SEP, '\\u2029');
 }
 
+/** @param {{ title: string, headExtra?: string, body: string }} options */
 function htmlShell({ title, headExtra = '', body }) {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -71,6 +86,7 @@ ${body}
 </html>`;
 }
 
+/** @param {any} data */
 function normalizeChartData(data) {
   if (data && Array.isArray(data.datasets)) {
     return { labels: Array.isArray(data.labels) ? data.labels : [], datasets: data.datasets };
@@ -80,6 +96,11 @@ function normalizeChartData(data) {
   return { labels, datasets: [{ label: (data && data.label) || '值', data: values }] };
 }
 
+/**
+ * @param {string} kind
+ * @param {string} title
+ * @param {VizSpec} spec
+ */
 function renderChart(kind, title, spec) {
   const chartData = normalizeChartData(spec.data);
   const options = spec.options && typeof spec.options === 'object' ? spec.options : { responsive: true };
@@ -96,6 +117,10 @@ function renderChart(kind, title, spec) {
   return htmlShell({ title, headExtra, body });
 }
 
+/**
+ * @param {string} title
+ * @param {VizSpec} spec
+ */
 function renderMermaid(title, spec) {
   const definition = String(
     (spec.data && (spec.data.definition || spec.data.code)) || spec.code || spec.definition || '',
@@ -111,10 +136,14 @@ function renderMermaid(title, spec) {
   return htmlShell({ title, headExtra, body });
 }
 
+/**
+ * @param {string} title
+ * @param {VizSpec} spec
+ */
 function renderTable(title, spec) {
   const data = spec.data || {};
-  const columns = Array.isArray(data.columns) ? data.columns : [];
-  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const columns = /** @type {unknown[]} */ (Array.isArray(data.columns) ? data.columns : []);
+  const rows = /** @type {unknown[]} */ (Array.isArray(data.rows) ? data.rows : []);
   if (columns.length === 0 && rows.length === 0) {
     throw fail('table viz requires columns or rows');
   }
@@ -132,6 +161,7 @@ ${head}          <tbody>
   return htmlShell({ title, body });
 }
 
+/** @param {VizSpec} [spec] */
 export function renderViz(spec = {}) {
   const title = spec.title ? String(spec.title) : '可视化';
   const kind = String(spec.kind || '').toLowerCase();

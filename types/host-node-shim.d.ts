@@ -32,6 +32,7 @@ declare module 'node:crypto' {
   export function createHash(algorithm: string): Hash;
   export function createHmac(algorithm: string, key: Buffer | string): Hmac;
   export function randomBytes(size: number): Buffer;
+  export function randomUUID(): string;
   export function timingSafeEqual(a: Buffer, b: Buffer): boolean;
 }
 
@@ -55,6 +56,7 @@ declare module 'node:fs' {
   export function readFileSync(path: string): Buffer;
   export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
+  export function renameSync(oldPath: string, newPath: string): void;
   export function statSync(path: string): Stats;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function realpathSync(path: string): string;

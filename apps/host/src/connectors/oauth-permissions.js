@@ -1,14 +1,33 @@
+// @ts-check
+
+/**
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ id?: string, label?: string, description?: string, risk?: string, default?: boolean }} OAuthPermissionInput
+ * @typedef {{ auth?: { permissions?: OAuthPermissionInput[], scopes?: string[] } }} OAuthConnector
+ * @typedef {{ id: string, label: string, description: string, risk: string, default: boolean }} OAuthPermission
+ */
+
+/**
+ * @param {number} statusCode
+ * @param {string} message
+ * @returns {HttpError}
+ */
 function makeHttpError(statusCode, message) {
-  const err = new Error(message);
+  const err = /** @type {HttpError} */ (new Error(message));
   err.statusCode = statusCode;
   return err;
 }
 
+/** @param {unknown} scopes */
 function rawRequestedScopes(scopes) {
   const list = Array.isArray(scopes) ? scopes : String(scopes || '').split(/\s+/);
   return list.map((scope) => String(scope).trim()).filter(Boolean);
 }
 
+/**
+ * @param {OAuthConnector} connector
+ * @returns {OAuthPermission[]}
+ */
 export function oauthPermissions(connector) {
   const auth = connector?.auth || {};
   if (Array.isArray(auth.permissions) && auth.permissions.length > 0) {
@@ -29,6 +48,11 @@ export function oauthPermissions(connector) {
   }));
 }
 
+/**
+ * @param {OAuthConnector} connector
+ * @param {unknown} requestedScopes
+ * @returns {string[]}
+ */
 export function normalizeOAuthScopes(connector, requestedScopes) {
   const permissions = oauthPermissions(connector);
   const allowed = new Set(permissions.map((permission) => permission.id));
@@ -49,6 +73,11 @@ export function normalizeOAuthScopes(connector, requestedScopes) {
   return selected;
 }
 
+/**
+ * @param {OAuthConnector} connector
+ * @param {string[]} scopes
+ * @returns {OAuthPermission[]}
+ */
 export function selectedOAuthPermissions(connector, scopes) {
   const selected = new Set(scopes || []);
   return oauthPermissions(connector).filter((permission) => selected.has(permission.id));

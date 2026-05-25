@@ -1,10 +1,21 @@
+// @ts-check
+
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * @typedef {{ defaults?: any }} JsonStoreOptions
+ */
+
+/** @param {any} data */
 function normalizeData(data) {
   return data === undefined ? {} : data;
 }
 
+/**
+ * @param {string} filePath
+ * @param {string} payload
+ */
 function writeAtomic(filePath, payload) {
   const dir = path.dirname(filePath);
   const tempPath = `${filePath}.tmp`;
@@ -14,11 +25,16 @@ function writeAtomic(filePath, payload) {
 }
 
 export class JsonStore {
+  /**
+   * @param {string} filePath
+   * @param {JsonStoreOptions} [options]
+   */
   constructor(filePath, options = {}) {
     this.filePath = filePath;
     this.defaults = options.defaults ?? {};
   }
 
+  /** @returns {any} */
   load() {
     if (!fs.existsSync(this.filePath)) {
       return normalizeData(this.defaults);
@@ -32,16 +48,19 @@ export class JsonStore {
     try {
       return JSON.parse(raw);
     } catch (err) {
-      throw new Error(`Invalid JSON store at ${this.filePath}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Invalid JSON store at ${this.filePath}: ${message}`);
     }
   }
 
+  /** @param {any} data */
   save(data) {
     const serializable = normalizeData(data);
     writeAtomic(this.filePath, JSON.stringify(serializable, null, 2));
     return serializable;
   }
 
+  /** @param {(current: Record<string, any>) => any} mutator */
   update(mutator) {
     const current = this.load();
     const next = mutator({ ...current });
