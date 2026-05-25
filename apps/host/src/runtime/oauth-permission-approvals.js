@@ -1,14 +1,56 @@
+// @ts-check
+
 import crypto from 'node:crypto';
-import { stableJsonStringify } from '../http/request-utils.js';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ tenantId?: unknown, userId?: unknown }} ApprovalContext
+ * @typedef {{ tenantId: string, userId: string }} ApprovalScope
+ * @typedef {{ connectorId: string, provider: string, scopes?: unknown }} ApprovalHashInput
+ * @typedef {{ id: string, connectorId: string, provider: string, scopesHash: string, scope: ApprovalScope, expiresAt: number, used: boolean }} OAuthPermissionApproval
+ * @typedef {{ ttlMs?: number, generateId?: () => string, now?: () => number }} OAuthPermissionApprovalStoreOptions
+ * @typedef {{ connectorId: string, provider: string, scopes?: unknown, context?: ApprovalContext }} OAuthPermissionRequest
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function stableJsonStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .sort()
+      .map((key) => {
+        const record = /** @type {Record<string, unknown>} */ (value);
+        const encoded = stableJsonStringify(record[key]);
+        return encoded === undefined ? undefined : `${JSON.stringify(key)}:${encoded}`;
+      })
+      .filter(Boolean);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * @param {number} statusCode
+ * @param {string} message
+ * @returns {HttpError}
+ */
 function makeHttpError(statusCode, message) {
-  const err = new Error(message);
+  const err = /** @type {HttpError} */ (new Error(message));
   err.statusCode = statusCode;
   return err;
 }
 
+/**
+ * @param {ApprovalContext} [context]
+ * @returns {ApprovalScope}
+ */
 function scopeFromContext(context = {}) {
   return {
     tenantId: String(context.tenantId || 'tenant_local'),
@@ -16,6 +58,10 @@ function scopeFromContext(context = {}) {
   };
 }
 
+/**
+ * @param {ApprovalHashInput} input
+ * @returns {string}
+ */
 function approvalHash({ connectorId, provider, scopes }) {
   return crypto
     .createHash('sha256')
@@ -28,11 +74,15 @@ function approvalHash({ connectorId, provider, scopes }) {
     .digest('hex');
 }
 
+/**
+ * @param {OAuthPermissionApprovalStoreOptions} [options]
+ */
 export function createOAuthPermissionApprovalStore({
   ttlMs = DEFAULT_TTL_MS,
   generateId = () => `oauth_apr_${crypto.randomUUID().replace(/-/g, '')}`,
   now = () => Date.now(),
 } = {}) {
+  /** @type {Map<string, OAuthPermissionApproval>} */
   const approvals = new Map();
 
   function cleanup() {
@@ -42,6 +92,10 @@ export function createOAuthPermissionApprovalStore({
     }
   }
 
+  /**
+   * @param {OAuthPermissionRequest} request
+   * @returns {{ id: string, expiresAt: number }}
+   */
   function issue({ connectorId, provider, scopes, context }) {
     cleanup();
     const id = generateId();
@@ -58,6 +112,11 @@ export function createOAuthPermissionApprovalStore({
     return { id, expiresAt };
   }
 
+  /**
+   * @param {unknown} id
+   * @param {OAuthPermissionRequest} request
+   * @returns {OAuthPermissionApproval}
+   */
   function consume(id, { connectorId, provider, scopes, context }) {
     cleanup();
     if (!id || typeof id !== 'string') {
@@ -86,6 +145,9 @@ export function createOAuthPermissionApprovalStore({
   return {
     issue,
     consume,
+    /**
+     * @returns {number}
+     */
     pendingCount: () => {
       cleanup();
       return approvals.size;
