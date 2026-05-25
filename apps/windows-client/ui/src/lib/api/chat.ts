@@ -83,6 +83,13 @@ export interface TokenUsage {
   total_tokens?: number;
 }
 
+export interface ModelRunConfig {
+  provider?: string;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
 function usage(data: SsePayload): TokenUsage | undefined {
   return data.usage && typeof data.usage === 'object' ? data.usage as TokenUsage : undefined;
 }
@@ -127,6 +134,7 @@ export async function agentChatStream(
   opts: {
     trustedRoot?: string;
     model?: string;
+    modelConfig?: ModelRunConfig;
     thinking?: string;
     autoApprove?: boolean;
     planMode?: boolean;
@@ -142,6 +150,7 @@ export async function agentChatStream(
       prompt,
       trustedRoot: opts.trustedRoot,
       model: opts.model,
+      modelConfig: opts.modelConfig,
       thinking: opts.thinking,
       autoApprove: opts.autoApprove,
       planMode: opts.planMode,

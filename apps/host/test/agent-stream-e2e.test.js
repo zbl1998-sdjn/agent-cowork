@@ -93,6 +93,65 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
   }
 });
 
+test('E2E /api/agent/chat/stream applies session model config without persisting or echoing keys', async () => {
+  const root = tmp();
+  const sessionKey = 'sk-session-secret-DO-NOT-RECORD-1234567890';
+  let capturedConfig = null;
+  const agentModelCall = async ({ kimiConfig }) => {
+    capturedConfig = kimiConfig;
+    return { content: 'session provider recorded' };
+  };
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    agentModelCall,
+  });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '临时切 provider',
+        modelConfig: {
+          provider: 'OPENAI',
+          apiKey: sessionKey,
+          baseUrl: 'https://api.openai.test/v1/',
+          model: 'gpt-session',
+          fallbacks: [{ provider: 'openai', apiKey: 'sk-body-fallback-leak' }],
+        },
+      }),
+    });
+    assert.equal(res.status, 200);
+    const all = await readStream(res);
+    assert.match(all, /event: done/);
+    assert.equal(capturedConfig.provider, 'openai');
+    assert.equal(capturedConfig.model, 'gpt-session');
+    assert.equal(capturedConfig.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(capturedConfig.apiKey, sessionKey);
+    assert.ok(!JSON.stringify(capturedConfig.fallbacks || []).includes('sk-body-fallback-leak'));
+
+    const runId = JSON.parse(/event: start\s+data: ([^\n]+)/.exec(all)[1]).runId;
+    const recordRaw = fs.readFileSync(path.join(root, '.AgentCowork', 'runs', `${runId}.json`), 'utf8');
+    const record = JSON.parse(recordRaw);
+    assert.equal(record.provider, 'openai');
+    assert.equal(record.model, 'gpt-session');
+    assert.equal(record.configSnapshot.provider, 'openai');
+    assert.equal(record.configSnapshot.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(record.configSnapshot.apiKey, undefined);
+    assert.ok(!recordRaw.includes(sessionKey), 'session API key leaked into run record');
+
+    const infoRaw = await (await fetch(`${base}/api/kimi/info`)).text();
+    const info = JSON.parse(infoRaw);
+    assert.notEqual(info.provider, 'openai');
+    assert.notEqual(info.model, 'gpt-session');
+    assert.ok(!infoRaw.includes(sessionKey), 'session API key leaked into persisted config response');
+    assert.ok(!infoRaw.includes('sk-body-fallback-leak'), 'request fallback key leaked into persisted config response');
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden until search_tools activates them', async () => {
   const root = tmp();
   fs.writeFileSync(path.join(root, 'hi.txt'), 'hi', 'utf8');

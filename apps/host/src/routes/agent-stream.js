@@ -13,6 +13,7 @@ import { runAgentChat } from '../kimi/agent/tool-loop.js';
 import { buildAgentToolset } from '../kimi/agent/toolset-builder.js';
 import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
 import { resolveAgentRunStart } from './agent-resume.js';
+import { applySessionModelConfig } from './session-model-config.js';
 
 function modelProvider(kimiConfig) {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
@@ -118,6 +119,7 @@ export async function streamAgentChat({
   scheduler = null,
 }) {
   const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot });
+  const runKimiConfig = applySessionModelConfig(kimiConfig, body);
   if (resumed && !resumeState) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify({ error: '没有找到可续跑的检查点。', runId }));
@@ -159,7 +161,7 @@ export async function streamAgentChat({
       skillRegistry,
       runDeps: { runStoreRoot, runEvents, runsIndex },
       agentDeps: {
-        kimiConfig,
+        kimiConfig: runKimiConfig,
         modelCall,
         approvals,
         autoApprove: body.autoApprove === true,
@@ -174,15 +176,15 @@ export async function streamAgentChat({
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
     const memory = loadLayeredMemory({ trustedRoot, userHome });
-    const runTimeoutMs = resolveAgentRunTimeoutMs(body, kimiConfig);
-    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs });
+    const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
+    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs });
     const runTrace = createRunTrace({ runId, runEvents });
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
       : [];
     outcome = await runAgentChat({
       prompt: body.prompt,
-      kimiConfig,
+      kimiConfig: runKimiConfig,
       trustedRoot,
       modelCall,
       tools: coreTools,
@@ -231,7 +233,7 @@ export async function streamAgentChat({
       runsIndex,
       requestContext,
       runId,
-      kimiConfig,
+      kimiConfig: runKimiConfig,
       body,
       trustedRoot,
       startedAt,

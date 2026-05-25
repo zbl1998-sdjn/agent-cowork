@@ -124,6 +124,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P3-A2 provider 配置选择与运行留痕:`resolveKimiApiConfig` 支持 `KCW_MODEL_PROVIDER`/`KIMI_PROVIDER` 与 host `kimiProvider/modelProvider`, `/api/kimi/config` 可持久化 provider 且不回显 key;agent/chat/plan run record 与 agent config snapshot 均记录 provider,便于后续 P3-B fallback 与 P3-C 成本按 provider 归因。新增配置 API 与 agent stream E2E 覆盖 provider 持久化、重启加载和 run record 留痕。
 - [x] P3-B1 provider fallback 链:agent 模型调用支持 `fallbacks` 串行降级并复用 per-provider/baseUrl/model circuit breaker;fallback 不继承 primary API key/provider/baseUrl/model,4xx/auth/未配置错误不降级,临时失败/熔断可切下一 provider;`model_fallback` 事件只发脱敏摘要。`/api/kimi/config` 可持久化 fallback providers 且 info 响应不回显 fallback key。聚焦模型韧性、配置与 tool-loop 测试通过。
 - [x] P3-C1 provider 成本归因:运行 metrics 现在记录 `provider` 与 `cost.provider`,成本估算支持 `provider:model` 定价 key;可观测面板的成本卡和模型归因显示 provider,只展示 provider id,不暴露 key/baseUrl/fallback secret。聚焦 host usage/run-metrics 与 UI view-model 测试通过。
+- [x] P3-D1 会话级模型覆盖协议:`/api/agent/chat/stream` 支持本轮 `modelConfig` 覆盖 provider/model/baseUrl/apiKey,无全局 key 时可用本轮 BYO-key 或 `openai/local` 进入;覆盖不持久化,run record 不记录 key,请求体 fallbacks 被忽略。UI API helper 已可透传 modelConfig,可见控件留给 P3-D2。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。

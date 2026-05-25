@@ -585,7 +585,7 @@ describe('SSE streams', () => {
   });
 
   it('streams agent todo snapshots and updates', async () => {
-    const { api } = await importApi((url) => {
+    const { api, calls } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });
       if (url.endsWith('/api/agent/chat/stream')) {
         return sseResponse([
@@ -609,12 +609,21 @@ describe('SSE streams', () => {
     const updates: unknown[] = [];
     let done: unknown = null;
 
-    await api.agentChatStream('执行计划', { trustedRoot: 'C:/work', autoApprove: true, planMode: true }, {
+    await api.agentChatStream('执行计划', {
+      trustedRoot: 'C:/work',
+      autoApprove: true,
+      planMode: true,
+      modelConfig: { provider: 'openai', model: 'gpt-session', baseUrl: 'https://api.openai.test/v1', apiKey: 'sk-session' },
+    }, {
       onTodoSnapshot: (todos) => snapshots.push(todos),
       onTodoUpdate: (todo) => updates.push(todo),
       onDone: (full) => { done = full; },
     });
 
+    const streamCall = calls.find((call) => call.url.endsWith('/api/agent/chat/stream'));
+    expect(JSON.parse(String(streamCall?.init?.body))).toMatchObject({
+      modelConfig: { provider: 'openai', model: 'gpt-session', baseUrl: 'https://api.openai.test/v1', apiKey: 'sk-session' },
+    });
     expect(snapshots).toEqual([[{ id: 'plan-1', text: '读取现状', status: 'pending' }]]);
     expect(updates).toEqual([{ id: 'plan-1', text: '读取现状', status: 'done' }]);
     expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });

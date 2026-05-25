@@ -3,8 +3,7 @@ import { streamAgentChat } from './agent-stream.js';
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../kimi/api-runner.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
-
-const KIMI_NOT_CONFIGURED = KIMI_API_NOT_CONFIGURED_MESSAGE;
+import { hasSessionModelAccess } from './session-model-config.js';
 
 function modelProvider(kimiConfig) { return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api'; }
 function fallbackSummaries(value) { return Array.isArray(value) ? value.map((item) => ({ provider: modelProvider(item), baseUrl: item && item.baseUrl, model: item && item.model, hasKey: Boolean(item && item.apiKey) })) : []; }
@@ -151,7 +150,7 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && (pathname === '/api/kimi/plan' || pathname === '/api/kimi/chat')) {
     await withJsonBody(request, response, async (body) => {
       if (!state.kimiApiEnabled) {
-        sendJson(response, 503, { error: KIMI_NOT_CONFIGURED });
+        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
@@ -175,8 +174,8 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
 
   if (request.method === 'POST' && pathname === '/api/agent/chat/stream') {
     await withJsonBody(request, response, async (body) => {
-      if (!state.kimiApiEnabled) {
-        sendJson(response, 503, { error: KIMI_NOT_CONFIGURED });
+      if (!state.kimiApiEnabled && !hasSessionModelAccess(body)) {
+        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       const hasPrompt = body && typeof body.prompt === 'string' && body.prompt.trim();
@@ -224,7 +223,7 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/kimi/chat/stream') {
     await withJsonBody(request, response, async (body) => {
       if (!state.kimiApiEnabled) {
-        sendJson(response, 503, { error: KIMI_NOT_CONFIGURED });
+        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
