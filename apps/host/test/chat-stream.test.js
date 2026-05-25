@@ -51,6 +51,7 @@ test('POST /api/kimi/chat/stream returns 503 when Kimi API is not configured', a
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'hi' }),
     });
     assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /需要模型回复时请联网/);
   } finally {
     await new Promise((r) => server.close(r));
   }

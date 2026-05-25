@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "mode": "offline-local",
+  "generatedAt": "2026-05-25T18:09:33.566Z",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\offline-local-smoke-workspace",
+  "checks": {
+    "health": "passed",
+    "workspace": "passed",
+    "localFiles": "passed",
+    "localWrite": "passed",
+    "runtimeDependencies": "passed",
+    "modelNetworkBoundary": "passed",
+    "audit": "passed"
+  }
+}

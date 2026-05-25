@@ -3,6 +3,7 @@ const DEFAULT_MODEL = 'kimi-k2.6';
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_TOKENS = 2048;
 const MAX_PROMPT_LENGTH = 8000;
+export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置 Kimi/Moonshot API Key。本地文件功能仍可离线使用；需要模型回复时请联网并配置 KIMI_API_KEY 或 MOONSHOT_API_KEY。';
 
 function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
@@ -130,7 +131,7 @@ async function runKimiApiText({
   resultMode,
 } = {}) {
   if (!apiKey || typeof apiKey !== 'string') {
-    throw new Error('Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY.');
+    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
   }
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
@@ -231,7 +232,7 @@ export async function runKimiApiChatStream({
   temperature,
 } = {}) {
   if (!apiKey || typeof apiKey !== 'string') {
-    throw new Error('Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY.');
+    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
   }
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');

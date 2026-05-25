@@ -1,9 +1,10 @@
 import { streamChat } from '../kimi/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
+import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../kimi/api-runner.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 
-const KIMI_NOT_CONFIGURED = 'Kimi API is not configured. Set KIMI_API_KEY or MOONSHOT_API_KEY to enable it.';
+const KIMI_NOT_CONFIGURED = KIMI_API_NOT_CONFIGURED_MESSAGE;
 
 async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summary, runner, response, context }) {
   const runId = createRunId();

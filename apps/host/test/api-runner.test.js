@@ -112,6 +112,6 @@ test('runKimiApiPlan rejects missing API key before network calls', async () => 
         throw new Error('should not call network');
       },
     }),
-    /not configured/,
+    /本地文件功能仍可离线使用/,
   );
 });

@@ -59,7 +59,7 @@ test('kimi plan endpoint is disabled unless API key or runner is configured', as
       body: JSON.stringify({ trustedRoot, prompt: '生成计划' }),
     });
     assert.equal(response.status, 503);
-    assert.match((await response.json()).error, /Kimi API is not configured/i);
+    assert.match((await response.json()).error, /本地文件功能仍可离线使用/);
   });
 });
 

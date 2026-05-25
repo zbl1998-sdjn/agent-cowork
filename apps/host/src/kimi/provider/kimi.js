@@ -1,3 +1,5 @@
+import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
+
 export function createKimiProvider() {
   return {
     id: 'kimi',
@@ -11,7 +13,7 @@ export function createKimiProvider() {
       signal,
     }) {
       if (!kimiConfig || !kimiConfig.apiKey) {
-        throw new Error('Kimi API is not configured. Set KIMI_API_KEY.');
+        throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
       }
       const endpoint = `${String(kimiConfig.baseUrl).replace(/\/+$/, '')}/chat/completions`;
       const headers = {
