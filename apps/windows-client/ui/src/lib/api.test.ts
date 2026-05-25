@@ -349,6 +349,50 @@ describe('JSON requests', () => {
       idempotencyKey: expect.stringMatching(/^conn-/),
     });
   });
+
+  it('posts exact-ID batch approval requests with deduped ids', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/approvals/batch')) {
+        return jsonResponse({
+          ok: false,
+          resolved: 1,
+          results: [{ id: 'apr_one', ok: true }, { id: 'apr_two', ok: false }],
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const result = await api.respondApprovals(['apr_one', '', 'apr_two', 'apr_one'], 'session');
+
+    const request = calls.find((call) => call.url.endsWith('/api/approvals/batch'));
+    expect(request?.init?.method).toBe('POST');
+    expect(JSON.parse(String(request?.init?.body))).toEqual({
+      ids: ['apr_one', 'apr_two'],
+      decision: 'session',
+    });
+    expect(result).toEqual({
+      ok: false,
+      resolved: 1,
+      results: [{ id: 'apr_one', ok: true }, { id: 'apr_two', ok: false }],
+    });
+  });
+
+  it('keeps batch approval helper closed on empty ids and network failures', async () => {
+    const empty = await (await importApi()).api.respondApprovals(['', ''], 'once');
+    expect(empty).toEqual({ ok: false, resolved: 0, results: [] });
+
+    const { api } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      throw new Error('offline');
+    });
+
+    await expect(api.respondApprovals(['apr_one', 'apr_two'], 'once')).resolves.toEqual({
+      ok: false,
+      resolved: 0,
+      results: [{ id: 'apr_one', ok: false }, { id: 'apr_two', ok: false }],
+    });
+  });
 });
 
 describe('host readiness', () => {

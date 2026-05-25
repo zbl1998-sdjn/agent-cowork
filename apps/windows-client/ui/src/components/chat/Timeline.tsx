@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { answerQuestion, openPath, respondApproval } from '../../lib/api';
+import { answerQuestion, openPath, respondApproval, respondApprovals } from '../../lib/api';
 import { extractSuggestions } from '../../lib/md';
 import type { AssistantMessage, Message } from '../../lib/app-types';
 import { MessageText } from '../MessageText';
@@ -39,6 +39,11 @@ interface TimelineProps {
   onSubmitEdit: (messageId: string) => void;
 }
 
+interface PendingApprovalRef {
+  messageId: string;
+  id: string;
+}
+
 export function Timeline({
   editText,
   editingMsgId,
@@ -62,6 +67,14 @@ export function Timeline({
   onSetEditText,
   onSubmitEdit,
 }: TimelineProps) {
+  const pendingApprovalIds = new Set<string>();
+  const pendingApprovals = messages.flatMap((message): PendingApprovalRef[] => {
+    if (message.role !== 'assistant' || !message.approval) return [];
+    const id = message.approval.id.trim();
+    if (!id || pendingApprovalIds.has(id)) return [];
+    pendingApprovalIds.add(id);
+    return [{ messageId: message.id, id }];
+  });
   return (
     <>
       <main className="timeline" role="log" ref={timelineRef}>
@@ -74,6 +87,7 @@ export function Timeline({
             </div>
           </div>
         )}
+        {pendingApprovals.length > 1 && <BatchApprovalBar pendingApprovals={pendingApprovals} onPatchAssistant={onPatchAssistant} />}
         {messages.map((message) => message.role === 'user' ? (
           editingMsgId === message.id ? (
             <div key={message.id} className="user-edit">
@@ -175,6 +189,15 @@ function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage
     onPatchAssistant(message.id, (m) => ({ ...m, question: undefined, status: 'running' }));
   };
   return <div className="question-card"><div className="question-q">{message.question!.question}</div><div className="question-options">{message.question!.options.length > 0 ? message.question!.options.map((opt, i) => <button key={i} type="button" onClick={() => respondToQuestion(opt.label)}><strong>{opt.label}</strong>{opt.description && <span>{opt.description}</span>}</button>) : <button type="button" onClick={() => respondToQuestion('继续')}>继续</button>}</div></div>;
+}
+
+function BatchApprovalBar({ pendingApprovals, onPatchAssistant }: { pendingApprovals: PendingApprovalRef[]; onPatchAssistant: TimelineProps['onPatchAssistant'] }) {
+  const respondToBatch = (decision: 'once' | 'session') => {
+    const ids = pendingApprovals.map((item) => item.id);
+    void respondApprovals(ids, decision);
+    pendingApprovals.forEach((item) => onPatchAssistant(item.messageId, (m) => ({ ...m, approval: undefined })));
+  };
+  return <div className="approval-bar"><span className="approval-q">待批准操作：<strong>{pendingApprovals.length}</strong> 个</span><div className="approval-actions"><button type="button" onClick={() => respondToBatch('once')}>批准当前 {pendingApprovals.length} 个</button><button type="button" onClick={() => respondToBatch('session')}>本会话批准当前 {pendingApprovals.length} 个</button></div></div>;
 }
 
 function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: TimelineProps['onPatchAssistant'] }) {

@@ -190,6 +190,27 @@ export async function respondApproval(id: string, decision: 'once' | 'session' |
   }
 }
 
+export interface ApprovalBatchResult {
+  ok: boolean;
+  resolved: number;
+  results: Array<{ id: string; ok: boolean }>;
+}
+
+export async function respondApprovals(ids: string[], decision: 'once' | 'session' | 'reject'): Promise<ApprovalBatchResult> {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (!uniqueIds.length) return { ok: false, resolved: 0, results: [] };
+  try {
+    const res = await postJson<ApprovalBatchResult>('/api/approvals/batch', { ids: uniqueIds, decision });
+    return {
+      ok: Boolean(res.ok),
+      resolved: Number(res.resolved || 0),
+      results: Array.isArray(res.results) ? res.results : [],
+    };
+  } catch {
+    return { ok: false, resolved: 0, results: uniqueIds.map((id) => ({ id, ok: false })) };
+  }
+}
+
 export async function answerQuestion(id: string, answer: string): Promise<boolean> {
   try {
     const res = await postJson<{ ok?: boolean }>(`/api/approvals/${encodeURIComponent(id)}`, { answer });
