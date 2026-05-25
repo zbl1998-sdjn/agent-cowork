@@ -40,6 +40,7 @@
     "apps/host/src/runtime/rate-limit.js",
     "apps/host/src/runtime/resilience.js",
     "apps/host/src/runtime/run-checkpoint.js",
+    "apps/host/src/runtime/run-metrics.js",
     "apps/host/src/runtime/run-resume.js",
     "apps/host/src/runtime/task-presenter.js",
     "apps/host/src/runtime/usage.js",

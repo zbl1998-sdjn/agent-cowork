@@ -115,6 +115,8 @@ D4 完成记录(2026-05-25):新增 L0 `util/ids.js` seedable ID 源,提供 deter
 | E3 | 版本归因:run 记录绑定 system-prompt 版本 + 模型 + 关键配置快照 | `runtime/run-store` 增字段 + `kimi/system-prompt` 版本戳 | **前置 run-store 特征测试** | **每个结果可追溯到 prompt / 模型 / 配置版本** | S |
 | E4 | 决策 trace:结构化记录"模型看到什么→决定调哪个工具→为什么→结果",可回放调试 | `runtime/run-trace.js` | 单测 | 任一运行可回放其决策轨迹用于排错 | M |
 
+E1 完成记录(2026-05-25):新增 `runtime/run-metrics.js` 结构化运行指标生成器,逐运行派生 token、估算成本、耗时、步骤数、工具调用数、失败数和失败率;`writeRunRecord` 在所有运行记录写盘前统一补 `metrics`,agent SSE 记录会持久化聚合 usage 以进入指标。已补纯函数、run-store 持久化和 agent stream 真实记录路径测试,并纳入 host `checkJs`。`npm run test:host` 通过(536 tests,535 pass,1 skip)。
+
 ---
 
 ## F · 预算、超时与熔断 — 防止失控烧钱 / 卡死(上版缺失,补)

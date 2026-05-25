@@ -39,7 +39,7 @@ function recordAgentRun({
     status,
     context: requestContext,
     input: { prompt: String(prompt || '') },
-    result: { ok: status === 'succeeded', text: outcome.text, steps: outcome.steps },
+    result: { ok: status === 'succeeded', text: outcome.text, steps: outcome.steps, usage: outcome.usage },
     events,
   };
   try {
