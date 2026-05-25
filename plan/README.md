@@ -132,6 +132,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-3b 局部接入(SchedulesPanel):定时任务面板的内联空态/错误态已替换为现有 `Empty`/`ErrorState`,错误态保留重新加载入口;新增状态渲染单测。
 - [x] FE-3b 局部接入(MemoryPanel):记忆面板的内联空态/错误态已替换为现有 `Empty`/`ErrorState`,错误态保留重新加载入口且不再同时显示空态;新增状态渲染单测。
 - [x] FE-3b 局部接入(ToolsPanel):工具面板搜索前空态已替换为 `Empty`,工具调用/参数 JSON 失败结果已替换为 `ErrorState`;成功工具 JSON 结果继续用 preformatted 输出。新增单测覆盖空态、错误态、成功结果和错误分类。
+- [x] FE-3b 局部接入(VizPanel):活页渲染失败态已替换为 `ErrorState`,保持原有活页渲染/刷新逻辑;新增单测覆盖默认无错误态与错误态渲染。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../lib/api';
 import { LiveArtifactView } from './LiveArtifactView';
+import { ErrorState } from './ui/StateViews';
 
 interface VizPanelProps {
   trustedRoot: string;
@@ -11,6 +12,11 @@ const SAMPLE = JSON.stringify(
   null,
   2,
 );
+
+export function VizPanelErrorState({ error }: { error: string }) {
+  if (!error) return null;
+  return <ErrorState title="活页渲染失败" message={error} />;
+}
 
 // Render a viz spec to a live, refreshable artifact and preview it inline.
 export function VizPanel({ trustedRoot }: VizPanelProps) {
@@ -55,7 +61,7 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
         <button type="button" disabled={busy} onClick={() => void onRender()}>{busy ? '渲染中…' : '渲染活页'}</button>
         {viewUrl && <button type="button" onClick={() => void fetchArtifactHtml(viewUrl).then(setSrcDoc).catch((e) => setError((e as Error).message))}>重开活页</button>}
       </div>
-      {error && <p className="panel-error">{error}</p>}
+      <VizPanelErrorState error={error} />
       <LiveArtifactView srcDoc={srcDoc} dataUrl={dataUrl} filePath={filePath} busy={busy} />
     </section>
   );
