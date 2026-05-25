@@ -1,9 +1,28 @@
 import { useState } from 'react';
 import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../lib/api';
+import { Empty, ErrorState } from './ui/StateViews';
 
 interface ToolsPanelProps {
   trustedRoot: string;
   onRunPlan?: (goal: string, steps: SubagentStep[]) => void;
+}
+
+export function ToolsPanelEmptyState() {
+  return <Empty title="输入关键字搜索工具" message="匹配到的可用工具会显示在这里。" />;
+}
+
+export function isToolPanelErrorResult(result: string): boolean {
+  return result.startsWith('错误：') || result.startsWith('参数 JSON 无效：');
+}
+
+export function ToolsPanelResultState({ result }: { result: string }) {
+  if (!result) return null;
+  if (isToolPanelErrorResult(result)) {
+    const title = result.startsWith('参数 JSON 无效：') ? '参数 JSON 无效' : '工具调用失败';
+    const message = result.replace(/^错误：/, '').replace(/^参数 JSON 无效：/, '');
+    return <ErrorState title={title} message={message} />;
+  }
+  return <pre className="panel-result">{result}</pre>;
 }
 
 // Tool discovery + ad-hoc invocation + a sub-agent plan builder. Mirrors the
@@ -86,7 +105,11 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
             <p>{tool.description}</p>
           </li>
         ))}
-        {tools.length === 0 && <li className="panel-empty">输入关键字后搜索可用工具</li>}
+        {tools.length === 0 && (
+          <li className="panel-empty">
+            <ToolsPanelEmptyState />
+          </li>
+        )}
       </ul>
       {selected && (
         <div className="panel-call">
@@ -97,7 +120,7 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
             <button type="button" disabled={selectedRequiresApproval} onClick={onAddStep}>加入计划</button>
           </div>
           {selectedRequiresApproval && <p className="panel-note">该工具需经 Agent 审批流执行。</p>}
-          {result && <pre className="panel-result">{result}</pre>}
+          <ToolsPanelResultState result={result} />
         </div>
       )}
       {plan.length > 0 && (
