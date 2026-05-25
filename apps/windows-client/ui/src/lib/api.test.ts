@@ -90,6 +90,29 @@ describe('resolveUrl', () => {
 });
 
 describe('JSON requests', () => {
+  it('loads run lists and run details through typed run helpers', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/runs?limit=10')) {
+        return jsonResponse({
+          runs: [{ id: 'run_1', type: 'agent', status: 'done', metrics: { tokens: { total_tokens: 12 } } }],
+        });
+      }
+      if (url.endsWith('/api/runs/run%201')) {
+        return jsonResponse({ id: 'run 1', type: 'agent', status: 'done', attribution: { model: { model: 'kimi' } } });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const list = await api.listRunRecords(10);
+    const detail = await api.getRunRecord('run 1');
+
+    expect(list).toEqual([{ id: 'run_1', type: 'agent', status: 'done', metrics: { tokens: { total_tokens: 12 } } }]);
+    expect(detail).toEqual({ id: 'run 1', type: 'agent', status: 'done', attribution: { model: { model: 'kimi' } } });
+    expect(calls.some((call) => call.url.endsWith('/api/runs?limit=10'))).toBe(true);
+    expect(calls.some((call) => call.url.endsWith('/api/runs/run%201'))).toBe(true);
+  });
+
   it('injects the Bearer token on GET requests after host readiness', async () => {
     const { api, calls } = await importApi();
     api.setAuthToken(' token-123 ');

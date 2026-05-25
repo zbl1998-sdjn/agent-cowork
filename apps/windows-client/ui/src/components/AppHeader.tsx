@@ -48,6 +48,7 @@ export function AppHeader({
         <button type="button" className={panel === 'artifacts' ? 'is-active' : ''} onClick={() => onTogglePanel('artifacts')}>产物</button>
         <button type="button" className={panel === 'schedules' ? 'is-active' : ''} onClick={() => onTogglePanel('schedules')}>定时任务</button>
         <button type="button" className={panel === 'memory' ? 'is-active' : ''} onClick={() => onTogglePanel('memory')}>记忆</button>
+        <button type="button" className={panel === 'observability' ? 'is-active' : ''} onClick={() => onTogglePanel('observability')}>可观测</button>
         <button type="button" onClick={onOpenSettings} title="API 设置">⚙ 设置</button>
         <span className="header-user" title={`租户 ${user.tenantId}`}>{user.username}</span>
         <button type="button" className="header-logout" onClick={onLogout} title="退出登录">退出</button>

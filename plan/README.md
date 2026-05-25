@@ -81,6 +81,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-D2 run-resume:新增 `runtime/run-resume.js`,可从最新检查点生成 `resumeState`;`tool-loop` 支持从检查点消息、usage、已批准工具和 todo 续跑。已用崩溃后续跑测试锁定已完成工具 handler 不重复执行、文件副作用不重复。
 - [x] 07-D4 seed 注入:新增 L0 `util/ids.js` seedable ID 源;`createRunId`/`createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现 start `runId`,便于 replay/debug 对齐轨迹。
 - [x] 07-E1 RunMetrics:新增 `runtime/run-metrics.js`,所有 `writeRunRecord` 持久化记录都会自动带 `metrics`(token/估算成本/耗时/步骤/工具调用/失败率);agent stream 记录已持久化聚合 usage。`npm run test:host` 当前 536 tests,535 pass,1 skip。
+- [x] 07-E2 前端成本/可观测面板:新增 `ObservabilityPanel` 与 `/api/runs` typed helpers,展示 token、成本、工具为什么、耗时、模型/配置归因和来源跳转。UI 测试通过(25 files,114 tests),本机 5173 UI + 3017 host 烟测可打开面板。
 - [x] 07-E3 版本归因:新增 `runtime/run-attribution.js`,所有 `writeRunRecord` 持久化记录都会自动带 `attribution`(输入 prompt 哈希、system-prompt 版本、prompt builder、provider/model/mode/baseUrl 与脱敏配置快照);agent stream 记录只写入安全配置摘要。`npm run test:host` 当前 539 tests,538 pass,1 skip。
 - [x] 07-E4 决策 trace:新增 `runtime/run-trace.js`/`run-trace-normalizers.js`,可结构化记录模型上下文、工具决策、why、工具结果并通过 `run-events` 回放;也可从现有 messages 构建决策轨迹。聚焦 `run-trace.test.js` 通过,`npm run check` 通过。
 - [x] 07-G1 InjectionGuard:新增 `kimi/safety/untrusted-content.js`,工具结果回灌前统一包成不可信数据区;检测到 prompt injection/tool hijack/exfiltration/approval bypass 模式时发 `untrusted_content_flagged`,并用 tool-loop 注入用例锁定恶意工具输出不会诱导 Shell。

@@ -3,6 +3,7 @@ import type { SidePanel } from '../lib/app-types';
 import { ArtifactsPanel } from './ArtifactsPanel';
 import { ConnectorsPanel } from './ConnectorsPanel';
 import { MemoryPanel } from './MemoryPanel';
+import { ObservabilityPanel } from './ObservabilityPanel';
 import { SchedulesPanel } from './SchedulesPanel';
 import { ToolsPanel } from './ToolsPanel';
 import { VizPanel } from './VizPanel';
@@ -25,6 +26,7 @@ export function AppSidePanel({ panel, trustedRoot, onClose, onRunSubagent }: App
       {panel === 'artifacts' && <ArtifactsPanel trustedRoot={trustedRoot} />}
       {panel === 'schedules' && <SchedulesPanel />}
       {panel === 'memory' && <MemoryPanel trustedRoot={trustedRoot} />}
+      {panel === 'observability' && <ObservabilityPanel />}
     </aside>
   );
 }

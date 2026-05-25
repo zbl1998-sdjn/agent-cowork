@@ -117,6 +117,8 @@ D4 完成记录(2026-05-25):新增 L0 `util/ids.js` seedable ID 源,提供 deter
 
 E1 完成记录(2026-05-25):新增 `runtime/run-metrics.js` 结构化运行指标生成器,逐运行派生 token、估算成本、耗时、步骤数、工具调用数、失败数和失败率;`writeRunRecord` 在所有运行记录写盘前统一补 `metrics`,agent SSE 记录会持久化聚合 usage 以进入指标。已补纯函数、run-store 持久化和 agent stream 真实记录路径测试,并纳入 host `checkJs`。`npm run test:host` 通过(536 tests,535 pass,1 skip)。
 
+E2 完成记录(2026-05-25):前端新增 `ObservabilityPanel` 与 `run-observability` view model,通过 `/api/runs` 列表/详情展示每次运行的 token、估算成本、工具调用、失败率、耗时、模型归因、配置快照和来源跳转。已补 UI 纯逻辑测试和 API helper 测试;`npm --prefix apps/windows-client/ui run test` 通过(25 files,114 tests)。本地 5173 UI + 3017 host 烟测确认 guest 登录后可打开"可观测"面板并显示空运行态。
+
 E3 完成记录(2026-05-25):新增 `runtime/run-attribution.js` 统一生成运行归因,每条 `writeRunRecord` 持久化记录都会绑定输入 prompt 哈希、输入长度、system-prompt 版本、prompt builder、provider/model/mode/baseUrl 与脱敏后的关键配置快照;`kimi/system-prompt.js` 暴露 `SYSTEM_PROMPT_VERSION`,agent SSE 记录通过 `routes/agent-config-snapshot.js` 只写入安全配置摘要,不持久化 API key/token/secret。已补纯函数、run-store 持久化和 agent stream 真实记录路径测试,并纳入 host `checkJs`。`npm run test:host` 通过(539 tests,538 pass,1 skip)。
 
 E4 完成记录(2026-05-25):新增 `runtime/run-trace.js` 与 `runtime/run-trace-normalizers.js`,支持结构化记录模型上下文、工具决策、为什么调用、工具结果,并通过 `run-events` 发布 `run_trace` 事件用于回放调试;`buildDecisionTraceFromMessages` 可从现有 message 序列恢复"模型看到什么→决定调哪个工具→结果"轨迹。单测覆盖脱敏、截断、事件回放和 message 序列决策关联;聚焦 `run-trace.test.js` 通过,`npm run check` 通过。

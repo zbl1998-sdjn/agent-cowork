@@ -88,8 +88,84 @@ export interface RunSummary {
   id: string;
   type: string;
   status: RunStatus | string;
+  provider?: string | null;
+  mode?: string | null;
   recipeId?: string | null;
   promptPreview?: string | null;
   startedAt?: string | null;
+  finishedAt?: string | null;
   durationMs?: number | null;
+}
+
+export interface TokenUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+export interface RunCost {
+  currency?: string;
+  input?: number;
+  output?: number;
+  total?: number;
+  estimated?: boolean;
+  source?: string;
+  model?: string;
+}
+
+export interface RunMetrics {
+  schemaVersion?: number;
+  model?: string;
+  status?: string;
+  tokens?: TokenUsage;
+  cost?: RunCost;
+  duration?: {
+    totalMs?: number;
+    phases?: Array<{ key?: string; label?: string; durationMs?: number; percent?: number }>;
+    unaccountedMs?: number;
+  };
+  steps?: {
+    total?: number;
+    succeeded?: number;
+    failed?: number;
+  };
+  tools?: {
+    calls?: number;
+    succeeded?: number;
+    failed?: number;
+    unique?: string[];
+  };
+  failures?: {
+    count?: number;
+    rate?: number;
+    runFailed?: boolean;
+  };
+}
+
+export interface RunAttribution {
+  schemaVersion?: number;
+  prompt?: {
+    inputSha256?: string | null;
+    inputChars?: number;
+    systemPromptVersion?: string | null;
+    builder?: string | null;
+  };
+  model?: {
+    provider?: string | null;
+    model?: string | null;
+    mode?: string | null;
+    baseUrl?: string | null;
+  };
+  config?: Record<string, unknown>;
+}
+
+export interface RunRecord extends RunSummary {
+  metrics?: RunMetrics | null;
+  attribution?: RunAttribution | null;
+  prompt?: string | null;
+  input?: { prompt?: string | null };
+  result?: unknown;
+  error?: string | { message?: string } | null;
+  events?: Array<RunEvent | Record<string, unknown>>;
+  sources?: SourceRef[];
 }

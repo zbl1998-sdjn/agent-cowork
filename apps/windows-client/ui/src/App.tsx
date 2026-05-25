@@ -240,7 +240,7 @@ export function App() {
     { id: 'new', label: '新建对话', run: conversations.newConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'plan', label: planMode ? '关闭计划模式' : '开启计划模式', run: () => setPlanMode((v) => !v) },
     { id: 'auto', label: autoApprove ? '关闭自动批准' : '开启自动批准', run: () => setAutoApprove((v) => !v) }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
     { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
-    { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') },
+    { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
     { id: 'settings', label: 'API 设置', run: () => setSettingsOpen(true) }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
   ], [autoApprove, autoClarify, conversations.newConversation, doLogout, planMode, theme, toggleTheme]);
 
