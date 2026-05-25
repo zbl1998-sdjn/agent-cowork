@@ -48,9 +48,9 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 04-Q6(真实 Kimi API smoke 子项):`npm run smoke:kimi-api` 已修复 guest auth 并在真实 `KIMI_API_KEY` 环境下通过 `/api/kimi/plan`;证据见 `reports/kimi-api-smoke/kimi-api-smoke-20260524T221510Z.json`。该项只证明 Kimi API 通路,不替代 P1-A3 多文件端到端验收。
 - [x] FE-1:智能滚动代码+单测完成,并新增 `npm run smoke:react-scroll` 真实浏览器验收;覆盖长对话中翻看历史时流式新内容不强行拽回底部,以及"回到底部"按钮出现/点击回底。
 - [x] 03-B1a:活页 `live-artifact.js` 已按 spec/render/refresh 拆为独立模块,新增安全特征测试并通过门禁。
-- [x] 03-B1b(本地可测子项):活页 data endpoint 支持手动 refresh 工作区 `file-json` 数据源,并复用 trustedRoot jail 校验。
+- [x] 03-B1b(本地可测子项):活页 data endpoint 支持手动 refresh 工作区 `file-json` 数据源,并支持已连接 filesystem MCP 的 `mcp__fs__read_text` 作为 connector-tool 数据源;未连接 connector 与高风险 MCP 工具会被拒绝,复用 trustedRoot jail/connector allowlist 安全边界。
 - [x] 03-B1c(本地可测子项):前端 `LiveArtifactView` 支持活页预览、手动刷新、可选定时刷新、重开活页与打开产物文件;UI 单测通过,并新增 `npm run smoke:react-live-artifact` 真实浏览器验收(渲染活页→修改 `file-json` 数据源→自动刷新拉取新数据→独立活页刷新渲染新数据),证据见 `reports/react-live-artifact/react-live-artifact-2026-05-24T21-51-04-272Z.json`。
-- [ ] 03-B1 延后项:连接器数据源仍待 P2-B 连接器体系;安装版/WebView 内嵌 iframe 的视觉深验仍留到 04-R5 深验。
+- [ ] 03-B1 延后项:安装版/WebView 内嵌 iframe 的视觉深验仍留到 04-R5 深验。
 - [x] 03-B2:产物面板已卡片化,支持打开、重命名;后端 `/api/artifacts/rename` 复用 trustedRoot jail 与幂等键,host/UI 单测通过,并新增 `npm run smoke:react-artifacts` 真实浏览器验收(产物列表→重命名→磁盘同步)。
 - [x] 05-B1a:对话消息树/分支模型 + 历史消息编辑 fork 已实现;file/PG 存储和迁移已补测试。
 - [x] 05-B1b:分支切换控件、分支差异摘要与 hook 同步已实现;新增 `npm run smoke:react-branches` 真实浏览器验收,覆盖主线→分支→回到主线时的时间线与差异摘要更新;证据见 `reports/react-branches/react-branches-2026-05-24T20-48-18-623Z.json`。
@@ -73,4 +73,4 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 前端优化专项线(FE,聚焦交互修复/架构分层+错误空态/流式性能;设计系统暂缓)
 - [x] 4 个开放问题按默认锁成 D1–D4
 - [x] 已开工:P0 地基、03/04/05 多个本地可测切片已完成并纳入 CI
-- [ ] 继续:深度优先收尾 P2-B OAuth 真实外部验收;P1-A3 真实 Kimi 多文件留档、03-B1 连接器数据源、05-A2 Office 深操作等仍按延期验收清单处理。
+- [ ] 继续:深度优先收尾 P2-B OAuth 真实外部验收;P1-A3 真实 Kimi 多文件留档、05-A2 Office 深操作等仍按延期验收清单处理。

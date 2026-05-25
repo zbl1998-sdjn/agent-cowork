@@ -52,6 +52,21 @@ export function normalizeLiveArtifactDataSource(dataSource) {
     throw fail('dataSource must be an object');
   }
   const type = String(dataSource.type || dataSource.kind || '').toLowerCase();
+  if (type === 'connector-tool') {
+    const tool = String(dataSource.tool || dataSource.name || '').trim();
+    if (!/^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_.-]+$/.test(tool)) {
+      throw fail('dataSource.tool must be a connected MCP tool name');
+    }
+    const args = dataSource.args == null ? {} : dataSource.args;
+    if (!args || typeof args !== 'object' || Array.isArray(args)) {
+      throw fail('dataSource.args must be an object');
+    }
+    return {
+      type,
+      tool,
+      args: JSON.parse(JSON.stringify(args)),
+    };
+  }
   if (type !== 'file-json') {
     throw fail(`unsupported artifact data source "${type || '(empty)'}"`);
   }
@@ -70,7 +85,7 @@ export function normalizeLiveArtifactDataSource(dataSource) {
 
 export function resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource }) {
   const source = normalizeLiveArtifactDataSource(dataSource);
-  if (!source) {
+  if (!source || source.type !== 'file-json') {
     return null;
   }
   const root = path.resolve(trustedRoot);

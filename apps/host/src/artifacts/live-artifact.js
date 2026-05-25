@@ -9,15 +9,27 @@ import {
   resolveLiveArtifactDataSourcePath,
 } from './live-spec.js';
 import { renderLivePage } from './live-render.js';
-import { readArtifactManifest, readLiveArtifactHtml, refreshLiveArtifactData } from './live-refresh.js';
+import {
+  readArtifactManifest,
+  readLiveArtifactHtml,
+  refreshLiveArtifactData,
+  refreshLiveArtifactDataAsync,
+} from './live-refresh.js';
 
-export { createArtifactId, renderLivePage, readArtifactManifest, readLiveArtifactHtml, refreshLiveArtifactData };
+export {
+  createArtifactId,
+  renderLivePage,
+  readArtifactManifest,
+  readLiveArtifactHtml,
+  refreshLiveArtifactData,
+  refreshLiveArtifactDataAsync,
+};
 
 export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource }) {
   const spec = normalizeLiveArtifactSpec({ id, title, viz, dataUrl, dataSource });
   // Validate the viz spec by rendering it once (throws 400 on bad kind/data).
   renderViz(spec.viz);
-  if (spec.dataSource) {
+  if (spec.dataSource?.type === 'file-json') {
     resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });
   }
 

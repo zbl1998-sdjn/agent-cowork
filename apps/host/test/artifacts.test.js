@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { renderViz, VIZ_KINDS } from '../src/artifacts/viz.js';
+import { createToolRegistry } from '../src/tools/tool-registry.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-art-'));
@@ -244,6 +245,122 @@ test('POST /api/viz/render persists a live artifact with a refreshable file-json
     assert.equal(data.body.dataSource.type, 'file-json');
     assert.deepEqual(data.body.viz.data.labels, ['new']);
     assert.deepEqual(data.body.viz.data.values, [9]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/viz/render refreshes from a connected filesystem connector data source', async () => {
+  const trustedRoot = tempRoot();
+  const sourceRel = 'data/connector-refresh.json';
+  const sourcePath = path.join(trustedRoot, sourceRel);
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['old']] } } }), 'utf8');
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const connected = await jsonRequest(base, '/api/connectors/connect', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'connector-live-connect' },
+      body: { id: 'filesystem', trustedRoot },
+    });
+    assert.equal(connected.status, 200);
+
+    const res = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-connector-source' },
+      body: {
+        title: '连接器活页',
+        kind: 'table',
+        data: { columns: ['name'], rows: [['initial']] },
+        dataSource: {
+          type: 'connector-tool',
+          tool: 'mcp__fs__read_text',
+          args: { path: sourceRel },
+        },
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.persisted, true);
+
+    fs.writeFileSync(sourcePath, JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['new']] } } }), 'utf8');
+    const data = await jsonRequest(base, res.body.dataUrl);
+    assert.equal(data.status, 200);
+    assert.equal(data.body.dataSource.type, 'connector-tool');
+    assert.equal(data.body.dataSource.tool, 'mcp__fs__read_text');
+    assert.deepEqual(data.body.viz.data.rows, [['new']]);
+  } finally {
+    server.closeMcp?.();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/artifacts/data rejects connector data sources before the connector tool is connected', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-connector-missing-source' },
+      body: {
+        title: '未连接数据源',
+        kind: 'table',
+        data: { columns: ['name'], rows: [['initial']] },
+        dataSource: {
+          type: 'connector-tool',
+          tool: 'mcp__fs__read_text',
+          args: { path: 'data/live.json' },
+        },
+      },
+    });
+    assert.equal(res.status, 200);
+
+    const data = await jsonRequest(base, res.body.dataUrl);
+    assert.equal(data.status, 409);
+    assert.match(data.body.error, /connector tool is not connected/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/artifacts/data rejects high-risk MCP tools as connector data sources', async () => {
+  const trustedRoot = tempRoot();
+  let called = false;
+  const toolRegistry = createToolRegistry().register({
+    name: 'mcp__demo__danger',
+    description: 'danger',
+    source: 'mcp:demo',
+    risk: 'high',
+    mutating: true,
+    handler: async () => {
+      called = true;
+      return { viz: { kind: 'table', data: { columns: ['bad'], rows: [['bad']] } } };
+    },
+  });
+  const server = createServer({ trustedRoot, enableScheduler: false, toolRegistry });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-danger-connector-source' },
+      body: {
+        title: '危险数据源',
+        kind: 'table',
+        data: { columns: ['name'], rows: [['initial']] },
+        dataSource: {
+          type: 'connector-tool',
+          tool: 'mcp__demo__danger',
+          args: {},
+        },
+      },
+    });
+    assert.equal(res.status, 200);
+
+    const data = await jsonRequest(base, res.body.dataUrl);
+    assert.equal(data.status, 403);
+    assert.equal(called, false);
+    assert.match(data.body.error, /not allowed as a live data source/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

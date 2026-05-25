@@ -1,6 +1,6 @@
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { renderViz } from '../artifacts/viz.js';
-import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactData } from '../artifacts/live-artifact.js';
+import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync } from '../artifacts/live-artifact.js';
 
 // Inline-viz + live-artifact routes.
 //
@@ -36,6 +36,7 @@ export async function handleVizRoutes({
   cacheKeyFor,
   requireIdempotencyKey,
   sendCachedOrStore,
+  toolRegistry,
 }) {
   if (request.method === 'POST' && pathname === '/api/viz/render') {
     await withJsonBody(request, response, async (body) => {
@@ -89,7 +90,12 @@ export async function handleVizRoutes({
     const id = decodeURIComponent(pathname.slice(DATA_PREFIX.length));
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
-      const artifactData = refreshLiveArtifactData({ trustedRoot, id });
+      const artifactData = await refreshLiveArtifactDataAsync({
+        trustedRoot,
+        id,
+        toolRegistry,
+        context: requestContext,
+      });
       sendJson(response, 200, {
         context: requestContext,
         ...artifactData,
