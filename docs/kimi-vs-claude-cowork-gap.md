@@ -52,7 +52,7 @@ Agent Cowork 当前是"Windows 本地文件可信操作 + 审批回滚 + Kimi CL
 |---|---|---|---|
 | 主模型 | Kimi (CLI `--print --final-message-only` + Kimi Gateway OpenAI-compatible) | Claude Opus 4.6 / Sonnet 4.6 / Haiku 4.5 多档可选 | 模型层 Kimi 自己决定, **缺多档调度** |
 | 廉价二线推理 | 无 | Artifact 内 `window.cowork.askClaude(prompt, data)` 调 Haiku 做实时摘要/分类 | **缺 inline 廉价推理原语** |
-| 子 Agent | 无 (Kimi CLI 单 shot) | `Agent` 工具支持 subagent_type: Plan / Explore / general-purpose / claude-code-guide / 自定义, 可用 worktree isolation | **缺子 Agent 编排** |
+| 子 Agent | 无 (Kimi CLI 单 shot) | `Agent` 工具支持通过 `subagent_type` 指定当前实例已注册的 agent,可用 worktree isolation;具体名称以报错里的 `Available agents:` 或本机 agent 注册表为准,不能假设默认 `general-purpose` 一定存在 | **缺子 Agent 编排** |
 | Plan Mode | 协作工作台 = preview-only plan | `Plan` agent + `ExitPlanMode`, 强制先方案后执行 | 形式上 Kimi 已有, 缺产品化的 plan UI |
 | Trace 调试 | runs/*.json 落盘 | 默认不暴露, 但 Skills 里 doc-coauthoring 等可结构化输出 | Kimi 反而更透明 |
 
