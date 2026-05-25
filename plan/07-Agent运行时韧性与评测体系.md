@@ -98,6 +98,8 @@ C3 完成记录(2026-05-25):`kimi/agent/tool-loop.js` 已接入 `LoopGuard` 与 
 | D3 | `ModelRecorder`/`Replayer`(model-call 装饰器):录制真实响应、按输入回放复现 | `runtime/model-recorder.js` | 单测 | 同输入确定性回放;eval/调试可复现 | M |
 | D4 | 种子化:随机 / ULID 注入种子(复用 L0 `util/ids`),运行可复现 | `kimi/agent/*` 注入点 | 单测 | 给定种子,运行轨迹可复现 | S |
 
+D1 完成记录(2026-05-25):新增 `runtime/run-checkpoint.js` 与 agent 层 `checkpoint-state` 注入器;SSE agent 入口为每个 `runId` 创建检查点写入器,`tool-loop` 在模型工具调用、工具结果、验证请求、完成、预算/超时/循环停止等边界持久化最新 `messages/step/usage/approvedTools/todos/metadata`。检查点落在 `runStoreRoot/checkpoints/<runId>.json`,运行 ID 受白名单校验并使用同目录临时文件 rename 写入;单测覆盖完整读回、路径逃逸拒绝和真实 `runAgentChat` 循环落盘。
+
 ---
 
 ## E · 可观测与归因 — 让结果可解释、可追溯

@@ -21,6 +21,7 @@ declare const Buffer: {
 
 declare const process: {
   platform: string;
+  pid: number;
   cwd(): string;
 };
 
@@ -66,6 +67,7 @@ declare module 'node:fs' {
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
   export function renameSync(oldPath: string, newPath: string): void;
   export function statSync(path: string): Stats;
+  export function unlinkSync(path: string): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function realpathSync(path: string): string;
   export namespace realpathSync {

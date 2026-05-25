@@ -1,5 +1,6 @@
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { createRunCheckpointer } from '../runtime/run-checkpoint.js';
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
@@ -192,6 +193,7 @@ export async function streamAgentChat({
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
       budgetGuard,
       runTimeoutMs,
+      checkpointer: runStoreRoot ? createRunCheckpointer({ root: runStoreRoot }) : null,
     });
     if (controller && controller.signal.aborted) {
       status = 'cancelled';

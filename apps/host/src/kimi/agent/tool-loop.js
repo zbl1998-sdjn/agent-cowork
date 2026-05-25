@@ -23,6 +23,7 @@ import { createRetryPolicy } from './tool-retry.js';
 import { validateToolArguments } from './arg-validator.js';
 import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
+import { createCheckpointRecorder } from './checkpoint-state.js';
 
 function addLazySearchTool(agentTools, lazyTools) {
   const activeNames = new Set(agentTools.map((t) => t.name));
@@ -122,6 +123,7 @@ export async function runAgentChat({
   retryOptions = {},
   budgetGuard = null,
   runTimeoutMs = 0,
+  checkpointer = null,
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -142,6 +144,7 @@ export async function runAgentChat({
   const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions);
   const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions);
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
+  const activeCheckpointer = checkpointer;
   let messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
   const steps = [];
   const sessionApproved = new Set();
@@ -152,13 +155,27 @@ export async function runAgentChat({
   let planApproved = !planMode;
   let didMutate = false;
   let verified = false;
-  const toolTodos = createToolTodoTracker(emit);
+  const checkpointRecorder = createCheckpointRecorder({
+    checkpointer: activeCheckpointer,
+    runId,
+    usageTotals,
+    sessionApproved,
+    steps,
+    context,
+    getFinalText: () => finalText,
+    emit,
+  });
+  const toolTodos = createToolTodoTracker(checkpointRecorder.emitTodo);
 
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
   const runTimeout = createRunTimeout({ signal, timeoutMs: runTimeoutMs });
   let stopForLoopGuard = false;
   let stopForBudget = false;
   let stopForTimeout = false;
+  let lastCheckpointStep = 0;
+  const saveCheckpoint = (phase, step, checkpointMessages = messages) => {
+    if (checkpointRecorder.save(phase, step, checkpointMessages)) lastCheckpointStep = step;
+  };
   const stopOnBudget = (budgetDecision) => {
     stopForBudget = true;
     const text = activeBudgetGuard.stopMessage(budgetDecision);
@@ -188,6 +205,7 @@ export async function runAgentChat({
       stopOnBudget(preBudgetDecision);
       break;
     }
+    const stepNumber = i + 1;
     let streamedContent = false;
     let streamedReasoning = false;
     const prepared = activeContextManager.prepareMessages(messages);
@@ -229,19 +247,23 @@ export async function runAgentChat({
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
     if (calls.length === 0) {
       finalText = message.content || '';
+      const finalMessage = { role: 'assistant', content: finalText };
       if (verify && didMutate && !verified) {
         verified = true;
         emit('verify_start', {});
         audit('verify.start', {});
-        messages.push({ role: 'assistant', content: finalText });
+        messages.push(finalMessage);
         messages.push({ role: 'user', content: '请用只读工具(Read/Glob/Grep)读回你刚才改动或新建的文件，核对内容是否正确、完整。如发现问题请修正；确认无误后用一句话中文总结结果。' });
+        saveCheckpoint('verify_requested', stepNumber);
         continue;
       }
+      saveCheckpoint('completed', stepNumber, [...messages, finalMessage]);
       if (!streamedContent && finalText) emit('token', { delta: finalText });
       break;
     }
 
     messages.push({ role: 'assistant', content: message.content || '', tool_calls: calls, ...(message.reasoning_content ? { reasoning_content: message.reasoning_content } : {}) });
+    saveCheckpoint('assistant_tool_calls', stepNumber);
     for (const call of calls) {
       const { name, args } = parseToolCall(call);
       emit('tool_call', { name, args });
@@ -255,21 +277,32 @@ export async function runAgentChat({
         emit('tool_result', { name, status: 'failed', result });
         const formatted = activeContextManager.formatToolResult(result, { toolName: name });
         messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
+        saveCheckpoint('tool_result', stepNumber);
         continue;
       }
       const isMutating = !!(tool && tool.mutating === true);
       const needsApproval = toolNeedsApproval(tool);
-      if (await runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call })) continue;
+      if (await runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call })) {
+        saveCheckpoint('tool_result', stepNumber);
+        continue;
+      }
       const planResult = await handleExitPlanMode({ name, args, hasApprovals, autoApprove, approvals, runId, emit, audit, steps, messages, call, context });
       if (planResult.handled) {
         if (planResult.planApproved) planApproved = true;
+        saveCheckpoint('plan_result', stepNumber);
         continue;
       }
-      if (blockUntilPlanApproved({ planMode, planApproved, needsApproval, name, tool, steps, audit, emit, messages, call })) continue;
+      if (blockUntilPlanApproved({ planMode, planApproved, needsApproval, name, tool, steps, audit, emit, messages, call })) {
+        saveCheckpoint('tool_result', stepNumber);
+        continue;
+      }
       if (await requestToolApproval({
         needsApproval, hasApprovals, sessionApproved, name, args, tool, runId,
         approvals, emit, audit, messages, call, autoApprove, planMode, planApproved, steps, context,
-      })) continue;
+      })) {
+        saveCheckpoint('approval_result', stepNumber);
+        continue;
+      }
 
       const todo = toolTodos.start(name);
       let result;
@@ -310,6 +343,7 @@ export async function runAgentChat({
         });
       }
       messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
+      saveCheckpoint('tool_result', stepNumber);
       if (hooks) await hooks.run('post_tool', { name, result, ok });
       const postToolBudgetDecision = activeBudgetGuard.check();
       if (postToolBudgetDecision.shouldAbort) {
@@ -333,6 +367,10 @@ export async function runAgentChat({
 
     finalText = await summarizeAfterBudget({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals });
     finalText = applyStaticBackstop(finalText, runTimeout.signal, emit);
+    if ((stopForBudget || stopForTimeout || stopForLoopGuard) && finalText) {
+      const phase = stopForBudget ? 'budget_stopped' : (stopForTimeout ? 'timeout_stopped' : 'loop_guard_stopped');
+      saveCheckpoint(phase, lastCheckpointStep || stepBudget, [...messages, { role: 'assistant', content: finalText }]);
+    }
     return {
       text: finalText,
       steps,
