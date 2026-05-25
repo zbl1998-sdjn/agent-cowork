@@ -67,6 +67,24 @@ test('resolveKimiApiConfig reads model provider from env/config', () => {
   assert.equal(explicitConfig.provider, 'openai/local');
 });
 
+test('resolveKimiApiConfig reads sanitized fallback model chain', () => {
+  const fromEnv = resolveKimiApiConfig({}, {
+    KIMI_API_KEY: 'primary-key',
+    KCW_MODEL_FALLBACKS: JSON.stringify([
+      { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1/', model: 'local-model' },
+      { provider: 'OPENAI', apiKey: 'fallback-key', baseUrl: 'https://api.openai.test/v1', model: 'gpt-fallback', maxTokens: 99 },
+    ]),
+  });
+
+  assert.equal(fromEnv.fallbacks.length, 2);
+  assert.equal(fromEnv.fallbacks[0].provider, 'openai/local');
+  assert.equal(fromEnv.fallbacks[0].baseUrl, 'http://127.0.0.1:11434/v1');
+  assert.equal(fromEnv.fallbacks[0].apiKey, undefined);
+  assert.equal(fromEnv.fallbacks[1].provider, 'openai');
+  assert.equal(fromEnv.fallbacks[1].apiKey, 'fallback-key');
+  assert.equal(fromEnv.fallbacks[1].maxTokens, 99);
+});
+
 test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
   let captured;
   const result = await runKimiApiPlan({

@@ -237,7 +237,7 @@ export async function runAgentChat({
         signal: runTimeout.signal,
         onContent: (d) => { streamedContent = true; if (d) emit('token', { delta: d }); },
         onReasoning: (d) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); },
-      }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
+      }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs, onFallback: (event) => emit('model_fallback', event) });
     } catch (err) {
       if (runTimeout.timedOut() && isAbortLikeError(err)) {
         stopOnTimeout();

@@ -30,7 +30,11 @@ export async function summarizeAfterBudget({
       fetchImpl,
       onContent: (d) => { if (d) emit('token', { delta: d }); },
       onReasoning: () => {},
-    }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
+    }, {
+      kimiConfig,
+      timeoutMs: kimiConfig && kimiConfig.timeoutMs,
+      onFallback: (event) => emit('model_fallback', event),
+    });
     addUsage(usageTotals, wrap && wrap.usage);
     return (wrap && wrap.content) || '';
   } catch {

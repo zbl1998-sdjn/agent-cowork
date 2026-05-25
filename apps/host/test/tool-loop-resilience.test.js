@@ -193,3 +193,39 @@ test('runAgentChat does not retry permanent tool errors', async () => {
   assert.match(capturedToolMessage.content, /outside trusted root/);
   assert.ok(!events.some((event) => event.type === 'tool_retry'));
 });
+
+test('runAgentChat emits model_fallback when the primary provider fails and fallback succeeds', async () => {
+  const root = tmp();
+  const events = [];
+  const seenProviders = [];
+  const modelCall = async ({ kimiConfig }) => {
+    seenProviders.push(kimiConfig.provider);
+    if (kimiConfig.provider === 'openai') {
+      throw new Error('primary temporary outage');
+    }
+    return { content: 'fallback done' };
+  };
+
+  const out = await runAgentChat({
+    prompt: 'fallback',
+    kimiConfig: {
+      provider: 'openai',
+      apiKey: 'sk-primary-secret-DO-NOT-ECHO-123456',
+      baseUrl: 'https://primary.example/v1',
+      model: 'primary-model',
+      fallbacks: [{ provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local-model' }],
+    },
+    trustedRoot: root,
+    tools: [],
+    modelCall,
+    emit: (type, payload) => events.push({ type, payload }),
+    runStoreRoot: path.join(root, 'runs'),
+  });
+
+  assert.equal(out.text, 'fallback done');
+  assert.deepEqual(seenProviders, ['openai', 'openai/local']);
+  const fallbackEvent = events.find((event) => event.type === 'model_fallback');
+  assert.equal(fallbackEvent.payload.failed.provider, 'openai');
+  assert.equal(fallbackEvent.payload.next.provider, 'openai/local');
+  assert.ok(!JSON.stringify(fallbackEvent).includes('sk-primary-secret'), 'fallback event leaked primary key');
+});

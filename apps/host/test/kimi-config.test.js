@@ -125,6 +125,50 @@ test('POST /api/kimi/config stores provider without echoing the key', async () =
   });
 });
 
+test('POST /api/kimi/config stores fallback providers without echoing fallback keys', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-kimicfg-fallbacks');
+  const fallbackSecret = 'sk-fallback-secret-DO-NOT-ECHO-123456';
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/api/kimi/config`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'openai',
+        apiKey: SECRET,
+        model: 'gpt-primary',
+        fallbacks: [
+          { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1/', model: 'local-model' },
+          { provider: 'openai', apiKey: fallbackSecret, baseUrl: 'https://fallback.example/v1', model: 'gpt-fallback' },
+        ],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const raw = await res.text();
+    assert.ok(!raw.includes(SECRET), 'config response leaked the primary API key');
+    assert.ok(!raw.includes(fallbackSecret), 'config response leaked the fallback API key');
+    const body = JSON.parse(raw);
+    assert.equal(body.fallbacks.length, 2);
+    assert.equal(body.fallbacks[0].provider, 'openai/local');
+    assert.equal(body.fallbacks[0].hasKey, false);
+    assert.equal(body.fallbacks[1].provider, 'openai');
+    assert.equal(body.fallbacks[1].hasKey, true);
+    assert.equal(body.fallbacks[1].apiKey, undefined);
+  });
+
+  const cfgPath = path.join(trustedRoot, '.AgentCowork', 'config.json');
+  const persisted = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+  assert.equal(persisted.kimiApi.fallbacks[0].baseUrl, 'http://127.0.0.1:11434/v1');
+  assert.equal(persisted.kimiApi.fallbacks[1].apiKey, fallbackSecret);
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const raw = await (await fetch(`${baseUrl}/api/kimi/info`)).text();
+    assert.ok(!raw.includes(fallbackSecret), 'info response leaked the fallback API key');
+    const info = JSON.parse(raw);
+    assert.equal(info.fallbacks[1].hasKey, true);
+    assert.equal(info.fallbacks[1].model, 'gpt-fallback');
+  });
+});
+
 test('clearKey wipes the stored key and disables the API', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-clear');
   await withServer({ trustedRoot }, async (baseUrl) => {

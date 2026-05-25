@@ -14,6 +14,27 @@ function cleanProvider(value, fallback = 'kimi-api') {
   return provider || fallback;
 }
 
+function cleanModelFallbacks(value) {
+  let input = value;
+  if (typeof input === 'string' && input.trim()) {
+    try { input = JSON.parse(input); } catch { return []; }
+  }
+  if (!Array.isArray(input)) return [];
+  return input.map((item) => {
+    const source = item && typeof item === 'object' ? item : {};
+    const fallback = {};
+    const provider = cleanProvider(source.provider || source.kimiProvider || source.modelProvider, '');
+    if (provider) fallback.provider = provider;
+    if (typeof source.apiKey === 'string' && source.apiKey.trim()) fallback.apiKey = source.apiKey.trim();
+    if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) fallback.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
+    if (typeof source.model === 'string' && source.model.trim()) fallback.model = source.model.trim();
+    if (Number.isFinite(Number(source.timeoutMs))) fallback.timeoutMs = Math.max(1000, Number(source.timeoutMs));
+    if (Number.isFinite(Number(source.maxTokens))) fallback.maxTokens = Math.max(1, Number(source.maxTokens));
+    if (Number.isFinite(Number(source.temperature))) fallback.temperature = Number(source.temperature);
+    return fallback;
+  }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
+}
+
 function buildMemoryBlock(memory) {
   const text = cleanText(memory).slice(0, 4096);
   if (!text) {
@@ -75,6 +96,7 @@ export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }) {
 
 export function resolveKimiApiConfig(config = {}, env = process.env) {
   const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
+  const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;
   const apiKey = String(config.kimiApiKey || env.KIMI_API_KEY || env.MOONSHOT_API_KEY || '').trim();
   const baseUrl = String(config.kimiBaseUrl || env.KIMI_BASE_URL || env.MOONSHOT_BASE_URL || DEFAULT_BASE_URL).trim();
   const model = String(config.kimiModel || env.KIMI_MODEL || DEFAULT_MODEL).trim();
@@ -93,6 +115,7 @@ export function resolveKimiApiConfig(config = {}, env = process.env) {
     maxTokens,
     temperature,
     userAgent,
+    fallbacks: cleanModelFallbacks(fallbackInput),
   };
 }
 

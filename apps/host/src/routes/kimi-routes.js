@@ -7,6 +7,7 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 const KIMI_NOT_CONFIGURED = KIMI_API_NOT_CONFIGURED_MESSAGE;
 
 function modelProvider(kimiConfig) { return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api'; }
+function fallbackSummaries(value) { return Array.isArray(value) ? value.map((item) => ({ provider: modelProvider(item), baseUrl: item && item.baseUrl, model: item && item.model, hasKey: Boolean(item && item.apiKey) })) : []; }
 
 async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summary, runner, response, context }) {
   const runId = createRunId();
@@ -111,11 +112,10 @@ async function runKimiAndRecord({ state, type, mode, trustedRoot, prompt, summar
 function sendKimiInfo(response, state) {
   sendJson(response, 200, {
     provider: modelProvider(state.kimiApiConfig),
-    configured: state.kimiApiConfig.configured,
-    planEnabled: state.kimiApiEnabled,
-    chatEnabled: state.kimiApiEnabled,
+    configured: state.kimiApiConfig.configured, planEnabled: state.kimiApiEnabled, chatEnabled: state.kimiApiEnabled,
     baseUrl: state.kimiApiConfig.baseUrl,
     model: state.kimiApiConfig.model,
+    fallbacks: fallbackSummaries(state.kimiApiConfig.fallbacks),
     hasKey: Boolean(state.kimiApiConfig.apiKey),
   });
 }
@@ -127,6 +127,7 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
       if (next.clearKey === true) state.kimiApiConfig.apiKey = '';
       else if (typeof next.apiKey === 'string' && next.apiKey.trim()) state.kimiApiConfig.apiKey = next.apiKey.trim();
       if (typeof next.provider === 'string' && next.provider.trim()) state.kimiApiConfig.provider = modelProvider(next);
+      if (Array.isArray(next.fallbacks)) state.kimiApiConfig.fallbacks = next.fallbacks;
       if (typeof next.baseUrl === 'string' && next.baseUrl.trim()) state.kimiApiConfig.baseUrl = next.baseUrl.trim().replace(/\/+$/, '');
       if (typeof next.model === 'string' && next.model.trim()) state.kimiApiConfig.model = next.model.trim();
       state.kimiApiConfig.configured = Boolean(state.kimiApiConfig.apiKey);
