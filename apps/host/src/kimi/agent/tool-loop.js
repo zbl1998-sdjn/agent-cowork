@@ -124,6 +124,7 @@ export async function runAgentChat({
   budgetGuard = null,
   runTimeoutMs = 0,
   checkpointer = null,
+  resumeState = null,
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -144,24 +145,27 @@ export async function runAgentChat({
   const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions);
   const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions);
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
-  const activeCheckpointer = checkpointer;
-  let messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
+  const resumed = resumeState && typeof resumeState === 'object' ? resumeState : null;
+  const resumeUsage = (resumed && resumed.usage) || {};
+  const defaultMessages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
+  let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   const steps = [];
-  const sessionApproved = new Set();
+  const sessionApproved = new Set((resumed && Array.isArray(resumed.approvedTools)) ? resumed.approvedTools : []);
   const hasApprovals = !!approvals;
-  const usageTotals = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  const usageTotals = { prompt_tokens: Number(resumeUsage.prompt_tokens || 0), completion_tokens: Number(resumeUsage.completion_tokens || 0), total_tokens: Number(resumeUsage.total_tokens || 0) };
   const audit = makeAudit(auditBus, context);
   let finalText = '';
   let planApproved = !planMode;
   let didMutate = false;
   let verified = false;
   const checkpointRecorder = createCheckpointRecorder({
-    checkpointer: activeCheckpointer,
+    checkpointer,
     runId,
     usageTotals,
     sessionApproved,
     steps,
     context,
+    initialTodos: resumed ? resumed.todos : [],
     getFinalText: () => finalText,
     emit,
   });

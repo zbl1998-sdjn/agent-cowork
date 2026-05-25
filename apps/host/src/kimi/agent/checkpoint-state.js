@@ -10,6 +10,7 @@
  *   sessionApproved: Set<unknown>,
  *   steps: unknown[],
  *   context?: unknown,
+ *   initialTodos?: unknown,
  *   getFinalText: () => string,
  *   emit: (type: string, payload: unknown) => void,
  * }} CheckpointRecorderOptions
@@ -49,11 +50,12 @@ export function createCheckpointRecorder({
   sessionApproved,
   steps,
   context,
+  initialTodos,
   getFinalText,
   emit,
 }) {
   /** @type {unknown[]} */
-  const todos = [];
+  const todos = Array.isArray(initialTodos) ? /** @type {unknown[]} */ (JSON.parse(JSON.stringify(initialTodos))) : [];
   return {
     /** @param {string} type @param {unknown} payload */
     emitTodo(type, payload) {
