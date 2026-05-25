@@ -1,4 +1,5 @@
 import childProcess from 'node:child_process';
+import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { runConstrainedChild } from './exec-child.js';
 
@@ -36,7 +37,9 @@ export class LocalSubprocessSandbox {
     }
 
     const env = { ...spec.env };
-    if (process.env.PATH) env.PATH = process.env.PATH;
+    if (process.env.PATH) {
+      env.PATH = env.PATH ? `${env.PATH}${path.delimiter}${process.env.PATH}` : process.env.PATH;
+    }
     if (process.env.PATHEXT) env.PATHEXT = process.env.PATHEXT;
     if (process.env.SystemRoot) env.SystemRoot = process.env.SystemRoot;
 

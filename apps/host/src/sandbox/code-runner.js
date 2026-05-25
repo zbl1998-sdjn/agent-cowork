@@ -2,26 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { normalizeSandboxSpec } from './index.js';
+import { resolveEmbeddedPython, withEmbeddedPythonLimits } from './embedded-python.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 
-// Run an inline code snippet inside the sandbox.
-//
-// This is the bridge between "task templates / recipes" and the sandbox: a
-// caller hands us a tool name (node/python/...) plus the source text, and we
-//
-//   1. materialise the source as a script file *inside the trusted root*
-//      (so both the local cwd-jail and the docker `-v root:/work` mount can
-//      see it),
-//   2. run it through the same structured SandboxSpec the /exec route uses,
-//   3. record a `sandbox-code` run + event timeline, identical in shape to a
-//      recipe run so the history/timeline UIs work unchanged.
-//
-// The script path handed to the tool is *relative* to the trusted root so it
-// resolves correctly across backends: local (cwd = root) and docker (-w /work,
-// where /work is the mounted root) both interpret it the same way.
-//
-// Returns { ok, runId, runPath, backend, scriptPath, scriptRelative, spec, result, events }.
+// Materialise an inline snippet inside trustedRoot, execute it via the
+// structured sandbox spec, and record a sandbox-code run/event timeline.
+// The script argv stays relative to trustedRoot so local and mounted VM/docker
+// backends resolve the same file.
 
 const MAX_CODE_BYTES = 256 * 1024;
 const EXT_BY_TOOL = Object.freeze({
@@ -59,6 +47,7 @@ function preview(text, max = 2000) {
 export async function runCode({
   sandbox,
   sandboxLimits = {},
+  runtimeEnv = process.env,
   tool,
   code,
   prompt = '',
@@ -101,14 +90,39 @@ export async function runCode({
     safeRoot,
   );
 
+  // Validate the requested tool *before* applying local runtime preferences:
+  // bundled Python must not widen the caller's allowlist.
+  let requestedSpec;
+  try {
+    requestedSpec = normalizeSandboxSpec(
+      { tool: toolName, args: [scriptRelative], timeoutMs, network },
+      sandboxLimits,
+    );
+  } catch (err) {
+    err.statusCode = err.statusCode || 400;
+    throw err;
+  }
+
+  const embeddedPython = resolveEmbeddedPython(toolName, sandbox, runtimeEnv);
+
   // Validate the spec *before* writing anything: an unknown tool or a budget
   // violation should 400 without leaving a stray script behind.
   let spec;
   try {
-    spec = normalizeSandboxSpec(
-      { tool: toolName, args: [scriptRelative], timeoutMs, network },
-      sandboxLimits,
-    );
+    if (embeddedPython) {
+      spec = normalizeSandboxSpec(
+        {
+          tool: embeddedPython.tool,
+          args: requestedSpec.args,
+          timeoutMs: requestedSpec.timeoutMs,
+          network: requestedSpec.network,
+          env: { PATH: embeddedPython.pathPrefix },
+        },
+        withEmbeddedPythonLimits(sandboxLimits, embeddedPython.tool),
+      );
+    } else {
+      spec = requestedSpec;
+    }
   } catch (err) {
     err.statusCode = err.statusCode || 400;
     throw err;

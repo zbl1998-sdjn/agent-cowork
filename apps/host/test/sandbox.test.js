@@ -8,6 +8,7 @@ import { normalizeSandboxSpec } from '../src/sandbox/sandbox-spec.js';
 import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
 import { VmSandbox } from '../src/sandbox/vm-sandbox.js';
 import { createSandbox, DEFAULT_ALLOW_TOOLS } from '../src/sandbox/index.js';
+import { runCode } from '../src/sandbox/code-runner.js';
 import { resolveSandboxStartup } from '../src/sandbox/startup-probe.js';
 import { createServer } from '../src/server.js';
 
@@ -401,6 +402,98 @@ test('createSandbox provisions a docker VM sandbox when given an image + spawn',
 });
 
 // ---- inline code runner (POST /api/sandbox/run-code) ----
+
+test('runCode prefers configured embedded Python on the local backend', async () => {
+  const trustedRoot = tempRoot();
+  const embeddedPython = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'python.exe' : 'python');
+  let capturedSpec = null;
+  const sandbox = {
+    backend: 'local-subprocess',
+    exec: async (spec) => {
+      capturedSpec = spec;
+      return {
+        backend: 'local-subprocess',
+        exitCode: 0,
+        timedOut: false,
+        stdout: 'ok',
+        stderr: '',
+        durationMs: 1,
+      };
+    },
+  };
+
+  const outcome = await runCode({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS },
+    runtimeEnv: { KCW_EMBEDDED_PYTHON: embeddedPython },
+    tool: 'python3',
+    code: 'print("ok")',
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+  });
+
+  assert.equal(capturedSpec.tool, path.basename(embeddedPython));
+  assert.deepEqual(capturedSpec.args, [outcome.scriptRelative]);
+  assert.equal(capturedSpec.env.PATH, path.dirname(embeddedPython));
+  assert.match(outcome.scriptRelative, /^\.AgentCowork\/scripts\/run_[^/]+\.py$/);
+});
+
+test('runCode keeps VM Python tools inside the VM image', async () => {
+  const trustedRoot = tempRoot();
+  const embeddedPython = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'python.exe' : 'python');
+  let capturedSpec = null;
+  const sandbox = {
+    backend: 'vm:docker',
+    exec: async (spec) => {
+      capturedSpec = spec;
+      return {
+        backend: 'vm:docker',
+        exitCode: 0,
+        timedOut: false,
+        stdout: 'ok',
+        stderr: '',
+        durationMs: 1,
+      };
+    },
+  };
+
+  await runCode({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS },
+    runtimeEnv: { KCW_EMBEDDED_PYTHON: embeddedPython },
+    tool: 'python3',
+    code: 'print("ok")',
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+  });
+
+  assert.equal(capturedSpec.tool, 'python3');
+  assert.deepEqual(capturedSpec.env, {});
+});
+
+test('runCode does not let embedded Python bypass the sandbox allowlist', async () => {
+  const trustedRoot = tempRoot();
+  const embeddedPython = path.join(trustedRoot, 'runtime', process.platform === 'win32' ? 'python.exe' : 'python');
+  const sandbox = {
+    backend: 'local-subprocess',
+    exec: async () => {
+      throw new Error('sandbox.exec should not be called');
+    },
+  };
+
+  await assert.rejects(
+    () => runCode({
+      sandbox,
+      sandboxLimits: { allowTools: ['node'] },
+      runtimeEnv: { KCW_EMBEDDED_PYTHON: embeddedPython },
+      tool: 'python3',
+      code: 'print("ok")',
+      trustedRoot,
+      runStoreRoot: path.join(trustedRoot, 'runs'),
+    }),
+    /not in the allowlist/,
+  );
+});
 
 test('POST /api/sandbox/run-code runs inline code, writes the script, records a sandbox-code run, and is idempotent', async () => {
   const trustedRoot = tempRoot();
