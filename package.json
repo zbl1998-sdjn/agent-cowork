@@ -29,6 +29,7 @@
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:e2e": "node scripts/e2e-smoke.mjs",
     "bench": "node scripts/bench.mjs",
+    "eval": "node scripts/eval.mjs",
     "smoke:windows-client": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-windows-client.ps1",
     "smoke:installed-tauri": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installed-tauri.ps1",
     "smoke:ui": "node scripts/smoke-ui-contract.mjs",

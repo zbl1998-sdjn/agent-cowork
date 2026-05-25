@@ -4,6 +4,7 @@ dist/
 coverage/
 .KimiCowork/
 .AgentCowork/
+.eval/
 *.log
 *.log.err
 
@@ -37,3 +38,4 @@ hosttest*.done
 agent-demo*.md
 approval-demo.txt
 risk-demo.txt
+reports/eval/

@@ -1,0 +1,5 @@
+{
+  "name": "offline-contract-baseline",
+  "passRate": 1,
+  "regressionTolerance": 0.05
+}
