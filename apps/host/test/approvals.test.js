@@ -35,6 +35,24 @@ test('approval registry resolves a pending request with a decision', async () =>
   assert.equal(reg.resolve('ghost', 'once'), false);
 });
 
+test('approval registry resolveMany resolves only exact IDs and preserves scope', async () => {
+  const reg = createApprovalRegistry();
+  const a = reg.request({ name: 'Shell', tenantId: 'tenant_a', userId: 'user_a' });
+  const b = reg.request({ name: 'Write', tenantId: 'tenant_a', userId: 'user_a' });
+
+  assert.deepEqual(reg.resolveMany([a.id, b.id], 'session', { tenantId: 'tenant_b', userId: 'user_a' }), [
+    { id: a.id, ok: false },
+    { id: b.id, ok: false },
+  ]);
+  assert.deepEqual(reg.resolveMany([a.id, 'ghost', b.id, a.id], 'session', { tenantId: 'tenant_a', userId: 'user_a' }), [
+    { id: a.id, ok: true },
+    { id: 'ghost', ok: false },
+    { id: b.id, ok: true },
+  ]);
+  assert.equal(await a.promise, 'session');
+  assert.equal(await b.promise, 'session');
+});
+
 test('approval registry rejects resolve attempts from the wrong tenant/user scope', async () => {
   const reg = createApprovalRegistry();
   const { id, promise } = reg.request({ name: 'Shell', tenantId: 'tenant_a', userId: 'user_a' });
@@ -174,6 +192,81 @@ test('POST /api/agent/chat/stream gates Shell, proceeds after POST /api/approval
     assert.equal((await ap.json()).ok, true);
     for (;;) { const { value, done } = await reader.read(); if (done) break; all += dec.decode(value, { stream: true }); }
     assert.match(all, /event: done/);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('POST /api/approvals/batch resolves only exact IDs in the caller scope', async () => {
+  const root = tmp();
+  const approvalRegistry = createApprovalRegistry();
+  const first = approvalRegistry.request({ name: 'Shell', tenantId: 'tenant_a', userId: 'user_a' });
+  const second = approvalRegistry.request({ name: 'Write', tenantId: 'tenant_a', userId: 'user_a' });
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    requireAuth: true,
+    trustIdentityHeaders: true,
+    approvalRegistry,
+  });
+  const base = await bind(server);
+  try {
+    const wrong = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+      body: JSON.stringify({ ids: [first.id, second.id], decision: 'once' }),
+    });
+    assert.equal(wrong.status, 404, 'different tenant cannot batch-resolve approvals');
+    const wrongBody = await wrong.json();
+    assert.equal(wrongBody.context.tenantId, 'tenant_b');
+    assert.equal(wrongBody.context.userId, 'user_b');
+    assert.deepEqual(wrongBody.ids, [first.id, second.id]);
+    assert.equal(wrongBody.ok, false);
+    assert.equal(wrongBody.resolved, 0);
+    assert.deepEqual(wrongBody.results, [{ id: first.id, ok: false }, { id: second.id, ok: false }]);
+    assert.equal(wrongBody.decision, 'once');
+
+    const owner = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-tenant-id': 'tenant_a', 'x-user-id': 'user_a' },
+      body: JSON.stringify({ ids: [first.id, 'ghost', second.id, first.id], decision: 'session' }),
+    });
+    assert.equal(owner.status, 200);
+    const ownerBody = await owner.json();
+    assert.equal(ownerBody.context.tenantId, 'tenant_a');
+    assert.equal(ownerBody.context.userId, 'user_a');
+    assert.deepEqual(ownerBody.ids, [first.id, 'ghost', second.id]);
+    assert.equal(ownerBody.ok, false);
+    assert.equal(ownerBody.resolved, 2);
+    assert.deepEqual(ownerBody.results, [{ id: first.id, ok: true }, { id: 'ghost', ok: false }, { id: second.id, ok: true }]);
+    assert.equal(ownerBody.decision, 'session');
+    assert.equal(await first.promise, 'session');
+    assert.equal(await second.promise, 'session');
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('POST /api/approvals/batch rejects invalid ids', async () => {
+  const root = tmp();
+  const approvalRegistry = createApprovalRegistry();
+  const server = createServer({ trustedRoot: root, enableScheduler: false, approvalRegistry });
+  const base = await bind(server);
+  try {
+    const invalid = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['apr_ok', '../bad'], decision: 'once' }),
+    });
+    assert.equal(invalid.status, 400);
+    assert.match((await invalid.json()).error, /ids/i);
+
+    const empty = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: [], decision: 'once' }),
+    });
+    assert.equal(empty.status, 400);
   } finally {
     await new Promise((r) => server.close(r));
   }

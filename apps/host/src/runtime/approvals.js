@@ -66,6 +66,17 @@ export function createApprovalRegistry({ ttlMs = 15 * 60 * 1000, maxPending = 10
       entry.resolve(DECISIONS.has(decision) ? decision : 'reject');
       return true;
     },
+    resolveMany(ids, decision, context = null) {
+      const uniqueIds = [...new Set(Array.isArray(ids) ? ids : [])];
+      const normalizedDecision = DECISIONS.has(decision) ? decision : 'reject';
+      return uniqueIds.map((id) => {
+        const entry = pending.get(id);
+        if (!entry || !sameScope(entry.meta, context)) return { id, ok: false };
+        pending.delete(id);
+        entry.resolve(normalizedDecision);
+        return { id, ok: true };
+      });
+    },
     // Resolve a pending request with an arbitrary free-form value (used by
     // AskUserQuestion, where the answer is the chosen option text, not a
     // fixed approve/reject decision).

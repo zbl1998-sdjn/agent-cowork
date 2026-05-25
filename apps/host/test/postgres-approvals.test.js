@@ -25,7 +25,7 @@ function mockCluster() {
         if (t.startsWith("UPDATE pending_approvals SET status='resolved'") && t.includes('WHERE id=')) {
           const [id, decision, tenantId] = params;
           const r = rows.get(id);
-          const tenantOk = tenantId ? r.tenant_id == null || r.tenant_id === tenantId : r.tenant_id == null;
+          const tenantOk = !!r && (tenantId ? r.tenant_id == null || r.tenant_id === tenantId : r.tenant_id == null);
           if (r && r.status === 'pending' && tenantOk) {
             r.status = 'resolved'; r.decision = decision; return { rowCount: 1 };
           }
@@ -75,6 +75,25 @@ test('cross-instance: tenant-scoped resolve rejects the wrong tenant', async () 
   assert.equal(await B.resolve(id, 'once', { tenantId: 't2' }), false);
   assert.equal(await B.resolve(id, 'once', { tenantId: 't1' }), true);
   assert.equal(await promise, 'once');
+});
+
+test('cross-instance: exact-ID batch resolve preserves per-id results', async () => {
+  const cluster = mockCluster();
+  const A = new PostgresApprovalStore({ client: cluster.makeClient() });
+  const B = new PostgresApprovalStore({ client: cluster.makeClient() });
+  await A.start();
+  await B.start();
+  const a = A.request({ runId: 'r1', tenantId: 't1', kind: 'approval' });
+  const b = A.request({ runId: 'r1', tenantId: 't1', kind: 'approval' });
+  await new Promise((r) => setTimeout(r, 5));
+
+  assert.deepEqual(await B.resolveMany([a.id, 'ghost', b.id, a.id], 'session', { tenantId: 't1' }), [
+    { id: a.id, ok: true },
+    { id: 'ghost', ok: false },
+    { id: b.id, ok: true },
+  ]);
+  assert.equal(await a.promise, 'session');
+  assert.equal(await b.promise, 'session');
 });
 
 test('cross-instance: tenant-scoped resolve also rejects missing tenant context', async () => {

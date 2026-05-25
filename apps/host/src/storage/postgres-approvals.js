@@ -85,6 +85,15 @@ export class PostgresApprovalStore {
     return this._resolveRow(id, DEC.has(decision) ? decision : 'reject', context);
   }
 
+  async resolveMany(ids, decision, context = null) {
+    const uniqueIds = [...new Set(Array.isArray(ids) ? ids : [])];
+    const results = [];
+    for (const id of uniqueIds) {
+      results.push({ id, ok: await this.resolve(id, decision, context) });
+    }
+    return results;
+  }
+
   async respond(id, value, context = null) {
     return this._resolveRow(id, value, context);
   }

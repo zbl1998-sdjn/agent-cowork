@@ -68,3 +68,38 @@ test('POST /api/approvals/:id awaits an async resolve (PG-style store)', async (
     await new Promise((r) => server.close(r));
   }
 });
+
+test('POST /api/approvals/batch awaits async resolveMany', async () => {
+  const root = tmp();
+  let resolvedWith = null;
+  const approvalRegistry = {
+    request: () => ({ id: 'x', promise: Promise.resolve('once') }),
+    resolve: async () => false,
+    resolveMany: async (ids, decision) => {
+      resolvedWith = { ids, decision };
+      return ids.map((id) => ({ id, ok: id !== 'missing' }));
+    },
+    respond: async () => true,
+    cancelByRun: async () => 0,
+    pendingCount: async () => 0,
+  };
+  const server = createServer({ trustedRoot: root, enableScheduler: false, approvalRegistry });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['apr_a', 'missing', 'apr_a'], decision: 'session' }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body.ids, ['apr_a', 'missing']);
+    assert.equal(body.ok, false);
+    assert.equal(body.resolved, 1);
+    assert.deepEqual(body.results, [{ id: 'apr_a', ok: true }, { id: 'missing', ok: false }]);
+    assert.equal(body.decision, 'session');
+    assert.deepEqual(resolvedWith, { ids: ['apr_a', 'missing'], decision: 'session' });
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
