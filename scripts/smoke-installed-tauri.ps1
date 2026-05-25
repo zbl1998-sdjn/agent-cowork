@@ -60,6 +60,31 @@ function Get-SignatureSummary {
     }
 }
 
+function Get-AgentCoworkUninstallEntry {
+    param([Parameter(Mandatory = $true)][ValidateSet("HKCU", "HKLM")][string]$Hive)
+
+    $roots = if ($Hive -eq "HKCU") {
+        @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall")
+    } else {
+        @(
+            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        )
+    }
+    foreach ($root in $roots) {
+        $entries = Get-ItemProperty -Path (Join-Path $root "*") -ErrorAction SilentlyContinue |
+            Where-Object {
+                $name = $_.PSObject.Properties["DisplayName"]
+                $name -and $name.Value -eq "Agent Cowork"
+            } |
+            Select-Object -First 1 DisplayName,DisplayVersion,InstallLocation,UninstallString,PSPath
+        if ($entries) {
+            return $entries
+        }
+    }
+    return $null
+}
+
 function Wait-ForMainWindow {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
@@ -184,9 +209,14 @@ try {
     $sidecarExists = Test-Path -LiteralPath $sidecar
     Assert-True $sidecarExists "Installed host sidecar not found: $sidecar"
 
-    $uninstallEntry = Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -eq "Agent Cowork" } |
-        Select-Object -First 1 DisplayName,DisplayVersion,InstallLocation,UninstallString
+    $expectedInstallRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Agent Cowork")).TrimEnd("\")
+    $resolvedInstallDir = [System.IO.Path]::GetFullPath($installDir).TrimEnd("\")
+    Assert-True ($resolvedInstallDir.StartsWith($expectedInstallRoot, [System.StringComparison]::OrdinalIgnoreCase)) "Installed app is not under the per-user LOCALAPPDATA root: $resolvedInstallDir"
+
+    $hkcuUninstallEntry = Get-AgentCoworkUninstallEntry -Hive HKCU
+    $hklmUninstallEntry = Get-AgentCoworkUninstallEntry -Hive HKLM
+    Assert-True ($null -ne $hkcuUninstallEntry) "Per-user HKCU uninstall entry not found for Agent Cowork"
+    Assert-True ($null -eq $hklmUninstallEntry) "All-machine HKLM uninstall entry found for Agent Cowork; installer must default to currentUser"
 
     $report.installedExe = $exe
     $report.installDir = $installDir
@@ -195,13 +225,23 @@ try {
         installedExe = Get-SignatureSummary -Path $exe
         installer = Get-SignatureSummary -Path $InstallerPath
     }
-    $report.uninstallEntry = $uninstallEntry
+    $report.installScope = [ordered]@{
+        expected = "currentUser"
+        expectedRoot = $expectedInstallRoot
+        resolvedInstallDir = $resolvedInstallDir
+        hkcuUninstallEntry = $hkcuUninstallEntry
+        hklmUninstallEntry = $hklmUninstallEntry
+    }
+    $report.uninstallEntry = $hkcuUninstallEntry
     $report.liveReplyConfigured = [bool]($env:KIMI_API_KEY -or $env:MOONSHOT_API_KEY)
 
     if ($DryRun) {
         $report.ok = $true
         $report.checks.installedExeExists = $true
         $report.checks.sidecarExists = $true
+        $report.checks.perUserInstallRoot = "passed"
+        $report.checks.hkcuUninstallEntry = "passed"
+        $report.checks.hklmUninstallEntryAbsent = "passed"
         return
     }
 
@@ -331,6 +371,9 @@ try {
     }
     $report.checks.installedExeExists = $true
     $report.checks.sidecarExists = $true
+    $report.checks.perUserInstallRoot = "passed"
+    $report.checks.hkcuUninstallEntry = "passed"
+    $report.checks.hklmUninstallEntryAbsent = "passed"
     $report.checks.mainWindow = "passed"
     $report.checks.sidecarHealth = "passed"
     $report.checks.authRoundTrip = "passed"

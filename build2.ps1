@@ -18,14 +18,12 @@ Set-Location "$root\apps\windows-client\ui"
 npx --no-install postject $target NODE_SEA_BLOB "$root\apps\host\dist\host.blob" --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --overwrite *>> $log
 Log 'STEP 4 cargo tauri build'
 Set-Location "$root\apps\windows-client"; cargo tauri build *>> $log; if($LASTEXITCODE -ne 0){Fail 'tauri'}
-Log 'STEP 5 copy + sign'
+Log 'STEP 5 copy + sign NSIS per-user installer'
 $base="$root\apps\windows-client\src-tauri\target\release\bundle"; $dest="$root\installers"
+New-Item -ItemType Directory -Path $dest -Force | Out-Null
 Remove-Item "$dest\*" -Force -ErrorAction SilentlyContinue
-$msi = Get-ChildItem -LiteralPath "$base\msi" -Filter 'Agent Cowork_*_x64_en-US.msi' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $nsis = Get-ChildItem -LiteralPath "$base\nsis" -Filter 'Agent Cowork_*_x64-setup.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if(-not $msi){Fail 'msi'}
 if(-not $nsis){Fail 'nsis'}
-Copy-Item $msi.FullName $dest -Force
 Copy-Item $nsis.FullName $dest -Force
 & pwsh -NoProfile -ExecutionPolicy Bypass -File "$root\scripts\sign-windows.ps1" -SelfSigned *>> $log
 Log 'STEP 6 host test suite'

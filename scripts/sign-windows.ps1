@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Code-sign the Agent Cowork Windows installers (MSI + NSIS setup.exe).
+  Code-sign the Agent Cowork Windows installers (NSIS setup.exe; MSI if present).
 
 .DESCRIPTION
   Production distribution should be signed with a certificate from a trusted CA
@@ -55,7 +55,7 @@ function Find-SignTool {
   throw 'signtool.exe not found. Install the Windows 10/11 SDK (Windows Kits).'
 }
 
-# Default to the two installers produced by `cargo tauri build`, copied into installers\.
+# Default to installers produced by `cargo tauri build`, copied into installers\.
 if (-not $Files -or $Files.Count -eq 0) {
   $installerDir = Join-Path $repoRoot 'installers'
   $setup = Get-ChildItem -LiteralPath $installerDir -Filter 'Agent Cowork_*_x64-setup.exe' -File -ErrorAction SilentlyContinue |
