@@ -21,6 +21,7 @@
     "apps/host/src/kimi/agent/todo-state.js",
     "apps/host/src/kimi/context/history-compactor.js",
     "apps/host/src/kimi/context/token-estimator.js",
+    "apps/host/src/kimi/context/tool-result-summarizer.js",
     "apps/host/src/memory/memory-utils.js",
     "apps/host/src/security/redaction.js",
     "apps/host/src/security/path-policy.js",

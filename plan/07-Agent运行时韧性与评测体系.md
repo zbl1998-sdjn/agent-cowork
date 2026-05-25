@@ -67,6 +67,8 @@ B1 完成记录(2026-05-25):新增 `kimi/context/token-estimator.js` 启发式 `
 
 B2 完成记录(2026-05-25):新增 `kimi/context/history-compactor.js` 纯 `HistoryCompactor`,超预算时生成确定性压缩 system message、保留最近消息、提取 `FACT/IMPORTANT/DECISION/关键事实/偏好` 等关键事实清单,并在 retained 内容过大时按预算裁剪而不溢出窗口;≥200 轮历史、关键事实保留和极紧预算边界均有单测锁定。已纳入 host `checkJs` 类型护栏。
 
+B3 完成记录(2026-05-25):新增 `kimi/context/tool-result-summarizer.js` 纯 `ToolResultSummarizer`,用 token 预算替代 `JSON.stringify(result).slice(0,8000)` 式硬截断前置能力;小结果保持可读原样,大结构化/文本结果压缩成含关键要点、来源与预览的摘要,并优先保留与关键要点绑定的 source。大结果不撑窗、要点不丢与 source-like 行保留均有单测锁定。已纳入 host `checkJs` 类型护栏。
+
 ---
 
 ## C · 任务循环韧性 — 敢长时间放手跑的前提
