@@ -1,6 +1,7 @@
 import { modelBreakerStats } from '../kimi/agent-runner.js';
 import { sendJson } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
+import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 
 export async function handleSystemRoutes({ request, response, pathname, requestContext, state }) {
   if (request.method === 'GET' && pathname === '/health') {
@@ -84,6 +85,15 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
       },
       checks,
     });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/runtime/dependencies') {
+    sendJson(response, 200, getRuntimeDependencyStatus({
+      env: state.config.runtimeDependencyEnv || process.env,
+      platform: state.config.runtimeDependencyPlatform || process.platform,
+      sandboxStartup: state.sandboxStartup,
+    }));
     return true;
   }
 
