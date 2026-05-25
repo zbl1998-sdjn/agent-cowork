@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchLiveArtifactData, openPath, type LiveArtifactData } from '../lib/api';
+import { Empty, ErrorState, Loading } from './ui/StateViews';
 
 export const DEFAULT_AUTO_REFRESH_SECONDS = 5;
 export const MIN_AUTO_REFRESH_SECONDS = 1;
@@ -40,6 +41,33 @@ export function liveArtifactViewState(model: LiveArtifactViewModel) {
     autoRefreshLabel: autoRefresh ? `自动刷新 ${autoRefreshSeconds}s` : '自动刷新',
     statusText: model.error || (hasArtifact ? '活页已就绪' : '尚未生成活页'),
   };
+}
+
+type LiveArtifactRenderState = ReturnType<typeof liveArtifactViewState>;
+
+export function LiveArtifactStatusView({
+  busy,
+  lastRefresh = '',
+  state,
+}: {
+  busy?: boolean;
+  lastRefresh?: string;
+  state: LiveArtifactRenderState;
+}) {
+  if (state.isError) {
+    return <ErrorState title="活页刷新失败" message={state.statusText} />;
+  }
+  if (busy && !state.hasArtifact) {
+    return <Loading message="正在生成活页…" />;
+  }
+  if (!state.hasArtifact) {
+    return <Empty title="尚未生成活页" message="渲染完成后会在这里预览。" />;
+  }
+  return (
+    <p className="panel-note">
+      {state.statusText}{lastRefresh ? ` · ${new Date(lastRefresh).toLocaleString()}` : ''}
+    </p>
+  );
 }
 
 interface LiveArtifactViewProps extends LiveArtifactViewModel {
@@ -123,9 +151,7 @@ export function LiveArtifactView({
           onChange={(event) => setAutoRefreshSeconds(normaliseAutoRefreshSeconds(event.target.value))}
         />
       </div>
-      <p className={state.isError ? 'panel-error' : 'panel-note'}>
-        {state.statusText}{lastRefresh ? ` · ${new Date(lastRefresh).toLocaleString()}` : ''}
-      </p>
+      <LiveArtifactStatusView busy={busy} lastRefresh={lastRefresh} state={state} />
       {srcDoc && <iframe ref={frameRef} className="viz-frame" title={title} srcDoc={srcDoc} sandbox="allow-scripts" />}
     </div>
   );
