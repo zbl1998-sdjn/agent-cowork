@@ -113,6 +113,30 @@ describe('JSON requests', () => {
     expect(calls.some((call) => call.url.endsWith('/api/runs/run%201'))).toBe(true);
   });
 
+  it('loads runtime dependency status through the typed helper', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/runtime/dependencies')) {
+        return jsonResponse({
+          ok: true,
+          service: 'agent-cowork-host',
+          generatedAt: '2026-05-25T00:00:00.000Z',
+          platform: 'win32',
+          arch: 'x64',
+          dependencies: [{ id: 'node', section: 'A4', label: 'Node runtime', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' }],
+          summary: { total: 1, requiredMissing: 0, byStatus: { available: 1 } },
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const result = await api.getRuntimeDependencies();
+
+    expect(result.dependencies[0].id).toBe('node');
+    expect(result.summary.byStatus.available).toBe(1);
+    expect(calls.some((call) => call.url.endsWith('/api/runtime/dependencies'))).toBe(true);
+  });
+
   it('injects the Bearer token on GET requests after host readiness', async () => {
     const { api, calls } = await importApi();
     api.setAuthToken(' token-123 ');

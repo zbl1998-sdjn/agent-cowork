@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
+import { RuntimeDependenciesPanel } from './RuntimeDependenciesPanel';
 
-type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'selfcheck';
+type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
 
 interface SettingsProps {
   username: string;
@@ -100,6 +101,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
             <button type="button" className={tab === 'model' ? 'is-active' : ''} onClick={() => setTab('model')}>模型</button>
             <button type="button" className={tab === 'input' ? 'is-active' : ''} onClick={() => setTab('input')}>输入</button>
             <button type="button" className={tab === 'api' ? 'is-active' : ''} onClick={() => setTab('api')}>API</button>
+            <button type="button" className={tab === 'runtime' ? 'is-active' : ''} onClick={() => setTab('runtime')}>运行时</button>
             <button type="button" className={tab === 'selfcheck' ? 'is-active' : ''} onClick={() => setTab('selfcheck')}>自检</button>
           </nav>
           <section className="settings-pane">
@@ -160,6 +162,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
                 </div>
               )
             )}
+            {tab === 'runtime' && <RuntimeDependenciesPanel />}
             {tab === 'selfcheck' && (
               <div className="selfcheck">
                 <div className="selfcheck-head">
