@@ -22,6 +22,7 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
   assert.deepEqual(config.bundle.targets, ['nsis']);
+  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: 'embedBootstrapper' });
   assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
   assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
 });

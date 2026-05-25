@@ -200,6 +200,26 @@ function Get-NsisCleanupHookStatus {
     }
 }
 
+function Get-WebViewInstallModeStatus {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $tauriRoot = Join-Path $RepoRoot "apps\windows-client\src-tauri"
+    $configPath = Join-Path $tauriRoot "tauri.conf.json"
+    Assert-True (Test-Path -LiteralPath $configPath) "Tauri config not found: $configPath"
+
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $mode = $config.bundle.windows.webviewInstallMode
+    Assert-True ($null -ne $mode) "Windows webviewInstallMode is not configured"
+    Assert-True ($mode.type -eq "embedBootstrapper") "Windows webviewInstallMode must embed the WebView2 bootstrapper"
+
+    return [ordered]@{
+        configured = $true
+        type = $mode.type
+        configPath = $configPath
+        purpose = "Install WebView2 runtime on Windows machines that do not already have it"
+    }
+}
+
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $workspace = Join-Path $repoRoot "build\installed-tauri-smoke-workspace"
@@ -234,6 +254,10 @@ $oldStore = $env:KCW_STORE
 $oldSqlitePath = $env:KCW_SQLITE_PATH
 
 try {
+    $webviewInstallMode = Get-WebViewInstallModeStatus -RepoRoot $repoRoot
+    $report.webviewInstallMode = $webviewInstallMode
+    $report.checks.webviewInstallMode = "passed"
+
     $nsisCleanupHook = Get-NsisCleanupHookStatus -RepoRoot $repoRoot
     $report.installerCleanupHook = $nsisCleanupHook
     $report.checks.nsisCleanupHook = "passed"
