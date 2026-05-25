@@ -85,3 +85,69 @@ test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden unti
     await closeTestServer(server);
   }
 });
+
+test('E2E /api/agent/chat/stream: resumeRunId continues from checkpoint without replaying writes', async () => {
+  const root = tmp();
+  let firstRunCalls = 0;
+  let resumeMode = false;
+  let resumedSawToolResult = false;
+  const agentModelCall = async ({ messages }) => {
+    const sawToolResult = Array.isArray(messages)
+      && messages.some((message) => message.role === 'tool' && message.tool_call_id === 'c1');
+    if (resumeMode && sawToolResult) {
+      resumedSawToolResult = true;
+      return { content: '续跑完成。', usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 } };
+    }
+    if (!resumeMode) {
+      firstRunCalls += 1;
+      if (firstRunCalls === 1) {
+        return {
+          content: '',
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          tool_calls: [{
+            id: 'c1',
+            function: { name: 'Write', arguments: JSON.stringify({ path: 'resume.txt', content: 'first' }) },
+          }],
+        };
+      }
+      throw new Error('simulated crash after checkpoint');
+    }
+    return {
+      content: '',
+      tool_calls: [{
+        id: 'c_replay',
+        function: { name: 'Write', arguments: JSON.stringify({ path: 'resume.txt', content: 'replayed' }) },
+      }],
+    };
+  };
+  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const base = await bind(server);
+  try {
+    const first = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: '写入后模拟崩溃', autoApprove: true }),
+    });
+    const firstText = await readStream(first);
+    assert.match(firstText, /event: error/);
+    const runId = JSON.parse(/event: start\s+data: ([^\n]+)/.exec(firstText)[1]).runId;
+    assert.ok(runId, 'first run emitted runId');
+    assert.equal(fs.readFileSync(path.join(root, 'resume.txt'), 'utf8'), 'first');
+
+    resumeMode = true;
+    const resumed = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ resumeRunId: runId, autoApprove: true }),
+    });
+    assert.equal(resumed.status, 200);
+    const resumedText = await readStream(resumed);
+    assert.match(resumedText, /"resumed":true/);
+    assert.match(resumedText, /event: done/);
+    assert.match(resumedText, /续跑完成/);
+    assert.equal(resumedSawToolResult, true);
+    assert.equal(fs.readFileSync(path.join(root, 'resume.txt'), 'utf8'), 'first');
+  } finally {
+    await closeTestServer(server);
+  }
+});

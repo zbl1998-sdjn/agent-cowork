@@ -102,6 +102,8 @@ D1 完成记录(2026-05-25):新增 `runtime/run-checkpoint.js` 与 agent 层 `ch
 
 D2 完成记录(2026-05-25):新增 `runtime/run-resume.js` 将最新检查点规范化为 `resumeState`;`tool-loop` 可从检查点的 `messages/usage/approvedTools/todos` 继续运行。前置特征测试覆盖"工具已执行并写入检查点后进程崩溃"场景:续跑时模型收到已完成工具的 tool result,handler 不再执行,文件副作用只出现一次,usage 从检查点继续累计。
 
+D2b 完成记录(2026-05-26):`/api/agent/chat/stream` 现支持 `resumeRunId`,会在 SSE 开始前读取同一 run 的 checkpoint,用原 runId 注册取消/审批/trace 并把 `resumeState` 注入 `tool-loop`;缺少 checkpoint 时直接返回 404,不会启动新 SSE。E2E 覆盖首轮写入后模拟崩溃、第二次仅带 `resumeRunId` 续跑,确认模型看到已完成 tool result 且文件写入不会重放。
+
 D3 完成记录(2026-05-26):`runtime/model-recorder.js` 新增 JSONL 文件型 `ModelRecordStore`,可把已脱敏的 model-call 记录持久化到磁盘并重新加载给 `ModelReplayer`;保持现有 fingerprint、脱敏字段省略、失败记录不参与 replay 与 replay miss 行为不变。单测覆盖持久化后确定性回放、API key/非确定性回调不落盘、失败记录脱敏且不可回放,并复跑 eval replay backend。
 
 D4 完成记录(2026-05-25):新增 L0 `util/ids.js` seedable ID 源,提供 deterministic random/hex/bytes/date;`createRunId` 与 `createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现的 start `runId`。单测覆盖同 seed 的 runId/ULID 复现和 SSE start runId 稳定。

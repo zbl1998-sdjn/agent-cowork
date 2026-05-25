@@ -176,8 +176,10 @@ export async function handleKimiRoutes({ request, response, pathname, requestCon
         sendJson(response, 503, { error: KIMI_NOT_CONFIGURED });
         return;
       }
-      if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) {
-        sendJson(response, 400, { error: 'body.prompt is required' });
+      const hasPrompt = body && typeof body.prompt === 'string' && body.prompt.trim();
+      const hasResumeRunId = body && typeof body.resumeRunId === 'string' && body.resumeRunId.trim();
+      if (!hasPrompt && !hasResumeRunId) {
+        sendJson(response, 400, { error: 'body.prompt or body.resumeRunId is required' });
         return;
       }
       if (state.draining) {

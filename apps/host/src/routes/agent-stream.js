@@ -1,11 +1,9 @@
-import { createRunId, writeRunRecord } from '../runtime/run-store.js';
+import { writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
-import { createRunCheckpointer } from '../runtime/run-checkpoint.js';
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createBudgetGuard } from '../runtime/budget-guard.js';
-import { createSeededIdSource } from '../util/ids.js';
 import { createRunTrace } from '../runtime/run-trace.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
 import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
@@ -14,6 +12,7 @@ import { sse } from '../kimi/agent/finalize.js';
 import { runAgentChat } from '../kimi/agent/tool-loop.js';
 import { buildAgentToolset } from '../kimi/agent/toolset-builder.js';
 import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
+import { resolveAgentRunStart } from './agent-resume.js';
 
 function recordAgentRun({
   runStoreRoot,
@@ -94,17 +93,6 @@ function createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs }) {
   });
 }
 
-function createAgentRunIdentity(body) {
-  const seed = body && (body.runSeed || body.seed);
-  if (!seed) {
-    const startedAt = new Date();
-    return { runId: createRunId(startedAt), startedAt };
-  }
-  const ids = createSeededIdSource(seed);
-  const startedAt = ids.date();
-  return { runId: createRunId(startedAt, { randomHex: ids.randomHex }), startedAt };
-}
-
 export async function streamAgentChat({
   response,
   requestContext,
@@ -125,14 +113,20 @@ export async function streamAgentChat({
   request = null,
   scheduler = null,
 }) {
+  const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot });
+  if (resumed && !resumeState) {
+    response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+    response.end(JSON.stringify({ error: '没有找到可续跑的检查点。', runId }));
+    return;
+  }
+
   response.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
     'cache-control': 'no-store',
     connection: 'keep-alive',
   });
-  const { runId, startedAt } = createAgentRunIdentity(body);
   const controller = cancellation ? cancellation.register(runId) : null;
-  sse(response, 'start', { runId });
+  sse(response, 'start', { runId, resumed: !!resumeState });
 
   let finished = false;
   const onDisconnect = () => {
@@ -212,7 +206,8 @@ export async function streamAgentChat({
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
       budgetGuard,
       runTimeoutMs,
-      checkpointer: runStoreRoot ? createRunCheckpointer({ root: runStoreRoot }) : null,
+      checkpointer,
+      resumeState,
       runTrace,
     });
     if (controller && controller.signal.aborted) {
