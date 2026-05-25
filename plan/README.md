@@ -71,6 +71,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-B3 ToolResultSummarizer:新增 `kimi/context/tool-result-summarizer.js` 纯摘要器,大工具结果按 token 预算压缩成关键要点+来源+预览,替代后续 `tool-loop` 硬截断接入前的可插拔能力;覆盖小结果原样、大结构化结果要点/source 不丢、超长文本 source-like 行保留的行为测试。
 - [x] 07-B4 ContextManager 接入 tool-loop:新增 `kimi/context/context-manager.js`,组合 token 估算、历史压缩与工具结果摘要;`tool-loop` 每轮模型调用前压缩消息、工具结果回灌前按 token 预算摘要,并补热点特征测试锁定大工具结果不再硬截断且保留关键要点/source。
 - [x] 07-C1 LoopGuard:新增 `kimi/agent/loop-guard.js` 纯循环护栏,按工具名+稳定参数指纹检测重复调用和连续失败,达到阈值返回可读打断原因;覆盖参数顺序稳定、不同工具/参数隔离、成功重置连续失败。
+- [x] 07-C2 RetryPolicy:新增 `kimi/agent/tool-retry.js` 纯重试策略,仅对网络/超时/文件锁/临时繁忙等可重试错误做有界指数退避,权限/参数/schema/path 越界等永久失败立即上报;覆盖 thrown error 与 `{ error }` 工具结果两种失败形态。
 - [x] P2-B1 验收补齐:连接器 catalog/管理面板/一键连接已存在;新增 `npm run smoke:react-connectors` 真实浏览器验收,覆盖打开连接器面板→一键连接内置 filesystem MCP→`mcp__fs__read_text` 进入工具 registry。
 - [x] P2-B2(本地可测子项):新增 GitHub OAuth device-flow 连接器、`/api/connectors/oauth/{status,start,complete,revoke}`、服务端 device-code session 与 Host 凭证仓库;Windows 默认 DPAPI 保护 access token,状态/撤销只返回脱敏摘要;前端连接器面板已支持开始授权、完成授权、撤销授权。`smoke:react-connectors` 用本地 mock GitHub device-flow 覆盖 UI 闭环和凭证不泄漏。
 - [x] P2-B3(本地可测子项):连接器支持断开/撤销;断开 filesystem MCP 会关闭 client 并从工具 registry 移除 `mcp__fs__*`;OAuth 连接器支持 allowlist scope 审批、单次 approval receipt、高风险 scope 标记与前端审批控件;`smoke:react-connectors` 已覆盖连接→断开→工具撤销→GitHub OAuth scope 审批→授权→撤销。

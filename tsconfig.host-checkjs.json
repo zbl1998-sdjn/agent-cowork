@@ -20,6 +20,7 @@
     "apps/host/src/connectors/oauth-permissions.js",
     "apps/host/src/kimi/agent/loop-guard.js",
     "apps/host/src/kimi/agent/todo-state.js",
+    "apps/host/src/kimi/agent/tool-retry.js",
     "apps/host/src/kimi/context/context-manager.js",
     "apps/host/src/kimi/context/history-compactor.js",
     "apps/host/src/kimi/context/token-estimator.js",
