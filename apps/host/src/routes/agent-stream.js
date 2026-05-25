@@ -7,10 +7,12 @@ import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createBudgetGuard } from '../runtime/budget-guard.js';
 import { createSeededIdSource } from '../util/ids.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
+import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
 import { sse } from '../kimi/agent/finalize.js';
 import { runAgentChat } from '../kimi/agent/tool-loop.js';
 import { buildAgentToolset } from '../kimi/agent/toolset-builder.js';
+import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
 
 function recordAgentRun({
   runStoreRoot,
@@ -18,6 +20,7 @@ function recordAgentRun({
   requestContext,
   runId,
   kimiConfig,
+  body,
   trustedRoot,
   startedAt,
   status,
@@ -31,6 +34,9 @@ function recordAgentRun({
     type: 'agent-chat',
     provider: 'kimi-api',
     model: kimiConfig.model,
+    systemPromptVersion: SYSTEM_PROMPT_VERSION,
+    promptBuilder: 'agent-system-prompt',
+    configSnapshot: buildAgentConfigSnapshot(body, kimiConfig),
     mode: 'agent',
     trustedRoot,
     startedAt: startedAt.toISOString(),
@@ -224,6 +230,7 @@ export async function streamAgentChat({
       requestContext,
       runId,
       kimiConfig,
+      body,
       trustedRoot,
       startedAt,
       status,

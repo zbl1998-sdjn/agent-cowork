@@ -80,6 +80,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-D2 run-resume:新增 `runtime/run-resume.js`,可从最新检查点生成 `resumeState`;`tool-loop` 支持从检查点消息、usage、已批准工具和 todo 续跑。已用崩溃后续跑测试锁定已完成工具 handler 不重复执行、文件副作用不重复。
 - [x] 07-D4 seed 注入:新增 L0 `util/ids.js` seedable ID 源;`createRunId`/`createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现 start `runId`,便于 replay/debug 对齐轨迹。
 - [x] 07-E1 RunMetrics:新增 `runtime/run-metrics.js`,所有 `writeRunRecord` 持久化记录都会自动带 `metrics`(token/估算成本/耗时/步骤/工具调用/失败率);agent stream 记录已持久化聚合 usage。`npm run test:host` 当前 536 tests,535 pass,1 skip。
+- [x] 07-E3 版本归因:新增 `runtime/run-attribution.js`,所有 `writeRunRecord` 持久化记录都会自动带 `attribution`(输入 prompt 哈希、system-prompt 版本、prompt builder、provider/model/mode/baseUrl 与脱敏配置快照);agent stream 记录只写入安全配置摘要。`npm run test:host` 当前 539 tests,538 pass,1 skip。
 - [x] 07-G1 InjectionGuard:新增 `kimi/safety/untrusted-content.js`,工具结果回灌前统一包成不可信数据区;检测到 prompt injection/tool hijack/exfiltration/approval bypass 模式时发 `untrusted_content_flagged`,并用 tool-loop 注入用例锁定恶意工具输出不会诱导 Shell。
 - [x] 07-G2 工具参数 schema 校验:新增 `kimi/agent/arg-validator.js`,tool-loop 在 handler/hook/审批前校验模型工具参数;缺字段/类型错会发 `tool_args_invalid` 并回灌错误,不会执行 handler。
 - [x] 07-G3 红队 eval 回归护栏:复用 A7 redteam 任务集覆盖危险 Shell、路径穿越、间接提示注入、绕审批删除/外传等场景;`npm run eval` 当前 28/28 passed。

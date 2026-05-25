@@ -117,6 +117,8 @@ D4 完成记录(2026-05-25):新增 L0 `util/ids.js` seedable ID 源,提供 deter
 
 E1 完成记录(2026-05-25):新增 `runtime/run-metrics.js` 结构化运行指标生成器,逐运行派生 token、估算成本、耗时、步骤数、工具调用数、失败数和失败率;`writeRunRecord` 在所有运行记录写盘前统一补 `metrics`,agent SSE 记录会持久化聚合 usage 以进入指标。已补纯函数、run-store 持久化和 agent stream 真实记录路径测试,并纳入 host `checkJs`。`npm run test:host` 通过(536 tests,535 pass,1 skip)。
 
+E3 完成记录(2026-05-25):新增 `runtime/run-attribution.js` 统一生成运行归因,每条 `writeRunRecord` 持久化记录都会绑定输入 prompt 哈希、输入长度、system-prompt 版本、prompt builder、provider/model/mode/baseUrl 与脱敏后的关键配置快照;`kimi/system-prompt.js` 暴露 `SYSTEM_PROMPT_VERSION`,agent SSE 记录通过 `routes/agent-config-snapshot.js` 只写入安全配置摘要,不持久化 API key/token/secret。已补纯函数、run-store 持久化和 agent stream 真实记录路径测试,并纳入 host `checkJs`。`npm run test:host` 通过(539 tests,538 pass,1 skip)。
+
 ---
 
 ## F · 预算、超时与熔断 — 防止失控烧钱 / 卡死(上版缺失,补)

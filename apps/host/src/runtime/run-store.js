@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { withRunAttribution } from './run-attribution.js';
 import { withRunMetrics } from './run-metrics.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
@@ -25,7 +26,7 @@ export function writeRunRecord(runStoreRoot, record) {
     throw new Error('Run record id is required');
   }
   fs.mkdirSync(runStoreRoot, { recursive: true });
-  const enriched = withRunMetrics(record);
+  const enriched = withRunMetrics(withRunAttribution(record));
   const runPath = getRunPath(runStoreRoot, enriched.id);
   fs.writeFileSync(runPath, `${JSON.stringify(enriched, null, 2)}\n`, 'utf8');
   return runPath;

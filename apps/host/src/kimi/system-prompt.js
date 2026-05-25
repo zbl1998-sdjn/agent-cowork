@@ -2,6 +2,16 @@
 // skills/memory injection + inline-viz/suggestions hints. Pure (no I/O), so it
 // is trivially unit-testable and kept out of the agent loop module.
 
+export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v1';
+
+/**
+ * @typedef {{ id: string, name: string, description?: string }} SkillDescriptor
+ */
+
+/**
+ * @param {{ memoryText?: string, skills?: SkillDescriptor[], planMode?: boolean, developerMode?: boolean }} [options]
+ * @returns {string}
+ */
 export function buildSystemPrompt({ memoryText = '', skills = [], planMode = false, developerMode = false } = {}) {
   const lines = [
     '你是 Agent Cowork，一个运行在用户本地电脑上的 AI 助手。',
