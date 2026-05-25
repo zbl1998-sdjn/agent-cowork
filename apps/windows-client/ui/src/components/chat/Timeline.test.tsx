@@ -1,8 +1,16 @@
 import type { RefObject } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { AssistantMessage } from '../../lib/app-types';
-import { Timeline } from './Timeline';
+import type { AssistantMessage, UserMessage } from '../../lib/app-types';
+import {
+  Timeline,
+  assistantTurnPropsEqual,
+  userEditTurnPropsEqual,
+  userTurnPropsEqual,
+  type AssistantTurnProps,
+  type UserEditTurnProps,
+  type UserTurnProps,
+} from './Timeline';
 
 vi.mock('../../lib/api', () => ({
   answerQuestion: vi.fn(),
@@ -21,6 +29,43 @@ const baseAssistant: AssistantMessage = {
   sources: [],
   approvalState: 'idle',
 };
+
+const baseUser: UserMessage = { id: 'u1', role: 'user', text: '请帮我修改文件' };
+
+function assistantTurnProps(overrides: Partial<AssistantTurnProps> = {}): AssistantTurnProps {
+  return {
+    message: baseAssistant,
+    streamingId: null,
+    trustedRoot: 'C:/work',
+    onCopyText: vi.fn(),
+    onHandleApprove: vi.fn(),
+    onOpenOrPreview: vi.fn(),
+    onPatchAssistant: vi.fn(),
+    onQuickSend: vi.fn(),
+    onRegenerate: vi.fn(),
+    ...overrides,
+  };
+}
+
+function userTurnProps(overrides: Partial<UserTurnProps> = {}): UserTurnProps {
+  return {
+    message: baseUser,
+    streamingId: null,
+    onBeginEdit: vi.fn(),
+    ...overrides,
+  };
+}
+
+function userEditTurnProps(overrides: Partial<UserEditTurnProps> = {}): UserEditTurnProps {
+  return {
+    editText: baseUser.text,
+    message: baseUser,
+    onSetEditingMsgId: vi.fn(),
+    onSetEditText: vi.fn(),
+    onSubmitEdit: vi.fn(),
+    ...overrides,
+  };
+}
 
 function renderTimeline(messages: AssistantMessage[] | AssistantMessage): string {
   return renderToStaticMarkup(
@@ -78,5 +123,30 @@ describe('Timeline', () => {
     expect(batch).toContain('待批准操作');
     expect(batch).toContain('批准当前 2 个');
     expect(batch).toContain('本会话批准当前 2 个');
+  });
+
+  it('keeps assistant turns memoized unless render-sensitive props change', () => {
+    const props = assistantTurnProps();
+
+    expect(assistantTurnPropsEqual(props, { ...props })).toBe(true);
+    expect(assistantTurnPropsEqual(props, { ...props, message: { ...baseAssistant } })).toBe(false);
+    expect(assistantTurnPropsEqual(props, { ...props, streamingId: baseAssistant.id })).toBe(false);
+    expect(assistantTurnPropsEqual(props, { ...props, onRegenerate: vi.fn() })).toBe(false);
+  });
+
+  it('keeps user turns memoized across unrelated assistant streaming updates', () => {
+    const props = userTurnProps();
+
+    expect(userTurnPropsEqual(props, { ...props })).toBe(true);
+    expect(userTurnPropsEqual(props, { ...props, message: { ...baseUser } })).toBe(false);
+    expect(userTurnPropsEqual(props, { ...props, streamingId: 'a1' })).toBe(false);
+  });
+
+  it('keeps user edit turns memoized until edit state or handlers change', () => {
+    const props = userEditTurnProps();
+
+    expect(userEditTurnPropsEqual(props, { ...props })).toBe(true);
+    expect(userEditTurnPropsEqual(props, { ...props, editText: '新内容' })).toBe(false);
+    expect(userEditTurnPropsEqual(props, { ...props, onSubmitEdit: vi.fn() })).toBe(false);
   });
 });

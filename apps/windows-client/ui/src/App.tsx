@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   agentChatStream, cancelRun, fileToUpload, getJson, getKimiInfo, getMe, guestLogin, importUploads,
   logout as apiLogout, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents,
@@ -103,6 +103,8 @@ export function App() {
   }, [user]);
 
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -227,12 +229,13 @@ export function App() {
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const regenerate = useCallback((assistantId: string) => {
-    const idx = messages.findIndex((m) => m.id === assistantId);
+    const currentMessages = messagesRef.current;
+    const idx = currentMessages.findIndex((m) => m.id === assistantId);
     for (let i = idx - 1; i >= 0; i -= 1) {
-      const text = messages[i].role === 'user' ? messages[i].text : '';
+      const text = currentMessages[i].role === 'user' ? currentMessages[i].text : '';
       if (text) { quickSend(text); return; }
     }
-  }, [messages, quickSend]);
+  }, [quickSend]);
   const beginEdit = useCallback((messageId: string, text: string) => {
     if (!streamingId) { setEditingMsgId(messageId); setEditText(text); }
   }, [streamingId]);
@@ -271,6 +274,7 @@ export function App() {
       patchAssistant(message.id, (m) => ({ ...m, rollbackApprovalId: applied.rollbackApprovalId || null, approvalState: 'approved', status: 'done' }));
     } catch (error) { patchAssistant(message.id, (m) => ({ ...m, text: (error as Error).message })); }
   }, [trustedRoot, patchAssistant]);
+  const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
 
   const commands = useMemo<Command[]>(() => [
     { id: 'new', label: '新建对话', run: conversations.newConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'plan', label: planMode ? '关闭计划模式' : '开启计划模式', run: () => setPlanMode((v) => !v) },
@@ -288,7 +292,7 @@ export function App() {
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
         <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
-        <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={(m) => void handleApprove(m)} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
+        <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
