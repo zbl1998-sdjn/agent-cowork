@@ -7,6 +7,7 @@ import {
 import { mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { AUTO_CLARIFY_KEY, GUEST_KEY, loadConversations, nextMessageId, PREVIEWABLE_RE, STARTERS } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel, WorkspaceInfo } from './lib/app-types';
+import { ONBOARDING_DONE_KEY } from './lib/onboarding';
 import type { RunEvent, RunSummary } from './lib/types';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
@@ -46,6 +47,9 @@ export function App() {
   const [user, setUser] = useState<AuthIdentity | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    try { return localStorage.getItem(ONBOARDING_DONE_KEY) !== '1'; } catch { return true; }
+  });
   useEffect(() => {
     void (async () => {
       try {
@@ -65,6 +69,14 @@ export function App() {
     try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
     setUser(null);
   }, []);
+  const completeOnboarding = useCallback(() => {
+    try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* ignore */ }
+    setOnboardingOpen(false);
+  }, []);
+  const openSettingsFromOnboarding = useCallback(() => {
+    completeOnboarding();
+    setSettingsOpen(true);
+  }, [completeOnboarding]);
   const continueAsGuest = useCallback(() => {
     try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* ignore */ }
     void (async () => { const g = await guestLogin(); if (g) setUser(g); })();
@@ -256,7 +268,7 @@ export function App() {
         <AppComposerDock commands={commands} defaultModel={defaultModel} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} settingsOpen={settingsOpen} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
     </div>
   );
 }

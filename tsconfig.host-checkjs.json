@@ -31,6 +31,7 @@
     "apps/host/src/kimi/safety/untrusted-content.js",
     "apps/host/src/kimi/system-prompt.js",
     "apps/host/src/memory/memory-utils.js",
+    "apps/host/src/onboarding/recommendations.js",
     "apps/host/src/security/redaction.js",
     "apps/host/src/security/path-policy.js",
     "apps/host/src/runtime/budget-guard.js",

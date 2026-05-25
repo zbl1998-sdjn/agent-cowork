@@ -54,6 +54,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 03-B1c(本地可测子项):前端 `LiveArtifactView` 支持活页预览、手动刷新、可选定时刷新、重开活页与打开产物文件;UI 单测通过,并新增 `npm run smoke:react-live-artifact` 真实浏览器验收(渲染活页→修改 `file-json` 数据源→自动刷新拉取新数据→独立活页刷新渲染新数据),证据见 `reports/react-live-artifact/react-live-artifact-2026-05-24T21-51-04-272Z.json`。
 - [ ] 03-B1 延后项:安装版/WebView 内嵌 iframe 的视觉深验仍留到 04-R5 深验。
 - [x] 03-B2:产物面板已卡片化,支持打开、重命名;后端 `/api/artifacts/rename` 复用 trustedRoot jail 与幂等键,host/UI 单测通过,并新增 `npm run smoke:react-artifacts` 真实浏览器验收(产物列表→重命名→磁盘同步)。
+- [x] 03-B4/06-F6 首启引导基础闭环:新增 onboarding 推荐路由与首启面板,按角色推荐技能/连接器/设置项,展示依赖体检推荐组件与当前状态摘要,支持本地降级推荐、进入设置和完成/稍后再说;host/UI 单测通过,本机 5173 UI + 3017 host smoke 覆盖 guest 登录后首启面板展示。
 - [x] 05-B1a:对话消息树/分支模型 + 历史消息编辑 fork 已实现;file/PG 存储和迁移已补测试。
 - [x] 05-B1b:分支切换控件、分支差异摘要与 hook 同步已实现;新增 `npm run smoke:react-branches` 真实浏览器验收,覆盖主线→分支→回到主线时的时间线与差异摘要更新;证据见 `reports/react-branches/react-branches-2026-05-24T20-48-18-623Z.json`。
 - [x] P1-B1(本地可测子项):`/api/subagent/run` 子代理接口已有 run 记录/时间线;本批补独立上下文预算与步数上限,过大计划返回 413 且不会执行任何工具;直接子代理路由继续拒绝高风险/写入型工具,需走 agent 审批流。

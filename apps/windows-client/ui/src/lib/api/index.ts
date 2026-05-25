@@ -13,3 +13,4 @@ export * from './chat';
 export * from './prompt';
 export * from './search';
 export * from './memory';
+export * from './onboarding';

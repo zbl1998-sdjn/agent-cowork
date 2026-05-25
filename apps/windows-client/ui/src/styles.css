@@ -661,6 +661,95 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 .preview-pdf-wrap { width: 100%; }
 .preview-pdf { width: 100%; height: 70vh; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 
+/* ================= first-run onboarding ================= */
+.onboarding-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 65;
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  letter-spacing: 0;
+}
+.onboarding-head { display: flex; align-items: flex-start; gap: 12px; }
+.onboarding-head h2 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 650; letter-spacing: 0; }
+.onboarding-head p { margin: 5px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; letter-spacing: 0; }
+.onboarding-close { margin-left: auto; border: none; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 3px; letter-spacing: 0; }
+.onboarding-close:hover { color: var(--text); }
+.onboarding-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.onboarding-roles button {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 9px 10px;
+  cursor: pointer;
+  letter-spacing: 0;
+}
+.onboarding-roles button:hover { border-color: var(--accent); }
+.onboarding-roles button.is-active { border-color: var(--accent); background: #fff4ef; }
+.onboarding-roles strong { display: block; font-size: 13px; line-height: 1.25; letter-spacing: 0; }
+.onboarding-roles span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.4; letter-spacing: 0; }
+.onboarding-dependency {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--bg);
+  letter-spacing: 0;
+}
+.onboarding-dependency strong { display: block; font-size: 12.5px; line-height: 1.25; letter-spacing: 0; }
+.onboarding-dependency > span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.4; letter-spacing: 0; }
+.onboarding-dependency-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.onboarding-dependency-list span {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 7px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 11.5px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+.onboarding-dependency-list span[data-status="available"],
+.onboarding-dependency-list span[data-status="configured"] { color: #176b4d; border-color: #9fd8c1; }
+.onboarding-dependency-list span[data-status="missing"],
+.onboarding-dependency-list span[data-status="degraded"] { color: #9a4d12; border-color: #f1c38c; }
+.onboarding-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.onboarding-section { min-width: 0; }
+.onboarding-section h3 { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0; }
+.onboarding-section ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.onboarding-section li { border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface); letter-spacing: 0; }
+.onboarding-section li strong { display: block; font-size: 12.5px; line-height: 1.25; letter-spacing: 0; }
+.onboarding-section li span { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.35; letter-spacing: 0; }
+.onboarding-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.onboarding-actions .btn-primary {
+  font: inherit;
+  font-size: 13px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 9px 14px;
+  cursor: pointer;
+  letter-spacing: 0;
+}
+.onboarding-actions .btn-secondary { letter-spacing: 0; }
+[data-theme="dark"] .onboarding-roles button.is-active { background: #2f241f; }
+
+@media (max-width: 720px) {
+  .onboarding-panel { right: 12px; bottom: 12px; max-height: calc(100vh - 24px); }
+  .onboarding-roles, .onboarding-sections { grid-template-columns: 1fr; }
+  .onboarding-actions { flex-wrap: wrap; }
+}
+
 /* ================= security self-check panel ================= */
 .selfcheck-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .selfcheck-head .btn-secondary { font: inherit; font-size: 12.5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 5px 12px; cursor: pointer; }

@@ -5,6 +5,7 @@ import { handleClarifyRoutes } from './clarify-routes.js';
 import { handleConnectorRoutes } from './connector-routes.js';
 import { handleConversationRoutes } from './conversation-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
+import { handleOnboardingRoutes } from './onboarding-routes.js';
 import { handlePlanRoutes } from './plan-routes.js';
 import { handlePromptRoutes } from './prompt-routes.js';
 import { handleRecipeRoutes } from './recipe-routes.js';
@@ -81,6 +82,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
   if (await handlePromptRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleSearchRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleKimiRoutes({ request, response, pathname, requestContext, state })) return true;
+  if (await handleOnboardingRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleWorkspaceFileRoutes({
     request,
     response,
