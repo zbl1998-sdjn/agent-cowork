@@ -76,6 +76,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-F1 BudgetGuard:新增 `runtime/budget-guard.js`,支持 per-run/per-session token、估算成本和 wall-clock 硬上限;agent stream 入口创建预算守卫并注入 `tool-loop`,模型 usage 超限或运行超时会发出 `budget_guard_abort`、停止后续工具执行并直接返回可读收尾文案。
 - [x] 07-F2 整轮 wall-clock 超时:新增 `kimi/agent/run-timeout.js`,整轮运行 signal 会传入模型调用;挂起模型调用达到 `runTimeoutMs` 后触发 `run_timeout` 并安全收尾,不依赖 maxSteps 或单模型默认 timeout。
 - [x] 07-F3 流式中断恢复:OpenAI-compatible SSE parser 在模型流中途断开时保留已累计 content/reasoning/usage 与完整 tool_calls,返回 `stream_interrupted` 元数据;不完整工具参数只进 `partial_tool_calls`,不会被下游当成可执行工具调用。
+- [x] 07-G1 InjectionGuard:新增 `kimi/safety/untrusted-content.js`,工具结果回灌前统一包成不可信数据区;检测到 prompt injection/tool hijack/exfiltration/approval bypass 模式时发 `untrusted_content_flagged`,并用 tool-loop 注入用例锁定恶意工具输出不会诱导 Shell。
 - [x] P2-B1 验收补齐:连接器 catalog/管理面板/一键连接已存在;新增 `npm run smoke:react-connectors` 真实浏览器验收,覆盖打开连接器面板→一键连接内置 filesystem MCP→`mcp__fs__read_text` 进入工具 registry。
 - [x] P2-B2(本地可测子项):新增 GitHub OAuth device-flow 连接器、`/api/connectors/oauth/{status,start,complete,revoke}`、服务端 device-code session 与 Host 凭证仓库;Windows 默认 DPAPI 保护 access token,状态/撤销只返回脱敏摘要;前端连接器面板已支持开始授权、完成授权、撤销授权。`smoke:react-connectors` 用本地 mock GitHub device-flow 覆盖 UI 闭环和凭证不泄漏。
 - [x] P2-B3(本地可测子项):连接器支持断开/撤销;断开 filesystem MCP 会关闭 client 并从工具 registry 移除 `mcp__fs__*`;OAuth 连接器支持 allowlist scope 审批、单次 approval receipt、高风险 scope 标记与前端审批控件;`smoke:react-connectors` 已覆盖连接→断开→工具撤销→GitHub OAuth scope 审批→授权→撤销。

@@ -282,13 +282,19 @@ export async function runAgentChat({
       if (needsApproval) audit('tool.execute', { tool: name, risk: tool.risk, ok });
       todo.finish(ok ? 'done' : 'failed');
       emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result });
-      const formatted = activeContextManager.formatToolResult(result);
+      const formatted = activeContextManager.formatToolResult(result, { toolName: name });
       if (formatted.summarized) {
         emit('tool_result_summary', {
           name,
           beforeTokens: formatted.beforeTokens,
           afterTokens: formatted.afterTokens,
           sources: formatted.sources || [],
+        });
+      }
+      if (formatted.injectionFlagged) {
+        emit('untrusted_content_flagged', {
+          name,
+          reasons: formatted.injectionReasons || [],
         });
       }
       messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
