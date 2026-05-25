@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { redactText } from '../security/redaction.js';
 
 const OMIT_KEYS = new Set(['fetchImpl', 'onContent', 'onReasoning', 'signal']);
@@ -63,6 +65,41 @@ export function createMemoryModelRecordStore(initialRecords = []) {
       const found = records.find((record) => record.fingerprint === fingerprint && record.status === 'succeeded');
       return found ? jsonClone(found) : null;
     },
+  };
+}
+
+export function createJsonlModelRecordStore(filePath) {
+  const recordPath = path.resolve(filePath);
+  function readRecords() {
+    let raw = '';
+    try {
+      raw = fs.readFileSync(recordPath, 'utf8');
+    } catch (error) {
+      if (error?.code === 'ENOENT') return [];
+      throw error;
+    }
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+  return {
+    append(record) {
+      const cloned = jsonClone(record);
+      fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+      fs.appendFileSync(recordPath, `${JSON.stringify(cloned)}\n`, 'utf8');
+      return jsonClone(cloned);
+    },
+    list() {
+      return readRecords().map((record) => jsonClone(record));
+    },
+    findByFingerprint(fingerprint) {
+      const records = readRecords();
+      const found = records.find((record) => record.fingerprint === fingerprint && record.status === 'succeeded');
+      return found ? jsonClone(found) : null;
+    },
+    filePath: recordPath,
   };
 }
 

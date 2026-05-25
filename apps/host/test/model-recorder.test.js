@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const INPUT = {
   messages: [{ role: 'user', content: 'hello' }],
@@ -75,6 +78,60 @@ test('ModelReplayer returns the recorded response for the same sanitized input',
       ...INPUT,
       messages: [{ role: 'user', content: 'different' }],
     }),
+    (error) => error.code === 'MODEL_REPLAY_MISS',
+  );
+});
+
+test('JsonlModelRecordStore persists sanitized records for deterministic replay', async () => {
+  const {
+    createJsonlModelRecordStore,
+    createModelRecorder,
+    createModelReplayer,
+  } = await import('../src/runtime/model-recorder.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-'));
+  const filePath = path.join(dir, 'records.jsonl');
+  const store = createJsonlModelRecordStore(filePath);
+  const recorder = createModelRecorder({ store });
+
+  await recorder.wrap(async () => ({
+    content: 'persisted-answer',
+    usage: { total_tokens: 9 },
+  }))(INPUT);
+  assert.equal(store.filePath, filePath);
+
+  const raw = fs.readFileSync(filePath, 'utf8');
+  assert.ok(raw.endsWith('\n'));
+  assert.equal(raw.trim().split(/\r?\n/).length, 1);
+  assert.ok(!raw.includes('sk-RECORDERSECRET'), 'jsonl record leaked model API key');
+  assert.ok(!raw.includes('fetchImpl'), 'jsonl record stored non-deterministic fetchImpl');
+
+  const reloadedStore = createJsonlModelRecordStore(filePath);
+  const records = reloadedStore.list();
+  assert.equal(records.length, 1);
+  assert.equal(records[0].request.kimiConfig.apiKey, '[REDACTED]');
+  const replayed = await createModelReplayer({ store: reloadedStore }).wrap()(INPUT);
+  assert.deepEqual(replayed, { content: 'persisted-answer', usage: { total_tokens: 9 } });
+});
+
+test('JsonlModelRecordStore ignores failed records during replay', async () => {
+  const {
+    createJsonlModelRecordStore,
+    createModelRecorder,
+    createModelReplayer,
+  } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const store = createJsonlModelRecordStore(filePath);
+  const recorder = createModelRecorder({ store });
+  await assert.rejects(
+    () => recorder.wrap(async () => {
+      throw new Error('upstream sk-FAILSECRET1234567890 failed');
+    })(INPUT),
+    /upstream/,
+  );
+
+  assert.ok(!fs.readFileSync(filePath, 'utf8').includes('sk-FAILSECRET'), 'jsonl error record leaked secret text');
+  await assert.rejects(
+    () => createModelReplayer({ store }).wrap()(INPUT),
     (error) => error.code === 'MODEL_REPLAY_MISS',
   );
 });
