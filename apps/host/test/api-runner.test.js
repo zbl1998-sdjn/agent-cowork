@@ -67,6 +67,36 @@ test('resolveKimiApiConfig reads model provider from env/config', () => {
   assert.equal(explicitConfig.provider, 'openai/local');
 });
 
+test('resolveKimiApiConfig reads Anthropic provider-specific env without Kimi defaults', () => {
+  const config = resolveKimiApiConfig({}, {
+    KCW_MODEL_PROVIDER: 'anthropic',
+    KIMI_API_KEY: 'kimi-key-should-not-cross',
+    KIMI_MODEL: 'kimi-model-should-not-cross',
+    ANTHROPIC_API_KEY: 'anthropic-key',
+    ANTHROPIC_BASE_URL: 'https://api.anthropic.test/v1/',
+    ANTHROPIC_MODEL: 'claude-test',
+  });
+
+  assert.equal(config.provider, 'anthropic');
+  assert.equal(config.configured, true);
+  assert.equal(config.apiKey, 'anthropic-key');
+  assert.equal(config.baseUrl, 'https://api.anthropic.test/v1');
+  assert.equal(config.model, 'claude-test');
+});
+
+test('resolveKimiApiConfig fails closed for Anthropic when no model env is configured', () => {
+  const config = resolveKimiApiConfig({}, {
+    KIMI_PROVIDER: 'claude',
+    CLAUDE_API_KEY: 'claude-key',
+  });
+
+  assert.equal(config.provider, 'claude');
+  assert.equal(config.configured, true);
+  assert.equal(config.apiKey, 'claude-key');
+  assert.equal(config.baseUrl, 'https://api.anthropic.com/v1');
+  assert.equal(config.model, '');
+});
+
 test('resolveKimiApiConfig reads sanitized fallback model chain', () => {
   const fromEnv = resolveKimiApiConfig({}, {
     KIMI_API_KEY: 'primary-key',

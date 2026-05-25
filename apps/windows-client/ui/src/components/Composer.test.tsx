@@ -23,6 +23,7 @@ describe('Composer', () => {
 
     expect(html).toContain('title="本轮模型提供商"');
     expect(html).toContain('value="openai"');
+    expect(html).toContain('value="anthropic"');
     expect(html).toContain('value="openai/local"');
     expect(html).toContain('title="本轮模型"');
     expect(html).toContain('title="本轮 Base URL"');

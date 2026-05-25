@@ -4,6 +4,13 @@ import { RuntimeDependenciesPanel } from './RuntimeDependenciesPanel';
 
 type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
 
+const MODEL_PROVIDERS = [
+  { value: 'kimi-api', label: 'Kimi' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Claude' },
+  { value: 'openai/local', label: '本地 OpenAI-compatible' },
+];
+
 interface SettingsProps {
   username: string;
   tenantId: string;
@@ -22,6 +29,7 @@ interface SettingsProps {
 export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
   const [tab, setTab] = useState<Tab>('account');
   const [apiKey, setApiKey] = useState('');
+  const [provider, setProvider] = useState('kimi-api');
   const [baseUrl, setBaseUrl] = useState('');
   const [model, setModel] = useState('');
   const [hasKey, setHasKey] = useState(false);
@@ -37,6 +45,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
     void (async () => {
       try {
         const info = await getKimiInfo();
+        setProvider(info.provider || 'kimi-api');
         setBaseUrl(info.baseUrl || '');
         setModel(info.model || '');
         setHasKey(Boolean(info.hasKey));
@@ -68,7 +77,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
   }, [tab]);
 
   const persist = async (
-    payload: { apiKey?: string; baseUrl?: string; model?: string; clearKey?: boolean },
+    payload: { provider?: string; apiKey?: string; baseUrl?: string; model?: string; clearKey?: boolean },
     okMsg: string,
   ) => {
     if (busy) return;
@@ -124,12 +133,18 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
             {tab === 'model' && (
               <div>
                 <label className="auth-field">
+                  <span>默认提供商</span>
+                  <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+                    {MODEL_PROVIDERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                <label className="auth-field">
                   <span>默认模型</span>
                   <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="kimi-k2-0905-preview" />
                 </label>
                 <div className="modal-actions">
                   <span className="modal-actions-spacer" />
-                  <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ model: model.trim() || undefined }, '模型已保存')}>保存</button>
+                  <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</button>
                 </div>
               </div>
             )}
@@ -156,7 +171,7 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
                   <div className="modal-actions">
                     {hasKey && <button type="button" className="btn-ghost-danger" disabled={busy} onClick={() => void persist({ clearKey: true }, '密钥已清除')}>清除密钥</button>}
                     <span className="modal-actions-spacer" />
-                    <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</button>
+                    <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</button>
                   </div>
                   <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
                 </div>

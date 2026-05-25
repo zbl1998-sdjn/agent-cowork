@@ -1,6 +1,7 @@
 const PROVIDER_OPTIONS = [
   { value: 'kimi-api', label: 'Kimi' },
   { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Claude' },
   { value: 'openai/local', label: '本地' },
 ];
 

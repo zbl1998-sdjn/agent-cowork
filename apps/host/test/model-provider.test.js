@@ -45,6 +45,11 @@ test('resolveModelProvider registers OpenAI-compatible providers', () => {
   assert.equal(resolveModelProvider({ provider: 'local-openai' }).id, 'openai/local');
 });
 
+test('resolveModelProvider registers Anthropic aliases', () => {
+  assert.equal(resolveModelProvider({ provider: 'anthropic' }).id, 'anthropic');
+  assert.equal(resolveModelProvider({ provider: 'CLAUDE' }).id, 'anthropic');
+});
+
 test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch', async () => {
   const captured = {};
   const fetchImpl = async (url, init) => {
@@ -89,6 +94,73 @@ test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch
   assert.equal(message.provider, 'openai');
   assert.equal(message.model, 'gpt-test');
   assert.equal(message.usage.total_tokens, 5);
+});
+
+test('defaultAgentModelCall routes Anthropic provider through fake fetch', async () => {
+  const tokens = [];
+  const captured = {};
+  const fetchImpl = async (url, init) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body);
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        getReader: () => streamReader([
+          'data: {"type":"message_start","message":{"usage":{"input_tokens":3}}}\n',
+          'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hel"}}\n',
+          'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}\n',
+          'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"Read","input":{}}}\n',
+          'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\""}}\n',
+          'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":":\\"a.txt\\"}"}}\n',
+          'data: {"type":"message_delta","usage":{"output_tokens":5}}\n',
+        ]),
+      },
+    };
+  };
+
+  const message = await defaultAgentModelCall({
+    kimiConfig: {
+      provider: 'anthropic',
+      apiKey: 'sk-ant-test-secret',
+      baseUrl: 'https://api.anthropic.test/v1/',
+      model: 'claude-test',
+      maxTokens: 456,
+      temperature: 0.1,
+    },
+    messages: [
+      { role: 'system', content: 'be brief' },
+      { role: 'user', content: 'hi' },
+    ],
+    tools: [{ type: 'function', function: { name: 'Read', description: 'read file', parameters: { type: 'object' } } }],
+    fetchImpl,
+    onContent: (delta) => tokens.push(delta),
+  });
+
+  assert.equal(captured.url, 'https://api.anthropic.test/v1/messages');
+  assert.equal(captured.headers['x-api-key'], 'sk-ant-test-secret');
+  assert.equal(captured.headers['anthropic-version'], '2023-06-01');
+  assert.equal(captured.headers.authorization, undefined);
+  assert.equal(captured.body.model, 'claude-test');
+  assert.equal(captured.body.stream, true);
+  assert.equal(captured.body.max_tokens, 456);
+  assert.equal(captured.body.temperature, 0.1);
+  assert.equal(captured.body.system, 'be brief');
+  assert.equal(captured.body.messages[0].role, 'user');
+  assert.equal(captured.body.messages[0].content[0].text, 'hi');
+  assert.equal(captured.body.tools[0].name, 'Read');
+  assert.equal(captured.body.tools[0].input_schema.type, 'object');
+  assert.deepEqual(tokens, ['hel', 'lo']);
+  assert.equal(message.content, 'hello');
+  assert.equal(message.provider, 'anthropic');
+  assert.equal(message.model, 'claude-test');
+  assert.equal(message.usage.prompt_tokens, 3);
+  assert.equal(message.usage.completion_tokens, 5);
+  assert.equal(message.usage.total_tokens, 8);
+  assert.equal(message.tool_calls[0].id, 'toolu_1');
+  assert.equal(message.tool_calls[0].function.name, 'Read');
+  assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
 });
 
 test('local OpenAI-compatible provider does not require or send an API key', async () => {
@@ -138,6 +210,31 @@ test('OpenAI provider fails closed without an API key', async () => {
       },
     }),
     /OpenAI API Key/,
+  );
+});
+
+test('Anthropic provider fails closed without API key or model', async () => {
+  await assert.rejects(
+    () => defaultAgentModelCall({
+      kimiConfig: { provider: 'anthropic', baseUrl: 'https://api.anthropic.test/v1', model: 'claude-test' },
+      messages: [],
+      tools: [],
+      fetchImpl: async () => {
+        throw new Error('must not call fetch');
+      },
+    }),
+    /Anthropic\/Claude/,
+  );
+  await assert.rejects(
+    () => defaultAgentModelCall({
+      kimiConfig: { provider: 'claude', apiKey: 'sk-ant', baseUrl: 'https://api.anthropic.test/v1' },
+      messages: [],
+      tools: [],
+      fetchImpl: async () => {
+        throw new Error('must not call fetch');
+      },
+    }),
+    /Anthropic\/Claude/,
   );
 });
 

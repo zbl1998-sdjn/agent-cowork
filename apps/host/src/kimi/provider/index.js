@@ -1,6 +1,8 @@
+import { createAnthropicProvider } from './anthropic.js';
 import { createKimiProvider } from './kimi.js';
 import { createLocalOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
 
+const anthropicProvider = createAnthropicProvider();
 const kimiProvider = createKimiProvider();
 const openAiProvider = createOpenAiProvider();
 const localOpenAiProvider = createLocalOpenAiCompatibleProvider();
@@ -10,6 +12,8 @@ const BUILTIN_PROVIDERS = new Map([
   ['kimi-api', kimiProvider],
   ['openai', openAiProvider],
   ['openai-compatible', openAiProvider],
+  ['anthropic', anthropicProvider],
+  ['claude', anthropicProvider],
   ['openai/local', localOpenAiProvider],
   ['local-openai', localOpenAiProvider],
   ['local', localOpenAiProvider],

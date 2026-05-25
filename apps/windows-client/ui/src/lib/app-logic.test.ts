@@ -213,6 +213,8 @@ describe('buildAgentChatStreamOptions', () => {
 describe('hasSessionModelAccess', () => {
   it('allows BYO-key and local OpenAI-compatible session models through the chat gate', () => {
     expect(hasSessionModelAccess({ apiKey: ' sk-session ' })).toBe(true);
+    expect(hasSessionModelAccess({ provider: 'anthropic', model: 'claude-test', apiKey: 'sk-ant' })).toBe(true);
+    expect(hasSessionModelAccess({ provider: 'anthropic', model: 'claude-test' })).toBe(false);
     expect(hasSessionModelAccess({ provider: 'openai/local', model: 'local-model' })).toBe(true);
     expect(hasSessionModelAccess({ provider: 'local-openai', model: 'local-model' })).toBe(true);
     expect(hasSessionModelAccess({ provider: 'openai', model: 'gpt-4.1' })).toBe(false);

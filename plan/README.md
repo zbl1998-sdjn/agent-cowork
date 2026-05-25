@@ -126,6 +126,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] P3-C1 provider 成本归因:运行 metrics 现在记录 `provider` 与 `cost.provider`,成本估算支持 `provider:model` 定价 key;可观测面板的成本卡和模型归因显示 provider,只展示 provider id,不暴露 key/baseUrl/fallback secret。聚焦 host usage/run-metrics 与 UI view-model 测试通过。
 - [x] P3-D1 会话级模型覆盖协议:`/api/agent/chat/stream` 支持本轮 `modelConfig` 覆盖 provider/model/baseUrl/apiKey,无全局 key 时可用本轮 BYO-key 或 `openai/local` 进入;覆盖不持久化,run record 不记录 key,请求体 fallbacks 被忽略。UI API helper 已可透传 modelConfig,可见控件留给 P3-D2。
 - [x] P3-D2 会话模型控制面:Composer 输入栏可为本轮选择 provider、填写模型/Base URL/API key,发送时才组装 `modelConfig` 透传给 agent stream;空字段不覆盖全局默认,BYO-key 不写入 Settings/本地状态。UI 纯函数、App option 组装和静态渲染测试通过;真实跨 provider 任务切换仍需可用外部 key/本地模型环境验收。
+- [x] P3-A3 Anthropic/Claude provider:Host 注册 `anthropic`/`claude` alias,把 OpenAI-style messages/tools 转换到 Anthropic Messages API,并把流式 text/tool_use/usage 转回现有 agent `content/tool_calls/usage` 契约;Anthropic env 读取独立于 Kimi 默认 env,无 key/model fail-closed。Composer 与设置页已暴露 Claude provider;API key 不回显,本轮 BYO-key 不持久化。聚焦 host/UI 测试通过,真实 Claude key 端到端验收后补。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
