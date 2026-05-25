@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { assertTrustedPath, isSensitivePath } from '../src/security/path-policy.js';
+import { assertReadableWorkspacePath, assertTrustedPath, isSensitivePath } from '../src/security/path-policy.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const root = makeTestWorkspace('kfcowork-root');
@@ -55,5 +55,22 @@ describe('path-policy', () => {
     assert.equal(isSensitivePath(path.join(fakeRoot, '.ssh', 'config'), fakeRoot), true);
     // Whole-path form (no root) keeps the legacy behaviour for direct callers.
     assert.equal(isSensitivePath(normalFile), true);
+  });
+
+  it('does not block a normal read when trusted root is a non-canonical alias under AppData', () => {
+    const realRoot = path.join(root, 'AppData', 'Local', 'ReadWorkspace');
+    const aliasRoot = path.join(root, 'read-alias');
+    fs.mkdirSync(path.join(realRoot, 'docs'), { recursive: true });
+    try {
+      fs.symlinkSync(realRoot, aliasRoot, 'junction');
+    } catch {
+      fs.symlinkSync(realRoot, aliasRoot);
+    }
+    const note = path.join(aliasRoot, 'docs', 'note.txt');
+    fs.writeFileSync(note, 'ok', 'utf8');
+
+    const safe = assertReadableWorkspacePath(note, aliasRoot);
+
+    assert.equal(path.basename(safe), 'note.txt');
   });
 });

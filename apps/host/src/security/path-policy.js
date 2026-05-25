@@ -168,7 +168,14 @@ export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
 /** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
   const safe = assertTrustedPath(candidatePath, trustedRoot);
-  if (isWorkspaceIgnoredPath(safe, trustedRoot)) {
+  // `safe` is already realpath-canonicalized; canonicalize the root too so the
+  // "segments below root" scoping in isWorkspaceIgnoredPath actually matches.
+  // Without this, a non-canonical root (8.3 short name like ADMINI~1, or a
+  // symlink/junction) breaks the prefix match, the segment/sensitive checks
+  // fall back to whole-path inspection, and a legitimate workspace that merely
+  // lives under AppData/Temp has every read wrongly blocked.
+  const canonicalRoot = canonicalizePath(trustedRoot);
+  if (isWorkspaceIgnoredPath(safe, canonicalRoot)) {
     throw new Error(`Workspace ignored or sensitive path blocked by policy: ${candidatePath}`);
   }
   return safe;
