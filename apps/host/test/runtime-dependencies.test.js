@@ -428,33 +428,91 @@ test('runtime dependency status accepts traditional Chinese OCR tessdata', () =>
   assert.equal(component.source, 'KCW_TESSDATA_PREFIX');
 });
 
+test('runtime dependency status reports Pandoc component availability from home directory', () => {
+  const root = makeTestWorkspace('kcw-runtime-pandoc');
+  const binDir = path.join(root, 'bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(path.join(binDir, process.platform === 'win32' ? 'pandoc.exe' : 'pandoc'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_PANDOC_HOME: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'pandoc');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_PANDOC_HOME');
+  assert.equal(component.detail, 'Pandoc 组件可用');
+});
+
+test('runtime dependency status rejects non-pandoc executable paths', () => {
+  const root = makeTestWorkspace('kcw-runtime-pandoc-bad');
+  const toolPath = path.join(root, 'not-pandoc.exe');
+  fs.writeFileSync(toolPath, '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_PANDOC_EXE: toolPath,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'pandoc');
+  assert.equal(component.status, 'missing');
+  assert.equal(component.source, 'KCW_PANDOC_EXE');
+  assert.match(component.detail, /名称不匹配/);
+});
+
+test('runtime dependency status accepts a configured Pandoc executable', () => {
+  const root = makeTestWorkspace('kcw-runtime-pandoc-exe');
+  const toolPath = path.join(root, process.platform === 'win32' ? 'pandoc.exe' : 'pandoc');
+  fs.writeFileSync(toolPath, '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_PANDOC_EXE: toolPath,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'pandoc');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_PANDOC_EXE');
+});
+
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
   const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
   await withServer({ trustedRoot, runtimeDependencyAppDataRoot: appDataRoot }, async (base) => {
     const install = await postJson(base, '/api/runtime/dependencies/install-plan', {
-      selectedIds: ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit'],
+      selectedIds: ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit'],
       freeBytes: 250 * 1024 * 1024,
     });
     assert.equal(install.status, 200);
     assert.equal(install.body.ok, false);
     assert.equal(install.body.disk.status, 'insufficient');
-    assert.deepEqual(install.body.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit']);
+    assert.deepEqual(install.body.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit']);
 
     const cleanup = await postJson(base, '/api/runtime/dependencies/cleanup-plan', {
-      selectedIds: ['tesseract-ocr', 'ffmpeg', 'mingit'],
+      selectedIds: ['tesseract-ocr', 'pandoc', 'ffmpeg', 'mingit'],
       keepUserData: false,
     });
     assert.equal(cleanup.status, 200);
     assert.equal(cleanup.body.appDataRoot, appDataRoot);
     assert.ok(cleanup.body.targets.find((item) => item.id === 'tesseract-ocr').path.endsWith('\\components\\tesseract-ocr'));
+    assert.ok(cleanup.body.targets.find((item) => item.id === 'pandoc').path.endsWith('\\components\\pandoc'));
     assert.ok(cleanup.body.targets.find((item) => item.id === 'ffmpeg').path.endsWith('\\components\\ffmpeg'));
     assert.ok(cleanup.body.targets.find((item) => item.id === 'mingit').path.endsWith('\\components\\mingit'));
     assert.equal(cleanup.body.targets.find((item) => item.id === 'user-data').requiresConfirmation, true);
     assert.equal(cleanup.body.targets.every((item) => item.action === 'remove'), true);
 
     const update = await postJson(base, '/api/runtime/dependencies/update-plan', {
-      selectedIds: ['data-science', 'ffmpeg', 'mingit'],
+      selectedIds: ['data-science', 'pandoc', 'ffmpeg', 'mingit'],
       currentVersion: '0.2.0',
       targetVersion: '0.2.1',
     });
@@ -468,7 +526,7 @@ test('runtime dependency plan routes expose install cleanup and update plans wit
 
 test('runtime dependency install plan blocks downloads when disk space is insufficient', () => {
   const plan = buildRuntimeDependencyInstallPlan({
-    selectedIds: ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit'],
+    selectedIds: ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit'],
     freeBytes: 250 * 1024 * 1024,
   });
 
@@ -476,7 +534,7 @@ test('runtime dependency install plan blocks downloads when disk space is insuff
   assert.equal(plan.disk.availableBytes, 250 * 1024 * 1024);
   assert.ok(plan.disk.requiredBytes > plan.disk.availableBytes);
   assert.match(plan.disk.message, /磁盘空间不足/);
-  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit']);
+  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit']);
   assert.equal(plan.components.every((item) => item.installMode === 'on-demand'), true);
   assert.ok(plan.components.find((item) => item.id === 'ffmpeg').estimatedDownloadBytes > 0);
 });
@@ -496,13 +554,13 @@ test('runtime dependency cleanup plan removes on-demand components while preserv
   const root = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
   const plan = buildRuntimeDependencyCleanupPlan({
     appDataRoot: root,
-    selectedIds: ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit'],
+    selectedIds: ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit'],
     keepUserData: true,
   });
 
   assert.equal(plan.ok, true);
   assert.equal(plan.mode, 'preserve-user-data');
-  assert.deepEqual(plan.targets.map((item) => item.id), ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit', 'runtime-cache']);
+  assert.deepEqual(plan.targets.map((item) => item.id), ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit', 'runtime-cache']);
   assert.equal(plan.targets.some((item) => item.kind === 'user-data'), false);
   assert.equal(plan.retained[0].id, 'user-data');
   for (const target of plan.targets) {
@@ -556,14 +614,15 @@ test('runtime dependency update plan preserves AppData components, venv and user
     appDataRoot: root,
     currentVersion: '0.2.0',
     targetVersion: '0.2.1',
-    selectedIds: ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit'],
+    selectedIds: ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit'],
   });
 
   assert.equal(plan.ok, true);
   assert.equal(plan.mode, 'preserve-on-update');
   assert.equal(plan.destructiveActions.length, 0);
-  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'ffmpeg', 'mingit']);
+  assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit']);
   assert.ok(plan.components.find((item) => item.id === 'ffmpeg').path.endsWith('\\components\\ffmpeg'));
+  assert.ok(plan.components.find((item) => item.id === 'pandoc').path.endsWith('\\components\\pandoc'));
   assert.ok(plan.components.find((item) => item.id === 'mingit').path.endsWith('\\components\\mingit'));
   assert.ok(plan.retained.some((item) => item.id === 'user-data' && item.path === plan.appDataRoot));
   assert.ok(plan.retained.some((item) => item.id === 'python-venv' && item.path.endsWith('\\venv')));

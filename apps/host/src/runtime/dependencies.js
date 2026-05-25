@@ -3,6 +3,7 @@ import { detectDataScienceRuntime } from './data-science-runtime.js';
 import { detectCjkFonts } from './font-runtime.js';
 import { detectGitRuntime } from './git-runtime.js';
 import { detectOcrRuntime } from './ocr-runtime.js';
+import { detectPandocRuntime } from './pandoc-runtime.js';
 import { detectVcRuntime } from './windows-runtime.js';
 
 export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
@@ -205,6 +206,8 @@ function detectDependency(item, options) {
   if (item.id === 'data-science') return detectDataScienceRuntime({ env, fsImpl: options.fsImpl });
 
   if (item.id === 'tesseract-ocr') return detectOcrRuntime({ env, fsImpl: options.fsImpl });
+
+  if (item.id === 'pandoc') return detectPandocRuntime({ env, fsImpl: options.fsImpl });
 
   if (item.id === 'mingit') return detectGitRuntime({ env, spawnSync: options.spawnSync });
 
