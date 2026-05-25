@@ -84,6 +84,7 @@ test('runAgentChat executes a Write tool call then returns a final answer', asyn
   assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'hello agent');
   assert.ok(events.some((e) => e.type === 'todo_update' && e.payload.status === 'running' && e.payload.text === '调用 Write'), 'tool todo starts running');
   assert.ok(events.some((e) => e.type === 'todo_update' && e.payload.status === 'done' && e.payload.text === '调用 Write'), 'tool todo finishes done');
+  assert.ok(events.some((e) => e.type === 'tool_result' && e.payload.name === 'Write' && Number.isFinite(e.payload.durationMs)), 'tool result reports duration');
   assert.equal(out.text, '已为你创建 out.txt。');
 });
 

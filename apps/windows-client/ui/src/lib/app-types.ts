@@ -3,6 +3,17 @@ import type { ApprovalState, FileOperation, SourceRef, SubtaskGroupItem, TodoIte
 
 export interface PendingApproval { id: string; name: string }
 
+export interface ToolCallItem {
+  name: string;
+  args?: unknown;
+  status: string;
+  result?: unknown;
+  startedAt?: number;
+  finishedAt?: number;
+  durationMs?: number;
+  error?: string;
+}
+
 export interface AssistantMessage {
   id: string;
   role: 'assistant';
@@ -24,7 +35,7 @@ export interface AssistantMessage {
   verifying?: boolean;
   question?: { id: string; question: string; options: Array<{ label: string; description?: string }> };
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-  tools?: Array<{ name: string; args?: unknown; status: string; result?: unknown }>;
+  tools?: ToolCallItem[];
 }
 
 export interface UserMessage { id: string; role: 'user'; text: string }

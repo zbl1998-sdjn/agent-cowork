@@ -182,10 +182,19 @@ export function App() {
       await agentChatStream(prompt, { trustedRoot, model: meta.model, thinking: meta.thinking, autoApprove, planMode, images: uploaded.filter((p) => isImagePath(p)) }, {
         onStart: (rid) => patchAssistant(assistantId, (m) => ({ ...m, runId: rid })),
         onReasoning: (delta) => patchAssistant(assistantId, (m) => ({ ...m, reasoning: (m.reasoning || '') + delta })),
-        onToolCall: (name, args) => patchAssistant(assistantId, (m) => ({ ...m, status: 'running', tools: [...(m.tools || []), { name, args, status: 'running' }] })),
-        onToolResult: (name, st, result) => patchAssistant(assistantId, (m) => {
+        onToolCall: (name, args) => patchAssistant(assistantId, (m) => ({ ...m, status: 'running', tools: [...(m.tools || []), { name, args, status: 'running', startedAt: Date.now() }] })),
+        onToolResult: (name, st, result, meta) => patchAssistant(assistantId, (m) => {
           const tools = [...(m.tools || [])];
-          for (let i = tools.length - 1; i >= 0; i -= 1) if (tools[i].name === name && tools[i].status === 'running') { tools[i] = { ...tools[i], status: st, result }; break; }
+          const finishedAt = Date.now();
+          const error = result && typeof result === 'object' && 'error' in result ? String((result as { error?: unknown }).error || '') : undefined;
+          for (let i = tools.length - 1; i >= 0; i -= 1) {
+            const current = tools[i];
+            if (!current || current.name !== name || current.status !== 'running') continue;
+            const rawStartedAt = current.startedAt;
+            const startedAtMs = typeof rawStartedAt === 'number' && Number.isFinite(rawStartedAt) ? rawStartedAt : finishedAt;
+            tools[i] = { ...current, status: st, result, finishedAt, durationMs: meta?.durationMs ?? Math.max(0, finishedAt - startedAtMs), ...(error ? { error } : {}) };
+            break;
+          }
           return { ...m, tools };
         }),
         onTodoSnapshot: (todos) => patchAssistant(assistantId, (m) => ({ ...m, todos })),

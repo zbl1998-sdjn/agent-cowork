@@ -309,6 +309,7 @@ export async function runAgentChat({
       }
 
       const todo = toolTodos.start(name);
+      const toolStartedAt = Date.now();
       let result;
       try {
         result = await activeRetryPolicy.run(async () => (
@@ -317,6 +318,7 @@ export async function runAgentChat({
       } catch (err) {
         result = { error: err.message };
       }
+      const durationMs = Math.max(0, Date.now() - toolStartedAt);
       if (activeRetryPolicy.lastRun.retried) {
         emit('tool_retry', {
           name,
@@ -327,10 +329,10 @@ export async function runAgentChat({
       const ok = !(result && result.error);
       if (ok && needsApproval) didMutate = true;
       if (ok && isMutating && result && result.path) emit('file_written', { path: result.path });
-      steps.push({ tool: name, ok });
+      steps.push({ tool: name, ok, durationMs });
       if (needsApproval) audit('tool.execute', { tool: name, risk: tool.risk, ok });
       todo.finish(ok ? 'done' : 'failed');
-      emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result });
+      emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result, durationMs });
       const formatted = activeContextManager.formatToolResult(result, { toolName: name });
       if (formatted.summarized) {
         emit('tool_result_summary', {

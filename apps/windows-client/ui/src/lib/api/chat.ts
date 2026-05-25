@@ -67,7 +67,7 @@ export interface AgentStreamHandlers {
   onTodoUpdate?: (todo: TodoItem) => void;
   onReasoning?: (delta: string) => void;
   onToolCall?: (name: string, args: unknown) => void;
-  onToolResult?: (name: string, status: string, result?: unknown) => void;
+  onToolResult?: (name: string, status: string, result?: unknown, meta?: { durationMs?: number }) => void;
   onFileWritten?: (path: string) => void;
   onVerifyStart?: () => void;
   onQuestion?: (id: string, question: string, options: Array<{ label: string; description?: string }>) => void;
@@ -84,6 +84,11 @@ export interface TokenUsage {
 
 function usage(data: SsePayload): TokenUsage | undefined {
   return data.usage && typeof data.usage === 'object' ? data.usage as TokenUsage : undefined;
+}
+
+function num(data: SsePayload, key: string): number | undefined {
+  const value = data[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function questionOptions(data: SsePayload): Array<{ label: string; description?: string }> {
@@ -160,7 +165,7 @@ export async function agentChatStream(
     else if (type === 'approval_request') {
       handlers.onApprovalRequest?.(str(data, 'id') || '', str(data, 'name') || '', data.args);
     } else if (type === 'tool_result') {
-      handlers.onToolResult?.(str(data, 'name') || '', str(data, 'status') || 'succeeded', data.result);
+      handlers.onToolResult?.(str(data, 'name') || '', str(data, 'status') || 'succeeded', data.result, { durationMs: num(data, 'durationMs') });
     } else if (type === 'file_written') handlers.onFileWritten?.(str(data, 'path') || '');
     else if (type === 'verify_start') handlers.onVerifyStart?.();
     else if (type === 'question') {

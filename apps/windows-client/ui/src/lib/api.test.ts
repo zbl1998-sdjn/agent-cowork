@@ -481,6 +481,30 @@ describe('SSE streams', () => {
     expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });
   });
 
+  it('passes tool result duration metadata to agent stream handlers', async () => {
+    const { api } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/agent/chat/stream')) {
+        return sseResponse([
+          'event: tool_result',
+          'data: {"name":"Read","status":"succeeded","result":{"ok":true},"durationMs":37}',
+          '',
+          'event: done',
+          'data: {"text":"完成","runId":"run_tool"}',
+          '',
+        ].join('\n'));
+      }
+      return jsonResponse({ ok: true });
+    });
+    const results: unknown[] = [];
+
+    await api.agentChatStream('读文件', {}, {
+      onToolResult: (name, status, result, meta) => results.push({ name, status, result, meta }),
+    });
+
+    expect(results).toEqual([{ name: 'Read', status: 'succeeded', result: { ok: true }, meta: { durationMs: 37 } }]);
+  });
+
   it('reports stream JSON errors without throwing to the caller', async () => {
     const { api } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });
