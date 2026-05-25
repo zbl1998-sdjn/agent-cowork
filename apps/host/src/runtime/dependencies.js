@@ -64,6 +64,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 200 * 1024 * 1024,
+    cleanup: { relativePath: 'components/data-science' },
   },
   {
     id: 'playwright-chromium',
@@ -72,6 +73,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 150 * 1024 * 1024,
+    cleanup: { relativePath: 'components/playwright-chromium' },
   },
   {
     id: 'tesseract-ocr',
@@ -80,6 +82,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 120 * 1024 * 1024,
+    cleanup: { relativePath: 'components/tesseract-ocr' },
   },
   {
     id: 'pandoc',
@@ -88,6 +91,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 80 * 1024 * 1024,
+    cleanup: { relativePath: 'components/pandoc' },
   },
   {
     id: 'mingit',
@@ -96,6 +100,7 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     required: false,
     installMode: 'on-demand',
     estimatedDownloadBytes: 80 * 1024 * 1024,
+    cleanup: { relativePath: 'components/mingit' },
   },
   {
     id: 'sandbox-isolation',

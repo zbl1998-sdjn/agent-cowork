@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
-import { buildRuntimeDependencyInstallPlan } from '../src/runtime/dependency-install-plan.js';
+import {
+  buildRuntimeDependencyCleanupPlan,
+  buildRuntimeDependencyInstallPlan,
+} from '../src/runtime/dependency-install-plan.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 async function withServer(config, fn) {
@@ -75,4 +78,44 @@ test('runtime dependency install plan accepts required bundled defaults without 
   assert.equal(plan.ok, true);
   assert.equal(plan.disk.requiredBytes, 0);
   assert.equal(plan.disk.status, 'ok');
+});
+
+test('runtime dependency cleanup plan removes on-demand components while preserving user data', () => {
+  const root = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
+  const plan = buildRuntimeDependencyCleanupPlan({
+    appDataRoot: root,
+    selectedIds: ['data-science', 'playwright-chromium'],
+    keepUserData: true,
+  });
+
+  assert.equal(plan.ok, true);
+  assert.equal(plan.mode, 'preserve-user-data');
+  assert.deepEqual(plan.targets.map((item) => item.id), ['data-science', 'playwright-chromium', 'runtime-cache']);
+  assert.equal(plan.targets.some((item) => item.kind === 'user-data'), false);
+  assert.equal(plan.retained[0].id, 'user-data');
+  for (const target of plan.targets) {
+    assert.ok(target.path.startsWith(plan.appDataRoot), `${target.path} escaped cleanup root`);
+  }
+});
+
+test('runtime dependency cleanup plan requires confirmation before deleting user data', () => {
+  const plan = buildRuntimeDependencyCleanupPlan({
+    appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+    selectedIds: ['tesseract-ocr', 'unknown-component'],
+    keepUserData: false,
+  });
+
+  assert.equal(plan.ok, false);
+  assert.deepEqual(plan.unknownIds, ['unknown-component']);
+  assert.equal(plan.mode, 'remove-user-data');
+  const userData = plan.targets.find((item) => item.id === 'user-data');
+  assert.equal(userData.requiresConfirmation, true);
+  assert.match(plan.warnings[0], /二次确认/);
+});
+
+test('runtime dependency cleanup plan refuses non-AgentCowork roots', () => {
+  assert.throws(
+    () => buildRuntimeDependencyCleanupPlan({ appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming' }),
+    /must end with AgentCowork/,
+  );
 });
