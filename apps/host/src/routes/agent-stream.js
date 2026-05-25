@@ -60,16 +60,26 @@ function tightestLimit(configValue, requestValue) {
   return fromConfig ?? fromRequest ?? undefined;
 }
 
-function createAgentBudgetGuard({ body, kimiConfig, startedAt }) {
+function budgetInputs(body, kimiConfig) {
   const requestBody = body && typeof body === 'object' ? body : {};
   const config = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
   const requestBudget = requestBody.budget && typeof requestBody.budget === 'object' ? requestBody.budget : {};
+  return { requestBody, config, requestBudget };
+}
+
+function resolveAgentRunTimeoutMs(body, kimiConfig) {
+  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
+  return tightestLimit(config.maxAgentWallClockMs, requestBudget.maxWallClockMs ?? requestBody.maxWallClockMs);
+}
+
+function createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs }) {
+  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
   return createBudgetGuard({
     maxRunTokens: tightestLimit(config.maxRunTokens, requestBudget.maxRunTokens ?? requestBody.maxRunTokens),
     maxSessionTokens: tightestLimit(config.maxSessionTokens, requestBudget.maxSessionTokens ?? requestBody.maxSessionTokens),
     maxRunCostUsd: tightestLimit(config.maxRunCostUsd, requestBudget.maxRunCostUsd ?? requestBody.maxRunCostUsd),
     maxSessionCostUsd: tightestLimit(config.maxSessionCostUsd, requestBudget.maxSessionCostUsd ?? requestBody.maxSessionCostUsd),
-    maxWallClockMs: tightestLimit(config.maxAgentWallClockMs, requestBudget.maxWallClockMs ?? requestBody.maxWallClockMs),
+    maxWallClockMs: runTimeoutMs,
     model: config.model,
     startedAtMs: startedAt.getTime(),
   });
@@ -147,7 +157,8 @@ export async function streamAgentChat({
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
     const memory = loadLayeredMemory({ trustedRoot, userHome });
-    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig, startedAt });
+    const runTimeoutMs = resolveAgentRunTimeoutMs(body, kimiConfig);
+    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs });
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
       : [];
@@ -180,6 +191,7 @@ export async function streamAgentChat({
       userContent,
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
       budgetGuard,
+      runTimeoutMs,
     });
     if (controller && controller.signal.aborted) {
       status = 'cancelled';

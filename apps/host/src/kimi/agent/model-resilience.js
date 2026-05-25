@@ -20,11 +20,20 @@ export function modelBreakerStats() {
 export async function callModelResilient(modelCall, callArgs, { kimiConfig, timeoutMs = 60000 } = {}) {
   return modelBreaker(kimiConfig).run(async () => {
     const controller = new AbortController();
+    const upstreamSignal = callArgs && callArgs.signal;
+    const abortFromUpstream = () => {
+      if (!controller.signal.aborted) controller.abort(upstreamSignal && upstreamSignal.reason);
+    };
+    if (upstreamSignal) {
+      if (upstreamSignal.aborted) abortFromUpstream();
+      else upstreamSignal.addEventListener('abort', abortFromUpstream, { once: true });
+    }
     const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs || 60000));
     try {
       return await modelCall({ ...callArgs, signal: controller.signal });
     } finally {
       clearTimeout(timer);
+      if (upstreamSignal) upstreamSignal.removeEventListener('abort', abortFromUpstream);
     }
   });
 }

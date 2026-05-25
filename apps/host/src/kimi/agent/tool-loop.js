@@ -21,6 +21,7 @@ import { createToolTodoTracker } from './todo-state.js';
 import { createLoopGuard } from './loop-guard.js';
 import { createRetryPolicy } from './tool-retry.js';
 import { createContextManager } from '../context/context-manager.js';
+import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 
 function addLazySearchTool(agentTools, lazyTools) {
   const activeNames = new Set(agentTools.map((t) => t.name));
@@ -119,6 +120,7 @@ export async function runAgentChat({
   retryPolicy = null,
   retryOptions = {},
   budgetGuard = null,
+  runTimeoutMs = 0,
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -152,8 +154,10 @@ export async function runAgentChat({
   const toolTodos = createToolTodoTracker(emit);
 
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
+  const runTimeout = createRunTimeout({ signal, timeoutMs: runTimeoutMs });
   let stopForLoopGuard = false;
   let stopForBudget = false;
+  let stopForTimeout = false;
   const stopOnBudget = (budgetDecision) => {
     stopForBudget = true;
     const text = activeBudgetGuard.stopMessage(budgetDecision);
@@ -167,8 +171,15 @@ export async function runAgentChat({
     });
     emit('token', { delta: text });
   };
-  for (let i = 0; i < stepBudget; i += 1) {
-    if (signal && signal.aborted) break;
+  const stopOnTimeout = () => {
+    stopForTimeout = true;
+    finalText = runTimeout.stopMessage();
+    emit('run_timeout', { timeoutMs: runTimeout.timeoutMs });
+    emit('token', { delta: finalText });
+  };
+  try {
+    for (let i = 0; i < stepBudget; i += 1) {
+    if (runTimeout.aborted()) break;
     if (stopForLoopGuard) break;
     if (stopForBudget) break;
     const preBudgetDecision = activeBudgetGuard.check();
@@ -189,14 +200,24 @@ export async function runAgentChat({
         });
       }
     }
-    const message = await callModelResilient(modelCall, {
-      messages,
-      tools: buildToolSpecs(),
-      kimiConfig,
-      fetchImpl,
-      onContent: (d) => { streamedContent = true; if (d) emit('token', { delta: d }); },
-      onReasoning: (d) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); },
-    }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
+    let message;
+    try {
+      message = await callModelResilient(modelCall, {
+        messages,
+        tools: buildToolSpecs(),
+        kimiConfig,
+        fetchImpl,
+        signal: runTimeout.signal,
+        onContent: (d) => { streamedContent = true; if (d) emit('token', { delta: d }); },
+        onReasoning: (d) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); },
+      }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
+    } catch (err) {
+      if (runTimeout.timedOut() && isAbortLikeError(err)) {
+        stopOnTimeout();
+        break;
+      }
+      throw err;
+    }
     if (!streamedReasoning && message.reasoning_content) emit('reasoning', { delta: message.reasoning_content });
     addUsage(usageTotals, message.usage);
     const usageBudgetDecision = activeBudgetGuard.recordUsage(message.usage);
@@ -292,7 +313,17 @@ export async function runAgentChat({
     }
   }
 
-  finalText = await summarizeAfterBudget({ finalText, signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals });
-  finalText = applyStaticBackstop(finalText, signal, emit);
-  return { text: finalText, steps, usage: usageTotals, cancelled: !!(signal && signal.aborted), budgetStopped: stopForBudget };
+    finalText = await summarizeAfterBudget({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals });
+    finalText = applyStaticBackstop(finalText, runTimeout.signal, emit);
+    return {
+      text: finalText,
+      steps,
+      usage: usageTotals,
+      cancelled: !!(signal && signal.aborted),
+      budgetStopped: stopForBudget,
+      timeoutStopped: stopForTimeout,
+    };
+  } finally {
+    runTimeout.dispose();
+  }
 }
