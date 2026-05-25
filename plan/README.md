@@ -100,6 +100,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-G3 红队 eval 回归护栏:复用 A7 redteam 任务集覆盖危险 Shell、路径穿越、间接提示注入、绕审批删除/外传等场景;`npm run eval` 当前 28/28 passed。
 - [x] P2-B1 验收补齐:连接器 catalog/管理面板/一键连接已存在;新增 `npm run smoke:react-connectors` 真实浏览器验收,覆盖打开连接器面板→一键连接内置 filesystem MCP→`mcp__fs__read_text` 进入工具 registry。
 - [x] P2-B2(本地可测子项):新增 GitHub OAuth device-flow 连接器、`/api/connectors/oauth/{status,start,complete,revoke}`、服务端 device-code session 与 Host 凭证仓库;Windows 默认 DPAPI 保护 access token,状态/撤销只返回脱敏摘要;前端连接器面板已支持开始授权、完成授权、撤销授权。`smoke:react-connectors` 用本地 mock GitHub device-flow 覆盖 UI 闭环和凭证不泄漏。
+- [x] P2-B2(未配置预检):`/api/connectors/oauth/status` 明确返回 GitHub OAuth client id 配置状态和所需环境变量;`/oauth/start` 在缺少 `KCW_GITHUB_OAUTH_CLIENT_ID` 时返回 428 且不消耗一次性 OAuth scope approval;前端连接器面板在未配置时显示中文提示并禁用授权启动,避免把外部配置缺失误当授权失败。
 - [x] P2-B3(本地可测子项):连接器支持断开/撤销;断开 filesystem MCP 会关闭 client 并从工具 registry 移除 `mcp__fs__*`;OAuth 连接器支持 allowlist scope 审批、单次 approval receipt、高风险 scope 标记与前端审批控件;`smoke:react-connectors` 已覆盖连接→断开→工具撤销→GitHub OAuth scope 审批→授权→撤销。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。

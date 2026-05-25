@@ -12,6 +12,8 @@ import {
   selectedOAuthPermissions,
 } from '../connectors/oauth-permissions.js';
 
+const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
+
 function isGitHub(id) {
   return String(id || '').toLowerCase() === 'github';
 }
@@ -70,6 +72,10 @@ export async function handleConnectorOAuthRoutes({
       connected: accounts.length > 0,
       accounts,
       configured: Boolean(githubClientId({}, oauthConfig)),
+      requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
+      configurationMessage: githubClientId({}, oauthConfig)
+        ? 'GitHub OAuth client id 已配置。'
+        : 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。',
       permissions: oauthPermissions(githubConnector()),
     });
     return true;
@@ -118,6 +124,17 @@ export async function handleConnectorOAuthRoutes({
       try {
         const connector = githubConnector();
         const clientId = githubClientId(body, oauthConfig);
+        if (!clientId) {
+          sendJson(response, 428, {
+            context: requestContext,
+            provider: 'github',
+            configured: false,
+            code: 'OAUTH_NOT_CONFIGURED',
+            requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
+            error: 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID 后再开始授权。',
+          });
+          return;
+        }
         const scopes = normalizeOAuthScopes(connector, body && body.scopes);
         oauthPermissionApprovals.consume(body && (body.approvalId || body.oauthApprovalId), {
           connectorId: 'github',

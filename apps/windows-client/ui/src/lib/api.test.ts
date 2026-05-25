@@ -327,7 +327,14 @@ describe('JSON requests', () => {
         return jsonResponse({ provider: 'github', connected: true, account: { login: 'octocat' } });
       }
       if (url.includes('/api/connectors/oauth/status')) {
-        return jsonResponse({ provider: 'github', connected: true, accounts: [{ accountId: 'octocat' }] });
+        return jsonResponse({
+          provider: 'github',
+          connected: true,
+          configured: true,
+          configurationMessage: 'GitHub OAuth client id 已配置。',
+          requiredEnv: ['KCW_GITHUB_OAUTH_CLIENT_ID'],
+          accounts: [{ accountId: 'octocat' }],
+        });
       }
       if (url.endsWith('/api/connectors/oauth/revoke')) {
         return jsonResponse({ provider: 'github', removed: 1 });
@@ -345,6 +352,8 @@ describe('JSON requests', () => {
     expect(started.userCode).toBe('ABCD-1234');
     expect(completed.account?.login).toBe('octocat');
     expect(status.connected).toBe(true);
+    expect(status.configured).toBe(true);
+    expect(status.requiredEnv).toEqual(['KCW_GITHUB_OAUTH_CLIENT_ID']);
     expect(revoked.removed).toBe(1);
     expect(JSON.stringify(calls)).not.toContain('access_token');
     expect(JSON.parse(String(calls.find((call) => call.url.endsWith('/api/connectors/oauth/approve'))?.init?.body))).toEqual({

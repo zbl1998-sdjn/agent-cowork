@@ -203,6 +203,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .connector-permissions label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4f554c; cursor: pointer; }
 .connector-permissions input { width: 14px; height: 14px; accent-color: #c96442; }
 .connector-permissions em { margin-left: auto; color: #9a3d2c; font-size: 11px; font-style: normal; }
+.connector-oauth-warning { margin-top: 8px; padding: 7px 9px; border: 1px solid #f1c38c; border-radius: 8px; background: #fff7ed; color: #8a4b12; font-size: 12px; line-height: 1.35; }
 .plan-card { background: #f5f7f2; border: 1px solid #b8c2ad; border-left: 3px solid #6b8e4e; border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
 .plan-card-head { font-size: 12px; font-weight: 600; color: #4a6b33; letter-spacing: .02em; margin-bottom: 6px; }
 .plan-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

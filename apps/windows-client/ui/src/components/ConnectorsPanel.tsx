@@ -14,6 +14,14 @@ import {
   type OAuthStartResult,
 } from '../lib/api';
 
+type OAuthStatusView = {
+  connected: boolean;
+  accounts: string[];
+  configured?: boolean;
+  configurationMessage?: string;
+  requiredEnv?: string[];
+};
+
 interface ConnectorsPanelProps {
   trustedRoot: string;
   onConnected?: (servers: string[]) => void;
@@ -27,7 +35,7 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
   const [query, setQuery] = useState('');
   const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
   const [connected, setConnected] = useState<string[]>([]);
-  const [oauthStatus, setOauthStatus] = useState<Record<string, { connected: boolean; accounts: string[]; configured?: boolean }>>({});
+  const [oauthStatus, setOauthStatus] = useState<Record<string, OAuthStatusView>>({});
   const [oauthSessions, setOauthSessions] = useState<Record<string, OAuthStartResult>>({});
   const [oauthApprovals, setOauthApprovals] = useState<Record<string, { approvalId: string; scopes: string[] }>>({});
   const [oauthScopes, setOauthScopes] = useState<Record<string, string[]>>({});
@@ -60,13 +68,15 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
 
   const refreshOAuthStatus = async (items: ConnectorInfo[]) => {
     const oauthItems = items.filter((connector) => connector.auth?.type === 'oauth-device');
-    const next: Record<string, { connected: boolean; accounts: string[]; configured?: boolean }> = {};
+    const next: Record<string, OAuthStatusView> = {};
     await Promise.all(oauthItems.map(async (connector) => {
       try {
         const status = await getOAuthConnectorStatus(connector.id);
         next[connector.id] = {
           connected: status.connected,
           configured: status.configured,
+          configurationMessage: status.configurationMessage,
+          requiredEnv: status.requiredEnv,
           accounts: (status.accounts || []).map((account) => account.accountId),
         };
       } catch {
@@ -279,6 +289,7 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
           const oauth = oauthStatus[c.id];
           const isOAuth = c.auth?.type === 'oauth-device';
           const hasOAuthSession = Boolean(oauthSessions[c.id]);
+          const missingOAuthConfig = Boolean(isOAuth && oauth?.configured === false && !oauth?.connected);
           const approved = matchingOAuthApproval(c);
           const scopes = selectedScopes(c);
           const isOn = connected.includes(c.id)
@@ -292,6 +303,11 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
               {isOAuth && <span className="tool-src">OAuth</span>}
               {isOn && <span className="tool-src">已连接</span>}
               <p>{c.description}</p>
+              {missingOAuthConfig && (
+                <div className="connector-oauth-warning" role="status">
+                  {oauth?.configurationMessage || `需要先配置 ${oauth?.requiredEnv?.[0] || 'OAuth client id'}。`}
+                </div>
+              )}
               {isOAuth && !oauth?.connected && (
                 <div className="connector-permissions">
                   {connectorPermissions(c).map((permission) => (
@@ -311,14 +327,14 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
               {isOAuth ? (
                 <button
                   type="button"
-                  disabled={busyId === c.id}
+                  disabled={busyId === c.id || missingOAuthConfig}
                   onClick={() => void (oauth?.connected
                     ? onRevokeOAuth(c)
                     : hasOAuthSession ? onCompleteOAuth(c) : approved ? onStartOAuth(c) : onApproveOAuth(c))}
                 >
                   {busyId === c.id
                     ? (oauth?.connected ? '撤销中…' : hasOAuthSession ? '确认中…' : approved ? '授权中…' : '审批中…')
-                    : oauth?.connected ? '撤销授权' : hasOAuthSession ? '完成授权' : approved ? '开始授权' : '审批权限'}
+                    : oauth?.connected ? '撤销授权' : missingOAuthConfig ? '待配置 OAuth' : hasOAuthSession ? '完成授权' : approved ? '开始授权' : '审批权限'}
                 </button>
               ) : c.builtin ? (
                 <button

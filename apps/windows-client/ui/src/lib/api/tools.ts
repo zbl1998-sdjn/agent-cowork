@@ -115,6 +115,8 @@ export interface OAuthStatusResult {
   provider: string;
   connected: boolean;
   configured?: boolean;
+  configurationMessage?: string;
+  requiredEnv?: string[];
   accounts: OAuthAccountSummary[];
   permissions?: OAuthPermission[];
 }
