@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadGoldenEvalTasks } from '../eval/tasks/index.js';
 import { runEvalTasks } from '../eval/runner.js';
 import { writeEvalReport } from '../eval/report.js';
+import { createOfflineReplayExecutor } from '../eval/replay-backend.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const reportDir = path.join(repoRoot, 'reports', 'eval');
@@ -14,6 +15,13 @@ const baselinePath = path.join(repoRoot, 'eval', 'baseline.json');
 function readBaseline() {
   if (!fs.existsSync(baselinePath)) return null;
   return JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+}
+
+function readReplayRecords() {
+  const recordsPath = process.env.KCW_EVAL_REPLAY_RECORDS;
+  if (!recordsPath) return null;
+  const raw = JSON.parse(fs.readFileSync(path.resolve(recordsPath), 'utf8'));
+  return Array.isArray(raw) ? raw : raw.records;
 }
 
 function passingContractResult(task) {
@@ -51,10 +59,14 @@ function passingContractResult(task) {
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-'));
 try {
   const tasks = loadGoldenEvalTasks();
+  const replayRecords = readReplayRecords();
+  const executor = replayRecords
+    ? createOfflineReplayExecutor({ records: replayRecords })
+    : async ({ task }) => passingContractResult(task);
   const summary = await runEvalTasks({
     tasks,
     workRoot,
-    executor: async ({ task }) => passingContractResult(task),
+    executor,
   });
   const report = writeEvalReport(summary, {
     outDir: reportDir,
