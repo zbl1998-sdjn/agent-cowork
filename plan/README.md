@@ -86,6 +86,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 06-B5 ffmpeg plan-only 支持:运行时依赖 catalog 纳入按需安装的便携版 ffmpeg,进入依赖面板、安装计划预检、清理计划和更新保留计划;仅做可审查计划,不执行真实下载或删除。host/UI 单测锁定 B5 分组、体积估算和 `%APPDATA%\AgentCowork\components\ffmpeg` 安全根。
 - [x] 06-B6 MinGit plan-only 支持:运行时依赖状态优先识别 `KCW_MINGIT_HOME`/`KCW_GIT_HOME`,否则用短超时 `git --version` 探测系统 Git;缺失时保持按需安装计划,并纳入安装预检、清理计划和更新保留计划。新增 host 单测覆盖配置优先、系统 Git 可用、缺失状态与 `%APPDATA%\AgentCowork\components\mingit` 安全根。
 - [x] 06-B1 数据分析组件 plan-only 支持:运行时依赖状态识别 `KCW_DATA_SCIENCE_HOME`/`KCW_DATA_SCIENCE_VENV`,目录内包含 pandas/numpy/matplotlib package marker 才标记可用;缺失或不完整时保持按需安装计划。新增 host 单测覆盖完整组件可用与缺包拒绝,不执行下载、建 venv 或 pip install。
+- [x] 06-B3 OCR 组件 plan-only 支持:运行时依赖状态识别 `KCW_TESSERACT_HOME`/`KCW_TESSDATA_PREFIX`,存在 `chi_sim.traineddata` 或 `chi_tra.traineddata` 才标记中文 OCR 可用;缺失时保持按需安装计划。新增 host 单测覆盖中文语言包可用与缺包拒绝,不执行下载、OCR 调用或系统安装。
 - [x] 06-F8 磁盘空间预检:运行时依赖 catalog 已为按需组件记录体积估算,新增 `dependency-install-plan` 纯函数生成安装/下载计划;当可用磁盘空间不足时返回中文阻断提示,用于后续依赖面板/安装器复用。聚焦 `runtime-dependencies.test.js` 通过,`npm run check` 通过。
 - [x] 06-F9 离线可用性:新增 `npm run smoke:offline-local`,在清空 Kimi/proxy 环境并拦截非本机 fetch 的情况下验证 health/workspace/文件读取/文件写入/依赖状态/audit 仍可用;模型路由无 key 时返回中文说明"本地文件功能仍可离线使用,模型回复需联网配置 key",证据见 `reports/offline-local/offline-local-smoke-2026-05-25T18-09-33-602Z.json`。
 - [x] 07-A 评测体系(A1-A7):已新增 EvalTask schema、21 个 golden 任务、7 个 redteam 任务、多维 scorer、隔离 trustedRoot runner、JSON/HTML 报告、离线 replay backend 与 CI eval 回归门禁;`npm run eval` 当前 28/28 通过,`npm run test:host` 当前 496 tests,495 pass,1 skip。eval 产物写入 `reports/eval/` 并作为本地产物忽略。

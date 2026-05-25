@@ -372,6 +372,62 @@ test('runtime dependency status accepts data science venv with lowercase site-pa
   assert.equal(component.source, 'KCW_DATA_SCIENCE_VENV');
 });
 
+test('runtime dependency status reports OCR component availability with Chinese tessdata', () => {
+  const root = makeTestWorkspace('kcw-runtime-ocr');
+  fs.mkdirSync(path.join(root, 'tessdata'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'tessdata', 'chi_sim.traineddata'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_TESSERACT_HOME: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'tesseract-ocr');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_TESSERACT_HOME');
+  assert.equal(component.detail, 'OCR 中文语言包可用');
+});
+
+test('runtime dependency status rejects OCR components without Chinese tessdata', () => {
+  const root = makeTestWorkspace('kcw-runtime-ocr-missing-lang');
+  fs.mkdirSync(path.join(root, 'tessdata'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'tessdata', 'eng.traineddata'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_TESSDATA_PREFIX: path.join(root, 'tessdata'),
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'tesseract-ocr');
+  assert.equal(component.status, 'missing');
+  assert.equal(component.source, 'KCW_TESSDATA_PREFIX');
+  assert.match(component.detail, /中文语言包/);
+});
+
+test('runtime dependency status accepts traditional Chinese OCR tessdata', () => {
+  const root = makeTestWorkspace('kcw-runtime-ocr-tra');
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(path.join(root, 'chi_tra.traineddata'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_TESSDATA_PREFIX: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'tesseract-ocr');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_TESSDATA_PREFIX');
+});
+
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
   const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
@@ -391,6 +447,7 @@ test('runtime dependency plan routes expose install cleanup and update plans wit
     });
     assert.equal(cleanup.status, 200);
     assert.equal(cleanup.body.appDataRoot, appDataRoot);
+    assert.ok(cleanup.body.targets.find((item) => item.id === 'tesseract-ocr').path.endsWith('\\components\\tesseract-ocr'));
     assert.ok(cleanup.body.targets.find((item) => item.id === 'ffmpeg').path.endsWith('\\components\\ffmpeg'));
     assert.ok(cleanup.body.targets.find((item) => item.id === 'mingit').path.endsWith('\\components\\mingit'));
     assert.equal(cleanup.body.targets.find((item) => item.id === 'user-data').requiresConfirmation, true);
