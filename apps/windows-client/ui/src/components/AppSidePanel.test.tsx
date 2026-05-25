@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { Children, Suspense, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AppSidePanel } from './AppSidePanel';
@@ -33,11 +33,23 @@ describe('AppSidePanel', () => {
     expect((boundary?.props as { label?: string }).label).toBe('工具面板');
   });
 
-  it('keeps rendering the selected panel content', () => {
+  it('renders lazy panel fallback while the selected panel chunk loads', () => {
     const html = renderToStaticMarkup(
       <AppSidePanel panel="schedules" trustedRoot="C:/work" onClose={vi.fn()} onRunSubagent={vi.fn()} />,
     );
-    expect(html).toContain('定时任务');
+    expect(html).toContain('正在加载面板');
     expect(html).toContain('aria-label="关闭"');
+  });
+
+  it('loads panel content behind suspense', () => {
+    const element = renderPanel('tools');
+    const props = element?.props as { children: unknown };
+    const children = Children.toArray(props.children as ReactNode);
+    const boundary = children.find(
+      (child) => isValidElement(child) && child.type === ErrorBoundary,
+    ) as ReactElement | undefined;
+    const suspense = (boundary?.props as { children?: ReactElement }).children;
+
+    expect(suspense?.type).toBe(Suspense);
   });
 });

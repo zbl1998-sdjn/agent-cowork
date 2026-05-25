@@ -140,6 +140,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-3b 代码+单测完成汇总:`Empty`/`Loading`/`ErrorState` 已覆盖主侧边面板与内联可视化/活页状态面;源码扫描已无旧式裸 `panel-error`、`inline-viz-loading` 和“图表渲染失败：”内联错误文案。保留的 `panel-empty` 仅作为列表语义容器包裹 `Empty`,保留的 `panel-result` 仅用于成功/info 的 preformatted 输出;真实长会话/安装版视觉深验后续补。
 - [x] FE-4 代码+单测完成:`Timeline` 用户/assistant 消息项已 memo 化,显式 comparator 锁定重渲边界;`App` 侧稳定 approval/regenerate 回调,避免流式 token 更新刷新整条时间线。新增 `Timeline.test.tsx` comparator 单测;真实 profiling 与数百消息长会话验收后续补。
 - [x] FE-5 代码+单测完成:`Timeline` 在长会话中复用 `computeVirtualWindow` 只渲当前窗口,保留原 timeline 滚动容器和 sticky-to-bottom 行为;短会话仍全量渲染。新增长会话窗口化单测,真实 profiling/安装版长会话深验后续补。
+- [x] FE-6 代码+单测+构建完成:侧边面板、Settings 与运行时依赖子面板已按需 `React.lazy` 加载;Vite manualChunks 已拆出 `vendor-react`、markdown、`panel-*`、Settings 与 RuntimeDependenciesPanel chunk。新增 UI/配置单测,真实 UI build 已验证 chunk 输出;安装版首屏体感后续补。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。

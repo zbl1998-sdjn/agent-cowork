@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
-import { RuntimeDependenciesPanel } from './RuntimeDependenciesPanel';
+import { Loading } from './ui/StateViews';
+
+const RuntimeDependenciesPanel = lazy(() => import('./RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
 
 type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
 
@@ -177,7 +179,11 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
                 </div>
               )
             )}
-            {tab === 'runtime' && <RuntimeDependenciesPanel />}
+            {tab === 'runtime' && (
+              <Suspense fallback={<Loading message="正在加载运行时状态…" />}>
+                <RuntimeDependenciesPanel />
+              </Suspense>
+            )}
             {tab === 'selfcheck' && (
               <div className="selfcheck">
                 <div className="selfcheck-head">

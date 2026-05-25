@@ -1,13 +1,16 @@
+import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
-import { ArtifactsPanel } from './ArtifactsPanel';
-import { ConnectorsPanel } from './ConnectorsPanel';
-import { MemoryPanel } from './MemoryPanel';
-import { ObservabilityPanel } from './ObservabilityPanel';
-import { SchedulesPanel } from './SchedulesPanel';
-import { ToolsPanel } from './ToolsPanel';
-import { VizPanel } from './VizPanel';
 import { ErrorBoundary } from './ui/ErrorBoundary';
+import { Loading } from './ui/StateViews';
+
+const ToolsPanel = lazy(() => import('./ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
+const VizPanel = lazy(() => import('./VizPanel').then((module) => ({ default: module.VizPanel })));
+const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
+const ArtifactsPanel = lazy(() => import('./ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
+const SchedulesPanel = lazy(() => import('./SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
+const MemoryPanel = lazy(() => import('./MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
+const ObservabilityPanel = lazy(() => import('./ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
 
 interface AppSidePanelProps {
   panel: SidePanel;
@@ -42,7 +45,9 @@ export function AppSidePanel({ panel, trustedRoot, onClose, onRunSubagent }: App
     <aside className="side-drawer">
       <button type="button" className="drawer-close" aria-label="关闭" onClick={onClose}>×</button>
       <ErrorBoundary key={panel} label={PANEL_LABELS[panel]}>
-        {panelContent(panel, trustedRoot, onRunSubagent)}
+        <Suspense fallback={<Loading message="正在加载面板…" />}>
+          {panelContent(panel, trustedRoot, onRunSubagent)}
+        </Suspense>
       </ErrorBoundary>
     </aside>
   );
