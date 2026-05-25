@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer } from '../src/server.js';
 import {
   buildRuntimeDependencyCleanupPlan,
@@ -7,6 +10,9 @@ import {
   buildRuntimeDependencyUpdatePlan,
 } from '../src/runtime/dependency-install-plan.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '../../..');
 
 async function withServer(config, fn) {
   const server = createServer({ requireAuth: false, enableScheduler: false, ...config });
@@ -172,6 +178,24 @@ test('runtime dependency cleanup plan refuses non-AgentCowork roots', () => {
     () => buildRuntimeDependencyCleanupPlan({ appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming' }),
     /must end with AgentCowork/,
   );
+});
+
+test('NSIS uninstall hook deletes AgentCowork AppData only after delete-data confirmation', () => {
+  const tauriRoot = path.join(repoRoot, 'apps/windows-client/src-tauri');
+  const config = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8'));
+  const hooksRel = config.bundle?.windows?.nsis?.installerHooks;
+  assert.equal(hooksRel, './windows/nsis-hooks.nsh');
+
+  const hookText = fs.readFileSync(path.join(tauriRoot, hooksRel), 'utf8');
+  assert.match(hookText, /NSIS_HOOK_POSTUNINSTALL/);
+  assert.match(hookText, /\$DeleteAppDataCheckboxState = 1/);
+  assert.match(hookText, /\$UpdateMode <> 1/);
+  const cleanupLines = hookText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('RmDir'));
+  assert.deepEqual(cleanupLines, ['RmDir /r "$APPDATA\\AgentCowork"']);
+  assert.doesNotMatch(hookText, /RmDir\s+\/r\s+"\$APPDATA"/);
 });
 
 test('runtime dependency update plan preserves AppData components, venv and user data', () => {

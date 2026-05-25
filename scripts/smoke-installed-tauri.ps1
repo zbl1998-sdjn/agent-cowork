@@ -167,6 +167,39 @@ function Wait-ForHostHealth {
     throw "Timed out waiting for installed sidecar health. Last error: $lastError"
 }
 
+function Get-NsisCleanupHookStatus {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $tauriRoot = Join-Path $RepoRoot "apps\windows-client\src-tauri"
+    $configPath = Join-Path $tauriRoot "tauri.conf.json"
+    Assert-True (Test-Path -LiteralPath $configPath) "Tauri config not found: $configPath"
+
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $hookRel = $config.bundle.windows.nsis.installerHooks
+    Assert-True (-not [string]::IsNullOrWhiteSpace($hookRel)) "NSIS installerHooks is not configured"
+
+    $hookPath = [System.IO.Path]::GetFullPath((Join-Path $tauriRoot $hookRel))
+    $tauriRootFull = [System.IO.Path]::GetFullPath($tauriRoot).TrimEnd("\")
+    $tauriRootPrefix = $tauriRootFull + [System.IO.Path]::DirectorySeparatorChar
+    Assert-True ($hookPath.StartsWith($tauriRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) "NSIS hook path escapes src-tauri: $hookPath"
+    Assert-True (Test-Path -LiteralPath $hookPath) "NSIS hook file not found: $hookPath"
+
+    $hookText = Get-Content -LiteralPath $hookPath -Raw
+    Assert-True $hookText.Contains("NSIS_HOOK_POSTUNINSTALL") "NSIS hook does not define post-uninstall cleanup"
+    Assert-True $hookText.Contains('$DeleteAppDataCheckboxState = 1') "NSIS cleanup is not gated by delete-data confirmation"
+    Assert-True $hookText.Contains('$UpdateMode <> 1') "NSIS cleanup is not gated away from update mode"
+    $cleanupMatches = [regex]::Matches($hookText, 'RmDir\s+/r\s+"\$APPDATA\\AgentCowork"')
+    Assert-True ($cleanupMatches.Count -eq 1) "NSIS cleanup must contain exactly one precise AgentCowork AppData removal"
+
+    return [ordered]@{
+        configured = $true
+        configPath = $configPath
+        hookPath = $hookPath
+        safeRoot = '$APPDATA\AgentCowork'
+        gatedBy = @("DeleteAppDataCheckboxState", "not UpdateMode")
+    }
+}
+
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $workspace = Join-Path $repoRoot "build\installed-tauri-smoke-workspace"
@@ -201,6 +234,10 @@ $oldStore = $env:KCW_STORE
 $oldSqlitePath = $env:KCW_SQLITE_PATH
 
 try {
+    $nsisCleanupHook = Get-NsisCleanupHookStatus -RepoRoot $repoRoot
+    $report.installerCleanupHook = $nsisCleanupHook
+    $report.checks.nsisCleanupHook = "passed"
+
     $exeExists = Test-Path -LiteralPath $InstalledExePath
     Assert-True $exeExists "Installed Tauri executable not found: $InstalledExePath"
     $exe = (Resolve-Path -LiteralPath $InstalledExePath).Path
