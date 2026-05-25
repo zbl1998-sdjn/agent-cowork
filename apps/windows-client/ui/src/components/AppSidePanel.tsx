@@ -8,7 +8,7 @@ const ToolsPanel = lazy(() => import('./ToolsPanel').then((module) => ({ default
 const VizPanel = lazy(() => import('./VizPanel').then((module) => ({ default: module.VizPanel })));
 const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
 const ArtifactsPanel = lazy(() => import('./ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
-const SchedulesPanel = lazy(() => import('./SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
+const SchedulesPanel = lazy(() => import('./panels/SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
 const MemoryPanel = lazy(() => import('./MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
 const ObservabilityPanel = lazy(() => import('./ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
 

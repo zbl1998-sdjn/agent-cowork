@@ -11,7 +11,7 @@ export function manualChunks(id: string): string | undefined {
   if (normalized.indexOf('/src/components/VizPanel') >= 0) return 'panel-viz';
   if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0) return 'panel-connectors';
   if (normalized.indexOf('/src/components/ArtifactsPanel') >= 0) return 'panel-artifacts';
-  if (normalized.indexOf('/src/components/SchedulesPanel') >= 0) return 'panel-schedules';
+  if (normalized.indexOf('/src/components/SchedulesPanel') >= 0 || normalized.indexOf('/src/components/panels/SchedulesPanel') >= 0) return 'panel-schedules';
   if (normalized.indexOf('/src/components/MemoryPanel') >= 0) return 'panel-memory';
   if (normalized.indexOf('/src/components/ObservabilityPanel') >= 0) return 'panel-observability';
   return undefined;

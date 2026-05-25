@@ -9,6 +9,7 @@ describe('vite manualChunks', () => {
 
   it('splits panel chunks away from the startup bundle', () => {
     expect(manualChunks('C:/repo/src/components/ToolsPanel.tsx')).toBe('panel-tools');
+    expect(manualChunks('C:/repo/src/components/panels/SchedulesPanel.tsx')).toBe('panel-schedules');
     expect(manualChunks('C:/repo/src/components/ObservabilityPanel.tsx')).toBe('panel-observability');
   });
 

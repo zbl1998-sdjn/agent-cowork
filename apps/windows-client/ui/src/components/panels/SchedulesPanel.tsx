@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { listSchedules, cancelSchedule, type ScheduleItem } from '../lib/api';
-import { Empty, ErrorState } from './ui/StateViews';
+import { listSchedules, cancelSchedule, type ScheduleItem } from '../../lib/api';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 export function SchedulesPanelStateViews({ error, onRetry }: { error: string; onRetry: () => void }) {
   if (error) {
