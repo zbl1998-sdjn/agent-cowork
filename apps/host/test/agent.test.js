@@ -6,6 +6,7 @@ import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { createApprovalRegistry } from '../src/runtime/approvals.js';
+import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
 import { createServer } from '../src/server.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-agent-')); }
@@ -50,6 +51,24 @@ test('Edit replaces a string in a workspace file', async () => {
   assert.equal(fs.readFileSync(path.join(root, 'c.txt'), 'utf8'), 'baz bar foo');
   const all = await edit.handler({ path: 'c.txt', old_string: 'foo', new_string: 'X', replace_all: true });
   assert.equal(all.replacements, 1);
+});
+
+test('Shell captures stdout from quoted node -e commands on Windows local backend', async (t) => {
+  if (process.platform !== 'win32') {
+    t.skip('Windows shell quoting regression');
+    return;
+  }
+  const root = tmp();
+  const tools = createAgentTools({
+    trustedRoot: root,
+    sandbox: new LocalSubprocessSandbox(),
+    sandboxLimits: { allowTools: ['node'] },
+  });
+  const shell = tools.find((tool) => tool.name === 'Shell');
+  const result = await shell.handler({ command: 'node -e "process.stdout.write(\'shell-ok\')"' });
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdout, 'shell-ok');
+  assert.equal(result.stderr, '');
 });
 
 test('runAgentChat executes a Write tool call then returns a final answer', async () => {

@@ -161,10 +161,16 @@ function makeDryRunModelCall() {
 
 function summarize(events) {
   const eventNames = events.map((item) => item.event);
+  const shellResults = events
+    .filter((item) => item.event === 'tool_result' && item.data?.name === 'Shell')
+    .map((item) => item.data?.result || {});
+  const shellOk = shellResults.some((result) => result.exitCode === 0 && String(result.stdout || '').includes('shell-ok'));
   return {
     start: eventNames.includes('start'),
     toolCallCount: eventNames.filter((event) => event === 'tool_call').length,
     toolResultCount: eventNames.filter((event) => event === 'tool_result').length,
+    shellResultCount: shellResults.length,
+    shellOk,
     approvals: eventNames.filter((event) => event === 'approval_request').length,
     fileWritten: eventNames.includes('file_written'),
     done: eventNames.includes('done'),
@@ -200,6 +206,7 @@ async function main() {
     const summary = summarize(events);
     assert(summary.done, 'agent stream did not emit done');
     assert(summary.toolResultCount >= 2, 'agent stream did not exercise enough tool results');
+    assert(summary.shellOk, 'agent stream did not capture shell-ok from Shell stdout');
     assert(outputExists, 'e2e-output.md was not written');
 
     const report = {

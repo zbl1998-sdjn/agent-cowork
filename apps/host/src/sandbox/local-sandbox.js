@@ -37,6 +37,7 @@ export class LocalSubprocessSandbox {
 
     const env = { ...spec.env };
     if (process.env.PATH) env.PATH = process.env.PATH;
+    if (process.env.PATHEXT) env.PATHEXT = process.env.PATHEXT;
     if (process.env.SystemRoot) env.SystemRoot = process.env.SystemRoot;
 
     const core = await runConstrainedChild({

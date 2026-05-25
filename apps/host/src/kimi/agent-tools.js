@@ -207,12 +207,11 @@ export function createAgentTools(ctx = {}) {
 
   if (sandbox) {
     // On the local desktop backend, run the (user-approved) command through the
-    // OS shell so ordinary commands work — Windows: `cmd /d /s /c <cmd>`, POSIX:
-    // `sh -c <cmd>`. Previously every command was spawned as a bare argv against
-    // a node/python-only allowlist, so the model's `ls`/`find`/`dir` attempts all
-    // failed and it flailed across other tools. The structured allowlist still
-    // guards VM/server backends. Shell stays risk:'high' — every command is
-    // approval-gated and the cwd is jailed to the workspace root.
+    // OS shell so ordinary commands work — Windows: PowerShell, POSIX: `sh -c`.
+    // `cmd /s /c` drops stdout for quoted inline scripts such as `node -e "..."`.
+    // The structured allowlist still guards VM/server backends. Shell stays
+    // risk:'high' — every command is approval-gated and the cwd is jailed to the
+    // workspace root.
     const isLocalBackend = !sandbox.backend || sandbox.backend === 'local-subprocess';
     const isWindows = process.platform === 'win32';
     tools.push({
@@ -227,7 +226,7 @@ export function createAgentTools(ctx = {}) {
         let spec;
         if (isLocalBackend) {
           const shellSpec = isWindows
-            ? { tool: 'cmd', args: ['/d', '/s', '/c', command] }
+            ? { tool: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', command] }
             : { tool: 'sh', args: ['-c', command] };
           // Permit the OS shell binary for this approval-gated wrapper; other
           // backends keep their strict tool allowlist unchanged.
