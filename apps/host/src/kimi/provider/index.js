@@ -1,15 +1,25 @@
 import { createKimiProvider } from './kimi.js';
+import { createLocalOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
+
+const kimiProvider = createKimiProvider();
+const openAiProvider = createOpenAiProvider();
+const localOpenAiProvider = createLocalOpenAiCompatibleProvider();
 
 const BUILTIN_PROVIDERS = new Map([
-  ['kimi', createKimiProvider()],
-  ['kimi-api', createKimiProvider()],
+  ['kimi', kimiProvider],
+  ['kimi-api', kimiProvider],
+  ['openai', openAiProvider],
+  ['openai-compatible', openAiProvider],
+  ['openai/local', localOpenAiProvider],
+  ['local-openai', localOpenAiProvider],
+  ['local', localOpenAiProvider],
 ]);
 
 export function resolveModelProvider(kimiConfig = {}) {
   if (kimiConfig.provider && typeof kimiConfig.provider.chatCompletion === 'function') {
     return kimiConfig.provider;
   }
-  const id = String(kimiConfig.provider || 'kimi').trim() || 'kimi';
+  const id = String(kimiConfig.provider || 'kimi').trim().toLowerCase() || 'kimi';
   return BUILTIN_PROVIDERS.get(id) || BUILTIN_PROVIDERS.get('kimi');
 }
 
