@@ -1,15 +1,14 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildCiSteps, changedFilesFromEnv } from './ci-gates.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const npmCommand = 'npm';
-
-const steps = [
-  { name: 'check', args: ['run', 'check'] },
-  { name: 'test:host', args: ['run', 'test:host'] },
-  { name: 'test:ui', args: ['run', 'test:ui'] },
-];
+const steps = buildCiSteps({
+  changedFiles: changedFilesFromEnv(),
+  forceEval: process.env.KCW_CI_FORCE_EVAL === '1',
+});
 
 function runStep(step) {
   return new Promise((resolve) => {
