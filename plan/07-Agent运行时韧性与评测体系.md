@@ -63,6 +63,8 @@
 | B3 | 工具结果摘要(替代硬截断):大结果先摘要再回灌,保留要点 + 来源 | `kimi/context/tool-result-summarizer.js` | 单测 | 大工具结果可读、不撑窗、要点不丢 | M |
 | B4 | 接入 `tool-loop`(消费 ContextManager) | `kimi/agent/tool-loop.js` | **前置:补 tool-loop/agent-runner 特征测试** | 接入后断言不改仍全绿;长任务稳定 | M |
 
+B1 完成记录(2026-05-25):新增 `kimi/context/token-estimator.js` 启发式 `TokenEstimator`,支持 text/messages token 估算、message overhead、reply primer、tool call / object content 计数与 `heuristic-v1` 元数据;已纳入 host `checkJs` 类型护栏。`npm run test:host` 通过(499 tests,498 pass,1 skip)。
+
 ---
 
 ## C · 任务循环韧性 — 敢长时间放手跑的前提
