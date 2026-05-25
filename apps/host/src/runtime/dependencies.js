@@ -1,4 +1,5 @@
 import { redactText } from '../security/redaction.js';
+import { detectChromiumRuntime } from './chromium-runtime.js';
 import { detectDataScienceRuntime } from './data-science-runtime.js';
 import { detectCjkFonts } from './font-runtime.js';
 import { detectGitRuntime } from './git-runtime.js';
@@ -58,13 +59,9 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     estimatedDownloadBytes: 0,
   },
   {
-    id: 'proxy',
-    section: 'F1',
-    label: '网络代理配置',
+    id: 'proxy', section: 'F1', label: '网络代理配置',
     description: '读取系统或环境代理，用于模型调用和连接器访问外网。',
-    required: false,
-    installMode: 'environment',
-    estimatedDownloadBytes: 0,
+    required: false, installMode: 'environment', estimatedDownloadBytes: 0,
   },
   {
     id: 'data-science',
@@ -204,6 +201,8 @@ function detectDependency(item, options) {
   }
 
   if (item.id === 'data-science') return detectDataScienceRuntime({ env, fsImpl: options.fsImpl });
+
+  if (item.id === 'playwright-chromium') return detectChromiumRuntime({ env, fsImpl: options.fsImpl });
 
   if (item.id === 'tesseract-ocr') return detectOcrRuntime({ env, fsImpl: options.fsImpl });
 

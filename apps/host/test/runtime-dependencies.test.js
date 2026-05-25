@@ -485,6 +485,45 @@ test('runtime dependency status accepts a configured Pandoc executable', () => {
   assert.equal(component.source, 'KCW_PANDOC_EXE');
 });
 
+test('runtime dependency status reports Chromium component availability from Playwright home', () => {
+  const root = makeTestWorkspace('kcw-runtime-chromium');
+  const chromeDir = path.join(root, 'chrome-win');
+  fs.mkdirSync(chromeDir, { recursive: true });
+  fs.writeFileSync(path.join(chromeDir, 'chrome.exe'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_PLAYWRIGHT_CHROMIUM_HOME: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'playwright-chromium');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_PLAYWRIGHT_CHROMIUM_HOME');
+  assert.equal(component.detail, '浏览器自动化组件可用');
+});
+
+test('runtime dependency status rejects non-Chromium executable paths', () => {
+  const root = makeTestWorkspace('kcw-runtime-chromium-bad');
+  const toolPath = path.join(root, 'firefox.exe');
+  fs.writeFileSync(toolPath, '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_CHROMIUM_EXECUTABLE: toolPath,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'playwright-chromium');
+  assert.equal(component.status, 'missing');
+  assert.equal(component.source, 'KCW_CHROMIUM_EXECUTABLE');
+  assert.match(component.detail, /名称不匹配/);
+});
+
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
   const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
