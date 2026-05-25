@@ -6,6 +6,7 @@ import {
   type MemoryProfileEntry,
   type MemoryProfileType,
 } from '../lib/api';
+import { Empty, ErrorState } from './ui/StateViews';
 
 interface MemoryPanelProps {
   trustedRoot: string;
@@ -19,6 +20,13 @@ const TYPE_LABEL: Record<MemoryProfileType, string> = {
 
 export function formatProfileEntry(entry: MemoryProfileEntry): string {
   return `${TYPE_LABEL[entry.type] || entry.type} · ${entry.key}: ${entry.value}`;
+}
+
+export function MemoryPanelStateViews({ error, onRetry }: { error: string; onRetry: () => void }) {
+  if (error) {
+    return <ErrorState title="记忆加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
+  }
+  return <Empty title="暂无本地画像记忆" message="保存术语、项目和偏好后会显示在这里。" />;
 }
 
 export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
@@ -87,7 +95,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
         />
         <button type="button" disabled={busy} onClick={() => void load()}>{busy ? '读取中…' : '刷新'}</button>
       </div>
-      {error && <div className="panel-error">{error}</div>}
+      {error && <MemoryPanelStateViews error={error} onRetry={() => void load()} />}
       <ul className="tool-list">
         {entries.map((entry) => (
           <li key={`${entry.type}:${entry.key}`}>
@@ -97,7 +105,11 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
             <button type="button" disabled={busy} onClick={() => void forget(entry)}>删除</button>
           </li>
         ))}
-        {entries.length === 0 && <li className="panel-empty">暂无本地画像记忆</li>}
+        {entries.length === 0 && !error && (
+          <li className="panel-empty">
+            <MemoryPanelStateViews error="" onRetry={() => void load()} />
+          </li>
+        )}
       </ul>
       <div className="panel-call">
         <label>新增记忆</label>

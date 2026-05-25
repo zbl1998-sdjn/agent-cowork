@@ -130,6 +130,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-3a 面板级 ErrorBoundary:根应用已有全局 `ErrorBoundary`,本轮补齐 `AppSidePanel` 对 tools/viz/connectors/artifacts/schedules/memory/observability 各侧边面板的独立错误边界和中文 label;新增 UI 单测锁定空面板、boundary 包裹与现有面板内容渲染。
 - [x] FE-3b 局部接入(ArtifactsPanel):产物面板的内联空态/错误态已替换为现有 `Empty`/`ErrorState`,错误态保留重新加载入口;新增状态渲染单测。其余面板状态统一继续小切片推进。
 - [x] FE-3b 局部接入(SchedulesPanel):定时任务面板的内联空态/错误态已替换为现有 `Empty`/`ErrorState`,错误态保留重新加载入口;新增状态渲染单测。
+- [x] FE-3b 局部接入(MemoryPanel):记忆面板的内联空态/错误态已替换为现有 `Empty`/`ErrorState`,错误态保留重新加载入口且不再同时显示空态;新增状态渲染单测。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
