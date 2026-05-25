@@ -72,6 +72,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 06-A1 WebView2 安装器引导:Tauri Windows bundle 显式配置 `webviewInstallMode.type=embedBootstrapper`,安装包会内置 WebView2 Evergreen bootstrapper,在缺失 WebView2 的 Windows 机器上由安装器补齐运行时;scaffold 单测与安装版 smoke dry-run 均校验该配置。
 - [x] 06-A2 内嵌 Python 运行器接入(代码+单测完成):`runCode` 在本地 sandbox 后端检测 `KCW_EMBEDDED_PYTHON`/`KCW_PYTHON_HOME` 后优先通过内嵌解释器目录运行 `python/python3`,同时先校验原始请求工具在 sandbox allowlist 内,避免配置绕过;VM/docker 后端继续使用容器内裸 `python/python3`。新增单测覆盖本地优先、VM 不改写、allowlist 不放宽。
 - [x] 06-A4 Node 运行器接入(代码+单测完成):`runCode` 在本地 sandbox 后端对 `node` 优先使用 `KCW_NODE_EXE`/`KCW_NODE_HOME` 或开发态 host `process.execPath` 所在目录,通过 PATH 前缀命中自带 Node;VM/docker 后端继续使用镜像内 `node`。新增单测覆盖本地优先、VM 不改写、allowlist 不放宽和相对配置忽略。
+- [x] 06-A5 VC++ 运行库预检:运行时依赖状态优先识别安装器配置标记,Windows 下只读查询 VC Runtime x64/x86 注册表 `Installed` 标记并展示版本,缺失时提示安装器补齐;非 Windows 标记为不适用。新增 host 单测覆盖配置优先、x64/x86 可用、缺失与非 Windows 不探测。
 - [x] 06-D 依赖管理器基础面板:设置页新增"运行时"tab,读取 `/api/runtime/dependencies` 展示核心/可选/按需组件状态、中文用途说明、检测详情、安装方式、体积估算和核心异常警示;host 新增安装/清理/更新计划 API(`/install-plan`、`/cleanup-plan`、`/update-plan`),只生成可审查计划、不执行下载或删除,真实安装/下载仍留给后续按需组件流程。UI 纯逻辑/API 与 host 路由/auth-gate 测试通过。
 - [x] 06-D2 安装计划预检 UI:运行时依赖面板可从缺失/待补的按需组件生成 `/api/runtime/dependencies/install-plan` 预检,展示预计下载、磁盘空间状态、组件列表和未知组件,刷新依赖时清空旧预检;仅展示可审查计划,不执行真实安装或下载。UI 测试(32 files,137 tests)、UI build 与 `npm run check` 通过。
 - [x] 06-F1 中文路径/长路径 smoke:新增 `npm run smoke:windows-paths`,在中文 workspace 与 >260 字符路径下覆盖文件树、读取、预览、搜索、context bundle、上传导入、artifact 列表/查看/改名、批量写/改名/移动/回滚;同时断言越界路径、敏感路径与 junction 逃逸不会写出 trustedRoot。

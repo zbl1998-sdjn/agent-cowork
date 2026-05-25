@@ -1,5 +1,6 @@
 import { redactText } from '../security/redaction.js';
 import { detectGitRuntime } from './git-runtime.js';
+import { detectVcRuntime } from './windows-runtime.js';
 
 export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
@@ -186,11 +187,7 @@ function detectDependency(item, options) {
     return configuredFromEnv(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT'], '字体包路径已配置');
   }
 
-  if (item.id === 'vc-runtime') {
-    return platform === 'win32'
-      ? { status: 'unknown', detail: '需要安装器探测 VC++ 运行库' }
-      : { status: 'not_applicable', detail: '仅 Windows 需要' };
-  }
+  if (item.id === 'vc-runtime') return detectVcRuntime({ env, platform, spawnSync: options.spawnSync });
 
   if (item.id === 'proxy') {
     const proxy = envValue(env, ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']);

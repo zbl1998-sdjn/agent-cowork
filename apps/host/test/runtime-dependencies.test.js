@@ -89,7 +89,10 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
 test('runtime dependency status detects configured MinGit before probing system git', () => {
   let called = false;
   const status = getRuntimeDependencyStatus({
-    env: { KCW_MINGIT_HOME: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\components\\mingit' },
+    env: {
+      KCW_MINGIT_HOME: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
     spawnSync: () => {
       called = true;
       return { status: 1 };
@@ -129,6 +132,102 @@ test('runtime dependency status marks MinGit missing when git is unavailable', (
   const mingit = status.dependencies.find((item) => item.id === 'mingit');
   assert.equal(mingit.status, 'missing');
   assert.match(mingit.detail, /按需安装 MinGit/);
+});
+
+test('runtime dependency status detects configured VC runtime before registry probing', () => {
+  let called = false;
+  const status = getRuntimeDependencyStatus({
+    env: { KCW_VC_RUNTIME_INSTALLED: '1', KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit' },
+    platform: 'win32',
+    spawnSync: () => {
+      called = true;
+      return { status: 1 };
+    },
+  });
+
+  const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
+  assert.equal(called, false);
+  assert.equal(vcRuntime.status, 'configured');
+  assert.equal(vcRuntime.source, 'KCW_VC_RUNTIME_INSTALLED');
+});
+
+test('runtime dependency status reports VC runtime registry availability on Windows', () => {
+  const status = getRuntimeDependencyStatus({
+    env: {},
+    platform: 'win32',
+    spawnSync: (command, args, options) => {
+      if (command === 'git') return { status: 1, stdout: '', stderr: '' };
+      assert.equal(command, 'reg');
+      assert.equal(args[0], 'query');
+      assert.match(args[1], /\\Runtimes\\x64$/);
+      assert.equal(args.at(-1), 'Installed');
+      assert.equal(options.windowsHide, true);
+      return {
+        status: 0,
+        stdout: 'Installed    REG_DWORD    0x1\nVersion    REG_SZ    v14.40.33810.0\n',
+        stderr: '',
+      };
+    },
+  });
+
+  const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
+  assert.equal(vcRuntime.status, 'available');
+  assert.equal(vcRuntime.version, 'v14.40.33810.0');
+  assert.match(vcRuntime.detail, /VC\+\+ 运行库可用/);
+});
+
+test('runtime dependency status accepts x86 VC runtime when x64 is absent', () => {
+  const queried = [];
+  const status = getRuntimeDependencyStatus({
+    env: { KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit' },
+    platform: 'win32',
+    spawnSync: (command, args) => {
+      queried.push(args[1]);
+      if (/\\Runtimes\\x86$/.test(args[1])) {
+        return { status: 0, stdout: 'Installed    REG_DWORD    0x1\n', stderr: '' };
+      }
+      return { status: 1, stdout: '', stderr: 'not found' };
+    },
+  });
+
+  const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
+  assert.deepEqual(queried, [
+    'HKLM\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64',
+    'HKLM\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x86',
+  ]);
+  assert.equal(vcRuntime.status, 'available');
+  assert.match(vcRuntime.detail, /x86/);
+});
+
+test('runtime dependency status marks VC runtime missing on Windows when registry flag is absent', () => {
+  const status = getRuntimeDependencyStatus({
+    env: {},
+    platform: 'win32',
+    spawnSync: (command) => {
+      if (command === 'git') return { status: 1, stdout: '', stderr: '' };
+      return { status: 1, stdout: '', stderr: 'not found' };
+    },
+  });
+
+  const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
+  assert.equal(vcRuntime.status, 'missing');
+  assert.match(vcRuntime.detail, /安装器需要补齐/);
+});
+
+test('runtime dependency status skips VC runtime probing off Windows', () => {
+  let called = false;
+  const status = getRuntimeDependencyStatus({
+    env: { KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit' },
+    platform: 'linux',
+    spawnSync: () => {
+      called = true;
+      return { status: 0 };
+    },
+  });
+
+  const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
+  assert.equal(called, false);
+  assert.equal(vcRuntime.status, 'not_applicable');
 });
 
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
