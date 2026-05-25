@@ -20,6 +20,7 @@ import { callModelResilient } from './model-resilience.js';
 import { createToolTodoTracker } from './todo-state.js';
 import { createLoopGuard } from './loop-guard.js';
 import { createRetryPolicy } from './tool-retry.js';
+import { validateToolArguments } from './arg-validator.js';
 import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 
@@ -245,6 +246,17 @@ export async function runAgentChat({
       const { name, args } = parseToolCall(call);
       emit('tool_call', { name, args });
       const tool = toolMap.get(name);
+      const argValidation = tool ? validateToolArguments(tool.parameters, args) : { valid: true, errors: [] };
+      if (!argValidation.valid) {
+        const result = { error: 'invalid tool arguments', errors: argValidation.errors };
+        steps.push({ tool: name, ok: false, invalidArgs: true });
+        audit('tool.args_invalid', { tool: name, errors: argValidation.errors });
+        emit('tool_args_invalid', { name, errors: argValidation.errors });
+        emit('tool_result', { name, status: 'failed', result });
+        const formatted = activeContextManager.formatToolResult(result, { toolName: name });
+        messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
+        continue;
+      }
       const isMutating = !!(tool && tool.mutating === true);
       const needsApproval = toolNeedsApproval(tool);
       if (await runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call })) continue;
