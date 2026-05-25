@@ -15,6 +15,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 - Added a GitHub OAuth device-flow connector prototype with server-side device-code sessions, protected credential storage, redacted status/revoke routes, and React connector-panel start/complete/revoke controls.
 - Added OAuth connector permission approvals: allowlisted scopes, single-use approval receipts, high-risk scope labels, and React connector-panel approval controls.
 - Added live artifact connector data sources for connected filesystem MCP reads, with tests for disconnected and high-risk connector tool rejection.
+- Added sub-agent context-budget enforcement so over-large plans are rejected before any tool runs, while direct sub-agent routes remain read-only/approval-isolated.
 - Expanded the host `checkJs`/JSDoc type guard to cover live artifact specs, viz rendering, OAuth permissions, JSON stores, and the tool registry.
 - Added the local `npm run ci` gate for architecture checks, file-size checks, host tests, and UI tests.
 - Added a dry-run-first release skeleton for SemVer validation, VERSION planning, git bundle planning, installer signing/archive planning, and tag planning.

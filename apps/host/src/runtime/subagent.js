@@ -12,6 +12,45 @@ import { summariseRunForIndex } from './runs-index.js';
 //
 // Returns { ok, runId, runPath, goal, steps, events }.
 
+const DEFAULT_CONTEXT_BUDGET_BYTES = 32 * 1024;
+const DEFAULT_MAX_STEPS = 20;
+
+function makeHttpError(statusCode, message, payload = {}) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  err.payload = payload;
+  return err;
+}
+
+function contextSnapshot({ goal, steps }) {
+  return {
+    goal: String(goal || ''),
+    steps: steps.map((step) => ({
+      tool: String(step.tool || ''),
+      note: step.note == null ? undefined : String(step.note),
+      rationale: step.rationale == null ? undefined : String(step.rationale),
+      args: step.args || {},
+    })),
+  };
+}
+
+function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps }) {
+  const stepLimit = Math.max(1, Number(maxSteps) || DEFAULT_MAX_STEPS);
+  if (steps.length > stepLimit) {
+    throw makeHttpError(400, `runSubagent: too many steps; max ${stepLimit}`, { maxSteps: stepLimit });
+  }
+  const budget = Math.max(1, Number(contextBudgetBytes) || DEFAULT_CONTEXT_BUDGET_BYTES);
+  const snapshot = contextSnapshot({ goal, steps });
+  const contextBytes = Buffer.byteLength(JSON.stringify(snapshot), 'utf8');
+  if (contextBytes > budget) {
+    throw makeHttpError(413, `runSubagent: context budget exceeded (${contextBytes}/${budget} bytes)`, {
+      contextBytes,
+      contextBudgetBytes: budget,
+    });
+  }
+  return { contextBytes, contextBudgetBytes: budget, maxSteps: stepLimit };
+}
+
 function summariseResult(result) {
   if (result == null || typeof result !== 'object') {
     return { value: result === undefined ? null : result };
@@ -42,6 +81,8 @@ export async function runSubagent({
   runsIndex = null,
   context = {},
   stopOnError = true,
+  contextBudgetBytes = DEFAULT_CONTEXT_BUDGET_BYTES,
+  maxSteps = DEFAULT_MAX_STEPS,
 }) {
   if (!registry) {
     throw new Error('runSubagent: registry is required');
@@ -66,6 +107,7 @@ export async function runSubagent({
       throw err;
     }
   });
+  const limits = enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps });
 
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const runId = createRunId();
@@ -113,6 +155,7 @@ export async function runSubagent({
     command: 'subagent',
     mode: 'agent',
     trustedRoot: safeRoot,
+    limits,
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMs,

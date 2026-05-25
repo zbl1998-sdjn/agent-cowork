@@ -171,6 +171,26 @@ test('runSubagent rejects an unknown tool with 400', async () => {
   );
 });
 
+test('runSubagent rejects over-budget context before executing steps', async () => {
+  const root = tempRoot();
+  const registry = new ToolRegistry();
+  let called = false;
+  registry.register({ name: 'safe.read', description: '', handler: () => { called = true; return { ok: true }; } });
+
+  await assert.rejects(
+    () => runSubagent({
+      goal: 'x'.repeat(128),
+      steps: [{ tool: 'safe.read', args: { q: 'alpha' } }],
+      registry,
+      trustedRoot: root,
+      runStoreRoot: path.join(root, 'runs'),
+      contextBudgetBytes: 64,
+    }),
+    (err) => { assert.equal(err.statusCode, 413); return true; },
+  );
+  assert.equal(called, false);
+});
+
 // ---- route integration ----
 
 test('GET /api/tools lists built-in tools (sandbox + recipes)', async () => {
@@ -314,6 +334,28 @@ test('POST /api/subagent/run rejects approval-gated steps', async () => {
     });
     assert.equal(res.status, 428);
     assert.match(res.body.error, /requires agent approval/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/subagent/run rejects over-budget plans before executing any tool', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/subagent/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'agent-budget' },
+      body: {
+        goal: 'x'.repeat(40_000),
+        steps: [
+          { tool: 'SearchWorkspace', args: { query: 'alpha', limit: 3 } },
+        ],
+      },
+    });
+    assert.equal(res.status, 413);
+    assert.match(res.body.error, /context budget exceeded/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
