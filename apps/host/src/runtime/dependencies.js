@@ -1,4 +1,5 @@
 import { redactText } from '../security/redaction.js';
+import { detectCjkFonts } from './font-runtime.js';
 import { detectGitRuntime } from './git-runtime.js';
 import { detectVcRuntime } from './windows-runtime.js';
 
@@ -31,13 +32,9 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     estimatedDownloadBytes: 0,
   },
   {
-    id: 'cjk-fonts',
-    section: 'A3',
-    label: '中日韩字体包',
+    id: 'cjk-fonts', section: 'A3', label: '中日韩字体包',
     description: '确保中文、日文、韩文内容在安装版中正常显示。',
-    required: true,
-    installMode: 'bundled',
-    estimatedDownloadBytes: 0,
+    required: true, installMode: 'bundled', estimatedDownloadBytes: 0,
   },
   {
     id: 'vc-runtime',
@@ -183,9 +180,7 @@ function detectDependency(item, options) {
     return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], '内置 Python 路径已配置');
   }
 
-  if (item.id === 'cjk-fonts') {
-    return configuredFromEnv(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT'], '字体包路径已配置');
-  }
+  if (item.id === 'cjk-fonts') return detectCjkFonts({ env, fsImpl: options.fsImpl });
 
   if (item.id === 'vc-runtime') return detectVcRuntime({ env, platform, spawnSync: options.spawnSync });
 

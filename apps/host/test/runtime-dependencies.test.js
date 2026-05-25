@@ -81,6 +81,8 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
     assert.equal(byId.mingit.installMode, 'on-demand');
     assert.equal(byId['python-embedded'].status, 'configured');
     assert.equal(byId['python-embedded'].detail, '内置 Python 路径已配置');
+    assert.equal(byId['cjk-fonts'].section, 'A3');
+    assert.equal(byId['cjk-fonts'].required, true);
     assert.equal(byId.proxy.status, 'configured');
     assert.equal(byId.proxy.detail, 'http://proxy-user:[REDACTED]@127.0.0.1:7890');
   });
@@ -228,6 +230,86 @@ test('runtime dependency status skips VC runtime probing off Windows', () => {
   const vcRuntime = status.dependencies.find((item) => item.id === 'vc-runtime');
   assert.equal(called, false);
   assert.equal(vcRuntime.status, 'not_applicable');
+});
+
+test('runtime dependency status reports configured CJK font directory availability', () => {
+  const root = makeTestWorkspace('kcw-runtime-fonts');
+  const fontDir = path.join(root, 'fonts');
+  fs.mkdirSync(fontDir, { recursive: true });
+  fs.writeFileSync(path.join(fontDir, 'NotoSansCJKsc-Regular.otf'), '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_CJK_FONT_DIR: fontDir,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const cjkFonts = status.dependencies.find((item) => item.id === 'cjk-fonts');
+  assert.equal(cjkFonts.status, 'available');
+  assert.equal(cjkFonts.source, 'KCW_CJK_FONT_DIR');
+  assert.equal(cjkFonts.detail, 'CJK 字体包可用');
+});
+
+test('runtime dependency status rejects missing CJK font paths', () => {
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_CJK_FONT: 'C:\\AgentCowork\\runtime\\fonts\\missing.otf',
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const cjkFonts = status.dependencies.find((item) => item.id === 'cjk-fonts');
+  assert.equal(cjkFonts.status, 'missing');
+  assert.equal(cjkFonts.source, 'KCW_CJK_FONT');
+  assert.match(cjkFonts.detail, /未包含字体文件/);
+});
+
+test('runtime dependency status accepts a configured single CJK font file', () => {
+  const root = makeTestWorkspace('kcw-runtime-font-file');
+  const fontFile = path.join(root, 'NotoSansCJKsc-Regular.ttc');
+  fs.writeFileSync(fontFile, '');
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_CJK_FONT: fontFile,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const cjkFonts = status.dependencies.find((item) => item.id === 'cjk-fonts');
+  assert.equal(cjkFonts.status, 'available');
+  assert.equal(cjkFonts.source, 'KCW_CJK_FONT');
+});
+
+test('runtime dependency status rejects empty or non-font CJK directories', () => {
+  const root = makeTestWorkspace('kcw-runtime-font-empty');
+  const emptyDir = path.join(root, 'empty-fonts');
+  const textDir = path.join(root, 'text-fonts');
+  fs.mkdirSync(emptyDir, { recursive: true });
+  fs.mkdirSync(textDir, { recursive: true });
+  fs.writeFileSync(path.join(textDir, 'README.txt'), 'not a font');
+
+  const emptyStatus = getRuntimeDependencyStatus({
+    env: {
+      KCW_CJK_FONT_DIR: emptyDir,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+  const textStatus = getRuntimeDependencyStatus({
+    env: {
+      KCW_CJK_FONT_DIR: textDir,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  assert.equal(emptyStatus.dependencies.find((item) => item.id === 'cjk-fonts').status, 'missing');
+  assert.equal(textStatus.dependencies.find((item) => item.id === 'cjk-fonts').status, 'missing');
 });
 
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
