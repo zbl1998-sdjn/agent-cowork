@@ -48,10 +48,11 @@ describe('runtime dependency view model', () => {
     const vm = toRuntimeDependencyViewModel(response([
       { id: 'node', section: 'A4', label: 'Node.js 运行时', description: '启动 host', required: true, installMode: 'bundled', estimatedDownloadBytes: 0, status: 'available' },
       { id: 'pandoc', section: 'B4', label: '文档转换组件', description: '转换 Office 和 Markdown', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'missing' },
+      { id: 'ffmpeg', section: 'B5', label: '音视频处理组件', description: '处理音视频', required: false, installMode: 'on-demand', estimatedDownloadBytes: 100 * 1024 * 1024, status: 'missing' },
       { id: 'mingit', section: 'B6', label: 'Git 轻量运行时', description: '仓库连接器', required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024, status: 'unknown' },
     ]));
 
-    expect(vm.sections.map((section) => section.id)).toEqual(['A4', 'B4', 'B6']);
+    expect(vm.sections.map((section) => section.id)).toEqual(['A4', 'B4', 'B5', 'B6']);
     expect(vm.sections[1].items[0]).toMatchObject({
       id: 'pandoc',
       label: '文档转换组件',
@@ -60,9 +61,14 @@ describe('runtime dependency view model', () => {
       installModeLabel: '按需下载',
       downloadLabel: '约 80MB',
     });
-    expect(vm.summary.onDemandCount).toBe(2);
-    expect(vm.installPlanCandidateIds).toEqual(['pandoc', 'mingit']);
-    expect(vm.installPlanCandidateLabel).toBe('文档转换组件、Git 轻量运行时');
+    expect(vm.sections[2].items[0]).toMatchObject({
+      id: 'ffmpeg',
+      label: '音视频处理组件',
+      downloadLabel: '约 100MB',
+    });
+    expect(vm.summary.onDemandCount).toBe(3);
+    expect(vm.installPlanCandidateIds).toEqual(['pandoc', 'ffmpeg', 'mingit']);
+    expect(vm.installPlanCandidateLabel).toBe('文档转换组件、音视频处理组件、Git 轻量运行时');
   });
 
   it('summarizes install plan precheck results for the panel', () => {

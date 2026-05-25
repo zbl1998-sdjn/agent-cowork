@@ -105,6 +105,14 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     cleanup: { relativePath: 'components/pandoc' },
   },
   {
+    id: 'ffmpeg',
+    section: 'B5',
+    label: '音视频处理组件',
+    description: '按需安装便携版 ffmpeg，用于未来音视频处理技能。',
+    required: false, installMode: 'on-demand', estimatedDownloadBytes: 100 * 1024 * 1024,
+    cleanup: { relativePath: 'components/ffmpeg' },
+  },
+  {
     id: 'mingit',
     section: 'B6',
     label: 'Git 轻量运行时',
