@@ -16,6 +16,17 @@ function streamReader(lines) {
   };
 }
 
+function interruptedStreamReader(lines, error = new Error('stream socket closed')) {
+  const reader = streamReader(lines);
+  return {
+    async read() {
+      const next = await reader.read();
+      if (next.done) throw error;
+      return next;
+    },
+  };
+}
+
 test('resolveModelProvider accepts an injected provider seam', async () => {
   const provider = {
     async chatCompletion() {
@@ -45,4 +56,39 @@ test('parseOpenAiCompatibleStream accumulates content, reasoning, tools, and usa
   assert.equal(message.tool_calls[0].function.name, 'Read');
   assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
   assert.equal(message.usage.total_tokens, 7);
+});
+
+test('parseOpenAiCompatibleStream returns accumulated message when stream breaks mid-flight', async () => {
+  const tokens = [];
+  const reasoning = [];
+  const message = await parseOpenAiCompatibleStream(interruptedStreamReader([
+    'data: {"choices":[{"delta":{"reasoning_content":"why","content":"hel","tool_calls":[{"index":0,"id":"call_1","function":{"name":"Read","arguments":"{\\"path\\""}}]}}]}\n',
+    'data: {"choices":[{"delta":{"content":"lo","tool_calls":[{"index":0,"function":{"arguments":":\\"a.txt\\"}"}}]}}],"usage":{"total_tokens":7}}\n',
+  ]), {
+    onContent: (delta) => tokens.push(delta),
+    onReasoning: (delta) => reasoning.push(delta),
+  });
+
+  assert.equal(message.content, 'hello');
+  assert.equal(message.reasoning_content, 'why');
+  assert.deepEqual(tokens, ['hel', 'lo']);
+  assert.deepEqual(reasoning, ['why']);
+  assert.equal(message.tool_calls[0].function.name, 'Read');
+  assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
+  assert.equal(message.usage.total_tokens, 7);
+  assert.equal(message.stream_interrupted, true);
+  assert.equal(message.finish_reason, 'stream_interrupted');
+  assert.match(message.stream_error, /stream socket closed/);
+});
+
+test('parseOpenAiCompatibleStream does not promote interrupted partial tool calls to executable calls', async () => {
+  const message = await parseOpenAiCompatibleStream(interruptedStreamReader([
+    'data: {"choices":[{"delta":{"content":"need file","tool_calls":[{"index":0,"id":"call_1","function":{"name":"Read","arguments":"{\\"path\\""}}]}}]}\n',
+  ]));
+
+  assert.equal(message.content, 'need file');
+  assert.equal(message.stream_interrupted, true);
+  assert.equal(message.tool_calls, undefined);
+  assert.equal(message.partial_tool_calls[0].function.name, 'Read');
+  assert.equal(message.partial_tool_calls[0].function.arguments, '{"path"');
 });

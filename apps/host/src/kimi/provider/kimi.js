@@ -43,18 +43,70 @@ export function createKimiProvider() {
   };
 }
 
+function hasCompleteToolCallArguments(call) {
+  const fn = call && call.function ? call.function : {};
+  const raw = typeof fn.arguments === 'string' ? fn.arguments.trim() : '';
+  if (!fn.name || !raw) return false;
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function splitInterruptedToolCalls(calls, interrupted) {
+  if (!interrupted) return { executable: calls, partial: [] };
+  const executable = [];
+  const partial = [];
+  for (const call of calls) {
+    if (hasCompleteToolCallArguments(call)) executable.push(call);
+    else partial.push(call);
+  }
+  return { executable, partial };
+}
+
 export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoning } = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
   let reasoning = '';
   let usage = null;
+  let interrupted = false;
+  let streamError = '';
   const toolCalls = [];
+  const hasAccumulated = () => !!(content || reasoning || usage || toolCalls.some(Boolean));
+  const finish = () => {
+    const calls = toolCalls.filter(Boolean);
+    const { executable, partial } = splitInterruptedToolCalls(calls, interrupted);
+    return {
+      content,
+      reasoning_content: reasoning || undefined,
+      tool_calls: executable.length ? executable : undefined,
+      partial_tool_calls: partial.length ? partial : undefined,
+      usage,
+      ...(interrupted ? {
+        stream_interrupted: true,
+        finish_reason: 'stream_interrupted',
+        stream_error: streamError,
+      } : {}),
+    };
+  };
   for (;;) {
-    const { value, done } = await reader.read();
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (err) {
+      if (!hasAccumulated()) throw err;
+      interrupted = true;
+      streamError = (err && err.message) || 'stream interrupted';
+      break;
+    }
+    const { value, done } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     let nl;
+    let sawDone = false;
     while ((nl = buffer.indexOf('\n')) >= 0) {
       const line = buffer.slice(0, nl).trim();
       buffer = buffer.slice(nl + 1);
@@ -62,6 +114,7 @@ export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoni
       const data = line.slice(5).trim();
       if (data === '[DONE]') {
         buffer = '';
+        sawDone = true;
         break;
       }
       let json;
@@ -92,7 +145,7 @@ export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoni
         }
       }
     }
+    if (sawDone) break;
   }
-  const calls = toolCalls.filter(Boolean);
-  return { content, reasoning_content: reasoning || undefined, tool_calls: calls.length ? calls : undefined, usage };
+  return finish();
 }
