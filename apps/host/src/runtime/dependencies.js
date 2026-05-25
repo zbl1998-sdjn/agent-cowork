@@ -1,4 +1,5 @@
 import { redactText } from '../security/redaction.js';
+import { detectDataScienceRuntime } from './data-science-runtime.js';
 import { detectCjkFonts } from './font-runtime.js';
 import { detectGitRuntime } from './git-runtime.js';
 import { detectVcRuntime } from './windows-runtime.js';
@@ -199,6 +200,8 @@ function detectDependency(item, options) {
     }
     return { status: 'unknown', detail: '尚未接入沙箱启动探测' };
   }
+
+  if (item.id === 'data-science') return detectDataScienceRuntime({ env, fsImpl: options.fsImpl });
 
   if (item.id === 'mingit') return detectGitRuntime({ env, spawnSync: options.spawnSync });
 

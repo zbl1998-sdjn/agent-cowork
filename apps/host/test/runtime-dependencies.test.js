@@ -312,6 +312,66 @@ test('runtime dependency status rejects empty or non-font CJK directories', () =
   assert.equal(textStatus.dependencies.find((item) => item.id === 'cjk-fonts').status, 'missing');
 });
 
+test('runtime dependency status reports data science component availability', () => {
+  const root = makeTestWorkspace('kcw-runtime-data-science');
+  const sitePackages = path.join(root, 'Lib', 'site-packages');
+  for (const pkg of ['pandas', 'numpy', 'matplotlib']) {
+    fs.mkdirSync(path.join(sitePackages, pkg), { recursive: true });
+  }
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_DATA_SCIENCE_HOME: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'data-science');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_DATA_SCIENCE_HOME');
+  assert.equal(component.detail, '数据分析组件可用');
+});
+
+test('runtime dependency status rejects incomplete data science components', () => {
+  const root = makeTestWorkspace('kcw-runtime-data-science-missing');
+  fs.mkdirSync(path.join(root, 'Lib', 'site-packages', 'pandas'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'Lib', 'site-packages', 'numpy'), { recursive: true });
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_DATA_SCIENCE_HOME: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'data-science');
+  assert.equal(component.status, 'missing');
+  assert.equal(component.source, 'KCW_DATA_SCIENCE_HOME');
+  assert.match(component.detail, /pandas\/numpy\/matplotlib/);
+});
+
+test('runtime dependency status accepts data science venv with lowercase site-packages', () => {
+  const root = makeTestWorkspace('kcw-runtime-data-science-venv');
+  const sitePackages = path.join(root, 'lib', 'site-packages');
+  for (const pkg of ['pandas', 'numpy', 'matplotlib']) {
+    fs.mkdirSync(path.join(sitePackages, pkg), { recursive: true });
+  }
+
+  const status = getRuntimeDependencyStatus({
+    env: {
+      KCW_DATA_SCIENCE_VENV: root,
+      KCW_MINGIT_HOME: 'C:\\AgentCowork\\components\\mingit',
+      KCW_VC_RUNTIME_INSTALLED: '1',
+    },
+  });
+
+  const component = status.dependencies.find((item) => item.id === 'data-science');
+  assert.equal(component.status, 'available');
+  assert.equal(component.source, 'KCW_DATA_SCIENCE_VENV');
+});
+
 test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
   const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
