@@ -1,4 +1,5 @@
 import { redactText } from '../security/redaction.js';
+import { detectGitRuntime } from './git-runtime.js';
 
 export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
@@ -113,13 +114,9 @@ export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
     cleanup: { relativePath: 'components/ffmpeg' },
   },
   {
-    id: 'mingit',
-    section: 'B6',
-    label: 'Git 轻量运行时',
+    id: 'mingit', section: 'B6', label: 'Git 轻量运行时',
     description: '按需安装 MinGit，用于仓库连接器和本地版本控制操作。',
-    required: false,
-    installMode: 'on-demand',
-    estimatedDownloadBytes: 80 * 1024 * 1024,
+    required: false, installMode: 'on-demand', estimatedDownloadBytes: 80 * 1024 * 1024,
     cleanup: { relativePath: 'components/mingit' },
   },
   {
@@ -210,6 +207,8 @@ function detectDependency(item, options) {
     }
     return { status: 'unknown', detail: '尚未接入沙箱启动探测' };
   }
+
+  if (item.id === 'mingit') return detectGitRuntime({ env, spawnSync: options.spawnSync });
 
   const marker = envValue(env, [`KCW_${item.id.toUpperCase().replace(/-/g, '_')}_HOME`]);
   if (marker) return { status: 'configured', source: marker.key, detail: `${item.label} 路径已配置` };
