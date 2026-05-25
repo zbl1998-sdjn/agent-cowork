@@ -137,6 +137,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-3b 局部接入(ObservabilityPanel):运行记录列表、详情占位、详情行缺失、工具缺失等空态已替换为 `Empty`,运行记录/详情加载失败已替换为 `ErrorState` 并保留重新加载入口;新增状态渲染单测。
 - [x] FE-3b 局部接入(InlineViz):内联图表加载态/错误态已替换为 `Loading`/`ErrorState`,保持 `renderViz` 调用和 iframe 渲染逻辑;新增状态渲染单测。
 - [x] FE-3b 局部接入(LiveArtifactView):活页首次生成中/尚未生成/刷新失败状态已替换为 `Loading`/`Empty`/`ErrorState`,保留 ready note、iframe、自动刷新和打开文件逻辑;新增状态渲染单测。
+- [x] FE-3b 代码+单测完成汇总:`Empty`/`Loading`/`ErrorState` 已覆盖主侧边面板与内联可视化/活页状态面;源码扫描已无旧式裸 `panel-error`、`inline-viz-loading` 和“图表渲染失败：”内联错误文案。保留的 `panel-empty` 仅作为列表语义容器包裹 `Empty`,保留的 `panel-result` 仅用于成功/info 的 preformatted 输出;真实长会话/安装版视觉深验后续补。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
