@@ -28,6 +28,7 @@
     "apps/host/src/memory/memory-utils.js",
     "apps/host/src/security/redaction.js",
     "apps/host/src/security/path-policy.js",
+    "apps/host/src/runtime/budget-guard.js",
     "apps/host/src/runtime/circuit-breaker.js",
     "apps/host/src/runtime/cancellation.js",
     "apps/host/src/runtime/concurrency.js",

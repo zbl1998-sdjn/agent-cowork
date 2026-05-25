@@ -3,6 +3,7 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
+import { createBudgetGuard } from '../runtime/budget-guard.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
 import { sse } from '../kimi/agent/finalize.js';
@@ -45,6 +46,33 @@ function recordAgentRun({
   } catch {
     // never break the response on record/index failure
   }
+}
+
+function positiveLimit(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function tightestLimit(configValue, requestValue) {
+  const fromConfig = positiveLimit(configValue);
+  const fromRequest = positiveLimit(requestValue);
+  if (fromConfig !== null && fromRequest !== null) return Math.min(fromConfig, fromRequest);
+  return fromConfig ?? fromRequest ?? undefined;
+}
+
+function createAgentBudgetGuard({ body, kimiConfig, startedAt }) {
+  const requestBody = body && typeof body === 'object' ? body : {};
+  const config = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
+  const requestBudget = requestBody.budget && typeof requestBody.budget === 'object' ? requestBody.budget : {};
+  return createBudgetGuard({
+    maxRunTokens: tightestLimit(config.maxRunTokens, requestBudget.maxRunTokens ?? requestBody.maxRunTokens),
+    maxSessionTokens: tightestLimit(config.maxSessionTokens, requestBudget.maxSessionTokens ?? requestBody.maxSessionTokens),
+    maxRunCostUsd: tightestLimit(config.maxRunCostUsd, requestBudget.maxRunCostUsd ?? requestBody.maxRunCostUsd),
+    maxSessionCostUsd: tightestLimit(config.maxSessionCostUsd, requestBudget.maxSessionCostUsd ?? requestBody.maxSessionCostUsd),
+    maxWallClockMs: tightestLimit(config.maxAgentWallClockMs, requestBudget.maxWallClockMs ?? requestBody.maxWallClockMs),
+    model: config.model,
+    startedAtMs: startedAt.getTime(),
+  });
 }
 
 export async function streamAgentChat({
@@ -119,6 +147,7 @@ export async function streamAgentChat({
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
     const memory = loadLayeredMemory({ trustedRoot, userHome });
+    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig, startedAt });
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
       : [];
@@ -150,6 +179,7 @@ export async function streamAgentChat({
       runId,
       userContent,
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
+      budgetGuard,
     });
     if (controller && controller.signal.aborted) {
       status = 'cancelled';

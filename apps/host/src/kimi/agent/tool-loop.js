@@ -65,6 +65,23 @@ function parseToolCall(call) {
   }
 }
 
+function createNoopBudgetGuard() {
+  const snapshot = {
+    runUsage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    sessionUsage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    runCostUsd: 0,
+    sessionCostUsd: 0,
+    elapsedMs: 0,
+    model: 'default',
+  };
+  const ok = { shouldAbort: false, limit: '', actual: 0, maximum: 0, reason: '', snapshot };
+  return {
+    check: () => ok,
+    recordUsage: () => ok,
+    stopMessage: () => '本轮已触发预算保护，已安全停止继续执行。',
+  };
+}
+
 export async function runAgentChat({
   prompt,
   kimiConfig,
@@ -101,6 +118,7 @@ export async function runAgentChat({
   loopGuardOptions = {},
   retryPolicy = null,
   retryOptions = {},
+  budgetGuard = null,
 }) {
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context })).slice();
@@ -120,6 +138,7 @@ export async function runAgentChat({
   const activeContextManager = contextManager || createContextManager(contextOptions);
   const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions);
   const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions);
+  const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   let messages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
   const steps = [];
   const sessionApproved = new Set();
@@ -134,9 +153,29 @@ export async function runAgentChat({
 
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
   let stopForLoopGuard = false;
+  let stopForBudget = false;
+  const stopOnBudget = (budgetDecision) => {
+    stopForBudget = true;
+    const text = activeBudgetGuard.stopMessage(budgetDecision);
+    finalText = text;
+    emit('budget_guard_abort', {
+      limit: budgetDecision.limit,
+      actual: budgetDecision.actual,
+      maximum: budgetDecision.maximum,
+      reason: budgetDecision.reason,
+      snapshot: budgetDecision.snapshot,
+    });
+    emit('token', { delta: text });
+  };
   for (let i = 0; i < stepBudget; i += 1) {
     if (signal && signal.aborted) break;
     if (stopForLoopGuard) break;
+    if (stopForBudget) break;
+    const preBudgetDecision = activeBudgetGuard.check();
+    if (preBudgetDecision.shouldAbort) {
+      stopOnBudget(preBudgetDecision);
+      break;
+    }
     let streamedContent = false;
     let streamedReasoning = false;
     const prepared = activeContextManager.prepareMessages(messages);
@@ -160,6 +199,11 @@ export async function runAgentChat({
     }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs });
     if (!streamedReasoning && message.reasoning_content) emit('reasoning', { delta: message.reasoning_content });
     addUsage(usageTotals, message.usage);
+    const usageBudgetDecision = activeBudgetGuard.recordUsage(message.usage);
+    if (usageBudgetDecision.shouldAbort) {
+      stopOnBudget(usageBudgetDecision);
+      break;
+    }
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
     if (calls.length === 0) {
       finalText = message.content || '';
@@ -228,6 +272,11 @@ export async function runAgentChat({
       }
       messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
       if (hooks) await hooks.run('post_tool', { name, result, ok });
+      const postToolBudgetDecision = activeBudgetGuard.check();
+      if (postToolBudgetDecision.shouldAbort) {
+        stopOnBudget(postToolBudgetDecision);
+        break;
+      }
       const guardDecision = activeLoopGuard.observe({ name, args }, ok);
       if (guardDecision.shouldBreak) {
         stopForLoopGuard = true;
@@ -245,5 +294,5 @@ export async function runAgentChat({
 
   finalText = await summarizeAfterBudget({ finalText, signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals });
   finalText = applyStaticBackstop(finalText, signal, emit);
-  return { text: finalText, steps, usage: usageTotals, cancelled: !!(signal && signal.aborted) };
+  return { text: finalText, steps, usage: usageTotals, cancelled: !!(signal && signal.aborted), budgetStopped: stopForBudget };
 }

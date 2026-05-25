@@ -121,6 +121,8 @@ C3 完成记录(2026-05-25):`kimi/agent/tool-loop.js` 已接入 `LoopGuard` 与 
 | F2 | 整轮 wall-clock 超时(独立于 maxSteps 与单工具超时) | tool-loop 注入 `AbortController`/signal | 单测 | 长跑超时被干净中断,状态可收尾 | S |
 | F3 | 流式中断恢复:模型流中途断开时,已累计的 content/tool_calls 不丢、可重试该步 | `kimi/model-call.js` + model-resilience | **前置 model-call 特征测试** | 流断不致整轮失败,可恢复或安全降级 | M |
 
+F1 完成记录(2026-05-25):新增 `runtime/budget-guard.js` 纯 `BudgetGuard`,支持 per-run/per-session token、估算成本与 wall-clock 硬上限;`routes/agent-stream.js` 在运行入口创建预算守卫并传入 `tool-loop`,请求预算只能收紧服务端配置预算。`tool-loop` 以注入式消费预算守卫,模型 usage 超限或运行超时会发出 `budget_guard_abort`、停止后续工具执行并直接返回可读收尾文案,避免超限后再发起强制总结模型调用。已补 `budget-guard.test.js` 与 `tool-loop-budget.test.js`,覆盖 token/session/cost/wall-clock 和超 token 后工具不执行。
+
 ## G · Agent 回路安全(防注入 / 工具输出不可信)— 保护"agent 的脑子"(上版缺失,补)
 
 > 现状缺口:路径 jail 保护了文件系统,但**没保护 agent 的推理不被恶意内容劫持**。网页/文件/工具输出里的恶意指令(间接提示注入)可能改写 agent 行为。
