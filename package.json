@@ -28,6 +28,7 @@
     "smoke:react-connectors": "node scripts/smoke-react-connectors.mjs",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:windows-paths": "node scripts/smoke-windows-paths.mjs",
+    "smoke:sqlite-runtime": "node scripts/smoke-sqlite-runtime.mjs",
     "smoke:e2e": "node scripts/e2e-smoke.mjs",
     "bench": "node scripts/bench.mjs",
     "eval": "node scripts/eval.mjs",

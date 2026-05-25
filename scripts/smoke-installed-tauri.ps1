@@ -172,6 +172,8 @@ $report = [ordered]@{
 $process = $null
 $caught = $null
 $oldTrustedRoot = $env:KCW_TRUSTED_ROOT
+$oldStore = $env:KCW_STORE
+$oldSqlitePath = $env:KCW_SQLITE_PATH
 
 try {
     $exeExists = Test-Path -LiteralPath $InstalledExePath
@@ -211,11 +213,16 @@ try {
     }
     New-Item -ItemType Directory -Path $workspace | Out-Null
     Set-Content -LiteralPath (Join-Path $workspace "installed-smoke.txt") -Encoding utf8 -Value "installed tauri smoke"
+    $sqliteDir = Join-Path $workspace ".AgentCowork"
+    $sqlitePath = Join-Path $sqliteDir "state.sqlite"
+    New-Item -ItemType Directory -Path $sqliteDir | Out-Null
 
     $existingOwner = Get-PortOwner
     Assert-True ($null -eq $existingOwner) "Port 3017 is already in use before launch: $($existingOwner | ConvertTo-Json -Compress)"
 
     $env:KCW_TRUSTED_ROOT = $workspace
+    $env:KCW_STORE = "sqlite"
+    $env:KCW_SQLITE_PATH = $sqlitePath
     $workspaceArg = "--workspace=`"$workspace`""
     $process = Start-Process -FilePath $exe -ArgumentList $workspaceArg -WorkingDirectory $installDir -PassThru -ErrorAction Stop
 
@@ -230,16 +237,72 @@ try {
     $authHeaders = @{ authorization = "Bearer $($guest.token)" }
     $me = Invoke-Json -Uri "$baseUrl/api/auth/me" -Headers $authHeaders
     $kimiInfo = Invoke-Json -Uri "$baseUrl/api/kimi/info" -Headers $authHeaders
+    $runtimeDependencies = Invoke-Json -Uri "$baseUrl/api/runtime/dependencies" -Headers $authHeaders
+    $sqliteDependency = $runtimeDependencies.dependencies | Where-Object { $_.id -eq "sqlite" } | Select-Object -First 1
+    Assert-True ($null -ne $sqliteDependency) "Runtime dependency catalog did not include sqlite"
+    Assert-True ($sqliteDependency.status -eq "available") "Installed sidecar SQLite runtime unavailable: $($sqliteDependency | ConvertTo-Json -Compress)"
+
+    $memoryFact = Invoke-Json -Uri "$baseUrl/api/memory/facts" -Method POST -Headers $authHeaders -Body @{
+        key = "安装版 SQLite"
+        value = "sidecar write chain persisted"
+    }
+    $runHeaders = @{ authorization = "Bearer $($guest.token)"; "idempotency-key" = "installed-sqlite-run" }
+    $recipeRun = Invoke-Json -Uri "$baseUrl/api/recipes/meeting-actions/run" -Method POST -Headers $runHeaders -Body @{
+        prompt = "安装版 SQLite smoke"
+        files = @()
+    }
+    Assert-True (-not [string]::IsNullOrWhiteSpace($recipeRun.runId)) "Recipe run did not return runId"
+
+    $scheduleHeaders = @{ authorization = "Bearer $($guest.token)"; "idempotency-key" = "installed-sqlite-schedule" }
+    $schedule = Invoke-Json -Uri "$baseUrl/api/schedules" -Method POST -Headers $scheduleHeaders -Body @{
+        name = "installed-sqlite-smoke"
+        fireAt = (Get-Date).ToUniversalTime().AddMinutes(1).ToString("o")
+        payload = @{ recipeId = "meeting-actions" }
+    }
+    Assert-True (-not [string]::IsNullOrWhiteSpace($schedule.schedule.id)) "Schedule create did not return schedule id"
+    Assert-True (Test-Path -LiteralPath $sqlitePath) "SQLite state database was not created: $sqlitePath"
+
+    $process.Refresh()
+    if (-not $process.HasExited) {
+        $process.CloseMainWindow() | Out-Null
+        if (-not $process.WaitForExit(5000)) {
+            $process.Kill()
+            $process.WaitForExit(5000) | Out-Null
+        }
+    }
+    $deadline = (Get-Date).AddSeconds(8)
+    do {
+        Start-Sleep -Milliseconds 250
+        $ownerAfterRestartClose = Get-PortOwner
+    } while ($null -ne $ownerAfterRestartClose -and (Get-Date) -lt $deadline)
+    Assert-True ($null -eq $ownerAfterRestartClose) "Installed sidecar was still listening before SQLite restart check: $($ownerAfterRestartClose | ConvertTo-Json -Compress)"
+    $process = $null
+
+    $process = Start-Process -FilePath $exe -ArgumentList $workspaceArg -WorkingDirectory $installDir -PassThru -ErrorAction Stop
+    $restartWindow = Wait-ForMainWindow -Process $process
+    $restartHealth = Wait-ForHostHealth -BaseUrl $baseUrl -TimeoutSeconds $HealthTimeoutSeconds
+    $meAfterRestart = Invoke-Json -Uri "$baseUrl/api/auth/me" -Headers $authHeaders
+    Assert-True ($meAfterRestart.userId -eq $me.userId) "SQLite auth token did not persist through installed restart"
+    $memoryAfterRestart = Invoke-Json -Uri "$baseUrl/api/memory" -Headers $authHeaders
+    Assert-True ($memoryAfterRestart.memory.text -like "*安装版 SQLite*") "SQLite memory fact did not persist through installed restart"
+    $runsAfterRestart = Invoke-Json -Uri "$baseUrl/api/runs/index" -Headers $authHeaders
+    $persistedRun = $runsAfterRestart.runs | Where-Object { $_.id -eq $recipeRun.runId } | Select-Object -First 1
+    Assert-True ($null -ne $persistedRun) "SQLite runs index did not persist through installed restart"
+    $schedulesAfterRestart = Invoke-Json -Uri "$baseUrl/api/schedules" -Headers $authHeaders
+    $persistedSchedule = $schedulesAfterRestart.schedules | Where-Object { $_.id -eq $schedule.schedule.id } | Select-Object -First 1
+    Assert-True ($null -ne $persistedSchedule) "SQLite schedule did not persist through installed restart"
 
     $report.ok = $true
     $report.process = [ordered]@{
         pid = $process.Id
         path = $exe
         window = $window
+        restartWindow = $restartWindow
     }
     $report.host = [ordered]@{
         url = $baseUrl
         health = $health
+        restartHealth = $restartHealth
         portOwner = $owner
     }
     $report.auth = [ordered]@{
@@ -252,11 +315,28 @@ try {
         provider = $kimiInfo.provider
         model = $kimiInfo.model
     }
+    $report.sqlite = [ordered]@{
+        dbPath = $sqlitePath
+        dependency = $sqliteDependency
+        dependencySummary = $runtimeDependencies.summary
+        memoryFactFile = $memoryFact.file
+        runId = $recipeRun.runId
+        scheduleId = $schedule.schedule.id
+        persistedAfterRestart = [ordered]@{
+            auth = $true
+            memory = $true
+            run = $true
+            schedule = $true
+        }
+    }
     $report.checks.installedExeExists = $true
     $report.checks.sidecarExists = $true
     $report.checks.mainWindow = "passed"
     $report.checks.sidecarHealth = "passed"
     $report.checks.authRoundTrip = "passed"
+    $report.checks.sqliteRuntime = "passed"
+    $report.checks.sqliteWriteChain = "passed"
+    $report.checks.sqliteRestartPersistence = "passed"
 }
 catch {
     $caught = $_
@@ -267,6 +347,16 @@ finally {
         Remove-Item Env:KCW_TRUSTED_ROOT -ErrorAction SilentlyContinue
     } else {
         $env:KCW_TRUSTED_ROOT = $oldTrustedRoot
+    }
+    if ($null -eq $oldStore) {
+        Remove-Item Env:KCW_STORE -ErrorAction SilentlyContinue
+    } else {
+        $env:KCW_STORE = $oldStore
+    }
+    if ($null -eq $oldSqlitePath) {
+        Remove-Item Env:KCW_SQLITE_PATH -ErrorAction SilentlyContinue
+    } else {
+        $env:KCW_SQLITE_PATH = $oldSqlitePath
     }
 
     $cleanup = [ordered]@{}

@@ -1,0 +1,115 @@
+{
+  "ok": true,
+  "mode": "installed-tauri",
+  "generatedAt": "2026-05-25T16:29:31.5132297Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "installer": "",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace",
+  "checks": {
+    "installedExeExists": true,
+    "sidecarExists": true,
+    "mainWindow": "passed",
+    "sidecarHealth": "passed",
+    "authRoundTrip": "passed",
+    "sqliteRuntime": "passed",
+    "sqliteWriteChain": "passed",
+    "sqliteRestartPersistence": "passed"
+  },
+  "deferred": [
+    "deep WebView UI interaction",
+    "real Kimi reply",
+    "production signing trust chain"
+  ],
+  "installDir": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork",
+  "sidecar": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe",
+  "signatures": {
+    "installedExe": {
+      "status": "NotSigned",
+      "subject": null,
+      "thumbprint": null
+    },
+    "installer": null
+  },
+  "uninstallEntry": {
+    "DisplayName": "Agent Cowork",
+    "DisplayVersion": "0.2.0",
+    "InstallLocation": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\"",
+    "UninstallString": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\uninstall.exe\""
+  },
+  "liveReplyConfigured": false,
+  "process": {
+    "pid": 92200,
+    "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+    "window": {
+      "handle": 99948448,
+      "title": "Agent Cowork"
+    },
+    "restartWindow": {
+      "handle": 1055058,
+      "title": ""
+    }
+  },
+  "host": {
+    "url": "http://127.0.0.1:3017",
+    "health": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "restartHealth": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "portOwner": {
+      "pid": 45508,
+      "processName": "agent-cowork-host",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe"
+    }
+  },
+  "auth": {
+    "guestUserId": "guest_5ba1a9ef2919",
+    "meUserId": "guest_5ba1a9ef2919",
+    "tenantId": "tenant_guest_5ba1a9ef2919"
+  },
+  "kimi": {
+    "configured": false,
+    "provider": "kimi-api",
+    "model": "kimi-k2.6"
+  },
+  "sqlite": {
+    "dbPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace\\.AgentCowork\\state.sqlite",
+    "dependency": {
+      "id": "sqlite",
+      "section": "F2",
+      "label": "SQLite runtime",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "available",
+      "version": "3.51.2",
+      "detail": "node:sqlite available"
+    },
+    "dependencySummary": {
+      "total": 13,
+      "requiredMissing": 2,
+      "byStatus": {
+        "available": 2,
+        "unknown": 3,
+        "missing": 7,
+        "configured": 1
+      }
+    },
+    "memoryFactFile": "sqlite://memory_facts/memfact_01KSFZGTK1899AJNCF3X22ZK7E",
+    "runId": "run_20260525162936_fcfc727e",
+    "scheduleId": "sched_01KSFZGTKFAM4459BRNXTNJDZN",
+    "persistedAfterRestart": {
+      "auth": true,
+      "memory": true,
+      "run": true,
+      "schedule": true
+    }
+  },
+  "cleanup": {
+    "closedDesktop": true,
+    "hostStoppedAfterClose": true
+  }
+}

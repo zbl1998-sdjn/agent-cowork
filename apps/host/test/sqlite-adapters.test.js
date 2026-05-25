@@ -212,6 +212,26 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
   }
 });
 
+test('SQLite migrations can use embedded SQL when migration files are not present', { skip: !sqliteAvailable }, () => {
+  const root = tempRoot();
+  const db = openSqliteDatabase(path.join(root, 'state.sqlite'));
+  migrateSqliteDatabase(db, {
+    migrationsPath: path.join(root, 'missing-migrations'),
+    useEmbeddedMigrations: true,
+  });
+
+  const tables = db.prepare(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table'
+      AND name IN ('runs_index', 'memory_facts', 'memory_notes', 'schedules')
+    ORDER BY name
+  `).all().map((row) => row.name);
+  assert.deepEqual(tables, ['memory_facts', 'memory_notes', 'runs_index', 'schedules']);
+  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => row.id);
+  assert.deepEqual(applied, ['0001_init.sql']);
+});
+
 test('SQLite migrations roll back failed migration files atomically', { skip: !sqliteAvailable }, () => {
   const root = tempRoot();
   const migrationsPath = path.join(root, 'migrations');
