@@ -19,6 +19,7 @@
     "apps/host/src/connectors/catalog.js",
     "apps/host/src/connectors/oauth-permissions.js",
     "apps/host/src/kimi/agent/todo-state.js",
+    "apps/host/src/kimi/context/history-compactor.js",
     "apps/host/src/kimi/context/token-estimator.js",
     "apps/host/src/memory/memory-utils.js",
     "apps/host/src/security/redaction.js",

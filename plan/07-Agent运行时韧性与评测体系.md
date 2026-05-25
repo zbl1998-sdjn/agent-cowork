@@ -65,6 +65,8 @@
 
 B1 完成记录(2026-05-25):新增 `kimi/context/token-estimator.js` 启发式 `TokenEstimator`,支持 text/messages token 估算、message overhead、reply primer、tool call / object content 计数与 `heuristic-v1` 元数据;已纳入 host `checkJs` 类型护栏。`npm run test:host` 通过(499 tests,498 pass,1 skip)。
 
+B2 完成记录(2026-05-25):新增 `kimi/context/history-compactor.js` 纯 `HistoryCompactor`,超预算时生成确定性压缩 system message、保留最近消息、提取 `FACT/IMPORTANT/DECISION/关键事实/偏好` 等关键事实清单,并在 retained 内容过大时按预算裁剪而不溢出窗口;≥200 轮历史、关键事实保留和极紧预算边界均有单测锁定。已纳入 host `checkJs` 类型护栏。
+
 ---
 
 ## C · 任务循环韧性 — 敢长时间放手跑的前提
