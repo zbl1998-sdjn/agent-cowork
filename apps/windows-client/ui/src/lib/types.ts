@@ -111,10 +111,12 @@ export interface RunCost {
   estimated?: boolean;
   source?: string;
   model?: string;
+  provider?: string;
 }
 
 export interface RunMetrics {
   schemaVersion?: number;
+  provider?: string;
   model?: string;
   status?: string;
   tokens?: TokenUsage;

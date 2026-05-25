@@ -38,6 +38,8 @@ test('buildRunMetrics derives tokens, cost, duration, steps, tools, and failure 
   });
 
   assert.equal(metrics.schemaVersion, 1);
+  assert.equal(metrics.provider, 'kimi-api');
+  assert.equal(metrics.cost.provider, 'kimi-api');
   assert.deepEqual(metrics.tokens, { prompt_tokens: 1000, completion_tokens: 500, total_tokens: 1500 });
   assert.equal(metrics.cost.total, 0.002595);
   assert.equal(metrics.duration.totalMs, 2500);
@@ -103,6 +105,7 @@ test('agent stream persists token usage metrics from the run outcome', async () 
       .map((name) => JSON.parse(fs.readFileSync(path.join(runStoreRoot, name), 'utf8')));
     const record = records.find((item) => item.type === 'agent-chat');
     assert.ok(record, 'agent-chat run record persisted');
+    assert.equal(record.metrics.provider, 'kimi-api');
     assert.deepEqual(record.metrics.tokens, { prompt_tokens: 15, completion_tokens: 3, total_tokens: 18 });
     assert.equal(record.metrics.steps.total, 1);
     assert.equal(record.metrics.tools.calls, 1);

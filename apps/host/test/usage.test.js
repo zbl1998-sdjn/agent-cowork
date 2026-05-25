@@ -51,6 +51,25 @@ test('estimateTokenCost uses local pricing without secrets', () => {
   assert.equal(cost.estimated, true);
 });
 
+test('estimateTokenCost can use provider-specific pricing keys', () => {
+  const cost = estimateTokenCost(
+    { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 },
+    {
+      provider: 'OpenAI',
+      model: 'gpt-test',
+      pricing: {
+        default: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+        'gpt-test': { inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 1 },
+        'openai:gpt-test': { inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 4 },
+      },
+    },
+  );
+
+  assert.equal(cost.provider, 'openai');
+  assert.equal(cost.model, 'gpt-test');
+  assert.equal(cost.total, 6);
+});
+
 test('breakdownDuration computes total, phase percentages, and unaccounted time', () => {
   const breakdown = breakdownDuration({
     startedAt: '2026-05-24T00:00:00.000Z',
@@ -72,12 +91,14 @@ test('buildUsageTransparency returns the backend display contract', () => {
       { prompt_tokens: 4, completion_tokens: 1 },
       { prompt_tokens: 6, completion_tokens: 9 },
     ],
+    provider: 'openai/local',
     model: 'local-test',
     pricing: { 'local-test': { inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 2 } },
     timing: { durationMs: 1234, phases: [{ key: 'model', label: 'Model', durationMs: 1000 }] },
   });
 
   assert.equal(summary.schemaVersion, 1);
+  assert.equal(summary.provider, 'openai/local');
   assert.deepEqual(summary.tokens, { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 });
   assert.equal(summary.cost.total, 0.00003);
   assert.equal(summary.duration.unaccountedMs, 234);

@@ -126,8 +126,9 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
   const steps = metrics.steps || {};
   const title = text(safeRecord.promptPreview) || text(safeRecord.input?.prompt) || text(safeRecord.prompt) || text(safeRecord.id) || '未选择运行';
   const subtitle = [safeRecord.type || 'run', safeRecord.status || 'unknown', safeRecord.id].filter(Boolean).join(' · ');
+  const providerName = text(metrics.provider) || text(cost?.provider) || text(attribution.model?.provider) || text(safeRecord.provider) || '未记录';
   const modelName = text(metrics.model) || text(attribution.model?.model) || text(safeRecord.provider) || '未记录';
-  const modelDetail = [attribution.model?.provider, attribution.model?.mode].map(text).filter(Boolean).join(' / ') || '无归因';
+  const modelDetail = [providerName, attribution.model?.mode].map(text).filter(Boolean).join(' / ') || '无归因';
   const toolFailures = numberValue(tools.failed, 0);
   const toolCalls = numberValue(tools.calls, 0);
   const failureRate = numberValue(failures.rate, 0);
@@ -148,7 +149,7 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
       {
         label: '估算成本',
         value: formatEstimatedCost(cost),
-        detail: cost?.source || (cost?.estimated === false ? 'metered' : 'local-estimate'),
+        detail: `${providerName} · ${cost?.source || (cost?.estimated === false ? 'metered' : 'local-estimate')}`,
         tone: 'neutral',
       },
       {
@@ -178,6 +179,7 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
       row('未归因耗时', metrics.duration?.unaccountedMs ? formatDurationMs(metrics.duration.unaccountedMs) : ''),
     ]),
     attributionRows: compactRows([
+      row('Provider', providerName),
       row('System prompt', attribution.prompt?.systemPromptVersion),
       row('Prompt builder', attribution.prompt?.builder),
       row('Prompt chars', attribution.prompt?.inputChars),

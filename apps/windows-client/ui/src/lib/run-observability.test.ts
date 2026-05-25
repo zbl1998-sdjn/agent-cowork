@@ -14,10 +14,11 @@ const record: RunRecord = {
   durationMs: 2500,
   metrics: {
     schemaVersion: 1,
+    provider: 'openai',
     model: 'kimi-k2-test',
     status: 'failed',
     tokens: { prompt_tokens: 1000, completion_tokens: 200, total_tokens: 1200 },
-    cost: { currency: 'USD', input: 0.0003, output: 0.00012, total: 0.00042, estimated: true, source: 'local-estimate' },
+    cost: { currency: 'USD', input: 0.0003, output: 0.00012, total: 0.00042, estimated: true, source: 'local-estimate', provider: 'openai' },
     duration: { totalMs: 2500, phases: [], unaccountedMs: 2500 },
     steps: { total: 4, succeeded: 3, failed: 1 },
     tools: { calls: 4, succeeded: 3, failed: 1, unique: ['Read', 'Shell'] },
@@ -53,13 +54,14 @@ describe('run observability view model', () => {
     expect(view.subtitle).toBe('agent · failed · run_observe_1');
     expect(view.cards).toEqual([
       { label: '用量', value: '1,200 tokens', detail: 'Prompt 1,000 / Completion 200', tone: 'neutral' },
-      { label: '估算成本', value: '≈USD 0.00042', detail: 'local-estimate', tone: 'neutral' },
+      { label: '估算成本', value: '≈USD 0.00042', detail: 'openai · local-estimate', tone: 'neutral' },
       { label: '工具调用', value: '4 次', detail: '3 成功 / 1 失败', tone: 'warn' },
       { label: '失败率', value: '25.0%', detail: '运行失败', tone: 'danger' },
-      { label: '模型', value: 'kimi-k2-test', detail: 'kimi / agent', tone: 'neutral' },
+      { label: '模型', value: 'kimi-k2-test', detail: 'openai / agent', tone: 'neutral' },
     ]);
     expect(view.toolNames).toEqual(['Read', 'Shell']);
     expect(view.attributionRows).toEqual([
+      { label: 'Provider', value: 'openai' },
       { label: 'System prompt', value: 'sp-2026-05-25' },
       { label: 'Prompt builder', value: 'agent-system-prompt' },
       { label: 'Prompt chars', value: '128' },
@@ -85,6 +87,7 @@ describe('run observability view model', () => {
 
     expect(view.title).toBe('run_pending');
     expect(view.cards.map((card) => card.value)).toEqual(['0 tokens', '≈USD 0.00', '0 次', '0.0%', '未记录']);
+    expect(view.cards[1].detail).toBe('未记录 · local-estimate');
     expect(view.isSparse).toBe(true);
   });
 

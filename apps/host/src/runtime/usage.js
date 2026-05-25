@@ -80,28 +80,40 @@ export function aggregateTokenUsage(usages = []) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+/**
  * @param {unknown} model
  * @param {UsagePricing} pricing
+ * @param {unknown} [provider]
  * @returns {UsageRate}
  */
-function resolvePricing(model, pricing) {
+function resolvePricing(model, pricing, provider = '') {
   if (!pricing || typeof pricing !== 'object') return DEFAULT_USAGE_PRICING.default;
-  const key = String(model || '').trim();
-  return pricing[key] || pricing.default || DEFAULT_USAGE_PRICING.default;
+  const modelKey = cleanText(model);
+  const providerKey = cleanText(provider).toLowerCase();
+  const combinedKey = providerKey && modelKey ? `${providerKey}:${modelKey}` : '';
+  return pricing[combinedKey] || pricing[modelKey] || pricing[providerKey] || pricing.default || DEFAULT_USAGE_PRICING.default;
 }
 
 /**
  * @param {unknown} usage
- * @param {{ model?: string, currency?: string, pricing?: UsagePricing }} [options]
- * @returns {{ currency: string, input: number, output: number, total: number, estimated: true, source: 'local-estimate', model: string }}
+ * @param {{ model?: string, provider?: string, currency?: string, pricing?: UsagePricing }} [options]
+ * @returns {{ currency: string, input: number, output: number, total: number, estimated: true, source: 'local-estimate', model: string, provider: string }}
  */
 export function estimateTokenCost(usage, {
   model = 'default',
+  provider = 'unknown',
   currency = 'USD',
   pricing = DEFAULT_USAGE_PRICING,
 } = {}) {
   const tokens = normalizeTokenUsage(usage);
-  const rate = resolvePricing(model, pricing);
+  const rate = resolvePricing(model, pricing, provider);
   const inputUsd = tokens.prompt_tokens * finiteNumber(rate.inputUsdPerMillionTokens, 0) / USD_PER_MILLION;
   const outputUsd = tokens.completion_tokens * finiteNumber(rate.outputUsdPerMillionTokens, 0) / USD_PER_MILLION;
   const totalUsd = inputUsd + outputUsd;
@@ -112,7 +124,8 @@ export function estimateTokenCost(usage, {
     total: Number(totalUsd.toFixed(8)),
     estimated: true,
     source: 'local-estimate',
-    model: String(model || 'default'),
+    model: cleanText(model) || 'default',
+    provider: cleanText(provider).toLowerCase() || 'unknown',
   };
 }
 
@@ -159,22 +172,25 @@ export function breakdownDuration({
 }
 
 /**
- * @param {{ usage?: unknown, usages?: unknown[] | null, model?: string, pricing?: UsagePricing, timing?: TimingInput }} [input]
- * @returns {{ schemaVersion: 1, model: string, tokens: TokenUsage, cost: ReturnType<typeof estimateTokenCost>, duration: ReturnType<typeof breakdownDuration>, disclosure: { estimated: true, source: 'local-estimate', requiresSecret: false } }}
+ * @param {{ usage?: unknown, usages?: unknown[] | null, model?: string, provider?: string, pricing?: UsagePricing, timing?: TimingInput }} [input]
+ * @returns {{ schemaVersion: 1, provider: string, model: string, tokens: TokenUsage, cost: ReturnType<typeof estimateTokenCost>, duration: ReturnType<typeof breakdownDuration>, disclosure: { estimated: true, source: 'local-estimate', requiresSecret: false } }}
  */
 export function buildUsageTransparency({
   usage = null,
   usages = null,
   model = 'default',
+  provider = 'unknown',
   pricing = DEFAULT_USAGE_PRICING,
   timing = {},
 } = {}) {
   const tokens = Array.isArray(usages) ? aggregateTokenUsage(usages) : normalizeTokenUsage(usage);
-  const cost = estimateTokenCost(tokens, { model, pricing });
+  const cleanProvider = cleanText(provider).toLowerCase() || 'unknown';
+  const cost = estimateTokenCost(tokens, { model, provider: cleanProvider, pricing });
   const duration = breakdownDuration(timing);
   return {
     schemaVersion: 1,
-    model: String(model || 'default'),
+    provider: cleanProvider,
+    model: cleanText(model) || 'default',
     tokens,
     cost,
     duration,

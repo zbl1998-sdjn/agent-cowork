@@ -110,14 +110,16 @@ function roundRate(value) {
 
 /**
  * @param {Record<string, unknown>} record
- * @returns {{ usage: unknown, model: string, timing: { startedAt?: string | number | null, finishedAt?: string | number | null, durationMs?: number | null } }}
+ * @returns {{ usage: unknown, provider: string, model: string, timing: { startedAt?: string | number | null, finishedAt?: string | number | null, durationMs?: number | null } }}
  */
 function usageInput(record) {
   const result = objectAt(record, 'result');
   const existingMetrics = objectAt(record, 'metrics');
+  const attributionModel = objectAt(objectAt(record, 'attribution'), 'model');
   return {
     usage: record.usage || result.usage || result.usageTotals || existingMetrics.tokens || null,
-    model: text(record.model || result.model || 'default') || 'default',
+    provider: text(record.provider || result.provider || attributionModel.provider || existingMetrics.provider || 'unknown') || 'unknown',
+    model: text(record.model || result.model || attributionModel.model || existingMetrics.model || 'default') || 'default',
     timing: {
       startedAt: timingStamp(record.startedAt),
       finishedAt: timingStamp(record.finishedAt),
@@ -184,12 +186,12 @@ function countTools(record, stepRecords) {
 
 /**
  * @param {unknown} record
- * @returns {{ schemaVersion: 1, model: string, status: string, tokens: { prompt_tokens: number, completion_tokens: number, total_tokens: number }, cost: ReturnType<typeof buildUsageTransparency>['cost'], duration: ReturnType<typeof buildUsageTransparency>['duration'], steps: { total: number, succeeded: number, failed: number }, tools: { calls: number, succeeded: number, failed: number, unique: string[] }, failures: { count: number, rate: number, runFailed: boolean } }}
+ * @returns {{ schemaVersion: 1, provider: string, model: string, status: string, tokens: { prompt_tokens: number, completion_tokens: number, total_tokens: number }, cost: ReturnType<typeof buildUsageTransparency>['cost'], duration: ReturnType<typeof buildUsageTransparency>['duration'], steps: { total: number, succeeded: number, failed: number }, tools: { calls: number, succeeded: number, failed: number, unique: string[] }, failures: { count: number, rate: number, runFailed: boolean } }}
  */
 export function buildRunMetrics(record) {
   const source = isRecord(record) ? record : {};
-  const { usage, model, timing } = usageInput(source);
-  const usageSummary = buildUsageTransparency({ usage, model, timing });
+  const { usage, provider, model, timing } = usageInput(source);
+  const usageSummary = buildUsageTransparency({ usage, provider, model, timing });
   const { stepRecords, ...steps } = countSteps(source);
   const tools = countTools(source, stepRecords);
   const runFailed = FAILURE_STATUSES.has(text(source.status).toLowerCase());
@@ -197,6 +199,7 @@ export function buildRunMetrics(record) {
   const denominator = tools.calls || steps.total || (runFailed ? 1 : 0);
   return {
     schemaVersion: 1,
+    provider: usageSummary.provider,
     model: usageSummary.model,
     status: text(source.status || 'unknown') || 'unknown',
     tokens: usageSummary.tokens,
