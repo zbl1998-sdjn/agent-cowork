@@ -22,6 +22,16 @@ async function withServer(config, fn) {
   }
 }
 
+async function postJson(base, route, body) {
+  const response = await fetch(`${base}${route}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text ? JSON.parse(text) : null };
+}
+
 test('GET /api/runtime/dependencies reports runtime catalog without leaking proxy credentials', async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-deps');
   await withServer({
@@ -53,6 +63,41 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
     assert.equal(byId['python-embedded'].status, 'configured');
     assert.equal(byId.proxy.status, 'configured');
     assert.equal(byId.proxy.detail, 'http://proxy-user:[REDACTED]@127.0.0.1:7890');
+  });
+});
+
+test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
+  const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
+  await withServer({ trustedRoot, runtimeDependencyAppDataRoot: appDataRoot }, async (base) => {
+    const install = await postJson(base, '/api/runtime/dependencies/install-plan', {
+      selectedIds: ['data-science', 'playwright-chromium'],
+      freeBytes: 250 * 1024 * 1024,
+    });
+    assert.equal(install.status, 200);
+    assert.equal(install.body.ok, false);
+    assert.equal(install.body.disk.status, 'insufficient');
+    assert.deepEqual(install.body.components.map((item) => item.id), ['data-science', 'playwright-chromium']);
+
+    const cleanup = await postJson(base, '/api/runtime/dependencies/cleanup-plan', {
+      selectedIds: ['tesseract-ocr'],
+      keepUserData: false,
+    });
+    assert.equal(cleanup.status, 200);
+    assert.equal(cleanup.body.appDataRoot, appDataRoot);
+    assert.equal(cleanup.body.targets.find((item) => item.id === 'user-data').requiresConfirmation, true);
+    assert.equal(cleanup.body.targets.every((item) => item.action === 'remove'), true);
+
+    const update = await postJson(base, '/api/runtime/dependencies/update-plan', {
+      selectedIds: ['data-science'],
+      currentVersion: '0.2.0',
+      targetVersion: '0.2.1',
+    });
+    assert.equal(update.status, 200);
+    assert.equal(update.body.appDataRoot, appDataRoot);
+    assert.equal(update.body.destructiveActions.length, 0);
+    assert.equal(update.body.components[0].action, 'preserve');
+    assert.ok(update.body.retained.some((item) => item.id === 'user-data'));
   });
 });
 

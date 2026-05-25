@@ -44,6 +44,9 @@ test('new file and route surfaces are covered by the auth gate', async () => {
       ['/api/viz/render', { method: 'POST', headers: { 'idempotency-key': 'viz-gate' }, body: { trustedRoot, kind: 'table', data: { columns: ['a'], rows: [[1]] } } }],
       ['/api/prompt/refine', { method: 'POST', body: { trustedRoot, prompt: '改一下' } }],
       ['/api/runtime/dependencies', { method: 'GET' }],
+      ['/api/runtime/dependencies/install-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
+      ['/api/runtime/dependencies/cleanup-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
+      ['/api/runtime/dependencies/update-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
     ];
 
     for (const [route, options] of routes) {

@@ -1,7 +1,29 @@
 import { modelBreakerStats } from '../kimi/agent-runner.js';
-import { sendJson } from '../http/request-utils.js';
+import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
+import {
+  buildRuntimeDependencyCleanupPlan,
+  buildRuntimeDependencyInstallPlan,
+  buildRuntimeDependencyUpdatePlan,
+} from '../runtime/dependency-install-plan.js';
+
+function objectBody(body) {
+  return body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+}
+
+function dependencyPlanOptions(body, state) {
+  const input = objectBody(body);
+  const appDataRoot = input.appDataRoot || state.config.runtimeDependencyAppDataRoot;
+  return {
+    selectedIds: input.selectedIds,
+    freeBytes: input.freeBytes,
+    keepUserData: input.keepUserData,
+    currentVersion: input.currentVersion,
+    targetVersion: input.targetVersion,
+    appDataRoot,
+  };
+}
 
 export async function handleSystemRoutes({ request, response, pathname, requestContext, state }) {
   if (request.method === 'GET' && pathname === '/health') {
@@ -94,6 +116,27 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
       platform: state.config.runtimeDependencyPlatform || process.platform,
       sandboxStartup: state.sandboxStartup,
     }));
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/runtime/dependencies/install-plan') {
+    await withJsonBody(request, response, (body) => {
+      sendJson(response, 200, buildRuntimeDependencyInstallPlan(dependencyPlanOptions(body, state)));
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/runtime/dependencies/cleanup-plan') {
+    await withJsonBody(request, response, (body) => {
+      sendJson(response, 200, buildRuntimeDependencyCleanupPlan(dependencyPlanOptions(body, state)));
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/runtime/dependencies/update-plan') {
+    await withJsonBody(request, response, (body) => {
+      sendJson(response, 200, buildRuntimeDependencyUpdatePlan(dependencyPlanOptions(body, state)));
+    });
     return true;
   }
 
