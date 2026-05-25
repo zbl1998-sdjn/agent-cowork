@@ -11,6 +11,8 @@
 | `03-智能输入与体验进化.md` | 智能输入、澄清优先、记忆画像、活页与进阶前端体验 | 体验增强任务 |
 | `04-质量保障与交付安全.md` | CI、E2E、bench、release、安装冒烟、安全隐私基线 | 每次交付前 |
 | `05-深水区能力与高级体验.md` | RAG、Office、技能固化、数据分析、开发者模式、分支/项目/通知等深水能力 | v1.0 扩展能力池 |
+| `06-运行时依赖与集成安装.md` | 开箱即用依赖、安装器组件、按需下载、中文 Windows 生命周期细节 | 安装/发布/依赖任务 |
+| `07-Agent运行时韧性与评测体系.md` | eval、上下文管理、循环韧性、可恢复/可复现、可观测、预算熔断和回路安全 | Agent 运行时加固任务 |
 | `Agent-Cowork-v1.0-迭代计划-草案.md` | 高层阶段路线(已被 00/01/02 细化) | 看全局 |
 
 ## 已锁决策(可随时复议)
@@ -39,7 +41,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 
 ## 当前状态快照(2026-05-25)
 - [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
-- [x] `03/04/05` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
+- [x] `03/04/05/06/07` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
 - [x] P0-T10a/Q9(本地可测子项):已新增 host opt-in `checkJs` + JSDoc 类型护栏,覆盖 25 个纯/叶子/安全链路模块(新增 file-preview、live artifact spec/viz、OAuth permissions、JSON store、tool registry、Office writer 等边界),并加入 host Node 内建最小类型声明;已接入 `npm run check`。
 - [ ] P0-T10 延后项:完整 Node 类型覆盖、更多 L0/L1 模块纳入仍在推进;逐文件 `.ts` 转换尚未开始,需先明确直接 Node 运行下的导入/打包路径;不改 Node host 语言栈、不重写。
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
