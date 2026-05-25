@@ -18,10 +18,9 @@ function isGitHub(id) {
   return String(id || '').toLowerCase() === 'github';
 }
 
-function githubClientId(body, oauthConfig) {
+function githubClientId(oauthConfig) {
   return String(
-    (body && body.clientId)
-      || oauthConfig?.github?.clientId
+    oauthConfig?.github?.clientId
       || process.env.KCW_GITHUB_OAUTH_CLIENT_ID
       || process.env.GITHUB_OAUTH_CLIENT_ID
       || '',
@@ -71,9 +70,9 @@ export async function handleConnectorOAuthRoutes({
       provider: 'github',
       connected: accounts.length > 0,
       accounts,
-      configured: Boolean(githubClientId({}, oauthConfig)),
+      configured: Boolean(githubClientId(oauthConfig)),
       requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
-      configurationMessage: githubClientId({}, oauthConfig)
+      configurationMessage: githubClientId(oauthConfig)
         ? 'GitHub OAuth client id 已配置。'
         : 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。',
       permissions: oauthPermissions(githubConnector()),
@@ -123,7 +122,7 @@ export async function handleConnectorOAuthRoutes({
       }
       try {
         const connector = githubConnector();
-        const clientId = githubClientId(body, oauthConfig);
+        const clientId = githubClientId(oauthConfig);
         if (!clientId) {
           sendJson(response, 428, {
             context: requestContext,

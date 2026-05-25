@@ -176,7 +176,6 @@ export async function startOAuthConnector(body: {
   id: string;
   scopes?: string[];
   approvalId?: string;
-  clientId?: string;
 }): Promise<OAuthStartResult> {
   return postJson('/api/connectors/oauth/start', { ...body, idempotencyKey: newIdempotencyKey('conn') });
 }

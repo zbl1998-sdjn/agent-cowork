@@ -300,7 +300,7 @@ test('GitHub OAuth start requires approved connector scopes', async () => {
   }
 });
 
-test('GitHub OAuth start reports missing client id before consuming approval', async () => {
+test('GitHub OAuth start only accepts host-configured client id and preserves approval on missing config', async () => {
   const previousClientId = process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
   const previousLegacyClientId = process.env.GITHUB_OAUTH_CLIENT_ID;
   delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
@@ -349,6 +349,7 @@ test('GitHub OAuth start reports missing client id before consuming approval', a
       method: 'POST',
       body: {
         id: 'github',
+        clientId: 'body-client',
         scopes: ['read:user'],
         approvalId: approved.body.approvalId,
       },
@@ -358,11 +359,12 @@ test('GitHub OAuth start reports missing client id before consuming approval', a
     assert.match(missingConfig.body.error, /KCW_GITHUB_OAUTH_CLIENT_ID/);
     assert.equal(calls.length, 0);
 
+    process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'env-client';
     const started = await J(base, '/api/connectors/oauth/start', {
       method: 'POST',
       body: {
         id: 'github',
-        clientId: 'test-client',
+        clientId: 'body-client',
         scopes: ['read:user'],
         approvalId: approved.body.approvalId,
       },
@@ -370,7 +372,8 @@ test('GitHub OAuth start reports missing client id before consuming approval', a
     assert.equal(started.status, 200);
     assert.equal(started.body.userCode, 'CONF-1234');
     assert.equal(calls.length, 1);
-    assert.match(calls[0].body, /client_id=test-client/);
+    assert.match(calls[0].body, /client_id=env-client/);
+    assert.doesNotMatch(calls[0].body, /body-client/);
   } finally {
     if (previousClientId === undefined) delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
     else process.env.KCW_GITHUB_OAUTH_CLIENT_ID = previousClientId;
