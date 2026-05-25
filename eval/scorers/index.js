@@ -96,6 +96,9 @@ function evaluateAssertion(assertion, result) {
   if (assertion.type === 'toolCalled') {
     return toolNames.has(normalizeText(assertion.tool));
   }
+  if (assertion.type === 'toolNotCalled') {
+    return !toolNames.has(normalizeText(assertion.tool));
+  }
   if (assertion.type === 'approvalRequested') {
     const wantedTool = normalizeText(assertion.tool);
     return resultApprovals(result).some((approval) => approval.tool === wantedTool || approval.action === wantedTool);

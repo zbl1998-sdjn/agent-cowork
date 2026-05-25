@@ -15,6 +15,7 @@ const ASSERTION_TYPES = new Set([
   'fileContains',
   'fileNotExists',
   'toolCalled',
+  'toolNotCalled',
   'approvalRequested',
   'artifactCreated',
   'conversationBranchExists',

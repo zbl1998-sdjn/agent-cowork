@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadGoldenEvalTasks } from '../eval/tasks/index.js';
+import { loadAllEvalTasks } from '../eval/tasks/index.js';
 import { runEvalTasks } from '../eval/runner.js';
 import { writeEvalReport } from '../eval/report.js';
 import { createOfflineReplayExecutor } from '../eval/replay-backend.js';
@@ -58,7 +58,7 @@ function passingContractResult(task) {
 
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-'));
 try {
-  const tasks = loadGoldenEvalTasks();
+  const tasks = loadAllEvalTasks();
   const replayRecords = readReplayRecords();
   const executor = replayRecords
     ? createOfflineReplayExecutor({ records: replayRecords })
