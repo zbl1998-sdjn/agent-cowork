@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../lib/api';
+import { Empty, ErrorState } from './ui/StateViews';
 
 interface ArtifactsPanelProps { trustedRoot: string }
 
@@ -22,6 +23,13 @@ export function sanitizeArtifactRename(value: string): string {
   if (!name) return '';
   if (name.includes('/') || name.includes('\\') || name === '.' || name === '..') return '';
   return name;
+}
+
+export function ArtifactsPanelStateViews({ error, onRetry }: { error: string; onRetry: () => void }) {
+  if (error) {
+    return <ErrorState title="产物加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
+  }
+  return <Empty title="还没有产物" message="完成一次任务后会出现在这里。" />;
 }
 
 // Lists the work products the agent has saved under .AgentCowork/artifacts. Each
@@ -100,9 +108,13 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
             </div>
           </li>
         ))}
-        {items.length === 0 && !error && <li className="panel-empty">还没有产物。完成一次任务后会出现在这里。</li>}
+        {items.length === 0 && !error && (
+          <li className="panel-empty">
+            <ArtifactsPanelStateViews error="" onRetry={() => void refresh()} />
+          </li>
+        )}
       </ul>
-      {error && <pre className="panel-result">错误：{error}</pre>}
+      {error && <ArtifactsPanelStateViews error={error} onRetry={() => void refresh()} />}
     </section>
   );
 }
