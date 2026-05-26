@@ -1,4 +1,5 @@
 import type { ArtifactFile } from '../lib/types';
+import { Button } from './ui/Button';
 
 export interface ArtifactCardProps {
   file: ArtifactFile;
@@ -18,7 +19,7 @@ export function ArtifactCard({ file, metadata, onOpen }: ArtifactCardProps) {
         <strong>{basename(file.relativePath || file.path)}</strong>
         <span>{metadata || file.relativePath || file.path}</span>
       </div>
-      <button type="button" onClick={() => onOpen(file.path)}>在系统中打开</button>
+      <Button onClick={() => onOpen(file.path)}>在系统中打开</Button>
     </div>
   );
 }

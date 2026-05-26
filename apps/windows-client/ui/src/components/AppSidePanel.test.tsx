@@ -39,6 +39,7 @@ describe('AppSidePanel', () => {
     );
     expect(html).toContain('正在加载面板');
     expect(html).toContain('aria-label="关闭"');
+    expect(html).toContain('ui-icon-btn drawer-close');
   });
 
   it('loads panel content behind suspense', () => {

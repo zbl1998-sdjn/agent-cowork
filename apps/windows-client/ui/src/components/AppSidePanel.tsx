@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
 import { ErrorBoundary } from './ui/ErrorBoundary';
+import { IconButton } from './ui/Button';
 import { Loading } from './ui/StateViews';
 
 const ToolsPanel = lazy(() => import('./panels/ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
@@ -43,7 +44,7 @@ export function AppSidePanel({ panel, trustedRoot, onClose, onRunSubagent }: App
   if (panel === 'none') return null;
   return (
     <aside className="side-drawer">
-      <button type="button" className="drawer-close" aria-label="关闭" onClick={onClose}>×</button>
+      <IconButton className="drawer-close" label="关闭" onClick={onClose}>×</IconButton>
       <ErrorBoundary key={panel} label={PANEL_LABELS[panel]}>
         <Suspense fallback={<Loading message="正在加载面板…" />}>
           {panelContent(panel, trustedRoot, onRunSubagent)}

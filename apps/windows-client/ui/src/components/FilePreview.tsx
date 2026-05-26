@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { previewFile, openPath, type FilePreviewResult } from '../lib/api';
 import { renderMarkdown } from '../lib/md';
+import { Button, IconButton } from './ui/Button';
 
 interface FilePreviewProps {
   path: string;
@@ -39,8 +40,8 @@ export function FilePreview({ path, trustedRoot, onClose }: FilePreviewProps) {
         <header className="modal-head">
           <h2 className="preview-title" title={name}>{name}</h2>
           <div className="preview-head-actions">
-            <button type="button" className="btn-secondary" onClick={() => void openPath(path)}>用系统打开</button>
-            <button type="button" className="modal-close" aria-label="关闭" onClick={onClose}>×</button>
+            <Button className="btn-secondary" onClick={() => void openPath(path)}>用系统打开</Button>
+            <IconButton className="modal-close" label="关闭" onClick={onClose}>×</IconButton>
           </div>
         </header>
         <div className="preview-content">
@@ -84,7 +85,7 @@ export function FilePreview({ path, trustedRoot, onClose }: FilePreviewProps) {
           {data?.kind === 'other' && (
             <div className="preview-fallback">
               <p>该文件类型暂不支持内联预览。</p>
-              <button type="button" className="btn-primary" onClick={() => void openPath(path)}>用系统打开</button>
+              <Button variant="primary" className="btn-primary" onClick={() => void openPath(path)}>用系统打开</Button>
             </div>
           )}
         </div>
