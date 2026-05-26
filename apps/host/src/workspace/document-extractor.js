@@ -1,63 +1,33 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
 import { readTextFile } from './file-reader.js';
 import { readZipEntries } from './zip-utils.js';
+import {
+  DEFAULT_MAX_BYTES,
+  cappedMaxBytes,
+  compactLines,
+  decodePdfLiteral,
+  decodeXmlEntities,
+  sha256,
+  xmlToText,
+} from './document-extractor-utils.js';
 
-const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv', '.json', '.log']);
 
-function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(Math.max(1, Math.floor(n)), DEFAULT_MAX_BYTES);
-}
+/**
+ * @typedef {import('./zip-utils.js').ZipReadEntry} ZipReadEntry
+ * @typedef {{ trustedRoot?: string, root?: string, maxSize?: unknown }} ExtractOptions
+ * @typedef {{ path: string, relativePath: string, kind: string, size: number, sha256: string, content: string }} ExtractedDocument
+ */
 
-function sha256(buffer) {
-  return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-function decodeXmlEntities(text) {
-  return String(text || '')
-    .replace(/&#x([0-9a-f]+);/gi, (_, value) => String.fromCodePoint(Number.parseInt(value, 16)))
-    .replace(/&#([0-9]+);/g, (_, value) => String.fromCodePoint(Number.parseInt(value, 10)))
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-}
-
-function compactLines(text, maxChars = 12000) {
-  const compacted = String(text || '')
-    .replace(/\u0000/g, ' ')
-    .split(/\r?\n/)
-    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
-    .filter(Boolean)
-    .join('\n');
-  return compacted.length > maxChars ? `${compacted.slice(0, maxChars)}\n[内容已截断]` : compacted;
-}
-
-function xmlToText(xml) {
-  return compactLines(
-    decodeXmlEntities(
-      String(xml || '')
-        .replace(/<\?xml[^>]*>/gi, ' ')
-        .replace(/<w:tab\s*\/>/gi, '\t')
-        .replace(/<a:br\s*\/>/gi, '\n')
-        .replace(/<\/(?:w:p|a:p|p|row|worksheet|si)>/gi, '\n')
-        .replace(/<\/(?:w:tr|a:tr|tr)>/gi, '\n')
-        .replace(/<[^>]+>/g, ' '),
-    ),
-  );
-}
-
+/** @param {ZipReadEntry[]} entries @param {string} name @returns {string} */
 function zipEntryText(entries, name) {
   const entry = entries.find((item) => item.name === name);
   return entry ? entry.content.toString('utf8') : '';
 }
 
+/** @param {ZipReadEntry[]} entries @returns {string} */
 function extractDocx(entries) {
   const documentXml = zipEntryText(entries, 'word/document.xml');
   if (!documentXml) {
@@ -66,6 +36,7 @@ function extractDocx(entries) {
   return xmlToText(documentXml);
 }
 
+/** @param {ZipReadEntry[]} entries @returns {string[]} */
 function sharedStrings(entries) {
   const xml = zipEntryText(entries, 'xl/sharedStrings.xml');
   if (!xml) {
@@ -78,6 +49,7 @@ function sharedStrings(entries) {
   return strings;
 }
 
+/** @param {string} xml @param {string[]} strings @returns {string} */
 function extractWorksheetText(xml, strings) {
   const values = [];
   for (const match of String(xml || '').matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)) {
@@ -101,6 +73,7 @@ function extractWorksheetText(xml, strings) {
   return compactLines(values.join('\n'));
 }
 
+/** @param {ZipReadEntry[]} entries @returns {string} */
 function extractXlsx(entries) {
   const strings = sharedStrings(entries);
   const worksheets = entries
@@ -119,6 +92,7 @@ function extractXlsx(entries) {
   return compactLines(parts.join('\n\n'));
 }
 
+/** @param {ZipReadEntry[]} entries @returns {string} */
 function extractPptx(entries) {
   const slides = entries
     .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/i.test(entry.name))
@@ -133,35 +107,7 @@ function extractPptx(entries) {
   );
 }
 
-function decodePdfLiteral(input) {
-  let output = '';
-  for (let i = 0; i < input.length; i += 1) {
-    const ch = input[i];
-    if (ch !== '\\') {
-      output += ch;
-      continue;
-    }
-    const next = input[i + 1];
-    i += 1;
-    if (next === 'n') output += '\n';
-    else if (next === 'r') output += '\r';
-    else if (next === 't') output += '\t';
-    else if (next === 'b') output += '\b';
-    else if (next === 'f') output += '\f';
-    else if (/[0-7]/.test(next || '')) {
-      let octal = next;
-      for (let j = 0; j < 2 && /[0-7]/.test(input[i + 1] || ''); j += 1) {
-        octal += input[i + 1];
-        i += 1;
-      }
-      output += String.fromCharCode(Number.parseInt(octal, 8));
-    } else {
-      output += next || '';
-    }
-  }
-  return output;
-}
-
+/** @param {Buffer} buffer @returns {string} */
 function extractPdf(buffer) {
   const latin1 = buffer.toString('latin1');
   const literals = [];
@@ -175,6 +121,7 @@ function extractPdf(buffer) {
   return compactLines(latin1.replace(/[^\x09\x0a\x0d\x20-\x7e]+/g, ' '));
 }
 
+/** @param {string} filePath @param {ExtractOptions} [options] @returns {ExtractedDocument} */
 export function extractDocumentText(filePath, options = {}) {
   const trustedRoot = options.trustedRoot ?? options.root;
   if (!trustedRoot) {
@@ -232,6 +179,7 @@ export function extractDocumentText(filePath, options = {}) {
   };
 }
 
+/** @param {string} filePath @returns {boolean} */
 export function isExtractableDocument(filePath) {
   return TEXT_EXTENSIONS.has(path.extname(filePath).toLowerCase()) || ['.docx', '.xlsx', '.pptx', '.pdf'].includes(path.extname(filePath).toLowerCase());
 }

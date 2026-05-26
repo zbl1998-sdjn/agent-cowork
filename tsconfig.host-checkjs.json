@@ -118,9 +118,14 @@
     "apps/host/src/tools/tool-registry.js",
     "apps/host/src/util/ids.js",
     "apps/host/src/workspace/context-bundle.js",
+    "apps/host/src/workspace/attachment-context.js",
+    "apps/host/src/workspace/document-extractor.js",
+    "apps/host/src/workspace/document-extractor-utils.js",
     "apps/host/src/workspace/file-preview.js",
     "apps/host/src/workspace/file-reader.js",
     "apps/host/src/workspace/file-tree.js",
+    "apps/host/src/workspace/image-loader.js",
+    "apps/host/src/workspace/zip-utils.js",
     "apps/host/src/workspace/index/chunk.js"
   ]
 }

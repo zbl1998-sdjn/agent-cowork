@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { extractDocumentText } from './document-extractor.js';
 
+/**
+ * @typedef {{ path?: string, fullPath?: string, relativePath?: string }} AttachmentInput
+ * @typedef {{ path: string, kind: string, ext?: string, note?: string, relativePath?: string, size?: number, sha256?: string, excerpt?: string, error?: string }} AttachmentItem
+ */
+
 // Multimodal attachment pipeline: classify uploaded files and extract usable
 // context. Text/PDF/DOCX are extracted to text (works today); images are
 // carried as references for a vision-capable model. Lets the chat/recipe layer
@@ -8,8 +13,10 @@ import { extractDocumentText } from './document-extractor.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
 
+/** @param {{ files?: Array<string | AttachmentInput>, trustedRoot?: string, maxSize?: unknown, maxItems?: number, excerptBytes?: number }} [options] */
 export function buildAttachmentContext({ files = [], trustedRoot, maxSize, maxItems = 12, excerptBytes = 2000 } = {}) {
   const list = Array.isArray(files) ? files.slice(0, maxItems) : [];
+  /** @type {AttachmentItem[]} */
   const items = [];
   for (const entry of list) {
     const filePath = typeof entry === 'string' ? entry : (entry && (entry.path || entry.fullPath || entry.relativePath));
@@ -28,10 +35,10 @@ export function buildAttachmentContext({ files = [], trustedRoot, maxSize, maxIt
         size: doc.size,
         sha256: doc.sha256,
         excerpt: (doc.content || '').slice(0, excerptBytes),
-        error: doc.error,
       });
     } catch (err) {
-      items.push({ path: filePath, kind: 'error', error: err.message });
+      const error = /** @type {{ message?: string }} */ (err || {});
+      items.push({ path: filePath, kind: 'error', error: error.message });
     }
   }
   return {
