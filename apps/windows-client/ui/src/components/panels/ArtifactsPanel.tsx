@@ -1,5 +1,8 @@
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../../lib/api';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { Empty, ErrorState } from '../ui/StateViews';
 
 interface ArtifactsPanelProps { trustedRoot: string }
@@ -30,6 +33,61 @@ export function ArtifactsPanelStateViews({ error, onRetry }: { error: string; on
     return <ErrorState title="产物加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
   return <Empty title="还没有产物" message="完成一次任务后会出现在这里。" />;
+}
+
+export interface ArtifactPanelItemProps {
+  item: ArtifactItem;
+  busy: boolean;
+  renaming: boolean;
+  renameText: string;
+  onRenameTextChange: (value: string) => void;
+  onCommitRename: (item: ArtifactItem) => void;
+  onCancelRename: () => void;
+  onOpen: (path: string) => void;
+  onBeginRename: (item: ArtifactItem) => void;
+}
+
+export function ArtifactPanelItem({
+  item,
+  busy,
+  renaming,
+  renameText,
+  onRenameTextChange,
+  onCommitRename,
+  onCancelRename,
+  onOpen,
+  onBeginRename,
+}: ArtifactPanelItemProps) {
+  const onRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      onCommitRename(item);
+    }
+  };
+  return (
+    <li className="artifact-panel-card" key={item.path}>
+      <div className="artifact-panel-head">
+        <code>{item.name}</code>
+        <span>{artifactMeta(item)}</span>
+      </div>
+      {item.relativePath && <p>{item.relativePath}</p>}
+      {renaming && (
+        <div className="panel-row">
+          <Input
+            aria-label={`重命名 ${item.name}`}
+            value={renameText}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onRenameTextChange(event.target.value)}
+            onKeyDown={onRenameKeyDown}
+          />
+          <Button variant="primary" disabled={busy || !sanitizeArtifactRename(renameText)} onClick={() => onCommitRename(item)}>保存</Button>
+          <Button variant="secondary" disabled={busy} onClick={onCancelRename}>取消</Button>
+        </div>
+      )}
+      <div className="panel-row">
+        <Button variant="secondary" onClick={() => onOpen(item.path)}>打开</Button>
+        <Button variant="secondary" disabled={busy} onClick={() => onBeginRename(item)}>重命名</Button>
+      </div>
+    </li>
+  );
 }
 
 // Lists the work products the agent has saved under .AgentCowork/artifacts. Each
@@ -85,28 +143,22 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
     <section className="side-panel">
       <h2>产物</h2>
       <div className="panel-row">
-        <button type="button" disabled={busy} onClick={() => void refresh()}>{busy ? '刷新中…' : '刷新'}</button>
+        <Button variant="secondary" disabled={busy} onClick={() => void refresh()}>{busy ? '刷新中…' : '刷新'}</Button>
       </div>
       <ul className="artifact-list">
         {items.map((it) => (
-          <li className="artifact-panel-card" key={it.path}>
-            <div className="artifact-panel-head">
-              <code>{it.name}</code>
-              <span>{artifactMeta(it)}</span>
-            </div>
-            {it.relativePath && <p>{it.relativePath}</p>}
-            {renamingPath === it.path && (
-              <div className="panel-row">
-                <input value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commitRename(it); }} />
-                <button type="button" disabled={busy || !sanitizeArtifactRename(renameText)} onClick={() => void commitRename(it)}>保存</button>
-                <button type="button" disabled={busy} onClick={() => { setRenamingPath(''); setRenameText(''); }}>取消</button>
-              </div>
-            )}
-            <div className="panel-row">
-              <button type="button" onClick={() => void openPath(it.path)}>打开</button>
-              <button type="button" disabled={busy} onClick={() => beginRename(it)}>重命名</button>
-            </div>
-          </li>
+          <ArtifactPanelItem
+            key={it.path}
+            item={it}
+            busy={busy}
+            renaming={renamingPath === it.path}
+            renameText={renameText}
+            onRenameTextChange={setRenameText}
+            onCommitRename={(item) => void commitRename(item)}
+            onCancelRename={() => { setRenamingPath(''); setRenameText(''); }}
+            onOpen={(targetPath) => void openPath(targetPath)}
+            onBeginRename={beginRename}
+          />
         ))}
         {items.length === 0 && !error && (
           <li className="panel-empty">
