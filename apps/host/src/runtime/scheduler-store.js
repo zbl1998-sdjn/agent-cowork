@@ -8,7 +8,7 @@ const SCHEDULE_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 /**
  * @typedef {{ get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number }, all(...params: unknown[]): unknown[] }} SqliteStatement
  * @typedef {{ prepare(sql: string): SqliteStatement }} SqliteDatabase
- * @typedef {{ id: string, tenantId: string, userId?: string, traceId?: string, name: string, kind: string, status: string, cron?: string | null, fireAt?: string | null, nextFireAt?: string | null, lastFiredAt?: string | null, lastRunId?: string | null, version?: number, runs?: number, createdAt?: string, updatedAt?: string, [key: string]: unknown }} ScheduleRecord
+ * @typedef {{ id: string, tenantId: string, userId?: string, traceId?: string | null, name: string, kind: string, status: string, cron?: string | null, fireAt?: string | null, nextFireAt?: string | null, lastFiredAt?: string | null, lastRunId?: string | null, version?: number, runs?: number, createdAt?: string, updatedAt?: string, [key: string]: unknown }} ScheduleRecord
  * @typedef {{ storeDir?: string }} FileScheduleStoreOptions
  * @typedef {{ dbPath?: string, db?: SqliteDatabase | null }} SqliteScheduleStoreOptions
  * @typedef {{ backend?: string, storeDir?: string, dbPath?: string, db?: SqliteDatabase | null }} CreateScheduleStoreOptions
