@@ -1,5 +1,6 @@
 import { CircuitBreaker } from '../../runtime/circuit-breaker.js';
 import { redactText } from '../../security/redaction.js';
+import { runWithFallback } from '../provider/router.js';
 
 const MODEL_BREAKERS = new Map();
 
@@ -98,24 +99,28 @@ async function callOneModel(modelCall, callArgs, kimiConfig, timeoutMs) {
 export async function callModelResilient(modelCall, callArgs, { kimiConfig, timeoutMs = 60000, onFallback } = {}) {
   const candidates = modelCandidates(kimiConfig);
   if (candidates.length <= 1) return callOneModel(modelCall, callArgs, candidates[0], timeoutMs);
-  const errors = [];
-  for (let index = 0; index < candidates.length; index += 1) {
-    try {
-      return await callOneModel(modelCall, callArgs, candidates[index], timeoutMs);
-    } catch (err) {
-      errors.push(err);
-      if (!shouldFallbackModelError(err)) throw err;
-      if (index >= candidates.length - 1) break;
-      if (typeof onFallback === 'function') {
-        onFallback({
-          failed: modelSummary(candidates[index]),
-          next: modelSummary(candidates[index + 1]),
-          error: redactText(errorMessage(err)),
-        });
-      }
+  try {
+    const routed = await runWithFallback(candidates, (candidate) => (
+      callOneModel(modelCall, callArgs, candidate, timeoutMs)
+    ), {
+      shouldFallback: (err) => shouldFallbackModelError(err),
+      onFallback: ({ failed, next, error }) => {
+        if (typeof onFallback === 'function') {
+          onFallback({
+            failed: modelSummary(failed),
+            next: modelSummary(next),
+            error: redactText(errorMessage(error)),
+          });
+        }
+      },
+    });
+    return routed.result;
+  } catch (err) {
+    if (err && Array.isArray(err.attempts)) {
+      throw fallbackExhausted(err.attempts.map((attempt) => new Error(attempt.error)));
     }
+    throw err;
   }
-  throw fallbackExhausted(errors);
 }
 
 export function friendlyAgentError(err, context) {

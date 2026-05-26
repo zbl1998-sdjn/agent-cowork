@@ -9,29 +9,69 @@
 // runner — so this stays pure, layer-clean (L1, no upward imports) and testable.
 
 /**
- * @typedef {(provider: string) => boolean} ProviderCircuitReader
- * @typedef {(provider: string) => void} ProviderAttemptReporter
- * @typedef {(provider: string) => unknown | Promise<unknown>} ProviderRunner
+ * @typedef {string | Record<string, unknown>} ProviderCandidate
+ * @typedef {(candidate: ProviderCandidate) => boolean} ProviderCircuitReader
+ * @typedef {(candidate: ProviderCandidate) => void} ProviderAttemptReporter
+ * @typedef {(candidate: ProviderCandidate) => unknown | Promise<unknown>} ProviderRunner
+ * @typedef {(error: unknown, candidate: ProviderCandidate, index: number, chain: ProviderCandidate[]) => boolean} ProviderFallbackPredicate
+ * @typedef {(event: { failed: ProviderCandidate, next: ProviderCandidate, error: unknown }) => void} ProviderFallbackReporter
  * @typedef {{ provider: string, error: string }} ProviderAttemptError
- * @typedef {{ provider: string, result: unknown, attempts: number }} ProviderRunResult
- * @typedef {{ chain?: unknown[] | null, isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter }} ProviderRouterOptions
- * @typedef {{ order: () => string[], run: (runner: ProviderRunner) => Promise<ProviderRunResult> }} ProviderRouter
+ * @typedef {{ provider: ProviderCandidate, result: unknown, attempts: number }} ProviderRunResult
+ * @typedef {{ chain?: unknown[] | null, isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter, shouldFallback?: ProviderFallbackPredicate, onFallback?: ProviderFallbackReporter }} ProviderRouterOptions
+ * @typedef {{ order: () => ProviderCandidate[], run: (runner: ProviderRunner) => Promise<ProviderRunResult> }} ProviderRouter
  */
+
+/**
+ * @param {ProviderCandidate} candidate
+ * @param {string} field
+ */
+function providerPart(candidate, field) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return String(candidate[field] || '').trim();
+}
+
+/**
+ * @param {ProviderCandidate} candidate
+ * @param {number} index
+ */
+function providerKey(candidate, index) {
+  if (typeof candidate === 'string') return candidate;
+  const provider = providerPart(candidate, 'provider').toLowerCase();
+  const baseUrl = providerPart(candidate, 'baseUrl').replace(/\/+$/, '');
+  const model = providerPart(candidate, 'model');
+  return provider || baseUrl || model ? `${provider}|${baseUrl}|${model}` : `candidate:${index}`;
+}
+
+/** @param {ProviderCandidate} candidate */
+function providerLabel(candidate) {
+  if (typeof candidate === 'string') return candidate;
+  const provider = providerPart(candidate, 'provider') || 'unknown';
+  const baseUrl = providerPart(candidate, 'baseUrl').replace(/\/+$/, '');
+  const model = providerPart(candidate, 'model');
+  return [provider, baseUrl, model].filter(Boolean).join('|');
+}
+
+/** @param {unknown} err */
+function errorMessage(err) {
+  return err instanceof Error && err.message ? err.message : String(err);
+}
 
 /**
  * @param {unknown[] | null | undefined} chain
  * @param {{ isOpen?: ProviderCircuitReader }} [options]
- * @returns {string[]}
+ * @returns {ProviderCandidate[]}
  */
 export function orderProviderChain(chain, { isOpen } = {}) {
-  const list = (Array.isArray(chain) ? chain : []).map(String).filter(Boolean);
+  const list = (Array.isArray(chain) ? chain : []).filter(Boolean);
   const seen = new Set();
-  /** @type {string[]} */
+  /** @type {ProviderCandidate[]} */
   const unique = [];
-  for (const name of list) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      unique.push(name);
+  for (let index = 0; index < list.length; index += 1) {
+    const candidate = /** @type {ProviderCandidate} */ (list[index]);
+    const key = providerKey(candidate, index);
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(candidate);
     }
   }
   if (typeof isOpen !== 'function') {
@@ -47,10 +87,10 @@ export function orderProviderChain(chain, { isOpen } = {}) {
 /**
  * @param {unknown[] | null | undefined} chain
  * @param {ProviderRunner | null | undefined} runner
- * @param {{ isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter }} [options]
+ * @param {{ isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter, shouldFallback?: ProviderFallbackPredicate, onFallback?: ProviderFallbackReporter }} [options]
  * @returns {Promise<ProviderRunResult>}
  */
-export async function runWithFallback(chain, runner, { isOpen, onAttempt } = {}) {
+export async function runWithFallback(chain, runner, { isOpen, onAttempt, shouldFallback, onFallback } = {}) {
   if (typeof runner !== 'function') {
     throw new Error('runWithFallback: runner is required');
   }
@@ -60,15 +100,25 @@ export async function runWithFallback(chain, runner, { isOpen, onAttempt } = {})
   }
   /** @type {ProviderAttemptError[]} */
   const errors = [];
-  for (const name of ordered) {
+  for (let index = 0; index < ordered.length; index += 1) {
+    const candidate = ordered[index];
     try {
       if (typeof onAttempt === 'function') {
-        onAttempt(name);
+        onAttempt(candidate);
       }
-      const result = await runner(name);
-      return { provider: name, result, attempts: errors.length + 1 };
+      const result = await runner(candidate);
+      return { provider: candidate, result, attempts: errors.length + 1 };
     } catch (err) {
-      errors.push({ provider: name, error: err instanceof Error && err.message ? err.message : String(err) });
+      errors.push({ provider: providerLabel(candidate), error: errorMessage(err) });
+      const hasNext = index < ordered.length - 1;
+      const canFallback = hasNext && (typeof shouldFallback !== 'function' || shouldFallback(err, candidate, index, ordered));
+      if (!canFallback) {
+        if (hasNext && typeof shouldFallback === 'function') throw err;
+        break;
+      }
+      if (typeof onFallback === 'function') {
+        onFallback({ failed: candidate, next: ordered[index + 1], error: err });
+      }
     }
   }
   const aggregate = Object.assign(new Error(

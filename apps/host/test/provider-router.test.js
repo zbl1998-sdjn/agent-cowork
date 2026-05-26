@@ -14,6 +14,13 @@ test('orderProviderChain puts circuit-open providers last', () => {
   );
 });
 
+test('orderProviderChain keeps same-provider candidates with distinct baseUrl or model', () => {
+  const primary = { provider: 'openai', baseUrl: 'https://a.example/v1', model: 'gpt-a' };
+  const fallback = { provider: 'openai', baseUrl: 'https://b.example/v1', model: 'gpt-a' };
+  const duplicate = { provider: 'OPENAI', baseUrl: 'https://a.example/v1/', model: 'gpt-a' };
+  assert.deepEqual(orderProviderChain([primary, fallback, duplicate]), [primary, fallback]);
+});
+
 test('runWithFallback returns the primary result when it succeeds', async () => {
   const out = await runWithFallback(['kimi', 'openai'], async (name) => `ok:${name}`);
   assert.equal(out.provider, 'kimi');
@@ -40,6 +47,37 @@ test('runWithFallback throws an aggregate error when all providers fail', async 
       return true;
     },
   );
+});
+
+test('runWithFallback can stop on non-fallbackable errors', async () => {
+  const tried = [];
+  await assert.rejects(
+    () => runWithFallback(
+      ['openai', 'openai/local'],
+      async (name) => { tried.push(name); throw new Error('OpenAI request failed with status 401'); },
+      { shouldFallback: (err) => !/status 401/.test(err.message) },
+    ),
+    /status 401/,
+  );
+  assert.deepEqual(tried, ['openai']);
+});
+
+test('runWithFallback reports object candidates when falling through', async () => {
+  const primary = { provider: 'openai', baseUrl: 'https://primary.example/v1', model: 'gpt-primary' };
+  const fallback = { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local' };
+  const events = [];
+  const out = await runWithFallback(
+    [primary, fallback],
+    async (candidate) => {
+      if (candidate === primary) throw new Error('temporary outage');
+      return 'ok';
+    },
+    { onFallback: (event) => events.push(event) },
+  );
+  assert.equal(out.provider, fallback);
+  assert.equal(out.result, 'ok');
+  assert.equal(events[0].failed, primary);
+  assert.equal(events[0].next, fallback);
 });
 
 test('runWithFallback tries circuit-open providers last', async () => {

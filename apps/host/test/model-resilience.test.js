@@ -72,6 +72,35 @@ test('callModelResilient falls back to the next provider without inheriting the 
   assert.ok(!events[0].error.includes('sk-PRIMARYSECRET'), 'fallback event leaked primary key');
 });
 
+test('callModelResilient keeps same-provider fallbacks distinct by baseUrl and model', async () => {
+  const seen = [];
+  const cfg = {
+    provider: 'openai',
+    apiKey: 'sk-primary-same-provider-123456',
+    baseUrl: 'https://primary-openai.example/v1',
+    model: 'gpt-primary',
+    fallbacks: [
+      { provider: 'openai', apiKey: 'sk-fallback-same-provider-123456', baseUrl: 'https://fallback-openai.example/v1', model: 'gpt-fallback' },
+    ],
+  };
+
+  const out = await callModelResilient(
+    async ({ kimiConfig }) => {
+      seen.push({ provider: kimiConfig.provider, baseUrl: kimiConfig.baseUrl, model: kimiConfig.model, apiKey: kimiConfig.apiKey });
+      if (kimiConfig.baseUrl === 'https://primary-openai.example/v1') {
+        throw new Error('primary temporary outage');
+      }
+      return { content: 'same provider fallback ok', provider: kimiConfig.provider, model: kimiConfig.model };
+    },
+    {},
+    { kimiConfig: cfg, timeoutMs: 5000 },
+  );
+
+  assert.equal(out.content, 'same provider fallback ok');
+  assert.deepEqual(seen.map((item) => item.baseUrl), ['https://primary-openai.example/v1', 'https://fallback-openai.example/v1']);
+  assert.equal(seen[1].apiKey, 'sk-fallback-same-provider-123456');
+});
+
 test('callModelResilient reports exhausted fallback chains with redacted layer errors', async () => {
   const cfg = {
     provider: 'openai',

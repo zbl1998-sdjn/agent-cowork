@@ -94,6 +94,78 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
   }
 });
 
+test('E2E /api/agent/chat/stream falls back through provider router without leaking secrets', async () => {
+  const root = tmp();
+  const primarySecret = 'sk-primary-router-secret-1234567890';
+  const fallbackSecret = 'sk-fallback-router-secret-1234567890';
+  const seen = [];
+  const agentModelCall = async ({ kimiConfig, messages }) => {
+    seen.push({ provider: kimiConfig.provider, baseUrl: kimiConfig.baseUrl, model: kimiConfig.model, apiKey: kimiConfig.apiKey });
+    if (kimiConfig.baseUrl === 'https://primary-router.example/v1') {
+      throw new Error(`temporary outage ${primarySecret}`);
+    }
+    if (messages.some((message) => message.role === 'tool' && message.tool_call_id === 'fallback_write')) {
+      return { content: 'fallback write done' };
+    }
+    return {
+      content: '',
+      tool_calls: [{
+        id: 'fallback_write',
+        function: { name: 'Write', arguments: JSON.stringify({ path: 'fallback.txt', content: kimiConfig.model }) },
+      }],
+    };
+  };
+  const server = createServer({
+    requireAuth: false,
+    trustedRoot: root,
+    enableScheduler: false,
+    kimiProvider: 'openai',
+    kimiApiKey: primarySecret,
+    kimiBaseUrl: 'https://primary-router.example/v1',
+    kimiModel: 'gpt-primary-router',
+    kimiFallbacks: [{
+      provider: 'openai',
+      apiKey: fallbackSecret,
+      baseUrl: 'https://fallback-router.example/v1',
+      model: 'gpt-fallback-router',
+    }],
+    kimiChatRunner: async () => ({}),
+    agentModelCall,
+  });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'fallback 写文件', autoApprove: true }),
+    });
+    assert.equal(res.status, 200);
+    const all = await readStream(res);
+    assert.match(all, /event: model_fallback/);
+    assert.match(all, /event: done/);
+    assert.ok(!all.includes(primarySecret), 'SSE leaked primary key');
+    assert.ok(!all.includes(fallbackSecret), 'SSE leaked fallback key');
+    assert.deepEqual(seen.map((item) => item.baseUrl), [
+      'https://primary-router.example/v1',
+      'https://fallback-router.example/v1',
+      'https://primary-router.example/v1',
+      'https://fallback-router.example/v1',
+    ]);
+    assert.equal(seen[1].apiKey, fallbackSecret);
+    assert.equal(seen[3].apiKey, fallbackSecret);
+    assert.equal(fs.readFileSync(path.join(root, 'fallback.txt'), 'utf8'), 'gpt-fallback-router');
+    const runId = JSON.parse(/event: start\s+data: ([^\n]+)/.exec(all)[1]).runId;
+    const recordRaw = fs.readFileSync(path.join(root, '.AgentCowork', 'runs', `${runId}.json`), 'utf8');
+    assert.ok(!recordRaw.includes(primarySecret), 'run record leaked primary key');
+    assert.ok(!recordRaw.includes(fallbackSecret), 'run record leaked fallback key');
+    const record = JSON.parse(recordRaw);
+    assert.equal(record.configSnapshot.fallbacks[0].hasKey, true);
+    assert.equal(record.configSnapshot.fallbacks[0].apiKey, undefined);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('E2E /api/agent/chat/stream applies session model config without persisting or echoing keys', async () => {
   const root = tmp();
   const sessionKey = 'sk-session-secret-DO-NOT-RECORD-1234567890';
