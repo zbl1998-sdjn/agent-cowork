@@ -38,6 +38,26 @@ function onDemandDependencyIds() {
     .map((item) => item.id);
 }
 
+function hasValidSha256(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+}
+
+function buildSupplyChainPrecheck(item) {
+  if (item.installMode !== 'on-demand') {
+    return { ok: true, status: 'not_required', reasons: [] };
+  }
+  const reasons = [];
+  if (!item.sourceKind) reasons.push('缺少下载来源类型。');
+  if (!item.sourceUrl) reasons.push('缺少下载来源 URL。');
+  if (!hasValidSha256(item.sha256)) reasons.push('缺少有效 sha256 校验值。');
+  if (!item.signaturePolicy) reasons.push('缺少签名策略。');
+  return {
+    ok: reasons.length === 0,
+    status: reasons.length === 0 ? 'ready' : 'blocked',
+    reasons,
+  };
+}
+
 function retainedPath(appDataRoot, relativePath) {
   return relativePath === '.' ? appDataRoot : safeChild(appDataRoot, relativePath);
 }
@@ -63,6 +83,11 @@ export function buildRuntimeDependencyInstallPlan(options = {}) {
       required: item.required,
       estimatedDownloadBytes: item.estimatedDownloadBytes || 0,
       needsDownload: item.installMode === 'on-demand',
+      sourceKind: item.sourceKind || null,
+      sourceUrl: item.sourceUrl || null,
+      sha256: item.sha256 || null,
+      signaturePolicy: item.signaturePolicy || null,
+      supplyChain: buildSupplyChainPrecheck(item),
     });
   }
 
@@ -72,11 +97,25 @@ export function buildRuntimeDependencyInstallPlan(options = {}) {
   const availableBytes = finiteBytes(options.freeBytes);
   const missingBytes = availableBytes == null ? 0 : Math.max(0, requiredBytes - availableBytes);
   const diskStatus = availableBytes == null ? 'unknown' : missingBytes > 0 ? 'insufficient' : 'ok';
-  const ok = unknownIds.length === 0 && diskStatus !== 'insufficient';
+  const supplyChainIssues = components
+    .filter((item) => item.needsDownload && !item.supplyChain.ok)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      reasons: item.supplyChain.reasons,
+    }));
+  const ok = unknownIds.length === 0 && diskStatus !== 'insufficient' && supplyChainIssues.length === 0;
   return {
     ok,
     components,
     unknownIds,
+    supplyChain: {
+      status: supplyChainIssues.length ? 'blocked' : 'ok',
+      issues: supplyChainIssues,
+      message: supplyChainIssues.length
+        ? '按需下载组件缺少可验证来源、哈希或签名策略，禁止下载。'
+        : '按需下载供应链预检通过。',
+    },
     disk: {
       status: diskStatus,
       availableBytes,

@@ -74,6 +74,9 @@ test('GET /api/runtime/dependencies reports runtime catalog without leaking prox
     assert.match(byId.webview2.description, /桌面外壳/);
     assert.match(byId['data-science'].label, /数据分析/);
     assert.match(byId['data-science'].description, /按需安装/);
+    assert.equal(byId['data-science'].sourceKind, 'official');
+    assert.equal(byId['data-science'].sha256, null);
+    assert.equal(byId['data-science'].signaturePolicy, 'sha256-required');
     assert.equal(byId.ffmpeg.section, 'B5');
     assert.equal(byId.ffmpeg.installMode, 'on-demand');
     assert.match(byId.ffmpeg.description, /音视频处理/);
@@ -578,6 +581,26 @@ test('runtime dependency install plan blocks downloads when disk space is insuff
   assert.ok(plan.components.find((item) => item.id === 'ffmpeg').estimatedDownloadBytes > 0);
 });
 
+test('runtime dependency install plan blocks on-demand downloads without verifiable source metadata', () => {
+  const plan = buildRuntimeDependencyInstallPlan({
+    selectedIds: ['pandoc'],
+    freeBytes: 1024 * 1024 * 1024,
+  });
+
+  assert.equal(plan.ok, false);
+  assert.equal(plan.disk.status, 'ok');
+  assert.equal(plan.supplyChain.status, 'blocked');
+  assert.deepEqual(plan.supplyChain.issues.map((item) => item.id), ['pandoc']);
+  const component = plan.components[0];
+  assert.equal(component.needsDownload, true);
+  assert.equal(component.sourceKind, 'official');
+  assert.equal(component.sourceUrl, null);
+  assert.equal(component.sha256, null);
+  assert.equal(component.signaturePolicy, 'sha256-required');
+  assert.match(component.supplyChain.reasons.join('\n'), /下载来源 URL/);
+  assert.match(component.supplyChain.reasons.join('\n'), /sha256/);
+});
+
 test('runtime dependency install plan accepts required bundled defaults without optional downloads', () => {
   const plan = buildRuntimeDependencyInstallPlan({
     selectedIds: ['node', 'python-embedded', 'cjk-fonts'],
@@ -587,6 +610,7 @@ test('runtime dependency install plan accepts required bundled defaults without 
   assert.equal(plan.ok, true);
   assert.equal(plan.disk.requiredBytes, 0);
   assert.equal(plan.disk.status, 'ok');
+  assert.equal(plan.supplyChain.status, 'ok');
 });
 
 test('runtime dependency cleanup plan removes on-demand components while preserving user data', () => {
