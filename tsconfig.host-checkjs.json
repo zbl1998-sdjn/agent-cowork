@@ -145,6 +145,7 @@
     "apps/host/src/workspace/file-search.js",
     "apps/host/src/workspace/file-tree.js",
     "apps/host/src/workspace/image-loader.js",
+    "apps/host/src/workspace/uploads.js",
     "apps/host/src/workspace/zip-utils.js",
     "apps/host/src/workspace/index/chunk.js",
     "apps/host/src/workspace/index/retriever.js",

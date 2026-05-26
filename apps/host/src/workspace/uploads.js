@@ -6,12 +6,19 @@ const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_TOTAL_BYTES = 12 * 1024 * 1024;
 const DEFAULT_MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * @typedef {{ relativePath?: string, name?: string, contentBase64?: string, size?: number }} UploadFile
+ * @typedef {{ trustedRoot?: string, files?: UploadFile[], batchId?: string, maxFiles?: number, maxTotalBytes?: number, maxFileBytes?: number }} UploadOptions
+ * @typedef {{ relativePath: string, path: string, size: number }} ImportedFile
+ */
+
 function uniqueBatchId(date = new Date()) {
   const timestamp = date.toISOString().replace(/[-:.TZ]/g, '').slice(0, 17);
   const suffix = Math.random().toString(16).slice(2, 8);
   return `${timestamp}-${suffix}`;
 }
 
+/** @param {unknown} part @returns {string} */
 function cleanPathPart(part) {
   const value = String(part || '').trim();
   if (!value || value === '.' || value === '..') {
@@ -31,6 +38,7 @@ const BLOCKED_UPLOAD_EXTENSIONS = new Set([
   '.html', '.htm', '.svg', '.xhtml', '.mht', '.mhtml',
 ]);
 
+/** @param {unknown} input @returns {string} */
 export function sanitizeUploadRelativePath(input) {
   const raw = String(input || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!raw || path.isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) {
@@ -47,20 +55,23 @@ export function sanitizeUploadRelativePath(input) {
   return parts.join(path.sep);
 }
 
+/** @param {unknown} file @returns {Buffer} */
 function decodeBase64File(file) {
   if (!file || typeof file !== 'object') {
     throw new Error('Each upload file must be an object');
   }
-  if (typeof file.contentBase64 !== 'string') {
+  const input = /** @type {UploadFile} */ (file);
+  if (typeof input.contentBase64 !== 'string') {
     throw new Error('Upload file contentBase64 is required');
   }
-  const buffer = Buffer.from(file.contentBase64, 'base64');
-  if (buffer.length !== Number(file.size)) {
-    throw new Error(`Upload size mismatch for ${file.relativePath || file.name || 'file'}`);
+  const buffer = Buffer.from(input.contentBase64, 'base64');
+  if (buffer.length !== Number(input.size)) {
+    throw new Error(`Upload size mismatch for ${input.relativePath || input.name || 'file'}`);
   }
   return buffer;
 }
 
+/** @param {UploadOptions} [options] @returns {{ batchId: string, uploadRoot: string, imported: ImportedFile[], totalBytes: number }} */
 export function importUploadedFiles({
   trustedRoot,
   files,
@@ -82,6 +93,7 @@ export function importUploadedFiles({
   const safeRoot = path.resolve(trustedRoot);
   const uploadRoot = assertTrustedPathForCreate(path.join(safeRoot, 'Agent_Cowork上传', batchId), safeRoot);
   let totalBytes = 0;
+  /** @type {ImportedFile[]} */
   const imported = [];
 
   for (const file of files) {
