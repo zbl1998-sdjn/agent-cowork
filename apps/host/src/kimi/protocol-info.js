@@ -1,3 +1,6 @@
+// @ts-check
+
+/** @param {unknown} text @returns {string} */
 export function parseKimiVersion(text) {
   const raw = String(text ?? '').trim();
   const match = raw.match(/version\s+([0-9]+(?:\.[0-9]+){0,3})/i);
@@ -7,9 +10,14 @@ export function parseKimiVersion(text) {
   return match[1];
 }
 
+/**
+ * @typedef {{ version?: string, wireProtocol?: string, pythonVersion?: string, cli?: string }} KimiInfo
+ */
+
+/** @param {unknown} text @returns {KimiInfo} */
 export function parseKimiInfo(text) {
   const lines = String(text ?? '').split(/\r?\n/).map((line) => line.trim());
-  const data = {};
+  const data = /** @type {KimiInfo} */ ({});
   for (const line of lines) {
     const parts = line.split(':');
     if (parts.length < 2) {

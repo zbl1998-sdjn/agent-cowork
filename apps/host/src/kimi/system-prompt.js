@@ -1,3 +1,4 @@
+// @ts-check
 // Builds the agent's system prompt: capability framing + plan-mode rules +
 // skills/memory injection + inline-viz/suggestions hints. Pure (no I/O), so it
 // is trivially unit-testable and kept out of the agent loop module.
