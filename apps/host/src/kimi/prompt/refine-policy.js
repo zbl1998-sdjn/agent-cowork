@@ -20,10 +20,19 @@ const OUTPUT_PATTERNS = [
   /\b(output|return|list|format|steps|plan|table|report|summary|checklist|patch)\b/iu,
 ];
 
+/**
+ * @typedef {'create' | 'fix' | 'review' | 'summarize' | 'translate' | 'general' | 'unknown'} PromptIntent
+ * @typedef {'goal' | 'action' | 'target' | 'desiredOutput'} PromptMissing
+ * @typedef {{ maxLength?: number }} PromptAnalyzeOptions
+ * @typedef {{ normalized: string, intent: PromptIntent, missing: PromptMissing[], shouldRefine: boolean, needsClarification: boolean, explicit: boolean }} PromptPolicy
+ */
+
+/** @param {RegExp[]} patterns @param {string} text @returns {boolean} */
 function textIncludes(patterns, text) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+/** @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {string} */
 export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
   return String(raw ?? '')
     .replace(/\r\n/g, '\n')
@@ -32,6 +41,7 @@ export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
     .slice(0, maxLength);
 }
 
+/** @param {string} text @returns {PromptIntent} */
 export function detectPromptIntent(text) {
   if (/修复|报错|失败|fix|error|fail/iu.test(text)) return 'fix';
   if (/实现|新增|创建|生成|导出|保存|转换|build|implement|create|generate|export|save|convert/iu.test(text)) return 'create';
@@ -41,8 +51,10 @@ export function detectPromptIntent(text) {
   return 'general';
 }
 
+/** @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {PromptPolicy} */
 export function analyzePromptForRefine(raw, options = {}) {
   const normalized = normalizePrompt(raw, options);
+  /** @type {PromptMissing[]} */
   const missing = [];
   if (!normalized) {
     return {
