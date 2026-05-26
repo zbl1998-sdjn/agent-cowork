@@ -5,6 +5,13 @@ import { createCappedBuffer } from '../sandbox/exec-child.js';
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_MAX_OUTPUT_BYTES = 8192;
 
+/**
+ * @typedef {{ command?: string, args?: string[], allowCommands?: boolean, timeoutMs?: number, maxOutputBytes?: number, trustedRoot?: string, cwd?: string }} CommandInput
+ * @typedef {{ command: string, args: string[] }} ParsedCommand
+ * @typedef {{ exitCode: number, signal: string | null, stdout: string, stderr: string, timedOut: boolean, truncated: boolean, error?: string }} CommandResult
+ */
+
+/** @param {unknown} cmd @returns {ParsedCommand} */
 function parseCommand(cmd) {
   if (typeof cmd !== 'string' || !cmd.trim()) {
     throw new Error('command is required');
@@ -13,7 +20,8 @@ function parseCommand(cmd) {
   return { command, args };
 }
 
-export async function runCommand(input) {
+/** @param {CommandInput} [input] @returns {Promise<CommandResult>} */
+export async function runCommand(input = {}) {
   const options = input || {};
   const allowCommands = options.allowCommands === true;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -28,7 +36,7 @@ export async function runCommand(input) {
     throw new Error('trustedRoot is required');
   }
 
-  const parsed = input.args ? { command: options.command, args: options.args } : parseCommand(options.command);
+  const parsed = options.args ? { command: options.command, args: options.args } : parseCommand(options.command);
   if (!parsed.command) {
     throw new Error('command is required');
   }
@@ -50,7 +58,7 @@ export async function runCommand(input) {
   child.stdout.on('data', (chunk) => out.push(chunk));
   child.stderr.on('data', (chunk) => err.push(chunk));
 
-  const result = new Promise((resolve, reject) => {
+  const result = /** @type {Promise<CommandResult>} */ (new Promise((resolve, reject) => {
     child.on('error', (e) => reject(e));
     child.on('close', (code, signal) => {
       resolve({
@@ -62,7 +70,7 @@ export async function runCommand(input) {
         truncated: out.truncated || err.truncated || timedOut,
       });
     });
-  });
+  }));
   timeout = setTimeout(() => {
     timedOut = true;
     child.kill('SIGKILL');
