@@ -43,6 +43,7 @@
     "apps/host/src/kimi/agent/todo-state.js",
     "apps/host/src/kimi/agent/tool-loop-support.js",
     "apps/host/src/kimi/agent/tool-retry.js",
+    "apps/host/src/kimi/agent/toolset-builder.js",
     "apps/host/src/kimi/api-runner-config.js",
     "apps/host/src/kimi/api-runner-prompts.js",
     "apps/host/src/kimi/api-runner.js",

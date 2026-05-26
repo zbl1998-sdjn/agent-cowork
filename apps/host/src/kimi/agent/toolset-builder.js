@@ -1,19 +1,41 @@
+// @ts-check
 import { createAgentTools } from '../agent-tools.js';
 import { runRecipe } from '../../recipes/run-recipe.js';
 import { createParallelSubAgentTool } from './parallel-agent-tool.js';
 
+/**
+ * @typedef {Record<string, unknown>} ToolArgs
+ * @typedef {{ name: string, risk?: string, mutating?: boolean, description?: string, parameters?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
+ * @typedef {{ name?: unknown, source?: unknown, description?: unknown, inputSchema?: { type?: unknown } & Record<string, unknown> }} ToolDescriptor
+ * @typedef {{ list(): unknown[], call(name: string, args: unknown, context: Record<string, unknown>): unknown | Promise<unknown> }} ToolRegistry
+ * @typedef {{ enabled?: boolean }} SkillDescriptor
+ * @typedef {{ get(id: unknown): SkillDescriptor | null | undefined }} SkillRegistry
+ * @typedef {{ tenantId?: unknown, userId?: unknown, traceId?: unknown, [key: string]: unknown }} RequestContext
+ * @typedef {{ trustedRoot: string, context?: RequestContext, sandbox?: unknown, sandboxLimits?: unknown }} ToolsetContext
+ * @typedef {{ runStoreRoot?: string, runEvents?: unknown, runsIndex?: unknown }} RunDeps
+ * @typedef {{ request(payload: Record<string, unknown>): { id: string, promise: Promise<unknown> } }} ApprovalRegistry
+ * @typedef {{ create(args: Record<string, unknown>): { id: unknown, name: unknown, kind: unknown, nextFireAt?: unknown, cronHuman?: unknown } }} Scheduler
+ * @typedef {{ approvals?: ApprovalRegistry | null, scheduler?: Scheduler | null, emit?: (type: string, payload: Record<string, unknown>) => void, runId?: unknown, runAgentChat?: (args: Record<string, unknown>) => Promise<{ text?: unknown, steps: unknown[] }>, kimiConfig?: unknown, modelCall?: unknown, autoApprove?: unknown, auditBus?: unknown, hooks?: unknown }} AgentDeps
+ * @typedef {{ ctx: ToolsetContext, toolRegistry?: ToolRegistry | null, skillRegistry?: SkillRegistry | null, runDeps?: RunDeps, agentDeps?: AgentDeps | null }} BuildToolsetOptions
+ * @typedef {{ ctx: ToolsetContext, runDeps: RunDeps, agentDeps: AgentDeps, baseTools: AgentTool[] }} SubAgentToolOptions
+ */
+
+/** @param {BuildToolsetOptions} options @returns {AgentTool[]} */
 export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = {}, agentDeps = null }) {
-  const tools = createAgentTools(ctx);
+  const tools = createAgentTools(/** @type {Parameters<typeof createAgentTools>[0]} */ (ctx));
   if (toolRegistry && typeof toolRegistry.list === 'function') {
-    for (const descriptor of toolRegistry.list()) {
+    for (const rawDescriptor of toolRegistry.list()) {
+      const descriptor = /** @type {ToolDescriptor} */ (rawDescriptor && typeof rawDescriptor === 'object' ? rawDescriptor : {});
       if (!descriptor.source || !String(descriptor.source).startsWith('mcp:')) continue;
+      const name = String(descriptor.name || '').trim();
+      if (!name) continue;
       tools.push({
-        name: descriptor.name,
+        name,
         risk: 'high',
         mutating: true,
-        description: descriptor.description || `外部连接器工具 ${descriptor.name}`,
+        description: String(descriptor.description || `外部连接器工具 ${name}`),
         parameters: descriptor.inputSchema?.type ? descriptor.inputSchema : { type: 'object', properties: {} },
-        handler: (args) => toolRegistry.call(descriptor.name, args, { trustedRoot: ctx.trustedRoot, context: ctx.context }),
+        handler: (args) => toolRegistry.call(name, args, { trustedRoot: ctx.trustedRoot, context: ctx.context || {} }),
       });
     }
   }
@@ -27,13 +49,13 @@ export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = 
         const skill = skillRegistry.get(args.id);
         if (!skill || !skill.enabled) return { error: `skill not available: ${args.id}` };
         const result = runRecipe({
-          recipeId: args.id,
+          recipeId: String(args.id || ''),
           trustedRoot: ctx.trustedRoot,
           prompt: args.prompt || '',
-          context: ctx.context,
-          runStoreRoot: runDeps.runStoreRoot,
-          runEvents: runDeps.runEvents,
-          runsIndex: runDeps.runsIndex,
+          context: ctx.context || {},
+          runStoreRoot: runDeps.runStoreRoot || '',
+          runEvents: /** @type {Parameters<typeof runRecipe>[0]['runEvents']} */ (runDeps.runEvents || null),
+          runsIndex: /** @type {Parameters<typeof runRecipe>[0]['runsIndex']} */ (runDeps.runsIndex || null),
         });
         return { skill: args.id, operations: result.operations.length, runId: result.runId };
       },
@@ -49,6 +71,7 @@ export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = 
   return tools;
 }
 
+/** @param {AgentDeps} agentDeps @param {ToolsetContext} ctx @returns {AgentTool} */
 function createAskUserQuestionTool(agentDeps, ctx) {
   const emit = typeof agentDeps.emit === 'function' ? agentDeps.emit : () => {};
   const context = (ctx && ctx.context) || {};
@@ -63,8 +86,12 @@ function createAskUserQuestionTool(agentDeps, ctx) {
       if (!question) return { error: 'question is required' };
       const options = (Array.isArray(args.options) ? args.options : [])
         .slice(0, 8)
-        .map((o) => (typeof o === 'string' ? { label: o } : { label: String((o && o.label) || ''), description: (o && o.description) || '' }))
+        .map((o) => {
+          const option = /** @type {{ label?: unknown, description?: unknown }} */ (o && typeof o === 'object' ? o : {});
+          return typeof o === 'string' ? { label: o } : { label: String(option.label || ''), description: option.description || '' };
+        })
         .filter((o) => o.label);
+      if (!agentDeps.approvals) return { error: 'approval registry unavailable' };
       const { id, promise } = agentDeps.approvals.request({
         kind: 'question',
         question,
@@ -80,6 +107,7 @@ function createAskUserQuestionTool(agentDeps, ctx) {
   };
 }
 
+/** @param {ToolsetContext} ctx @param {AgentDeps} agentDeps @returns {AgentTool} */
 function createScheduleTaskTool(ctx, agentDeps) {
   return {
     name: 'ScheduleTask',
@@ -89,6 +117,7 @@ function createScheduleTaskTool(ctx, agentDeps) {
     parameters: { type: 'object', properties: { name: { type: 'string' }, cron: { type: 'string' }, fireAt: { type: 'string' }, prompt: { type: 'string' }, recipeId: { type: 'string' } }, required: ['name'] },
     handler: async (args = {}) => {
       try {
+        if (!agentDeps.scheduler) return { error: 'scheduler unavailable' };
         const record = agentDeps.scheduler.create({
           name: args.name,
           cron: args.cron || null,
@@ -100,12 +129,13 @@ function createScheduleTaskTool(ctx, agentDeps) {
         });
         return { id: record.id, name: record.name, kind: record.kind, nextFireAt: record.nextFireAt, cronHuman: record.cronHuman || null };
       } catch (err) {
-        return { error: err.message };
+        return { error: err instanceof Error ? err.message : String(err) };
       }
     },
   };
 }
 
+/** @param {SubAgentToolOptions} options @returns {AgentTool} */
 function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }) {
   return {
     name: 'Agent',
@@ -114,7 +144,9 @@ function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }) {
     parameters: { type: 'object', properties: { task: { type: 'string', description: '交给子 Agent 的明确子任务' } }, required: ['task'] },
     handler: async (args = {}) => {
       if (typeof agentDeps.runAgentChat !== 'function') return { error: 'sub-agent runner unavailable' };
-      const sub = await agentDeps.runAgentChat({
+      /** @type {(args: Record<string, unknown>) => Promise<{ text?: unknown, steps: unknown[] }>} */
+      const runAgentChat = agentDeps.runAgentChat;
+      const sub = await runAgentChat({
         prompt: String(args.task || ''),
         kimiConfig: agentDeps.kimiConfig,
         trustedRoot: ctx.trustedRoot,
