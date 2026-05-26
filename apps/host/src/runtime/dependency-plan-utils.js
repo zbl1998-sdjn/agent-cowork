@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies.js';
+import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
 
 export function finiteBytes(value) {
   const n = Number(value);

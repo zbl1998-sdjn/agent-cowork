@@ -179,6 +179,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] Host 体积治理(run trace):`run-trace-normalizers.js` 拆出 `run-trace-sanitizers.js` 的脱敏、截断、JSON parse 与 tool call/schema helper,保留 trace entry schema 和公共导出;聚焦 run-trace 测试与门禁通过,体积软警告降为 8 个。
 - [x] Host 体积治理(data profile):`tools/data/profile.js` 拆出 `tools/data/table.js` 的 trustedRoot 校验、大小限制和 CSV/TSV 解析 helper,保留 `readDataTable` re-export 与 `data.profile`/`data.analyze`/`AnalyzeDataFile` 契约;聚焦 data profile 测试与门禁通过,体积软警告降为 7 个。
 - [x] Host 体积治理(dependency plans):`runtime/dependency-install-plan.js` 拆出 `dependency-plan-utils.js` 的路径 jail、catalog、字节数和供应链预检 helper,保留安装/清理/更新计划结构与 route 行为;聚焦 runtime dependency 测试与门禁通过,体积软警告降为 6 个。
+- [x] Host 体积治理(dependency catalog):`runtime/dependencies.js` 拆出 `dependencies-catalog.js` 静态 catalog,保留原 catalog re-export 与依赖状态响应;`dependency-plan-utils` 直接依赖 catalog,聚焦 runtime dependency 测试与门禁通过,体积软警告降为 5 个。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
