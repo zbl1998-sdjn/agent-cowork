@@ -1,5 +1,8 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
+
+/** @typedef {{ maxBytes?: unknown, maxFiles?: unknown }} JsonlWriterOptions */
 
 // Append-only JSONL writer with size-based rotation. Audit/event logs grow
 // without bound otherwise; here, once the file would exceed `maxBytes` we shift
@@ -9,12 +12,23 @@ const DEFAULT_MAX_BYTES = Number(process.env.KCW_LOG_MAX_BYTES || 8 * 1024 * 102
 const DEFAULT_MAX_FILES = Math.max(1, Number(process.env.KCW_LOG_MAX_FILES || 3));
 
 export class JsonlWriter {
+  /**
+   * @param {string} filePath
+   * @param {JsonlWriterOptions} [options]
+   */
   constructor(filePath, { maxBytes = DEFAULT_MAX_BYTES, maxFiles = DEFAULT_MAX_FILES } = {}) {
+    /** @type {string} */
     this.filePath = filePath;
+    /** @type {number} */
     this.maxBytes = Math.max(1, Number(maxBytes) || DEFAULT_MAX_BYTES);
+    /** @type {number} */
     this.maxFiles = Math.max(1, Number(maxFiles) || DEFAULT_MAX_FILES);
   }
 
+  /**
+   * @param {number} incomingBytes
+   * @returns {void}
+   */
   _rotateIfNeeded(incomingBytes) {
     let size = 0;
     try { size = fs.statSync(this.filePath).size; } catch { return; } // not created yet
@@ -31,6 +45,10 @@ export class JsonlWriter {
     try { fs.writeFileSync(this.filePath, ''); } catch { /* best-effort */ }
   }
 
+  /**
+   * @param {unknown} record
+   * @returns {void}
+   */
   append(record) {
     const dir = path.dirname(this.filePath);
     fs.mkdirSync(dir, { recursive: true });

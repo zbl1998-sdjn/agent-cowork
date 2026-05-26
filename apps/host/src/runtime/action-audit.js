@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import { AuditEventBus, createJsonlAuditSubscriber } from './audit-events.js';
 
@@ -7,12 +8,21 @@ import { AuditEventBus, createJsonlAuditSubscriber } from './audit-events.js';
 // append-only trail of every side-effecting decision the agent made.
 
 const ACTION_AUDIT_FILE = path.join('.AgentCowork', 'audit', 'actions.jsonl');
+/** @type {Map<string, InstanceType<typeof AuditEventBus>>} */
 const buses = new Map();
 
+/**
+ * @param {string | null | undefined} trustedRoot
+ * @returns {string}
+ */
 export function actionAuditPath(trustedRoot) {
   return path.join(path.resolve(trustedRoot || '.'), ACTION_AUDIT_FILE);
 }
 
+/**
+ * @param {string | null | undefined} trustedRoot
+ * @returns {InstanceType<typeof AuditEventBus>}
+ */
 export function getActionAuditBus(trustedRoot) {
   const file = actionAuditPath(trustedRoot);
   let bus = buses.get(file);
