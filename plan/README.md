@@ -142,6 +142,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-5 代码+单测完成:`Timeline` 在长会话中复用 `computeVirtualWindow` 只渲当前窗口,保留原 timeline 滚动容器和 sticky-to-bottom 行为;短会话仍全量渲染。新增长会话窗口化单测,真实 profiling/安装版长会话深验后续补。
 - [x] FE-6 代码+单测+构建完成:侧边面板、Settings 与运行时依赖子面板已按需 `React.lazy` 加载;Vite manualChunks 已拆出 `vendor-react`、markdown、`panel-*`、Settings 与 RuntimeDependenciesPanel chunk。新增 UI/配置单测,真实 UI build 已验证 chunk 输出;安装版首屏体感后续补。
 - [x] FE-2a 局部迁移(SchedulesPanel):建立 `components/panels/` 目录,先迁移无 props 的定时任务面板与测试,同步 `AppSidePanel` lazy import 和 `panel-schedules` 分包规则;其余面板继续小步迁移。
+- [x] FE-2a 局部迁移(ObservabilityPanel):可观测面板与状态视图单测迁入 `components/panels/`,同步懒加载入口和 `panel-observability` 分包规则;运行记录 API、空态/错误态与 view-model 行为不变。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。

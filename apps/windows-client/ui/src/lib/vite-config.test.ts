@@ -10,7 +10,7 @@ describe('vite manualChunks', () => {
   it('splits panel chunks away from the startup bundle', () => {
     expect(manualChunks('C:/repo/src/components/ToolsPanel.tsx')).toBe('panel-tools');
     expect(manualChunks('C:/repo/src/components/panels/SchedulesPanel.tsx')).toBe('panel-schedules');
-    expect(manualChunks('C:/repo/src/components/ObservabilityPanel.tsx')).toBe('panel-observability');
+    expect(manualChunks('C:/repo/src/components/panels/ObservabilityPanel.tsx')).toBe('panel-observability');
   });
 
   it('keeps unrelated app modules in the default chunking path', () => {

@@ -22,7 +22,7 @@ export function manualChunks(id) {
         return 'panel-schedules';
     if (normalized.indexOf('/src/components/MemoryPanel') >= 0)
         return 'panel-memory';
-    if (normalized.indexOf('/src/components/ObservabilityPanel') >= 0)
+    if (normalized.indexOf('/src/components/ObservabilityPanel') >= 0 || normalized.indexOf('/src/components/panels/ObservabilityPanel') >= 0)
         return 'panel-observability';
     return undefined;
 }

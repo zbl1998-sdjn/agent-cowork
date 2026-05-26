@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getRunRecord, listRunRecords, openPath } from '../lib/api';
-import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../lib/run-observability';
-import type { RunRecord } from '../lib/types';
-import { Empty, ErrorState } from './ui/StateViews';
+import { getRunRecord, listRunRecords, openPath } from '../../lib/api';
+import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../../lib/run-observability';
+import type { RunRecord } from '../../lib/types';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 function runTitle(record: RunRecord): string {
   return record.promptPreview || record.prompt || record.id;
