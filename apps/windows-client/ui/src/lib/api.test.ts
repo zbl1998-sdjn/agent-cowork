@@ -693,6 +693,36 @@ describe('SSE streams', () => {
     expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });
   });
 
+  it('posts resumeRunId to the agent stream and exposes resumed start metadata', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/agent/chat/stream')) {
+        return sseResponse([
+          'event: start',
+          'data: {"runId":"run_resume","resumed":true}',
+          '',
+          'event: done',
+          'data: {"text":"续跑完成","runId":"run_resume"}',
+          '',
+        ].join('\n'));
+      }
+      return jsonResponse({ ok: true });
+    });
+    let start: unknown = null;
+
+    await api.agentChatStream('', { trustedRoot: 'C:/work', resumeRunId: 'run_resume' }, {
+      onStart: (runId, meta) => { start = { runId, meta }; },
+    });
+
+    const streamCall = calls.find((call) => call.url.endsWith('/api/agent/chat/stream'));
+    expect(JSON.parse(String(streamCall?.init?.body))).toMatchObject({
+      prompt: '',
+      trustedRoot: 'C:/work',
+      resumeRunId: 'run_resume',
+    });
+    expect(start).toEqual({ runId: 'run_resume', meta: { resumed: true } });
+  });
+
   it('routes cancelled agent frames without marking the run done', async () => {
     const { api } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });

@@ -143,6 +143,7 @@ export function buildAgentChatStreamOptions(input: {
   autoApprove?: boolean;
   planMode?: boolean;
   images?: string[];
+  resumeRunId?: string;
 }) {
   return {
     trustedRoot: input.trustedRoot,
@@ -152,6 +153,7 @@ export function buildAgentChatStreamOptions(input: {
     autoApprove: input.autoApprove,
     planMode: input.planMode,
     images: input.images,
+    ...(input.resumeRunId ? { resumeRunId: input.resumeRunId } : {}),
   };
 }
 

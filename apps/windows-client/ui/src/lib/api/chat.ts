@@ -71,7 +71,7 @@ export interface AgentStreamHandlers {
   onFileWritten?: (path: string) => void;
   onVerifyStart?: () => void;
   onQuestion?: (id: string, question: string, options: Array<{ label: string; description?: string }>) => void;
-  onStart?: (runId: string) => void;
+  onStart?: (runId: string, meta?: { resumed?: boolean }) => void;
   onDone?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
   onCancelled?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
   onError?: (message: string) => void;
@@ -139,6 +139,7 @@ export async function agentChatStream(
     autoApprove?: boolean;
     planMode?: boolean;
     images?: string[];
+    resumeRunId?: string;
   } = {},
   handlers: AgentStreamHandlers = {},
 ): Promise<void> {
@@ -155,6 +156,7 @@ export async function agentChatStream(
       autoApprove: opts.autoApprove,
       planMode: opts.planMode,
       images: opts.images,
+      resumeRunId: opts.resumeRunId,
     }),
   });
   if (!response.ok || !response.body) {
@@ -162,7 +164,7 @@ export async function agentChatStream(
     return;
   }
   await streamSse(response, (type, data) => {
-    if (type === 'start') handlers.onStart?.(str(data, 'runId') || '');
+    if (type === 'start') handlers.onStart?.(str(data, 'runId') || '', { resumed: data.resumed === true });
     else if (type === 'token') handlers.onToken?.(str(data, 'delta') || '');
     else if (type === 'reasoning') handlers.onReasoning?.(str(data, 'delta') || '');
     else if (type === 'tool_call') handlers.onToolCall?.(str(data, 'name') || '', data.args);

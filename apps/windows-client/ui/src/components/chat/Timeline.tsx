@@ -7,6 +7,7 @@ import { AssistantTurn, UserEditTurn, UserTurn } from './TimelineTurns';
 
 export {
   assistantTurnPropsEqual,
+  assistantContinueRunId,
   userEditTurnPropsEqual,
   userTurnPropsEqual,
   type AssistantTurnProps,
@@ -32,6 +33,7 @@ interface TimelineProps {
   onPatchAssistant: (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
   onQuickSend: (text: string) => void;
   onRegenerate: (assistantId: string) => void;
+  onResumeRun: (runId: string) => void;
   onScrollToBottom: () => void;
   onSetEditingMsgId: (id: string | null) => void;
   onSetEditText: (text: string) => void;
@@ -131,6 +133,7 @@ export function Timeline({
   onPatchAssistant,
   onQuickSend,
   onRegenerate,
+  onResumeRun,
   onScrollToBottom,
   onSetEditingMsgId,
   onSetEditText,
@@ -201,6 +204,7 @@ export function Timeline({
               onPatchAssistant={onPatchAssistant}
               onQuickSend={onQuickSend}
               onRegenerate={onRegenerate}
+              onResumeRun={onResumeRun}
             />
           ))}
           {timelineWindow.bottomSpacer > 0 && <div aria-hidden="true" className="timeline-window-spacer" style={{ height: timelineWindow.bottomSpacer }} />}

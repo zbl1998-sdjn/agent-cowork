@@ -170,16 +170,17 @@ export function App() {
     } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
   }, [trustedRoot, patchAssistant, wireEvents]);
 
-  const handleSend = useCallback(async (text: string, meta: ComposerMeta) => {
+  const handleSend = useCallback(async (text: string, meta: ComposerMeta & { resumeRunId?: string }) => {
+    const resumeRunId = meta.resumeRunId?.trim();
     const userText = text || (meta.files.length ? `（已上传 ${meta.files.length} 个文件）` : '');
     setMessages((list) => [...list, { id: nextMessageId(), role: 'user', text: userText }]);
     const assistantId = nextMessageId();
     setMessages((list) => [...list, { id: assistantId, role: 'assistant', status: 'thinking', progress: [], operations: [], sources: [], approvalState: 'idle' }]);
-    const uploaded = await uploadAttachments(meta.files);
-    if (selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
+    const uploaded = resumeRunId ? [] : await uploadAttachments(meta.files);
+    if (!resumeRunId && selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
 
     const sessionModelAccess = hasSessionModelAccess(meta.modelConfig);
-    let enabled = chatEnabled || sessionModelAccess;
+    let enabled = Boolean(resumeRunId) || chatEnabled || sessionModelAccess;
     if (!enabled) {
       try {
         const reconciled = reconcileChatEnabled(chatEnabled, await getKimiInfo());
@@ -193,7 +194,7 @@ export function App() {
       return;
     }
 
-    const prompt = uploaded.length ? `${text}\n\n[已上传文件]\n${uploaded.join('\n')}` : text;
+    const prompt = resumeRunId ? '' : uploaded.length ? `${text}\n\n[已上传文件]\n${uploaded.join('\n')}` : text;
     setStreamingId(assistantId);
     try {
       await agentChatStream(prompt, buildAgentChatStreamOptions({
@@ -204,6 +205,7 @@ export function App() {
         autoApprove,
         planMode,
         images: uploaded.filter((p) => isImagePath(p)),
+        resumeRunId,
       }), {
         onStart: (rid) => patchAssistant(assistantId, (m) => ({ ...m, runId: rid })),
         onReasoning: (delta) => patchAssistant(assistantId, (m) => ({ ...m, reasoning: (m.reasoning || '') + delta })),
@@ -238,6 +240,7 @@ export function App() {
   }, [autoApprove, chatEnabled, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
+  const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
   const regenerate = useCallback((assistantId: string) => {
     const currentMessages = messagesRef.current;
     const idx = currentMessages.findIndex((m) => m.id === assistantId);
@@ -302,7 +305,7 @@ export function App() {
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
         <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
-        <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
+        <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />

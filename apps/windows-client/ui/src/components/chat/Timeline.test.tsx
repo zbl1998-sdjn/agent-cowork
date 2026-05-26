@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AssistantMessage, Message, UserMessage } from '../../lib/app-types';
 import {
   Timeline,
+  assistantContinueRunId,
   assistantTurnPropsEqual,
   computeTimelineWindow,
   userEditTurnPropsEqual,
@@ -45,6 +46,7 @@ function assistantTurnProps(overrides: Partial<AssistantTurnProps> = {}): Assist
     onPatchAssistant: vi.fn(),
     onQuickSend: vi.fn(),
     onRegenerate: vi.fn(),
+    onResumeRun: vi.fn(),
     ...overrides,
   };
 }
@@ -95,6 +97,7 @@ function renderTimelineWith(overrides: Partial<Parameters<typeof Timeline>[0]> =
       onPatchAssistant={vi.fn()}
       onQuickSend={vi.fn()}
       onRegenerate={vi.fn()}
+      onResumeRun={vi.fn()}
       onScrollToBottom={vi.fn()}
       onSetEditingMsgId={vi.fn()}
       onSetEditText={vi.fn()}
@@ -113,6 +116,12 @@ describe('Timeline', () => {
     expect(cancelled).toContain('>继续</button>');
     expect(failed).toContain('执行失败。');
     expect(failed).toContain('>继续</button>');
+  });
+
+  it('resolves continue actions to resume run ids when a checkpoint run exists', () => {
+    expect(assistantContinueRunId({ ...baseAssistant, runId: ' run_resume ' })).toBe('run_resume');
+    expect(assistantContinueRunId({ ...baseAssistant, runId: '' })).toBeNull();
+    expect(assistantContinueRunId({ ...baseAssistant, status: 'done', runId: 'run_done' })).toBeNull();
   });
 
   it('shows exact-ID batch approval actions only when multiple approvals are visible', () => {
@@ -185,6 +194,7 @@ describe('Timeline', () => {
     expect(assistantTurnPropsEqual(props, { ...props, message: { ...baseAssistant } })).toBe(false);
     expect(assistantTurnPropsEqual(props, { ...props, streamingId: baseAssistant.id })).toBe(false);
     expect(assistantTurnPropsEqual(props, { ...props, onRegenerate: vi.fn() })).toBe(false);
+    expect(assistantTurnPropsEqual(props, { ...props, onResumeRun: vi.fn() })).toBe(false);
   });
 
   it('keeps user turns memoized across unrelated assistant streaming updates', () => {

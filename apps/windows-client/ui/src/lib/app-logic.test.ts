@@ -178,7 +178,12 @@ describe('buildAgentChatStreamOptions', () => {
       autoApprove: false,
       planMode: true,
       images: ['C:/work/a.png'],
+      resumeRunId: 'run_resume',
     })).not.toHaveProperty('modelConfig');
+    expect(buildAgentChatStreamOptions({
+      trustedRoot: 'C:/work',
+      resumeRunId: 'run_resume',
+    })).toMatchObject({ trustedRoot: 'C:/work', resumeRunId: 'run_resume' });
 
     expect(buildAgentChatStreamOptions({
       trustedRoot: 'C:/work',
