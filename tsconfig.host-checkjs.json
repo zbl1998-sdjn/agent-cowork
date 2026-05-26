@@ -57,6 +57,7 @@
     "apps/host/src/runtime/font-runtime.js",
     "apps/host/src/runtime/file-operation-approvals.js",
     "apps/host/src/runtime/git-runtime.js",
+    "apps/host/src/runtime/model-recorder.js",
     "apps/host/src/runtime/oauth-permission-approvals.js",
     "apps/host/src/runtime/ocr-runtime.js",
     "apps/host/src/runtime/pandoc-runtime.js",
