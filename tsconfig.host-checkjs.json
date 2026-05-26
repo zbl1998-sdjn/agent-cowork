@@ -56,6 +56,7 @@
     "apps/host/src/runtime/oauth-permission-approvals.js",
     "apps/host/src/runtime/ocr-runtime.js",
     "apps/host/src/runtime/pandoc-runtime.js",
+    "apps/host/src/runtime/plan-builder.js",
     "apps/host/src/runtime/rate-limit.js",
     "apps/host/src/runtime/resilience.js",
     "apps/host/src/runtime/run-attribution.js",
