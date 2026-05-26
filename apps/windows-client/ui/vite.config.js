@@ -12,7 +12,7 @@ export function manualChunks(id) {
         return 'markdown';
     if (normalized.indexOf('/src/components/ToolsPanel') >= 0)
         return 'panel-tools';
-    if (normalized.indexOf('/src/components/VizPanel') >= 0)
+    if (normalized.indexOf('/src/components/VizPanel') >= 0 || normalized.indexOf('/src/components/panels/VizPanel') >= 0)
         return 'panel-viz';
     if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0)
         return 'panel-connectors';

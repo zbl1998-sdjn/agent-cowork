@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../lib/api';
-import { LiveArtifactView } from './LiveArtifactView';
-import { ErrorState } from './ui/StateViews';
+import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../../lib/api';
+import { LiveArtifactView } from '../LiveArtifactView';
+import { ErrorState } from '../ui/StateViews';
 
 interface VizPanelProps {
   trustedRoot: string;
