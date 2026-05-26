@@ -1,14 +1,32 @@
 import childProcess from 'node:child_process';
 
+/**
+ * @typedef {{ code?: string, message?: string }} ProbeError
+ * @typedef {{ status?: number | null, stdout?: unknown, stderr?: unknown, error?: ProbeError }} ProbeResult
+ * @typedef {(command: string, args: readonly string[], options: Record<string, unknown>) => ProbeResult} SpawnSyncLike
+ * @typedef {Record<string, string | undefined>} RuntimeEnv
+ * @typedef {{ backend?: string, image?: string | null, distro?: string | null, [key: string]: unknown }} SandboxStartupOptions
+ * @typedef {{ available: boolean, usable: boolean, networkIsolated: boolean, image?: string | null, imagePresent?: boolean, distro?: string | null, detail: string, reason: string }} BackendProbe
+ * @typedef {{ docker: BackendProbe, wsl: BackendProbe, local: { available: boolean, usable: boolean, networkIsolated: boolean } }} StartupBackends
+ */
+
 const DOCKER_INFO_ARGS = Object.freeze(['info', '--format', '{{.ServerVersion}}']);
 const WSL_STATUS_ARGS = Object.freeze(['--status']);
 const DEFAULT_PROBE_TIMEOUT_MS = 1500;
 const LOCAL_WARNING = '本地不隔离网络: local sandbox runs on the host and cannot enforce network isolation.';
 
+/** @param {unknown} value @returns {string} */
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 240);
 }
 
+/**
+ * @param {SpawnSyncLike} spawnSync
+ * @param {string} command
+ * @param {readonly string[]} args
+ * @param {number} timeoutMs
+ * @returns {{ ok: boolean, detail: string }}
+ */
 function runProbe(spawnSync, command, args, timeoutMs) {
   try {
     const result = spawnSync(command, args, {
@@ -24,10 +42,12 @@ function runProbe(spawnSync, command, args, timeoutMs) {
     }
     return { ok: true, detail: cleanText(result.stdout || result.stderr) };
   } catch (err) {
-    return { ok: false, detail: cleanText(err && err.message) };
+    const message = err instanceof Error ? err.message : err;
+    return { ok: false, detail: cleanText(message) };
   }
 }
 
+/** @param {{ sandboxOptions?: SandboxStartupOptions, env?: RuntimeEnv }} options @returns {string | null} */
 function dockerImageFrom({ sandboxOptions = {}, env = {} }) {
   return sandboxOptions.image
     || env.KCW_SANDBOX_DOCKER_IMAGE
@@ -35,6 +55,7 @@ function dockerImageFrom({ sandboxOptions = {}, env = {} }) {
     || null;
 }
 
+/** @param {{ spawnSync: SpawnSyncLike, timeoutMs: number, image?: string | null }} options @returns {BackendProbe} */
 function probeDocker({ spawnSync, timeoutMs, image }) {
   const docker = {
     available: false,
@@ -65,6 +86,7 @@ function probeDocker({ spawnSync, timeoutMs, image }) {
   return docker;
 }
 
+/** @param {{ spawnSync: SpawnSyncLike, timeoutMs: number, distro?: string | null }} options @returns {BackendProbe} */
 function probeWsl({ spawnSync, timeoutMs, distro }) {
   const wsl = {
     available: false,
@@ -82,6 +104,7 @@ function probeWsl({ spawnSync, timeoutMs, distro }) {
   return wsl;
 }
 
+/** @param {StartupBackends} backends @returns {string} */
 function fallbackReason(backends) {
   const docker = backends.docker;
   if (docker.available && docker.image && !docker.imagePresent) {
@@ -96,6 +119,10 @@ function fallbackReason(backends) {
   return 'No Docker backend with a local image is available.';
 }
 
+/**
+ * @param {{ requestedBackend?: string, sandboxOptions: SandboxStartupOptions, docker: BackendProbe, wsl: BackendProbe }} options
+ * @returns {{ options: SandboxStartupOptions, info: Record<string, unknown> }}
+ */
 function explicitStartup({ requestedBackend, sandboxOptions, docker, wsl }) {
   const backend = String(requestedBackend || '').toLowerCase();
   const networkIsolated = backend === 'docker' || backend === 'vm' || backend === 'hyperv';
@@ -117,6 +144,10 @@ function explicitStartup({ requestedBackend, sandboxOptions, docker, wsl }) {
   };
 }
 
+/**
+ * @param {{ requestedBackend?: string, sandboxOptions?: SandboxStartupOptions, env?: RuntimeEnv, spawnSync?: SpawnSyncLike, timeoutMs?: number }} [options]
+ * @returns {{ options: SandboxStartupOptions, info: Record<string, unknown> }}
+ */
 export function resolveSandboxStartup({
   requestedBackend = 'auto',
   sandboxOptions = {},

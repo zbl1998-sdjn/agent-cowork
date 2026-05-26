@@ -3,47 +3,40 @@ import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { normalizeSandboxSpec } from './index.js';
 import { resolveLocalRuntimeTool, withLocalRuntimeToolLimits } from './local-runtime-tools.js';
+import { MAX_CODE_BYTES, SCRIPT_DIR_SEGMENTS, fail, pickExt, preview, toHttpError } from './code-runner-utils.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 
-// Materialise an inline snippet inside trustedRoot, execute it via the
-// structured sandbox spec, and record a sandbox-code run/event timeline.
-// The script argv stays relative to trustedRoot so local and mounted VM/docker
-// backends resolve the same file.
+/**
+ * @typedef {import('./sandbox-spec.js').SandboxSpec} SandboxSpec
+ * @typedef {import('./sandbox-spec.js').SandboxLimits} SandboxLimits
+ * @typedef {{ backend?: unknown, exitCode: number, stdout?: string, stderr?: string, timedOut?: boolean, truncated?: boolean, durationMs?: number }} SandboxExecResult
+ * @typedef {{ backend?: unknown, exec(spec: SandboxSpec, ctx?: { trustedRoot?: string, context?: Record<string, unknown> }): Promise<SandboxExecResult> | SandboxExecResult }} SandboxLike
+ * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
+ * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
+ * @typedef {{
+ *   sandbox?: SandboxLike | null,
+ *   sandboxLimits?: SandboxLimits,
+ *   runtimeEnv?: Record<string, string | undefined>,
+ *   nodeExecPath?: unknown,
+ *   tool?: unknown,
+ *   code?: unknown,
+ *   prompt?: unknown,
+ *   ext?: unknown,
+ *   timeoutMs?: unknown,
+ *   network?: boolean,
+ *   trustedRoot: string,
+ *   runStoreRoot: string,
+ *   runEvents?: RunEventsLike | null,
+ *   runsIndex?: RunsIndexLike | null,
+ *   context?: Record<string, unknown>,
+ * }} RunCodeOptions
+ * @typedef {{ id: string, [key: string]: unknown }} RunRecordLike
+ */
 
-const MAX_CODE_BYTES = 256 * 1024;
-const EXT_BY_TOOL = Object.freeze({
-  node: 'js',
-  python: 'py',
-  python3: 'py',
-});
-const EXT_RE = /^[a-z0-9]{1,8}$/i;
-const SCRIPT_DIR_SEGMENTS = ['.AgentCowork', 'scripts'];
-
-function fail(message, statusCode = 400) {
-  const error = new Error(`code runner: ${message}`);
-  error.statusCode = statusCode;
-  return error;
-}
-
-function pickExt(tool, override) {
-  if (override != null) {
-    const ext = String(override).replace(/^\./, '');
-    if (!EXT_RE.test(ext)) {
-      throw fail('ext must be a short alphanumeric extension');
-    }
-    return ext.toLowerCase();
-  }
-  return EXT_BY_TOOL[tool] || 'txt';
-}
-
-function preview(text, max = 2000) {
-  if (typeof text !== 'string' || text.length === 0) {
-    return '';
-  }
-  return text.length > max ? `${text.slice(0, max)}…` : text;
-}
-
+/**
+ * @param {RunCodeOptions} options
+ */
 export async function runCode({
   sandbox,
   sandboxLimits = {},
@@ -100,8 +93,7 @@ export async function runCode({
       sandboxLimits,
     );
   } catch (err) {
-    err.statusCode = err.statusCode || 400;
-    throw err;
+    throw toHttpError(err, 400);
   }
 
   const localRuntime = resolveLocalRuntimeTool(toolName, sandbox, runtimeEnv, nodeExecPath);
@@ -125,12 +117,14 @@ export async function runCode({
       spec = requestedSpec;
     }
   } catch (err) {
-    err.statusCode = err.statusCode || 400;
-    throw err;
+    throw toHttpError(err, 400);
   }
 
+  /** @type {Record<string, unknown>[]} */
   const events = [];
+  /** @param {string} type @param {Record<string, unknown>} [payload] */
   const emit = (type, payload = {}) => {
+    /** @type {Record<string, unknown>} */
     let enriched;
     if (runEvents) {
       enriched = runEvents.publish(runId, { type, ...payload });
@@ -157,6 +151,7 @@ export async function runCode({
     input: { prompt: promptText, tool: toolName, script: scriptRelative },
   };
 
+  /** @param {RunRecordLike} record */
   const finalize = (record) => {
     const runPath = writeRunRecord(runStoreRoot, record);
     if (runsIndex) {
@@ -173,17 +168,18 @@ export async function runCode({
     fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
     fs.writeFileSync(scriptPath, code, 'utf8');
   } catch (err) {
-    emit('assistant_end', { status: 'failed', error: err.message });
+    const error = toHttpError(err);
+    emit('assistant_end', { status: 'failed', error: error.message });
     const finishedAt = new Date();
     const runPath = finalize({
       ...baseRecord,
       status: 'failed',
       finishedAt: finishedAt.toISOString(),
       durationMs: finishedAt.getTime() - startedAt.getTime(),
-      error: { message: err.message },
+      error: { message: error.message },
     });
-    err.payload = { runId, runPath };
-    throw err;
+    error.payload = { runId, runPath };
+    throw error;
   }
 
   emit('progress', { icon: 'check', text: `已写入脚本 ${scriptRelative}` });
@@ -193,19 +189,19 @@ export async function runCode({
   try {
     result = await sandbox.exec(spec, { trustedRoot: safeRoot, context });
   } catch (err) {
-    emit('sandbox_end', { status: 'failed', error: err.message });
-    emit('assistant_end', { status: 'failed', error: err.message });
+    const error = toHttpError(err, 502);
+    emit('sandbox_end', { status: 'failed', error: error.message });
+    emit('assistant_end', { status: 'failed', error: error.message });
     const finishedAt = new Date();
     const runPath = finalize({
       ...baseRecord,
       status: 'failed',
       finishedAt: finishedAt.toISOString(),
       durationMs: finishedAt.getTime() - startedAt.getTime(),
-      error: { message: err.message },
+      error: { message: error.message },
     });
-    err.payload = { runId, runPath };
-    err.statusCode = err.statusCode || 502;
-    throw err;
+    error.payload = { runId, runPath };
+    throw error;
   }
 
   const finishedAt = new Date();
