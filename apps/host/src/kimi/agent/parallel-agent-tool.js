@@ -1,7 +1,21 @@
+// @ts-check
 const DEFAULT_PARALLEL_AGENT_BUDGET_BYTES = 32 * 1024;
 const DEFAULT_PARALLEL_AGENT_MAX_TASKS = 8;
 const DEFAULT_PARALLEL_AGENT_CONCURRENCY = 3;
 
+/**
+ * @typedef {{ task?: unknown, goal?: unknown }} TaskLike
+ * @typedef {Record<string, unknown> & { tasks?: unknown, agents?: unknown, maxTasks?: unknown, contextBudgetBytes?: unknown, maxConcurrency?: unknown, maxSteps?: unknown }} ParallelArgs
+ * @typedef {{ index: number, task: string }} NormalizedTask
+ * @typedef {{ error?: string, contextBytes?: number, contextBudgetBytes?: number, maxTasks?: number }} ParallelLimits
+ * @typedef {{ trustedRoot: string, sandbox?: unknown, sandboxLimits?: unknown, context?: Record<string, unknown> }} ParallelCtx
+ * @typedef {{ runStoreRoot?: unknown, runEvents?: unknown, runsIndex?: unknown }} RunDeps
+ * @typedef {{ runAgentChat?: (args: Record<string, unknown>) => Promise<{ text?: unknown, steps: unknown[] }>, kimiConfig?: unknown, modelCall?: unknown, approvals?: unknown, autoApprove?: unknown, auditBus?: unknown, hooks?: unknown, emit?: (type: string, payload: Record<string, unknown>) => void }} AgentDeps
+ * @typedef {{ ctx: ParallelCtx, runDeps: RunDeps, agentDeps: AgentDeps, baseTools: unknown[] }} ParallelToolOptions
+ * @typedef {{ index: number, task: string, ok: boolean, text?: unknown, steps?: number, error?: string }} ChildResult
+ */
+
+/** @param {ParallelArgs} [args] @returns {NormalizedTask[]} */
 function normalizeParallelAgentTasks(args = {}) {
   const rawTasks = Array.isArray(args.tasks)
     ? args.tasks
@@ -13,11 +27,12 @@ function normalizeParallelAgentTasks(args = {}) {
       index,
       task: typeof task === 'string'
         ? task.trim()
-        : String(task?.task || task?.goal || '').trim(),
+        : String((/** @type {TaskLike} */ (task && typeof task === 'object' ? task : {})).task || (/** @type {TaskLike} */ (task && typeof task === 'object' ? task : {})).goal || '').trim(),
     }))
     .filter((task) => task.task);
 }
 
+/** @param {NormalizedTask[]} tasks @param {ParallelArgs} [args] @returns {ParallelLimits} */
 function enforceParallelAgentBudget(tasks, args = {}) {
   const maxTasks = Math.max(1, Number(args.maxTasks) || DEFAULT_PARALLEL_AGENT_MAX_TASKS);
   if (tasks.length === 0) return { error: 'tasks must be a non-empty array' };
@@ -30,6 +45,7 @@ function enforceParallelAgentBudget(tasks, args = {}) {
   return { contextBytes, contextBudgetBytes: budget, maxTasks };
 }
 
+/** @param {ParallelToolOptions} options */
 export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools }) {
   return {
     name: 'AgentParallel',
@@ -45,17 +61,22 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
     },
     handler: async (args = {}) => {
       if (typeof agentDeps.runAgentChat !== 'function') return { error: 'sub-agent runner unavailable' };
-      const tasks = normalizeParallelAgentTasks(args);
-      const limits = enforceParallelAgentBudget(tasks, args);
+      /** @type {(args: Record<string, unknown>) => Promise<{ text?: unknown, steps: unknown[] }>} */
+      const runAgentChat = agentDeps.runAgentChat;
+      const input = /** @type {ParallelArgs} */ (args);
+      const tasks = normalizeParallelAgentTasks(input);
+      const limits = enforceParallelAgentBudget(tasks, input);
       if (limits.error) return { error: limits.error };
       const concurrency = Math.max(
         1,
-        Math.min(Number(args.maxConcurrency) || DEFAULT_PARALLEL_AGENT_CONCURRENCY, tasks.length),
+        Math.min(Number(input.maxConcurrency) || DEFAULT_PARALLEL_AGENT_CONCURRENCY, tasks.length),
       );
-      const maxSteps = Math.max(1, Number(args.maxSteps) || 4);
+      const maxSteps = Math.max(1, Number(input.maxSteps) || 4);
+      /** @param {string} type @param {Record<string, unknown>} payload */
       const emitChild = (type, payload) => {
         if (typeof agentDeps.emit === 'function') agentDeps.emit(type, payload);
       };
+      /** @type {ChildResult[]} */
       const children = new Array(tasks.length);
       let next = 0;
       async function worker() {
@@ -66,7 +87,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
           const task = tasks[index];
           emitChild('child_start', { index, goal: task.task, stepCount: maxSteps });
           try {
-            const sub = await agentDeps.runAgentChat({
+            const sub = await runAgentChat({
               prompt: task.task,
               kimiConfig: agentDeps.kimiConfig,
               trustedRoot: ctx.trustedRoot,
@@ -85,7 +106,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
               runsIndex: runDeps.runsIndex,
               context: { ...(ctx.context || {}), childIndex: index },
             });
-            children[index] = { index, task: task.task, ok: true, text: sub.text, steps: sub.steps.length };
+            children[index] = { index, task: task.task, ok: true, text: sub.text, steps: Array.isArray(sub.steps) ? sub.steps.length : 0 };
             emitChild('child_end', { index, goal: task.task, status: 'succeeded', stepCount: sub.steps.length });
           } catch (err) {
             children[index] = {

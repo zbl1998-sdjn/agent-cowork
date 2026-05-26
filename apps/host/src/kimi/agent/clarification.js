@@ -1,5 +1,14 @@
+// @ts-check
 import { analyzePromptForRefine } from '../prompt/refine-policy.js';
 
+/**
+ * @typedef {'action' | 'target' | 'desiredOutput' | 'goal'} MissingKey
+ * @typedef {{ missing?: unknown[], needsClarification?: boolean, normalized?: string }} ClarificationPolicy
+ * @typedef {{ handler?: (args: { question: string, options: Array<{ label: string, description: string }> }) => unknown | Promise<unknown> }} AskTool
+ * @typedef {{ prompt?: unknown, userContent?: unknown, toolMap: Map<string, AskTool> }} ClarifyOptions
+ */
+
+/** @type {Record<MissingKey, string>} */
 const MISSING_TEXT = {
   action: '要执行的动作',
   target: '要处理的对象或文件',
@@ -7,10 +16,12 @@ const MISSING_TEXT = {
   goal: '任务目标',
 };
 
+/** @param {unknown[] | undefined} missing */
 function describeMissing(missing) {
-  return missing.map((item) => MISSING_TEXT[item] || item).join('、');
+  return (missing || []).map((item) => MISSING_TEXT[/** @type {MissingKey} */ (item)] || String(item)).join('、');
 }
 
+/** @param {ClarificationPolicy} policy */
 export function buildPromptClarification(policy) {
   const missing = describeMissing(policy.missing);
   return {
@@ -24,11 +35,12 @@ export function buildPromptClarification(policy) {
   };
 }
 
+/** @param {ClarifyOptions} options */
 export async function clarifyPromptBeforeModel({ prompt, userContent, toolMap }) {
   if (Array.isArray(userContent) && userContent.length) {
     return { prompt, clarified: false };
   }
-  const policy = analyzePromptForRefine(prompt);
+  const policy = /** @type {ClarificationPolicy} */ (analyzePromptForRefine(String(prompt || '')));
   if (!policy.needsClarification) {
     return { prompt: policy.normalized || String(prompt || ''), clarified: false };
   }
@@ -38,8 +50,8 @@ export async function clarifyPromptBeforeModel({ prompt, userContent, toolMap })
   }
 
   const { question, options } = buildPromptClarification(policy);
-  const result = await askTool.handler({ question, options });
-  const answer = String(result?.answer || '').trim();
+  const result = /** @type {{ answer?: unknown }} */ (await askTool.handler({ question, options }));
+  const answer = String(result && result.answer || '').trim();
   if (!answer || answer === 'reject') {
     return { prompt: policy.normalized || String(prompt || ''), clarified: false };
   }
