@@ -23,7 +23,10 @@ describe('Settings', () => {
   it('opens on the requested API tab', () => {
     const html = renderSettings('api');
 
-    expect(html).toContain('class="is-active">API</button>');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('ui-btn ui-btn--ghost ui-btn--md is-active');
+    expect(html).toContain('>API</button>');
     expect(html).toContain('加载中');
     expect(html).toContain('ui-icon-btn modal-close');
     expect(html).not.toContain('用户名');
@@ -32,9 +35,22 @@ describe('Settings', () => {
   it('opens on the requested self-check tab', () => {
     const html = renderSettings('selfcheck');
 
-    expect(html).toContain('class="is-active">自检</button>');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('>自检</button>');
     expect(html).toContain('安全 / 韧性自检');
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).not.toContain('用户名');
+  });
+
+  it('renders settings segmented controls through the shared primitive', () => {
+    const appearance = renderSettings('appearance');
+    const input = renderSettings('input');
+
+    expect(appearance).toContain('role="group"');
+    expect(appearance).toContain('aria-label="主题"');
+    expect(appearance).toContain('aria-pressed="true"');
+    expect(input).toContain('aria-label="发送前澄清"');
+    expect(input).toContain('>关闭</button>');
   });
 });

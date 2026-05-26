@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
 import { Button, IconButton } from './ui/Button';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
 
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
@@ -12,6 +13,26 @@ const MODEL_PROVIDERS = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Claude' },
   { value: 'openai/local', label: '本地 OpenAI-compatible' },
+];
+
+const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
+  { value: 'account', label: '账户' },
+  { value: 'appearance', label: '外观' },
+  { value: 'model', label: '模型' },
+  { value: 'input', label: '输入' },
+  { value: 'api', label: 'API' },
+  { value: 'runtime', label: '运行时' },
+  { value: 'selfcheck', label: '自检' },
+];
+
+const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+];
+
+const AUTO_CLARIFY_OPTIONS: Array<{ value: boolean; label: string }> = [
+  { value: false, label: '关闭' },
+  { value: true, label: '开启' },
 ];
 
 interface SettingsProps {
@@ -112,15 +133,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
           <IconButton className="modal-close" label="关闭" onClick={onClose}>×</IconButton>
         </header>
         <div className="settings-body">
-          <nav className="settings-tabs">
-            <button type="button" className={tab === 'account' ? 'is-active' : ''} onClick={() => setTab('account')}>账户</button>
-            <button type="button" className={tab === 'appearance' ? 'is-active' : ''} onClick={() => setTab('appearance')}>外观</button>
-            <button type="button" className={tab === 'model' ? 'is-active' : ''} onClick={() => setTab('model')}>模型</button>
-            <button type="button" className={tab === 'input' ? 'is-active' : ''} onClick={() => setTab('input')}>输入</button>
-            <button type="button" className={tab === 'api' ? 'is-active' : ''} onClick={() => setTab('api')}>API</button>
-            <button type="button" className={tab === 'runtime' ? 'is-active' : ''} onClick={() => setTab('runtime')}>运行时</button>
-            <button type="button" className={tab === 'selfcheck' ? 'is-active' : ''} onClick={() => setTab('selfcheck')}>自检</button>
-          </nav>
+          <nav><SegmentedControl ariaLabel="设置分区" className="settings-tabs" variant="sidebar" value={tab} options={SETTINGS_TABS} onChange={setTab} /></nav>
           <section className="settings-pane">
             {tab === 'account' && (
               <div>
@@ -132,10 +145,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             {tab === 'appearance' && (
               <div className="set-row">
                 <span className="set-label">主题</span>
-                <div className="seg">
-                  <button type="button" className={theme === 'light' ? 'is-active' : ''} onClick={() => onSetTheme('light')}>浅色</button>
-                  <button type="button" className={theme === 'dark' ? 'is-active' : ''} onClick={() => onSetTheme('dark')}>深色</button>
-                </div>
+                <SegmentedControl ariaLabel="主题" className="seg" value={theme} options={THEME_OPTIONS} onChange={onSetTheme} />
               </div>
             )}
             {tab === 'model' && (
@@ -159,10 +169,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             {tab === 'input' && (
               <div className="set-row">
                 <span className="set-label">发送前澄清</span>
-                <div className="seg">
-                  <button type="button" className={!autoClarify ? 'is-active' : ''} onClick={() => onSetAutoClarify(false)}>关闭</button>
-                  <button type="button" className={autoClarify ? 'is-active' : ''} onClick={() => onSetAutoClarify(true)}>开启</button>
-                </div>
+                <SegmentedControl ariaLabel="发送前澄清" className="seg" value={autoClarify} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoClarify} />
               </div>
             )}
             {tab === 'api' && (
