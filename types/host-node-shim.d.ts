@@ -130,6 +130,7 @@ declare module 'node:util' {
 declare module 'node:fs' {
   export interface Stats {
     size: number;
+    mtime: Date;
     mtimeMs: number;
     isDirectory(): boolean;
     isFile(): boolean;

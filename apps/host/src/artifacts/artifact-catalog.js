@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -5,17 +6,35 @@ import { assertTrustedPath } from '../security/path-policy.js';
 const ARTIFACT_ROOT_PARTS = ['.AgentCowork', 'artifacts'];
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.json', '.html', '.htm', '.log']);
 
+/**
+ * @typedef {{ safeRoot: string, root: string }} ArtifactRoot
+ * @typedef {{ path: string, name: string, relativePath: string, extension: string, kind: string, size: number, mtime: string, viewable: boolean }} ArtifactItem
+ * @typedef {{ trustedRoot?: string, limit?: number }} ListArtifactsOptions
+ * @typedef {{ trustedRoot?: string, artifactPath?: string, newName?: unknown }} RenameArtifactOptions
+ * @typedef {{ trustedRoot?: string, artifactPath?: string, maxBytes?: number }} RenderArtifactOptions
+ */
+
+/** @param {string} message @param {number} statusCode @returns {Error & { statusCode: number }} */
+function httpError(message, statusCode) {
+  const err = /** @type {Error & { statusCode: number }} */ (new Error(message));
+  err.statusCode = statusCode;
+  return err;
+}
+
+/** @param {string} trustedRoot @returns {ArtifactRoot} */
 function safeArtifactRoot(trustedRoot) {
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const root = assertTrustedPath(path.join(safeRoot, ...ARTIFACT_ROOT_PARTS), safeRoot);
   return { safeRoot, root };
 }
 
+/** @param {string} parent @param {string} candidate @returns {boolean} */
 function isInside(parent, candidate) {
   const relative = path.relative(parent, candidate);
   return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+/** @param {string} trustedRoot @param {string} artifactPath @returns {{ root: string, safe: string }} */
 function safeArtifactPath(trustedRoot, artifactPath) {
   const { root } = safeArtifactRoot(trustedRoot);
   const safe = assertTrustedPath(path.resolve(artifactPath), root);
@@ -25,6 +44,7 @@ function safeArtifactPath(trustedRoot, artifactPath) {
   return { root, safe };
 }
 
+/** @param {unknown} value @returns {string} */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -34,6 +54,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+/** @param {string} filePath @returns {string} */
 function artifactKind(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.html' || ext === '.htm') {
@@ -66,11 +87,13 @@ function artifactKind(filePath) {
   return 'binary';
 }
 
+/** @param {string} root @param {string} filePath @returns {string} */
 function artifactRelativePath(root, filePath) {
   const relative = path.relative(root, filePath).replace(/\\/g, '/');
   return ['.AgentCowork', 'artifacts', relative].join('/');
 }
 
+/** @param {string} root @param {string} filePath @returns {ArtifactItem} */
 function artifactItem(root, filePath) {
   const stat = fs.statSync(filePath);
   const name = path.basename(filePath);
@@ -86,6 +109,7 @@ function artifactItem(root, filePath) {
   };
 }
 
+/** @param {unknown} newName @returns {string} */
 function safeArtifactName(newName) {
   const name = String(newName || '').trim();
   if (!name) {
@@ -100,6 +124,7 @@ function safeArtifactName(newName) {
   return name;
 }
 
+/** @param {string} root @param {string} current @param {ArtifactItem[]} files @param {number} limit */
 function collectFiles(root, current, files, limit) {
   if (files.length >= limit || !fs.existsSync(current)) {
     return;
@@ -120,11 +145,13 @@ function collectFiles(root, current, files, limit) {
   }
 }
 
+/** @param {ListArtifactsOptions} [options] @returns {ArtifactItem[]} */
 export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
   const { root } = safeArtifactRoot(trustedRoot);
+  /** @type {ArtifactItem[]} */
   const files = [];
   collectFiles(root, root, files, Math.max(1, Math.min(Number(limit) || 20, 100)));
   return files
@@ -132,6 +159,7 @@ export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
     .slice(0, Math.max(1, Math.min(Number(limit) || 20, 100)));
 }
 
+/** @param {RenameArtifactOptions} [options] @returns {ArtifactItem} */
 export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
@@ -141,9 +169,7 @@ export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
   }
   const { root, safe } = safeArtifactPath(trustedRoot, artifactPath);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
-    const err = new Error('artifact not found');
-    err.statusCode = 404;
-    throw err;
+    throw httpError('artifact not found', 404);
   }
   const target = path.join(path.dirname(safe), safeArtifactName(newName));
   if (!isInside(root, target)) {
@@ -153,14 +179,13 @@ export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
     return artifactItem(root, safe);
   }
   if (fs.existsSync(target)) {
-    const err = new Error('artifact target already exists');
-    err.statusCode = 409;
-    throw err;
+    throw httpError('artifact target already exists', 409);
   }
   fs.renameSync(safe, target);
   return artifactItem(root, target);
 }
 
+/** @param {RenderArtifactOptions} [options] @returns {string} */
 export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 * 1024 } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
@@ -170,9 +195,7 @@ export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 *
   }
   const { root, safe } = safeArtifactPath(trustedRoot, artifactPath);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
-    const err = new Error('artifact not found');
-    err.statusCode = 404;
-    throw err;
+    throw httpError('artifact not found', 404);
   }
 
   const stat = fs.statSync(safe);
