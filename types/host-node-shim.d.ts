@@ -124,6 +124,7 @@ declare module 'node:path' {
   export function relative(from: string, to: string): string;
   export function resolve(...paths: string[]): string;
   export const delimiter: string;
+  export const sep: string;
 }
 
 declare module 'node:module' {

@@ -5,6 +5,13 @@ import {
   sendJson,
 } from '../request-utils.js';
 
+/**
+ * @typedef {import('../request-utils.js').HttpRequestLike & { method?: string }} MiddlewareRequest
+ * @typedef {import('../request-utils.js').HttpResponseLike & { setHeader(name: string, value: string): unknown }} MiddlewareResponse
+ * @typedef {{ traceId: string, tenantId: string, userId: string, authenticated?: boolean }} RequestContext
+ * @typedef {{ take(key: string): { limit: number, remaining: number, allowed: boolean, retryAfterSec: number } }} RateLimiterLike
+ */
+
 export const SECURITY_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -19,10 +26,13 @@ const PUBLIC_API_ROUTES = [
   ['POST', '/api/auth/guest'],
 ];
 
+/** @param {unknown} method @param {string} pathname @returns {boolean} */
 function isPublicApiRoute(method, pathname) {
-  return PUBLIC_API_ROUTES.some(([m, p]) => m === method && p === pathname);
+  const requestMethod = String(method || '').toUpperCase();
+  return PUBLIC_API_ROUTES.some(([m, p]) => m === requestMethod && p === pathname);
 }
 
+/** @param {{ request: MiddlewareRequest, response: MiddlewareResponse, pathname: string, requestContext: RequestContext, rateLimiter?: RateLimiterLike | null, requireAuth?: boolean }} options */
 export function applyRequestMiddleware({
   request,
   response,

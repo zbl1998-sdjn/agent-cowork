@@ -20,6 +20,8 @@
     "apps/host/src/connectors/oauth-github.js",
     "apps/host/src/connectors/oauth-permissions.js",
     "apps/host/src/http/request-utils.js",
+    "apps/host/src/http/middleware/common.js",
+    "apps/host/src/http/static-assets.js",
     "apps/host/src/kimi/agent/arg-validator.js",
     "apps/host/src/kimi/agent/checkpoint-state.js",
     "apps/host/src/kimi/agent/loop-guard.js",
