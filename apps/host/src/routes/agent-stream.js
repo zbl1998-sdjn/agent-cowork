@@ -1,102 +1,16 @@
-import { writeRunRecord } from '../runtime/run-store.js';
-import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
-import { createBudgetGuard } from '../runtime/budget-guard.js';
 import { createRunTrace } from '../runtime/run-trace.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
-import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
 import { sse } from '../kimi/agent/finalize.js';
 import { runAgentChat } from '../kimi/agent/tool-loop.js';
 import { buildAgentToolset } from '../kimi/agent/toolset-builder.js';
-import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
 import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
-
-function modelProvider(kimiConfig) {
-  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
-}
-
-function recordAgentRun({
-  runStoreRoot,
-  runsIndex,
-  requestContext,
-  runId,
-  kimiConfig,
-  body,
-  trustedRoot,
-  startedAt,
-  status,
-  prompt,
-  outcome,
-  events,
-}) {
-  const finishedAt = new Date();
-  const record = {
-    id: runId,
-    type: 'agent-chat',
-    provider: modelProvider(kimiConfig),
-    model: kimiConfig.model,
-    systemPromptVersion: SYSTEM_PROMPT_VERSION,
-    promptBuilder: 'agent-system-prompt',
-    configSnapshot: buildAgentConfigSnapshot(body, kimiConfig),
-    mode: 'agent',
-    trustedRoot,
-    startedAt: startedAt.toISOString(),
-    finishedAt: finishedAt.toISOString(),
-    durationMs: finishedAt.getTime() - startedAt.getTime(),
-    status,
-    context: requestContext,
-    input: { prompt: String(prompt || '') },
-    result: { ok: status === 'succeeded', text: outcome.text, steps: outcome.steps, usage: outcome.usage },
-    events,
-  };
-  try {
-    const runPath = writeRunRecord(runStoreRoot, record);
-    runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
-  } catch {
-    // never break the response on record/index failure
-  }
-}
-
-function positiveLimit(value) {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function tightestLimit(configValue, requestValue) {
-  const fromConfig = positiveLimit(configValue);
-  const fromRequest = positiveLimit(requestValue);
-  if (fromConfig !== null && fromRequest !== null) return Math.min(fromConfig, fromRequest);
-  return fromConfig ?? fromRequest ?? undefined;
-}
-
-function budgetInputs(body, kimiConfig) {
-  const requestBody = body && typeof body === 'object' ? body : {};
-  const config = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
-  const requestBudget = requestBody.budget && typeof requestBody.budget === 'object' ? requestBody.budget : {};
-  return { requestBody, config, requestBudget };
-}
-
-function resolveAgentRunTimeoutMs(body, kimiConfig) {
-  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
-  return tightestLimit(config.maxAgentWallClockMs, requestBudget.maxWallClockMs ?? requestBody.maxWallClockMs);
-}
-
-function createAgentBudgetGuard({ body, kimiConfig, startedAt, runTimeoutMs }) {
-  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
-  return createBudgetGuard({
-    maxRunTokens: tightestLimit(config.maxRunTokens, requestBudget.maxRunTokens ?? requestBody.maxRunTokens),
-    maxSessionTokens: tightestLimit(config.maxSessionTokens, requestBudget.maxSessionTokens ?? requestBody.maxSessionTokens),
-    maxRunCostUsd: tightestLimit(config.maxRunCostUsd, requestBudget.maxRunCostUsd ?? requestBody.maxRunCostUsd),
-    maxSessionCostUsd: tightestLimit(config.maxSessionCostUsd, requestBudget.maxSessionCostUsd ?? requestBody.maxSessionCostUsd),
-    maxWallClockMs: runTimeoutMs,
-    model: config.model,
-    startedAtMs: startedAt.getTime(),
-  });
-}
+import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
+import { recordAgentRun } from './agent-stream-record.js';
 
 export async function streamAgentChat({
   response,
