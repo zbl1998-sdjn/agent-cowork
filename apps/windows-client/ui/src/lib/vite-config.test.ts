@@ -14,6 +14,7 @@ describe('vite manualChunks', () => {
     expect(manualChunks('C:/repo/src/components/panels/ArtifactsPanel.tsx')).toBe('panel-artifacts');
     expect(manualChunks('C:/repo/src/components/panels/SchedulesPanel.tsx')).toBe('panel-schedules');
     expect(manualChunks('C:/repo/src/components/panels/MemoryPanel.tsx')).toBe('panel-memory');
+    expect(manualChunks('C:/repo/src/components/panels/RuntimeDependenciesPanel.tsx')).toBe('panel-runtime-dependencies');
     expect(manualChunks('C:/repo/src/components/panels/ObservabilityPanel.tsx')).toBe('panel-observability');
   });
 

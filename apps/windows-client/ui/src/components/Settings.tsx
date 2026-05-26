@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
 import { Loading } from './ui/StateViews';
 
-const RuntimeDependenciesPanel = lazy(() => import('./RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
+const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
 
 type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
 

@@ -6,7 +6,7 @@ import {
   type RuntimeDependencyCleanupPlanResponse,
   type RuntimeDependencyInstallPlanResponse,
   type RuntimeDependencyResponse,
-} from '../lib/api';
+} from '../../lib/api';
 import {
   toRuntimeDependencyCleanupPlanViewModel,
   toRuntimeDependencyInstallPlanViewModel,
@@ -14,7 +14,7 @@ import {
   type RuntimeDependencyCleanupPlanViewModel,
   type RuntimeDependencyInstallPlanViewModel,
   type RuntimeDependencyViewModel,
-} from '../lib/runtime-dependencies';
+} from '../../lib/runtime-dependencies';
 
 export function RuntimeDependencyInstallPlanPreview({ plan }: { plan: RuntimeDependencyInstallPlanViewModel }) {
   return (
