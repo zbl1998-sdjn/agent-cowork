@@ -74,6 +74,7 @@
     "apps/host/src/storage/jsonl-writer.js",
     "apps/host/src/tools/data/profile.js",
     "apps/host/src/tools/data/report.js",
+    "apps/host/src/tools/data/statistics.js",
     "apps/host/src/tools/data/table.js",
     "apps/host/src/tools/tool-registry.js",
     "apps/host/src/util/ids.js",
