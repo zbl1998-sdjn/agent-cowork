@@ -13,6 +13,7 @@ import {
   type OAuthPermission,
   type OAuthStartResult,
 } from '../../lib/api';
+import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 
 type OAuthStatusView = {
@@ -57,6 +58,10 @@ export function ConnectorsPanelMessageState({ message }: { message: string }) {
     return <ErrorState title="连接器操作失败" message={detail} />;
   }
   return <pre className="panel-result">{message}</pre>;
+}
+
+export function ConnectorSearchAction({ onSearch }: { onSearch: () => void }) {
+  return <Button onClick={onSearch}>搜索</Button>;
 }
 
 // Connector catalog + one-click MCP connect. Mirrors Claude Cowork's "suggest
@@ -304,7 +309,7 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void onSearch(); }}
         />
-        <button type="button" onClick={() => void onSearch()}>搜索</button>
+        <ConnectorSearchAction onSearch={() => void onSearch()} />
       </div>
 
       {connected.length > 0 && (
