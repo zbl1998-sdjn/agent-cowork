@@ -4,6 +4,7 @@ import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
+import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
 import { RefinePreview } from './chat/RefinePreview';
 export interface Recipe { id: string; name: string; summary?: string }
@@ -349,16 +350,7 @@ export function Composer({
         </div>
       )}
 
-      {attachments.length > 0 && (
-        <div className="composer-attachments">
-          {attachments.map((file, index) => (
-            <span key={`${file.name}-${index}`} className="attachment-chip">
-              {file.name}
-              <button type="button" aria-label="移除附件" onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== index))}>×</button>
-            </span>
-          ))}
-        </div>
-      )}
+      <ComposerAttachments attachments={attachments} onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))} />
 
       {refineResult && (
         <RefinePreview
