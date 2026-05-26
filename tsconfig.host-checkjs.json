@@ -43,6 +43,8 @@
     "apps/host/src/kimi/api-runner-config.js",
     "apps/host/src/kimi/api-runner-prompts.js",
     "apps/host/src/kimi/api-runner.js",
+    "apps/host/src/kimi/agent-tools-support.js",
+    "apps/host/src/kimi/agent-tools.js",
     "apps/host/src/kimi/chat-stream.js",
     "apps/host/src/kimi/context/context-manager.js",
     "apps/host/src/kimi/context/history-compactor.js",

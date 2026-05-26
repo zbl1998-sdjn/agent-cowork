@@ -1,6 +1,7 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath, assertTrustedPathForCreate, isWorkspaceIgnoredPath } from '../security/path-policy.js';
+import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { readTextFile } from '../workspace/file-reader.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
@@ -8,6 +9,7 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { webFetch } from '../tools/web-fetch.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
 import { analyzeDataFile } from '../tools/data/report.js';
+import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
 
 // Agent tools aligned with the Kimi CLI / Claude Code native tool set:
 //   Read, Write, Edit, Glob, Grep, Shell, WebFetch, git helpers.
@@ -15,46 +17,27 @@ import { analyzeDataFile } from '../tools/data/report.js';
 // can gate them behind an approval prompt. All file paths are jailed to the
 // trusted workspace root.
 
-function clip(text, max = 8000) {
-  const s = String(text ?? '');
-  return s.length > max ? `${s.slice(0, max)}\n…(已截断 ${s.length - max} 字符)` : s;
-}
+/**
+ * @typedef {Record<string, unknown>} ToolArgs
+ * @typedef {{ allowTools?: string[] }} SandboxLimits
+ * @typedef {{ backend?: string, exec(spec: unknown, options: { trustedRoot: string, context?: unknown }): Promise<{ exitCode?: unknown, stdout?: unknown, stderr?: unknown, timedOut?: unknown }> }} SandboxLike
+ * @typedef {{ trustedRoot?: string, sandbox?: SandboxLike, sandboxLimits?: SandboxLimits, context?: unknown }} AgentToolsContext
+ * @typedef {{ name: string, mutating?: boolean, risk?: string, description?: string, parameters?: unknown, inputSchema?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
+ */
 
-function globToRegExp(pattern) {
-  // Minimal glob: ** -> any path, * -> any segment chars, ? -> one char.
-  let re = '';
-  const p = String(pattern).replace(/\\/g, '/');
-  for (let i = 0; i < p.length; i += 1) {
-    const c = p[i];
-    if (c === '*') {
-      if (p[i + 1] === '*') { re += '.*'; i += 1; if (p[i + 1] === '/') i += 1; }
-      else re += '[^/]*';
-    } else if (c === '?') re += '[^/]';
-    else if ('.+^${}()|[]\\'.includes(c)) re += `\\${c}`;
-    else re += c;
-  }
-  return new RegExp(`^${re}$`);
-}
-
-function walkFiles(root, current, out, limit) {
-  if (out.length >= limit || !fs.existsSync(current)) return;
-  for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-    if (out.length >= limit || entry.isSymbolicLink()) continue;
-    const full = path.join(current, entry.name);
-    if (isWorkspaceIgnoredPath(full, root)) continue;
-    if (entry.isDirectory()) walkFiles(root, full, out, limit);
-    else if (entry.isFile()) out.push(path.relative(root, full).replace(/\\/g, '/'));
-  }
-}
-
+/** @param {AgentToolsContext} [ctx] @returns {AgentTool[]} */
 export function createAgentTools(ctx = {}) {
   const { trustedRoot, sandbox, sandboxLimits } = ctx;
+  if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');
   const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
-  const within = (rel) => assertTrustedPath(path.join(root, rel || ''), root);
+  /** @param {unknown} rel */
+  const within = (rel) => assertTrustedPath(path.join(root, String(rel || '')), root);
   // Create-aware variant for write targets that may not exist yet (defeats
   // junction/symlink parent escape on brand-new files).
-  const withinForCreate = (rel) => assertTrustedPathForCreate(path.join(root, rel || ''), root);
+  /** @param {unknown} rel */
+  const withinForCreate = (rel) => assertTrustedPathForCreate(path.join(root, String(rel || '')), root);
 
+  /** @type {AgentTool[]} */
   const tools = [
     {
       name: 'Read', mutating: false, risk: 'safe',
@@ -102,6 +85,7 @@ export function createAgentTools(ctx = {}) {
       description: '按 glob 模式列出工作区内匹配的文件（如 **/*.md）。',
       parameters: { type: 'object', properties: { pattern: { type: 'string' } }, required: ['pattern'] },
       handler: async (args = {}) => {
+        /** @type {string[]} */
         const all = [];
         walkFiles(root, root, all, 2000);
         const re = globToRegExp(args.pattern || '**/*');
@@ -113,12 +97,15 @@ export function createAgentTools(ctx = {}) {
       description: '在工作区文件内容中搜索正则模式，返回命中的文件与行。',
       parameters: { type: 'object', properties: { pattern: { type: 'string' }, glob: { type: 'string' }, maxResults: { type: 'number' } }, required: ['pattern'] },
       handler: async (args = {}) => {
+        /** @type {string[]} */
         const files = [];
         walkFiles(root, root, files, 2000);
         const fileRe = args.glob ? globToRegExp(args.glob) : null;
+        /** @type {RegExp} */
         let re;
-        try { re = new RegExp(args.pattern, 'i'); } catch { throw new Error('invalid regex pattern'); }
+        try { re = new RegExp(String(args.pattern || ''), 'i'); } catch { throw new Error('invalid regex pattern'); }
         const limit = Math.min(Number(args.maxResults) || 50, 200);
+        /** @type {Array<{ file: string, line: number, text: string }>} */
         const hits = [];
         for (const rel of files) {
           if (hits.length >= limit) break;
