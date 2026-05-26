@@ -15,6 +15,7 @@ import { TaskStatusBadge } from '../TaskStatusBadge';
 import { TodoList } from '../TodoList';
 import { ToolCallCard } from '../ToolCallCard';
 import { Button } from '../ui/Button';
+import { ChoiceButton } from '../ui/ChoiceButton';
 
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
 
@@ -170,7 +171,18 @@ function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage
     void answerQuestion(message.question.id, answer);
     onPatchAssistant(message.id, (m) => ({ ...m, question: undefined, status: 'running' }));
   };
-  return <div className="question-card"><div className="question-q">{message.question!.question}</div><div className="question-options">{message.question!.options.length > 0 ? message.question!.options.map((opt, i) => <button key={i} type="button" onClick={() => respondToQuestion(opt.label)}><strong>{opt.label}</strong>{opt.description && <span>{opt.description}</span>}</button>) : <button type="button" onClick={() => respondToQuestion('继续')}>继续</button>}</div></div>;
+  return (
+    <div className="question-card">
+      <div className="question-q">{message.question!.question}</div>
+      <div className="question-options">
+        {message.question!.options.length > 0 ? message.question!.options.map((opt, i) => (
+          <ChoiceButton key={i} tone="warm" label={opt.label} detail={opt.description} onClick={() => respondToQuestion(opt.label)} />
+        )) : (
+          <ChoiceButton tone="warm" label="继续" onClick={() => respondToQuestion('继续')} />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {

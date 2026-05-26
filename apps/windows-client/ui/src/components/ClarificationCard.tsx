@@ -1,3 +1,5 @@
+import { ChoiceButton } from './ui/ChoiceButton';
+
 export interface ClarificationOption {
   label: string;
   detail?: string;
@@ -17,16 +19,15 @@ export function ClarificationCard({ question, options, answer, onAnswer }: Clari
       <div className="clarification-q">{question}</div>
       <div className="clarification-options">
         {options.map((option) => (
-          <button
+          <ChoiceButton
             key={option.label}
-            type="button"
-            className={answer === option.label ? 'is-chosen' : ''}
+            className="clarification-option"
+            label={option.label}
+            detail={option.detail}
+            selected={answer === option.label}
             disabled={Boolean(answer)}
             onClick={() => onAnswer(option)}
-          >
-            <strong>{option.label}</strong>
-            {option.detail && <span>{option.detail}</span>}
-          </button>
+          />
         ))}
       </div>
     </div>

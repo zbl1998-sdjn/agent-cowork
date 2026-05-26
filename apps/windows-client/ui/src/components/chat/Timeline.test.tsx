@@ -163,6 +163,21 @@ describe('Timeline', () => {
     expect(approval).toContain('ui-btn--danger');
   });
 
+  it('renders clarification question options with ChoiceButton primitives', () => {
+    const html = renderTimeline({
+      ...baseAssistant,
+      id: 'a-question',
+      status: 'awaiting_approval',
+      text: undefined,
+      question: { id: 'q1', question: '要继续吗？', options: [{ label: '继续', description: '沿用当前计划' }] },
+    });
+
+    expect(html).toContain('question-card');
+    expect(html).toContain('要继续吗？');
+    expect(html).toContain('沿用当前计划');
+    expect(html).toContain('ui-btn ui-btn--secondary');
+  });
+
   it('keeps assistant turns memoized unless render-sensitive props change', () => {
     const props = assistantTurnProps();
 
