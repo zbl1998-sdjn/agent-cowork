@@ -1,4 +1,5 @@
 import type { ApprovalState, FileOperation } from '../lib/types';
+import { Button } from './ui/Button';
 
 export interface ApprovalActionsProps {
   runId: string;
@@ -18,9 +19,9 @@ export function ApprovalActions({ approvalState, onApprove, onReject, onViewDiff
   }
   return (
     <div className="approval-actions">
-      <button type="button" className="btn-primary" onClick={onApprove}>审批执行</button>
-      {onViewDiff && <button type="button" onClick={onViewDiff}>查看 diff</button>}
-      <button type="button" onClick={onReject}>拒绝</button>
+      <Button variant="primary" onClick={onApprove}>审批执行</Button>
+      {onViewDiff && <Button variant="secondary" onClick={onViewDiff}>查看 diff</Button>}
+      <Button variant="danger" onClick={onReject}>拒绝</Button>
     </div>
   );
 }
