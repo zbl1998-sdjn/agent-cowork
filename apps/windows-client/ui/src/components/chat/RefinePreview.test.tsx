@@ -1,5 +1,6 @@
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { refinePreviewDisabled, refinePreviewPrompt } from './RefinePreview';
+import { RefinePreview, refinePreviewDisabled, refinePreviewPrompt } from './RefinePreview';
 import type { PromptRefineResult } from '../../lib/api/prompt';
 
 describe('RefinePreview logic', () => {
@@ -18,5 +19,31 @@ describe('RefinePreview logic', () => {
     expect(refinePreviewDisabled(base)).toBe(true);
     expect(refinePreviewDisabled({ ...base, changed: true })).toBe(false);
     expect(refinePreviewDisabled({ ...base, missing: ['target'] })).toBe(false);
+  });
+
+  it('renders action buttons through the Button primitive with stable labels', () => {
+    const result: PromptRefineResult = { refined: '优化后', changed: true, intent: 'general', missing: [] };
+    const html = renderToStaticMarkup(
+      <RefinePreview original="原始" result={result} onResolve={() => {}} />,
+    );
+
+    expect(html.match(/class="ui-btn /g)?.length).toBe(3);
+    expect(html).toContain('ui-btn--secondary');
+    expect(html).toContain('ui-btn--md');
+    expect(html).toContain('>采用</button>');
+    expect(html).toContain('>编辑后采用</button>');
+    expect(html).toContain('>忽略</button>');
+  });
+
+  it('keeps missing-state action disabling and dismiss label', () => {
+    const result: PromptRefineResult = { refined: '优化后', changed: false, intent: 'general', missing: ['目标'] };
+    const html = renderToStaticMarkup(
+      <RefinePreview original="原始" result={result} onResolve={() => {}} />,
+    );
+
+    expect(html).toContain('>采用</button>');
+    expect(html).toContain('>编辑后采用</button>');
+    expect(html).toContain('>忽略</button>');
+    expect(html.match(/disabled=""/g)?.length).toBe(2);
   });
 });

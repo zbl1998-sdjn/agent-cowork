@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PromptRefineResult } from '../../lib/api/prompt';
+import { Button } from '../ui/Button';
 
 export type RefinePreviewAction = 'apply' | 'edit' | 'ignore';
 
@@ -43,26 +44,23 @@ export function RefinePreview({ original, result, onResolve }: RefinePreviewProp
         />
       )}
       <div className="refine-preview-actions">
-        <button
-          type="button"
+        <Button
           disabled={missing || refinePreviewDisabled(result)}
           onClick={() => onResolve('apply', refinePreviewPrompt('apply', original, result.refined, edited))}
         >
           采用
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           disabled={missing}
           onClick={() => onResolve('edit', refinePreviewPrompt('edit', original, result.refined, edited))}
         >
           编辑后采用
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           onClick={() => onResolve('ignore', refinePreviewPrompt('ignore', original, result.refined, edited))}
         >
           忽略
-        </button>
+        </Button>
       </div>
     </section>
   );
