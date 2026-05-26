@@ -1,5 +1,10 @@
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 
+/** @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest */
+/** @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse */
+/** @typedef {{ list(): unknown[], isEnabled(id: string): boolean, setEnabled(id: string, enabled: boolean): unknown }} SkillRegistryLike */
+/** @typedef {Error & { statusCode?: number }} RouteError */
+
 // Skill routes: list skills + toggle enable/disable.
 //
 //   GET  /api/skills              -> manifest + enabled state for every skill
@@ -10,6 +15,7 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 
 const TOGGLE_RE = /^\/api\/skills\/([a-zA-Z0-9_-]+)\/toggle$/;
 
+/** @param {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext?: Record<string, unknown>, skillRegistry?: SkillRegistryLike | null }} options */
 export async function handleSkillRoutes({ request, response, pathname, requestContext, skillRegistry }) {
   if (!skillRegistry) {
     return false;
@@ -24,11 +30,13 @@ export async function handleSkillRoutes({ request, response, pathname, requestCo
   if (request.method === 'POST' && match) {
     await withJsonBody(request, response, async (body) => {
       try {
-        const next = body && typeof body.enabled === 'boolean' ? body.enabled : !skillRegistry.isEnabled(match[1]);
+        const input = /** @type {{ enabled?: unknown }} */ (body || {});
+        const next = typeof input.enabled === 'boolean' ? input.enabled : !skillRegistry.isEnabled(match[1]);
         const skill = skillRegistry.setEnabled(match[1], next);
         sendJson(response, 200, { context: requestContext, skill });
       } catch (err) {
-        sendJson(response, err.statusCode || 400, { error: err.message });
+        const error = /** @type {RouteError} */ (err);
+        sendJson(response, error.statusCode || 400, { error: error.message });
       }
     });
     return true;
