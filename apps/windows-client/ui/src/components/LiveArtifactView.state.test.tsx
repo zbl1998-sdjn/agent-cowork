@@ -32,4 +32,18 @@ describe('LiveArtifactView state views', () => {
     expect(html).toContain('state-view--error');
     expect(html).toContain('role="alert"');
   });
+
+  it('renders refresh and open actions with Button primitives', () => {
+    const html = renderToStaticMarkup(
+      <LiveArtifactView
+        srcDoc="<html></html>"
+        dataUrl="/api/artifacts/data/viz_1"
+        filePath="C:/work/.AgentCowork/artifacts/viz_1.html"
+      />,
+    );
+
+    expect(html).toContain('ui-btn ui-btn--secondary');
+    expect(html).toContain('刷新数据');
+    expect(html).toContain('打开文件');
+  });
 });

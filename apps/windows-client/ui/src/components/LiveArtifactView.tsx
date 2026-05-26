@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchLiveArtifactData, openPath, type LiveArtifactData } from '../lib/api';
+import { Button } from './ui/Button';
 import { Empty, ErrorState, Loading } from './ui/StateViews';
 
 export const DEFAULT_AUTO_REFRESH_SECONDS = 5;
@@ -129,8 +130,8 @@ export function LiveArtifactView({
     <div className="live-artifact-view">
       <div className="panel-row live-artifact-actions">
         <strong>{title}</strong>
-        <button type="button" disabled={!state.canRefresh} onClick={() => void refresh()}>{state.refreshLabel}</button>
-        {filePath && <button type="button" disabled={!state.canOpen} onClick={() => void openPath(filePath)}>打开文件</button>}
+        <Button variant="secondary" disabled={!state.canRefresh} onClick={() => void refresh()}>{state.refreshLabel}</Button>
+        {filePath && <Button variant="secondary" disabled={!state.canOpen} onClick={() => void openPath(filePath)}>打开文件</Button>}
         <label className="live-artifact-auto">
           <input
             type="checkbox"
