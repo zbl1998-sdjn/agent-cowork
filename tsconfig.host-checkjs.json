@@ -108,6 +108,7 @@
     "apps/host/src/routes/search-routes.js",
     "apps/host/src/routes/skill-routes.js",
     "apps/host/src/routes/tool-routes.js",
+    "apps/host/src/routes/workspace-file-routes.js",
     "apps/host/src/sandbox/exec-child.js",
     "apps/host/src/sandbox/code-runner.js",
     "apps/host/src/sandbox/code-runner-utils.js",

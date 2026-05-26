@@ -12,6 +12,17 @@ import { buildAttachmentContext } from '../workspace/attachment-context.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {{ root?: string, trustedRoot?: string, path?: string, files?: any[], includeFiles?: boolean, includeDirectories?: boolean, maxSize?: number, maxBytes?: number, query?: unknown, maxResults?: number, includeContent?: boolean, maxContentBytes?: number, paths?: string[], maxTextSize?: number, operations?: unknown, fileOperationApprovalId?: unknown, approvalId?: unknown, rollbackApprovalId?: unknown, rollback?: unknown, applied?: unknown }} WorkspaceBody
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: Record<string, unknown>, trustedRootDefault: string, config: { maxUploadJsonBytes?: number, journalWriter?: { append(event: unknown): unknown } }, cacheKeyFor(context: Record<string, unknown>, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: Record<string, unknown>): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string, fileOperationApprovals: { issue(input: unknown): string, consume(id: unknown, input: unknown): unknown } }} WorkspaceFileRouteOptions
+ */
+
+/** @param {RouteRequest} request @param {RouteResponse} response @param {(body: WorkspaceBody) => void | Promise<void>} handler @param {{ maxBytes?: number, requireJsonContentType?: boolean }} [options] */
+function withWorkspaceBody(request, response, handler, options) { return withJsonBody(request, response, (body) => handler(/** @type {WorkspaceBody} */ (body || {})), options); }
+
+/** @param {WorkspaceFileRouteOptions} options */
 export async function handleWorkspaceFileRoutes({
   request,
   response,
@@ -26,7 +37,7 @@ export async function handleWorkspaceFileRoutes({
   fileOperationApprovals,
 }) {
   if (request.method === 'POST' && pathname === '/api/files/tree') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!body || typeof body.root !== 'string' || !body.root.trim()) {
         throw new Error('body.root is required');
       }
@@ -42,7 +53,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/uploads/import') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
       const imported = importUploadedFiles({
@@ -55,7 +66,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/files/read') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!body || typeof body.path !== 'string' || !body.path.trim()) {
         throw new Error('body.path is required');
       }
@@ -70,7 +81,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/files/preview') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!body || typeof body.path !== 'string' || !body.path.trim()) {
         throw new Error('body.path is required');
       }
@@ -79,14 +90,15 @@ export async function handleWorkspaceFileRoutes({
         const preview = readFilePreview(body.path, { trustedRoot, maxBytes: body.maxBytes });
         sendJson(response, 200, preview);
       } catch (err) {
-        sendJson(response, err.statusCode || 400, { error: err.message });
+        const error = /** @type {Error & { statusCode?: number }} */ (err);
+        sendJson(response, error.statusCode || 400, { error: error.message });
       }
     });
     return true;
   }
 
   if (request.method === 'POST' && pathname === '/api/files/extract') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!body || typeof body.path !== 'string' || !body.path.trim()) {
         throw new Error('body.path is required');
       }
@@ -102,7 +114,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/files/search') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
       const results = searchWorkspace({
@@ -118,7 +130,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/context/bundle') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
       if (!Array.isArray(body.paths)) {
         throw new Error('body.paths must be an array');
@@ -138,7 +150,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
       const preview = previewFileOperations(body.operations, { trustedRoot });
       const fileOperationApprovalId = preview.operations.length
@@ -155,7 +167,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!requireIdempotencyKey(response, requestContext)) {
         return;
       }
@@ -194,7 +206,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/file-ops/rollback') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       if (!requireIdempotencyKey(response, requestContext)) {
         return;
       }
@@ -224,7 +236,7 @@ export async function handleWorkspaceFileRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/attachments/context') {
-    await withJsonBody(request, response, async (body) => {
+    await withWorkspaceBody(request, response, async (body) => {
       const trustedRoot = safeTrustedRoot(body && body.trustedRoot);
       const result = buildAttachmentContext({ files: body && body.files, trustedRoot, maxSize: body && body.maxSize });
       sendJson(response, 200, { context: requestContext, ...result });
