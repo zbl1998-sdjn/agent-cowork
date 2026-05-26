@@ -169,6 +169,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2b 完结(专用菜单/listbox 原语):新增 `MenuItemButton`/`ListboxOptionButton`,CommandPalette 命令项与 Composer listbox 选项已迁入专用原语,保留现有样式类、键盘导航和点击/鼠标选择语义;新增 primitive/CommandPalette SSR 单测,源码扫描确认应用层 raw `<button>` 仅剩 `components/ui` 内部原语和 markdown 复制按钮字符串。
 - [x] FE 体积治理(ConnectorsPanel):连接器面板拆出 `useConnectorsPanelState`、`connectorScopes` 与 `connectorOAuthStatus`,主面板和新增模块均回落到软上限以内;OAuth scope 审批、连接/断开、状态消息和空/错态渲染语义不变,聚焦 UI 单测通过。
 - [x] FE 体积治理(Composer):输入栏建议 popover 拆出 `ComposerSuggestions`,保留 listbox/option、active 样式、mouse down 与 apply 语义;`send`/`onChange`/refine/voice 等状态联动暂不拆,聚焦 UI 测试与门禁通过。
+- [x] FE 体积治理(Composer voice):输入栏语音识别状态与 Web Speech API glue 拆出 `useComposerVoice`,主 `Composer.tsx` 降到约 330 行;不支持提示、中文识别参数、结束/错误清理和输入追加语义保持不变,聚焦 UI/hook 测试通过。
 - [x] Host 体积治理(tool-loop):`tool-loop.js` 拆出 `tool-loop-support.js` 的 lazy tool/search、tool call 解析和 no-op budget guard helper,主循环从 399/400 硬限风险降到约 340 行;高耦合工具执行/审批/预算/trace 主块暂不拆,聚焦 host 测试与 checkJs 通过。
 - [x] Host 体积治理(runs-index):`runs-index.js` 拆成 facade + file/sqlite/utils 小模块,从 389 行降到 32 行;原导出、JSONL replay、SQLite 语义、tenant 过滤和 version 递增保持不变,聚焦 runs-index/sqlite/seeded-id 测试通过,体积软警告降为 12 个。
 - [x] Host 体积治理(scheduler):`scheduler.js` 拆出 `scheduler-store.js` 的 file/sqlite store adapter 与 normalise helper,主 Scheduler 保留创建/取消/due/fire/tick/start/stop 时序不变;聚焦 scheduler/sqlite/server runtime/schedule tool 测试通过,体积软警告降为 11 个。

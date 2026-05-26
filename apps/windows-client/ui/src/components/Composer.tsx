@@ -8,6 +8,7 @@ import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
 import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
+import { useComposerVoice } from '../hooks/useComposerVoice';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
@@ -39,17 +40,6 @@ const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [
   { value: 'standard', label: '标准' },
   { value: 'deep', label: '深度' },
 ];
-// Minimal shape of the Web Speech API recognizer (no @types dependency).
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-};
 export function Composer({
   recipes,
   historyRuns,
@@ -67,7 +57,6 @@ export function Composer({
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<ComposerSuggestionMode | null>(null);
   const [items, setItems] = useState<ComposerSuggestionItem[]>([]);
@@ -79,7 +68,6 @@ export function Composer({
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
-  const [listening, setListening] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [refining, setRefining] = useState(false);
   const [refineOriginal, setRefineOriginal] = useState('');
@@ -88,6 +76,10 @@ export function Composer({
   const searchToken = useRef(0);
   const skipRefineFor = useRef('');
   const mentionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { listening, toggleVoice } = useComposerVoice({
+    onTranscript: (transcript) => setValue((v) => (v ? `${v} ${transcript}` : transcript)),
+    onUnsupported: () => setValue((v) => `${v}${v ? '\n' : ''}（此浏览器不支持语音输入）`),
+  });
 
   const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
   const currentModel = model.trim() || defaultModel;
@@ -290,38 +282,6 @@ export function Composer({
   function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     setAttachments((prev) => [...prev, ...Array.from(list)]);
-  }
-
-  function toggleVoice() {
-    const w = window as unknown as {
-      SpeechRecognition?: new () => SpeechRecognitionLike;
-      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-    };
-    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!Ctor) {
-      setValue((v) => `${v}${v ? '\n' : ''}（此浏览器不支持语音输入）`);
-      return;
-    }
-    if (listening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    const recognition = new Ctor();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onresult = (event) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
-      }
-      setValue((v) => (v ? `${v} ${transcript}` : transcript));
-    };
-    recognition.onend = () => { setListening(false); recognitionRef.current = null; };
-    recognition.onerror = () => { setListening(false); recognitionRef.current = null; };
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
   }
 
   return (
