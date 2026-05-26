@@ -6,6 +6,7 @@ import {
   type MemoryProfileEntry,
   type MemoryProfileType,
 } from '../../lib/api';
+import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 
 interface MemoryPanelProps {
@@ -27,6 +28,41 @@ export function MemoryPanelStateViews({ error, onRetry }: { error: string; onRet
     return <ErrorState title="记忆加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
   return <Empty title="暂无本地画像记忆" message="保存术语、项目和偏好后会显示在这里。" />;
+}
+
+export function MemoryEntryItem({
+  entry,
+  busy,
+  onForget,
+}: {
+  entry: MemoryProfileEntry;
+  busy: boolean;
+  onForget: (entry: MemoryProfileEntry) => void;
+}) {
+  return (
+    <li>
+      <code>{formatProfileEntry(entry)}</code>
+      <span className="tool-src">{entry.scope || 'user'}</span>
+      <p>{entry.evidence}</p>
+      <Button disabled={busy} onClick={() => onForget(entry)}>删除</Button>
+    </li>
+  );
+}
+
+export function MemoryPanelSaveAction({
+  busy,
+  disabled,
+  onLearn,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  onLearn: () => void;
+}) {
+  return (
+    <Button disabled={disabled} onClick={onLearn}>
+      {busy ? '保存中…' : '保存'}
+    </Button>
+  );
 }
 
 export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
@@ -93,17 +129,12 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') void load(); }}
         />
-        <button type="button" disabled={busy} onClick={() => void load()}>{busy ? '读取中…' : '刷新'}</button>
+        <Button disabled={busy} onClick={() => void load()}>{busy ? '读取中…' : '刷新'}</Button>
       </div>
       {error && <MemoryPanelStateViews error={error} onRetry={() => void load()} />}
       <ul className="tool-list">
         {entries.map((entry) => (
-          <li key={`${entry.type}:${entry.key}`}>
-            <code>{formatProfileEntry(entry)}</code>
-            <span className="tool-src">{entry.scope || 'user'}</span>
-            <p>{entry.evidence}</p>
-            <button type="button" disabled={busy} onClick={() => void forget(entry)}>删除</button>
-          </li>
+          <MemoryEntryItem key={`${entry.type}:${entry.key}`} entry={entry} busy={busy} onForget={(item) => void forget(item)} />
         ))}
         {entries.length === 0 && !error && (
           <li className="panel-empty">
@@ -123,9 +154,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
         </div>
         <textarea value={value} rows={2} placeholder="值" onChange={(event) => setValue(event.target.value)} />
         <textarea value={evidence} rows={2} placeholder="依据" onChange={(event) => setEvidence(event.target.value)} />
-        <button type="button" disabled={busy || !key.trim() || !value.trim()} onClick={() => void learn()}>
-          {busy ? '保存中…' : '保存'}
-        </button>
+        <MemoryPanelSaveAction busy={busy} disabled={busy || !key.trim() || !value.trim()} onLearn={() => void learn()} />
       </div>
     </section>
   );
