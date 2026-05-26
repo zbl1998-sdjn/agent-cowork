@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type RefObject, type UIEvent } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties, type RefObject, type UIEvent } from 'react';
 import { respondApprovals } from '../../lib/api';
 import type { AssistantMessage, Message } from '../../lib/app-types';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
@@ -47,6 +47,31 @@ const TIMELINE_VIRTUALIZE_AFTER = 120;
 const TIMELINE_ESTIMATED_ROW_HEIGHT = 132;
 const TIMELINE_VIEWPORT_FALLBACK = 720;
 const TIMELINE_OVERSCAN = 8;
+
+const starterChipStyle: CSSProperties = {
+  borderColor: 'var(--border)',
+  background: '#fff',
+  color: '#3a3e36',
+  borderRadius: 14,
+  padding: '8px 14px',
+  fontSize: 13,
+};
+
+const jumpToBottomStyle: CSSProperties = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 118,
+  transform: 'translateX(-50%)',
+  zIndex: 24,
+  minHeight: 34,
+  borderColor: '#d7c9c0',
+  background: 'rgba(255,255,255,0.94)',
+  color: '#b5482f',
+  borderRadius: 18,
+  padding: '7px 14px',
+  fontSize: 13,
+  boxShadow: '0 10px 24px rgba(27, 28, 30, 0.12)',
+};
 
 interface TimelineScrollMetrics {
   scrollTop: number;
@@ -144,7 +169,7 @@ export function Timeline({
             <strong>Agent Cowork</strong>
             <p>直接和 Kimi 对话即可，它能读写工作区文件、运行代码。需要文件操作时会先请你批准。</p>
             <div className="starter-chips">
-              {starters.map((sug) => <button key={sug} type="button" className="starter-chip" onClick={() => onQuickSend(sug)}>{sug}</button>)}
+              {starters.map((sug) => <Button key={sug} className="starter-chip" onClick={() => onQuickSend(sug)} style={starterChipStyle}>{sug}</Button>)}
             </div>
           </div>
         )}
@@ -182,7 +207,7 @@ export function Timeline({
         </div>
       </main>
       {hasNewContent && !isAtBottom && (
-        <button type="button" className="jump-to-bottom" onClick={() => onScrollToBottom()} title="回到底部">回到底部 ↓</button>
+        <Button className="jump-to-bottom" onClick={() => onScrollToBottom()} title="回到底部" style={jumpToBottomStyle}>回到底部 ↓</Button>
       )}
     </>
   );

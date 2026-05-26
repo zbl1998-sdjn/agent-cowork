@@ -70,6 +70,12 @@ function userEditTurnProps(overrides: Partial<UserEditTurnProps> = {}): UserEdit
 }
 
 function renderTimeline(messages: Message[] | Message): string {
+  return renderTimelineWith({
+    messages: Array.isArray(messages) ? messages : [messages],
+  });
+}
+
+function renderTimelineWith(overrides: Partial<Parameters<typeof Timeline>[0]> = {}): string {
   return renderToStaticMarkup(
     <Timeline
       editText=""
@@ -77,7 +83,7 @@ function renderTimeline(messages: Message[] | Message): string {
       empty={false}
       hasNewContent={false}
       isAtBottom
-      messages={Array.isArray(messages) ? messages : [messages]}
+      messages={[]}
       starters={[]}
       streamingId={null}
       timelineRef={{ current: null } as RefObject<HTMLElement>}
@@ -93,6 +99,7 @@ function renderTimeline(messages: Message[] | Message): string {
       onSetEditingMsgId={vi.fn()}
       onSetEditText={vi.fn()}
       onSubmitEdit={vi.fn()}
+      {...overrides}
     />,
   );
 }
@@ -188,6 +195,21 @@ describe('Timeline', () => {
     expect(html).toContain('重新发送');
     expect(html).toContain('ui-btn--secondary');
     expect(html).toContain('ui-btn--primary');
+  });
+
+  it('renders starter chips and jump-to-bottom with Button primitives', () => {
+    const html = renderTimelineWith({
+      empty: true,
+      hasNewContent: true,
+      isAtBottom: false,
+      starters: ['整理日报', '总结文件'],
+    });
+
+    expect(html.match(/class="ui-btn /g)?.length).toBe(3);
+    expect(html).toContain('starter-chip');
+    expect(html).toContain('整理日报');
+    expect(html).toContain('jump-to-bottom');
+    expect(html).toContain('回到底部 ↓');
   });
 
   it('renders the user edit trigger with the Button primitive when not streaming', () => {
