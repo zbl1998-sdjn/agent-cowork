@@ -54,12 +54,8 @@ export function canonicalizePath(input) {
   try {
     return realpath(resolved);
   } catch {
-    // The path (or its leaf) doesn't exist yet, so realpath() fails and would
-    // otherwise return the path UNRESOLVED. On Windows that leaves 8.3 short
-    // names (e.g. ADMINI~1) and junctions intact in the prefix, so a containment
-    // check against a realpath'd root spuriously reports "escaped". Resolve the
-    // nearest EXISTING ancestor (canonicalizing the prefix) and re-append the
-    // missing tail so not-yet-created paths compare correctly.
+    // Resolve the nearest existing ancestor so Windows 8.3 names and junctions
+    // in the prefix are canonicalized for not-yet-created paths.
     let cur = resolved;
     const missing = /** @type {string[]} */ ([]);
     let guard = 0;
@@ -100,18 +96,8 @@ export function resolveWithinRoot(candidatePath, trustedRoot) {
     : path.resolve(trustedRoot, candidatePath);
 }
 
-// Is this path sensitive (must never be written/read by the agent)?
-//
-// `relativeTo` (optional): when given, the directory-SEGMENT checks (.ssh,
-// appdata, credentials, .env-prefixed dirs, .kimi) only inspect the portion of
-// the path BELOW that trusted root. The root prefix is operator/user-chosen and
-// therefore trusted — without this, a workspace that merely *lives under* a
-// directory like `AppData` would have every write blocked even though the agent
-// can never escape the root (assertTrustedPath enforces that separately).
-// The filename/extension checks (id_rsa, *.key/*.pem) always apply to the
-// target itself, since those describe the file being created regardless of
-// where the workspace sits. Called WITHOUT relativeTo, behaviour is unchanged
-// (whole-path inspection) for direct callers and back-compat.
+// `relativeTo` scopes directory-segment checks below the trusted root, while
+// filename/extension checks still apply to the target itself.
 /** @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
 export function isSensitivePath(inputPath, relativeTo = null) {
   const normalized = normalizeForCompare(inputPath);
@@ -133,11 +119,8 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   const segments = segmentsBelowRoot(normalized, relativeTo);
 
   for (const segment of segments) {
-    // Sensitive directory names (appdata/.ssh/credentials/.kimi) are matched
-    // case-INSENSITIVELY. `normalizeForCompare` only lower-cases on Windows, so
-    // without this a path containing `AppData` (capital A) would slip past the
-    // lowercase `SENSITIVE_SEGMENTS` on a case-sensitive (Linux) host. The
-    // containment/escape check elsewhere stays case-sensitive on purpose.
+    // Directory sensitivity is case-insensitive; containment stays platform
+    // sensitive via normalizeForCompare.
     const seg = segment.toLowerCase();
     if (SENSITIVE_SEGMENTS.has(seg)) {
       return true;
