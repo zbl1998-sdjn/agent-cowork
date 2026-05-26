@@ -38,6 +38,7 @@
     "apps/host/src/kimi/agent/todo-state.js",
     "apps/host/src/kimi/agent/tool-loop-support.js",
     "apps/host/src/kimi/agent/tool-retry.js",
+    "apps/host/src/kimi/chat-stream.js",
     "apps/host/src/kimi/context/context-manager.js",
     "apps/host/src/kimi/context/history-compactor.js",
     "apps/host/src/kimi/context/token-estimator.js",

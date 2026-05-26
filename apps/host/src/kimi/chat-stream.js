@@ -1,3 +1,4 @@
+// @ts-check
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 
@@ -6,14 +7,36 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
 // records a kimi-chat run. The model call is an injectable streamRunner; an
 // optional cancellation registry lets POST /api/runs/:id/cancel interrupt it.
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpResponseLike & { write(chunk?: string | Buffer): unknown, writeHead(statusCode: number, headers?: Record<string, string>): unknown }} StreamResponse
+ * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
+ * @typedef {{ prompt?: unknown, summary?: unknown, thinking?: unknown, model?: unknown }} StreamBody
+ * @typedef {{ provider?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown }} KimiConfig
+ * @typedef {{ text?: string, model?: unknown, usage?: unknown }} StreamResult
+ * @typedef {{ prompt?: unknown, summary?: unknown, thinking?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider: string, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown, signal?: AbortSignal, onToken(delta: string): void, onReasoning(delta: string): void }} StreamRunnerInput
+ * @typedef {(input: StreamRunnerInput) => Promise<StreamResult> | StreamResult} StreamRunner
+ * @typedef {{ upsert(summary: unknown, context?: RequestContext): unknown }} RunsIndexLike
+ * @typedef {{ register(runId: string): AbortController, done(runId: string): unknown }} CancellationLike
+ * @typedef {{ response: StreamResponse, requestContext: RequestContext, body: StreamBody, streamRunner: StreamRunner, kimiConfig: KimiConfig, trustedRoot: string, runStoreRoot: string, runsIndex: RunsIndexLike, cancellation?: CancellationLike | null }} StreamChatOptions
+ * @typedef {Error & { name?: string }} RouteError
+ */
+
+/** @param {unknown} err @returns {string} */
+function errorMessage(err) {
+  return /** @type {Partial<RouteError>} */ (err)?.message || String(err || 'stream failed');
+}
+
+/** @param {StreamResponse} response @param {string} event @param {unknown} data */
 function sse(response, event, data) {
   response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/** @param {KimiConfig} kimiConfig */
 function modelProvider(kimiConfig) {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
+/** @param {StreamChatOptions} options */
 export async function streamChat({
   response,
   requestContext,
@@ -36,6 +59,7 @@ export async function streamChat({
   const signal = controller ? controller.signal : undefined;
   sse(response, 'start', { runId });
 
+  /** @param {string} status @param {Record<string, unknown>} extra */
   const record = (status, extra) => {
     const finishedAt = new Date();
     const base = {
@@ -76,7 +100,7 @@ export async function streamChat({
       userAgent: kimiConfig.userAgent,
       temperature: kimiConfig.temperature,
       signal,
-      onToken: (delta) => { text += delta; sse(response, 'token', { delta }); },
+      onToken: (delta) => { text += String(delta); sse(response, 'token', { delta }); },
       onReasoning: (delta) => sse(response, 'reasoning', { delta }),
     });
     text = (result && result.text) || text;
@@ -95,8 +119,8 @@ export async function streamChat({
       const runPath = record('cancelled', { result: { ok: false, cancelled: true, text } });
       sse(response, 'cancelled', { runId, runPath, text });
     } else {
-      record('failed', { error: { message: err.message } });
-      sse(response, 'error', { error: err.message });
+      record('failed', { error: { message: errorMessage(err) } });
+      sse(response, 'error', { error: errorMessage(err) });
     }
   } finally {
     if (cancellation) cancellation.done(runId);
