@@ -1,17 +1,29 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import { normaliseRecord, normaliseTenantId, normaliseUserId } from './runs-index-utils.js';
 
+/**
+ * @typedef {{ id: string, tenantId: string, userId: string, traceId: string, type: string, status: string, startedAt?: unknown, updatedAt?: unknown, version?: number, [key: string]: unknown }} RunIndexRecord
+ * @typedef {{ id?: unknown, op?: string, record?: RunIndexRecord, tenantId?: string, userId?: string, traceId?: unknown, ts?: unknown }} RunIndexEvent
+ * @typedef {{ indexRoot?: string, now?: () => Date }} RunsIndexOptions
+ * @typedef {{ traceId?: unknown }} RunsIndexContext
+ * @typedef {{ tenantId?: unknown, userId?: unknown, limit?: unknown, status?: unknown, type?: unknown, recipeId?: unknown }} RunsIndexListOptions
+ */
+
+/** @param {string} dir @returns {string} */
 function ensureDirSync(dir) {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
+/** @param {string} file @param {RunIndexEvent} event */
 function appendJsonl(file, event) {
   ensureDirSync(path.dirname(file));
   fs.appendFileSync(file, `${JSON.stringify(event)}\n`, 'utf8');
 }
 
+/** @param {string} file @returns {RunIndexEvent[]} */
 function readJsonl(file) {
   if (!fs.existsSync(file)) {
     return [];
@@ -27,10 +39,11 @@ function readJsonl(file) {
         return null;
       }
     })
-    .filter(Boolean);
+    .filter((event) => Boolean(event));
 }
 
 export class RunsIndex {
+  /** @param {RunsIndexOptions} [options] */
   constructor({ indexRoot, now = () => new Date() } = {}) {
     if (!indexRoot || typeof indexRoot !== 'string') {
       throw new Error('RunsIndex: indexRoot is required');
@@ -38,6 +51,7 @@ export class RunsIndex {
     this.indexRoot = indexRoot;
     this.eventFile = path.join(indexRoot, 'index.jsonl');
     this.now = now;
+    /** @type {Map<unknown, RunIndexRecord>} */
     this.records = new Map();
     this._replay();
   }
@@ -53,10 +67,15 @@ export class RunsIndex {
         continue;
       }
       const previous = this.records.get(event.id) || {};
-      this.records.set(event.id, { ...previous, ...event.record });
+      this.records.set(event.id, /** @type {RunIndexRecord} */ ({ ...previous, ...event.record }));
     }
   }
 
+  /**
+   * @param {unknown} record
+   * @param {RunsIndexContext} [context]
+   * @returns {RunIndexRecord}
+   */
   upsert(record, context = {}) {
     const normalised = normaliseRecord(record);
     const existing = this.records.get(normalised.id);
@@ -77,6 +96,11 @@ export class RunsIndex {
     return normalised;
   }
 
+  /**
+   * @param {unknown} id
+   * @param {RunsIndexContext} [context]
+   * @returns {boolean}
+   */
   remove(id, context = {}) {
     const existing = this.records.get(id);
     if (!existing) {
@@ -94,6 +118,11 @@ export class RunsIndex {
     return true;
   }
 
+  /**
+   * @param {unknown} id
+   * @param {{ tenantId?: unknown }} [options]
+   * @returns {RunIndexRecord | null}
+   */
   get(id, { tenantId } = {}) {
     const record = this.records.get(id);
     if (!record) {
@@ -105,6 +134,10 @@ export class RunsIndex {
     return record;
   }
 
+  /**
+   * @param {RunsIndexListOptions} [options]
+   * @returns {RunIndexRecord[]}
+   */
   list({ tenantId, userId, limit = 50, status, type, recipeId } = {}) {
     const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
     const wantUser = userId ? normaliseUserId(userId) : null;
@@ -122,14 +155,21 @@ export class RunsIndex {
     return out.slice(0, cap);
   }
 
+  /** @returns {number} */
   size() {
     return this.records.size;
   }
 
+  /**
+   * @param {{ tenantId?: unknown }} [options]
+   * @returns {{ total: number, byStatus: Record<string, number>, byType: Record<string, number> }}
+   */
   stats({ tenantId } = {}) {
     const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
     let total = 0;
+    /** @type {Record<string, number>} */
     const byStatus = Object.create(null);
+    /** @type {Record<string, number>} */
     const byType = Object.create(null);
     for (const record of this.records.values()) {
       if (wantTenant && record.tenantId !== wantTenant) continue;
