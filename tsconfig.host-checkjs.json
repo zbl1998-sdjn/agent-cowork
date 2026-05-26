@@ -80,6 +80,7 @@
     "apps/host/src/runtime/runs-index-utils.js",
     "apps/host/src/runtime/scheduler.js",
     "apps/host/src/runtime/scheduler-store.js",
+    "apps/host/src/runtime/subagent.js",
     "apps/host/src/runtime/task-presenter.js",
     "apps/host/src/runtime/usage.js",
     "apps/host/src/runtime/windows-runtime.js",
