@@ -52,6 +52,18 @@ declare module 'node:crypto' {
 }
 
 declare module 'node:child_process' {
+  export interface StreamLike {
+    on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
+  }
+
+  export interface ChildProcessLike {
+    stdout: StreamLike;
+    stderr: StreamLike;
+    kill(signal?: string): void;
+    on(event: 'error', listener: (error: Error) => void): unknown;
+    on(event: 'close', listener: (code: number | null, signal: string | null) => void): unknown;
+  }
+
   export interface SpawnSyncResult<T = string | Buffer> {
     status?: number | null;
     stdout?: T;
@@ -63,6 +75,11 @@ declare module 'node:child_process' {
     args?: readonly string[],
     options?: Record<string, unknown>
   ): SpawnSyncResult;
+  export function spawn(
+    command: string,
+    args?: readonly string[],
+    options?: Record<string, unknown>
+  ): ChildProcessLike;
 }
 
 declare module 'node:fs' {
@@ -106,6 +123,7 @@ declare module 'node:path' {
   export function join(...paths: string[]): string;
   export function relative(from: string, to: string): string;
   export function resolve(...paths: string[]): string;
+  export const delimiter: string;
 }
 
 declare module 'node:module' {

@@ -1,3 +1,4 @@
+// @ts-check
 // Structured execution spec for the sandbox.
 //
 // The sandbox never accepts a raw shell string. Callers describe *what* to run
@@ -15,12 +16,21 @@ const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024;
 const TOOL_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 const NUL = String.fromCharCode(0);
 
+/**
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ allowTools?: string[] | null, allowEnv?: string[], maxTimeoutMs?: number, defaultMaxOutputBytes?: number }} SandboxLimits
+ * @typedef {{ tool?: unknown, args?: unknown, cwd?: unknown, timeoutMs?: unknown, network?: unknown, env?: unknown }} RawSandboxSpec
+ * @typedef {{ tool: string, args: string[], cwd: string, timeoutMs: number, network: boolean, env: Record<string, string>, maxOutputBytes: number }} SandboxSpec
+ */
+
+/** @param {string} message @returns {HttpError} */
 function fail(message) {
-  const error = new Error(`sandbox spec: ${message}`);
+  const error = /** @type {HttpError} */ (new Error(`sandbox spec: ${message}`));
   error.statusCode = 400;
   return error;
 }
 
+/** @param {unknown} value @param {number} index @returns {string} */
 function cleanArg(value, index) {
   if (typeof value !== 'string') {
     throw fail(`args[${index}] must be a string`);
@@ -34,6 +44,7 @@ function cleanArg(value, index) {
   return value;
 }
 
+/** @param {unknown} env @param {string[]} [allowEnv] @returns {Record<string, string>} */
 function cleanEnv(env, allowEnv) {
   if (env == null) {
     return {};
@@ -42,6 +53,7 @@ function cleanEnv(env, allowEnv) {
     throw fail('env must be an object');
   }
   const allow = new Set(allowEnv || []);
+  /** @type {Record<string, string>} */
   const out = {};
   for (const [key, value] of Object.entries(env)) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
@@ -61,12 +73,12 @@ function cleanEnv(env, allowEnv) {
 /**
  * Validate + normalise a raw spec into a safe, fully-defaulted spec.
  *
- * @param {object} input raw caller spec
- * @param {object} [limits] { allowTools, allowEnv, maxTimeoutMs, defaultMaxOutputBytes }
- * @returns normalised spec: { tool, args, cwd, timeoutMs, network, env, maxOutputBytes }
+ * @param {RawSandboxSpec} input raw caller spec
+ * @param {SandboxLimits} [limits] { allowTools, allowEnv, maxTimeoutMs, defaultMaxOutputBytes }
+ * @returns {SandboxSpec} normalised spec: { tool, args, cwd, timeoutMs, network, env, maxOutputBytes }
  */
 export function normalizeSandboxSpec(input, limits = {}) {
-  const spec = input || {};
+  const spec = /** @type {RawSandboxSpec} */ (input || {});
   const allowTools = limits.allowTools || null; // null => any TOOL_RE-valid name
   const maxTimeoutMs = Math.min(Number(limits.maxTimeoutMs) || MAX_TIMEOUT_MS, MAX_TIMEOUT_MS);
   const maxOutputBytes = Number(limits.defaultMaxOutputBytes) || DEFAULT_MAX_OUTPUT_BYTES;

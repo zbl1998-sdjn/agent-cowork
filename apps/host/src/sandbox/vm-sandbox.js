@@ -1,3 +1,4 @@
+// @ts-check
 // VM sandbox adapter (contract).
 //
 // This is the extensible target that delivers Claude-Cowork-grade isolation:
@@ -16,6 +17,15 @@
 // message rather than silently falling back to an unisolated process — the
 // whole point of this adapter is the isolation guarantee.
 
+/**
+ * @typedef {import('./sandbox-spec.js').SandboxSpec} SandboxSpec
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ trustedRoot?: string, context?: Record<string, unknown> }} SandboxExecContext
+ * @typedef {{ argv: string[], networkIsolated: boolean } | null} VmPlan
+ * @typedef {(plan: VmPlan, spec: SandboxSpec, ctx: SandboxExecContext) => unknown | Promise<unknown>} VmRunner
+ */
+
+/** @param {string} backend @param {SandboxSpec} spec @param {string} mountRoot @returns {VmPlan} */
 function buildPlan(backend, spec, mountRoot) {
   switch (backend) {
     case 'docker':
@@ -42,6 +52,7 @@ function buildPlan(backend, spec, mountRoot) {
 }
 
 export class VmSandbox {
+  /** @param {{ backend?: string, image?: string | null, distro?: string | null, provisioned?: boolean, runner?: VmRunner | null }} [options] */
   constructor({ backend = 'docker', image = null, distro = null, provisioned = false, runner = null } = {}) {
     this.backend = `vm:${backend}`;
     this.vmBackend = backend;
@@ -55,18 +66,19 @@ export class VmSandbox {
     this._provisioned = provisioned && typeof runner === 'function';
   }
 
-  /** Describe (without running) the command plan for a spec — useful for previews/tests. */
+  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {VmPlan} */
   plan(spec, ctx = {}) {
     const mountRoot = ctx.trustedRoot || '<trusted-root>';
     return buildPlan(this.vmBackend, spec, mountRoot);
   }
 
+  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] */
   async exec(spec, ctx = {}) {
-    if (!this._provisioned) {
-      const error = new Error(
+    if (!this._provisioned || typeof this._runner !== 'function') {
+      const error = /** @type {HttpError} */ (new Error(
         `vm sandbox backend "${this.vmBackend}" is not provisioned on this machine; `
         + 'install the backend and inject a runner, or use the local backend',
-      );
+      ));
       error.statusCode = 501;
       throw error;
     }

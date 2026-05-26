@@ -1,3 +1,4 @@
+// @ts-check
 // Sandbox factory + shared limits.
 //
 // createSandbox selects an adapter by backend. Both adapters implement the
@@ -22,6 +23,13 @@ export const DEFAULT_ALLOW_TOOLS = Object.freeze([
 
 const VM_BACKENDS = new Set(['vm', 'docker', 'wsl', 'hyperv']);
 
+/**
+ * @typedef {import('./exec-child.js').SpawnLike} SpawnLike
+ * @typedef {import('./vm-sandbox.js').VmRunner} VmRunner
+ * @typedef {{ backend?: string, vmBackend?: string, runner?: VmRunner | null, provisioned?: boolean, image?: string | null, distro?: string | null, spawn?: SpawnLike }} SandboxOptions
+ */
+
+/** @param {SandboxOptions} [options] */
 export function createSandbox(options = {}) {
   const backend = String(options.backend || 'local').toLowerCase();
 

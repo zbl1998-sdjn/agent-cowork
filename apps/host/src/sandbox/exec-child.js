@@ -1,3 +1,4 @@
+// @ts-check
 // Shared constrained child-process runner.
 //
 // Both the local subprocess adapter and the VM (WSL/Docker) runner spawn a
@@ -6,6 +7,15 @@
 // place and identical across backends.
 
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
+
+/**
+ * @typedef {{ on(event: 'data', listener: (chunk: unknown) => void): unknown }} StreamLike
+ * @typedef {{ stdout: StreamLike, stderr: StreamLike, kill(signal?: string): void, on(event: 'error', listener: (error: Error) => void): unknown, on(event: 'close', listener: (code: number | null, signal: string | null) => void): unknown }} ChildLike
+ * @typedef {(command: string, args: string[], options: Record<string, unknown>) => ChildLike} SpawnLike
+ * @typedef {{ push(chunk: unknown): void, readonly text: string, readonly truncated: boolean, readonly bytes: number }} CappedBuffer
+ * @typedef {{ spawn: SpawnLike, command: string, args: string[], cwd: string, env: Record<string, string>, timeoutMs: number, maxOutputBytes: number }} RunChildOptions
+ * @typedef {{ exitCode: number, signal: string | null, stdout: string, stderr: string, timedOut: boolean, truncated: boolean, bytesStdout: number, bytesStderr: number, durationMs: number }} RunChildResult
+ */
 
 /**
  * A streaming, memory-bounded sink for a child stdout/stderr stream.
@@ -22,8 +32,10 @@ const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
  * real exit code; an *unbounded* producer is bounded in time by the SIGKILL
  * timeout. Either way memory stays O(maxBytes).
  */
+/** @param {number} maxBytes @returns {CappedBuffer} */
 export function createCappedBuffer(maxBytes) {
   const cap = Math.max(1, Number(maxBytes) || DEFAULT_MAX_OUTPUT_BYTES);
+  /** @type {Buffer[]} */
   const parts = [];
   let stored = 0; // bytes actually retained (<= cap)
   let total = 0;  // bytes seen (pre-truncation)
@@ -57,7 +69,7 @@ export function createCappedBuffer(maxBytes) {
  * @param {object} opts.env environment
  * @param {number} opts.timeoutMs hard timeout
  * @param {number} opts.maxOutputBytes per-stream output cap (retained memory)
- * @returns Promise<{ exitCode, signal, stdout, stderr, timedOut, truncated, bytesStdout, bytesStderr, durationMs }>
+ * @returns {Promise<RunChildResult>}
  */
 export function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }) {
   const startedAt = Date.now();
@@ -73,17 +85,18 @@ export function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs,
   const err = createCappedBuffer(maxOutputBytes);
   let timedOut = false;
 
-  child.stdout.on('data', (chunk) => out.push(chunk));
-  child.stderr.on('data', (chunk) => err.push(chunk));
+  child.stdout.on('data', /** @param {unknown} chunk */ (chunk) => out.push(chunk));
+  child.stderr.on('data', /** @param {unknown} chunk */ (chunk) => err.push(chunk));
 
   const timer = setTimeout(() => {
     timedOut = true;
     child.kill('SIGKILL');
   }, timeoutMs);
 
+  /** @type {Promise<{ code: number | null, signal: string | null }>} */
   const closed = new Promise((resolve, reject) => {
-    child.on('error', (err2) => reject(err2));
-    child.on('close', (code, signal) => resolve({ code, signal }));
+    child.on('error', /** @param {Error} err2 */ (err2) => reject(err2));
+    child.on('close', /** @param {number | null} code @param {string | null} signal */ (code, signal) => resolve({ code, signal }));
   });
 
   return closed

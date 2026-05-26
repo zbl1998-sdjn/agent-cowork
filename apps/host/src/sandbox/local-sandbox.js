@@ -1,3 +1,4 @@
+// @ts-check
 import childProcess from 'node:child_process';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -16,13 +17,22 @@ import { runConstrainedChild } from './exec-child.js';
 // warning when `network` was requested off. True isolation is the job of the
 // VM adapter (WSL2/Docker), which shares the same `exec(spec, ctx)` interface.
 
+/**
+ * @typedef {import('./sandbox-spec.js').SandboxSpec} SandboxSpec
+ * @typedef {import('./exec-child.js').SpawnLike} SpawnLike
+ * @typedef {{ trustedRoot?: string, context?: Record<string, unknown> }} SandboxExecContext
+ * @typedef {{ backend: string, exitCode: number, signal: string | null, stdout: string, stderr: string, timedOut: boolean, truncated: boolean, bytesStdout: number, bytesStderr: number, durationMs: number, networkIsolated: boolean, warnings: string[] }} SandboxExecResult
+ */
+
 export class LocalSubprocessSandbox {
+  /** @param {{ spawn?: SpawnLike }} [options] */
   constructor({ spawn = childProcess.spawn } = {}) {
     this.backend = 'local-subprocess';
     this.networkIsolated = false;
     this._spawn = spawn;
   }
 
+  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {Promise<SandboxExecResult>} */
   async exec(spec, ctx = {}) {
     const trustedRoot = ctx.trustedRoot;
     if (!trustedRoot) {
@@ -31,11 +41,13 @@ export class LocalSubprocessSandbox {
     const requestedCwd = spec.cwd ? spec.cwd : trustedRoot;
     const safeCwd = assertTrustedPath(requestedCwd, trustedRoot);
 
+    /** @type {string[]} */
     const warnings = [];
     if (!spec.network) {
       warnings.push('local backend cannot enforce network isolation; use the vm backend for a true no-network guarantee');
     }
 
+    /** @type {Record<string, string>} */
     const env = { ...spec.env };
     if (process.env.PATH) {
       env.PATH = env.PATH ? `${env.PATH}${path.delimiter}${process.env.PATH}` : process.env.PATH;

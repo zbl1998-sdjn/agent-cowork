@@ -1,3 +1,4 @@
+// @ts-check
 import childProcess from 'node:child_process';
 import { runConstrainedChild } from './exec-child.js';
 
@@ -17,7 +18,18 @@ import { runConstrainedChild } from './exec-child.js';
 // report `networkIsolated:false` and warn — never claim a guarantee we cannot
 // keep.
 
+/**
+ * @typedef {import('./sandbox-spec.js').SandboxSpec} SandboxSpec
+ * @typedef {import('./exec-child.js').SpawnLike} SpawnLike
+ * @typedef {Error & { statusCode?: number }} HttpError
+ * @typedef {{ trustedRoot?: string, context?: Record<string, unknown> }} SandboxExecContext
+ * @typedef {{ backend?: string, image?: string | null, distro?: string | null, spawn?: SpawnLike }} WslDockerRunnerOptions
+ * @typedef {{ backend: string, exitCode: number, signal: string | null, stdout: string, stderr: string, timedOut: boolean, truncated: boolean, bytesStdout: number, bytesStderr: number, durationMs: number, networkIsolated: boolean, warnings: string[], argv: string[] }} WslDockerRunResult
+ */
+
+/** @param {Record<string, string>} env @returns {string[]} */
 function dockerEnvFlags(env) {
+  /** @type {string[]} */
   const flags = [];
   for (const [key, value] of Object.entries(env || {})) {
     flags.push('-e', `${key}=${value}`);
@@ -25,11 +37,12 @@ function dockerEnvFlags(env) {
   return flags;
 }
 
+/** @param {string} backend @param {SandboxSpec} spec @param {SandboxExecContext} ctx @param {{ image?: string | null, distro?: string | null }} options @returns {string[]} */
 function buildArgv(backend, spec, ctx, { image, distro }) {
   const mountRoot = ctx.trustedRoot;
   if (backend === 'docker') {
     if (!image) {
-      const error = new Error('docker sandbox requires an image (set sandbox image)');
+      const error = /** @type {HttpError} */ (new Error('docker sandbox requires an image (set sandbox image)'));
       error.statusCode = 501;
       throw error;
     }
@@ -48,7 +61,7 @@ function buildArgv(backend, spec, ctx, { image, distro }) {
     const base = distro ? ['wsl.exe', '-d', distro, '--'] : ['wsl.exe', '--'];
     return [...base, spec.tool, ...spec.args];
   }
-  const error = new Error(`unsupported vm backend "${backend}"`);
+  const error = /** @type {HttpError} */ (new Error(`unsupported vm backend "${backend}"`));
   error.statusCode = 501;
   throw error;
 }
@@ -56,8 +69,8 @@ function buildArgv(backend, spec, ctx, { image, distro }) {
 /**
  * Create a runner suitable for `VmSandbox({ runner })`.
  *
- * @param {object} options { backend, image, distro, spawn }
- * @returns {(plan, spec, ctx) => Promise<result>}
+ * @param {WslDockerRunnerOptions} options { backend, image, distro, spawn }
+ * @returns {(plan: unknown, spec: SandboxSpec, ctx?: SandboxExecContext) => Promise<WslDockerRunResult>}
  */
 export function createWslDockerRunner(options = {}) {
   const backend = String(options.backend || 'docker').toLowerCase();
