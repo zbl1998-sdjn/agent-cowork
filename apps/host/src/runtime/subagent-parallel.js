@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createRunId, writeRunRecord } from './run-store.js';
@@ -14,6 +15,20 @@ import {
 const DEFAULT_MAX_PARALLEL_AGENTS = 8;
 const DEFAULT_MAX_CONCURRENCY = 3;
 
+/**
+ * @typedef {{ tool?: unknown, args?: unknown, note?: unknown, rationale?: unknown }} SubagentStep
+ * @typedef {{ goal?: unknown, task?: unknown, steps?: unknown }} ParallelAgentInput
+ * @typedef {{ index: number, goal: string, steps: SubagentStep[] }} ChildPlan
+ * @typedef {{ contextBytes: number, contextBudgetBytes: number, maxSteps: number }} ContextLimits
+ * @typedef {{ has(name: string): boolean, call(name: string, args: Record<string, unknown>, context: { trustedRoot: string, context: Record<string, unknown> }): unknown | Promise<unknown> }} ToolRegistryLike
+ * @typedef {{ publish(runId: string, payload: Record<string, unknown>): ParallelEvent }} RunEventsLike
+ * @typedef {{ upsert(record: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
+ * @typedef {{ seq?: number, ts?: string, type: string, [key: string]: unknown }} ParallelEvent
+ * @typedef {{ index: number, goal: string, runId?: string, status: 'succeeded' | 'failed', ok: boolean, steps?: unknown, error?: string, limits: ContextLimits }} ChildResult
+ * @typedef {{ goal?: unknown, agents?: ParallelAgentInput[], registry: ToolRegistryLike, trustedRoot: string, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, context?: Record<string, unknown>, stopOnError?: boolean, contextBudgetBytes?: number, maxSteps?: number, maxAgents?: number, maxConcurrency?: number }} RunSubagentsParallelOptions
+ */
+
+/** @param {RunSubagentsParallelOptions} options */
 export async function runSubagentsParallel({
   goal = '',
   agents = [],
@@ -43,10 +58,11 @@ export async function runSubagentsParallel({
     throw makeHttpError(400, `runSubagentsParallel: too many agents; max ${agentLimit}`, { maxAgents: agentLimit });
   }
 
+  /** @type {ChildPlan[]} */
   const childPlans = agents.map((agent, index) => ({
     index,
     goal: String(agent?.goal || agent?.task || `子任务 ${index + 1}`),
-    steps: Array.isArray(agent?.steps) ? agent.steps : [],
+    steps: Array.isArray(agent?.steps) ? /** @type {SubagentStep[]} */ (agent.steps) : [],
   }));
   const childLimits = childPlans.map((child) => {
     validateSubagentSteps({ steps: child.steps, registry });
@@ -61,7 +77,9 @@ export async function runSubagentsParallel({
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const runId = createRunId();
   const startedAt = new Date();
+  /** @type {ParallelEvent[]} */
   const events = [];
+  /** @param {string} type @param {Record<string, unknown>} [payload] */
   const emit = (type, payload = {}) => {
     const enriched = runEvents
       ? runEvents.publish(runId, { type, ...payload })
@@ -74,8 +92,10 @@ export async function runSubagentsParallel({
   emit('user_message', { text: String(goal || '').slice(0, 2000) || `并行子任务 (${childPlans.length} 个)` });
   emit('assistant_start', { status: 'running', childCount: childPlans.length, maxConcurrency: concurrency });
 
+  /** @type {(ChildResult | undefined)[]} */
   const children = new Array(childPlans.length);
   let next = 0;
+  /** @returns {Promise<void>} */
   async function worker() {
     for (;;) {
       const index = next;
@@ -145,7 +165,7 @@ export async function runSubagentsParallel({
       prompt: String(goal || ''),
       agents: childPlans.map((child) => ({
         goal: child.goal,
-        steps: child.steps.map((step) => ({ tool: step.tool })),
+        steps: child.steps.map((step) => ({ tool: String(step.tool || '') })),
       })),
     },
     result: { ok, children },
