@@ -30,6 +30,8 @@ declare const process: {
   version: string;
   versions?: Record<string, string | undefined>;
   cwd(): string;
+  memoryUsage(): { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number };
+  uptime(): number;
 };
 
 declare module 'node:crypto' {

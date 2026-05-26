@@ -1,22 +1,8 @@
-import { CircuitBreaker } from '../../runtime/circuit-breaker.js';
 import { redactText } from '../../security/redaction.js';
+import { modelBreaker, modelBreakerStats, modelProvider } from '../../runtime/model-breakers.js';
 import { runWithFallback } from '../provider/router.js';
 
-const MODEL_BREAKERS = new Map();
-
-function modelProvider(kimiConfig) {
-  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
-}
-
-function modelBreaker(kimiConfig) {
-  const key = `${modelProvider(kimiConfig)}|${kimiConfig && kimiConfig.baseUrl}|${kimiConfig && kimiConfig.model}`;
-  let breaker = MODEL_BREAKERS.get(key);
-  if (!breaker) {
-    breaker = new CircuitBreaker({ name: `model:${key}`, failureThreshold: 4, cooldownMs: 15000 });
-    MODEL_BREAKERS.set(key, breaker);
-  }
-  return breaker;
-}
+export { modelBreakerStats };
 
 function fallbackConfig(primary, fallback) {
   const source = fallback && typeof fallback === 'object' ? fallback : {};
@@ -69,10 +55,6 @@ function fallbackExhausted(errors) {
   agg.code = 'FALLBACK_EXHAUSTED';
   agg.errors = errors;
   return agg;
-}
-
-export function modelBreakerStats() {
-  return [...MODEL_BREAKERS.values()].map((b) => b.stats());
 }
 
 async function callOneModel(modelCall, callArgs, kimiConfig, timeoutMs) {

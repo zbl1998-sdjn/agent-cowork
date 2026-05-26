@@ -44,7 +44,7 @@ const HOST_LAYER_WAIVERS = new Map([
   ['kimi/agent-runner.js -> runtime/hooks.js', 'P0-T5 agent-runner split'],
   ['kimi/agent-runner.js -> runtime/action-audit.js', 'P0-T5 agent-runner split'],
   ['kimi/agent-runner.js -> runtime/circuit-breaker.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent/model-resilience.js -> runtime/circuit-breaker.js', 'model breaker is shared runtime protection used by the agent model call'],
+  ['kimi/agent/model-resilience.js -> runtime/model-breakers.js', 'model breaker is shared runtime protection used by the agent model call'],
   ['kimi/chat-stream.js -> runtime/run-store.js', 'stream runner currently records runs directly'],
   ['kimi/chat-stream.js -> runtime/runs-index.js', 'stream runner currently indexes runs directly'],
   ['recipes/run-recipe.js -> runtime/run-store.js', 'P0 recipe runner currently records runs directly'],

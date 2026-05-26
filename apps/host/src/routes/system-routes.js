@@ -1,4 +1,4 @@
-import { modelBreakerStats } from '../kimi/agent-runner.js';
+import { modelBreakerStats } from '../runtime/model-breakers.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
@@ -8,27 +8,76 @@ import {
   buildRuntimeDependencyUpdatePlan,
 } from '../runtime/dependency-install-plan.js';
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
+ * @typedef {import('../runtime/dependency-install-plan.js').RuntimeDependencyInstallPlanOptions & import('../runtime/dependency-install-plan.js').RuntimeDependencyCleanupPlanOptions & import('../runtime/dependency-install-plan.js').RuntimeDependencyUpdatePlanOptions} RuntimeDependencyPlanOptions
+ * @typedef {{ state?: string, name?: string }} ModelBreakerStats
+ * @typedef {{ active?: number, maxConcurrent?: number, tenants?: number, [key: string]: unknown }} ConcurrencyStats
+ * @typedef {{ tenants?: number, ratePerSec?: unknown, burst?: unknown, [key: string]: unknown }} RateLimitStats
+ * @typedef {{ stats(): ConcurrencyStats }} AgentConcurrencyLike
+ * @typedef {{ stats(): RateLimitStats }} RateLimiterLike
+ * @typedef {{ cancel(id: string): boolean }} CancellationLike
+ * @typedef {{ configured: boolean, apiKey?: unknown, provider?: unknown, baseUrl?: unknown, model?: unknown }} KimiApiConfigLike
+ * @typedef {{ backend?: string, networkIsolated?: boolean }} SandboxLike
+ * @typedef {{ info?: { backend?: string, networkIsolated?: boolean, userMessage?: string, [key: string]: unknown } }} SandboxStartupLike
+ * @typedef {{
+ *   agentConcurrency: AgentConcurrencyLike,
+ *   rateLimiter?: RateLimiterLike | null,
+ *   draining?: boolean,
+ *   kimiApiConfig: KimiApiConfigLike,
+ *   kimiApiEnabled?: boolean,
+ *   sandboxEnabled?: boolean,
+ *   sandbox?: SandboxLike | null,
+ *   sandboxStartup?: SandboxStartupLike | null,
+ *   storeBackend?: string,
+ *   usePostgresState?: boolean,
+ *   config: { runtimeDependencyEnv?: Record<string, string | undefined>, runtimeDependencyPlatform?: string, runtimeDependencyAppDataRoot?: string | null },
+ *   trustedRootDefault: string,
+ *   cancellation: CancellationLike,
+ * }} HostStateLike
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, state: HostStateLike }} SystemRouteOptions
+ */
+
+/** @param {unknown} body @returns {Record<string, unknown>} */
 function objectBody(body) {
-  return body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  return body && typeof body === 'object' && !Array.isArray(body)
+    ? /** @type {Record<string, unknown>} */ (body)
+    : {};
 }
 
+/** @param {KimiApiConfigLike | null | undefined} kimiConfig @returns {string} */
 function modelProvider(kimiConfig) {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
+/** @param {unknown} body @param {HostStateLike} state @returns {RuntimeDependencyPlanOptions} */
 function dependencyPlanOptions(body, state) {
   const input = objectBody(body);
-  const appDataRoot = input.appDataRoot || state.config.runtimeDependencyAppDataRoot;
+  const appDataRoot = typeof input.appDataRoot === 'string'
+    ? input.appDataRoot
+    : state.config.runtimeDependencyAppDataRoot;
   return {
-    selectedIds: input.selectedIds,
+    selectedIds: Array.isArray(input.selectedIds) ? input.selectedIds : undefined,
     freeBytes: input.freeBytes,
-    keepUserData: input.keepUserData,
+    keepUserData: typeof input.keepUserData === 'boolean' ? input.keepUserData : undefined,
     currentVersion: input.currentVersion,
     targetVersion: input.targetVersion,
     appDataRoot,
   };
 }
 
+/** @returns {ModelBreakerStats[]} */
+function safeModelBreakerStats() {
+  try {
+    return /** @type {ModelBreakerStats[]} */ (modelBreakerStats());
+  } catch {
+    return [];
+  }
+}
+
+/** @param {SystemRouteOptions} options @returns {Promise<boolean>} */
 export async function handleSystemRoutes({ request, response, pathname, requestContext, state }) {
   if (request.method === 'GET' && pathname === '/health') {
     sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
@@ -38,8 +87,7 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
   if (request.method === 'GET' && pathname === '/metrics') {
     const c = state.agentConcurrency.stats();
     const rl = state.rateLimiter ? state.rateLimiter.stats() : { tenants: 0 };
-    let breakers = [];
-    try { breakers = modelBreakerStats(); } catch { breakers = []; }
+    const breakers = safeModelBreakerStats();
     const openBreakers = breakers.filter((b) => b.state === 'open').length;
     const mem = process.memoryUsage();
     const body = [
@@ -71,10 +119,11 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
   }
 
   if (request.method === 'GET' && pathname === '/api/selfcheck') {
-    let breakers = [];
-    try { breakers = modelBreakerStats(); } catch { breakers = []; }
+    const breakers = safeModelBreakerStats();
     const rateLimit = state.rateLimiter ? { enabled: true, ...state.rateLimiter.stats() } : { enabled: false };
+    /** @type {Array<{ id: string, status: 'pass' | 'warn', detail: unknown }>} */
     const checks = [];
+    /** @param {string} id @param {boolean} ok @param {unknown} detail */
     const add = (id, ok, detail) => checks.push({ id, status: ok ? 'pass' : 'warn', detail });
     add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
