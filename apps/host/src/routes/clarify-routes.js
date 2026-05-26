@@ -9,6 +9,21 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 const ANSWER_RE = /^\/api\/clarify\/([a-zA-Z0-9_-]+)\/answer$/;
 const GET_RE = /^\/api\/clarify\/([a-zA-Z0-9_-]+)$/;
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {import('../runtime/clarifications.js').ClarificationStore} ClarificationStore
+ * @typedef {{ question?: unknown, options?: unknown, value?: unknown }} ClarifyBody
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: Record<string, unknown>, clarifications?: ClarificationStore | null }} ClarifyRouteOptions
+ */
+
+/** @param {unknown} err */
+function errorPayload(err) {
+  const error = /** @type {Error & { statusCode?: number }} */ (err);
+  return { status: error.statusCode || 400, body: { error: error.message } };
+}
+
+/** @param {ClarifyRouteOptions} options */
 export async function handleClarifyRoutes({ request, response, pathname, requestContext, clarifications }) {
   if (!clarifications) {
     return false;
@@ -16,15 +31,17 @@ export async function handleClarifyRoutes({ request, response, pathname, request
 
   if (request.method === 'POST' && pathname === '/api/clarify') {
     await withJsonBody(request, response, async (body) => {
+      const input = /** @type {ClarifyBody} */ (body || {});
       try {
         const clarification = clarifications.create({
-          question: body && body.question,
-          options: body && body.options,
+          question: input.question,
+          options: input.options,
           context: requestContext,
         });
         sendJson(response, 200, { context: requestContext, clarification });
       } catch (err) {
-        sendJson(response, err.statusCode || 400, { error: err.message });
+        const error = errorPayload(err);
+        sendJson(response, error.status, error.body);
       }
     });
     return true;
@@ -33,11 +50,13 @@ export async function handleClarifyRoutes({ request, response, pathname, request
   const answerMatch = pathname.match(ANSWER_RE);
   if (request.method === 'POST' && answerMatch) {
     await withJsonBody(request, response, async (body) => {
+      const input = /** @type {ClarifyBody} */ (body || {});
       try {
-        const clarification = clarifications.answer(answerMatch[1], body ? body.value : undefined);
+        const clarification = clarifications.answer(answerMatch[1], input.value);
         sendJson(response, 200, { context: requestContext, clarification });
       } catch (err) {
-        sendJson(response, err.statusCode || 400, { error: err.message });
+        const error = errorPayload(err);
+        sendJson(response, error.status, error.body);
       }
     });
     return true;
