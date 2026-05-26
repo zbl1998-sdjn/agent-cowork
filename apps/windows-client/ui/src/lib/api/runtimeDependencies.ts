@@ -95,6 +95,35 @@ export interface RuntimeDependencyCleanupPlanResponse {
   warnings: string[];
 }
 
+export interface RuntimeDependencyUpdatePlanRequest extends PostBody {
+  selectedIds?: string[];
+  currentVersion?: string;
+  targetVersion?: string;
+}
+
+export interface RuntimeDependencyUpdatePlanEntry {
+  id: string;
+  label: string;
+  relativePath?: string;
+  path: string;
+  action: 'preserve' | string;
+  kind: string;
+  reason?: string;
+}
+
+export interface RuntimeDependencyUpdatePlanResponse {
+  ok: boolean;
+  mode: 'preserve-on-update' | string;
+  currentVersion: string | null;
+  targetVersion: string | null;
+  appDataRoot: string;
+  unknownIds: string[];
+  components: RuntimeDependencyUpdatePlanEntry[];
+  retained: RuntimeDependencyUpdatePlanEntry[];
+  destructiveActions: unknown[];
+  installerInvariant: string;
+}
+
 export function getRuntimeDependencies(): Promise<RuntimeDependencyResponse> {
   return getJson<RuntimeDependencyResponse>('/api/runtime/dependencies');
 }
@@ -109,4 +138,10 @@ export function getRuntimeDependencyCleanupPlan(
   request: RuntimeDependencyCleanupPlanRequest,
 ): Promise<RuntimeDependencyCleanupPlanResponse> {
   return postJson<RuntimeDependencyCleanupPlanResponse>('/api/runtime/dependencies/cleanup-plan', request);
+}
+
+export function getRuntimeDependencyUpdatePlan(
+  request: RuntimeDependencyUpdatePlanRequest,
+): Promise<RuntimeDependencyUpdatePlanResponse> {
+  return postJson<RuntimeDependencyUpdatePlanResponse>('/api/runtime/dependencies/update-plan', request);
 }

@@ -3,6 +3,7 @@ import {
   formatDependencyBytes,
   toRuntimeDependencyCleanupPlanViewModel,
   toRuntimeDependencyInstallPlanViewModel,
+  toRuntimeDependencyUpdatePlanViewModel,
   toRuntimeDependencyViewModel,
 } from './runtime-dependencies';
 import type { RuntimeDependencyResponse } from './api/runtimeDependencies';
@@ -69,6 +70,8 @@ describe('runtime dependency view model', () => {
     expect(vm.summary.onDemandCount).toBe(3);
     expect(vm.installPlanCandidateIds).toEqual(['pandoc', 'ffmpeg', 'mingit']);
     expect(vm.installPlanCandidateLabel).toBe('文档转换组件、音视频处理组件、Git 轻量运行时');
+    expect(vm.updatePlanCandidateIds).toEqual(['pandoc', 'ffmpeg', 'mingit']);
+    expect(vm.updatePlanCandidateLabel).toBe('文档转换组件、音视频处理组件、Git 轻量运行时');
   });
 
   it('summarizes install plan precheck results for the panel', () => {
@@ -139,5 +142,43 @@ describe('runtime dependency view model', () => {
     expect(vm.targetLabels[0]).toContain('运行时下载缓存');
     expect(vm.warnings[0]).toContain('二次确认');
     expect(vm.unknownIds).toEqual(['unknown-component']);
+  });
+
+  it('summarizes update preservation plan without execution actions', () => {
+    const vm = toRuntimeDependencyUpdatePlanViewModel({
+      ok: true,
+      mode: 'preserve-on-update',
+      currentVersion: '0.2.0',
+      targetVersion: '0.2.1',
+      appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+      unknownIds: [],
+      components: [{
+        id: 'ffmpeg',
+        label: '音视频处理组件',
+        relativePath: 'components/ffmpeg',
+        path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\components\\ffmpeg',
+        action: 'preserve',
+        kind: 'downloaded-component',
+        reason: '升级应用本体时保留已下载组件，避免重复下载。',
+      }],
+      retained: [{
+        id: 'user-data',
+        label: '本机用户数据',
+        relativePath: '.',
+        path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+        action: 'preserve',
+        kind: 'user-data',
+        reason: '保留对话、记忆、鉴权、配置和本地状态。',
+      }],
+      destructiveActions: [],
+      installerInvariant: '更新只替换安装目录中的应用本体，不删除 AppData\\AgentCowork。',
+    });
+
+    expect(vm.title).toBe('更新保留计划预检通过');
+    expect(vm.versionLabel).toBe('0.2.0 → 0.2.1');
+    expect(vm.componentLabels[0]).toContain('音视频处理组件');
+    expect(vm.retainedLabels[0]).toContain('本机用户数据');
+    expect(vm.destructiveActionCount).toBe(0);
+    expect(vm.installerInvariant).toContain('不删除 AppData');
   });
 });

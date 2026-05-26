@@ -223,6 +223,51 @@ describe('JSON requests', () => {
     });
   });
 
+  it('loads runtime dependency update plan through the typed helper', async () => {
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.endsWith('/api/runtime/dependencies/update-plan')) {
+        return jsonResponse({
+          ok: true,
+          mode: 'preserve-on-update',
+          currentVersion: '0.2.0',
+          targetVersion: '0.2.1',
+          appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+          unknownIds: [],
+          components: [{
+            id: 'ffmpeg',
+            label: '音视频处理组件',
+            relativePath: 'components/ffmpeg',
+            path: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\components\\ffmpeg',
+            action: 'preserve',
+            kind: 'downloaded-component',
+            reason: '升级应用本体时保留已下载组件，避免重复下载。',
+          }],
+          retained: [],
+          destructiveActions: [],
+          installerInvariant: '更新只替换安装目录中的应用本体，不删除 AppData\\AgentCowork。',
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const result = await api.getRuntimeDependencyUpdatePlan({
+      selectedIds: ['ffmpeg'],
+      currentVersion: '0.2.0',
+      targetVersion: '0.2.1',
+    });
+
+    expect(result.components[0]).toMatchObject({ id: 'ffmpeg', action: 'preserve' });
+    expect(result.destructiveActions).toHaveLength(0);
+    const request = calls.find((call) => call.url.endsWith('/api/runtime/dependencies/update-plan'));
+    expect(request?.init?.method).toBe('POST');
+    expect(JSON.parse(String(request?.init?.body))).toEqual({
+      selectedIds: ['ffmpeg'],
+      currentVersion: '0.2.0',
+      targetVersion: '0.2.1',
+    });
+  });
+
   it('injects the Bearer token on GET requests after host readiness', async () => {
     const { api, calls } = await importApi();
     api.setAuthToken(' token-123 ');

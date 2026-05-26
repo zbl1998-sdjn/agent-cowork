@@ -3,6 +3,7 @@ import type {
   RuntimeDependencyCleanupPlanResponse,
   RuntimeDependencyInstallPlanResponse,
   RuntimeDependencyResponse,
+  RuntimeDependencyUpdatePlanResponse,
 } from './api/runtimeDependencies';
 
 export type RuntimeDependencySeverity = 'ok' | 'warn' | 'error' | 'muted';
@@ -37,6 +38,8 @@ export interface RuntimeDependencyViewModel {
   installPlanCandidateLabel: string;
   cleanupPlanCandidateIds: string[];
   cleanupPlanCandidateLabel: string;
+  updatePlanCandidateIds: string[];
+  updatePlanCandidateLabel: string;
 }
 
 export interface RuntimeDependencyInstallPlanViewModel {
@@ -62,6 +65,15 @@ export interface RuntimeDependencyCleanupPlanViewModel {
   warnings: string[];
   unknownIds: string[];
   requiresConfirmation: boolean;
+}
+
+export interface RuntimeDependencyUpdatePlanViewModel {
+  ok: boolean;
+  title: string;
+  versionLabel: string;
+  appDataRoot: string;
+  componentLabels: string[]; retainedLabels: string[]; unknownIds: string[];
+  destructiveActionCount: number; installerInvariant: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -142,6 +154,7 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
   }));
   const installPlanCandidates = items.filter(shouldPlanInstall);
   const cleanupPlanCandidates = items.filter(shouldPlanCleanup);
+  const updatePlanCandidates = items.filter((item) => item.installMode === 'on-demand');
   return {
     summary: {
       total: response.summary.total || items.length,
@@ -160,6 +173,10 @@ export function toRuntimeDependencyViewModel(response: RuntimeDependencyResponse
     cleanupPlanCandidateLabel: cleanupPlanCandidates.length
       ? cleanupPlanCandidates.map((item) => item.label).join('、')
       : '暂无可清理的按需组件',
+    updatePlanCandidateIds: updatePlanCandidates.map((item) => item.id),
+    updatePlanCandidateLabel: updatePlanCandidates.length
+      ? updatePlanCandidates.map((item) => item.label).join('、')
+      : '暂无需要保留的按需组件',
   };
 }
 
@@ -208,5 +225,24 @@ export function toRuntimeDependencyCleanupPlanViewModel(
     warnings: plan.warnings,
     unknownIds: plan.unknownIds,
     requiresConfirmation,
+  };
+}
+
+export function toRuntimeDependencyUpdatePlanViewModel(
+  plan: RuntimeDependencyUpdatePlanResponse,
+): RuntimeDependencyUpdatePlanViewModel {
+  const versionLabel = plan.currentVersion || plan.targetVersion
+    ? `${plan.currentVersion || '当前版本'} → ${plan.targetVersion || '目标版本'}`
+    : '未指定版本';
+  return {
+    ok: plan.ok,
+    title: plan.ok ? '更新保留计划预检通过' : '更新保留计划需要处理',
+    versionLabel,
+    appDataRoot: plan.appDataRoot,
+    componentLabels: plan.components.map((item) => `${item.label} · ${item.path}`),
+    retainedLabels: plan.retained.map((item) => `${item.label} · ${item.reason || item.path}`),
+    unknownIds: plan.unknownIds,
+    destructiveActionCount: plan.destructiveActions.length,
+    installerInvariant: plan.installerInvariant,
   };
 }

@@ -3,10 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from '../ui/Button';
 import {
-  RuntimeDependencyCleanupPlanPreview,
-  RuntimeDependencyInstallPlanPreview,
   RuntimeDependenciesPanelView,
 } from './RuntimeDependenciesPanel';
+import {
+  RuntimeDependencyCleanupPlanPreview,
+  RuntimeDependencyInstallPlanPreview,
+  RuntimeDependencyUpdatePlanPreview,
+} from './RuntimeDependencyPlanPreviews';
+import { RuntimeDependencyPlanActions } from './RuntimeDependencyPlanActions';
 import type { RuntimeDependencyViewModel } from '../../lib/runtime-dependencies';
 
 function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -58,6 +62,8 @@ function runtimeDependencyViewModel(overrides: Partial<RuntimeDependencyViewMode
     installPlanCandidateLabel: 'Python 运行时',
     cleanupPlanCandidateIds: ['python-runtime'],
     cleanupPlanCandidateLabel: 'Python 运行时',
+    updatePlanCandidateIds: ['python-runtime'],
+    updatePlanCandidateLabel: 'Python 运行时',
     ...overrides,
   };
 }
@@ -115,6 +121,32 @@ describe('RuntimeDependencyInstallPlanPreview', () => {
     expect(html).toContain('本机用户数据');
     expect(html).not.toContain('删除中');
   });
+
+  it('renders update preservation plan without destructive execution controls', () => {
+    const html = renderToStaticMarkup(
+      <RuntimeDependencyUpdatePlanPreview
+        plan={{
+          ok: true,
+          title: '更新保留计划预检通过',
+          versionLabel: '0.2.0 → 0.2.1',
+          appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
+          componentLabels: ['音视频处理组件 · C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork\\components\\ffmpeg'],
+          retainedLabels: ['本机用户数据 · 保留对话、记忆、鉴权、配置和本地状态。'],
+          unknownIds: [],
+          destructiveActionCount: 0,
+          installerInvariant: '更新只替换安装目录中的应用本体，不删除 AppData\\AgentCowork。',
+        }}
+      />,
+    );
+
+    expect(html).toContain('更新保留计划预检');
+    expect(html).toContain('破坏性动作');
+    expect(html).toContain('0 个');
+    expect(html).toContain('保留按需组件');
+    expect(html).toContain('不删除 AppData');
+    expect(html).not.toContain('更新中');
+    expect(html).not.toContain('删除中');
+  });
 });
 
 describe('RuntimeDependenciesPanelView', () => {
@@ -133,54 +165,86 @@ describe('RuntimeDependenciesPanelView', () => {
         cleanupStatus="loading"
         cleanupError=""
         cleanupVm={null}
+        updateStatus="loading"
+        updateError=""
+        updateVm={null}
         onLoad={() => {}}
         onLoadInstallPlan={() => {}}
         onLoadCleanupPlan={() => {}}
+        onLoadUpdatePlan={() => {}}
       />,
     );
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(4);
+    expect(html.match(/class="ui-btn /g)?.length).toBe(5);
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).not.toContain('btn-secondary');
     expect(html).toContain('检测中…');
     expect(html).toContain('暂无需要预检的按需组件');
     expect(html).toContain('生成中…');
-    expect(html.match(/disabled=""/g)?.length).toBe(4);
+    expect(html.match(/disabled=""/g)?.length).toBe(5);
   });
 
-  it('keeps refresh, install-plan, and cleanup-plan callbacks wired through Button primitives', () => {
+  it('keeps refresh, install-plan, cleanup-plan, and update-plan callbacks wired through Button primitives', () => {
     const onLoad = vi.fn();
     const onLoadInstallPlan = vi.fn();
     const onLoadCleanupPlan = vi.fn();
-    const buttons = collectByType(
+    const onLoadUpdatePlan = vi.fn();
+    const vm = runtimeDependencyViewModel();
+    const headerButtons = collectByType(
       RuntimeDependenciesPanelView({
         status: 'ready',
         error: '',
-        vm: runtimeDependencyViewModel(),
+        vm,
         planStatus: 'idle',
         planError: '',
         planVm: null,
         cleanupStatus: 'idle',
         cleanupError: '',
         cleanupVm: null,
+        updateStatus: 'idle',
+        updateError: '',
+        updateVm: null,
         onLoad,
         onLoadInstallPlan,
         onLoadCleanupPlan,
+        onLoadUpdatePlan,
+      }),
+      Button,
+    );
+    const planButtons = collectByType(
+      RuntimeDependencyPlanActions({
+        vm,
+        planStatus: 'idle',
+        planError: '',
+        planVm: null,
+        cleanupStatus: 'idle',
+        cleanupError: '',
+        cleanupVm: null,
+        updateStatus: 'idle',
+        updateError: '',
+        updateVm: null,
+        onLoadInstallPlan,
+        onLoadCleanupPlan,
+        onLoadUpdatePlan,
       }),
       Button,
     );
 
-    expect(buttons).toHaveLength(4);
-    expect(buttons.map((button) => button.props.disabled)).toEqual([false, false, false, false]);
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
-    buttons[2].props.onClick();
-    buttons[3].props.onClick();
+    expect(headerButtons).toHaveLength(1);
+    expect(planButtons).toHaveLength(4);
+    expect(headerButtons[0].props.disabled).toBe(false);
+    expect(planButtons.map((button) => button.props.disabled)).toEqual([false, false, false, false]);
+    headerButtons[0].props.onClick();
+    planButtons[0].props.onClick();
+    planButtons[1].props.onClick();
+    planButtons[2].props.onClick();
+    planButtons[3].props.onClick();
 
     expect(onLoad).toHaveBeenCalledOnce();
     expect(onLoadInstallPlan).toHaveBeenCalledOnce();
     expect(onLoadCleanupPlan).toHaveBeenCalledTimes(2);
     expect(onLoadCleanupPlan).toHaveBeenNthCalledWith(1, true);
     expect(onLoadCleanupPlan).toHaveBeenNthCalledWith(2, false);
+    expect(onLoadUpdatePlan).toHaveBeenCalledOnce();
   });
 });
