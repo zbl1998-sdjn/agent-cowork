@@ -4,7 +4,7 @@ import { Loading } from './ui/StateViews';
 
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
 
-type Tab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
+export type SettingsTab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
 
 const MODEL_PROVIDERS = [
   { value: 'kimi-api', label: 'Kimi' },
@@ -14,6 +14,7 @@ const MODEL_PROVIDERS = [
 ];
 
 interface SettingsProps {
+  initialTab?: SettingsTab;
   username: string;
   tenantId: string;
   theme: 'light' | 'dark';
@@ -28,8 +29,8 @@ interface SettingsProps {
 // Unified settings center (kimi.exe style): account / appearance / model / API /
 // self-check tabs in one modal. The API key is shown only as a `hasKey` flag and
 // never echoed back; saving an empty key keeps the existing one.
-export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
-  const [tab, setTab] = useState<Tab>('account');
+export function Settings({ initialTab = 'account', username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [apiKey, setApiKey] = useState('');
   const [provider, setProvider] = useState('kimi-api');
   const [baseUrl, setBaseUrl] = useState('');
@@ -64,6 +65,10 @@ export function Settings({ username, tenantId, theme, autoClarify, onSetAutoClar
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   // Load (or refresh) the self-check whenever its tab is opened.
   const loadSelfCheck = () => {

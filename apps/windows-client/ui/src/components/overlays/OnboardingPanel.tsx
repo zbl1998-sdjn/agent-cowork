@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { getJson, getOnboardingRecommendations } from '../../lib/api';
 import {
   getFallbackOnboarding,
+  getOnboardingSetupAction,
   selectRecommendedDependencies,
   selectInitialRole,
   toOnboardingViewModel,
+  type OnboardingSettingsTab,
   type OnboardingResponse,
   type OnboardingRole,
   type OnboardingViewModel,
@@ -19,9 +21,10 @@ interface OnboardingPanelProps {
   workspaceType?: string;
   onComplete: () => void;
   onOpenSettings: () => void;
+  onOpenSettingsTab?: (tab: OnboardingSettingsTab) => void;
 }
 
-export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSettings }: OnboardingPanelProps) {
+export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSettings, onOpenSettingsTab }: OnboardingPanelProps) {
   const [role, setRole] = useState<OnboardingRole>(() => selectInitialRole());
   const [response, setResponse] = useState<OnboardingResponse>(() => getFallbackOnboarding(role, workspaceType));
   const [loading, setLoading] = useState(false);
@@ -118,6 +121,19 @@ export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSet
                 <li key={item.id}>
                   <strong>{item.label}</strong>
                   <span>{item.reason}</span>
+                  {section.id === 'setup' && getOnboardingSetupAction(item.id) && (
+                    <button
+                      type="button"
+                      className="onboarding-setup-action"
+                      onClick={() => {
+                        const action = getOnboardingSetupAction(item.id);
+                        if (action && onOpenSettingsTab) onOpenSettingsTab(action.settingsTab);
+                        else onOpenSettings();
+                      }}
+                    >
+                      {getOnboardingSetupAction(item.id)?.label}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

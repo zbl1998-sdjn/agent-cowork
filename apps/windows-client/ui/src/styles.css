@@ -741,6 +741,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 .onboarding-section li { border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface); letter-spacing: 0; }
 .onboarding-section li strong { display: block; font-size: 12.5px; line-height: 1.25; letter-spacing: 0; }
 .onboarding-section li span { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.35; letter-spacing: 0; }
+.onboarding-setup-action {
+  margin-top: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 6px 8px;
+  cursor: pointer;
+  letter-spacing: 0;
+}
+.onboarding-setup-action:hover { border-color: var(--accent); }
 .onboarding-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .onboarding-actions .btn-primary {
   font: inherit;

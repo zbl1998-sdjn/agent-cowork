@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getFallbackOnboarding, selectInitialRole, selectRecommendedDependencies, toOnboardingViewModel } from './onboarding';
+import { getFallbackOnboarding, getOnboardingSetupAction, selectInitialRole, selectRecommendedDependencies, toOnboardingViewModel } from './onboarding';
 
 describe('selectInitialRole', () => {
   it('uses a supported preferred role when present', () => {
@@ -53,5 +53,12 @@ describe('onboarding fallback view model', () => {
       { id: 'mingit', label: 'MinGit', status: 'missing' },
       { id: 'pandoc', label: 'Pandoc', status: 'missing' },
     ], ['mingit', 'node']).map((item) => item.id)).toEqual(['node', 'mingit']);
+  });
+
+  it('maps setup recommendations to concrete settings actions', () => {
+    expect(getOnboardingSetupAction('api-key')).toEqual({ label: '进入 API 设置', settingsTab: 'api' });
+    expect(getOnboardingSetupAction('repo-root')).toEqual({ label: '运行自检', settingsTab: 'selfcheck' });
+    expect(getOnboardingSetupAction('workspace-index')).toEqual({ label: '打开依赖体检', settingsTab: 'runtime' });
+    expect(getOnboardingSetupAction('unknown')).toBeNull();
   });
 });

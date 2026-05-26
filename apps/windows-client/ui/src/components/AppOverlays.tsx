@@ -4,6 +4,7 @@ import type { Command } from './CommandPalette';
 import { CommandPalette } from './CommandPalette';
 import { FilePreview } from './FilePreview';
 import { OnboardingPanel } from './overlays/OnboardingPanel';
+import type { SettingsTab } from './Settings';
 import { Loading } from './ui/StateViews';
 
 const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })));
@@ -14,6 +15,7 @@ interface AppOverlaysProps {
   previewPath: string | null;
   onboardingOpen: boolean;
   settingsOpen: boolean;
+  settingsInitialTab?: SettingsTab;
   theme: 'light' | 'dark';
   trustedRoot: string;
   user: AuthIdentity;
@@ -23,6 +25,7 @@ interface AppOverlaysProps {
   onClosePreview: () => void;
   onCloseSettings: () => void;
   onOpenSettingsFromOnboarding: () => void;
+  onOpenSettingsTabFromOnboarding?: (tab: SettingsTab) => void;
   onLogout: () => void;
   onSettingsSaved: (info: KimiInfo) => void;
   onSetAutoClarify: (enabled: boolean) => void;
@@ -35,6 +38,7 @@ export function AppOverlays({
   previewPath,
   onboardingOpen,
   settingsOpen,
+  settingsInitialTab = 'account',
   theme,
   trustedRoot,
   user,
@@ -44,6 +48,7 @@ export function AppOverlays({
   onClosePreview,
   onCloseSettings,
   onOpenSettingsFromOnboarding,
+  onOpenSettingsTabFromOnboarding,
   onLogout,
   onSettingsSaved,
   onSetAutoClarify,
@@ -56,6 +61,7 @@ export function AppOverlays({
           workspaceType={trustedRoot ? 'workspace' : 'local'}
           onComplete={onCompleteOnboarding}
           onOpenSettings={onOpenSettingsFromOnboarding}
+          onOpenSettingsTab={onOpenSettingsTabFromOnboarding}
         />
       )}
       {cmdkOpen && <CommandPalette commands={commands} onClose={onCloseCommandPalette} />}
@@ -63,6 +69,7 @@ export function AppOverlays({
       {settingsOpen && (
         <Suspense fallback={<Loading message="正在加载设置…" />}>
           <Settings
+            initialTab={settingsInitialTab}
             username={user.username}
             tenantId={user.tenantId}
             theme={theme}

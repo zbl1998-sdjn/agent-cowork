@@ -19,6 +19,7 @@ import { AppSidePanel } from './components/AppSidePanel';
 import { AppOverlays } from './components/AppOverlays';
 import type { Command } from './components/CommandPalette';
 import type { ComposerMeta, FileHit, HistoryRun, Recipe } from './components/Composer';
+import type { SettingsTab } from './components/Settings';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useConversations } from './hooks/useConversations';
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
   const [user, setUser] = useState<AuthIdentity | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('account');
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     try { return localStorage.getItem(ONBOARDING_DONE_KEY) !== '1'; } catch { return true; }
   });
@@ -75,10 +77,18 @@ export function App() {
     try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* ignore */ }
     setOnboardingOpen(false);
   }, []);
+  const openSettings = useCallback((tab: SettingsTab = 'account') => {
+    setSettingsInitialTab(tab);
+    setSettingsOpen(true);
+  }, []);
   const openSettingsFromOnboarding = useCallback(() => {
     completeOnboarding();
-    setSettingsOpen(true);
-  }, [completeOnboarding]);
+    openSettings('account');
+  }, [completeOnboarding, openSettings]);
+  const openSettingsTabFromOnboarding = useCallback((tab: SettingsTab) => {
+    completeOnboarding();
+    openSettings(tab);
+  }, [completeOnboarding, openSettings]);
   const continueAsGuest = useCallback(() => {
     try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* ignore */ }
     void (async () => { const g = await guestLogin(); if (g) setUser(g); })();
@@ -281,8 +291,8 @@ export function App() {
     { id: 'auto', label: autoApprove ? '关闭自动批准' : '开启自动批准', run: () => setAutoApprove((v) => !v) }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
     { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
-    { id: 'settings', label: 'API 设置', run: () => setSettingsOpen(true) }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
-  ], [autoApprove, autoClarify, conversations.newConversation, doLogout, planMode, theme, toggleTheme]);
+    { id: 'settings', label: 'API 设置', run: () => openSettings('api') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
+  ], [autoApprove, autoClarify, conversations.newConversation, doLogout, openSettings, planMode, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
   if (!user) return <Login onAuthed={(u) => setUser(u)} onGuest={continueAsGuest} />;
@@ -291,12 +301,12 @@ export function App() {
     <div className="app-shell">
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
-        <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
+        <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
         <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={STARTERS} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onRegenerate={regenerate} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); setDefaultProvider(info.provider || 'kimi-api'); setDefaultBaseUrl(info.baseUrl || ''); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); setDefaultProvider(info.provider || 'kimi-api'); setDefaultBaseUrl(info.baseUrl || ''); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
     </div>
   );
 }

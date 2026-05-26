@@ -14,6 +14,13 @@ export interface OnboardingRecommendationItem {
   reason: string;
 }
 
+export type OnboardingSettingsTab = 'api' | 'runtime' | 'selfcheck' | 'input';
+
+export interface OnboardingSetupAction {
+  label: string;
+  settingsTab: OnboardingSettingsTab;
+}
+
 export interface OnboardingRecommendations {
   skills: OnboardingRecommendationItem[];
   connectors: OnboardingRecommendationItem[];
@@ -114,6 +121,14 @@ const FALLBACK_BY_ROLE: Record<OnboardingRole, OnboardingRecommendations> = {
   },
 };
 
+const SETUP_ACTIONS: Record<string, OnboardingSetupAction> = {
+  'api-key': { label: '进入 API 设置', settingsTab: 'api' },
+  'trusted-root': { label: '运行自检', settingsTab: 'selfcheck' },
+  'repo-root': { label: '运行自检', settingsTab: 'selfcheck' },
+  'workspace-index': { label: '打开依赖体检', settingsTab: 'runtime' },
+  notifications: { label: '调整输入设置', settingsTab: 'input' },
+};
+
 function isRole(value: string | null | undefined): value is OnboardingRole {
   return value === 'office' || value === 'developer' || value === 'research' || value === 'operations';
 }
@@ -143,6 +158,10 @@ export function selectInitialRole(preferred?: string | null, roles: OnboardingRo
   if (isRole(preferred) && roles.some((role) => role.id === preferred)) return preferred;
   if (roles.some((role) => role.id === 'office')) return 'office';
   return roles[0]?.id ?? 'office';
+}
+
+export function getOnboardingSetupAction(itemId: string): OnboardingSetupAction | null {
+  return SETUP_ACTIONS[itemId] || null;
 }
 
 export function getFallbackOnboarding(role?: string | null, workspaceType = 'local'): OnboardingResponse {
