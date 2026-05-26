@@ -1,8 +1,20 @@
+// @ts-check
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
+
+/**
+ * @typedef {Record<string, unknown> & { apiKey?: unknown, baseUrl?: unknown, model?: unknown, maxTokens?: unknown, temperature?: unknown, userAgent?: unknown }} ModelConfig
+ * @typedef {{ messages?: unknown[], tools?: unknown[], kimiConfig?: ModelConfig, fetchImpl?: unknown, onContent?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} ProviderChatArgs
+ * @typedef {{ id?: string, type?: string, index?: number, function?: { name?: string, arguments?: string } }} StreamToolCallDelta
+ * @typedef {{ id: string, type: string, function: { name: string, arguments: string } }} ToolCall
+ * @typedef {{ executable: ToolCall[], partial: ToolCall[] }} SplitToolCalls
+ * @typedef {{ read(): Promise<{ value?: BufferSource, done?: boolean }> }} StreamReader
+ * @typedef {{ onContent?: (delta: string) => void, onReasoning?: (delta: string) => void }} StreamHandlers
+ */
 
 export function createKimiProvider() {
   return {
     id: 'kimi',
+    /** @param {ProviderChatArgs} args */
     async chatCompletion({
       messages,
       tools,
@@ -16,12 +28,14 @@ export function createKimiProvider() {
         throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
       }
       const endpoint = `${String(kimiConfig.baseUrl).replace(/\/+$/, '')}/chat/completions`;
+      /** @type {Record<string, string>} */
       const headers = {
         authorization: `Bearer ${kimiConfig.apiKey}`,
         'content-type': 'application/json',
         accept: 'text/event-stream',
       };
-      if (kimiConfig.userAgent) headers['user-agent'] = kimiConfig.userAgent;
+      if (kimiConfig.userAgent) headers['user-agent'] = String(kimiConfig.userAgent);
+      /** @type {Record<string, unknown>} */
       const body = {
         model: kimiConfig.model,
         messages,
@@ -30,14 +44,15 @@ export function createKimiProvider() {
         max_tokens: kimiConfig.maxTokens || 2048,
         stream: true,
       };
-      if (Number.isFinite(kimiConfig.temperature)) body.temperature = kimiConfig.temperature;
-      const resp = await fetchImpl(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal });
+      if (Number.isFinite(kimiConfig.temperature)) body.temperature = /** @type {number} */ (kimiConfig.temperature);
+      const fetcher = /** @type {typeof fetch} */ (fetchImpl);
+      const resp = await fetcher(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal });
       if (!resp.ok) {
         throw new Error(`Kimi API request failed with status ${resp.status}`);
       }
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
       if (!reader) {
-        const json = await resp.json();
+        const json = /** @type {{ choices?: Array<{ message?: unknown }> }} */ (await resp.json());
         return (json.choices && json.choices[0] && json.choices[0].message) || { content: '' };
       }
       return parseOpenAiCompatibleStream(reader, { onContent, onReasoning });
@@ -45,8 +60,10 @@ export function createKimiProvider() {
   };
 }
 
+/** @param {unknown} call */
 function hasCompleteToolCallArguments(call) {
-  const fn = call && call.function ? call.function : {};
+  const item = /** @type {Partial<ToolCall>} */ (call && typeof call === 'object' ? call : {});
+  const fn = /** @type {ToolCall['function']} */ (item.function || {});
   const raw = typeof fn.arguments === 'string' ? fn.arguments.trim() : '';
   if (!fn.name || !raw) return false;
   try {
@@ -57,9 +74,12 @@ function hasCompleteToolCallArguments(call) {
   }
 }
 
+/** @param {ToolCall[]} calls @param {boolean} interrupted @returns {SplitToolCalls} */
 function splitInterruptedToolCalls(calls, interrupted) {
   if (!interrupted) return { executable: calls, partial: [] };
+  /** @type {ToolCall[]} */
   const executable = [];
+  /** @type {ToolCall[]} */
   const partial = [];
   for (const call of calls) {
     if (hasCompleteToolCallArguments(call)) executable.push(call);
@@ -68,14 +88,17 @@ function splitInterruptedToolCalls(calls, interrupted) {
   return { executable, partial };
 }
 
+/** @param {StreamReader} reader @param {StreamHandlers} [handlers] */
 export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoning } = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
   let reasoning = '';
+  /** @type {unknown} */
   let usage = null;
   let interrupted = false;
   let streamError = '';
+  /** @type {ToolCall[]} */
   const toolCalls = [];
   const hasAccumulated = () => !!(content || reasoning || usage || toolCalls.some(Boolean));
   const finish = () => {
@@ -101,7 +124,7 @@ export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoni
     } catch (err) {
       if (!hasAccumulated()) throw err;
       interrupted = true;
-      streamError = (err && err.message) || 'stream interrupted';
+      streamError = /** @type {{ message?: string }} */ (err && typeof err === 'object' ? err : {}).message || 'stream interrupted';
       break;
     }
     const { value, done } = chunk;
@@ -125,25 +148,27 @@ export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoni
       } catch {
         continue;
       }
+      json = /** @type {{ usage?: unknown, choices?: Array<{ delta?: Record<string, unknown> }> }} */ (json && typeof json === 'object' ? json : {});
       if (json && json.usage) usage = json.usage;
       const delta = json && json.choices && json.choices[0] ? (json.choices[0].delta || {}) : {};
-      if (delta.reasoning_content) {
+      if (typeof delta.reasoning_content === 'string') {
         reasoning += delta.reasoning_content;
         if (typeof onReasoning === 'function') onReasoning(delta.reasoning_content);
       }
-      if (delta.content) {
+      if (typeof delta.content === 'string') {
         content += delta.content;
         if (typeof onContent === 'function') onContent(delta.content);
       }
       if (Array.isArray(delta.tool_calls)) {
         for (const tc of delta.tool_calls) {
-          const idx = tc.index || 0;
+          const call = /** @type {StreamToolCallDelta} */ (tc && typeof tc === 'object' ? tc : {});
+          const idx = call.index || 0;
           if (!toolCalls[idx]) {
-            toolCalls[idx] = { id: tc.id || `call_${idx}`, type: 'function', function: { name: '', arguments: '' } };
+            toolCalls[idx] = { id: call.id || `call_${idx}`, type: 'function', function: { name: '', arguments: '' } };
           }
-          if (tc.id) toolCalls[idx].id = tc.id;
-          if (tc.function && tc.function.name) toolCalls[idx].function.name = tc.function.name;
-          if (tc.function && tc.function.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+          if (call.id) toolCalls[idx].id = call.id;
+          if (call.function && call.function.name) toolCalls[idx].function.name = call.function.name;
+          if (call.function && call.function.arguments) toolCalls[idx].function.arguments += call.function.arguments;
         }
       }
     }

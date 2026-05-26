@@ -1,23 +1,35 @@
+// @ts-check
 import { parseOpenAiCompatibleStream } from './kimi.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
+/**
+ * @typedef {Record<string, unknown> & { apiKey?: unknown, baseUrl?: unknown, model?: unknown, maxTokens?: unknown, temperature?: unknown, userAgent?: unknown }} ModelConfig
+ * @typedef {{ id?: string, defaultBaseUrl?: string, requiresApiKey?: boolean, notConfiguredMessage?: string }} ProviderOptions
+ * @typedef {{ messages?: unknown[], tools?: unknown[], kimiConfig?: ModelConfig, fetchImpl?: unknown, onContent?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} ProviderChatArgs
+ */
+
+/** @param {unknown} baseUrl */
 function trimBaseUrl(baseUrl) {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
 
+/** @param {string} id @param {string} message */
 function providerMessage(id, message) {
   return message || `未配置 ${id} 模型提供商。请配置 baseUrl、model 和 API key 后重试。`;
 }
 
+/** @param {unknown} payload */
 function jsonMessage(payload) {
-  const message = payload?.choices?.[0]?.message || { content: '' };
+  const body = /** @type {{ choices?: Array<{ message?: Record<string, unknown> }>, usage?: unknown }} */ (payload && typeof payload === 'object' ? payload : {});
+  const message = body.choices?.[0]?.message || { content: '' };
   return {
     ...message,
-    usage: payload?.usage || message.usage,
+    usage: body.usage || message.usage,
   };
 }
 
+/** @param {ProviderOptions} [options] */
 export function createOpenAiCompatibleProvider({
   id = 'openai-compatible',
   defaultBaseUrl = '',
@@ -26,6 +38,7 @@ export function createOpenAiCompatibleProvider({
 } = {}) {
   return {
     id,
+    /** @param {ProviderChatArgs} args */
     async chatCompletion({
       messages,
       tools,
@@ -45,12 +58,14 @@ export function createOpenAiCompatibleProvider({
       if (typeof fetchImpl !== 'function') {
         throw new Error('fetch is not available for model provider calls');
       }
+      /** @type {Record<string, string>} */
       const headers = {
         'content-type': 'application/json',
         accept: 'text/event-stream',
       };
       if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-      if (config.userAgent) headers['user-agent'] = config.userAgent;
+      if (config.userAgent) headers['user-agent'] = String(config.userAgent);
+      /** @type {Record<string, unknown>} */
       const body = {
         model,
         messages,
@@ -59,8 +74,9 @@ export function createOpenAiCompatibleProvider({
         max_tokens: config.maxTokens || 2048,
         stream: true,
       };
-      if (Number.isFinite(config.temperature)) body.temperature = config.temperature;
-      const resp = await fetchImpl(`${baseUrl}/chat/completions`, {
+      if (Number.isFinite(config.temperature)) body.temperature = /** @type {number} */ (config.temperature);
+      const fetcher = /** @type {typeof fetch} */ (fetchImpl);
+      const resp = await fetcher(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
