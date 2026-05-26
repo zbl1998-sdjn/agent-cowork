@@ -64,6 +64,56 @@ export function ConnectorSearchAction({ onSearch }: { onSearch: () => void }) {
   return <Button onClick={onSearch}>搜索</Button>;
 }
 
+export function ConnectorOAuthAction({
+  busy,
+  connected,
+  hasSession,
+  approved,
+  missingConfig,
+  onApprove,
+  onStart,
+  onComplete,
+  onRevoke,
+}: {
+  busy: boolean;
+  connected: boolean;
+  hasSession: boolean;
+  approved: boolean;
+  missingConfig: boolean;
+  onApprove: () => void;
+  onStart: () => void;
+  onComplete: () => void;
+  onRevoke: () => void;
+}) {
+  const label = busy
+    ? (connected ? '撤销中…' : hasSession ? '确认中…' : approved ? '授权中…' : '审批中…')
+    : connected ? '撤销授权' : missingConfig ? '待配置 OAuth' : hasSession ? '完成授权' : approved ? '开始授权' : '审批权限';
+  const onClick = connected ? onRevoke : hasSession ? onComplete : approved ? onStart : onApprove;
+  return (
+    <Button disabled={busy || missingConfig} onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
+export function ConnectorBuiltinAction({
+  busy,
+  connected,
+  onConnect,
+  onDisconnect,
+}: {
+  busy: boolean;
+  connected: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
+  return (
+    <Button disabled={busy} onClick={connected ? onDisconnect : onConnect}>
+      {busy ? (connected ? '断开中…' : '连接中…') : connected ? '断开' : '一键连接'}
+    </Button>
+  );
+}
+
 // Connector catalog + one-click MCP connect. Mirrors Claude Cowork's "suggest
 // connectors": browse the curated catalog, search by keyword, and connect a
 // builtin (e.g. filesystem) with one click. Non-builtin connectors show their
@@ -362,25 +412,24 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
                 </div>
               )}
               {isOAuth ? (
-                <button
-                  type="button"
-                  disabled={busyId === c.id || missingOAuthConfig}
-                  onClick={() => void (oauth?.connected
-                    ? onRevokeOAuth(c)
-                    : hasOAuthSession ? onCompleteOAuth(c) : approved ? onStartOAuth(c) : onApproveOAuth(c))}
-                >
-                  {busyId === c.id
-                    ? (oauth?.connected ? '撤销中…' : hasOAuthSession ? '确认中…' : approved ? '授权中…' : '审批中…')
-                    : oauth?.connected ? '撤销授权' : missingOAuthConfig ? '待配置 OAuth' : hasOAuthSession ? '完成授权' : approved ? '开始授权' : '审批权限'}
-                </button>
+                <ConnectorOAuthAction
+                  busy={busyId === c.id}
+                  connected={Boolean(oauth?.connected)}
+                  hasSession={hasOAuthSession}
+                  approved={Boolean(approved)}
+                  missingConfig={missingOAuthConfig}
+                  onApprove={() => void onApproveOAuth(c)}
+                  onStart={() => void onStartOAuth(c)}
+                  onComplete={() => void onCompleteOAuth(c)}
+                  onRevoke={() => void onRevokeOAuth(c)}
+                />
               ) : c.builtin ? (
-                <button
-                  type="button"
-                  disabled={busyId === c.id}
-                  onClick={() => void (isOn ? onDisconnect(c) : onConnect(c))}
-                >
-                  {busyId === c.id ? (isOn ? '断开中…' : '连接中…') : isOn ? '断开' : '一键连接'}
-                </button>
+                <ConnectorBuiltinAction
+                  busy={busyId === c.id}
+                  connected={isOn}
+                  onConnect={() => void onConnect(c)}
+                  onDisconnect={() => void onDisconnect(c)}
+                />
               ) : (
                 <code className="connector-install">{c.install}</code>
               )}

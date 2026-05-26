@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from '../ui/Button';
 import {
+  ConnectorBuiltinAction,
+  ConnectorOAuthAction,
   ConnectorSearchAction,
   ConnectorsPanel,
   ConnectorsPanelMessageState,
@@ -69,5 +71,102 @@ describe('ConnectorsPanel state views', () => {
     expect(buttons).toHaveLength(1);
     buttons[0].props.onClick();
     expect(onSearch).toHaveBeenCalledOnce();
+  });
+
+  it('keeps OAuth action labels, disabled state, and branch callbacks', () => {
+    const onApprove = vi.fn();
+    const onStart = vi.fn();
+    const onComplete = vi.fn();
+    const onRevoke = vi.fn();
+    const missingHtml = renderToStaticMarkup(
+      <ConnectorOAuthAction
+        busy={false}
+        connected={false}
+        hasSession={false}
+        approved={false}
+        missingConfig
+        onApprove={onApprove}
+        onStart={onStart}
+        onComplete={onComplete}
+        onRevoke={onRevoke}
+      />,
+    );
+    const approvedButton = collectByType(
+      ConnectorOAuthAction({
+        busy: false,
+        connected: false,
+        hasSession: false,
+        approved: true,
+        missingConfig: false,
+        onApprove,
+        onStart,
+        onComplete,
+        onRevoke,
+      }),
+      Button,
+    )[0];
+    const completeButton = collectByType(
+      ConnectorOAuthAction({
+        busy: false,
+        connected: false,
+        hasSession: true,
+        approved: false,
+        missingConfig: false,
+        onApprove,
+        onStart,
+        onComplete,
+        onRevoke,
+      }),
+      Button,
+    )[0];
+    const revokeButton = collectByType(
+      ConnectorOAuthAction({
+        busy: false,
+        connected: true,
+        hasSession: false,
+        approved: false,
+        missingConfig: false,
+        onApprove,
+        onStart,
+        onComplete,
+        onRevoke,
+      }),
+      Button,
+    )[0];
+
+    expect(missingHtml).toContain('ui-btn ui-btn--secondary');
+    expect(missingHtml).toContain('待配置 OAuth');
+    expect(missingHtml).toContain('disabled=""');
+    approvedButton.props.onClick();
+    completeButton.props.onClick();
+    revokeButton.props.onClick();
+    expect(onStart).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onRevoke).toHaveBeenCalledOnce();
+    expect(onApprove).not.toHaveBeenCalled();
+  });
+
+  it('keeps builtin connect action labels and callbacks', () => {
+    const onConnect = vi.fn();
+    const onDisconnect = vi.fn();
+    const busyHtml = renderToStaticMarkup(
+      <ConnectorBuiltinAction busy connected={false} onConnect={onConnect} onDisconnect={onDisconnect} />,
+    );
+    const connectButton = collectByType(
+      ConnectorBuiltinAction({ busy: false, connected: false, onConnect, onDisconnect }),
+      Button,
+    )[0];
+    const disconnectButton = collectByType(
+      ConnectorBuiltinAction({ busy: false, connected: true, onConnect, onDisconnect }),
+      Button,
+    )[0];
+
+    expect(busyHtml).toContain('ui-btn ui-btn--secondary');
+    expect(busyHtml).toContain('连接中…');
+    expect(busyHtml).toContain('disabled=""');
+    connectButton.props.onClick();
+    disconnectButton.props.onClick();
+    expect(onConnect).toHaveBeenCalledOnce();
+    expect(onDisconnect).toHaveBeenCalledOnce();
   });
 });
