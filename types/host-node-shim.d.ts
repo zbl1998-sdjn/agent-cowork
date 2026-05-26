@@ -15,6 +15,7 @@ declare const Buffer: {
   alloc(size: number): Buffer;
   byteLength(value: string, encoding?: string): number;
   concat(list: readonly Buffer[]): Buffer;
+  from(value: ArrayBuffer): Buffer;
   from(value: Buffer | string, encoding?: string): Buffer;
   from(value: Iterable<number> | ArrayLike<number>): Buffer;
   isBuffer(value: unknown): value is Buffer;

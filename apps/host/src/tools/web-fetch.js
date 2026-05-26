@@ -9,12 +9,27 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_BYTES = 512 * 1024;
 const BLOCKED_HOST_RE = /^(localhost|0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|::1|\[::1\])/i;
 
+/**
+ * @typedef {Error & { statusCode?: number }} WebFetchError
+ * @typedef {{ url?: unknown, timeoutMs?: unknown, maxBytes?: unknown, allowInternal?: boolean, fetchImpl?: typeof globalThis.fetch }} WebFetchOptions
+ * @typedef {{ ok: boolean, status: number, url: string, contentType: string, bytes: number, truncated: boolean, text: string }} WebFetchResult
+ */
+
+/**
+ * @param {string} message
+ * @param {number} [statusCode]
+ * @returns {WebFetchError}
+ */
 function fail(message, statusCode = 400) {
-  const error = new Error(`web.fetch: ${message}`);
+  const error = /** @type {WebFetchError} */ (new Error(`web.fetch: ${message}`));
   error.statusCode = statusCode;
   return error;
 }
 
+/**
+ * @param {WebFetchOptions} [options]
+ * @returns {Promise<WebFetchResult>}
+ */
 export async function webFetch({
   url,
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -46,7 +61,8 @@ export async function webFetch({
   try {
     response = await fetchImpl(parsed.href, { signal: controller.signal, redirect: 'follow' });
   } catch (err) {
-    throw fail(`request failed: ${err.message}`, 502);
+    const message = err instanceof Error ? err.message : String(err);
+    throw fail(`request failed: ${message}`, 502);
   } finally {
     clearTimeout(timer);
   }
