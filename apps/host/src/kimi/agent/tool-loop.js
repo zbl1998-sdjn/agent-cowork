@@ -239,8 +239,8 @@ export async function runAgentChat({
         onReasoning: (d) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); },
       }, { kimiConfig, timeoutMs: kimiConfig && kimiConfig.timeoutMs, onFallback: (event) => emit('model_fallback', event) });
     } catch (err) {
-      if (runTimeout.timedOut() && isAbortLikeError(err)) {
-        stopOnTimeout();
+      if (runTimeout.aborted() && isAbortLikeError(err)) {
+        if (runTimeout.timedOut()) stopOnTimeout();
         break;
       }
       throw err;

@@ -26,7 +26,7 @@ test('E2E /api/agent/chat/stream: file_written + verify_start + done (deep think
     if (n === 3) return { content: '', tool_calls: [{ id: 'c3', function: { name: 'Read', arguments: JSON.stringify({ path: 'report.md' }) } }] };
     return { content: '已核对，report.md 无误。' };
   };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '写报告', autoApprove: true, thinking: 'deep' }) });
@@ -47,7 +47,7 @@ test('E2E /api/agent/chat/stream: inline chart fenced block streams through to t
   const root = tmp();
   const chart = '```chart\n{"kind":"bar","data":{"labels":["A","B"],"datasets":[{"data":[1,2]}]}}\n```';
   const agentModelCall = async () => ({ content: `这是结果：\n${chart}` });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '画个图' }) });
@@ -63,6 +63,7 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
   const root = tmp();
   const agentModelCall = async () => ({ content: 'provider recorded' });
   const server = createServer({
+    requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
     kimiProvider: 'openai',
@@ -102,6 +103,7 @@ test('E2E /api/agent/chat/stream applies session model config without persisting
     return { content: 'session provider recorded' };
   };
   const server = createServer({
+    requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
     agentModelCall,
@@ -163,7 +165,7 @@ test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden unti
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'search_tools', arguments: JSON.stringify({ query: 'fs list dir' }) } }] };
     return { content: '已检索到可用工具。' };
   };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
   const base = await bind(server);
   try {
     const conn = await fetch(`${base}/api/connectors/connect`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'filesystem', trustedRoot: root }) });
@@ -213,7 +215,7 @@ test('E2E /api/agent/chat/stream: resumeRunId continues from checkpoint without 
       }],
     };
   };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall });
   const base = await bind(server);
   try {
     const first = await fetch(`${base}/api/agent/chat/stream`, {
