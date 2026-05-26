@@ -8,14 +8,28 @@ import {
 
 const SCHEDULE_ID_RE = /^[a-z0-9_-]+$/i;
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {import('../runtime/scheduler.js').ScheduleRecord} ScheduleRecord
+ * @typedef {import('../runtime/scheduler.js').SchedulerFireResult} SchedulerFireResult
+ * @typedef {{ tenantId: string, userId?: string, traceId?: string, idempotencyKey?: string, [key: string]: unknown }} RequestContext
+ * @typedef {{ payload?: unknown, name?: unknown, cron?: unknown, fireAt?: unknown }} ScheduleBody
+ * @typedef {{ list(options?: { tenantId?: unknown, userId?: unknown }): ScheduleRecord[], create(input: unknown): ScheduleRecord, get(id: string): ScheduleRecord | null, cancel(id: string): boolean, remove(id: string): boolean, tickOnce(filter?: { tenantId?: unknown, userId?: unknown }): Promise<SchedulerFireResult[]> }} SchedulerLike
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, activeScheduler?: SchedulerLike | null, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string }} ScheduleRouteOptions
+ */
+
+/** @param {ScheduleRecord | null | undefined} record @param {RequestContext} context @returns {boolean} */
 function scheduleVisibleToContext(record, context) {
   return Boolean(record) && stableHeader(record?.tenantId, 'tenant_local') === context.tenantId;
 }
 
+/** @returns {string} */
 function emptyBodyFingerprint() {
   return bodyFingerprint({});
 }
 
+/** @param {ScheduleRouteOptions} options @returns {Promise<boolean>} */
 export async function handleScheduleRoutes({
   request,
   response,
@@ -44,6 +58,7 @@ export async function handleScheduleRoutes({
 
   if (request.method === 'POST' && pathname === '/api/schedules') {
     await withJsonBody(request, response, async (body) => {
+      const input = /** @type {ScheduleBody} */ (body || {});
       if (!activeScheduler) {
         sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
         return;
@@ -56,14 +71,18 @@ export async function handleScheduleRoutes({
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
         return;
       }
-      const payload = body?.payload && typeof body.payload === 'object' ? { ...body.payload } : {};
+      const payload = /** @type {Record<string, unknown>} */ (
+        input.payload && typeof input.payload === 'object' && !Array.isArray(input.payload)
+          ? { ...input.payload }
+          : {}
+      );
       if (payload.trustedRoot) {
         payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
       }
       const record = activeScheduler.create({
-        name: body?.name,
-        cron: body?.cron,
-        fireAt: body?.fireAt,
+        name: input.name,
+        cron: input.cron,
+        fireAt: input.fireAt,
         payload,
         tenantId: requestContext.tenantId,
         userId: requestContext.userId,
@@ -89,7 +108,7 @@ export async function handleScheduleRoutes({
       return true;
     }
     const id = decodePathSegment(pathname.slice('/api/schedules/'.length, -'/cancel'.length));
-    if (!SCHEDULE_ID_RE.test(id)) {
+    if (!id || !SCHEDULE_ID_RE.test(id)) {
       sendCachedOrStore(response, cacheKey, fingerprint, 400, { error: 'Invalid schedule id' });
       return true;
     }
@@ -121,7 +140,7 @@ export async function handleScheduleRoutes({
       return true;
     }
     const id = decodePathSegment(pathname.slice('/api/schedules/'.length));
-    if (!SCHEDULE_ID_RE.test(id)) {
+    if (!id || !SCHEDULE_ID_RE.test(id)) {
       sendCachedOrStore(response, cacheKey, fingerprint, 400, { error: 'Invalid schedule id' });
       return true;
     }
