@@ -21,6 +21,7 @@ export class RunTrace {
     this.runEvents = runEvents;
     this.now = now;
     this.maxTextChars = Math.max(80, Math.floor(Number(maxTextChars) || DEFAULT_MAX_TEXT_CHARS));
+    /** @type {Record<string, unknown>[]} */
     this.entries = [];
     this.traceSeq = 0;
   }
@@ -77,7 +78,8 @@ export function replayRunTraceEvents(events, { after = 0 } = {}) {
   if (!Array.isArray(events)) return [];
   const floor = Number(after) || 0;
   return events
-    .filter((event) => isRecord(event) && event.type === 'run_trace')
+    .filter(isRecord)
+    .filter((event) => event.type === 'run_trace')
     .map((event) => (isRecord(event.trace) ? event.trace : event.entry))
     .filter(isRecord)
     .filter((entry) => Number(entry.traceSeq) > floor)
@@ -87,7 +89,7 @@ export function replayRunTraceEvents(events, { after = 0 } = {}) {
 
 /**
  * @param {unknown} message
- * @returns {boolean}
+ * @returns {message is Record<string, unknown>}
  */
 function isAssistantToolDecision(message) {
   return isRecord(message) && message.role === 'assistant' && Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
@@ -95,7 +97,7 @@ function isAssistantToolDecision(message) {
 
 /**
  * @param {unknown} message
- * @returns {boolean}
+ * @returns {message is Record<string, unknown>}
  */
 function isToolMessage(message) {
   return isRecord(message) && message.role === 'tool';

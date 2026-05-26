@@ -60,6 +60,8 @@
     "apps/host/src/runtime/run-attribution.js",
     "apps/host/src/runtime/run-checkpoint.js",
     "apps/host/src/runtime/run-trace-sanitizers.js",
+    "apps/host/src/runtime/run-trace-normalizers.js",
+    "apps/host/src/runtime/run-trace.js",
     "apps/host/src/runtime/run-metrics.js",
     "apps/host/src/runtime/run-store.js",
     "apps/host/src/runtime/run-resume.js",

@@ -60,7 +60,7 @@ export function toIsoString(value) {
 export function normalizeMessages(messages, maxTextChars) {
   if (!Array.isArray(messages)) return [];
   return messages.map((message) => {
-    const source = isRecord(message) ? message : { content: message };
+    const source = /** @type {Record<string, unknown>} */ (isRecord(message) ? message : { content: message });
     /** @type {Record<string, unknown>} */
     const out = { role: nonEmptyText(source.role) || 'unknown' };
     const name = nonEmptyText(source.name);
@@ -73,8 +73,9 @@ export function normalizeMessages(messages, maxTextChars) {
     if (source.reasoning_content !== undefined) {
       out.reasoning = sanitizeValue(source.reasoning_content, { maxTextChars }).value;
     }
-    if (Array.isArray(source.tool_calls)) {
-      out.toolCalls = source.tool_calls.map((call) => normalizeToolCall(call, maxTextChars));
+    const toolCalls = Array.isArray(source.tool_calls) ? source.tool_calls : [];
+    if (toolCalls.length > 0) {
+      out.toolCalls = toolCalls.map((call) => normalizeToolCall(call, maxTextChars));
     }
     return out;
   });
@@ -88,6 +89,7 @@ export function normalizeMessages(messages, maxTextChars) {
 export function normalizeToolResultPayload(value, maxTextChars) {
   const parsed = parseMaybeJson(value);
   const sanitized = sanitizeValue(parsed, { maxTextChars });
+  /** @type {Record<string, unknown>} */
   const result = isRecord(sanitized.value)
     ? { .../** @type {Record<string, unknown>} */ (sanitized.value) }
     : { value: sanitized.value };
