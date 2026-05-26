@@ -26,6 +26,7 @@
     "smoke:react-live-artifact": "node scripts/smoke-react-live-artifact.mjs",
     "smoke:react-branches": "node scripts/smoke-react-branches.mjs",
     "smoke:react-connectors": "node scripts/smoke-react-connectors.mjs",
+    "smoke:react-connectors:live-github": "node scripts/smoke-react-connectors.mjs --live-github",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
     "smoke:windows-paths": "node scripts/smoke-windows-paths.mjs",
     "smoke:sqlite-runtime": "node scripts/smoke-sqlite-runtime.mjs",

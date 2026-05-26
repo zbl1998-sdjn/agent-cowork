@@ -4,6 +4,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { createCredentialStore } from '../apps/host/src/security/credential-store.js';
@@ -12,12 +13,14 @@ const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
 const uiDistRoot = path.join(repoRoot, 'apps', 'windows-client', 'ui-dist');
 const defaultReportPath = path.join(buildDir, 'react-connectors-smoke-report.json');
+const liveGitHubRequested = process.argv.includes('--live-github') || process.env.REACT_CONNECTORS_LIVE_GITHUB === '1';
 const archiveRequested = process.env.REACT_CONNECTORS_ARCHIVE === '1';
 const reportRoot = path.resolve(process.env.REACT_CONNECTORS_REPORT_DIR || path.join(repoRoot, 'reports', 'react-connectors'));
 const reportPath = archiveRequested
-  ? path.join(reportRoot, `react-connectors-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
+  ? path.join(reportRoot, `react-connectors${liveGitHubRequested ? '-live-github' : ''}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
   : defaultReportPath;
 const screenshotPath = path.join(buildDir, 'react-connectors-smoke-1280x760.png');
+const liveGitHubTimeoutMs = Number(process.env.REACT_CONNECTORS_LIVE_GITHUB_TIMEOUT_MS || 5 * 60 * 1000);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -39,6 +42,27 @@ function jsonResponse(body, status = 200) {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function githubClientIdFromEnv() {
+  return String(process.env.KCW_GITHUB_OAUTH_CLIENT_ID || process.env.GITHUB_OAUTH_CLIENT_ID || '').trim();
+}
+
+function redactText(text) {
+  return String(text)
+    .replace(/github_pat_[A-Za-z0-9_]+/g, '[redacted-github-token]')
+    .replace(/gh[oOpsuUrRsS]_[A-Za-z0-9_]+/g, '[redacted-github-token]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]');
+}
+
+function redactReport(value) {
+  if (typeof value === 'string') return redactText(value);
+  if (Array.isArray(value)) return value.map((item) => redactReport(item));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+    if (/token|secret|deviceCode|authorization/i.test(key)) return [key, '[redacted]'];
+    return [key, redactReport(item)];
+  }));
 }
 
 function findBrowser() {
@@ -89,6 +113,31 @@ async function getJson(url, timeoutMs = 5000, headers = {}) {
     }
   }
   throw new Error(`Timed out waiting for ${url}`);
+}
+
+async function postJson(url, body, headers = {}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+  if (!response.ok) {
+    const err = new Error(`${url} returned ${response.status}: ${JSON.stringify(redactReport(payload))}`);
+    err.statusCode = response.status;
+    err.payload = payload;
+    throw err;
+  }
+  return { statusCode: response.status, body: payload };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 class CdpClient {
@@ -154,12 +203,86 @@ async function bind(server) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
+async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
+  const requestedScopes = ['read:user'];
+  const approval = await postJson(`${baseUrl}/api/connectors/oauth/approve`, {
+    id: 'github',
+    scopes: requestedScopes,
+  }, authHeader);
+  assert(String(approval.body.approvalId || '').startsWith('oauth_'), 'GitHub OAuth approval id was not issued');
+
+  const started = await postJson(`${baseUrl}/api/connectors/oauth/start`, {
+    id: 'github',
+    scopes: requestedScopes,
+    approvalId: approval.body.approvalId,
+  }, authHeader);
+  assert(started.body.userCode, 'GitHub OAuth live start did not return a user code');
+  assert(started.body.verificationUri, 'GitHub OAuth live start did not return a verification URI');
+
+  console.log(`\nGitHub device authorization required:
+  Open: ${started.body.verificationUri}
+  Code: ${started.body.userCode}
+  Scope: ${requestedScopes.join(' ')}
+`);
+
+  if (process.stdin.isTTY) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      await rl.question('Authorize in the browser, then press Enter to start polling...');
+    } finally {
+      rl.close();
+    }
+  }
+
+  const deadline = Date.now() + liveGitHubTimeoutMs;
+  let complete = null;
+  let pollCount = 0;
+  while (Date.now() < deadline) {
+    pollCount += 1;
+    const result = await postJson(`${baseUrl}/api/connectors/oauth/complete`, {
+      id: 'github',
+      sessionId: started.body.sessionId,
+    }, authHeader);
+    if (result.statusCode !== 202 && result.body.status !== 'pending') {
+      complete = result.body;
+      break;
+    }
+    const intervalMs = Math.max(1, Number(result.body.interval || started.body.interval || 5)) * 1000;
+    await sleep(intervalMs);
+  }
+  assert(complete?.connected === true, 'GitHub OAuth live authorization was not completed before timeout');
+
+  const status = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+  assert(status.connected === true, 'GitHub OAuth live status did not become connected');
+  assert(!/(github_pat_|gh[oOpsuUrRsS]_)/.test(JSON.stringify(status)), 'GitHub OAuth status appears to include a plaintext token');
+
+  const revoked = await postJson(`${baseUrl}/api/connectors/oauth/revoke`, { id: 'github' }, authHeader);
+  const statusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+  assert(statusAfterRevoke.connected === false, 'GitHub OAuth live status remained connected after revoke');
+
+  return redactReport({
+    mode: 'live-github',
+    configuredEnv: process.env.KCW_GITHUB_OAUTH_CLIENT_ID ? 'KCW_GITHUB_OAUTH_CLIENT_ID' : 'GITHUB_OAUTH_CLIENT_ID',
+    requestedScopes,
+    verificationUri: started.body.verificationUri,
+    userCodeShown: Boolean(started.body.userCode),
+    pollCount,
+    accountLogin: complete.account?.login || complete.credential?.accountId || '',
+    connected: status.connected,
+    revoked: revoked.body.removed,
+    connectedAfterRevoke: statusAfterRevoke.connected,
+  });
+}
+
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   assert(fs.existsSync(path.join(uiDistRoot, 'index.html')), 'React UI dist is missing; run npm run build:ui first');
   const browserPath = findBrowser();
   assert(browserPath, 'No Edge or Chrome executable was found for React connectors smoke');
+  if (liveGitHubRequested) {
+    assert(githubClientIdFromEnv(), 'Set KCW_GITHUB_OAUTH_CLIENT_ID before running --live-github');
+  }
 
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-react-connectors-'));
   fs.writeFileSync(path.join(workspace, 'connector-smoke.txt'), 'filesystem connector smoke\n', 'utf8');
@@ -168,7 +291,7 @@ async function main() {
     filePath: path.join(workspace, '.AgentCowork', 'credentials.json'),
     protector: smokeProtector(),
   });
-  const oauthFetch = async (url, init = {}) => {
+  const oauthFetch = liveGitHubRequested ? undefined : async (url, init = {}) => {
     const href = String(url);
     if (href.endsWith('/login/device/code')) {
       assert(String(init.body || '').includes('client_id=smoke-client'), 'OAuth start did not send the configured client id');
@@ -199,7 +322,7 @@ async function main() {
     uiDistRoot,
     credentialStore,
     oauthFetch,
-    oauthConfig: { github: { clientId: 'smoke-client' } },
+    oauthConfig: liveGitHubRequested ? {} : { github: { clientId: 'smoke-client' } },
   });
 
   const startedAt = Date.now();
@@ -400,6 +523,16 @@ async function main() {
     const connectorsAfterDisconnect = await getJson(`${baseUrl}/api/connectors`);
     assert(!connectorsAfterDisconnect.connected.includes('fs'), 'connector catalog still reported fs as connected');
 
+    let afterOAuthApproval = null;
+    let afterOAuthStart = null;
+    let afterOAuthComplete = null;
+    let afterOAuthRevoke = null;
+    let oauthStatus = { connected: false };
+    let oauthStatusAfterRevoke = { connected: false };
+    const authToken = await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`);
+    const authHeader = authToken ? { authorization: `Bearer ${authToken}` } : {};
+
+    if (!liveGitHubRequested) {
     await evaluate(
       sendPage,
       `(() => {
@@ -414,7 +547,7 @@ async function main() {
         return true;
       })()`,
     );
-    const afterOAuthApproval = await evaluate(
+    afterOAuthApproval = await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 10000;
@@ -451,7 +584,7 @@ async function main() {
         return true;
       })()`,
     );
-    const afterOAuthStart = await evaluate(
+    afterOAuthStart = await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 10000;
@@ -487,7 +620,7 @@ async function main() {
         return true;
       })()`,
     );
-    const afterOAuthComplete = await evaluate(
+    afterOAuthComplete = await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 10000;
@@ -513,10 +646,8 @@ async function main() {
         tick();
       })`,
     );
-    const authToken = await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`);
     assert(authToken, 'guest auth token missing after OAuth connector login');
-    const authHeader = { authorization: `Bearer ${authToken}` };
-    const oauthStatus = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    oauthStatus = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
     assert(oauthStatus.connected === true, 'GitHub OAuth status did not become connected');
     assert(!JSON.stringify(oauthStatus).includes(oauthToken), 'OAuth status leaked the access token');
 
@@ -532,7 +663,7 @@ async function main() {
         return true;
       })()`,
     );
-    const afterOAuthRevoke = await evaluate(
+    afterOAuthRevoke = await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 10000;
@@ -558,18 +689,24 @@ async function main() {
         tick();
       })`,
     );
-    const oauthStatusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    oauthStatusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
     assert(oauthStatusAfterRevoke.connected === false, 'GitHub OAuth status remained connected after revoke');
     assert(
       fs.readFileSync(path.join(workspace, '.AgentCowork', 'credentials.json'), 'utf8').includes(oauthToken) === false,
       'credential store leaked the OAuth token',
     );
+    }
+
+    const liveGitHub = liveGitHubRequested
+      ? await runLiveGitHubOAuthSmoke(baseUrl, authHeader)
+      : null;
 
     const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
-    const report = {
+    const report = redactReport({
       ok: true,
+      mode: liveGitHubRequested ? 'mock-and-live-github' : 'mock',
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       baseUrl,
@@ -590,20 +727,24 @@ async function main() {
       disconnected: connectorsAfterDisconnect.connected,
       oauthConnected: oauthStatus.connected,
       oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
-    };
+      liveGitHub,
+    });
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({
+    console.log(JSON.stringify(redactReport({
       ok: true,
+      mode: liveGitHubRequested ? 'mock-and-live-github' : 'mock',
       reportPath,
       screenshotPath,
       connected: connectors.connected,
       disconnected: connectorsAfterDisconnect.connected,
       oauthConnected: oauthStatus.connected,
       oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
-    }, null, 2));
+      liveGitHub,
+    }), null, 2));
   } catch (error) {
-    const report = {
+    const report = redactReport({
       ok: false,
+      mode: liveGitHubRequested ? 'mock-and-live-github' : 'mock',
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       baseUrl,
@@ -613,9 +754,9 @@ async function main() {
       reportPath,
       error: error.stack || error.message,
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
-    };
+    });
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(redactText(error.stack || error.message));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -638,13 +779,14 @@ async function main() {
 
 main().catch((error) => {
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  const report = {
+  const report = redactReport({
     ok: false,
+    mode: liveGitHubRequested ? 'mock-and-live-github' : 'mock',
     generatedAt: new Date().toISOString(),
     reportPath,
     error: error.stack || error.message,
-  };
+  });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(redactText(error.stack || error.message));
   process.exit(1);
 });
