@@ -2,10 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.resolve(process.env.KCW_ARCH_CHECK_ROOT || DEFAULT_ROOT);
 const HOST_ROOT = path.join(ROOT, 'apps', 'host', 'src');
 const UI_ROOT = path.join(ROOT, 'apps', 'windows-client', 'ui', 'src');
 const WINDOWS_CLIENT_ROOT = path.join(ROOT, 'apps', 'windows-client');
+const HOST_SOURCE_EXTENSIONS = new Set(['.js', '.ts']);
 
 const HOST_LAYERS = [
   { name: 'L0', rank: 0, prefixes: ['security/', 'http/', 'util/'] },
@@ -78,7 +80,7 @@ function walk(dir, predicate, out = []) {
 }
 
 function isHostSource(filePath) {
-  return filePath.startsWith(HOST_ROOT + path.sep) && filePath.endsWith('.js');
+  return filePath.startsWith(HOST_ROOT + path.sep) && HOST_SOURCE_EXTENSIONS.has(path.extname(filePath));
 }
 
 function isUiSource(filePath) {
@@ -98,6 +100,10 @@ function readImports(filePath) {
 
 function candidateFiles(base) {
   const ext = path.extname(base);
+  if (ext === '.js') {
+    const withoutExt = base.slice(0, -ext.length);
+    return [base, `${withoutExt}.ts`];
+  }
   if (ext) return [base];
   return [
     `${base}.js`,
