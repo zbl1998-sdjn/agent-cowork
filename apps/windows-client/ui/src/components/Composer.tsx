@@ -6,8 +6,8 @@ import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendD
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
+import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
-import { ListboxOptionButton } from './ui/MenuItemButton';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
@@ -34,8 +34,6 @@ export interface ComposerProps {
   autoClarify?: boolean;
   onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
 }
-type Mode = 'template' | 'mention' | 'history';
-interface Item { key: string; title: string; detail?: string; apply: () => void }
 const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [
   { value: 'fast', label: '快速' },
   { value: 'standard', label: '标准' },
@@ -71,8 +69,8 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const [value, setValue] = useState('');
-  const [mode, setMode] = useState<Mode | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
+  const [mode, setMode] = useState<ComposerSuggestionMode | null>(null);
+  const [items, setItems] = useState<ComposerSuggestionItem[]>([]);
   const [active, setActive] = useState(0);
   const [triggerStart, setTriggerStart] = useState(0);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -185,10 +183,10 @@ export function Composer({
     el?.focus();
   }
 
-  function templateItems(query: string): Item[] {
+  function templateItems(query: string): ComposerSuggestionItem[] {
     const q = query.toLowerCase();
     // App commands first (new chat, settings, theme, panels…), then task templates.
-    const cmds: Item[] = slashCommands
+    const cmds: ComposerSuggestionItem[] = slashCommands
       .filter((c) => !q || c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
       .slice(0, 6)
       .map((c) => ({
@@ -197,7 +195,7 @@ export function Composer({
         detail: '命令',
         apply: () => { replaceToken(''); c.run(); },
       }));
-    const tmpls: Item[] = recipes
+    const tmpls: ComposerSuggestionItem[] = recipes
       .filter((r) => !q || `${r.name} ${r.id} ${r.summary ?? ''}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map((r) => ({
@@ -209,7 +207,7 @@ export function Composer({
     return [...cmds, ...tmpls];
   }
 
-  function historyItems(query: string): Item[] {
+  function historyItems(query: string): ComposerSuggestionItem[] {
     const q = query.toLowerCase();
     return historyRuns
       .filter((run) => !q || (run.promptPreview ?? '').toLowerCase().includes(q))
@@ -334,22 +332,7 @@ export function Composer({
       onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer?.files ?? null); }}
     >
       {dragging && <div className="composer-drop-hint">松开以添加文件</div>}
-      {mode && items.length > 0 && (
-        <div className="composer-popover" role="listbox">
-          <div className="popover-header">{mode === 'template' ? '命令 / 任务模板' : mode === 'history' ? '历史任务' : '引用本地文件'}</div>
-          {items.map((item, index) => (
-            <ListboxOptionButton
-              key={item.key}
-              className="popover-item"
-              active={index === active}
-              onMouseDown={(e) => { e.preventDefault(); item.apply(); }}
-            >
-              <strong>{item.title}</strong>
-              {item.detail && <span>{item.detail}</span>}
-            </ListboxOptionButton>
-          ))}
-        </div>
-      )}
+      {mode && items.length > 0 && <ComposerSuggestions mode={mode} items={items} active={active} />}
 
       <ComposerAttachments attachments={attachments} onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))} />
 
