@@ -15,6 +15,7 @@ import {
   type RuntimeDependencyInstallPlanViewModel,
   type RuntimeDependencyViewModel,
 } from '../../lib/runtime-dependencies';
+import { Button } from '../ui/Button';
 
 export function RuntimeDependencyInstallPlanPreview({ plan }: { plan: RuntimeDependencyInstallPlanViewModel }) {
   return (
@@ -72,6 +73,122 @@ export function RuntimeDependencyCleanupPlanPreview({ plan }: { plan: RuntimeDep
       )}
       {plan.unknownIds.length > 0 && <p className="runtime-install-plan-unknown">未知组件：{plan.unknownIds.join('、')}</p>}
     </section>
+  );
+}
+
+export interface RuntimeDependenciesPanelViewProps {
+  status: 'idle' | 'loading' | 'ready' | 'failed';
+  error: string;
+  vm: RuntimeDependencyViewModel | null;
+  planStatus: 'idle' | 'loading' | 'ready' | 'failed';
+  planError: string;
+  planVm: RuntimeDependencyInstallPlanViewModel | null;
+  cleanupStatus: 'idle' | 'loading' | 'ready' | 'failed';
+  cleanupError: string;
+  cleanupVm: RuntimeDependencyCleanupPlanViewModel | null;
+  onLoad: () => void;
+  onLoadInstallPlan: () => void;
+  onLoadCleanupPlan: (keepUserData: boolean) => void;
+}
+
+export function RuntimeDependenciesPanelView({
+  status,
+  error,
+  vm,
+  planStatus,
+  planError,
+  planVm,
+  cleanupStatus,
+  cleanupError,
+  cleanupVm,
+  onLoad,
+  onLoadInstallPlan,
+  onLoadCleanupPlan,
+}: RuntimeDependenciesPanelViewProps) {
+  return (
+    <div className="runtime-deps">
+      <div className="runtime-deps-head">
+        <span className="set-label">运行时依赖</span>
+        <Button variant="secondary" disabled={status === 'loading'} onClick={onLoad}>
+          {status === 'loading' ? '检测中…' : '刷新'}
+        </Button>
+      </div>
+
+      {status === 'loading' && !vm && <div className="modal-loading">正在读取依赖状态…</div>}
+      {error && <div className="auth-error" role="alert">{error}</div>}
+
+      {vm && (
+        <>
+          <div className="runtime-deps-summary">
+            <span><strong>{vm.summary.readyCount}</strong> 可用</span>
+            <span><strong>{vm.summary.requiredMissing}</strong> 核心异常</span>
+            <span><strong>{vm.summary.optionalMissing}</strong> 可选待补</span>
+            <span><strong>{vm.summary.onDemandCount}</strong> 按需组件</span>
+          </div>
+
+          {vm.requiredIssues.length > 0 && (
+            <div className="runtime-deps-alert" role="status">
+              核心依赖需要处理：{vm.requiredIssues.map((item) => item.label).join('、')}
+            </div>
+          )}
+          <section className="runtime-deps-plan">
+            <div>
+              <strong>安装计划预检</strong>
+              <span>{vm.installPlanCandidateLabel}</span>
+            </div>
+            <Button variant="secondary" disabled={planStatus === 'loading' || vm.installPlanCandidateIds.length === 0} onClick={onLoadInstallPlan}>
+              {planStatus === 'loading' ? '生成中…' : '生成计划'}
+            </Button>
+          </section>
+          {planError && <div className="auth-error" role="alert">{planError}</div>}
+          {planVm && <RuntimeDependencyInstallPlanPreview plan={planVm} />}
+          <section className="runtime-deps-plan">
+            <div>
+              <strong>清理计划预检</strong>
+              <span>{vm.cleanupPlanCandidateLabel}</span>
+            </div>
+            <div className="runtime-deps-plan-actions">
+              <Button variant="secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => onLoadCleanupPlan(true)}>
+                {cleanupStatus === 'loading' ? '生成中…' : '保留数据'}
+              </Button>
+              <Button variant="secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => onLoadCleanupPlan(false)}>
+                删除数据
+              </Button>
+            </div>
+          </section>
+          {cleanupError && <div className="auth-error" role="alert">{cleanupError}</div>}
+          {cleanupVm && <RuntimeDependencyCleanupPlanPreview plan={cleanupVm} />}
+
+          <div className="runtime-deps-sections">
+            {vm.sections.map((section) => (
+              <section key={section.id} className="runtime-deps-section">
+                <h3>{section.title}</h3>
+                <ul>
+                  {section.items.map((item) => (
+                    <li key={item.id} className={`runtime-dep runtime-dep-${item.severity}`}>
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span>{item.purposeLabel}</span>
+                        <span className="runtime-dep-detail">{item.detailLabel}</span>
+                      </div>
+                      <div className="runtime-dep-meta">
+                        <span>{item.statusLabel}</span>
+                        <span>{item.installModeLabel}</span>
+                        <span>{item.downloadLabel}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+
+          <p className="modal-note">
+            这里只展示检测结果和可审查安装/清理计划；真实安装、下载、删除会走后续按需组件或卸载流程，不会在此处执行。
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -146,88 +263,19 @@ export function RuntimeDependenciesPanel() {
   };
 
   return (
-    <div className="runtime-deps">
-      <div className="runtime-deps-head">
-        <span className="set-label">运行时依赖</span>
-        <button type="button" className="btn-secondary" disabled={status === 'loading'} onClick={load}>
-          {status === 'loading' ? '检测中…' : '刷新'}
-        </button>
-      </div>
-
-      {status === 'loading' && !vm && <div className="modal-loading">正在读取依赖状态…</div>}
-      {error && <div className="auth-error" role="alert">{error}</div>}
-
-      {vm && (
-        <>
-          <div className="runtime-deps-summary">
-            <span><strong>{vm.summary.readyCount}</strong> 可用</span>
-            <span><strong>{vm.summary.requiredMissing}</strong> 核心异常</span>
-            <span><strong>{vm.summary.optionalMissing}</strong> 可选待补</span>
-            <span><strong>{vm.summary.onDemandCount}</strong> 按需组件</span>
-          </div>
-
-          {vm.requiredIssues.length > 0 && (
-            <div className="runtime-deps-alert" role="status">
-              核心依赖需要处理：{vm.requiredIssues.map((item) => item.label).join('、')}
-            </div>
-          )}
-          <section className="runtime-deps-plan">
-            <div>
-              <strong>安装计划预检</strong>
-              <span>{vm.installPlanCandidateLabel}</span>
-            </div>
-            <button type="button" className="btn-secondary" disabled={planStatus === 'loading' || vm.installPlanCandidateIds.length === 0} onClick={loadInstallPlan}>
-              {planStatus === 'loading' ? '生成中…' : '生成计划'}
-            </button>
-          </section>
-          {planError && <div className="auth-error" role="alert">{planError}</div>}
-          {planVm && <RuntimeDependencyInstallPlanPreview plan={planVm} />}
-          <section className="runtime-deps-plan">
-            <div>
-              <strong>清理计划预检</strong>
-              <span>{vm.cleanupPlanCandidateLabel}</span>
-            </div>
-            <div className="runtime-deps-plan-actions">
-              <button type="button" className="btn-secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => loadCleanupPlan(true)}>
-                {cleanupStatus === 'loading' ? '生成中…' : '保留数据'}
-              </button>
-              <button type="button" className="btn-secondary" disabled={cleanupStatus === 'loading' || vm.cleanupPlanCandidateIds.length === 0} onClick={() => loadCleanupPlan(false)}>
-                删除数据
-              </button>
-            </div>
-          </section>
-          {cleanupError && <div className="auth-error" role="alert">{cleanupError}</div>}
-          {cleanupVm && <RuntimeDependencyCleanupPlanPreview plan={cleanupVm} />}
-
-          <div className="runtime-deps-sections">
-            {vm.sections.map((section) => (
-              <section key={section.id} className="runtime-deps-section">
-                <h3>{section.title}</h3>
-                <ul>
-                  {section.items.map((item) => (
-                    <li key={item.id} className={`runtime-dep runtime-dep-${item.severity}`}>
-                      <div>
-                        <strong>{item.label}</strong>
-                        <span>{item.purposeLabel}</span>
-                        <span className="runtime-dep-detail">{item.detailLabel}</span>
-                      </div>
-                      <div className="runtime-dep-meta">
-                        <span>{item.statusLabel}</span>
-                        <span>{item.installModeLabel}</span>
-                        <span>{item.downloadLabel}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-
-          <p className="modal-note">
-            这里只展示检测结果和可审查安装/清理计划；真实安装、下载、删除会走后续按需组件或卸载流程，不会在此处执行。
-          </p>
-        </>
-      )}
-    </div>
+    <RuntimeDependenciesPanelView
+      status={status}
+      error={error}
+      vm={vm}
+      planStatus={planStatus}
+      planError={planError}
+      planVm={planVm}
+      cleanupStatus={cleanupStatus}
+      cleanupError={cleanupError}
+      cleanupVm={cleanupVm}
+      onLoad={load}
+      onLoadInstallPlan={loadInstallPlan}
+      onLoadCleanupPlan={loadCleanupPlan}
+    />
   );
 }
