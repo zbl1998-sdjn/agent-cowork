@@ -1,9 +1,23 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type CSSProperties, type FormEvent } from 'react';
 import { login as apiLogin, register as apiRegister, type AuthIdentity } from '../lib/api';
+import { Button } from './ui/Button';
 
 interface LoginProps {
   onAuthed: (identity: AuthIdentity) => void;
   onGuest: () => void;
+}
+
+function authTabStyle(active: boolean): CSSProperties {
+  return {
+    flex: 1,
+    border: 'none',
+    background: active ? 'var(--surface)' : 'transparent',
+    color: active ? 'var(--text)' : 'var(--muted)',
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+    fontWeight: active ? 500 : undefined,
+    padding: '8px 0',
+    borderRadius: 8,
+  };
 }
 
 // Full-screen sign-in gate, styled after the Kimi desktop app: a branded left
@@ -48,8 +62,8 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
           <h1 className="auth-title">{mode === 'login' ? '登录' : '创建账户'}</h1>
           <p className="auth-sub">{mode === 'login' ? '欢迎回来，登录后继续工作。' : '注册一个本地账户开始使用。'}</p>
           <div className="auth-tabs" role="tablist">
-            <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(''); }}>登录</button>
-            <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'is-active' : ''} onClick={() => { setMode('register'); setError(''); }}>注册</button>
+            <Button role="tab" aria-selected={mode === 'login'} variant="ghost" className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(''); }} style={authTabStyle(mode === 'login')}>登录</Button>
+            <Button role="tab" aria-selected={mode === 'register'} variant="ghost" className={mode === 'register' ? 'is-active' : ''} onClick={() => { setMode('register'); setError(''); }} style={authTabStyle(mode === 'register')}>注册</Button>
           </div>
           <label className="auth-field">
             <span>用户名</span>
@@ -60,8 +74,8 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="至少 6 位" />
           </label>
           {error && <div className="auth-error" role="alert">{error}</div>}
-          <button type="submit" className="auth-submit" disabled={busy}>{busy ? '请稍候…' : (mode === 'login' ? '登录' : '注册并登录')}</button>
-          <button type="button" className="auth-guest" onClick={onGuest}>跳过，先在本地使用 →</button>
+          <Button type="submit" variant="primary" className="auth-submit" disabled={busy} style={{ border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 600, cursor: busy ? 'progress' : 'pointer' }}>{busy ? '请稍候…' : (mode === 'login' ? '登录' : '注册并登录')}</Button>
+          <Button variant="ghost" className="auth-guest" onClick={onGuest} style={{ border: 'none', background: 'none', color: 'var(--muted)', marginTop: 12, padding: 6, fontSize: 13 }}>跳过，先在本地使用 →</Button>
         </form>
         <p className="auth-foot">账户信息仅保存在本机，用于区分多用户的工作数据。</p>
       </main>
