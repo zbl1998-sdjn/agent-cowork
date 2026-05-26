@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerModelControls } from './ComposerModelControls';
 import { RefinePreview } from './chat/RefinePreview';
 export interface Recipe { id: string; name: string; summary?: string }
@@ -380,15 +381,13 @@ export function Composer({
       <div className="composer-footer">
         <div className="composer-tools">
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-          <button type="button" className="tool-button" title="上传文件" onClick={() => fileRef.current?.click()}>上传</button>
-          <button type="button" className={`tool-button${listening ? ' is-active' : ''}`} title="语音输入" onClick={toggleVoice}>语音</button>
-          <button type="button" className="tool-button" title="优化提示" disabled={!value.trim() || refining || !onRefinePrompt} onClick={() => void refineCurrent()}>{refining ? '优化中…' : '优化提示'}</button>
+          <ComposerToolActions listening={listening} refining={refining} canRefine={Boolean(value.trim() && onRefinePrompt)} onUpload={() => fileRef.current?.click()} onToggleVoice={toggleVoice} onRefine={() => void refineCurrent()} />
           <ComposerModelControls model={model} modelOptions={modelOptions} provider={currentProvider} defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl} baseUrl={baseUrl} apiKey={apiKey} onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey} />
           <select className="thinking-select" value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)} title="思考强度">
             {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
           </select>
         </div>
-        <button type="button" className="send-button" onClick={() => void send()} disabled={refining}>发送</button>
+        <ComposerSendAction refining={refining} onSend={() => void send()} />
       </div>
     </div>
   );
