@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
 import { answerQuestion, openPath, respondApproval } from '../../lib/api';
 import type { AssistantMessage, UserMessage } from '../../lib/app-types';
 import { extractSuggestions } from '../../lib/md';
@@ -17,6 +17,15 @@ import { ToolCallCard } from '../ToolCallCard';
 import { Button } from '../ui/Button';
 
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
+
+const suggestionChipStyle: CSSProperties = {
+  borderColor: '#e3d9d3',
+  background: '#fbf7f5',
+  color: '#b5482f',
+  borderRadius: 14,
+  padding: '6px 12px',
+  fontSize: 12.5,
+};
 
 export interface UserTurnProps {
   message: UserMessage;
@@ -184,5 +193,5 @@ function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage;
 
 function AssistantText({ message, streamingId, trustedRoot, onQuickSend }: { message: AssistantMessage; streamingId: string | null; trustedRoot: string; onQuickSend: (text: string) => void }) {
   const parsed = extractSuggestions(message.text || '');
-  return <>{parsed.text && <MessageText text={parsed.text} trustedRoot={trustedRoot} />}{message.id === streamingId && <span className="type-caret" aria-hidden="true" />}{parsed.suggestions.length > 0 && message.status === 'done' && <div className="suggestion-chips">{parsed.suggestions.map((sug, i) => <button key={i} type="button" className="suggestion-chip" onClick={() => onQuickSend(sug)}>{sug}</button>)}</div>}</>;
+  return <>{parsed.text && <MessageText text={parsed.text} trustedRoot={trustedRoot} />}{message.id === streamingId && <span className="type-caret" aria-hidden="true" />}{parsed.suggestions.length > 0 && message.status === 'done' && <div className="suggestion-chips">{parsed.suggestions.map((sug, i) => <Button key={i} className="suggestion-chip" onClick={() => onQuickSend(sug)} style={suggestionChipStyle}>{sug}</Button>)}</div>}</>;
 }

@@ -212,6 +212,21 @@ describe('Timeline', () => {
     expect(html).toContain('回到底部 ↓');
   });
 
+  it('renders assistant suggestion chips with Button primitives', () => {
+    const html = renderTimeline({
+      ...baseAssistant,
+      id: 'a-suggestions',
+      status: 'done',
+      text: '已完成。\n```suggestions\n继续整理\n生成图表\n```',
+    });
+
+    expect(html).toContain('已完成。');
+    expect(html).toContain('suggestion-chip');
+    expect(html).toContain('ui-btn ui-btn--secondary');
+    expect(html).toContain('继续整理');
+    expect(html).toContain('生成图表');
+  });
+
   it('renders the user edit trigger with the Button primitive when not streaming', () => {
     const editable = renderToStaticMarkup(<UserTurn {...userTurnProps()} />);
     const streaming = renderToStaticMarkup(<UserTurn {...userTurnProps({ streamingId: 'a1' })} />);
