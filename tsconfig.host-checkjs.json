@@ -30,6 +30,7 @@
     "apps/host/src/kimi/context/history-compactor.js",
     "apps/host/src/kimi/context/token-estimator.js",
     "apps/host/src/kimi/context/tool-result-summarizer.js",
+    "apps/host/src/kimi/provider/router.js",
     "apps/host/src/kimi/safety/untrusted-content.js",
     "apps/host/src/kimi/system-prompt.js",
     "apps/host/src/memory/memory-utils.js",

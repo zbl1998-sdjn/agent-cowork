@@ -1,3 +1,5 @@
+// @ts-check
+
 // Provider routing + fallback chain (P3-B).
 //
 // Pure orchestration over an ordered provider chain: try the primary, fall
@@ -6,9 +8,25 @@
 // first. Decoupled from concrete providers — the caller injects a per-provider
 // runner — so this stays pure, layer-clean (L1, no upward imports) and testable.
 
+/**
+ * @typedef {(provider: string) => boolean} ProviderCircuitReader
+ * @typedef {(provider: string) => void} ProviderAttemptReporter
+ * @typedef {(provider: string) => unknown | Promise<unknown>} ProviderRunner
+ * @typedef {{ provider: string, error: string }} ProviderAttemptError
+ * @typedef {{ provider: string, result: unknown, attempts: number }} ProviderRunResult
+ * @typedef {{ chain?: unknown[] | null, isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter }} ProviderRouterOptions
+ * @typedef {{ order: () => string[], run: (runner: ProviderRunner) => Promise<ProviderRunResult> }} ProviderRouter
+ */
+
+/**
+ * @param {unknown[] | null | undefined} chain
+ * @param {{ isOpen?: ProviderCircuitReader }} [options]
+ * @returns {string[]}
+ */
 export function orderProviderChain(chain, { isOpen } = {}) {
   const list = (Array.isArray(chain) ? chain : []).map(String).filter(Boolean);
   const seen = new Set();
+  /** @type {string[]} */
   const unique = [];
   for (const name of list) {
     if (!seen.has(name)) {
@@ -26,6 +44,12 @@ export function orderProviderChain(chain, { isOpen } = {}) {
   return [...available, ...downed];
 }
 
+/**
+ * @param {unknown[] | null | undefined} chain
+ * @param {ProviderRunner | null | undefined} runner
+ * @param {{ isOpen?: ProviderCircuitReader, onAttempt?: ProviderAttemptReporter }} [options]
+ * @returns {Promise<ProviderRunResult>}
+ */
 export async function runWithFallback(chain, runner, { isOpen, onAttempt } = {}) {
   if (typeof runner !== 'function') {
     throw new Error('runWithFallback: runner is required');
@@ -34,6 +58,7 @@ export async function runWithFallback(chain, runner, { isOpen, onAttempt } = {})
   if (ordered.length === 0) {
     throw new Error('provider chain is empty');
   }
+  /** @type {ProviderAttemptError[]} */
   const errors = [];
   for (const name of ordered) {
     try {
@@ -43,16 +68,19 @@ export async function runWithFallback(chain, runner, { isOpen, onAttempt } = {})
       const result = await runner(name);
       return { provider: name, result, attempts: errors.length + 1 };
     } catch (err) {
-      errors.push({ provider: name, error: err && err.message ? err.message : String(err) });
+      errors.push({ provider: name, error: err instanceof Error && err.message ? err.message : String(err) });
     }
   }
-  const aggregate = new Error(
+  const aggregate = Object.assign(new Error(
     `all providers failed: ${errors.map((e) => `${e.provider}(${e.error})`).join(', ')}`,
-  );
-  aggregate.attempts = errors;
+  ), { attempts: errors });
   throw aggregate;
 }
 
+/**
+ * @param {ProviderRouterOptions} [options]
+ * @returns {ProviderRouter}
+ */
 export function createProviderRouter({ chain = [], isOpen, onAttempt } = {}) {
   return {
     order() {
