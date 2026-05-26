@@ -169,6 +169,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2b 完结(专用菜单/listbox 原语):新增 `MenuItemButton`/`ListboxOptionButton`,CommandPalette 命令项与 Composer listbox 选项已迁入专用原语,保留现有样式类、键盘导航和点击/鼠标选择语义;新增 primitive/CommandPalette SSR 单测,源码扫描确认应用层 raw `<button>` 仅剩 `components/ui` 内部原语和 markdown 复制按钮字符串。
 - [x] FE 体积治理(ConnectorsPanel):连接器面板拆出 `useConnectorsPanelState`、`connectorScopes` 与 `connectorOAuthStatus`,主面板和新增模块均回落到软上限以内;OAuth scope 审批、连接/断开、状态消息和空/错态渲染语义不变,聚焦 UI 单测通过。
 - [x] Host 体积治理(tool-loop):`tool-loop.js` 拆出 `tool-loop-support.js` 的 lazy tool/search、tool call 解析和 no-op budget guard helper,主循环从 399/400 硬限风险降到约 340 行;高耦合工具执行/审批/预算/trace 主块暂不拆,聚焦 host 测试与 checkJs 通过。
+- [x] Host 体积治理(runs-index):`runs-index.js` 拆成 facade + file/sqlite/utils 小模块,从 389 行降到 32 行;原导出、JSONL replay、SQLite 语义、tenant 过滤和 version 递增保持不变,聚焦 runs-index/sqlite/seeded-id 测试通过,体积软警告降为 12 个。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
