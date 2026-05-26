@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type RefObject, type UIEvent } from 're
 import { respondApprovals } from '../../lib/api';
 import type { AssistantMessage, Message } from '../../lib/app-types';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
+import { Button } from '../ui/Button';
 import { AssistantTurn, UserEditTurn, UserTurn } from './TimelineTurns';
 
 export {
@@ -193,5 +194,13 @@ function BatchApprovalBar({ pendingApprovals, onPatchAssistant }: { pendingAppro
     void respondApprovals(ids, decision);
     pendingApprovals.forEach((item) => onPatchAssistant(item.messageId, (m) => ({ ...m, approval: undefined })));
   };
-  return <div className="approval-bar"><span className="approval-q">待批准操作：<strong>{pendingApprovals.length}</strong> 个</span><div className="approval-actions"><button type="button" onClick={() => respondToBatch('once')}>批准当前 {pendingApprovals.length} 个</button><button type="button" onClick={() => respondToBatch('session')}>本会话批准当前 {pendingApprovals.length} 个</button></div></div>;
+  return (
+    <div className="approval-bar">
+      <span className="approval-q">待批准操作：<strong>{pendingApprovals.length}</strong> 个</span>
+      <div className="approval-actions">
+        <Button variant="primary" onClick={() => respondToBatch('once')}>批准当前 {pendingApprovals.length} 个</Button>
+        <Button variant="secondary" onClick={() => respondToBatch('session')}>本会话批准当前 {pendingApprovals.length} 个</Button>
+      </div>
+    </div>
+  );
 }

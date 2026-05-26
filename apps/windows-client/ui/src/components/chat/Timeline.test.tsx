@@ -124,6 +124,35 @@ describe('Timeline', () => {
     expect(batch).toContain('待批准操作');
     expect(batch).toContain('批准当前 2 个');
     expect(batch).toContain('本会话批准当前 2 个');
+    expect(batch).toContain('ui-btn--primary');
+    expect(batch).toContain('ui-btn--secondary');
+  });
+
+  it('renders plan and approval bars with Button primitives', () => {
+    const plan = renderTimeline({
+      ...baseAssistant,
+      id: 'a-plan',
+      status: 'awaiting_approval',
+      text: undefined,
+      plan: { id: 'plan_1', text: '1. 检查文件' },
+    });
+    const approval = renderTimeline({
+      ...baseAssistant,
+      id: 'a-approval',
+      status: 'awaiting_approval',
+      text: undefined,
+      approval: { id: 'apr_one', name: 'Shell' },
+    });
+
+    expect(plan).toContain('计划待批准');
+    expect(plan).toContain('批准并执行');
+    expect(plan).toContain('继续完善');
+    expect(plan).toContain('ui-btn--primary');
+    expect(plan).toContain('ui-btn--secondary');
+    expect(approval).toContain('需要批准操作');
+    expect(approval).toContain('本次批准');
+    expect(approval).toContain('本会话批准');
+    expect(approval).toContain('ui-btn--danger');
   });
 
   it('keeps assistant turns memoized unless render-sensitive props change', () => {

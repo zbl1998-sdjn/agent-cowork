@@ -14,6 +14,7 @@ import { SubtaskGroups } from '../SubtaskGroups';
 import { TaskStatusBadge } from '../TaskStatusBadge';
 import { TodoList } from '../TodoList';
 import { ToolCallCard } from '../ToolCallCard';
+import { Button } from '../ui/Button';
 
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
 
@@ -132,7 +133,16 @@ function PlanCard({ message, trustedRoot, onPatchAssistant }: { message: Assista
     void respondApproval(message.plan.id, approve ? 'once' : 'reject');
     onPatchAssistant(message.id, (m) => ({ ...m, plan: undefined, status: approve ? 'applying' : 'running' }));
   };
-  return <div className="plan-card"><div className="plan-card-head">计划待批准</div><MessageText text={message.plan!.text} trustedRoot={trustedRoot} /><div className="plan-card-actions"><button type="button" className="plan-approve" onClick={() => respondToPlan(true)}>批准并执行</button><button type="button" onClick={() => respondToPlan(false)}>继续完善</button></div></div>;
+  return (
+    <div className="plan-card">
+      <div className="plan-card-head">计划待批准</div>
+      <MessageText text={message.plan!.text} trustedRoot={trustedRoot} />
+      <div className="plan-card-actions">
+        <Button variant="primary" onClick={() => respondToPlan(true)}>批准并执行</Button>
+        <Button variant="secondary" onClick={() => respondToPlan(false)}>继续完善</Button>
+      </div>
+    </div>
+  );
 }
 
 function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
@@ -150,7 +160,16 @@ function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage;
     void respondApproval(message.approval.id, decision);
     onPatchAssistant(message.id, (m) => ({ ...m, approval: undefined }));
   };
-  return <div className="approval-bar"><span className="approval-q">需要批准操作：<code>{message.approval!.name}</code></span><div className="approval-actions"><button type="button" onClick={() => respondToApproval('once')}>本次批准</button><button type="button" onClick={() => respondToApproval('session')}>本会话批准</button><button type="button" className="reject" onClick={() => respondToApproval('reject')}>拒绝</button></div></div>;
+  return (
+    <div className="approval-bar">
+      <span className="approval-q">需要批准操作：<code>{message.approval!.name}</code></span>
+      <div className="approval-actions">
+        <Button variant="primary" onClick={() => respondToApproval('once')}>本次批准</Button>
+        <Button variant="secondary" onClick={() => respondToApproval('session')}>本会话批准</Button>
+        <Button variant="danger" onClick={() => respondToApproval('reject')}>拒绝</Button>
+      </div>
+    </div>
+  );
 }
 
 function AssistantText({ message, streamingId, trustedRoot, onQuickSend }: { message: AssistantMessage; streamingId: string | null; trustedRoot: string; onQuickSend: (text: string) => void }) {
