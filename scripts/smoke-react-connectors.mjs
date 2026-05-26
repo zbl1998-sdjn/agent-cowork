@@ -115,7 +115,7 @@ async function getJson(url, timeoutMs = 5000, headers = {}) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-async function postJson(url, body, headers = {}) {
+async function postJsonRaw(url, body, headers = {}) {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
@@ -127,13 +127,18 @@ async function postJson(url, body, headers = {}) {
   } catch {
     payload = {};
   }
-  if (!response.ok) {
-    const err = new Error(`${url} returned ${response.status}: ${JSON.stringify(redactReport(payload))}`);
-    err.statusCode = response.status;
-    err.payload = payload;
+  return { ok: response.ok, statusCode: response.status, body: payload };
+}
+
+async function postJson(url, body, headers = {}) {
+  const result = await postJsonRaw(url, body, headers);
+  if (!result.ok) {
+    const err = new Error(`${url} returned ${result.statusCode}: ${JSON.stringify(redactReport(result.body))}`);
+    err.statusCode = result.statusCode;
+    err.payload = result.body;
     throw err;
   }
-  return { statusCode: response.status, body: payload };
+  return { statusCode: result.statusCode, body: result.body };
 }
 
 function sleep(ms) {
@@ -274,6 +279,107 @@ async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
   });
 }
 
+async function runMissingGitHubClientIdSmoke() {
+  const previousClientId = process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+  const previousLegacyClientId = process.env.GITHUB_OAUTH_CLIENT_ID;
+  delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+  delete process.env.GITHUB_OAUTH_CLIENT_ID;
+
+  const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-react-connectors-no-client-'));
+  const credentialPath = path.join(workspace, '.AgentCowork', 'credentials.json');
+  const oauthFetchCalls = [];
+  const credentialStore = createCredentialStore({
+    filePath: credentialPath,
+    protector: smokeProtector(),
+  });
+  const oauthFetch = async (url, init = {}) => {
+    oauthFetchCalls.push({ url: String(url), body: String(init.body || '') });
+    if (String(url).endsWith('/login/device/code')) {
+      return jsonResponse({
+        device_code: 'device-after-config',
+        user_code: 'NOID-1234',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 900,
+        interval: 1,
+      });
+    }
+    throw new Error(`unexpected OAuth fetch: ${url}`);
+  };
+  const host = createServer({
+    trustedRoot: workspace,
+    requireAuth: false,
+    persistAuth: false,
+    enableScheduler: false,
+    uiDistRoot,
+    credentialStore,
+    oauthFetch,
+    oauthConfig: { github: {} },
+  });
+
+  let baseUrl = null;
+  try {
+    baseUrl = await bind(host);
+    const status = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`);
+    assert(status.configured === false, 'GitHub OAuth status should report missing client id');
+    assert(
+      Array.isArray(status.requiredEnv) && status.requiredEnv.includes('KCW_GITHUB_OAUTH_CLIENT_ID'),
+      'GitHub OAuth status did not report the required client id env var',
+    );
+
+    const approval = await postJson(`${baseUrl}/api/connectors/oauth/approve`, {
+      id: 'github',
+      scopes: ['read:user'],
+    });
+    assert(String(approval.body.approvalId || '').startsWith('oauth_'), 'GitHub OAuth approval id was not issued');
+
+    const missingConfig = await postJsonRaw(`${baseUrl}/api/connectors/oauth/start`, {
+      id: 'github',
+      clientId: 'body-client',
+      scopes: ['read:user'],
+      approvalId: approval.body.approvalId,
+    });
+    assert(missingConfig.statusCode === 428, `GitHub OAuth missing client id should return 428, got ${missingConfig.statusCode}`);
+    assert(missingConfig.body.code === 'OAUTH_NOT_CONFIGURED', 'GitHub OAuth missing client id returned the wrong error code');
+    assert(String(missingConfig.body.error || '').includes('KCW_GITHUB_OAUTH_CLIENT_ID'), 'GitHub OAuth missing client id error did not mention the env var');
+    assert(oauthFetchCalls.length === 0, 'GitHub OAuth missing client id should not call the external device-flow endpoint');
+
+    process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'smoke-env-client';
+    const started = await postJson(`${baseUrl}/api/connectors/oauth/start`, {
+      id: 'github',
+      clientId: 'body-client',
+      scopes: ['read:user'],
+      approvalId: approval.body.approvalId,
+    });
+    assert(started.body.userCode === 'NOID-1234', 'GitHub OAuth approval was not reusable after client id was configured');
+    assert(oauthFetchCalls.length === 1, 'GitHub OAuth configured retry should call the device-flow endpoint exactly once');
+    assert(oauthFetchCalls[0].body.includes('client_id=smoke-env-client'), 'GitHub OAuth configured retry did not use the env client id');
+    assert(!oauthFetchCalls[0].body.includes('body-client'), 'GitHub OAuth configured retry used the request body client id');
+    assert(!fs.existsSync(credentialPath), 'GitHub OAuth start preflight should not persist credentials');
+
+    return redactReport({
+      configuredBeforeStart: status.configured,
+      requiredEnv: status.requiredEnv,
+      missingStartStatus: missingConfig.statusCode,
+      missingStartCode: missingConfig.body.code,
+      externalCallsBeforeConfig: 0,
+      approvalReusedAfterConfig: true,
+      externalCallsAfterConfig: oauthFetchCalls.length,
+      credentialFileCreated: fs.existsSync(credentialPath),
+    });
+  } finally {
+    if (previousClientId === undefined) delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+    else process.env.KCW_GITHUB_OAUTH_CLIENT_ID = previousClientId;
+    if (previousLegacyClientId === undefined) delete process.env.GITHUB_OAUTH_CLIENT_ID;
+    else process.env.GITHUB_OAUTH_CLIENT_ID = previousLegacyClientId;
+    if (typeof host.shutdown === 'function') {
+      await host.shutdown({ timeoutMs: 3000 });
+    } else {
+      if (typeof host.closeMcp === 'function') host.closeMcp();
+      await new Promise((resolve) => host.close(resolve));
+    }
+  }
+}
+
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
@@ -283,6 +389,7 @@ async function main() {
   if (liveGitHubRequested) {
     assert(githubClientIdFromEnv(), 'Set KCW_GITHUB_OAUTH_CLIENT_ID before running --live-github');
   }
+  const missingGitHubClientId = await runMissingGitHubClientIdSmoke();
 
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-react-connectors-'));
   fs.writeFileSync(path.join(workspace, 'connector-smoke.txt'), 'filesystem connector smoke\n', 'utf8');
@@ -728,6 +835,7 @@ async function main() {
       oauthConnected: oauthStatus.connected,
       oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
       liveGitHub,
+      missingGitHubClientId,
     });
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify(redactReport({
@@ -740,6 +848,7 @@ async function main() {
       oauthConnected: oauthStatus.connected,
       oauthConnectedAfterRevoke: oauthStatusAfterRevoke.connected,
       liveGitHub,
+      missingGitHubClientId,
     }), null, 2));
   } catch (error) {
     const report = redactReport({
