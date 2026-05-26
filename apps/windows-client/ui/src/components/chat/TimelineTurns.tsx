@@ -34,7 +34,17 @@ export const UserTurn = memo(function UserTurn({ message, streamingId, onBeginEd
   return (
     <MessageBubble role="user">
       <span className="user-msg-text">{message.text}</span>
-      {!streamingId && <button type="button" className="user-edit-btn" title="编辑并重新发送" onClick={() => onBeginEdit(message.id, message.text)}>✎ 编辑</button>}
+      {!streamingId && (
+        <Button
+          variant="ghost"
+          className="user-edit-btn"
+          title="编辑并重新发送"
+          onClick={() => onBeginEdit(message.id, message.text)}
+          style={{ marginLeft: 10, border: 'none', background: 'none', color: 'var(--muted)', padding: 0, fontSize: 12 }}
+        >
+          ✎ 编辑
+        </Button>
+      )}
     </MessageBubble>
   );
 }, userTurnPropsEqual);

@@ -12,7 +12,7 @@ import {
   type UserEditTurnProps,
   type UserTurnProps,
 } from './Timeline';
-import { UserEditTurn } from './TimelineTurns';
+import { UserEditTurn, UserTurn } from './TimelineTurns';
 
 vi.mock('../../lib/api', () => ({
   answerQuestion: vi.fn(),
@@ -188,6 +188,16 @@ describe('Timeline', () => {
     expect(html).toContain('重新发送');
     expect(html).toContain('ui-btn--secondary');
     expect(html).toContain('ui-btn--primary');
+  });
+
+  it('renders the user edit trigger with the Button primitive when not streaming', () => {
+    const editable = renderToStaticMarkup(<UserTurn {...userTurnProps()} />);
+    const streaming = renderToStaticMarkup(<UserTurn {...userTurnProps({ streamingId: 'a1' })} />);
+
+    expect(editable).toContain('编辑并重新发送');
+    expect(editable).toContain('ui-btn ui-btn--ghost ui-btn--md user-edit-btn');
+    expect(editable).toContain('✎ 编辑');
+    expect(streaming).not.toContain('编辑并重新发送');
   });
 
   it('windows long timelines around the bottom when the view is stuck', () => {
