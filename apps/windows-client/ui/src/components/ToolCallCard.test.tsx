@@ -20,5 +20,7 @@ describe('ToolCallCard', () => {
     expect(html).toContain('失败');
     expect(html).toContain('1.2s');
     expect(html).toContain('失败原因：Path escaped trusted root');
+    expect(html).toContain('ui-btn ui-btn--ghost');
+    expect(html).toContain('toolcall-head');
   });
 });

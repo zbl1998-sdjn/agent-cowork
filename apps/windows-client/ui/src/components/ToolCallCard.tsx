@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { ToolCallItem } from '../lib/app-types';
+import { Button } from './ui/Button';
 
 export type ToolCall = ToolCallItem;
 
@@ -10,6 +11,17 @@ function fmt(v: unknown): string {
 
 const ICON: Record<string, string> = { running: '⟳', succeeded: '✓', failed: '✕', rejected: '✕', blocked: '⊘' };
 const LABEL: Record<string, string> = { running: '运行中', succeeded: '成功', failed: '失败', rejected: '已拒绝', blocked: '已阻止' };
+
+const headStyle: CSSProperties = {
+  width: '100%',
+  justifyContent: 'flex-start',
+  gap: 8,
+  border: 'none',
+  background: 'transparent',
+  padding: '7px 10px',
+  fontSize: 13,
+  textAlign: 'left',
+};
 
 function formatDuration(ms?: number): string {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
@@ -37,13 +49,13 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
   const reason = failureReason(call);
   return (
     <div className={`toolcall toolcall-${call.status}`}>
-      <button type="button" className="toolcall-head" onClick={() => setOpen((o) => !o)}>
+      <Button variant="ghost" className="toolcall-head" onClick={() => setOpen((o) => !o)} style={headStyle}>
         <span className={`toolcall-icon icon-${call.status}`}>{ICON[call.status] || '•'}</span>
         <code>{call.name}</code>
         <span className={`toolcall-status status-${call.status}`}>{LABEL[call.status] || call.status}</span>
         {duration ? <span className="toolcall-duration">{duration}</span> : null}
         <span className="toolcall-toggle">{open ? '收起' : '详情'}</span>
-      </button>
+      </Button>
       {reason ? <div className="toolcall-summary">失败原因：{reason}</div> : null}
       {open && (
         <div className="toolcall-body">
