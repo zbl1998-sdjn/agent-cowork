@@ -10,7 +10,7 @@ export function manualChunks(id) {
         return 'vendor-markdown';
     if (normalized.indexOf('/src/lib/md') >= 0)
         return 'markdown';
-    if (normalized.indexOf('/src/components/ToolsPanel') >= 0)
+    if (normalized.indexOf('/src/components/ToolsPanel') >= 0 || normalized.indexOf('/src/components/panels/ToolsPanel') >= 0)
         return 'panel-tools';
     if (normalized.indexOf('/src/components/VizPanel') >= 0 || normalized.indexOf('/src/components/panels/VizPanel') >= 0)
         return 'panel-viz';

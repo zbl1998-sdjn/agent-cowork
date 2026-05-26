@@ -4,7 +4,7 @@ import type { SidePanel } from '../lib/app-types';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Loading } from './ui/StateViews';
 
-const ToolsPanel = lazy(() => import('./ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
+const ToolsPanel = lazy(() => import('./panels/ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
 const VizPanel = lazy(() => import('./panels/VizPanel').then((module) => ({ default: module.VizPanel })));
 const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
 const ArtifactsPanel = lazy(() => import('./panels/ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));

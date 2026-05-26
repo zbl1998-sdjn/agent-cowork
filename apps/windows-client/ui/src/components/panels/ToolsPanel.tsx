@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../lib/api';
-import { Empty, ErrorState } from './ui/StateViews';
+import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../../lib/api';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 interface ToolsPanelProps {
   trustedRoot: string;

@@ -7,7 +7,7 @@ export function manualChunks(id: string): string | undefined {
   if (normalized.indexOf('/node_modules/recharts') >= 0) return 'vendor-charts';
   if (normalized.indexOf('/node_modules/marked') >= 0 || normalized.indexOf('/node_modules/markdown') >= 0) return 'vendor-markdown';
   if (normalized.indexOf('/src/lib/md') >= 0) return 'markdown';
-  if (normalized.indexOf('/src/components/ToolsPanel') >= 0) return 'panel-tools';
+  if (normalized.indexOf('/src/components/ToolsPanel') >= 0 || normalized.indexOf('/src/components/panels/ToolsPanel') >= 0) return 'panel-tools';
   if (normalized.indexOf('/src/components/VizPanel') >= 0 || normalized.indexOf('/src/components/panels/VizPanel') >= 0) return 'panel-viz';
   if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0) return 'panel-connectors';
   if (normalized.indexOf('/src/components/ArtifactsPanel') >= 0 || normalized.indexOf('/src/components/panels/ArtifactsPanel') >= 0) return 'panel-artifacts';
