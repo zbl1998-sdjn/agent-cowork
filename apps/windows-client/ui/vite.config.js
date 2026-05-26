@@ -16,7 +16,7 @@ export function manualChunks(id) {
         return 'panel-viz';
     if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0)
         return 'panel-connectors';
-    if (normalized.indexOf('/src/components/ArtifactsPanel') >= 0)
+    if (normalized.indexOf('/src/components/ArtifactsPanel') >= 0 || normalized.indexOf('/src/components/panels/ArtifactsPanel') >= 0)
         return 'panel-artifacts';
     if (normalized.indexOf('/src/components/SchedulesPanel') >= 0 || normalized.indexOf('/src/components/panels/SchedulesPanel') >= 0)
         return 'panel-schedules';

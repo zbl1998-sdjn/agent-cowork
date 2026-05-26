@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../lib/api';
-import { Empty, ErrorState } from './ui/StateViews';
+import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../../lib/api';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 interface ArtifactsPanelProps { trustedRoot: string }
 

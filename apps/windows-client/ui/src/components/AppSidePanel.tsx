@@ -7,7 +7,7 @@ import { Loading } from './ui/StateViews';
 const ToolsPanel = lazy(() => import('./ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
 const VizPanel = lazy(() => import('./VizPanel').then((module) => ({ default: module.VizPanel })));
 const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
-const ArtifactsPanel = lazy(() => import('./ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
+const ArtifactsPanel = lazy(() => import('./panels/ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
 const SchedulesPanel = lazy(() => import('./panels/SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
 const MemoryPanel = lazy(() => import('./panels/MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
 const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
