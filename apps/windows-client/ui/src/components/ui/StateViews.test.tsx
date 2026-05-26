@@ -27,6 +27,7 @@ describe('StateViews', () => {
     );
     expect(html).toContain('网络错误');
     expect(html).toContain('再试一次');
+    expect(html).toContain('ui-btn ui-btn--secondary ui-btn--sm state-view__retry');
     expect(html).toContain('role="alert"');
   });
 

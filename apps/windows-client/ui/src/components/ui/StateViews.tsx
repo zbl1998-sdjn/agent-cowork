@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Button } from './Button';
 
 // Reusable empty / loading / error state views (FE-3).
 // Self-contained: minimal inline styling so they render correctly without
@@ -76,24 +77,14 @@ export function ErrorState({
   onRetry,
   retryLabel = '重试',
 }: ErrorStateProps) {
-  const retryStyle: CSSProperties = {
-    marginTop: 4,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    borderRadius: 6,
-    border: '1px solid var(--border, #d1d5db)',
-    background: 'var(--surface, #fff)',
-    color: 'var(--fg, #374151)',
-  };
   return (
     <div className="state-view state-view--error" role="alert" style={container}>
       <div className="state-view__title" style={{ ...titleStyle, color: 'var(--danger, #b91c1c)' }}>{title}</div>
       <div className="state-view__message" style={messageStyle}>{message}</div>
       {onRetry ? (
-        <button type="button" className="state-view__retry" onClick={onRetry} style={retryStyle}>
+        <Button className="state-view__retry" size="sm" onClick={onRetry} style={{ marginTop: 4 }}>
           {retryLabel}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
