@@ -1,15 +1,32 @@
+// @ts-check
 import { createSqliteDatabase } from '../storage/sqlite.js';
 import { normaliseRecord, normaliseTenantId, normaliseUserId } from './runs-index-utils.js';
 
+/**
+ * @typedef {{ get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number }, all(...params: unknown[]): unknown[] }} SqliteStatement
+ * @typedef {{ prepare(sql: string): SqliteStatement }} SqliteDatabase
+ * @typedef {{ id: string, tenantId: string, userId: string, traceId: string, type: string, status: string, startedAt?: unknown, updatedAt?: unknown, version?: number, [key: string]: unknown }} RunIndexRecord
+ * @typedef {{ dbPath?: string, db?: SqliteDatabase | null, now?: () => Date }} SqliteRunsIndexOptions
+ * @typedef {{ traceId?: unknown }} RunsIndexContext
+ * @typedef {{ tenantId?: unknown, userId?: unknown, limit?: unknown, status?: unknown, type?: unknown, recipeId?: unknown }} RunsIndexListOptions
+ * @typedef {{ record_json?: string, count?: unknown, status?: unknown, type?: unknown }} RunsIndexRow
+ */
+
 export class SqliteRunsIndex {
+  /** @param {SqliteRunsIndexOptions} [options] */
   constructor({ dbPath, db = null, now = () => new Date() } = {}) {
     if (!db && (!dbPath || typeof dbPath !== 'string')) {
       throw new Error('SqliteRunsIndex: dbPath is required');
     }
-    this.db = db || createSqliteDatabase(dbPath);
+    this.db = db || createSqliteDatabase(/** @type {string} */ (dbPath));
     this.now = now;
   }
 
+  /**
+   * @param {unknown} record
+   * @param {RunsIndexContext} [context]
+   * @returns {RunIndexRecord}
+   */
   upsert(record, context = {}) {
     const normalised = normaliseRecord(record);
     const existing = this.get(normalised.id);
@@ -68,25 +85,34 @@ export class SqliteRunsIndex {
     return normalised;
   }
 
+  /** @param {unknown} id @returns {boolean} */
   remove(id) {
     const result = this.db.prepare('DELETE FROM runs_index WHERE id = ?').run(id);
     return Number(result.changes) > 0;
   }
 
+  /**
+   * @param {unknown} id
+   * @param {{ tenantId?: unknown }} [options]
+   * @returns {RunIndexRecord | null}
+   */
   get(id, { tenantId } = {}) {
-    const row = this.db.prepare('SELECT record_json FROM runs_index WHERE id = ?').get(id);
+    const row = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare('SELECT record_json FROM runs_index WHERE id = ?').get(id));
     if (!row) {
       return null;
     }
-    const record = JSON.parse(row.record_json);
+    const record = /** @type {RunIndexRecord} */ (JSON.parse(String(row.record_json || '{}')));
     if (tenantId && record.tenantId !== normaliseTenantId(tenantId)) {
       return null;
     }
     return record;
   }
 
+  /** @param {RunsIndexListOptions} [options] @returns {RunIndexRecord[]} */
   list({ tenantId, userId, limit = 50, status, type, recipeId } = {}) {
+    /** @type {string[]} */
     const where = [];
+    /** @type {unknown[]} */
     const params = [];
     if (tenantId) {
       where.push('tenant_id = ?');
@@ -116,36 +142,45 @@ export class SqliteRunsIndex {
       ORDER BY COALESCE(started_at, updated_at, created_at) DESC
       LIMIT ?
     `).all(...params, cap);
-    return rows.map((row) => JSON.parse(row.record_json));
+    return rows.map((row) => JSON.parse(String(/** @type {RunsIndexRow} */ (row).record_json || '{}')));
   }
 
+  /** @returns {number} */
   size() {
-    const row = this.db.prepare('SELECT COUNT(*) AS count FROM runs_index').get();
+    const row = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare('SELECT COUNT(*) AS count FROM runs_index').get());
     return Number(row?.count || 0);
   }
 
+  /**
+   * @param {{ tenantId?: unknown }} [options]
+   * @returns {{ total: number, byStatus: Record<string, number>, byType: Record<string, number> }}
+   */
   stats({ tenantId } = {}) {
+    /** @type {string[]} */
     const where = [];
+    /** @type {unknown[]} */
     const params = [];
     if (tenantId) {
       where.push('tenant_id = ?');
       params.push(normaliseTenantId(tenantId));
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const totalRow = this.db.prepare(`SELECT COUNT(*) AS count FROM runs_index ${whereSql}`).get(...params);
+    const totalRow = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare(`SELECT COUNT(*) AS count FROM runs_index ${whereSql}`).get(...params));
+    /** @type {Record<string, number>} */
     const byStatus = Object.create(null);
+    /** @type {Record<string, number>} */
     const byType = Object.create(null);
-    const statusRows = this.db.prepare(`
+    const statusRows = /** @type {RunsIndexRow[]} */ (this.db.prepare(`
       SELECT status, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY status
-    `).all(...params);
+    `).all(...params));
     for (const row of statusRows) {
-      byStatus[row.status] = Number(row.count) || 0;
+      byStatus[String(row.status || '')] = Number(row.count) || 0;
     }
-    const typeRows = this.db.prepare(`
+    const typeRows = /** @type {RunsIndexRow[]} */ (this.db.prepare(`
       SELECT type, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY type
-    `).all(...params);
+    `).all(...params));
     for (const row of typeRows) {
-      byType[row.type] = Number(row.count) || 0;
+      byType[String(row.type || '')] = Number(row.count) || 0;
     }
     return { total: Number(totalRow?.count || 0), byStatus, byType };
   }
