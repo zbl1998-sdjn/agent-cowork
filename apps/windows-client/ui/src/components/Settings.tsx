@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
+import { Button, IconButton } from './ui/Button';
 import { Loading } from './ui/StateViews';
 
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
@@ -108,7 +109,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
       <div className="modal-card settings-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="设置">
         <header className="modal-head">
           <h2>设置</h2>
-          <button type="button" className="modal-close" aria-label="关闭" onClick={onClose}>×</button>
+          <IconButton className="modal-close" label="关闭" onClick={onClose}>×</IconButton>
         </header>
         <div className="settings-body">
           <nav className="settings-tabs">
@@ -125,7 +126,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
               <div>
                 <div className="set-row"><span className="set-label">用户名</span><span className="set-val">{username}</span></div>
                 <div className="set-row"><span className="set-label">租户</span><span className="set-val">{tenantId}</span></div>
-                <button type="button" className="btn-secondary" onClick={onLogout}>退出登录</button>
+                <Button className="btn-secondary" onClick={onLogout}>退出登录</Button>
               </div>
             )}
             {tab === 'appearance' && (
@@ -151,7 +152,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
                 </label>
                 <div className="modal-actions">
                   <span className="modal-actions-spacer" />
-                  <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</button>
+                  <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
                 </div>
               </div>
             )}
@@ -176,9 +177,9 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
                     <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.moonshot.cn/v1" />
                   </label>
                   <div className="modal-actions">
-                    {hasKey && <button type="button" className="btn-ghost-danger" disabled={busy} onClick={() => void persist({ clearKey: true }, '密钥已清除')}>清除密钥</button>}
+                    {hasKey && <Button variant="danger" className="btn-ghost-danger" disabled={busy} onClick={() => void persist({ clearKey: true }, '密钥已清除')}>清除密钥</Button>}
                     <span className="modal-actions-spacer" />
-                    <button type="button" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</button>
+                    <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</Button>
                   </div>
                   <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
                 </div>
@@ -193,7 +194,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
               <div className="selfcheck">
                 <div className="selfcheck-head">
                   <span className="set-label">安全 / 韧性自检</span>
-                  <button type="button" className="btn-secondary" disabled={scLoading} onClick={loadSelfCheck}>{scLoading ? '检测中…' : '刷新'}</button>
+                  <Button className="btn-secondary" disabled={scLoading} onClick={loadSelfCheck}>{scLoading ? '检测中…' : '刷新'}</Button>
                 </div>
                 {scError && <div className="auth-error" role="alert">{scError}</div>}
                 {selfCheck && (

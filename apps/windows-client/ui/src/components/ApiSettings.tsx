@@ -1,9 +1,35 @@
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, type KimiInfo } from '../lib/api';
+import { Button, IconButton } from './ui/Button';
 
 interface ApiSettingsProps {
   onClose: () => void;
   onSaved: (info: KimiInfo) => void;
+}
+
+export function ApiSettingsActions({
+  hasKey,
+  busy,
+  savedTip,
+  onClearKey,
+  onCancel,
+  onSave,
+}: {
+  hasKey: boolean;
+  busy: boolean;
+  savedTip: string;
+  onClearKey: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="modal-actions">
+      {hasKey && <Button variant="danger" className="btn-ghost-danger" disabled={busy} onClick={onClearKey}>清除密钥</Button>}
+      <span className="modal-actions-spacer">{savedTip && <span className="saved-tip">{savedTip}</span>}</span>
+      <Button className="btn-secondary" disabled={busy} onClick={onCancel}>取消</Button>
+      <Button variant="primary" className="btn-primary" disabled={busy} onClick={onSave}>{busy ? '保存中…' : '保存'}</Button>
+    </div>
+  );
 }
 
 // API settings modal (kimi.exe style): pre-fills baseUrl/model from the host and
@@ -65,7 +91,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
       <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="API 设置">
         <header className="modal-head">
           <h2>API 设置</h2>
-          <button type="button" className="modal-close" aria-label="关闭" onClick={onClose}>×</button>
+          <IconButton className="modal-close" label="关闭" onClick={onClose}>×</IconButton>
         </header>
         {loading ? (
           <div className="modal-loading">加载中…</div>
@@ -84,12 +110,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
               <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="kimi-k2-0905-preview" />
             </label>
             {error && <div className="auth-error" role="alert">{error}</div>}
-            <div className="modal-actions">
-              {hasKey && <button type="button" className="btn-ghost-danger" disabled={busy} onClick={() => void save(true)}>清除密钥</button>}
-              <span className="modal-actions-spacer">{savedTip && <span className="saved-tip">{savedTip}</span>}</span>
-              <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>取消</button>
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => void save(false)}>{busy ? '保存中…' : '保存'}</button>
-            </div>
+            <ApiSettingsActions hasKey={hasKey} busy={busy} savedTip={savedTip} onClearKey={() => void save(true)} onCancel={onClose} onSave={() => void save(false)} />
             <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
           </div>
         )}

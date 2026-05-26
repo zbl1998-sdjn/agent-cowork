@@ -25,6 +25,7 @@ describe('Settings', () => {
 
     expect(html).toContain('class="is-active">API</button>');
     expect(html).toContain('加载中');
+    expect(html).toContain('ui-icon-btn modal-close');
     expect(html).not.toContain('用户名');
   });
 
@@ -33,6 +34,7 @@ describe('Settings', () => {
 
     expect(html).toContain('class="is-active">自检</button>');
     expect(html).toContain('安全 / 韧性自检');
+    expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).not.toContain('用户名');
   });
 });
