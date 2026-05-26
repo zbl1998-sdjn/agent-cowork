@@ -41,6 +41,7 @@
     "apps/host/src/kimi/agent/run-trace-events.js",
     "apps/host/src/kimi/agent/run-timeout.js",
     "apps/host/src/kimi/agent/todo-state.js",
+    "apps/host/src/kimi/agent/tool-call-executor.js",
     "apps/host/src/kimi/agent/tool-loop-support.js",
     "apps/host/src/kimi/agent/tool-retry.js",
     "apps/host/src/kimi/agent/toolset-builder.js",

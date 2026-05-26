@@ -1,15 +1,7 @@
 import { createAgentTools } from '../agent-tools.js';
 import { buildSystemPrompt } from '../system-prompt.js';
 import { defaultAgentModelCall } from '../model-call.js';
-import {
-  blockUntilPlanApproved,
-  ensureExitPlanModeTool,
-  handleExitPlanMode,
-  makeAudit,
-  requestToolApproval,
-  runPreToolHook,
-  toolNeedsApproval,
-} from './approval-gate.js';
+import { ensureExitPlanModeTool, makeAudit } from './approval-gate.js';
 import {
   addUsage,
   applyStaticBackstop,
@@ -24,8 +16,9 @@ import { validateToolArguments } from './arg-validator.js';
 import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 import { createCheckpointRecorder } from './checkpoint-state.js';
-import { traceModelContext, traceToolDecision, traceToolResult } from './run-trace-events.js';
-import { addLazySearchTool, createNoopBudgetGuard, parseToolCall } from './tool-loop-support.js';
+import { traceModelContext, traceToolDecision } from './run-trace-events.js';
+import { addLazySearchTool, createNoopBudgetGuard } from './tool-loop-support.js';
+import { executeToolCall } from './tool-call-executor.js';
 
 export async function runAgentChat({
   prompt,
@@ -215,107 +208,18 @@ export async function runAgentChat({
     traceToolDecision(runTrace, stepNumber, message);
     saveCheckpoint('assistant_tool_calls', stepNumber);
     for (const call of calls) {
-      const { name, args } = parseToolCall(call);
-      emit('tool_call', { name, args });
-      const tool = toolMap.get(name);
-      const argValidation = tool ? validateToolArguments(tool.parameters, args) : { valid: true, errors: [] };
-      if (!argValidation.valid) {
-        const result = { error: 'invalid tool arguments', errors: argValidation.errors };
-        steps.push({ tool: name, ok: false, invalidArgs: true });
-        audit('tool.args_invalid', { tool: name, errors: argValidation.errors });
-        emit('tool_args_invalid', { name, errors: argValidation.errors });
-        emit('tool_result', { name, status: 'failed', result });
-        traceToolResult(runTrace, stepNumber, call, name, 'failed', result);
-        const formatted = activeContextManager.formatToolResult(result, { toolName: name });
-        messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
-        saveCheckpoint('tool_result', stepNumber);
-        continue;
-      }
-      const isMutating = !!(tool && tool.mutating === true);
-      const needsApproval = toolNeedsApproval(tool);
-      if (await runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call })) {
-        saveCheckpoint('tool_result', stepNumber);
-        continue;
-      }
-      const planResult = await handleExitPlanMode({ name, args, hasApprovals, autoApprove, approvals, runId, emit, audit, steps, messages, call, context });
-      if (planResult.handled) {
-        if (planResult.planApproved) planApproved = true;
-        saveCheckpoint('plan_result', stepNumber);
-        continue;
-      }
-      if (blockUntilPlanApproved({ planMode, planApproved, needsApproval, name, tool, steps, audit, emit, messages, call })) {
-        saveCheckpoint('tool_result', stepNumber);
-        continue;
-      }
-      if (await requestToolApproval({
-        needsApproval, hasApprovals, sessionApproved, name, args, tool, runId,
-        approvals, emit, audit, messages, call, autoApprove, planMode, planApproved, steps, context,
-      })) {
-        saveCheckpoint('approval_result', stepNumber);
-        continue;
-      }
-
-      const todo = toolTodos.start(name);
-      const toolStartedAt = Date.now();
-      let result;
-      try {
-        result = await activeRetryPolicy.run(async () => (
-          tool ? tool.handler(args, toolCtx) : { error: `unknown tool: ${name}` }
-        ));
-      } catch (err) {
-        result = { error: err.message };
-      }
-      const durationMs = Math.max(0, Date.now() - toolStartedAt);
-      if (activeRetryPolicy.lastRun.retried) {
-        emit('tool_retry', {
-          name,
-          attempts: activeRetryPolicy.lastRun.attempts,
-          errors: activeRetryPolicy.lastRun.errors,
-        });
-      }
-      const ok = !(result && result.error);
-      if (ok && needsApproval) didMutate = true;
-      if (ok && isMutating && result && result.path) emit('file_written', { path: result.path });
-      steps.push({ tool: name, ok, durationMs });
-      if (needsApproval) audit('tool.execute', { tool: name, risk: tool.risk, ok });
-      todo.finish(ok ? 'done' : 'failed');
-      emit('tool_result', { name, status: ok ? 'succeeded' : 'failed', result, durationMs });
-      traceToolResult(runTrace, stepNumber, call, name, ok ? 'succeeded' : 'failed', result);
-      const formatted = activeContextManager.formatToolResult(result, { toolName: name });
-      if (formatted.summarized) {
-        emit('tool_result_summary', {
-          name,
-          beforeTokens: formatted.beforeTokens,
-          afterTokens: formatted.afterTokens,
-          sources: formatted.sources || [],
-        });
-      }
-      if (formatted.injectionFlagged) {
-        emit('untrusted_content_flagged', {
-          name,
-          reasons: formatted.injectionReasons || [],
-        });
-      }
-      messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
-      saveCheckpoint('tool_result', stepNumber);
-      if (hooks) await hooks.run('post_tool', { name, result, ok });
-      const postToolBudgetDecision = activeBudgetGuard.check();
-      if (postToolBudgetDecision.shouldAbort) {
-        stopOnBudget(postToolBudgetDecision);
-        break;
-      }
-      const guardDecision = activeLoopGuard.observe({ name, args }, ok);
-      if (guardDecision.shouldBreak) {
-        stopForLoopGuard = true;
-        emit('loop_guard_break', {
-          name,
-          reason: guardDecision.reason,
-          repeatCount: guardDecision.repeatCount,
-          consecutiveFailures: guardDecision.consecutiveFailures,
-        });
-        messages.push({ role: 'user', content: `循环护栏已停止当前路径：${guardDecision.reason}` });
-        break;
-      }
+      const result = await executeToolCall({
+        call, stepNumber, toolMap, activeContextManager, activeRetryPolicy,
+        activeBudgetGuard, activeLoopGuard, toolCtx, toolTodos,
+        hasApprovals, autoApprove, approvals, sessionApproved, runId,
+        planMode, planApproved, hooks, audit, emit, messages, steps, context, runTrace,
+        callbacks: { saveCheckpoint, stopOnBudget },
+      });
+      if (result.planApproved) planApproved = true;
+      if (result.didMutate) didMutate = true;
+      if (result.stopForBudget) stopForBudget = true;
+      if (result.stopForLoopGuard) stopForLoopGuard = true;
+      if (result.breakToolLoop) break;
     }
   }
 
