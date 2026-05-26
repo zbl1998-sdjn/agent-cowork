@@ -74,6 +74,7 @@
     "apps/host/src/runtime/run-metrics.js",
     "apps/host/src/runtime/run-store.js",
     "apps/host/src/runtime/run-resume.js",
+    "apps/host/src/runtime/runs-index.js",
     "apps/host/src/runtime/runs-index-file.js",
     "apps/host/src/runtime/runs-index-sqlite.js",
     "apps/host/src/runtime/runs-index-utils.js",
