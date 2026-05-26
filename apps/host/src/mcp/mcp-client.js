@@ -8,7 +8,16 @@ import { JsonRpcClient } from './json-rpc.js';
 
 const PROTOCOL_VERSION = '2024-11-05';
 
+/**
+ * @typedef {{ start?: () => void, send(message: unknown): void, onMessage(handler: (message: import('./json-rpc.js').JsonRpcMessage) => void): void, onClose?: (handler: () => void) => unknown, close?: () => void }} McpTransport
+ * @typedef {{ name: string, version: string }} McpClientInfo
+ * @typedef {{ transport?: McpTransport, clientInfo?: McpClientInfo, timeoutMs?: number }} McpClientOptions
+ */
+
 export class McpClient {
+  /**
+   * @param {McpClientOptions} [options]
+   */
   constructor({ transport, clientInfo = { name: 'agent-cowork-host', version: '0.1.0' }, timeoutMs = 15_000 } = {}) {
     if (!transport) {
       throw new Error('McpClient: transport is required');
@@ -31,6 +40,9 @@ export class McpClient {
     }
   }
 
+  /**
+   * @returns {Promise<unknown>}
+   */
   async connect() {
     if (this.connected) {
       return this.serverInfo;
@@ -43,18 +55,31 @@ export class McpClient {
       capabilities: { tools: {} },
       clientInfo: this.clientInfo,
     });
-    this.serverInfo = result?.serverInfo || null;
-    this.capabilities = result?.capabilities || null;
+    const response = result && typeof result === 'object'
+      ? /** @type {{ serverInfo?: unknown, capabilities?: unknown }} */ (result)
+      : {};
+    this.serverInfo = response.serverInfo || null;
+    this.capabilities = response.capabilities || null;
     this._rpc.notify('notifications/initialized');
     this.connected = true;
     return this.serverInfo;
   }
 
+  /**
+   * @returns {Promise<unknown[]>}
+   */
   async listTools() {
     const result = await this._rpc.request('tools/list', {});
-    return Array.isArray(result?.tools) ? result.tools : [];
+    return result && typeof result === 'object' && Array.isArray(/** @type {{ tools?: unknown }} */ (result).tools)
+      ? /** @type {{ tools: unknown[] }} */ (result).tools
+      : [];
   }
 
+  /**
+   * @param {string} name
+   * @param {Record<string, unknown>} [args]
+   * @returns {Promise<unknown>}
+   */
   async callTool(name, args = {}) {
     if (!name) {
       throw new Error('McpClient.callTool: name is required');

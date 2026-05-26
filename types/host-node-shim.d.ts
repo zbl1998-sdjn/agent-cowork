@@ -54,10 +54,16 @@ declare module 'node:crypto' {
 
 declare module 'node:child_process' {
   export interface StreamLike {
+    setEncoding(encoding: string): unknown;
     on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
   }
 
+  export interface WritableStreamLike {
+    write(data: Buffer | string): unknown;
+  }
+
   export interface ChildProcessLike {
+    stdin?: WritableStreamLike;
     stdout: StreamLike;
     stderr: StreamLike;
     kill(signal?: string): void;

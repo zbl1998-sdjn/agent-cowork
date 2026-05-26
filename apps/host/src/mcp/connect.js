@@ -12,11 +12,27 @@ import { McpClient } from './mcp-client.js';
 //
 // Returns { clients: [{ name, client }], errors: [{ name, error }], toolCount }.
 
+/**
+ * @typedef {import('./stdio-transport.js').SpawnFn} SpawnFn
+ * @typedef {{ name?: string, command?: string, args?: string[], env?: Record<string, string | undefined>, cwd?: string, timeoutMs?: number }} McpServerSpec
+ * @typedef {{ registerMcpClient(name: string, client: McpClient): number | Promise<number> }} McpRegistry
+ * @typedef {{ name: string, client: McpClient }} ConnectedMcpClient
+ * @typedef {{ name: string, error: string }} McpConnectError
+ * @typedef {{ registry?: McpRegistry, servers?: McpServerSpec[], spawn?: SpawnFn, timeoutMs?: number }} ConnectMcpOptions
+ * @typedef {{ clients: ConnectedMcpClient[], errors: McpConnectError[], toolCount: number }} ConnectMcpResult
+ */
+
+/**
+ * @param {ConnectMcpOptions} [options]
+ * @returns {Promise<ConnectMcpResult>}
+ */
 export async function connectMcpServers({ registry, servers = [], spawn = childProcess.spawn, timeoutMs = 15_000 } = {}) {
   if (!registry) {
     throw new Error('connectMcpServers: registry is required');
   }
+  /** @type {ConnectedMcpClient[]} */
   const clients = [];
+  /** @type {McpConnectError[]} */
   const errors = [];
   let toolCount = 0;
 
@@ -38,17 +54,21 @@ export async function connectMcpServers({ registry, servers = [], spawn = childP
       clients.push({ name: spec.name, client });
       toolCount += count;
     } catch (err) {
-      errors.push({ name: spec.name, error: err.message });
+      errors.push({ name: spec.name, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
   return { clients, errors, toolCount };
 }
 
+/**
+ * @param {(ConnectedMcpClient | McpClient)[]} [clients]
+ */
 export function closeMcpClients(clients = []) {
   for (const entry of clients) {
     try {
-      (entry.client || entry).close();
+      const client = entry instanceof McpClient ? entry : entry.client;
+      client.close();
     } catch {
       // ignore
     }

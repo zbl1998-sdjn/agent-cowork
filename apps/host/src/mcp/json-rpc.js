@@ -6,7 +6,21 @@
 // via `handleMessage(message)`. That keeps the protocol logic pure and unit
 // testable without spawning a real MCP server.
 
+/**
+ * @typedef {{ message?: string, code?: unknown, data?: unknown }} JsonRpcWireError
+ * @typedef {{ jsonrpc?: string, id?: string | number | null, method?: string, params?: unknown, result?: unknown, error?: JsonRpcWireError }} JsonRpcMessage
+ * @typedef {(message: JsonRpcMessage) => void} JsonRpcSend
+ * @typedef {(method: string, params?: unknown) => void} NotificationHandler
+ * @typedef {{ resolve: (value: unknown) => void, reject: (reason?: unknown) => void, timer: ReturnType<typeof setTimeout> }} PendingRequest
+ * @typedef {{ send?: JsonRpcSend, timeoutMs?: number, now?: () => number }} JsonRpcClientOptions
+ */
+
 export class JsonRpcError extends Error {
+  /**
+   * @param {string} message
+   * @param {unknown} [code]
+   * @param {unknown} [data]
+   */
   constructor(message, code, data) {
     super(message);
     this.name = 'JsonRpcError';
@@ -16,26 +30,41 @@ export class JsonRpcError extends Error {
 }
 
 export class JsonRpcClient {
+  /**
+   * @param {JsonRpcClientOptions} [options]
+   */
   constructor({ send, timeoutMs = 15_000, now = Date.now } = {}) {
     if (typeof send !== 'function') {
       throw new Error('JsonRpcClient: send(message) is required');
     }
+    /** @type {JsonRpcSend} */
     this._send = send;
     this._timeoutMs = timeoutMs;
     this._now = now;
     this._nextId = 1;
+    /** @type {Map<number, PendingRequest>} */
     this._pending = new Map(); // id -> { resolve, reject, timer }
+    /** @type {Set<NotificationHandler>} */
     this._notificationHandlers = new Set();
   }
 
+  /**
+   * @param {NotificationHandler} handler
+   */
   onNotification(handler) {
     this._notificationHandlers.add(handler);
     return () => this._notificationHandlers.delete(handler);
   }
 
+  /**
+   * @param {string} method
+   * @param {unknown} [params]
+   * @param {{ timeoutMs?: number }} [options]
+   * @returns {Promise<unknown>}
+   */
   request(method, params, { timeoutMs } = {}) {
     const id = this._nextId++;
-    const message = { jsonrpc: '2.0', id, method };
+    const message = /** @type {JsonRpcMessage} */ ({ jsonrpc: '2.0', id, method });
     if (params !== undefined) {
       message.params = params;
     }
@@ -54,21 +83,31 @@ export class JsonRpcClient {
     });
   }
 
+  /**
+   * @param {string} method
+   * @param {unknown} [params]
+   */
   notify(method, params) {
-    const message = { jsonrpc: '2.0', method };
+    const message = /** @type {JsonRpcMessage} */ ({ jsonrpc: '2.0', method });
     if (params !== undefined) {
       message.params = params;
     }
     this._send(message);
   }
 
+  /**
+   * @param {JsonRpcMessage} message
+   */
   handleMessage(message) {
     if (!message || typeof message !== 'object') {
       return;
     }
     // A response carries an id we issued.
-    if (Object.prototype.hasOwnProperty.call(message, 'id') && message.id != null && this._pending.has(message.id)) {
+    if (Object.prototype.hasOwnProperty.call(message, 'id') && typeof message.id === 'number' && this._pending.has(message.id)) {
       const entry = this._pending.get(message.id);
+      if (!entry) {
+        return;
+      }
       this._pending.delete(message.id);
       clearTimeout(entry.timer);
       if (message.error) {
@@ -90,6 +129,10 @@ export class JsonRpcClient {
     }
   }
 
+  /**
+   * @param {number} id
+   * @param {unknown} err
+   */
   _settleError(id, err) {
     const entry = this._pending.get(id);
     if (!entry) {
@@ -100,6 +143,9 @@ export class JsonRpcClient {
     entry.reject(err);
   }
 
+  /**
+   * @param {unknown} reason
+   */
   rejectAll(reason) {
     const err = reason instanceof Error ? reason : new Error(String(reason || 'closed'));
     for (const [id, entry] of this._pending) {
