@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRunRecord, listRunRecords, openPath } from '../../lib/api';
 import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../../lib/run-observability';
 import type { RunRecord } from '../../lib/types';
+import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 
 function runTitle(record: RunRecord): string {
@@ -28,10 +29,56 @@ function Rows({ empty, rows }: { empty: string; rows: ObservabilityRow[] }) {
       {rows.map((item) => (
         <div key={`${item.label}:${item.value}`} className="observe-row">
           <dt>{item.label}</dt>
-          <dd>{item.path ? <button type="button" onClick={() => void openPath(item.path!)}>{item.value}</button> : item.value}</dd>
+          <dd>
+            {item.path ? (
+              <Button size="sm" onClick={() => void openPath(item.path!)} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                {item.value}
+              </Button>
+            ) : item.value}
+          </dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+export function ObservabilityRefreshAction({ loading, onRefresh }: { loading: boolean; onRefresh: () => void }) {
+  return (
+    <Button variant="primary" disabled={loading} onClick={onRefresh}>
+      {loading ? '刷新中' : '刷新'}
+    </Button>
+  );
+}
+
+export function ObservabilityRunList({
+  records,
+  selectedId,
+  onSelectRecord,
+}: {
+  records: RunRecord[];
+  selectedId: string | null;
+  onSelectRecord: (id: string) => void;
+}) {
+  return (
+    <ul className="observe-run-list">
+      {records.map((record) => (
+        <li key={record.id}>
+          <Button
+            className={record.id === selectedId ? 'is-selected' : ''}
+            onClick={() => onSelectRecord(record.id)}
+            style={{ display: 'grid', width: '100%', justifyContent: 'stretch', textAlign: 'left' }}
+          >
+            <strong>{runTitle(record)}</strong>
+            <span>{runMeta(record)}</span>
+          </Button>
+        </li>
+      ))}
+      {!records.length && (
+        <li className="panel-empty">
+          <ObservabilityEmptyState title="暂无运行记录" message="完成一次 agent 运行后会显示在这里。" />
+        </li>
+      )}
+    </ul>
   );
 }
 
@@ -92,25 +139,11 @@ export function ObservabilityPanel() {
     <section className="side-panel observability-panel">
       <div className="observe-head">
         <h2>成本 / 可观测</h2>
-        <button type="button" onClick={() => void loadRuns()} disabled={loading}>{loading ? '刷新中' : '刷新'}</button>
+        <ObservabilityRefreshAction loading={loading} onRefresh={() => void loadRuns()} />
       </div>
       <ObservabilityErrorState error={error} onRetry={() => void loadRuns()} />
       <div className="observe-layout">
-        <ul className="observe-run-list">
-          {records.map((record) => (
-            <li key={record.id}>
-              <button type="button" className={record.id === selectedId ? 'is-selected' : ''} onClick={() => setSelectedId(record.id)}>
-                <strong>{runTitle(record)}</strong>
-                <span>{runMeta(record)}</span>
-              </button>
-            </li>
-          ))}
-          {!records.length && (
-            <li className="panel-empty">
-              <ObservabilityEmptyState title="暂无运行记录" message="完成一次 agent 运行后会显示在这里。" />
-            </li>
-          )}
-        </ul>
+        <ObservabilityRunList records={records} selectedId={selectedId} onSelectRecord={setSelectedId} />
 
         <div className="observe-detail" aria-busy={detailBusy}>
           {selected ? (
