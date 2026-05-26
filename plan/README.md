@@ -172,6 +172,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] Host 体积治理(tool-loop):`tool-loop.js` 拆出 `tool-loop-support.js` 的 lazy tool/search、tool call 解析和 no-op budget guard helper,主循环从 399/400 硬限风险降到约 340 行;高耦合工具执行/审批/预算/trace 主块暂不拆,聚焦 host 测试与 checkJs 通过。
 - [x] Host 体积治理(runs-index):`runs-index.js` 拆成 facade + file/sqlite/utils 小模块,从 389 行降到 32 行;原导出、JSONL replay、SQLite 语义、tenant 过滤和 version 递增保持不变,聚焦 runs-index/sqlite/seeded-id 测试通过,体积软警告降为 12 个。
 - [x] Host 体积治理(scheduler):`scheduler.js` 拆出 `scheduler-store.js` 的 file/sqlite store adapter 与 normalise helper,主 Scheduler 保留创建/取消/due/fire/tick/start/stop 时序不变;聚焦 scheduler/sqlite/server runtime/schedule tool 测试通过,体积软警告降为 11 个。
+- [x] Host 体积治理(api-runner):`api-runner.js` 拆出 `api-runner-config.js` 和 `api-runner-prompts.js`,保留配置解析、prompt builder、plan/chat/stream runner 原导出;provider/fallback/env 优先级和 SSE 解析不变,聚焦测试与门禁通过,体积软警告降为 10 个。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。

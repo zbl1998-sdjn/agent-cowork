@@ -1,139 +1,16 @@
-const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
-const DEFAULT_MODEL = 'kimi-k2.6';
-const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
-const DEFAULT_TIMEOUT_MS = 60_000;
-const DEFAULT_MAX_TOKENS = 2048;
-const MAX_PROMPT_LENGTH = 8000;
-export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置 Kimi/Moonshot API Key。本地文件功能仍可离线使用；需要模型回复时请联网并配置 KIMI_API_KEY 或 MOONSHOT_API_KEY。';
+import {
+  cleanProvider,
+  cleanText,
+  DEFAULT_BASE_URL,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_MODEL,
+  DEFAULT_TIMEOUT_MS,
+  KIMI_API_NOT_CONFIGURED_MESSAGE,
+} from './api-runner-config.js';
+import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
-function cleanText(value) {
-  return String(value || '').replace(/\r\n/g, '\n').trim();
-}
-
-function cleanProvider(value, fallback = 'kimi-api') {
-  const provider = String(value || '').trim().toLowerCase();
-  return provider || fallback;
-}
-
-function isAnthropicProvider(provider) {
-  return provider === 'anthropic' || provider === 'claude';
-}
-
-function cleanModelFallbacks(value) {
-  let input = value;
-  if (typeof input === 'string' && input.trim()) {
-    try { input = JSON.parse(input); } catch { return []; }
-  }
-  if (!Array.isArray(input)) return [];
-  return input.map((item) => {
-    const source = item && typeof item === 'object' ? item : {};
-    const fallback = {};
-    const provider = cleanProvider(source.provider || source.kimiProvider || source.modelProvider, '');
-    if (provider) fallback.provider = provider;
-    if (typeof source.apiKey === 'string' && source.apiKey.trim()) fallback.apiKey = source.apiKey.trim();
-    if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) fallback.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
-    if (typeof source.model === 'string' && source.model.trim()) fallback.model = source.model.trim();
-    if (Number.isFinite(Number(source.timeoutMs))) fallback.timeoutMs = Math.max(1000, Number(source.timeoutMs));
-    if (Number.isFinite(Number(source.maxTokens))) fallback.maxTokens = Math.max(1, Number(source.maxTokens));
-    if (Number.isFinite(Number(source.temperature))) fallback.temperature = Number(source.temperature);
-    return fallback;
-  }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
-}
-
-function buildMemoryBlock(memory) {
-  const text = cleanText(memory).slice(0, 4096);
-  if (!text) {
-    return '';
-  }
-  return [
-    '工作区记忆 (.AgentCowork/MEMORY.md, 用户已确认的长期事实, 严格遵守):',
-    text,
-    '工作区记忆结束。',
-  ].join('\n');
-}
-
-export function buildKimiApiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }) {
-  const userPrompt = cleanText(prompt);
-  if (!userPrompt) {
-    throw new Error('prompt is required');
-  }
-  if (userPrompt.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);
-  }
-
-  const safeSummary = cleanText(summary).slice(0, 2400);
-  const memoryBlock = buildMemoryBlock(memory);
-  const lines = [];
-  if (memoryBlock) {
-    lines.push(memoryBlock);
-  }
-  lines.push(
-    '只基于下面摘要回答，不要读取文件，不要使用工具，不要修改文件，不要运行命令。',
-    '用中文 Markdown 输出：目标理解、三条整理建议、审批前本地动作清单。',
-    `模式：${mode === 'code' ? 'code' : 'cowork'}`,
-    `摘要：${safeSummary || '暂无。'}`,
-    `用户指令：${userPrompt}`,
-  );
-  return lines.join('\n');
-}
-
-export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }) {
-  const userPrompt = cleanText(prompt);
-  if (!userPrompt) {
-    throw new Error('prompt is required');
-  }
-  if (userPrompt.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);
-  }
-
-  const safeSummary = cleanText(summary).slice(0, 2400);
-  const memoryBlock = buildMemoryBlock(memory);
-  const lines = [];
-  if (memoryBlock) {
-    lines.push(memoryBlock);
-  }
-  lines.push('你是 Agent Cowork 的智能助手，用简洁、自然的中文与用户对话，像同事一样直接回答问题，不要套话。');
-  lines.push('日常聊天无需读写文件，也不要生成“执行计划/待审批操作”；只有当用户明确要整理或处理本地文件时，再提示可在左侧选择对应模板。');
-  if (safeSummary) lines.push(`参考摘要：${safeSummary}`);
-  lines.push(`用户：${userPrompt}`);
-  return lines.join('\n');
-}
-
-export function resolveKimiApiConfig(config = {}, env = process.env) {
-  const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
-  const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;
-  const anthropic = isAnthropicProvider(provider);
-  const apiKey = String(
-    config.kimiApiKey
-    || (anthropic ? env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY : env.KIMI_API_KEY || env.MOONSHOT_API_KEY)
-    || '',
-  ).trim();
-  const baseUrl = String(
-    config.kimiBaseUrl
-    || (anthropic ? env.ANTHROPIC_BASE_URL || DEFAULT_ANTHROPIC_BASE_URL : env.KIMI_BASE_URL || env.MOONSHOT_BASE_URL || DEFAULT_BASE_URL),
-  ).trim();
-  const model = String(
-    config.kimiModel
-    || (anthropic ? env.ANTHROPIC_MODEL || env.CLAUDE_MODEL || '' : env.KIMI_MODEL || DEFAULT_MODEL),
-  ).trim();
-  const timeoutMs = Math.max(1000, Number(config.kimiApiTimeoutMs || env.KIMI_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS));
-  const maxTokens = Math.max(1, Number(config.kimiApiMaxTokens || env.KIMI_API_MAX_TOKENS || DEFAULT_MAX_TOKENS));
-  const userAgent = String(config.kimiUserAgent || env.KIMI_USER_AGENT || '').trim();
-  const tempRaw = config.kimiTemperature != null ? config.kimiTemperature : env.KIMI_TEMPERATURE;
-  const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
-  return {
-    provider,
-    configured: Boolean(apiKey),
-    apiKey,
-    baseUrl: baseUrl.replace(/\/+$/, ''),
-    model,
-    timeoutMs,
-    maxTokens,
-    temperature,
-    userAgent,
-    fallbacks: cleanModelFallbacks(fallbackInput),
-  };
-}
+export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
+export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
 function extractMessageText(payload) {
   const content = payload?.choices?.[0]?.message?.content;
