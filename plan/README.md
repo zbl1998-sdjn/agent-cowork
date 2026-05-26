@@ -161,7 +161,8 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2b 局部迁移(工具/提示优化/可视化控件):工具搜索/调用/计划、提示优化采纳/复制/清空、可视化活页渲染/重开已迁移到 `Button` 原语;新增组件/状态单测锁定 primitive class 与回调透传。
 - [x] FE-2b 局部迁移(头部/可观测/运行时/记忆/连接器控件):应用头部、可观测、运行时依赖、记忆、连接器搜索与连接动作已迁移到 `Button` 原语;新增单测覆盖忙碌/禁用文案与回调分支,全量 UI 和门禁通过。
 - [x] FE-2b 局部迁移(输入/设置/文件预览控件):输入框底部上传、语音、提示优化、发送动作,设置/API 弹窗 close/save/cancel/clear/refresh,文件预览、产物卡与侧栏关闭动作已迁移到 `Button`/`IconButton` 原语;保留 Composer popover/附件与 Settings tabs/segmented 等待专用原语。新增动作组件和 SSR 状态单测,全量 UI 测试 52 files/225 tests 与 `npm run check` 通过。
-- [x] FE-2b 局部迁移(剩余安全控件面):输入栏状态、状态视图重试、来源开关、登录页、对话栏、首启引导、时间线快捷按钮/建议 chip、设置分段控件、澄清/问题选项、工具调用折叠头已迁移到共享原语。新增 `SegmentedControl`/`ChoiceButton`/附件组件等单测;全量 UI 测试 61 files/246 tests 与 `npm run check` 通过。剩余 raw button 仅保留在内部原语、Composer listbox 和 CommandPalette menu item,等待专用菜单/listbox 原语。
+- [x] FE-2b 局部迁移(剩余安全控件面):输入栏状态、状态视图重试、来源开关、登录页、对话栏、首启引导、时间线快捷按钮/建议 chip、设置分段控件、澄清/问题选项、工具调用折叠头已迁移到共享原语。新增 `SegmentedControl`/`ChoiceButton`/附件组件等单测;全量 UI 测试 61 files/246 tests 与 `npm run check` 通过。
+- [x] FE-2b 完结(专用菜单/listbox 原语):新增 `MenuItemButton`/`ListboxOptionButton`,CommandPalette 命令项与 Composer listbox 选项已迁入专用原语,保留现有样式类、键盘导航和点击/鼠标选择语义;新增 primitive/CommandPalette SSR 单测,源码扫描确认应用层 raw `<button>` 仅剩 `components/ui` 内部原语和 markdown 复制按钮字符串。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。

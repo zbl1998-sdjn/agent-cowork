@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { MenuItemButton } from './ui/MenuItemButton';
 
 export interface Command { id: string; label: string; hint?: string; run: () => void }
 
@@ -28,18 +29,18 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
             else if (e.key === 'Enter') { e.preventDefault(); run(filtered[active]); }
           }}
         />
-        <div className="cmdk-list">
+        <div className="cmdk-list" role="menu">
           {filtered.map((c, i) => (
-            <button
+            <MenuItemButton
               key={c.id}
-              type="button"
-              className={'cmdk-item' + (i === active ? ' is-active' : '')}
+              className="cmdk-item"
+              active={i === active}
               onMouseEnter={() => setActive(i)}
               onClick={() => run(c)}
             >
               <span>{c.label}</span>
               {c.hint && <span className="cmdk-hint">{c.hint}</span>}
-            </button>
+            </MenuItemButton>
           ))}
           {filtered.length === 0 && <div className="cmdk-empty">没有匹配的命令</div>}
         </div>

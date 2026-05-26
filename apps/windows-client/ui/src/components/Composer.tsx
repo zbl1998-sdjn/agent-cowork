@@ -7,6 +7,7 @@ import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
 import { RefinePreview } from './chat/RefinePreview';
+import { ListboxOptionButton } from './ui/MenuItemButton';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
@@ -337,15 +338,15 @@ export function Composer({
         <div className="composer-popover" role="listbox">
           <div className="popover-header">{mode === 'template' ? '命令 / 任务模板' : mode === 'history' ? '历史任务' : '引用本地文件'}</div>
           {items.map((item, index) => (
-            <button
+            <ListboxOptionButton
               key={item.key}
-              type="button"
-              className={`popover-item${index === active ? ' is-active' : ''}`}
+              className="popover-item"
+              active={index === active}
               onMouseDown={(e) => { e.preventDefault(); item.apply(); }}
             >
               <strong>{item.title}</strong>
               {item.detail && <span>{item.detail}</span>}
-            </button>
+            </ListboxOptionButton>
           ))}
         </div>
       )}
