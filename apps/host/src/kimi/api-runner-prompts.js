@@ -1,5 +1,11 @@
+// @ts-check
 import { cleanText, MAX_PROMPT_LENGTH } from './api-runner-config.js';
 
+/**
+ * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }} PromptOptions
+ */
+
+/** @param {unknown} memory @returns {string} */
 function buildMemoryBlock(memory) {
   const text = cleanText(memory).slice(0, 4096);
   if (!text) {
@@ -12,6 +18,7 @@ function buildMemoryBlock(memory) {
   ].join('\n');
 }
 
+/** @param {PromptOptions} options @returns {string} */
 export function buildKimiApiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
@@ -37,6 +44,7 @@ export function buildKimiApiPlanPrompt({ prompt, summary = '', mode = 'cowork', 
   return lines.join('\n');
 }
 
+/** @param {PromptOptions} options @returns {string} */
 export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {

@@ -1,3 +1,4 @@
+// @ts-check
 export const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
 export const DEFAULT_MODEL = 'kimi-k2.6';
 export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
@@ -6,19 +7,28 @@ export const DEFAULT_MAX_TOKENS = 2048;
 export const MAX_PROMPT_LENGTH = 8000;
 export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置 Kimi/Moonshot API Key。本地文件功能仍可离线使用；需要模型回复时请联网并配置 KIMI_API_KEY 或 MOONSHOT_API_KEY。';
 
+/**
+ * @typedef {{ provider?: string, apiKey?: string, baseUrl?: string, model?: string, timeoutMs?: number, maxTokens?: number, temperature?: number }} ModelFallback
+ * @typedef {{ provider: string, configured: boolean, apiKey: string, baseUrl: string, model: string, timeoutMs: number, maxTokens: number, temperature?: number, userAgent: string, fallbacks: ModelFallback[] }} KimiApiConfig
+ */
+
+/** @param {unknown} value */
 export function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
 }
 
+/** @param {unknown} value @param {string} [fallback] */
 export function cleanProvider(value, fallback = 'kimi-api') {
   const provider = String(value || '').trim().toLowerCase();
   return provider || fallback;
 }
 
+/** @param {string} provider */
 function isAnthropicProvider(provider) {
   return provider === 'anthropic' || provider === 'claude';
 }
 
+/** @param {unknown} value @returns {ModelFallback[]} */
 function cleanModelFallbacks(value) {
   let input = value;
   if (typeof input === 'string' && input.trim()) {
@@ -26,7 +36,8 @@ function cleanModelFallbacks(value) {
   }
   if (!Array.isArray(input)) return [];
   return input.map((item) => {
-    const source = item && typeof item === 'object' ? item : {};
+    const source = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : {};
+    /** @type {ModelFallback} */
     const fallback = {};
     const provider = cleanProvider(source.provider || source.kimiProvider || source.modelProvider, '');
     if (provider) fallback.provider = provider;
@@ -40,6 +51,7 @@ function cleanModelFallbacks(value) {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
+/** @param {Record<string, unknown>} [config] @param {Record<string, string | undefined>} [env] @returns {KimiApiConfig} */
 export function resolveKimiApiConfig(config = {}, env = process.env) {
   const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
   const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;

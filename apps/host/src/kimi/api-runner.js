@@ -1,19 +1,21 @@
-import {
-  cleanProvider,
-  cleanText,
-  DEFAULT_BASE_URL,
-  DEFAULT_MAX_TOKENS,
-  DEFAULT_MODEL,
-  DEFAULT_TIMEOUT_MS,
-  KIMI_API_NOT_CONFIGURED_MESSAGE,
-} from './api-runner-config.js';
+// @ts-check
+import { cleanProvider, cleanText, DEFAULT_BASE_URL, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TIMEOUT_MS, KIMI_API_NOT_CONFIGURED_MESSAGE } from './api-runner-config.js';
 import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
 export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
 export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
+/**
+ * @typedef {{ usage?: unknown, choices?: Array<{ message?: { content?: unknown }, delta?: { content?: unknown, reasoning_content?: unknown } }> }} KimiPayload
+ * @typedef {{ ok: boolean, provider: string, model: string, mode: string, text: string, durationMs: number, usage?: unknown }} KimiTextResult
+ * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider?: unknown, timeoutMs?: unknown, maxTokens?: unknown, fetchImpl?: typeof fetch, userAgent?: unknown, temperature?: unknown, promptBuilder?: (options: { prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }) => string, resultMode?: string }} KimiTextOptions
+ * @typedef {KimiTextOptions & { onToken?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} KimiStreamOptions
+ */
+
+/** @param {unknown} payload @returns {string} */
 function extractMessageText(payload) {
-  const content = payload?.choices?.[0]?.message?.content;
+  const data = /** @type {KimiPayload} */ (payload && typeof payload === 'object' ? payload : {});
+  const content = data.choices?.[0]?.message?.content;
   if (typeof content === 'string') {
     return cleanText(content);
   }
@@ -36,6 +38,7 @@ function extractMessageText(payload) {
   return '';
 }
 
+/** @param {KimiTextOptions} [options] @returns {Promise<KimiTextResult>} */
 async function runKimiApiText({
   prompt,
   summary,
@@ -64,17 +67,21 @@ async function runKimiApiText({
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
   const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
+  if (typeof promptBuilder !== 'function') {
+    throw new Error('promptBuilder is required');
+  }
   const apiPrompt = promptBuilder({ prompt, summary, mode, memory });
 
   try {
+    const headers = /** @type {Record<string, string>} */ ({
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    });
+    if (userAgent) headers['user-agent'] = String(userAgent);
     const response = await fetchImpl(endpoint, {
       method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-        accept: 'application/json',
-        ...(userAgent ? { 'user-agent': userAgent } : {}),
-      },
+      headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
         messages: [
@@ -94,7 +101,7 @@ async function runKimiApiText({
       throw new Error(`Kimi API request failed with status ${response.status}`);
     }
 
-    const payload = await response.json();
+    const payload = /** @type {KimiPayload} */ (await response.json());
     const text = extractMessageText(payload);
     if (!text) {
       throw new Error('Kimi API returned empty output');
@@ -110,7 +117,7 @@ async function runKimiApiText({
       usage: payload.usage || null,
     };
   } catch (error) {
-    if (error?.name === 'AbortError') {
+    if (error && typeof error === 'object' && /** @type {{ name?: unknown }} */ (error).name === 'AbortError') {
       throw new Error(`Kimi API timed out after ${timeoutMs}ms`);
     }
     throw error;
@@ -119,6 +126,7 @@ async function runKimiApiText({
   }
 }
 
+/** @param {KimiTextOptions} [options] */
 export function runKimiApiPlan(options = {}) {
   return runKimiApiText({
     ...options,
@@ -127,6 +135,7 @@ export function runKimiApiPlan(options = {}) {
   });
 }
 
+/** @param {KimiTextOptions} [options] */
 export function runKimiApiChat(options = {}) {
   return runKimiApiText({
     ...options,
@@ -138,6 +147,7 @@ export function runKimiApiChat(options = {}) {
 // Streaming chat: same OpenAI-compatible request with stream:true, parsing the
 // upstream SSE and invoking onToken(delta) per content chunk. Returns the full
 // accumulated text. Used by POST /api/kimi/chat/stream.
+/** @param {KimiStreamOptions} [options] @returns {Promise<KimiTextResult>} */
 export async function runKimiApiChatStream({
   prompt,
   summary = '',
@@ -172,14 +182,15 @@ export async function runKimiApiChatStream({
   }
   let text = '';
   try {
+    const headers = /** @type {Record<string, string>} */ ({
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+    });
+    if (userAgent) headers['user-agent'] = String(userAgent);
     const response = await fetchImpl(endpoint, {
       method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
-        ...(userAgent ? { 'user-agent': userAgent } : {}),
-      },
+      headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
         messages: [{ role: 'user', content: apiPrompt }],
@@ -210,11 +221,11 @@ export async function runKimiApiChatStream({
         const data = line.slice(5).trim();
         if (data === '[DONE]') { buffer = ''; break; }
         try {
-          const json = JSON.parse(data);
-          const choiceDelta = json && json.choices && json.choices[0] ? (json.choices[0].delta || {}) : {};
-          const reasoning = choiceDelta.reasoning_content || '';
+          const json = /** @type {KimiPayload} */ (JSON.parse(data));
+          const choiceDelta = json.choices?.[0]?.delta || {};
+          const reasoning = typeof choiceDelta.reasoning_content === 'string' ? choiceDelta.reasoning_content : '';
           if (reasoning && typeof onReasoning === 'function') onReasoning(reasoning);
-          const delta = choiceDelta.content || '';
+          const delta = typeof choiceDelta.content === 'string' ? choiceDelta.content : '';
           if (delta) {
             text += delta;
             if (typeof onToken === 'function') onToken(delta);
@@ -226,7 +237,7 @@ export async function runKimiApiChatStream({
     }
     return { ok: true, provider: cleanProvider(provider), model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
   } catch (error) {
-    if (error && error.name === 'AbortError') {
+    if (error && typeof error === 'object' && /** @type {{ name?: unknown }} */ (error).name === 'AbortError') {
       throw new Error(`Kimi API timed out after ${timeoutMs}ms`);
     }
     throw error;
