@@ -1,59 +1,18 @@
 import crypto from 'node:crypto';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
-import {
-  completeGitHubDeviceFlow,
-  fetchGitHubViewer,
-  startGitHubDeviceFlow,
-} from '../connectors/oauth-github.js';
-import { getConnector } from '../connectors/catalog.js';
-import {
-  normalizeOAuthScopes,
-  oauthPermissions,
-  selectedOAuthPermissions,
-} from '../connectors/oauth-permissions.js';
+import { completeGitHubDeviceFlow, fetchGitHubViewer, startGitHubDeviceFlow } from '../connectors/oauth-github.js';
+import { normalizeOAuthScopes, oauthPermissions, selectedOAuthPermissions } from '../connectors/oauth-permissions.js';
+import { errorMessage, errorStatus, GITHUB_CLIENT_ID_ENV_KEYS, githubClientId, githubConnector, isGitHub, oauthFilter, oauthIdentity } from './connector-oauth-route-utils.js';
 
-const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {import('./connector-oauth-route-utils.js').RequestContext} RequestContext
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, credentialStore?: any, oauthPermissionApprovals?: any, oauthSessions: Map<string, any>, oauthFetch?: typeof globalThis.fetch, oauthConfig?: { github?: { clientId?: unknown } } }} ConnectorOAuthRouteOptions
+ * @typedef {{ id?: unknown, scopes?: unknown, approvalId?: unknown, oauthApprovalId?: unknown, clientSecret?: unknown, sessionId?: unknown }} ConnectorOAuthBody
+ */
 
-function isGitHub(id) {
-  return String(id || '').toLowerCase() === 'github';
-}
-
-function githubClientId(oauthConfig) {
-  return String(
-    oauthConfig?.github?.clientId
-      || process.env.KCW_GITHUB_OAUTH_CLIENT_ID
-      || process.env.GITHUB_OAUTH_CLIENT_ID
-      || '',
-  ).trim();
-}
-
-function oauthIdentity(requestContext, provider, accountId = 'default') {
-  return {
-    tenantId: requestContext.tenantId,
-    userId: requestContext.userId,
-    provider,
-    accountId,
-  };
-}
-
-function oauthFilter(requestContext, provider) {
-  return {
-    tenantId: requestContext.tenantId,
-    userId: requestContext.userId,
-    provider,
-  };
-}
-
-function githubConnector() {
-  const connector = getConnector('github');
-  if (!connector) {
-    const err = new Error('GitHub connector is not registered');
-    err.statusCode = 500;
-    throw err;
-  }
-  return connector;
-}
-
+/** @param {ConnectorOAuthRouteOptions} options */
 export async function handleConnectorOAuthRoutes({
   request, response, pathname, requestUrl, requestContext,
   credentialStore, oauthPermissionApprovals, oauthSessions, oauthFetch, oauthConfig,
@@ -82,13 +41,14 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/approve') {
     await withJsonBody(request, response, async (body) => {
-      if (!isGitHub(body && body.id) || !oauthPermissionApprovals) {
+      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      if (!isGitHub(input.id) || !oauthPermissionApprovals) {
         sendJson(response, 400, { error: 'unsupported OAuth connector' });
         return;
       }
       try {
         const connector = githubConnector();
-        const scopes = normalizeOAuthScopes(connector, body && body.scopes);
+        const scopes = normalizeOAuthScopes(connector, input.scopes);
         const approval = oauthPermissionApprovals.issue({
           connectorId: 'github',
           provider: 'github',
@@ -104,7 +64,7 @@ export async function handleConnectorOAuthRoutes({
           permissions: selectedOAuthPermissions(connector, scopes),
         });
       } catch (err) {
-        sendJson(response, err.statusCode || 400, { error: err.message });
+        sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
       }
     });
     return true;
@@ -112,11 +72,12 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/start') {
     await withJsonBody(request, response, async (body) => {
-      if (!isGitHub(body && body.id)) {
+      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      if (!isGitHub(input.id)) {
         sendJson(response, 400, { error: 'unsupported OAuth connector' });
         return;
       }
-      if (body && body.clientSecret) {
+      if (input.clientSecret) {
         sendJson(response, 400, { error: 'client_secret is not accepted by the device-flow connector' });
         return;
       }
@@ -134,8 +95,8 @@ export async function handleConnectorOAuthRoutes({
           });
           return;
         }
-        const scopes = normalizeOAuthScopes(connector, body && body.scopes);
-        oauthPermissionApprovals.consume(body && (body.approvalId || body.oauthApprovalId), {
+        const scopes = normalizeOAuthScopes(connector, input.scopes);
+        oauthPermissionApprovals.consume(input.approvalId || input.oauthApprovalId, {
           connectorId: 'github',
           provider: 'github',
           scopes,
@@ -169,7 +130,7 @@ export async function handleConnectorOAuthRoutes({
           scopes: started.scopes,
         });
       } catch (err) {
-        sendJson(response, err.statusCode || 502, { error: err.message });
+        sendJson(response, errorStatus(err, 502), { error: errorMessage(err) });
       }
     });
     return true;
@@ -177,9 +138,10 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/complete') {
     await withJsonBody(request, response, async (body) => {
-      const sessionId = String((body && body.sessionId) || '');
+      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      const sessionId = String(input.sessionId || '');
       const session = oauthSessions && oauthSessions.get(sessionId);
-      if (!isGitHub(body && body.id) || !session || session.provider !== 'github') {
+      if (!isGitHub(input.id) || !session || session.provider !== 'github') {
         sendJson(response, 404, { error: 'OAuth session not found' });
         return;
       }
@@ -225,7 +187,7 @@ export async function handleConnectorOAuthRoutes({
           permissions: session.permissions || [],
         });
       } catch (err) {
-        sendJson(response, err.statusCode || 502, { error: err.message });
+        sendJson(response, errorStatus(err, 502), { error: errorMessage(err) });
       }
     });
     return true;
@@ -233,7 +195,8 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/revoke') {
     await withJsonBody(request, response, async (body) => {
-      if (!isGitHub(body && body.id) || !credentialStore) {
+      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      if (!isGitHub(input.id) || !credentialStore) {
         sendJson(response, 400, { error: 'unsupported OAuth connector' });
         return;
       }
