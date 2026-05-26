@@ -1,0 +1,89 @@
+import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+import type { SidePanel } from '../lib/app-types';
+import { AppHeader, AppHeaderActions } from './AppHeader';
+import { Button } from './ui/Button';
+
+function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
+  const matches: ReactElement<Record<string, any>>[] = [];
+  const visit = (value: ReactNode) => {
+    Children.forEach(value, (child) => {
+      if (!isValidElement(child)) return;
+      if (child.type === type) {
+        matches.push(child as ReactElement<Record<string, any>>);
+      }
+      visit((child.props as { children?: ReactNode }).children);
+    });
+  };
+  visit(node);
+  return matches;
+}
+
+function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parameters<typeof AppHeader>[0] {
+  return {
+    autoApprove: false,
+    panel: 'memory',
+    planMode: true,
+    theme: 'dark',
+    trustedRoot: 'C:/work',
+    user: { userId: 'u1', tenantId: 't1', username: 'demo' },
+    onLogout: vi.fn(),
+    onOpenCommandPalette: vi.fn(),
+    onOpenSettings: vi.fn(),
+    onSetAutoApprove: vi.fn(),
+    onSetPlanMode: vi.fn(),
+    onTogglePanel: vi.fn(),
+    onToggleTheme: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('AppHeader', () => {
+  it('renders header actions with Button primitives', () => {
+    const html = renderToStaticMarkup(<AppHeader {...props()} />);
+
+    expect(html.match(/class="ui-btn /g)?.length).toBe(13);
+    expect(html).toContain('Agent Cowork');
+    expect(html).toContain('header-user');
+    expect(html).toContain('ui-btn--secondary');
+    expect(html).toContain('is-active');
+  });
+
+  it('keeps header action callbacks wired', () => {
+    const onOpenCommandPalette = vi.fn();
+    const onToggleTheme = vi.fn();
+    const onSetPlanMode = vi.fn();
+    const onSetAutoApprove = vi.fn();
+    const onTogglePanel = vi.fn();
+    const onOpenSettings = vi.fn();
+    const onLogout = vi.fn();
+    const componentProps = props({
+      onOpenCommandPalette,
+      onToggleTheme,
+      onSetPlanMode,
+      onSetAutoApprove,
+      onTogglePanel,
+      onOpenSettings,
+      onLogout,
+    });
+    const buttons = collectByType(AppHeaderActions(componentProps), Button);
+
+    expect(buttons).toHaveLength(13);
+    buttons[0].props.onClick();
+    buttons[1].props.onClick();
+    buttons.find((button) => button.props.children === '计划模式·开')?.props.onClick();
+    buttons.find((button) => button.props.children === '自动批准·关')?.props.onClick();
+    buttons.find((button) => button.props.children === '记忆')?.props.onClick();
+    buttons.find((button) => button.props.children === '⚙ 设置')?.props.onClick();
+    buttons.find((button) => button.props.children === '退出')?.props.onClick();
+
+    expect(onOpenCommandPalette).toHaveBeenCalledOnce();
+    expect(onToggleTheme).toHaveBeenCalledOnce();
+    expect(onSetPlanMode).toHaveBeenCalledWith(false);
+    expect(onSetAutoApprove).toHaveBeenCalledWith(true);
+    expect(onTogglePanel).toHaveBeenCalledWith('memory' satisfies SidePanel);
+    expect(onOpenSettings).toHaveBeenCalledOnce();
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
+});
