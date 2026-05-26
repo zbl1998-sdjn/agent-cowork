@@ -114,6 +114,7 @@
     "apps/host/src/routes/plan-routes.js",
     "apps/host/src/routes/prompt-routes.js",
     "apps/host/src/routes/search-routes.js",
+    "apps/host/src/routes/session-model-config.js",
     "apps/host/src/routes/skill-routes.js",
     "apps/host/src/routes/tool-routes.js",
     "apps/host/src/routes/workspace-file-routes.js",
