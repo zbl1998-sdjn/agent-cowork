@@ -2,8 +2,18 @@ import path from 'node:path';
 import { assertTrustedPath } from '../../security/path-policy.js';
 import { chunkText } from './chunk.js';
 
+/**
+ * @typedef {import('./chunk.js').WorkspaceChunk} WorkspaceChunk
+ * @typedef {{ path?: unknown, text?: unknown, chunks?: WorkspaceChunk[], maxChunkLines?: number, maxChunkBytes?: number }} UpsertInput
+ * @typedef {{ query?: unknown, limit?: number }} SearchInput
+ * @typedef {{ path: string, startLine: number, endLine: number }} ChunkSource
+ * @typedef {{ chunks: WorkspaceChunk[], sources: ChunkSource[] }} SearchResult
+ * @typedef {{ root: string, upsert(input?: UpsertInput): WorkspaceChunk[], remove(filePath: string): boolean, search(input?: SearchInput | string): SearchResult, chunks(): WorkspaceChunk[] }} WorkspaceIndex
+ */
+
 const DEFAULT_LIMIT = 20;
 
+/** @param {unknown} value @returns {string[]} */
 function tokenize(value) {
   return String(value || '')
     .toLowerCase()
@@ -11,11 +21,13 @@ function tokenize(value) {
     .filter(Boolean);
 }
 
+/** @param {SearchInput | string | undefined} input @returns {SearchInput} */
 function normalizeQuery(input) {
   if (typeof input === 'string') return { query: input };
   return input || {};
 }
 
+/** @param {WorkspaceChunk} chunk @param {string[]} terms @returns {number} */
 function chunkScore(chunk, terms) {
   const haystack = `${chunk.text}\n${path.basename(chunk.sourcePath)}`.toLowerCase();
   let score = 0;
@@ -30,8 +42,11 @@ function chunkScore(chunk, terms) {
   return score;
 }
 
+/** @param {WorkspaceChunk[]} chunks @returns {ChunkSource[]} */
 function sourcesFor(chunks) {
+  /** @type {Set<string>} */
   const seen = new Set();
+  /** @type {ChunkSource[]} */
   const sources = [];
   for (const chunk of chunks) {
     const key = `${chunk.sourcePath}:${chunk.startLine}:${chunk.endLine}`;
@@ -42,15 +57,18 @@ function sourcesFor(chunks) {
   return sources;
 }
 
+/** @param {{ root?: unknown }} [options] @returns {WorkspaceIndex} */
 export function createWorkspaceIndex({ root } = {}) {
   if (typeof root !== 'string' || root.length === 0) {
     throw new Error('root is required');
   }
   const trustedRoot = assertTrustedPath(path.resolve(root), path.resolve(root));
+  /** @type {Map<string, WorkspaceChunk[]>} */
   const byPath = new Map();
 
+  /** @param {unknown} candidate @returns {string} */
   function normalizePath(candidate) {
-    return assertTrustedPath(candidate, trustedRoot);
+    return assertTrustedPath(String(candidate || ''), trustedRoot);
   }
 
   return {
@@ -79,6 +97,7 @@ export function createWorkspaceIndex({ root } = {}) {
       const terms = tokenize(query);
       if (!terms.length) return { chunks: [], sources: [] };
 
+      /** @type {{ chunk: WorkspaceChunk, score: number }[]} */
       const scored = [];
       for (const chunks of byPath.values()) {
         for (const chunk of chunks) {

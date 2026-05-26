@@ -3,16 +3,23 @@ import { listWorkspaceTree } from '../file-tree.js';
 import { extractDocumentText, isExtractableDocument } from '../document-extractor.js';
 import { createWorkspaceRetriever } from './retriever.js';
 
+/**
+ * @typedef {import('./chunk.js').WorkspaceChunk} WorkspaceChunk
+ * @typedef {{ root?: unknown, query?: unknown, limit?: unknown, maxFiles?: unknown, maxFileBytes?: unknown, maxChunkLines?: number, maxChunkBytes?: number }} SearchWorkspaceOptions
+ */
+
 const DEFAULT_MAX_FILES = 400;
 const DEFAULT_MAX_FILE_BYTES = 512 * 1024;
 const DEFAULT_LIMIT = 10;
 
+/** @param {unknown} value @param {number} fallback @param {number} min @param {number} max @returns {number} */
 function cap(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), min), max);
 }
 
+/** @param {string} root @param {WorkspaceChunk} chunk */
 function sourceFromChunk(root, chunk) {
   return {
     path: chunk.sourcePath,
@@ -23,6 +30,7 @@ function sourceFromChunk(root, chunk) {
   };
 }
 
+/** @param {SearchWorkspaceOptions} [options] */
 export function searchWorkspaceIndex({
   root,
   query,
