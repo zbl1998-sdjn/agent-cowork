@@ -1,6 +1,17 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ existsSync(path: string): boolean }} ExistsFs
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -11,6 +22,11 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {ExistsFs} fsImpl
+ * @param {string} target
+ * @returns {boolean}
+ */
 function exists(fsImpl, target) {
   try {
     return fsImpl.existsSync(target);
@@ -19,12 +35,20 @@ function exists(fsImpl, target) {
   }
 }
 
+/**
+ * @param {string} root
+ * @param {ExistsFs} fsImpl
+ * @returns {boolean}
+ */
 function hasTessdata(root, fsImpl) {
   const dirs = [path.join(root, 'tessdata'), root];
   return dirs.some((dir) => exists(fsImpl, path.join(dir, 'chi_sim.traineddata'))
     || exists(fsImpl, path.join(dir, 'chi_tra.traineddata')));
 }
 
+/**
+ * @param {{ env?: EnvLike, fsImpl?: ExistsFs }} [options]
+ */
 export function detectOcrRuntime({ env = {}, fsImpl = fs } = {}) {
   const configured = envValue(env, ['KCW_TESSERACT_HOME', 'KCW_TESSDATA_PREFIX']);
   if (!configured) {

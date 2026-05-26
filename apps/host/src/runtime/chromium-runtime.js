@@ -1,6 +1,17 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ statSync(path: string): import('node:fs').Stats }} StatFs
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -11,10 +22,19 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {string} filePath
+ * @returns {boolean}
+ */
 function isChromiumBinary(filePath) {
   return /^(chrome|chromium)(?:\.exe)?$/i.test(path.basename(filePath || ''));
 }
 
+/**
+ * @param {StatFs} fsImpl
+ * @param {string} target
+ * @returns {boolean}
+ */
 function isFile(fsImpl, target) {
   try {
     return fsImpl.statSync(target).isFile();
@@ -23,6 +43,11 @@ function isFile(fsImpl, target) {
   }
 }
 
+/**
+ * @param {string} home
+ * @param {StatFs} fsImpl
+ * @returns {boolean}
+ */
 function hasChromiumBinary(home, fsImpl) {
   return [
     path.join(home, 'chrome.exe'),
@@ -34,6 +59,9 @@ function hasChromiumBinary(home, fsImpl) {
   ].some((candidate) => isFile(fsImpl, candidate));
 }
 
+/**
+ * @param {{ env?: EnvLike, fsImpl?: StatFs }} [options]
+ */
 export function detectChromiumRuntime({ env = {}, fsImpl = fs } = {}) {
   const configured = envValue(env, ['KCW_CHROMIUM_EXECUTABLE', 'KCW_PLAYWRIGHT_CHROMIUM_HOME']);
   if (!configured) {

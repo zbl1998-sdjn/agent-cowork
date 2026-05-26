@@ -1,5 +1,17 @@
+// @ts-check
 import childProcess from 'node:child_process';
 
+/**
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ status?: number | null, stdout?: unknown, stderr?: unknown }} SpawnResult
+ * @typedef {(command: string, args?: string[], options?: Record<string, unknown>) => SpawnResult} SpawnSyncLike
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -10,6 +22,9 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {{ env?: EnvLike, spawnSync?: SpawnSyncLike }} [options]
+ */
 export function detectGitRuntime({ env = {}, spawnSync = childProcess.spawnSync } = {}) {
   const configured = envValue(env, ['KCW_MINGIT_HOME', 'KCW_GIT_HOME']);
   if (configured) {

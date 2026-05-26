@@ -1,7 +1,18 @@
+// @ts-check
 import fs from 'node:fs';
 
 const FONT_RE = /\.(?:ttf|otf|ttc|woff2)$/i;
 
+/**
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ statSync(path: string): import('node:fs').Stats, readdirSync(path: string, options: { withFileTypes: true }): import('node:fs').Dirent[] }} FontFs
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -12,6 +23,11 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {string} target
+ * @param {FontFs} fsImpl
+ * @returns {boolean}
+ */
 function hasFontFile(target, fsImpl) {
   let stat;
   try {
@@ -29,6 +45,9 @@ function hasFontFile(target, fsImpl) {
   }
 }
 
+/**
+ * @param {{ env?: EnvLike, fsImpl?: FontFs }} [options]
+ */
 export function detectCjkFonts({ env = {}, fsImpl = fs } = {}) {
   const configured = envValue(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT']);
   if (!configured) {

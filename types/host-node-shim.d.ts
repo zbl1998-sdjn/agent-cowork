@@ -47,6 +47,20 @@ declare module 'node:crypto' {
   export function timingSafeEqual(a: Buffer, b: Buffer): boolean;
 }
 
+declare module 'node:child_process' {
+  export interface SpawnSyncResult<T = string | Buffer> {
+    status?: number | null;
+    stdout?: T;
+    stderr?: T;
+  }
+
+  export function spawnSync(
+    command: string,
+    args?: readonly string[],
+    options?: Record<string, unknown>
+  ): SpawnSyncResult;
+}
+
 declare module 'node:fs' {
   export interface Stats {
     size: number;
