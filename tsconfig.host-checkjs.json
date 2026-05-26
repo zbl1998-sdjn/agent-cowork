@@ -84,6 +84,7 @@
     "apps/host/src/storage/audit-events.js",
     "apps/host/src/storage/json-store.js",
     "apps/host/src/storage/jsonl-writer.js",
+    "apps/host/src/storage/sqlite.js",
     "apps/host/src/tools/data/profile.js",
     "apps/host/src/tools/data/report.js",
     "apps/host/src/tools/data/statistics.js",

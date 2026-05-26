@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -7,6 +8,14 @@ const require = createRequire(import.meta.url);
 const storageDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(storageDir, 'migrations');
 
+/**
+ * @typedef {{ get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number }, all(...params: unknown[]): unknown[] }} SqliteStatement
+ * @typedef {{ exec(sql: string): unknown, prepare(sql: string): SqliteStatement }} SqliteDatabase
+ * @typedef {{ id: string, sql?: string, readSql: () => string }} MigrationEntry
+ * @typedef {{ migrationsPath?: string, useEmbeddedMigrations?: boolean | null }} MigrationOptions
+ */
+
+/** @type {null | (new (dbPath: string) => SqliteDatabase)} */
 let DatabaseSync = null;
 
 const EMBEDDED_MIGRATIONS = Object.freeze([
@@ -97,18 +106,22 @@ CREATE INDEX IF NOT EXISTS idx_schedules_tenant_created_at
   },
 ]);
 
+/** @returns {new (dbPath: string) => SqliteDatabase} */
 function loadDatabaseSync() {
   if (!DatabaseSync) {
-    ({ DatabaseSync } = require('node:sqlite'));
+    const sqliteModule = /** @type {{ DatabaseSync: new (dbPath: string) => SqliteDatabase }} */ (require('node:sqlite'));
+    DatabaseSync = sqliteModule.DatabaseSync;
   }
   return DatabaseSync;
 }
 
+/** @param {string} dir @returns {string} */
 function ensureDirSync(dir) {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
+/** @param {string} [dir] @returns {string[]} */
 function listMigrationFiles(dir = migrationsDir) {
   if (!fs.existsSync(dir)) {
     return [];
@@ -120,6 +133,11 @@ function listMigrationFiles(dir = migrationsDir) {
     .map((name) => path.join(dir, name));
 }
 
+/**
+ * @param {string} [dir]
+ * @param {{ useEmbeddedMigrations?: boolean }} [options]
+ * @returns {MigrationEntry[]}
+ */
 function listMigrationEntries(dir = migrationsDir, { useEmbeddedMigrations = false } = {}) {
   const fileEntries = listMigrationFiles(dir).map((file) => ({
     id: path.basename(file),
@@ -134,6 +152,7 @@ function listMigrationEntries(dir = migrationsDir, { useEmbeddedMigrations = fal
   }));
 }
 
+/** @param {string} dbPath @returns {SqliteDatabase} */
 export function openSqliteDatabase(dbPath) {
   if (!dbPath || typeof dbPath !== 'string') {
     throw new Error('SQLite dbPath is required');
@@ -155,6 +174,11 @@ export function openSqliteDatabase(dbPath) {
   return db;
 }
 
+/**
+ * @param {SqliteDatabase} db
+ * @param {MigrationOptions} [options]
+ * @returns {SqliteDatabase}
+ */
 export function migrateSqliteDatabase(db, { migrationsPath = migrationsDir, useEmbeddedMigrations = null } = {}) {
   if (!db || typeof db.exec !== 'function') {
     throw new Error('SQLite database handle is required');
@@ -193,6 +217,7 @@ export function migrateSqliteDatabase(db, { migrationsPath = migrationsDir, useE
   return db;
 }
 
+/** @param {string} dbPath @param {MigrationOptions} [options] @returns {SqliteDatabase} */
 export function createSqliteDatabase(dbPath, options = {}) {
   const db = openSqliteDatabase(dbPath);
   return migrateSqliteDatabase(db, options);

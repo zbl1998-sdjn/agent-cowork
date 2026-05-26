@@ -86,6 +86,7 @@ declare module 'node:fs' {
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
   export function readFileSync(path: string): Buffer;
   export function readFileSync(path: string, encoding: string): string;
+  export function readdirSync(path: string): string[];
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
   export function renameSync(oldPath: string, newPath: string): void;
   export function statSync(path: string): Stats;
@@ -105,6 +106,14 @@ declare module 'node:path' {
   export function join(...paths: string[]): string;
   export function relative(from: string, to: string): string;
   export function resolve(...paths: string[]): string;
+}
+
+declare module 'node:module' {
+  export function createRequire(url: string): (specifier: string) => unknown;
+}
+
+declare module 'node:url' {
+  export function fileURLToPath(url: string): string;
 }
 
 declare module 'node:zlib' {
