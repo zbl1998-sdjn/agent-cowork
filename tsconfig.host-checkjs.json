@@ -51,6 +51,7 @@
     "apps/host/src/kimi/api-runner.js",
     "apps/host/src/kimi/agent-tools-support.js",
     "apps/host/src/kimi/agent-tools.js",
+    "apps/host/src/kimi/agent-runner.js",
     "apps/host/src/kimi/chat-stream.js",
     "apps/host/src/kimi/context/context-manager.js",
     "apps/host/src/kimi/context/history-compactor.js",
