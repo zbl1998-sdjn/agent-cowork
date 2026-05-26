@@ -1,3 +1,4 @@
+// @ts-check
 import { CHART_KINDS } from './live-spec.js';
 
 const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
@@ -5,6 +6,9 @@ const MERMAID_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/merma
 const U2028 = new RegExp(String.fromCharCode(0x2028), 'g');
 const U2029 = new RegExp(String.fromCharCode(0x2029), 'g');
 
+/** @typedef {{ kind?: string, [key: string]: unknown }} VizSpec */
+
+/** @param {unknown} value @returns {string} */
 function safeJson(value) {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
@@ -14,6 +18,7 @@ function safeJson(value) {
     .replace(U2029, '\\u2029');
 }
 
+/** @param {unknown} value @returns {string} */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -23,11 +28,13 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+/** @param {unknown} kind @returns {string} */
 function libTag(kind) {
-  if (CHART_KINDS.has(kind)) {
+  const value = String(kind || '');
+  if (CHART_KINDS.has(value)) {
     return `    <script src="${CHART_CDN}"></script>`;
   }
-  if (kind === 'mermaid') {
+  if (value === 'mermaid') {
     return `    <script src="${MERMAID_CDN}"></script>`;
   }
   return '';
@@ -81,6 +88,7 @@ const CLIENT_RENDERER = `
           else { renderChart(root, spec); }
         }`;
 
+/** @param {{ title?: unknown, viz: VizSpec, dataUrl?: string }} options @returns {string} */
 export function renderLivePage({ title, viz, dataUrl }) {
   const safeTitle = escapeHtml(title || '活页 Artifact');
   return `<!doctype html>

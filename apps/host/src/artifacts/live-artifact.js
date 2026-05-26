@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 
 import { renderViz } from './viz.js';
@@ -25,6 +26,13 @@ export {
   refreshLiveArtifactDataAsync,
 };
 
+/**
+ * @typedef {import('./viz.js').VizSpec} VizSpec
+ * @typedef {{ trustedRoot: string, id?: string, title?: string, viz: VizSpec, dataUrl?: string, dataSource?: unknown }} BuildLiveArtifactOptions
+ * @typedef {{ id: string, htmlPath: string, manifestPath: string, relativePath: string, dataUrl: string }} BuiltLiveArtifact
+ */
+
+/** @param {BuildLiveArtifactOptions} options @returns {BuiltLiveArtifact} */
 export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource }) {
   const spec = normalizeLiveArtifactSpec({ id, title, viz, dataUrl, dataSource });
   // Validate the viz spec by rendering it once (throws 400 on bad kind/data).
