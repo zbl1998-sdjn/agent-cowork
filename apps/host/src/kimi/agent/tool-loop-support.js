@@ -1,7 +1,8 @@
 // @ts-check
 
 /**
- * @typedef {{ name: string, description?: string, parameters?: unknown, risk?: string, mutating?: boolean, handler?: Function }} AgentTool
+ * @typedef {Record<string, unknown>} ToolArgs
+ * @typedef {{ name: string, description?: string, parameters?: unknown, risk?: string, mutating?: boolean, handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> }} AgentTool
  * @typedef {{ function?: { name?: string, arguments?: string } }} ToolCall
  */
 

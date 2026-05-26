@@ -13,7 +13,7 @@ import { traceToolResult } from './run-trace-events.js';
 /**
  * @typedef {Record<string, unknown>} ToolArgs
  * @typedef {{ id?: unknown, function?: { name?: string, arguments?: string } }} ToolCall
- * @typedef {{ name: string, mutating?: boolean, risk?: string, parameters?: unknown, handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> }} AgentTool
+ * @typedef {{ name: string, description?: string, mutating?: boolean, risk?: string, parameters?: unknown, handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> }} AgentTool
  * @typedef {{ formatToolResult(result: unknown, context: { toolName: string }): { content: string, summarized?: boolean, beforeTokens?: unknown, afterTokens?: unknown, sources?: unknown[], injectionFlagged?: boolean, injectionReasons?: unknown[] } }} ContextManager
  * @typedef {{ run(operation: () => unknown | Promise<unknown>): Promise<unknown>, lastRun: { retried?: boolean, attempts?: unknown, errors?: unknown } }} RetryPolicy
  * @typedef {{ check(): { shouldAbort?: boolean } & Record<string, unknown> }} BudgetGuard
