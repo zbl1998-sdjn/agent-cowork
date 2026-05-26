@@ -40,6 +40,7 @@
     "apps/host/src/security/path-policy.js",
     "apps/host/src/runtime/action-audit.js",
     "apps/host/src/runtime/audit-events.js",
+    "apps/host/src/runtime/background-tasks.js",
     "apps/host/src/runtime/budget-guard.js",
     "apps/host/src/runtime/circuit-breaker.js",
     "apps/host/src/runtime/cancellation.js",
