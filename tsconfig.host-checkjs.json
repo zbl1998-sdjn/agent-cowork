@@ -49,6 +49,7 @@
     "apps/host/src/runtime/dependency-install-plan.js",
     "apps/host/src/runtime/dependency-plan-utils.js",
     "apps/host/src/runtime/chromium-runtime.js",
+    "apps/host/src/runtime/clarifications.js",
     "apps/host/src/runtime/data-science-runtime.js",
     "apps/host/src/runtime/dependencies.js",
     "apps/host/src/runtime/font-runtime.js",
