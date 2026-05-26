@@ -48,6 +48,7 @@ declare module 'node:crypto' {
   export function createHmac(algorithm: string, key: Buffer | string): Hmac;
   export function randomBytes(size: number): Buffer;
   export function randomUUID(): string;
+  export function scryptSync(password: string, salt: string, keylen: number): Buffer;
   export function timingSafeEqual(a: Buffer, b: Buffer): boolean;
 }
 

@@ -1,5 +1,12 @@
 import crypto from 'node:crypto';
 
+/**
+ * @typedef {Error & { statusCode?: number }} AuthError
+ * @typedef {{ username: string, userId: string, tenantId: string, salt: string, hash: string, guest?: boolean }} UserRecord
+ * @typedef {{ username: string, userId: string, tenantId: string, guest?: boolean }} Identity
+ * @typedef {Identity & { token: string }} SessionIdentity
+ */
+
 // Local user store + sessions for desktop login. Passwords are salted and
 // hashed with scrypt; sessions are opaque bearer tokens mapped to a
 // user/tenant. This module ships two interchangeable adapters that expose the
@@ -14,15 +21,17 @@ const USERNAME_RE = /^[a-z0-9_.-]{3,40}$/;
 
 /** scrypt(password, salt) → hex. Both adapters MUST use this so a user
  *  registered under one backend verifies under the other. */
+/** @param {unknown} password @param {string} salt @returns {string} */
 export function hashPassword(password, salt) {
   return crypto.scryptSync(String(password), salt, 32).toString('hex');
 }
 
 /** Normalise + validate a username. Throws a 4xx-tagged Error on failure. */
+/** @param {unknown} username @returns {string} */
 export function normaliseUsername(username) {
   const name = String(username || '').trim().toLowerCase();
   if (!name || !USERNAME_RE.test(name)) {
-    const err = new Error('username must be 3-40 chars [a-z0-9_.-]');
+    const err = /** @type {AuthError} */ (new Error('username must be 3-40 chars [a-z0-9_.-]'));
     err.statusCode = 400;
     throw err;
   }
@@ -30,15 +39,17 @@ export function normaliseUsername(username) {
 }
 
 /** Validate a password length policy. Throws a 4xx-tagged Error on failure. */
+/** @param {unknown} password @returns {void} */
 export function assertValidPassword(password) {
   if (!password || String(password).length < 6) {
-    const err = new Error('password must be at least 6 characters');
+    const err = /** @type {AuthError} */ (new Error('password must be at least 6 characters'));
     err.statusCode = 400;
     throw err;
   }
 }
 
 /** Mint a fresh user identity (ids + salt + hash) for a registration. */
+/** @param {unknown} username @param {unknown} password @returns {UserRecord} */
 export function newUserRecord(username, password) {
   const name = normaliseUsername(username);
   assertValidPassword(password);
@@ -49,6 +60,7 @@ export function newUserRecord(username, password) {
 }
 
 /** Constant-time comparison of a candidate password against a stored record. */
+/** @param {{ salt: string, hash: string } | null | undefined} record @param {unknown} password @returns {boolean} */
 export function passwordMatches(record, password) {
   if (!record) return false;
   const candidate = hashPassword(password, record.salt);
@@ -58,24 +70,29 @@ export function passwordMatches(record, password) {
 }
 
 /** Mint an anonymous guest identity (isolated tenant). */
+/** @returns {Identity} */
 export function newGuestIdentity() {
   const userId = `guest_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   return { username: userId, userId, tenantId: `tenant_${userId}`, guest: true };
 }
 
 /** Opaque bearer session token. */
+/** @returns {string} */
 export function newSessionToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
 export function createUserStore() {
+  /** @type {Map<string, UserRecord>} */
   const users = new Map();    // username -> { username, userId, tenantId, salt, hash }
+  /** @type {Map<string, Identity>} */
   const sessions = new Map(); // token -> { userId, tenantId, username }
 
+  /** @param {unknown} username @param {unknown} password @returns {Identity} */
   function register(username, password) {
     const record = newUserRecord(username, password);
     if (users.has(record.username)) {
-      const err = new Error('username already exists');
+      const err = /** @type {AuthError} */ (new Error('username already exists'));
       err.statusCode = 409;
       throw err;
     }
@@ -83,12 +100,14 @@ export function createUserStore() {
     return { username: record.username, userId: record.userId, tenantId: record.tenantId };
   }
 
+  /** @param {unknown} username @param {unknown} password @returns {Identity | null} */
   function verify(username, password) {
     const user = users.get(String(username || '').trim().toLowerCase());
-    if (!passwordMatches(user, password)) return null;
+    if (!user || !passwordMatches(user, password)) return null;
     return { username: user.username, userId: user.userId, tenantId: user.tenantId };
   }
 
+  /** @param {Identity} identity @returns {string} */
   function createSession(identity) {
     const token = newSessionToken();
     sessions.set(token, {
@@ -100,20 +119,23 @@ export function createUserStore() {
     return token;
   }
 
+  /** @param {unknown} username @param {unknown} password @returns {SessionIdentity} */
   function login(username, password) {
     const identity = verify(username, password);
     if (!identity) {
-      const err = new Error('invalid username or password');
+      const err = /** @type {AuthError} */ (new Error('invalid username or password'));
       err.statusCode = 401;
       throw err;
     }
     return { ...identity, token: createSession(identity) };
   }
 
+  /** @param {unknown} token @returns {Identity | null} */
   function resolveToken(token) {
     return sessions.get(String(token || '')) || null;
   }
 
+  /** @param {unknown} token @returns {boolean} */
   function logout(token) {
     return sessions.delete(String(token || ''));
   }
@@ -122,6 +144,7 @@ export function createUserStore() {
   // "skip login" path still passes the auth gate (and gets its own tenant, so
   // guest data never mixes with a registered user's). No credentials required —
   // this is acceptable only because the host is loopback-only + CORS-restricted.
+  /** @returns {SessionIdentity} */
   function createGuest() {
     const identity = newGuestIdentity();
     return { ...identity, token: createSession(identity) };

@@ -7,6 +7,14 @@ import {
   newSessionToken,
 } from './user-store.js';
 
+/**
+ * @typedef {Error & { statusCode?: number }} AuthError
+ * @typedef {{ username: string, userId: string, tenantId: string, guest?: boolean }} Identity
+ * @typedef {Identity & { token: string }} SessionIdentity
+ * @typedef {{ username: string, user_id: string, tenant_id: string, salt: string, hash: string, is_guest?: number, n?: number }} AuthRow
+ * @typedef {{ exec(sql: string): unknown, prepare(sql: string): { get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number } }, close?: () => unknown }} AuthDatabase
+ */
+
 // SQLite-backed user store. Mirrors createUserStore()'s interface exactly, but
 // persists registered users + sessions + guest tenants across host restarts so
 // a signed-in user (or a guest with local data) survives a relaunch.
@@ -36,14 +44,17 @@ const SCHEMA = `
   );
 `;
 
+/** @param {{ dbPath?: string }} [options] */
 export function createSqliteUserStore({ dbPath } = {}) {
+  /** @type {AuthDatabase} */
   let db;
   try {
-    db = openSqliteDatabase(dbPath);
+    db = /** @type {AuthDatabase} */ (openSqliteDatabase(/** @type {string} */ (dbPath)));
     db.exec(SCHEMA);
   } catch (err) {
     // Graceful degradation: keep the host usable even without persistence.
-    console.error('[auth] sqlite user store unavailable, falling back to in-memory:', err && err.message);
+    const error = /** @type {{ message?: string }} */ (err || {});
+    console.error('[auth] sqlite user store unavailable, falling back to in-memory:', error.message);
     return createUserStore();
   }
 
@@ -58,10 +69,11 @@ export function createSqliteUserStore({ dbPath } = {}) {
   const selectSession = db.prepare('SELECT * FROM auth_sessions WHERE token = ?');
   const deleteSession = db.prepare('DELETE FROM auth_sessions WHERE token = ?');
 
+  /** @param {unknown} username @param {unknown} password @returns {Identity} */
   function register(username, password) {
     const record = newUserRecord(username, password);
     if (selectUser.get(record.username)) {
-      const err = new Error('username already exists');
+      const err = /** @type {AuthError} */ (new Error('username already exists'));
       err.statusCode = 409;
       throw err;
     }
@@ -69,14 +81,16 @@ export function createSqliteUserStore({ dbPath } = {}) {
     return { username: record.username, userId: record.userId, tenantId: record.tenantId };
   }
 
+  /** @param {unknown} username @param {unknown} password @returns {Identity | null} */
   function verify(username, password) {
-    const row = selectUser.get(String(username || '').trim().toLowerCase());
+    const row = /** @type {AuthRow | undefined} */ (selectUser.get(String(username || '').trim().toLowerCase()));
     if (!row) return null;
     const record = { salt: row.salt, hash: row.hash };
     if (!passwordMatches(record, password)) return null;
     return { username: row.username, userId: row.user_id, tenantId: row.tenant_id };
   }
 
+  /** @param {Identity} identity @returns {string} */
   function createSession(identity) {
     const token = newSessionToken();
     insertSession.run(
@@ -90,27 +104,31 @@ export function createSqliteUserStore({ dbPath } = {}) {
     return token;
   }
 
+  /** @param {unknown} username @param {unknown} password @returns {SessionIdentity} */
   function login(username, password) {
     const identity = verify(username, password);
     if (!identity) {
-      const err = new Error('invalid username or password');
+      const err = /** @type {AuthError} */ (new Error('invalid username or password'));
       err.statusCode = 401;
       throw err;
     }
     return { ...identity, token: createSession(identity) };
   }
 
+  /** @param {unknown} token @returns {Identity | null} */
   function resolveToken(token) {
-    const row = selectSession.get(String(token || ''));
+    const row = /** @type {AuthRow | undefined} */ (selectSession.get(String(token || '')));
     if (!row) return null;
     return { userId: row.user_id, tenantId: row.tenant_id, username: row.username, guest: row.is_guest === 1 };
   }
 
+  /** @param {unknown} token @returns {boolean} */
   function logout(token) {
     const res = deleteSession.run(String(token || ''));
     return Boolean(res && res.changes);
   }
 
+  /** @returns {SessionIdentity} */
   function createGuest() {
     const identity = newGuestIdentity();
     return { ...identity, token: createSession(identity) };
@@ -125,11 +143,11 @@ export function createSqliteUserStore({ dbPath } = {}) {
     logout,
     createGuest,
     count: () => {
-      const row = countUsers.get();
+      const row = /** @type {AuthRow | undefined} */ (countUsers.get());
       return row ? Number(row.n) : 0;
     },
     close: () => {
-      try { db.close(); } catch { /* already closed */ }
+      try { if (db.close) db.close(); } catch { /* already closed */ }
     },
   };
 }
