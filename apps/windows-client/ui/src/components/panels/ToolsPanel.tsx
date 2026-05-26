@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../../lib/api';
+import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 
 interface ToolsPanelProps {
@@ -23,6 +24,34 @@ export function ToolsPanelResultState({ result }: { result: string }) {
     return <ErrorState title={title} message={message} />;
   }
   return <pre className="panel-result">{result}</pre>;
+}
+
+export function ToolsPanelCallActions({
+  busy,
+  selectedRequiresApproval,
+  onCall,
+  onAddStep,
+}: {
+  busy: boolean;
+  selectedRequiresApproval: boolean;
+  onCall: () => void;
+  onAddStep: () => void;
+}) {
+  return (
+    <div className="panel-row">
+      <Button variant="secondary" disabled={busy || selectedRequiresApproval} onClick={onCall}>{busy ? '调用中…' : '调用'}</Button>
+      <Button variant="secondary" disabled={selectedRequiresApproval} onClick={onAddStep}>加入计划</Button>
+    </div>
+  );
+}
+
+export function ToolsPanelPlanActions({ onRun, onClear }: { onRun: () => void; onClear: () => void }) {
+  return (
+    <div className="panel-row">
+      <Button variant="secondary" onClick={onRun}>运行子任务</Button>
+      <Button variant="secondary" onClick={onClear}>清空</Button>
+    </div>
+  );
 }
 
 // Tool discovery + ad-hoc invocation + a sub-agent plan builder. Mirrors the
@@ -91,7 +120,7 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void onSearch(); }}
         />
-        <button type="button" onClick={() => void onSearch()}>搜索</button>
+        <Button variant="secondary" onClick={() => void onSearch()}>搜索</Button>
       </div>
       <ul className="tool-list">
         {tools.map((tool) => (
@@ -115,10 +144,12 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
         <div className="panel-call">
           <label>调用 <code>{selected}</code> · 参数 (JSON)</label>
           <textarea value={argsText} rows={3} spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
-          <div className="panel-row">
-            <button type="button" disabled={busy || selectedRequiresApproval} onClick={() => void onCall()}>{busy ? '调用中…' : '调用'}</button>
-            <button type="button" disabled={selectedRequiresApproval} onClick={onAddStep}>加入计划</button>
-          </div>
+          <ToolsPanelCallActions
+            busy={busy}
+            selectedRequiresApproval={selectedRequiresApproval}
+            onCall={() => void onCall()}
+            onAddStep={onAddStep}
+          />
           {selectedRequiresApproval && <p className="panel-note">该工具需经 Agent 审批流执行。</p>}
           <ToolsPanelResultState result={result} />
         </div>
@@ -132,10 +163,7 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
             ))}
           </ol>
           <input value={goal} placeholder="子任务目标（可选）" onChange={(e) => setGoal(e.target.value)} />
-          <div className="panel-row">
-            <button type="button" onClick={onRun}>运行子任务</button>
-            <button type="button" onClick={() => setPlan([])}>清空</button>
-          </div>
+          <ToolsPanelPlanActions onRun={onRun} onClear={() => setPlan([])} />
         </div>
       )}
     </section>
