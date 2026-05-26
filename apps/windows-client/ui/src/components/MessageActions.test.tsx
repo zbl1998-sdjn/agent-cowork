@@ -14,6 +14,8 @@ describe('MessageActions', () => {
     expect(html).toContain('复制');
     expect(html).toContain('继续');
     expect(html).toContain('重新生成');
+    expect(html).toContain('ui-btn--ghost');
+    expect(html).toContain('ui-btn--sm');
     expect(withoutContinue).not.toContain('继续');
   });
 });

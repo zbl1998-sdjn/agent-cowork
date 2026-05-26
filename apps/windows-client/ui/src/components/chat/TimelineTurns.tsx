@@ -69,8 +69,8 @@ export const UserEditTurn = memo(function UserEditTurn({ editText, message, onSe
         }}
       />
       <div className="user-edit-actions">
-        <button type="button" className="btn-secondary" onClick={() => onSetEditingMsgId(null)}>取消</button>
-        <button type="button" className="btn-primary" onClick={() => onSubmitEdit(message.id)}>重新发送</button>
+        <Button variant="secondary" onClick={() => onSetEditingMsgId(null)}>取消</Button>
+        <Button variant="primary" onClick={() => onSubmitEdit(message.id)}>重新发送</Button>
       </div>
     </div>
   );

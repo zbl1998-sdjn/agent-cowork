@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './ui/Button';
 
 interface MessageActionsProps {
   onCopy: () => void;
@@ -11,18 +12,19 @@ export function MessageActions({ onCopy, onContinue, onRegenerate }: MessageActi
   const [copied, setCopied] = useState(false);
   return (
     <div className="msg-actions">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         className="msg-act"
         onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
       >
         {copied ? '已复制' : '复制'}
-      </button>
+      </Button>
       {onContinue && (
-        <button type="button" className="msg-act" onClick={onContinue}>继续</button>
+        <Button variant="ghost" size="sm" className="msg-act" onClick={onContinue}>继续</Button>
       )}
       {onRegenerate && (
-        <button type="button" className="msg-act" onClick={onRegenerate}>重新生成</button>
+        <Button variant="ghost" size="sm" className="msg-act" onClick={onRegenerate}>重新生成</Button>
       )}
     </div>
   );

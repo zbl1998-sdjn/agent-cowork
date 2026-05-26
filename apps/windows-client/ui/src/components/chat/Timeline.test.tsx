@@ -12,6 +12,7 @@ import {
   type UserEditTurnProps,
   type UserTurnProps,
 } from './Timeline';
+import { UserEditTurn } from './TimelineTurns';
 
 vi.mock('../../lib/api', () => ({
   answerQuestion: vi.fn(),
@@ -178,6 +179,15 @@ describe('Timeline', () => {
     expect(userEditTurnPropsEqual(props, { ...props })).toBe(true);
     expect(userEditTurnPropsEqual(props, { ...props, editText: '新内容' })).toBe(false);
     expect(userEditTurnPropsEqual(props, { ...props, onSubmitEdit: vi.fn() })).toBe(false);
+  });
+
+  it('renders user edit actions with Button primitives', () => {
+    const html = renderToStaticMarkup(<UserEditTurn {...userEditTurnProps()} />);
+
+    expect(html).toContain('取消');
+    expect(html).toContain('重新发送');
+    expect(html).toContain('ui-btn--secondary');
+    expect(html).toContain('ui-btn--primary');
   });
 
   it('windows long timelines around the bottom when the view is stuck', () => {
