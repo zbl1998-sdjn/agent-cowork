@@ -1,27 +1,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { createRollbackBatchId, rollbackEntryForMove, rollbackEntryForWrite, rollbackFileOperations as rollbackEntries } from './file-rollback.js';
+import { fileExists, hashBuffer, hashFile, pathExists, requiredPath } from './file-operation-utils.js';
 
 export { rollbackEntries as rollbackFileOperations };
 
+/**
+ * @typedef {{ type?: unknown, path?: string, from?: string, to?: string, newName?: string, content?: unknown, contentBase64?: string, encoding?: string, overwrite?: boolean }} FileOperationInput
+ * @typedef {FileOperationInput & { type: string }} FileOperation
+ * @typedef {{ type: 'write' | 'rename' | 'move', path: string, targetPath?: string, beforeHash: string | null, afterHash: string }} OperationPreview
+ * @typedef {{ append(event: unknown): unknown }} JournalWriter
+ * @typedef {{ trustedRoot?: string, journalWriter?: JournalWriter, rollbackBatchId?: string }} FileOperationOptions
+ * @typedef {{ id: string, at: string, action: string, path: string, targetPath?: string, beforeHash: string | null, afterHash: string, rollback?: any, status: string, size?: number }} FileOperationEvent
+ */
+
+/** @param {unknown} op @returns {FileOperation} */
 function normalizeOp(op) {
   if (!op || typeof op !== 'object') {
     throw new Error('Each file operation must be an object');
   }
-  const type = String(op.type || '').toLowerCase();
-  return { ...op, type };
+  const record = /** @type {FileOperationInput} */ (op);
+  const type = String(record.type || '').toLowerCase();
+  return { ...record, type };
 }
 
-function hashBuffer(buffer) {
-  return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-function hashFile(filePath) {
-  return hashBuffer(fs.readFileSync(filePath));
-}
-
+/** @param {FileOperation} op @returns {Buffer} */
 function operationContentBuffer(op) {
   if (op.encoding === 'base64' || typeof op.contentBase64 === 'string') {
     return Buffer.from(String(op.contentBase64 ?? op.content ?? ''), 'base64');
@@ -29,27 +33,11 @@ function operationContentBuffer(op) {
   return Buffer.from(String(op.content ?? ''), 'utf8');
 }
 
-function fileExists(p) {
-  try {
-    return fs.statSync(p).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function pathExists(p) {
-  try {
-    fs.statSync(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
+/** @param {FileOperation} op @param {string} trustedRoot @returns {OperationPreview} */
 function previewWrite(op, trustedRoot) {
   // Create-aware: a write target may not exist yet, so resolve the real parent
   // (defeats junction/symlink escape).
-  const target = assertTrustedPathForCreate(path.resolve(op.path), trustedRoot);
+  const target = assertTrustedPathForCreate(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
   const content = operationContentBuffer(op);
   const overwrite = op.overwrite === true;
   const beforeExists = fileExists(target);
@@ -68,10 +56,11 @@ function previewWrite(op, trustedRoot) {
   };
 }
 
+/** @param {FileOperation} op @param {string} trustedRoot @returns {OperationPreview} */
 function previewRename(op, trustedRoot) {
-  const source = assertTrustedPath(path.resolve(op.path), trustedRoot);
+  const source = assertTrustedPath(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
   const base = path.dirname(source);
-  const target = assertTrustedPathForCreate(path.resolve(base, op.newName), trustedRoot);
+  const target = assertTrustedPathForCreate(path.resolve(base, requiredPath(op.newName, 'newName')), trustedRoot);
   if (source === target) {
     throw new Error(`Rename target equals source: ${source}`);
   }
@@ -91,9 +80,10 @@ function previewRename(op, trustedRoot) {
   };
 }
 
+/** @param {FileOperation} op @param {string} trustedRoot @returns {OperationPreview} */
 function previewMove(op, trustedRoot) {
-  const source = assertTrustedPath(path.resolve(op.from), trustedRoot);
-  const target = assertTrustedPathForCreate(path.resolve(op.to), trustedRoot);
+  const source = assertTrustedPath(path.resolve(requiredPath(op.from, 'from')), trustedRoot);
+  const target = assertTrustedPathForCreate(path.resolve(requiredPath(op.to, 'to')), trustedRoot);
   if (source === target) {
     throw new Error(`Move target equals source: ${source}`);
   }
@@ -113,6 +103,7 @@ function previewMove(op, trustedRoot) {
   };
 }
 
+/** @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ operations: OperationPreview[] }} */
 export function previewFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   if (!trustedRoot) {
@@ -122,6 +113,7 @@ export function previewFileOperations(operations, options = {}) {
     throw new Error('operations must be an array');
   }
 
+  /** @type {OperationPreview[]} */
   const previews = [];
   for (const rawOp of operations) {
     const op = normalizeOp(rawOp);
@@ -145,37 +137,46 @@ export function previewFileOperations(operations, options = {}) {
   return { operations: previews };
 }
 
-function applyWrite(op, options) {
-  const parentDir = path.dirname(op.path);
+/** @param {FileOperation} op */
+function applyWrite(op) {
+  const targetPath = requiredPath(op.path, 'path');
+  const parentDir = path.dirname(targetPath);
   fs.mkdirSync(parentDir, { recursive: true });
-  fs.writeFileSync(op.path, operationContentBuffer(op));
+  fs.writeFileSync(targetPath, operationContentBuffer(op));
 }
 
+/** @param {OperationPreview} op */
 function applyRename(op) {
-  fs.renameSync(op.path, op.targetPath);
+  fs.renameSync(op.path, requiredPath(op.targetPath, 'targetPath'));
 }
 
+/** @param {OperationPreview} op */
 function applyMove(op) {
-  fs.mkdirSync(path.dirname(op.targetPath), { recursive: true });
-  fs.renameSync(op.path, op.targetPath);
+  const targetPath = requiredPath(op.targetPath, 'targetPath');
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.renameSync(op.path, targetPath);
 }
 
+/** @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ applied: FileOperationEvent[] }} */
 export function applyFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   const journalWriter = options.journalWriter;
   const rollbackBatchId = options.rollbackBatchId || createRollbackBatchId();
   const requestedOperations = Array.isArray(operations) ? operations.map(normalizeOp) : operations;
   const preview = previewFileOperations(requestedOperations, { trustedRoot });
+  const appliedOperations = /** @type {FileOperation[]} */ (requestedOperations);
+  /** @type {FileOperationEvent[]} */
   const results = [];
 
   for (const [index, op] of preview.operations.entries()) {
-    const requested = requestedOperations[index] || {};
+    const requested = appliedOperations[index] || {};
     let rollback = null;
     if (op.type === 'write') {
       rollback = rollbackEntryForWrite(op, { trustedRoot, rollbackBatchId });
     } else if (op.type === 'rename' || op.type === 'move') {
       rollback = rollbackEntryForMove(op);
     }
+    /** @type {FileOperationEvent} */
     const event = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       at: new Date().toISOString(),
