@@ -9,7 +9,7 @@ const VizPanel = lazy(() => import('./VizPanel').then((module) => ({ default: mo
 const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
 const ArtifactsPanel = lazy(() => import('./ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
 const SchedulesPanel = lazy(() => import('./panels/SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
-const MemoryPanel = lazy(() => import('./MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
+const MemoryPanel = lazy(() => import('./panels/MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
 const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
 
 interface AppSidePanelProps {

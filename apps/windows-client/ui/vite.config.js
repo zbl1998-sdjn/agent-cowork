@@ -20,7 +20,7 @@ export function manualChunks(id) {
         return 'panel-artifacts';
     if (normalized.indexOf('/src/components/SchedulesPanel') >= 0 || normalized.indexOf('/src/components/panels/SchedulesPanel') >= 0)
         return 'panel-schedules';
-    if (normalized.indexOf('/src/components/MemoryPanel') >= 0)
+    if (normalized.indexOf('/src/components/MemoryPanel') >= 0 || normalized.indexOf('/src/components/panels/MemoryPanel') >= 0)
         return 'panel-memory';
     if (normalized.indexOf('/src/components/ObservabilityPanel') >= 0 || normalized.indexOf('/src/components/panels/ObservabilityPanel') >= 0)
         return 'panel-observability';

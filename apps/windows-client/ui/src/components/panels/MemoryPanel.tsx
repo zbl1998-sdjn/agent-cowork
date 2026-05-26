@@ -5,8 +5,8 @@ import {
   learnMemoryProfile,
   type MemoryProfileEntry,
   type MemoryProfileType,
-} from '../lib/api';
-import { Empty, ErrorState } from './ui/StateViews';
+} from '../../lib/api';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 interface MemoryPanelProps {
   trustedRoot: string;
