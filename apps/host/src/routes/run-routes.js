@@ -5,26 +5,51 @@ import { decodePathSegment, headerValue, sendJson, stableHeader } from '../http/
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike & { write(chunk?: string | Buffer): unknown, on(event: string, listener: (...args: any[]) => void): unknown }} RouteResponse
+ * @typedef {import('../runtime/run-store.js').RunRecord} RunRecord
+ * @typedef {import('../runtime/run-store.js').RunSummary} RunSummary
+ * @typedef {import('../runtime/run-events.js').RunEvent} RunEvent
+ * @typedef {import('../runtime/task-presenter.js').RunSummary} PresenterRunSummary
+ * @typedef {import('../runtime/task-presenter.js').TaskSummary} TaskSummary
+ * @typedef {{ tenantId: string, userId?: string, traceId: string, [key: string]: unknown }} RequestContext
+ * @typedef {RunRecord | RunSummary} VisibleRunRecord
+ * @typedef {{ list(options?: { tenantId?: string, userId?: string, limit?: number, status?: string, type?: string, recipeId?: string }): unknown[] | Promise<unknown[]>, stats(options?: { tenantId?: string }): unknown | Promise<unknown> }} RunsIndexLike
+ * @typedef {{ seed(runId: string, events: RunEvent[]): unknown, replay(runId: string, afterSeq?: number): RunEvent[], subscribe(runId: string, listener: (event: RunEvent) => void): () => void }} RunEventsLike
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, runStoreRoot: string, runsIndex: RunsIndexLike, runEvents: RunEventsLike }} RunRouteOptions
+ */
+
+/** @param {VisibleRunRecord | null | undefined} record @returns {string} */
 function recordTenantId(record) {
   return stableHeader(record?.context?.tenantId || record?.tenantId, 'tenant_local');
 }
 
+/** @param {VisibleRunRecord | null | undefined} record @param {RequestContext} context @returns {boolean} */
 function recordVisibleToContext(record, context) {
   return Boolean(record) && recordTenantId(record) === context.tenantId;
 }
 
+/** @param {string} runStoreRoot @param {RequestContext} context @param {number} limit @returns {RunSummary[]} */
 function visibleRunRecords(runStoreRoot, context, limit) {
   return listRunRecords(runStoreRoot, { limit: Number.MAX_SAFE_INTEGER })
     .filter((record) => recordVisibleToContext(record, context))
     .slice(0, limit);
 }
 
+/** @param {string} pathname @param {string} prefix @param {string} [suffix] @returns {string | null} */
 function parseRunId(pathname, prefix, suffix = '') {
   const encoded = pathname.slice(prefix.length, suffix ? -suffix.length : undefined);
   const runId = decodePathSegment(encoded);
-  return RUN_ID_RE.test(runId) ? runId : null;
+  return runId && RUN_ID_RE.test(runId) ? runId : null;
 }
 
+/** @param {RunSummary} run @returns {TaskSummary} */
+function presentRunTask(run) {
+  return taskFromRun(/** @type {PresenterRunSummary} */ (/** @type {unknown} */ (run)));
+}
+
+/** @param {RunRouteOptions} options @returns {Promise<boolean>} */
 export async function handleRunRoutes({
   request,
   response,
@@ -40,7 +65,7 @@ export async function handleRunRoutes({
     const runs = visibleRunRecords(runStoreRoot, requestContext, limit);
     sendJson(response, 200, {
       runStoreRoot,
-      tasks: runs.map(taskFromRun),
+      tasks: runs.map(presentRunTask),
     });
     return true;
   }
@@ -79,15 +104,16 @@ export async function handleRunRoutes({
     const lastEventId = parseLastEventId(
       headerValue(request, 'last-event-id') || requestUrl.searchParams.get('lastEventId'),
     );
+    /** @type {RunEvent[]} */
     let persisted = [];
     try {
       const record = readRunRecord(runStoreRoot, runId);
-      if (!recordVisibleToContext(record, requestContext)) {
+      if (!record || !recordVisibleToContext(record, requestContext)) {
         sendJson(response, 404, { error: 'Run record not found' });
         return true;
       }
       if (Array.isArray(record.events)) {
-        persisted = record.events;
+        persisted = /** @type {RunEvent[]} */ (record.events);
       }
     } catch {
       sendJson(response, 404, { error: 'Run record not found' });
@@ -104,7 +130,9 @@ export async function handleRunRoutes({
     });
     response.write('retry: 3000\n\n');
 
+    /** @type {Set<unknown>} */
     const sentSeqs = new Set();
+    /** @param {RunEvent} event */
     const writeEvent = (event) => {
       if (event.seq != null) {
         if (sentSeqs.has(event.seq)) {
@@ -130,8 +158,9 @@ export async function handleRunRoutes({
     const heartbeat = setInterval(() => {
       response.write(': ping\n\n');
     }, 15000);
-    if (heartbeat && typeof heartbeat.unref === 'function') {
-      heartbeat.unref();
+    const maybeUnref = /** @type {{ unref?: () => void }} */ (/** @type {unknown} */ (heartbeat));
+    if (typeof maybeUnref.unref === 'function') {
+      maybeUnref.unref();
     }
     const cleanup = () => {
       clearInterval(heartbeat);
