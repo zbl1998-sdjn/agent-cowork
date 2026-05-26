@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import type { Conversation } from '../lib/app-types';
 import { conversationBranchOptions } from '../lib/conversation-branches';
+import { Button, IconButton } from './ui/Button';
 
 interface ConversationRailProps {
   activeConvId: string;
@@ -18,6 +20,41 @@ interface ConversationRailProps {
   onSwitch: (id: string) => void;
   onTogglePin: (id: string) => void;
 }
+
+const newConversationButtonStyle: CSSProperties = {
+  borderColor: '#c0846f',
+  background: '#fff',
+  color: '#b5482f',
+  borderRadius: 10,
+  padding: '9px 12px',
+  fontSize: 13,
+  flexShrink: 0,
+};
+
+const conversationTitleStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  justifyContent: 'flex-start',
+  textAlign: 'left',
+  border: 'none',
+  background: 'transparent',
+  color: 'inherit',
+  padding: 2,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const conversationActionStyle: CSSProperties = {
+  width: 'auto',
+  height: 'auto',
+  border: 'none',
+  background: 'transparent',
+  color: '#9b9b97',
+  fontSize: 12,
+  lineHeight: 1,
+  padding: '3px 5px',
+  borderRadius: 6,
+};
 
 export function ConversationRail({
   activeConvId,
@@ -38,7 +75,7 @@ export function ConversationRail({
 }: ConversationRailProps) {
   return (
     <aside className="conversation-rail">
-      <button type="button" className="new-conv-btn" onClick={onNew}>＋ 新建对话</button>
+      <Button className="new-conv-btn" onClick={onNew} style={newConversationButtonStyle}>＋ 新建对话</Button>
       <input className="conv-search" placeholder="搜索对话…" value={convSearch} onChange={(e) => onSearch(e.target.value)} />
       <div className="conv-list">
         {conversations.map((c) => (
@@ -57,21 +94,21 @@ export function ConversationRail({
               />
             ) : (
               <>
-                <button type="button" className="conv-title" onClick={() => onSwitch(c.id)}>{c.pinned ? '📌 ' : ''}{c.title || '新对话'}</button>
-                <button type="button" className="conv-act" title={c.pinned ? '取消置顶' : '置顶'} onClick={() => onTogglePin(c.id)}>{c.pinned ? '☆' : '⤒'}</button>
-                <button type="button" className="conv-act" title="导出 Markdown" onClick={() => onExport(c.id)}>⤓</button>
-                <button
-                  type="button"
+                <Button variant="ghost" className="conv-title" onClick={() => onSwitch(c.id)} style={conversationTitleStyle}>{c.pinned ? '📌 ' : ''}{c.title || '新对话'}</Button>
+                <IconButton className="conv-act" label={c.pinned ? '取消置顶' : '置顶'} onClick={() => onTogglePin(c.id)} style={conversationActionStyle}>{c.pinned ? '☆' : '⤒'}</IconButton>
+                <IconButton className="conv-act" label="导出 Markdown" onClick={() => onExport(c.id)} style={conversationActionStyle}>⤓</IconButton>
+                <IconButton
                   className="conv-act"
-                  title="重命名"
+                  label="重命名"
                   onClick={() => {
                     onSetRenamingId(c.id);
                     onRenameText(c.title || '');
                   }}
+                  style={conversationActionStyle}
                 >
                   ✎
-                </button>
-                <button type="button" className="conv-act" title="删除" onClick={() => onDelete(c.id)}>✕</button>
+                </IconButton>
+                <IconButton className="conv-act" label="删除" onClick={() => onDelete(c.id)} style={conversationActionStyle}>✕</IconButton>
                 {(() => {
                   const branchOptions = conversationBranchOptions(c);
                   const activeBranch = branchOptions.find((branch) => branch.id === (c.activeBranchId || 'main')) || branchOptions[0];
