@@ -106,6 +106,7 @@
     "apps/host/src/routes/clarify-routes.js",
     "apps/host/src/routes/connector-oauth-route-utils.js",
     "apps/host/src/routes/auth-routes.js",
+    "apps/host/src/routes/conversation-routes.js",
     "apps/host/src/routes/connector-oauth-routes.js",
     "apps/host/src/routes/connector-routes.js",
     "apps/host/src/routes/memory-routes.js",

@@ -127,6 +127,19 @@ test('request-supplied trustedRoot cannot escape configured workspace', async ()
     const conversation = await jsonRequest(base, `/api/conversations/escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
     assert.equal(conversation.status, 400);
 
+    const conversationWrite = await jsonRequest(base, '/api/conversations/escape', {
+      method: 'PUT',
+      body: { trustedRoot: outsideRoot, title: 'outside', messages: [] },
+    });
+    assert.equal(conversationWrite.status, 400);
+
+    const conversationDelete = await jsonRequest(
+      base,
+      `/api/conversations/escape?trustedRoot=${encodeURIComponent(outsideRoot)}`,
+      { method: 'DELETE' },
+    );
+    assert.equal(conversationDelete.status, 400);
+
     const memory = await jsonRequest(base, `/api/memory?trustedRoot=${encodeURIComponent(outsideRoot)}`);
     assert.equal(memory.status, 400);
 
