@@ -2,8 +2,9 @@ import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
-import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
 import { buildHistorySuggestionItems, buildMentionSuggestionItems, buildTemplateSuggestionItems, findComposerTrigger, mentionInsertText } from '../lib/composer-trigger';
+import { useComposerRefine } from '../hooks/useComposerRefine';
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
@@ -36,11 +37,7 @@ export interface ComposerProps {
   autoClarify?: boolean;
   onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
 }
-const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [
-  { value: 'fast', label: '快速' },
-  { value: 'standard', label: '标准' },
-  { value: 'deep', label: '深度' },
-];
+const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准' }, { value: 'deep', label: '深度' }];
 export function Composer({
   recipes,
   historyRuns,
@@ -70,16 +67,30 @@ export function Composer({
   const [apiKey, setApiKey] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
   const [dragging, setDragging] = useState(false);
-  const [refining, setRefining] = useState(false);
-  const [refineOriginal, setRefineOriginal] = useState('');
-  const [refineResult, setRefineResult] = useState<PromptRefineResult | null>(null);
-  const [refineNotice, setRefineNotice] = useState('');
   const searchToken = useRef(0);
-  const skipRefineFor = useRef('');
   const mentionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { listening, toggleVoice } = useComposerVoice({
     onTranscript: (transcript) => setValue((v) => (v ? `${v} ${transcript}` : transcript)),
     onUnsupported: () => setValue((v) => `${v}${v ? '\n' : ''}（此浏览器不支持语音输入）`),
+  });
+  const {
+    refining,
+    refineOriginal,
+    refineResult,
+    refineNotice,
+    canRefine,
+    markChanged,
+    prepareSend,
+    refineCurrent,
+    resetRefineAfterSend,
+    resolvePreview,
+  } = useComposerRefine({
+    autoClarify,
+    onRefinePrompt,
+    onPreviewResolved: (next) => {
+      setValue(next);
+      ref.current?.focus();
+    },
   });
 
   const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
@@ -94,76 +105,20 @@ export function Composer({
     setActive(0);
   }
 
-  function clearRefine() {
-    setRefineOriginal('');
-    setRefineResult(null);
-  }
-
-  async function fetchRefine(text: string, showError: boolean): Promise<PromptRefineResult | null> {
-    if (!onRefinePrompt) return null;
-    setRefining(true);
-    if (showError) setRefineNotice('');
-    try {
-      return await onRefinePrompt(text);
-    } catch {
-      if (showError) setRefineNotice('提示优化暂不可用，请稍后重试');
-      return null;
-    } finally {
-      setRefining(false);
-    }
-  }
-
-  async function refineCurrent() {
-    const text = value.trim();
-    if (!text || !onRefinePrompt) return;
-    const result = await fetchRefine(text, true);
-    if (!result) return;
-    if (result.changed || result.missing.length > 0) {
-      setRefineOriginal(text);
-      setRefineResult(result);
-      setRefineNotice('');
-      return;
-    }
-    clearRefine();
-    setRefineNotice('当前提示已足够明确');
-  }
-
-  function resolvePreview(prompt: string) {
-    const next = prompt.trim();
-    setValue(next);
-    skipRefineFor.current = next;
-    clearRefine();
-    setRefineNotice('');
-    ref.current?.focus();
-  }
-
   async function send() {
     const text = value.trim();
     if (!text && attachments.length === 0) return;
-    let finalText = text;
-    if (shouldRefineBeforeSend(autoClarify, text) && skipRefineFor.current !== text) {
-      const result = await fetchRefine(text, false);
-      if (result) {
-        const decision = resolveRefineSendDecision(text, result);
-        if (decision.action === 'preview') {
-          setRefineOriginal(text);
-          setRefineResult(decision.result);
-          setRefineNotice('');
-          return;
-        }
-        finalText = decision.text;
-      }
-    }
+    const refineDecision = await prepareSend(text);
+    if (refineDecision.action === 'preview') return;
+    const finalText = refineDecision.text;
     const modelConfig = buildSessionModelConfig(
       { provider: currentProvider, model: currentModel, baseUrl, apiKey },
       { provider: defaultProvider, model: defaultModel, baseUrl: defaultBaseUrl },
     );
     onSend(finalText, { files: attachments, model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
-    skipRefineFor.current = '';
     setValue('');
     setAttachments([]);
-    clearRefine();
-    setRefineNotice('');
+    resetRefineAfterSend();
     close();
   }
 
@@ -195,9 +150,7 @@ export function Composer({
 
   function onChange(next: string, caret: number) {
     setValue(next);
-    if (next.trim() !== skipRefineFor.current) skipRefineFor.current = '';
-    if (refineResult) clearRefine();
-    if (refineNotice) setRefineNotice('');
+    markChanged(next);
     const trigger = findComposerTrigger(next.slice(0, caret));
     if (trigger?.mode === 'template') {
       setMode('template');
@@ -283,7 +236,7 @@ export function Composer({
       <div className="composer-footer">
         <div className="composer-tools">
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-          <ComposerToolActions listening={listening} refining={refining} canRefine={Boolean(value.trim() && onRefinePrompt)} onUpload={() => fileRef.current?.click()} onToggleVoice={toggleVoice} onRefine={() => void refineCurrent()} />
+          <ComposerToolActions listening={listening} refining={refining} canRefine={Boolean(value.trim() && canRefine)} onUpload={() => fileRef.current?.click()} onToggleVoice={toggleVoice} onRefine={() => void refineCurrent(value)} />
           <ComposerModelControls model={model} modelOptions={modelOptions} provider={currentProvider} defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl} baseUrl={baseUrl} apiKey={apiKey} onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey} />
           <select className="thinking-select" value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)} title="思考强度">
             {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
