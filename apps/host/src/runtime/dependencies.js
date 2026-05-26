@@ -1,3 +1,4 @@
+// @ts-check
 import { redactText } from '../security/redaction.js';
 import { detectChromiumRuntime } from './chromium-runtime.js';
 import { detectDataScienceRuntime } from './data-science-runtime.js';
@@ -10,6 +11,20 @@ import { detectVcRuntime } from './windows-runtime.js';
 
 export { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
 
+/**
+ * @typedef {import('./dependencies-catalog.js').RuntimeDependencyCatalogItem} RuntimeDependencyCatalogItem
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ info?: { backend?: string, networkIsolated?: boolean, userMessage?: string } }} SandboxStartup
+ * @typedef {{ env?: EnvLike, platform?: string, sandboxStartup?: SandboxStartup | null, fsImpl?: any, spawnSync?: any, now?: Date }} RuntimeDependencyStatusOptions
+ * @typedef {{ status: string, source?: string, version?: unknown, detail?: unknown }} RuntimeDependencyDetection
+ * @typedef {RuntimeDependencyCatalogItem & RuntimeDependencyDetection} RuntimeDependencyStatusItem
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -20,17 +35,32 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function redactProxyUrl(value) {
   const text = redactText(value) || '';
   return text.replace(/^([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+):([^@/\s]+)@/i, '$1$2:[REDACTED]@');
 }
 
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @param {string} detail
+ * @returns {RuntimeDependencyDetection}
+ */
 function configuredFromEnv(env, keys, detail) {
   const match = envValue(env, keys);
   if (!match) return { status: 'missing', detail };
   return { status: 'configured', source: match.key, detail };
 }
 
+/**
+ * @param {RuntimeDependencyCatalogItem} item
+ * @param {RuntimeDependencyStatusOptions} options
+ * @returns {RuntimeDependencyDetection}
+ */
 function detectDependency(item, options) {
   const env = options.env || {};
   const platform = options.platform || process.platform;
@@ -97,7 +127,12 @@ function detectDependency(item, options) {
   return { status: 'missing', detail: '可选按需组件尚未安装' };
 }
 
+/**
+ * @param {RuntimeDependencyStatusItem[]} dependencies
+ * @returns {{ total: number, requiredMissing: number, byStatus: Record<string, number> }}
+ */
 function summarize(dependencies) {
+  /** @type {Record<string, number>} */
   const byStatus = {};
   let requiredMissing = 0;
   for (const item of dependencies) {
@@ -113,6 +148,9 @@ function summarize(dependencies) {
   };
 }
 
+/**
+ * @param {RuntimeDependencyStatusOptions} [options]
+ */
 export function getRuntimeDependencyStatus(options = {}) {
   const dependencies = RUNTIME_DEPENDENCY_CATALOG.map((item) => ({
     ...item,

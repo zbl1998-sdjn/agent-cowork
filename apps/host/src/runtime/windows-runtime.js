@@ -1,5 +1,17 @@
+// @ts-check
 import childProcess from 'node:child_process';
 
+/**
+ * @typedef {Record<string, string | undefined>} EnvLike
+ * @typedef {{ status?: number | null, stdout?: unknown, stderr?: unknown }} SpawnResult
+ * @typedef {(command: string, args?: readonly string[], options?: Record<string, unknown>) => SpawnResult} SpawnSyncLike
+ */
+
+/**
+ * @param {EnvLike} env
+ * @param {string[]} keys
+ * @returns {{ key: string, value: string } | null}
+ */
 function envValue(env, keys) {
   for (const key of keys) {
     const value = env?.[key];
@@ -10,14 +22,27 @@ function envValue(env, keys) {
   return null;
 }
 
+/**
+ * @param {unknown} text
+ * @returns {string | undefined}
+ */
 function parseVcVersion(text) {
   return String(text || '').match(/\bVersion\s+REG_SZ\s+([^\r\n]+)/i)?.[1]?.trim();
 }
 
+/**
+ * @param {unknown} text
+ * @returns {boolean}
+ */
 function registryHasInstalledFlag(text) {
   return /\bInstalled\s+REG_DWORD\s+0x1\b/i.test(String(text || ''));
 }
 
+/**
+ * @param {SpawnSyncLike} spawnSync
+ * @param {string} arch
+ * @returns {SpawnResult}
+ */
 function queryVcRuntime(spawnSync, arch) {
   return spawnSync('reg', [
     'query',
@@ -27,6 +52,9 @@ function queryVcRuntime(spawnSync, arch) {
   ], { encoding: 'utf8', timeout: 1500, windowsHide: true });
 }
 
+/**
+ * @param {{ env?: EnvLike, platform?: string, spawnSync?: SpawnSyncLike }} [options]
+ */
 export function detectVcRuntime({
   env = {},
   platform = process.platform,

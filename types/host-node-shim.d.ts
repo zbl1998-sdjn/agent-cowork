@@ -21,9 +21,13 @@ declare const Buffer: {
 };
 
 declare const process: {
+  arch: string;
   env: Record<string, string | undefined>;
+  execPath?: string;
   platform: string;
   pid: number;
+  version: string;
+  versions?: Record<string, string | undefined>;
   cwd(): string;
 };
 
