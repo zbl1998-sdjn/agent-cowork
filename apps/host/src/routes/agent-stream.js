@@ -1,3 +1,4 @@
+// @ts-check
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
@@ -12,6 +13,21 @@ import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
 
+/**
+ * @typedef {Record<string, unknown> & { prompt?: unknown, images?: unknown, autoApprove?: unknown, maxSteps?: unknown, verify?: unknown, thinking?: unknown, planMode?: unknown, developerMode?: unknown, mode?: unknown, clarifyBeforeModel?: unknown, autoClarify?: unknown }} RequestBody
+ * @typedef {{ write(chunk?: string | Buffer): unknown, writeHead(status: number, headers?: Record<string, string>): unknown, end(chunk?: string): unknown, on?(event: string, listener: () => void): unknown }} ResponseLike
+ * @typedef {{ on?(event: string, listener: () => void): unknown }} RequestLike
+ * @typedef {{ signal: AbortSignal }} RunController
+ * @typedef {{ register(runId: string): RunController, cancel(runId: string): unknown, done(runId: string): unknown }} CancellationRegistry
+ * @typedef {import('../kimi/agent/toolset-builder.js').SkillRegistry & { enabledSkills?: () => Array<{ id: unknown, name: unknown, description?: unknown }> }} SkillRegistryLike
+ * @typedef {import('../kimi/agent/approval-gate.js').RequestContext} RequestContext
+ * @typedef {import('../kimi/agent/approval-gate.js').ApprovalRegistry & { cancelByRun?: (runId: string) => unknown }} ApprovalRegistry
+ * @typedef {{ publish(runId: string, event: Record<string, unknown>): unknown }} RunEventsLike
+ * @typedef {{ text: unknown, steps: unknown[], usage?: unknown }} AgentOutcome
+ * @typedef {{ response: ResponseLike, requestContext: RequestContext, body: RequestBody, kimiConfig: Record<string, unknown>, trustedRoot: string, runStoreRoot: string, runsIndex: import('./agent-stream-record.js').RunsIndexLike, modelCall?: import('../kimi/agent/model-resilience.js').ModelCall, sandbox?: import('../kimi/agent-tools.js').SandboxLike, sandboxLimits?: import('../kimi/agent-tools.js').SandboxLimits, runEvents?: RunEventsLike | null, approvals?: ApprovalRegistry | null, toolRegistry?: import('../kimi/agent/toolset-builder.js').ToolRegistry | null, skillRegistry?: SkillRegistryLike | null, userHome?: string, cancellation?: CancellationRegistry | null, request?: RequestLike | null, scheduler?: import('../kimi/agent/toolset-builder.js').Scheduler | null }} StreamAgentChatOptions
+ */
+
+/** @param {StreamAgentChatOptions} options */
 export async function streamAgentChat({
   response,
   requestContext,
@@ -57,18 +73,27 @@ export async function streamAgentChat({
   if (response && typeof response.on === 'function') response.on('close', onDisconnect);
   if (request && typeof request.on === 'function') request.on('close', onDisconnect);
 
+  /** @type {Array<Record<string, unknown>>} */
   const events = [];
+  /** @type {(type: string, data: Record<string, unknown>) => void} */
   const emit = (type, data) => { events.push({ type, ...data }); sse(response, type, data); };
+  /** @type {AgentOutcome} */
   let outcome = { text: '', steps: [] };
   let status = 'succeeded';
   try {
     const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext };
-    const hooks = loadHooksConfig({ trustedRoot, sandbox, sandboxLimits });
+    const hooks = loadHooksConfig({
+      trustedRoot,
+      sandbox: /** @type {import('../runtime/hooks.js').SandboxLike | null | undefined} */ (/** @type {unknown} */ (sandbox)),
+      sandboxLimits,
+    });
     const auditBus = getActionAuditBus(trustedRoot);
     const imageParts = Array.isArray(body.images) && body.images.length
       ? loadImageContentParts({ trustedRoot, paths: body.images })
       : [];
     const userContent = imageParts.length ? [{ type: 'text', text: String(body.prompt || '') }, ...imageParts] : null;
+    /** @type {NonNullable<import('../kimi/agent/toolset-builder.js').AgentDeps['runAgentChat']>} */
+    const subAgentRunner = (args) => runAgentChat(/** @type {Parameters<typeof runAgentChat>[0]} */ (/** @type {unknown} */ (args)));
     const agentTools = buildAgentToolset({
       ctx: agentCtx,
       toolRegistry,
@@ -84,7 +109,7 @@ export async function streamAgentChat({
         auditBus,
         runId,
         scheduler,
-        runAgentChat,
+        runAgentChat: subAgentRunner,
       },
     });
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
@@ -96,7 +121,7 @@ export async function streamAgentChat({
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
       : [];
-    outcome = await runAgentChat({
+    outcome = await runAgentChat(/** @type {Parameters<typeof runAgentChat>[0]} */ ({
       prompt: body.prompt,
       kimiConfig: runKimiConfig,
       trustedRoot,
@@ -129,7 +154,7 @@ export async function streamAgentChat({
       checkpointer,
       resumeState,
       runTrace,
-    });
+    }));
     if (controller && controller.signal.aborted) {
       status = 'cancelled';
       sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });
@@ -138,7 +163,7 @@ export async function streamAgentChat({
     }
   } catch (err) {
     status = 'failed';
-    sse(response, 'error', { error: friendlyAgentError(err, requestContext), runId });
+    sse(response, 'error', { error: friendlyAgentError(err, /** @type {{ traceId?: unknown }} */ (requestContext)), runId });
   } finally {
     finished = true;
     if (cancellation) cancellation.done(runId);
