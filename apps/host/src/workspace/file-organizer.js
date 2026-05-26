@@ -4,10 +4,17 @@ import crypto from 'node:crypto';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { previewFileOperations } from './file-operations.js';
 
+/**
+ * @typedef {{ trustedRoot?: string, files?: string[], mode?: string, targetDir?: string, renamePrefix?: string }} OrganizeOptions
+ * @typedef {{ type: 'move', from: string, to: string } | { type: 'rename', path: string, newName: string }} OrganizeOperation
+ */
+
+/** @param {string} file @returns {string} */
 function fileHash(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+/** @param {string} root @param {string} file @returns {string} */
 function safeFile(root, file) {
   const full = path.isAbsolute(file) ? path.resolve(file) : path.resolve(root, file);
   const safe = assertTrustedPath(full, root);
@@ -15,10 +22,12 @@ function safeFile(root, file) {
   return safe;
 }
 
+/** @param {string} root @param {string | undefined} targetDir @param {...string} parts @returns {string} */
 function safeTarget(root, targetDir, ...parts) {
   return assertTrustedPathForCreate(path.join(root, String(targetDir || 'organized'), ...parts), root);
 }
 
+/** @param {string} target @param {Set<string>} used @returns {string} */
 function targetWithSuffix(target, used) {
   const parsed = path.parse(target);
   let current = target;
@@ -31,6 +40,7 @@ function targetWithSuffix(target, used) {
   return current;
 }
 
+/** @param {OrganizeOptions} [options] @returns {{ operations: OrganizeOperation[], preview: { operations: unknown[] } }} */
 export function planFileOrganization({
   trustedRoot,
   files,
@@ -42,6 +52,7 @@ export function planFileOrganization({
   if (!Array.isArray(files) || files.length === 0) throw new Error('files must be a non-empty array');
   const root = path.resolve(trustedRoot);
   const safeFiles = files.map((file) => safeFile(root, file));
+  /** @type {OrganizeOperation[]} */
   const operations = [];
   const usedTargets = new Set();
 
