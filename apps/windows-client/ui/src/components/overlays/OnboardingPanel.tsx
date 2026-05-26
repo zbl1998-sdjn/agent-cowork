@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { getJson, getOnboardingRecommendations } from '../../lib/api';
 import {
   getFallbackOnboarding,
@@ -12,6 +12,7 @@ import {
   type OnboardingViewModel,
   type RuntimeDependencyItem,
 } from '../../lib/onboarding';
+import { Button, IconButton } from '../ui/Button';
 
 interface RuntimeDependencyStatus {
   dependencies?: RuntimeDependencyItem[];
@@ -23,6 +24,54 @@ interface OnboardingPanelProps {
   onOpenSettings: () => void;
   onOpenSettingsTab?: (tab: OnboardingSettingsTab) => void;
 }
+
+const closeButtonStyle: CSSProperties = {
+  marginLeft: 'auto',
+  border: 'none',
+  background: 'none',
+  color: 'var(--muted)',
+  fontSize: 20,
+  lineHeight: 1,
+  padding: '0 3px',
+};
+
+function roleButtonStyle(active: boolean): CSSProperties {
+  return {
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    justifyContent: 'flex-start',
+    borderColor: active ? 'var(--accent)' : 'var(--border)',
+    borderRadius: 8,
+    background: active ? '#fff4ef' : 'var(--bg)',
+    color: 'var(--text)',
+    padding: '9px 10px',
+  };
+}
+
+const setupActionStyle: CSSProperties = {
+  marginTop: 8,
+  width: '100%',
+  justifyContent: 'center',
+  fontSize: 12,
+  borderRadius: 8,
+  background: 'var(--bg)',
+  color: 'var(--text)',
+  padding: '6px 8px',
+};
+
+const secondaryActionStyle: CSSProperties = {
+  borderRadius: 9,
+  padding: '9px 14px',
+};
+
+const primaryActionStyle: CSSProperties = {
+  border: 'none',
+  borderRadius: 8,
+  background: 'var(--accent)',
+  color: '#fff',
+  padding: '9px 14px',
+};
 
 export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSettings, onOpenSettingsTab }: OnboardingPanelProps) {
   const [role, setRole] = useState<OnboardingRole>(() => selectInitialRole());
@@ -82,21 +131,22 @@ export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSet
           <h2>先按你的工作方式配一下</h2>
           <p>{loading ? '正在读取推荐…' : usingFallback ? '当前使用本地推荐，稍后可在设置中调整。' : '这些只是初始建议，不影响你继续使用主界面。'}</p>
         </div>
-        <button type="button" className="onboarding-close" aria-label="关闭首启引导" onClick={onComplete}>×</button>
+        <IconButton className="onboarding-close" label="关闭首启引导" onClick={onComplete} style={closeButtonStyle}>×</IconButton>
       </div>
 
       <div className="onboarding-roles" role="list" aria-label="选择角色">
         {viewModel.roleOptions.map((option) => (
-          <button
-            type="button"
+          <Button
             key={option.id}
+            variant="secondary"
             className={option.id === viewModel.selectedRole ? 'is-active' : ''}
             aria-pressed={option.id === viewModel.selectedRole}
             onClick={() => pickRole(option.id)}
+            style={roleButtonStyle(option.id === viewModel.selectedRole)}
           >
             <strong>{option.label}</strong>
             <span>{option.description}</span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -122,17 +172,17 @@ export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSet
                   <strong>{item.label}</strong>
                   <span>{item.reason}</span>
                   {section.id === 'setup' && getOnboardingSetupAction(item.id) && (
-                    <button
-                      type="button"
+                    <Button
                       className="onboarding-setup-action"
                       onClick={() => {
                         const action = getOnboardingSetupAction(item.id);
                         if (action && onOpenSettingsTab) onOpenSettingsTab(action.settingsTab);
                         else onOpenSettings();
                       }}
+                      style={setupActionStyle}
                     >
                       {getOnboardingSetupAction(item.id)?.label}
-                    </button>
+                    </Button>
                   )}
                 </li>
               ))}
@@ -142,9 +192,9 @@ export function OnboardingPanel({ workspaceType = 'local', onComplete, onOpenSet
       </div>
 
       <div className="onboarding-actions">
-        <button type="button" className="btn-secondary" onClick={onComplete}>稍后再说</button>
-        <button type="button" className="btn-secondary" onClick={onComplete}>完成</button>
-        <button type="button" className="btn-primary" onClick={onOpenSettings}>进入设置</button>
+        <Button className="btn-secondary" onClick={onComplete} style={secondaryActionStyle}>稍后再说</Button>
+        <Button className="btn-secondary" onClick={onComplete} style={secondaryActionStyle}>完成</Button>
+        <Button variant="primary" className="btn-primary" onClick={onOpenSettings} style={primaryActionStyle}>进入设置</Button>
       </div>
     </aside>
   );
