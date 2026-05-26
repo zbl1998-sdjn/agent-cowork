@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, resolveRefineSendDecision, shouldDebounceMentionSearch, shouldRefineBeforeSend } from '../lib/composer-logic';
+import { buildHistorySuggestionItems, buildMentionSuggestionItems, buildTemplateSuggestionItems, findComposerTrigger, mentionInsertText } from '../lib/composer-trigger';
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerModelControls } from './ComposerModelControls';
@@ -175,54 +176,12 @@ export function Composer({
     el?.focus();
   }
 
-  function templateItems(query: string): ComposerSuggestionItem[] {
-    const q = query.toLowerCase();
-    // App commands first (new chat, settings, theme, panels…), then task templates.
-    const cmds: ComposerSuggestionItem[] = slashCommands
-      .filter((c) => !q || c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((c) => ({
-        key: `cmd:${c.id}`,
-        title: c.label,
-        detail: '命令',
-        apply: () => { replaceToken(''); c.run(); },
-      }));
-    const tmpls: ComposerSuggestionItem[] = recipes
-      .filter((r) => !q || `${r.name} ${r.id} ${r.summary ?? ''}`.toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((r) => ({
-        key: r.id,
-        title: r.name,
-        detail: r.summary || r.id,
-        apply: () => { onPickTemplate?.(r); setValue(`${r.name}：读取本地材料并生成可审批产物`); close(); },
-      }));
-    return [...cmds, ...tmpls];
-  }
-
-  function historyItems(query: string): ComposerSuggestionItem[] {
-    const q = query.toLowerCase();
-    return historyRuns
-      .filter((run) => !q || (run.promptPreview ?? '').toLowerCase().includes(q))
-      .slice(0, 8)
-      .map((run) => ({
-        key: run.id,
-        title: run.promptPreview || run.id,
-        detail: run.id,
-        apply: () => { onPickHistory?.(run); close(); },
-      }));
-  }
-
   async function refreshMentions(query: string) {
     const token = ++searchToken.current;
     let hits: FileHit[] = [];
     try { hits = await searchFiles(query); } catch { hits = []; }
     if (token !== searchToken.current) return;
-    setItems(hits.slice(0, 8).map((f) => ({
-      key: f.path,
-      title: f.relativePath || f.path,
-      detail: 'file',
-      apply: () => replaceToken(`@${(f.relativePath || f.path).split(/[\\/]/).pop()} `),
-    })));
+    setItems(buildMentionSuggestionItems(hits, (hit) => replaceToken(mentionInsertText(hit))));
     setActive(0);
   }
 
@@ -239,28 +198,35 @@ export function Composer({
     if (next.trim() !== skipRefineFor.current) skipRefineFor.current = '';
     if (refineResult) clearRefine();
     if (refineNotice) setRefineNotice('');
-    const before = next.slice(0, caret);
-    const slash = before.match(/(?:^|\n)\/([^\s/]*)$/);
-    if (slash) {
+    const trigger = findComposerTrigger(next.slice(0, caret));
+    if (trigger?.mode === 'template') {
       setMode('template');
-      setTriggerStart(before.length - slash[1].length - 1);
-      setItems(templateItems(slash[1]));
+      setTriggerStart(trigger.triggerStart);
+      setItems(buildTemplateSuggestionItems({
+        slashCommands,
+        recipes,
+        query: trigger.query,
+        onCommand: (command) => { replaceToken(''); command.run(); },
+        onRecipe: (recipe) => { onPickTemplate?.(recipe); setValue(`${recipe.name}：读取本地材料并生成可审批产物`); close(); },
+      }));
       setActive(0);
       return;
     }
-    const hash = before.match(/(?:^|\n)#([^\s#]*)$/);
-    if (hash) {
+    if (trigger?.mode === 'history') {
       setMode('history');
-      setTriggerStart(before.length - hash[1].length - 1);
-      setItems(historyItems(hash[1]));
+      setTriggerStart(trigger.triggerStart);
+      setItems(buildHistorySuggestionItems({
+        historyRuns,
+        query: trigger.query,
+        onPick: (run) => { onPickHistory?.(run); close(); },
+      }));
       setActive(0);
       return;
     }
-    const at = before.match(/@([^\s@]*)$/);
-    if (at) {
+    if (trigger?.mode === 'mention') {
       setMode('mention');
-      setTriggerStart(before.length - at[1].length - 1);
-      if (shouldDebounceMentionSearch(at[1])) scheduleMentions(at[1]); else close();
+      setTriggerStart(trigger.triggerStart);
+      if (shouldDebounceMentionSearch(trigger.query)) scheduleMentions(trigger.query); else close();
       return;
     }
     close();
