@@ -11,17 +11,26 @@ import { createOfflineReplayExecutor } from '../eval/replay-backend.js';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const reportDir = path.join(repoRoot, 'reports', 'eval');
 const baselinePath = path.join(repoRoot, 'eval', 'baseline.json');
+const scriptPath = fileURLToPath(import.meta.url);
 
 function readBaseline() {
   if (!fs.existsSync(baselinePath)) return null;
   return JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 }
 
-function readReplayRecords() {
-  const recordsPath = process.env.KCW_EVAL_REPLAY_RECORDS;
+export function readReplayRecords(recordsPath = process.env.KCW_EVAL_REPLAY_RECORDS) {
   if (!recordsPath) return null;
-  const raw = JSON.parse(fs.readFileSync(path.resolve(recordsPath), 'utf8'));
-  return Array.isArray(raw) ? raw : raw.records;
+  const text = fs.readFileSync(path.resolve(recordsPath), 'utf8').trim();
+  if (!text) return [];
+  try {
+    const raw = JSON.parse(text);
+    const records = Array.isArray(raw) ? raw : raw.records;
+    if (!Array.isArray(records)) throw new Error('Eval replay records JSON must be an array or { records }');
+    return records;
+  } catch (error) {
+    if (error.message === 'Eval replay records JSON must be an array or { records }') throw error;
+  }
+  return text.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
 function passingContractResult(task) {
@@ -56,30 +65,61 @@ function passingContractResult(task) {
   };
 }
 
-const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-'));
-try {
+function envFlag(value) {
+  return ['1', 'true', 'yes'].includes(String(value || '').toLowerCase());
+}
+
+export function createEvalExecutorFromEnv({
+  recordsPath = process.env.KCW_EVAL_REPLAY_RECORDS,
+  allowContractExecutor = envFlag(process.env.KCW_EVAL_CONTRACT_EXECUTOR),
+} = {}) {
+  const replayRecords = readReplayRecords(recordsPath);
+  if (replayRecords) {
+    return { mode: 'replay', executor: createOfflineReplayExecutor({ records: replayRecords }) };
+  }
+  if (allowContractExecutor) {
+    return { mode: 'contract', executor: async ({ task }) => passingContractResult(task) };
+  }
+  const error = new Error(
+    'Eval replay records are required. Set KCW_EVAL_REPLAY_RECORDS to a JSON/JSONL ModelRecorder file, or set KCW_EVAL_CONTRACT_EXECUTOR=1 only for schema/scorer dry-runs.',
+  );
+  error.code = 'EVAL_REPLAY_RECORDS_REQUIRED';
+  throw error;
+}
+
+async function main() {
   const tasks = loadAllEvalTasks();
-  const replayRecords = readReplayRecords();
-  const executor = replayRecords
-    ? createOfflineReplayExecutor({ records: replayRecords })
-    : async ({ task }) => passingContractResult(task);
-  const summary = await runEvalTasks({
-    tasks,
-    workRoot,
-    executor,
-  });
-  const report = writeEvalReport(summary, {
-    outDir: reportDir,
-    baseline: readBaseline(),
-    regressionTolerance: 0.05,
-  });
-  console.log(`Eval tasks: ${summary.passedTasks}/${summary.totalTasks} passed (${(summary.passRate * 100).toFixed(1)}%)`);
-  console.log(`JSON report: ${path.relative(repoRoot, report.jsonPath)}`);
-  console.log(`HTML report: ${path.relative(repoRoot, report.htmlPath)}`);
-  if (report.json.baseline.regressed) {
-    console.error('Eval pass-rate regressed below baseline tolerance.');
+  const { mode, executor } = createEvalExecutorFromEnv();
+  const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-'));
+  try {
+    const summary = await runEvalTasks({
+      tasks,
+      workRoot,
+      executor,
+    });
+    const report = writeEvalReport(summary, {
+      outDir: reportDir,
+      baseline: readBaseline(),
+      regressionTolerance: 0.05,
+    });
+    console.log(`Eval executor: ${mode}`);
+    console.log(`Eval tasks: ${summary.passedTasks}/${summary.totalTasks} passed (${(summary.passRate * 100).toFixed(1)}%)`);
+    console.log(`JSON report: ${path.relative(repoRoot, report.jsonPath)}`);
+    console.log(`HTML report: ${path.relative(repoRoot, report.htmlPath)}`);
+    if (report.json.baseline.regressed) {
+      console.error('Eval pass-rate regressed below baseline tolerance.');
+      process.exitCode = 1;
+    }
+  } finally {
+    fs.rmSync(workRoot, { recursive: true, force: true });
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`[eval] ${error?.message || String(error)}`);
     process.exitCode = 1;
   }
-} finally {
-  fs.rmSync(workRoot, { recursive: true, force: true });
 }

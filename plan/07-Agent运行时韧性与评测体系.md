@@ -50,6 +50,8 @@
 
 **量化目标**:建立 pass-rate 基线;回归不得低于基线 −5%;**红队任务拦截率 100%**;eval 全程离线可复现;`npm run eval` 接入 `npm run ci`。
 
+A5 加固记录(2026-05-26):`scripts/eval.mjs` 默认改为 fail-closed:必须通过 `KCW_EVAL_REPLAY_RECORDS` 指向 JSON/JSONL ModelRecorder 记录后才运行离线回放;缺 records 不再使用合约造假执行器合成通过结果。原合约执行器仅保留为 `KCW_EVAL_CONTRACT_EXECUTOR=1` 的显式 schema/scorer dry-run,并在输出中标明 executor mode。新增单测锁定默认缺 records 会失败、contract executor 必须显式 opt-in、JSONL 记录可读取。
+
 ---
 
 ## B · 上下文管理 — 决定能否扛长任务

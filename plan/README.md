@@ -92,7 +92,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 06-B4 Pandoc 组件 plan-only 支持:运行时依赖状态识别 `KCW_PANDOC_HOME`/`KCW_PANDOC_EXE`,目录中存在 `pandoc(.exe)` 或 `bin/pandoc(.exe)` 才标记可用;缺失或名称不匹配时保持按需安装计划。新增 host 单测覆盖目录可用与错误可执行文件拒绝,不执行 pandoc 或下载。
 - [x] 06-F8 磁盘空间预检:运行时依赖 catalog 已为按需组件记录体积估算,新增 `dependency-install-plan` 纯函数生成安装/下载计划;当可用磁盘空间不足时返回中文阻断提示,用于后续依赖面板/安装器复用。聚焦 `runtime-dependencies.test.js` 通过,`npm run check` 通过。
 - [x] 06-F9 离线可用性:新增 `npm run smoke:offline-local`,在清空 Kimi/proxy 环境并拦截非本机 fetch 的情况下验证 health/workspace/文件读取/文件写入/依赖状态/audit 仍可用;模型路由无 key 时返回中文说明"本地文件功能仍可离线使用,模型回复需联网配置 key",证据见 `reports/offline-local/offline-local-smoke-2026-05-25T18-09-33-602Z.json`。
-- [x] 07-A 评测体系(A1-A7):已新增 EvalTask schema、21 个 golden 任务、7 个 redteam 任务、多维 scorer、隔离 trustedRoot runner、JSON/HTML 报告、离线 replay backend 与 CI eval 回归门禁;`npm run eval` 当前 28/28 通过,`npm run test:host` 当前 496 tests,495 pass,1 skip。eval 产物写入 `reports/eval/` 并作为本地产物忽略。
+- [x] 07-A 评测体系(A1-A7):已新增 EvalTask schema、21 个 golden 任务、7 个 redteam 任务、多维 scorer、隔离 trustedRoot runner、JSON/HTML 报告、离线 replay backend 与 CI eval 回归门禁;`npm run eval` 默认必须提供 `KCW_EVAL_REPLAY_RECORDS` 才会离线回放,缺 records 会 fail-closed,合约 dry-run 仅能用 `KCW_EVAL_CONTRACT_EXECUTOR=1` 显式开启。eval 产物写入 `reports/eval/` 并作为本地产物忽略。
 - [x] 07-B1 TokenEstimator:新增 `kimi/context/token-estimator.js` 启发式估算器,支持 text/messages、message overhead、reply primer、tool call/object content 计数与 host `checkJs`;`npm run test:host` 当前 499 tests,498 pass,1 skip。
 - [x] 07-B2 HistoryCompactor:新增 `kimi/context/history-compactor.js` 纯压缩器,超预算时压缩旧历史、保留最近消息、提取关键事实清单,并覆盖 ≥200 轮历史不溢出窗口与关键事实不丢的行为测试。
 - [x] 07-B3 ToolResultSummarizer:新增 `kimi/context/tool-result-summarizer.js` 纯摘要器,大工具结果按 token 预算压缩成关键要点+来源+预览,替代后续 `tool-loop` 硬截断接入前的可插拔能力;覆盖小结果原样、大结构化结果要点/source 不丢、超长文本 source-like 行保留的行为测试。
@@ -106,7 +106,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 07-D1 Checkpointer:新增 `runtime/run-checkpoint.js` 与 agent checkpoint 注入器;SSE agent 运行会在模型工具调用、工具结果、验证请求、完成和预算/超时/循环停止边界写入 `runStoreRoot/checkpoints/<runId>.json`,完整保存 messages/step/usage/approvedTools/todos/metadata 并可读回。
 - [x] 07-D2 run-resume:新增 `runtime/run-resume.js`,可从最新检查点生成 `resumeState`;`tool-loop` 支持从检查点消息、usage、已批准工具和 todo 续跑。已用崩溃后续跑测试锁定已完成工具 handler 不重复执行、文件副作用不重复。
 - [x] 07-D2b HTTP/SSE 续跑入口:`/api/agent/chat/stream` 支持 `resumeRunId`,从 checkpoint 读回 `resumeState` 后沿用原 runId 继续 SSE;缺 checkpoint 返回 404。E2E 覆盖写入后崩溃再续跑,确认不会重放已完成写操作。
-- [x] 07-D3 ModelRecorder/Replayer 状态闭环:`runtime/model-recorder.js` 已支持脱敏 model-call 录制、JSONL 持久化与确定性回放,`eval/replay-backend.js` 默认复用该回放后端;replay miss fail-closed,失败记录不参与回放,API key/token/callback/signal 不落盘。聚焦 `model-recorder.test.js`、`eval-replay-backend.test.js` 与 `npm run eval` 验证通过。
+- [x] 07-D3 ModelRecorder/Replayer 状态闭环:`runtime/model-recorder.js` 已支持脱敏 model-call 录制、JSONL 持久化与确定性回放,`eval/replay-backend.js` 默认复用该回放后端;replay miss fail-closed,失败记录不参与回放,API key/token/callback/signal 不落盘。聚焦 `model-recorder.test.js`、`eval-replay-backend.test.js` 与 eval executor 单测已验证;`npm run eval` 需显式 replay records。
 - [x] 07-D4 seed 注入:新增 L0 `util/ids.js` seedable ID 源;`createRunId`/`createUlid` 支持注入随机源,agent stream 支持 `runSeed` 生成可复现 start `runId`,便于 replay/debug 对齐轨迹。
 - [x] 07-E1 RunMetrics:新增 `runtime/run-metrics.js`,所有 `writeRunRecord` 持久化记录都会自动带 `metrics`(token/估算成本/耗时/步骤/工具调用/失败率);agent stream 记录已持久化聚合 usage。`npm run test:host` 当前 536 tests,535 pass,1 skip。
 - [x] 07-E2 前端成本/可观测面板:新增 `ObservabilityPanel` 与 `/api/runs` typed helpers,展示 token、成本、工具为什么、耗时、模型/配置归因和来源跳转。UI 测试通过(25 files,114 tests),本机 5173 UI + 3017 host 烟测可打开面板。
