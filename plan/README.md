@@ -172,6 +172,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE 体积治理(Composer voice):输入栏语音识别状态与 Web Speech API glue 拆出 `useComposerVoice`,主 `Composer.tsx` 降到约 330 行;不支持提示、中文识别参数、结束/错误清理和输入追加语义保持不变,聚焦 UI/hook 测试通过。
 - [x] FE 体积治理(Composer trigger):输入栏 `/`/`#`/`@` 触发解析与建议项构造拆出 `composer-trigger.ts`,主 `Composer.tsx` 降到约 296 行;命令/模板/历史/文件引用语义不变,聚焦 UI/纯函数测试通过。
 - [x] FE 体积治理(Composer refine):输入栏手动提示优化、发送前自动澄清、预览确认和 skip-refine 状态拆出 `useComposerRefine`,主 `Composer.tsx` 降到 249 行并回到软上限内;发送决策、预览确认和输入变更清理语义不变,聚焦 UI/hook 相关测试与 `npm run check` 通过,体积软警告降为 4 个。
+- [x] FE 体积治理(App shell):根组件拆出 `useAppRuntimeState`,承接认证启动、guest/logout、workspace/recipes/history/model bootstrap、设置/首启、主题、自动澄清和命令面板快捷键状态,`App.tsx` 降到 247 行并回到软上限内;消息流、审批、文件操作和渲染编排不变,聚焦 UI/logic 测试与 `npm run check` 通过,体积软警告降为 3 个。
 - [x] Host 体积治理(tool-loop):`tool-loop.js` 拆出 `tool-loop-support.js` 的 lazy tool/search、tool call 解析和 no-op budget guard helper,主循环从 399/400 硬限风险降到约 340 行;高耦合工具执行/审批/预算/trace 主块暂不拆,聚焦 host 测试与 checkJs 通过。
 - [x] Host 体积治理(runs-index):`runs-index.js` 拆成 facade + file/sqlite/utils 小模块,从 389 行降到 32 行;原导出、JSONL replay、SQLite 语义、tenant 过滤和 version 递增保持不变,聚焦 runs-index/sqlite/seeded-id 测试通过,体积软警告降为 12 个。
 - [x] Host 体积治理(scheduler):`scheduler.js` 拆出 `scheduler-store.js` 的 file/sqlite store adapter 与 normalise helper,主 Scheduler 保留创建/取消/due/fire/tick/start/stop 时序不变;聚焦 scheduler/sqlite/server runtime/schedule tool 测试通过,体积软警告降为 11 个。

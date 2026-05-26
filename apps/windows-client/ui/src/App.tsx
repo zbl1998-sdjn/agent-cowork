@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  agentChatStream, cancelRun, fileToUpload, getJson, getKimiInfo, getMe, guestLogin, importUploads,
-  logout as apiLogout, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents,
-  type AuthIdentity, type SubagentStep,
-} from './lib/api';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
-import { AUTO_CLARIFY_KEY, GUEST_KEY, loadConversations, nextMessageId, PREVIEWABLE_RE, STARTERS } from './lib/app-constants';
-import type { AssistantMessage, Message, RecipeRunResponse, SidePanel, WorkspaceInfo } from './lib/app-types';
-import { ONBOARDING_DONE_KEY } from './lib/onboarding';
-import type { RunEvent, RunSummary } from './lib/types';
+import { loadConversations, nextMessageId, PREVIEWABLE_RE, STARTERS } from './lib/app-constants';
+import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
+import type { RunEvent } from './lib/types';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
 import { ConversationRail } from './components/ConversationRail';
@@ -18,120 +13,57 @@ import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
 import { AppOverlays } from './components/AppOverlays';
 import type { Command } from './components/CommandPalette';
-import type { ComposerMeta, FileHit, HistoryRun, Recipe } from './components/Composer';
-import type { SettingsTab } from './components/Settings';
+import type { ComposerMeta, FileHit, Recipe } from './components/Composer';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useConversations } from './hooks/useConversations';
+import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 export function App() {
-  const [trustedRoot, setTrustedRoot] = useState('');
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [history, setHistory] = useState<HistoryRun[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0].messages || []);
   const [panel, setPanel] = useState<SidePanel>('none');
-  const [models, setModels] = useState<string[]>([]);
-  const [defaultModel, setDefaultModel] = useState('');
-  const [defaultProvider, setDefaultProvider] = useState('kimi-api');
-  const [defaultBaseUrl, setDefaultBaseUrl] = useState('');
-  const [chatEnabled, setChatEnabled] = useState(false);
   const [autoApprove, setAutoApprove] = useState(false);
-  const [autoClarify, setAutoClarify] = useState(() => {
-    try { return localStorage.getItem(AUTO_CLARIFY_KEY) === '1'; } catch { return false; }
-  });
   const [planMode, setPlanMode] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [previewPath, setPreviewPath] = useState<string | null>(null);
-  const [cmdkOpen, setCmdkOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return localStorage.getItem('kcw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
-  });
-  const [user, setUser] = useState<AuthIdentity | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('account');
-  const [onboardingOpen, setOnboardingOpen] = useState(() => {
-    try { return localStorage.getItem(ONBOARDING_DONE_KEY) !== '1'; } catch { return true; }
-  });
-  useEffect(() => {
-    void (async () => {
-      try {
-        const me = await getMe();
-        if (me) setUser(me);
-        else if (localStorage.getItem(GUEST_KEY) === '1') {
-          const g = await guestLogin();
-          if (g) setUser(g);
-        }
-      } catch { /* host not ready -> stay on gate */ }
-      finally { setAuthReady(true); }
-    })();
-  }, []);
-
-  const doLogout = useCallback(async () => {
-    try { await apiLogout(); } catch { /* best-effort */ }
-    try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
-    setUser(null);
-  }, []);
-  const completeOnboarding = useCallback(() => {
-    try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* ignore */ }
-    setOnboardingOpen(false);
-  }, []);
-  const openSettings = useCallback((tab: SettingsTab = 'account') => {
-    setSettingsInitialTab(tab);
-    setSettingsOpen(true);
-  }, []);
-  const openSettingsFromOnboarding = useCallback(() => {
-    completeOnboarding();
-    openSettings('account');
-  }, [completeOnboarding, openSettings]);
-  const openSettingsTabFromOnboarding = useCallback((tab: SettingsTab) => {
-    completeOnboarding();
-    openSettings(tab);
-  }, [completeOnboarding, openSettings]);
-  const continueAsGuest = useCallback(() => {
-    try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* ignore */ }
-    void (async () => { const g = await guestLogin(); if (g) setUser(g); })();
-  }, []);
-  useEffect(() => {
-    if (!user) return;
-    void (async () => {
-      try { const ws = await getJson<WorkspaceInfo>('/api/workspace'); setTrustedRoot(ws.trustedRoot); } catch { /* host not ready */ }
-      try { const r = await getJson<{ recipes: Recipe[] }>('/api/recipes'); setRecipes(r.recipes || []); } catch { /* ignore */ }
-      try {
-        const idx = await getJson<{ runs: RunSummary[] }>('/api/runs/index');
-        setHistory((idx.runs || []).map((run) => ({ id: run.id, promptPreview: run.promptPreview })));
-      } catch { /* ignore */ }
-      try {
-        const info = await getKimiInfo();
-        setChatEnabled(Boolean(info.chatEnabled));
-        setDefaultProvider(info.provider || 'kimi-api');
-        setDefaultBaseUrl(info.baseUrl || '');
-        if (info.model) { setDefaultModel(info.model); setModels([info.model]); }
-      } catch { /* ignore */ }
-    })();
-  }, [user]);
+  const {
+    applyKimiInfo,
+    authReady,
+    autoClarify,
+    chatEnabled,
+    closeSettings,
+    cmdkOpen,
+    completeOnboarding,
+    continueAsGuest,
+    defaultBaseUrl,
+    defaultModel,
+    defaultProvider,
+    doLogout,
+    handleAuthed,
+    history,
+    models,
+    onboardingOpen,
+    openSettings,
+    openSettingsFromOnboarding,
+    openSettingsTabFromOnboarding,
+    recipes,
+    setAutoClarify,
+    setChatEnabled,
+    setCmdkOpen,
+    setTheme,
+    settingsInitialTab,
+    settingsOpen,
+    theme,
+    toggleTheme,
+    trustedRoot,
+    user,
+  } = useAppRuntimeState();
 
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('kcw.theme', theme); } catch { /* ignore */ }
-  }, [theme]);
-  useEffect(() => {
-    try { localStorage.setItem(AUTO_CLARIFY_KEY, autoClarify ? '1' : '0'); } catch { /* ignore */ }
-  }, [autoClarify]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); setCmdkOpen((v) => !v); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const toggleTheme = useCallback(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')), []);
   const togglePanel = useCallback((next: SidePanel) => setPanel((current) => (current === next ? 'none' : next)), []);
   const patchAssistant = useCallback((id: string, patch: (m: AssistantMessage) => AssistantMessage) => {
     setMessages((list) => list.map((m) => (m.id === id && m.role === 'assistant' ? patch(m) : m)));
@@ -298,7 +230,7 @@ export function App() {
   ], [autoApprove, autoClarify, conversations.newConversation, doLogout, openSettings, planMode, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
-  if (!user) return <Login onAuthed={(u) => setUser(u)} onGuest={continueAsGuest} />;
+  if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;
 
   return (
     <div className="app-shell">
@@ -309,7 +241,7 @@ export function App() {
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
       <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={() => setSettingsOpen(false)} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { setSettingsOpen(false); void doLogout(); }} onSettingsSaved={(info) => { setChatEnabled(Boolean(info.chatEnabled)); setDefaultProvider(info.provider || 'kimi-api'); setDefaultBaseUrl(info.baseUrl || ''); if (info.model) { setDefaultModel(info.model); setModels([info.model]); } }} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
     </div>
   );
 }
