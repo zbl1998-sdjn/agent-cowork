@@ -44,6 +44,7 @@
     "apps/host/src/runtime/concurrency.js",
     "apps/host/src/runtime/cron.js",
     "apps/host/src/runtime/dependencies-catalog.js",
+    "apps/host/src/runtime/dependency-install-plan.js",
     "apps/host/src/runtime/dependency-plan-utils.js",
     "apps/host/src/runtime/oauth-permission-approvals.js",
     "apps/host/src/runtime/rate-limit.js",

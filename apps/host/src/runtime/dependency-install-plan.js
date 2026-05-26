@@ -1,3 +1,4 @@
+// @ts-check
 import {
   buildSupplyChainPrecheck,
   dependencyById,
@@ -8,10 +9,17 @@ import {
   safeChild,
 } from './dependency-plan-utils.js';
 
+/** @typedef {{ selectedIds?: unknown[], freeBytes?: unknown }} RuntimeDependencyInstallPlanOptions */
+/** @typedef {{ selectedIds?: unknown[], appDataRoot?: string | null | undefined, keepUserData?: boolean }} RuntimeDependencyCleanupPlanOptions */
+/** @typedef {{ selectedIds?: unknown[], appDataRoot?: string | null | undefined, currentVersion?: unknown, targetVersion?: unknown }} RuntimeDependencyUpdatePlanOptions */
+
+/** @param {RuntimeDependencyInstallPlanOptions} [options] */
 export function buildRuntimeDependencyInstallPlan(options = {}) {
   const selectedIds = Array.isArray(options.selectedIds) ? options.selectedIds : [];
   const catalog = dependencyById();
+  /** @type {Array<Record<string, unknown> & { id: string, label: string, needsDownload: boolean, estimatedDownloadBytes: number, supplyChain: { ok: boolean, reasons: string[] } }>} */
   const components = [];
+  /** @type {string[]} */
   const unknownIds = [];
   for (const id of selectedIds) {
     const key = String(id || '').trim();
@@ -76,12 +84,15 @@ export function buildRuntimeDependencyInstallPlan(options = {}) {
   };
 }
 
+/** @param {RuntimeDependencyCleanupPlanOptions} [options] */
 export function buildRuntimeDependencyCleanupPlan(options = {}) {
   const catalog = dependencyById();
   const appDataRoot = normalizeAgentCoworkRoot(options.appDataRoot);
   const selectedIds = Array.isArray(options.selectedIds) ? options.selectedIds : onDemandDependencyIds();
   const keepUserData = options.keepUserData !== false;
+  /** @type {Array<Record<string, unknown>>} */
   const components = [];
+  /** @type {string[]} */
   const unknownIds = [];
   for (const rawId of selectedIds) {
     const id = String(rawId || '').trim();
@@ -105,6 +116,7 @@ export function buildRuntimeDependencyCleanupPlan(options = {}) {
     });
   }
 
+  /** @type {Array<Record<string, unknown>>} */
   const targets = [
     ...components,
     {
@@ -149,11 +161,14 @@ export function buildRuntimeDependencyCleanupPlan(options = {}) {
   };
 }
 
+/** @param {RuntimeDependencyUpdatePlanOptions} [options] */
 export function buildRuntimeDependencyUpdatePlan(options = {}) {
   const catalog = dependencyById();
   const appDataRoot = normalizeAgentCoworkRoot(options.appDataRoot);
   const selectedIds = Array.isArray(options.selectedIds) ? options.selectedIds : onDemandDependencyIds();
+  /** @type {Array<Record<string, unknown>>} */
   const components = [];
+  /** @type {string[]} */
   const unknownIds = [];
   for (const rawId of selectedIds) {
     const id = String(rawId || '').trim();
@@ -178,6 +193,7 @@ export function buildRuntimeDependencyUpdatePlan(options = {}) {
     });
   }
 
+  /** @type {Array<Record<string, unknown> & { relativePath: string }>} */
   const retained = [
     {
       id: 'user-data',
