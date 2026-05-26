@@ -9,7 +9,7 @@ export function manualChunks(id: string): string | undefined {
   if (normalized.indexOf('/src/lib/md') >= 0) return 'markdown';
   if (normalized.indexOf('/src/components/ToolsPanel') >= 0 || normalized.indexOf('/src/components/panels/ToolsPanel') >= 0) return 'panel-tools';
   if (normalized.indexOf('/src/components/VizPanel') >= 0 || normalized.indexOf('/src/components/panels/VizPanel') >= 0) return 'panel-viz';
-  if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0) return 'panel-connectors';
+  if (normalized.indexOf('/src/components/ConnectorsPanel') >= 0 || normalized.indexOf('/src/components/panels/ConnectorsPanel') >= 0) return 'panel-connectors';
   if (normalized.indexOf('/src/components/ArtifactsPanel') >= 0 || normalized.indexOf('/src/components/panels/ArtifactsPanel') >= 0) return 'panel-artifacts';
   if (normalized.indexOf('/src/components/SchedulesPanel') >= 0 || normalized.indexOf('/src/components/panels/SchedulesPanel') >= 0) return 'panel-schedules';
   if (normalized.indexOf('/src/components/MemoryPanel') >= 0 || normalized.indexOf('/src/components/panels/MemoryPanel') >= 0) return 'panel-memory';

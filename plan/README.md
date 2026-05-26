@@ -148,6 +148,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2a 局部迁移(ArtifactsPanel):产物面板与 helper/状态视图单测迁入 `components/panels/`,同步懒加载入口和 `panel-artifacts` 分包规则;产物列表、打开、重命名校验与状态渲染行为不变。
 - [x] FE-2a 局部迁移(VizPanel):可视化/活页面板与状态视图单测迁入 `components/panels/`,同步懒加载入口和 `panel-viz` 分包规则;活页渲染、重开活页和 `LiveArtifactView` 组合行为不变。
 - [x] FE-2a 局部迁移(ToolsPanel):工具面板与状态视图/结果分类单测迁入 `components/panels/`,同步懒加载入口和 `panel-tools` 分包规则;工具搜索、调用、计划追加和需审批工具禁用行为不变。
+- [x] FE-2a 局部迁移(ConnectorsPanel):连接器面板与状态视图单测迁入 `components/panels/`,同步懒加载入口和 `panel-connectors` 分包规则;连接器目录、OAuth 授权/撤销、scope 审批和状态消息行为不变。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。

@@ -12,8 +12,8 @@ import {
   type ConnectorInfo,
   type OAuthPermission,
   type OAuthStartResult,
-} from '../lib/api';
-import { Empty, ErrorState } from './ui/StateViews';
+} from '../../lib/api';
+import { Empty, ErrorState } from '../ui/StateViews';
 
 type OAuthStatusView = {
   connected: boolean;
