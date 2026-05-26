@@ -152,6 +152,8 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2a 局部迁移(ConnectorsPanel):连接器面板与状态视图单测迁入 `components/panels/`,同步懒加载入口和 `panel-connectors` 分包规则;连接器目录、OAuth 授权/撤销、scope 审批和状态消息行为不变。
 - [x] FE-2a 局部迁移(RuntimeDependenciesPanel):运行时依赖子面板与安装/清理计划预览单测迁入 `components/panels/`,同步 Settings 懒加载入口和 `panel-runtime-dependencies` 分包规则;依赖状态、安装计划与清理计划预检行为不变。
 - [x] FE-2a 局部迁移(OnboardingPanel):新增 `components/overlays/` 并迁移首启引导浮层,同步 `AppOverlays` 引入路径;角色推荐、依赖体检和进入设置行为不变,避免把首启浮层混入侧边面板目录。
+- [x] 03-B4/06-F6 首启引导增强:建议设置项已补可执行 CTA,可直接打开 API、自检、运行时依赖和输入设置 tab;新增 Settings deep-link 与 onboarding action 单测,UI build、`npm run check`、全量 UI 测试通过。
+- [x] FE-2b 局部迁移(审批按钮):文件操作审批、计划审批、单项工具审批和批量审批 CTA 已迁移到 `Button` 原语;新增组件/时间线单测锁定按钮 primitive 与审批回调语义不变。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
