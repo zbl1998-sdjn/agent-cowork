@@ -5,6 +5,7 @@ import test from 'node:test';
 import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
+import { analyzeDataFile } from '../src/tools/data/report.js';
 import { profileDataFile } from '../src/tools/data/profile.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
@@ -75,4 +76,36 @@ test('data profile is exposed as safe builtin and agent tool', async () => {
   assert.equal(agentTool?.risk, 'safe');
   const agentResult = await agentTool.handler({ path: 'data.csv' });
   assert.equal(agentResult.rowCount, 1);
+  assert.equal(agentResult.kind, 'data-analysis');
+  assert.match(agentResult.reportMarkdown, /# Data analysis: data\.csv/);
+});
+
+test('data analysis builds a chart spec and markdown report', async () => {
+  const trustedRoot = workspace();
+  fs.writeFileSync(
+    path.join(trustedRoot, 'sales.csv'),
+    [
+      'region,revenue',
+      'North,10',
+      'South,15',
+      'North,5',
+    ].join('\n'),
+    'utf8',
+  );
+
+  const analysis = analyzeDataFile({ trustedRoot, path: 'sales.csv' });
+
+  assert.equal(analysis.kind, 'data-analysis');
+  assert.equal(analysis.rowCount, 3);
+  assert.equal(analysis.columnCount, 2);
+  assert.equal(analysis.chart.kind, 'bar');
+  assert.deepEqual(analysis.chart.data.labels, ['North', 'South']);
+  assert.deepEqual(analysis.chart.data.values, [15, 15]);
+  assert.match(analysis.reportMarkdown, /## Columns/);
+  assert.match(analysis.reportMarkdown, /Recommended chart/);
+
+  const registry = new ToolRegistry().registerMany(createBuiltinTools({ sandbox: null }));
+  const builtin = await registry.call('data.analyze', { path: 'sales.csv' }, { trustedRoot });
+  assert.equal(builtin.kind, 'data-analysis');
+  assert.equal(builtin.chart.title, 'revenue by region');
 });

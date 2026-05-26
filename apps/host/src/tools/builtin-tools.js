@@ -7,6 +7,7 @@ import { planFileOrganization } from '../workspace/file-organizer.js';
 import { webFetch } from './web-fetch.js';
 import { createGitReadOnlyBuiltinTools } from './dev/git.js';
 import { profileDataFile } from './data/profile.js';
+import { analyzeDataFile } from './data/report.js';
 
 // Built-in tools wired to the host's existing capabilities. These are plain
 // descriptors with handlers; the registry stays decoupled from the concrete
@@ -122,6 +123,24 @@ export function createBuiltinTools({
       required: ['path'],
     },
     handler: async (args = {}, ctx = {}) => profileDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
+  });
+
+  tools.push({
+    name: 'data.analyze',
+    description: '只读：分析工作区内 CSV/TSV 数据文件，返回列统计、图表数据和 Markdown 报告草稿。',
+    source: 'builtin',
+    risk: 'low',
+    mutating: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        maxRows: { type: 'number' },
+        maxBytes: { type: 'number' },
+      },
+      required: ['path'],
+    },
+    handler: async (args = {}, ctx = {}) => analyzeDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
   });
 
   tools.push({

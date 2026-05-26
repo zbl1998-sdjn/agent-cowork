@@ -5,6 +5,21 @@ import { assertTrustedPath } from '../../security/path-policy.js';
 const DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_ROWS = 5000;
 
+/**
+ * @typedef {{ value: string, count: number }} DataTopValue
+ * @typedef {{ count: number, min: number, max: number, mean: number, sum: number }} DataNumericSummary
+ * @typedef {{ name: string, index: number, type: string, nonEmpty: number, empty: number, unique: number, samples: string[], topValues: DataTopValue[], numeric?: DataNumericSummary }} DataColumnProfile
+ * @typedef {{ type: string, x: string, y?: string, reason: string }} DataChartSuggestion
+ * @typedef {{ kind: 'data-table', path: string, name: string, size: number, delimiter: string, headers: string[], rows: string[][], rowCount: number, sampledRows: number, truncated: boolean }} DataTable
+ * @typedef {{ kind: 'data-profile', path: string, name: string, size: number, delimiter: string, rowCount: number, sampledRows: number, truncated: boolean, columns: DataColumnProfile[], chartSuggestions: DataChartSuggestion[], report: string }} DataProfile
+ * @typedef {{ trustedRoot?: string, path?: string, maxBytes?: number, maxRows?: number }} DataFileOptions
+ */
+
+/**
+ * @param {string} line
+ * @param {string} delimiter
+ * @returns {string[]}
+ */
 function splitDelimitedLine(line, delimiter) {
   const cells = [];
   let cell = '';
@@ -27,24 +42,35 @@ function splitDelimitedLine(line, delimiter) {
   return cells.map((value) => value.trim());
 }
 
+/**
+ * @param {string} root
+ * @param {unknown} filePath
+ * @param {number} maxBytes
+ * @returns {{ safe: string, size: number }}
+ */
 function safeDataFile(root, filePath, maxBytes) {
   if (!filePath || typeof filePath !== 'string') throw new Error('path is required');
   const resolved = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
   const safe = assertTrustedPath(resolved, root);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
-    const err = new Error('file not found');
+    const err = /** @type {Error & { statusCode?: number }} */ (new Error('file not found'));
     err.statusCode = 404;
     throw err;
   }
   const size = fs.statSync(safe).size;
   if (size > maxBytes) {
-    const err = new Error(`file too large to analyze (${size} bytes; max ${maxBytes})`);
+    const err = /** @type {Error & { statusCode?: number }} */ (new Error(`file too large to analyze (${size} bytes; max ${maxBytes})`));
     err.statusCode = 413;
     throw err;
   }
   return { safe, size };
 }
 
+/**
+ * @param {string} filePath
+ * @param {string} text
+ * @returns {string}
+ */
 function delimiterFor(filePath, text) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.tsv') return '\t';
@@ -53,6 +79,12 @@ function delimiterFor(filePath, text) {
   return firstLine.split('\t').length > firstLine.split(',').length ? '\t' : ',';
 }
 
+/**
+ * @param {string} text
+ * @param {string} delimiter
+ * @param {number} maxRows
+ * @returns {{ headers: string[], rows: string[][], totalRowsSeen: number, truncated: boolean }}
+ */
 function parseTable(text, delimiter, maxRows) {
   const lines = String(text || '').split(/\r?\n/).filter((line) => line.trim());
   const rows = lines.slice(0, maxRows + 1).map((line) => splitDelimitedLine(line, delimiter));
@@ -65,6 +97,10 @@ function parseTable(text, delimiter, maxRows) {
   };
 }
 
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
 function numberValue(value) {
   if (value === '') return null;
   const normalized = String(value).replace(/,/g, '');
@@ -73,12 +109,23 @@ function numberValue(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
 function dateValue(value) {
   if (!value || !/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(String(value))) return null;
-  const time = Date.parse(value);
+  const time = Date.parse(String(value));
   return Number.isFinite(time) ? time : null;
 }
 
+/**
+ * @param {string[]} values
+ * @param {number} numericCount
+ * @param {number} dateCount
+ * @param {number} booleanCount
+ * @returns {string}
+ */
 function inferType(values, numericCount, dateCount, booleanCount) {
   const filled = values.length;
   if (filled === 0) return 'empty';
@@ -89,6 +136,12 @@ function inferType(values, numericCount, dateCount, booleanCount) {
   return 'text';
 }
 
+/**
+ * @param {string[][]} rows
+ * @param {string[]} headers
+ * @param {number} index
+ * @returns {DataColumnProfile}
+ */
 function profileColumn(rows, headers, index) {
   const counts = new Map();
   const values = [];
@@ -114,6 +167,7 @@ function profileColumn(rows, headers, index) {
   }
 
   const type = inferType(values, numbers.length, dateCount, booleanCount);
+  /** @type {DataColumnProfile} */
   const column = {
     name: headers[index] || `Column ${index + 1}`,
     index,
@@ -142,6 +196,10 @@ function profileColumn(rows, headers, index) {
   return column;
 }
 
+/**
+ * @param {DataColumnProfile[]} columns
+ * @returns {DataChartSuggestion[]}
+ */
 function chartSuggestions(columns) {
   const textLike = columns.find((column) => column.type === 'text' && column.unique > 1 && column.unique <= 50);
   const number = columns.find((column) => column.type === 'number');
@@ -159,6 +217,10 @@ function chartSuggestions(columns) {
   return suggestions.slice(0, 3);
 }
 
+/**
+ * @param {{ name: string, rowCount: number, columns: DataColumnProfile[], suggestions: DataChartSuggestion[] }} input
+ * @returns {string}
+ */
 function buildReport({ name, rowCount, columns, suggestions }) {
   const numeric = columns.filter((column) => column.type === 'number').length;
   const missing = columns.filter((column) => column.empty > 0).map((column) => column.name);
@@ -171,7 +233,11 @@ function buildReport({ name, rowCount, columns, suggestions }) {
   return lines.join(' ');
 }
 
-export function profileDataFile({
+/**
+ * @param {DataFileOptions} [options]
+ * @returns {DataTable}
+ */
+export function readDataTable({
   trustedRoot,
   path: filePath,
   maxBytes = DEFAULT_MAX_BYTES,
@@ -183,20 +249,40 @@ export function profileDataFile({
   const text = fs.readFileSync(safe, 'utf8');
   const delimiter = delimiterFor(safe, text);
   const table = parseTable(text, delimiter, Math.max(1, Math.min(Number(maxRows) || DEFAULT_MAX_ROWS, DEFAULT_MAX_ROWS)));
+  return {
+    kind: 'data-table',
+    path: path.relative(root, safe).replace(/\\/g, '/'),
+    name: path.basename(safe),
+    size,
+    delimiter: delimiter === '\t' ? 'tab' : delimiter,
+    headers: table.headers,
+    rows: table.rows,
+    rowCount: table.totalRowsSeen,
+    sampledRows: table.rows.length,
+    truncated: table.truncated,
+  };
+}
+
+/**
+ * @param {DataFileOptions} [options]
+ * @returns {DataProfile}
+ */
+export function profileDataFile(options = {}) {
+  const table = readDataTable(options);
   const columnCount = Math.max(table.headers.length, ...table.rows.map((row) => row.length), 0);
   const columns = Array.from({ length: columnCount }, (_, index) => profileColumn(table.rows, table.headers, index));
   const suggestions = chartSuggestions(columns);
   return {
     kind: 'data-profile',
-    path: path.relative(root, safe).replace(/\\/g, '/'),
-    name: path.basename(safe),
-    size,
-    delimiter: delimiter === '\t' ? 'tab' : delimiter,
-    rowCount: table.totalRowsSeen,
+    path: table.path,
+    name: table.name,
+    size: table.size,
+    delimiter: table.delimiter,
+    rowCount: table.rowCount,
     sampledRows: table.rows.length,
     truncated: table.truncated,
     columns,
     chartSuggestions: suggestions,
-    report: buildReport({ name: path.basename(safe), rowCount: table.totalRowsSeen, columns, suggestions }),
+    report: buildReport({ name: table.name, rowCount: table.rowCount, columns, suggestions }),
   };
 }

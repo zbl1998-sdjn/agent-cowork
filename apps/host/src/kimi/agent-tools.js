@@ -7,7 +7,7 @@ import { planFileOrganization } from '../workspace/file-organizer.js';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { webFetch } from '../tools/web-fetch.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
-import { profileDataFile } from '../tools/data/profile.js';
+import { analyzeDataFile } from '../tools/data/report.js';
 
 // Agent tools aligned with the Kimi CLI / Claude Code native tool set:
 //   Read, Write, Edit, Glob, Grep, Shell, WebFetch, git helpers.
@@ -160,7 +160,7 @@ export function createAgentTools(ctx = {}) {
     },
     {
       name: 'AnalyzeDataFile', mutating: false, risk: 'safe',
-      description: '剖析工作区内 CSV/TSV 数据文件，返回列类型、缺失值、数值统计和图表建议；不会修改文件。',
+      description: '分析工作区内 CSV/TSV 数据文件，返回列统计、图表数据和 Markdown 报告草稿；不会修改文件。',
       parameters: {
         type: 'object',
         properties: {
@@ -170,7 +170,7 @@ export function createAgentTools(ctx = {}) {
         },
         required: ['path'],
       },
-      handler: async (args = {}) => profileDataFile({ trustedRoot: root, ...args }),
+      handler: async (args = {}) => analyzeDataFile({ trustedRoot: root, ...args }),
     },
     {
       name: 'WebFetch', mutating: false, risk: 'safe',
