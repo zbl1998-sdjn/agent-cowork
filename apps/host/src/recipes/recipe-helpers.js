@@ -1,13 +1,21 @@
 import path from 'node:path';
 
+/**
+ * @typedef {{ path?: string, relativePath?: string, kind?: string, content?: string, error?: string, size?: unknown, sha256?: string }} SourceLike
+ * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
+ * @typedef {{ columns: string[], rows: string[][] }} ParsedTable
+ */
+
 export function stamp() {
   return `${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${Math.random().toString(16).slice(2, 6)}`;
 }
 
+/** @param {SourceLike} source @returns {string} */
 export function relSource(source) {
   return source.relativePath || source.path || 'unknown';
 }
 
+/** @param {SourceLike[]} sources @returns {string} */
 export function sourceBlock(sources) {
   if (!sources.length) {
     return '- 未提供可读取来源文件';
@@ -17,6 +25,7 @@ export function sourceBlock(sources) {
     .join('\n');
 }
 
+/** @param {SourceLike[]} sources @returns {string} */
 export function combinedText(sources) {
   return sources
     .filter((source) => source.content)
@@ -25,10 +34,12 @@ export function combinedText(sources) {
     .slice(0, 20000);
 }
 
+/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @returns {string} */
 export function artifactPath(trustedRoot, recipeId, filename) {
   return path.join(trustedRoot, '.AgentCowork', 'artifacts', `${recipeId}-${stamp()}-${filename}`);
 }
 
+/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {string} content @returns {FileOperationInput} */
 export function markdownOperation(trustedRoot, recipeId, filename, content) {
   return {
     type: 'write',
@@ -37,6 +48,7 @@ export function markdownOperation(trustedRoot, recipeId, filename, content) {
   };
 }
 
+/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {Buffer} buffer @returns {FileOperationInput} */
 export function binaryOperation(trustedRoot, recipeId, filename, buffer) {
   return {
     type: 'write',
@@ -46,15 +58,18 @@ export function binaryOperation(trustedRoot, recipeId, filename, buffer) {
   };
 }
 
+/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {Buffer} workbook @returns {FileOperationInput} */
 export function xlsxOperation(trustedRoot, recipeId, filename, workbook) {
   return binaryOperation(trustedRoot, recipeId, filename, workbook);
 }
 
+/** @param {unknown} value @returns {string} */
 function csvEscape(value) {
   const text = String(value ?? '');
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {unknown[][]} rows @returns {FileOperationInput} */
 export function csvOperation(trustedRoot, recipeId, filename, rows) {
   const content = rows.map((row) => row.map(csvEscape).join(',')).join('\n') + '\n';
   return {
@@ -64,6 +79,7 @@ export function csvOperation(trustedRoot, recipeId, filename, rows) {
   };
 }
 
+/** @param {string} text @param {unknown} prompt @returns {string[][]} */
 export function actionRows(text, prompt) {
   const candidates = text
     .split(/\r?\n/)
@@ -71,7 +87,7 @@ export function actionRows(text, prompt) {
     .filter((line) => line.length >= 4)
     .filter((line) => /待办|行动|负责|跟进|完成|确认|准备|整理|提交|TODO|todo|action/i.test(line))
     .slice(0, 18);
-  const lines = candidates.length ? candidates : [prompt || '根据来源材料整理后续行动项'];
+  const lines = candidates.length ? candidates : [String(prompt || '根据来源材料整理后续行动项')];
   return lines.map((line, index) => [
     String(index + 1),
     line,
@@ -81,6 +97,7 @@ export function actionRows(text, prompt) {
   ]);
 }
 
+/** @param {string} text @returns {ParsedTable} */
 export function parseTableRows(text) {
   const lines = text
     .split(/\r?\n/)
@@ -114,6 +131,7 @@ export function parseTableRows(text) {
   };
 }
 
+/** @param {string} text @returns {string[][]} */
 export function reimbursementRows(text) {
   const lines = text
     .split(/\r?\n/)

@@ -1,5 +1,12 @@
 import { createZip } from '../workspace/zip-utils.js';
 
+/**
+ * @typedef {Record<string, unknown>} WorkbookRowObject
+ * @typedef {unknown[] | WorkbookRowObject} WorkbookRow
+ * @typedef {{ sheetName?: unknown, columns?: unknown[], rows?: WorkbookRow[] }} WorkbookSpec
+ */
+
+/** @param {unknown} value @returns {string} */
 function escapeXml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -9,6 +16,7 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
+/** @param {number} index @returns {string} */
 function columnName(index) {
   let n = index + 1;
   let name = '';
@@ -20,17 +28,28 @@ function columnName(index) {
   return name;
 }
 
+/** @param {unknown} value @param {number} rowIndex @param {number} columnIndex @returns {string} */
 function cellXml(value, rowIndex, columnIndex) {
   const ref = `${columnName(columnIndex)}${rowIndex + 1}`;
   return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
 }
 
+/** @param {WorkbookRow} row @param {unknown} column @param {number} index @returns {string} */
+function rowValue(row, column, index) {
+  if (Array.isArray(row)) {
+    return String(row[index] ?? '');
+  }
+  const record = /** @type {WorkbookRowObject} */ (row && typeof row === 'object' ? row : {});
+  return String(record[String(column)] ?? '');
+}
+
+/** @param {unknown[]} columns @param {WorkbookRow[]} rows @returns {string} */
 function sheetXml(columns, rows) {
   const safeColumns = columns.length > 0 ? columns : ['内容'];
   const safeRows = rows.length > 0 ? rows : [['']];
   const renderedRows = [
     safeColumns.map((column) => String(column ?? '')),
-    ...safeRows.map((row) => safeColumns.map((_, index) => String(Array.isArray(row) ? row[index] ?? '' : row?.[safeColumns[index]] ?? ''))),
+    ...safeRows.map((row) => safeColumns.map((column, index) => rowValue(row, column, index))),
   ];
   const rowXml = renderedRows
     .map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => cellXml(value, rowIndex, columnIndex)).join('')}</row>`)
@@ -47,6 +66,7 @@ function sheetXml(columns, rows) {
   ].join('');
 }
 
+/** @param {WorkbookSpec} [spec] @returns {Buffer} */
 export function createXlsxWorkbook({ sheetName = 'Sheet1', columns = [], rows = [] } = {}) {
   const safeSheetName = escapeXml(String(sheetName || 'Sheet1').slice(0, 31));
   return createZip([

@@ -10,6 +10,18 @@ import {
 
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
 
+/**
+ * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
+ * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
+ * @typedef {{ tenantId?: string, userId?: string, traceId?: string, idempotencyKey?: string, [key: string]: unknown }} RequestContext
+ * @typedef {{ trustedRoot?: unknown, prompt?: unknown, files?: unknown, maxSize?: unknown }} RecipeRunBody
+ * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
+ * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
+ * @typedef {{ issue(input: unknown): string }} FileOperationApprovalsLike
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string, fileOperationApprovals: FileOperationApprovalsLike }} RecipeRouteOptions
+ */
+
+/** @param {RecipeRouteOptions} options @returns {Promise<boolean>} */
 export async function handleRecipeRoutes({
   request,
   response,
@@ -33,6 +45,7 @@ export async function handleRecipeRoutes({
 
   if (request.method === 'POST' && pathname.startsWith('/api/recipes/') && pathname.endsWith('/run')) {
     await withJsonBody(request, response, async (body) => {
+      const input = /** @type {RecipeRunBody} */ (body || {});
       const recipeId = decodePathSegment(pathname.slice('/api/recipes/'.length, -'/run'.length));
       if (!recipeId || !RECIPE_ID_RE.test(recipeId)) {
         sendJson(response, 400, { error: 'Invalid recipe id' });
@@ -51,13 +64,13 @@ export async function handleRecipeRoutes({
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
         return;
       }
-      const safeRoot = safeTrustedRoot(body.trustedRoot);
+      const safeRoot = safeTrustedRoot(input.trustedRoot);
       const result = runRecipe({
         recipeId,
         trustedRoot: safeRoot,
-        prompt: body.prompt,
-        files: body.files,
-        maxSize: body.maxSize,
+        prompt: input.prompt,
+        files: Array.isArray(input.files) ? input.files : [],
+        maxSize: input.maxSize,
         context: requestContext,
         runStoreRoot,
         runEvents,

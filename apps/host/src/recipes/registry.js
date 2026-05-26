@@ -12,65 +12,35 @@ import {
   xlsxOperation,
 } from './recipe-helpers.js';
 
-const RECIPES = [
-  {
-    id: 'meeting-actions',
-    name: '会议纪要转行动项',
-    description: '从会议记录中提取结论、负责人、截止时间和待办清单。',
-    output: 'Markdown + XLSX',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'excel-cleaning',
-    name: '表格清洗',
-    description: '读取 CSV/XLSX，去空行、标记重复和缺失字段，生成清洗结果。',
-    output: 'Markdown + XLSX',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'reimbursement',
-    name: '报销材料整理',
-    description: '汇总发票、金额、供应商和缺失材料，生成报销清单。',
-    output: 'CSV + Markdown',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'folder-organize',
-    name: '文件夹整理',
-    description: '按类型和主题生成整理建议，默认只写计划不移动原文件。',
-    output: 'Markdown',
-    riskLevel: 'preview-only',
-  },
-  {
-    id: 'contract-summary',
-    name: '合同摘要',
-    description: '提取合同主体、付款、续约、风险点和待确认事项。',
-    output: 'Markdown',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'feedback-clusters',
-    name: '反馈聚类',
-    description: '把用户反馈按主题、严重度和建议动作聚合。',
-    output: 'Markdown',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'summary-report',
-    name: '总结报告',
-    description: '把本地材料整理成结构化周报、项目总结或管理摘要。',
-    output: 'Markdown + DOCX + PPTX + PDF',
-    riskLevel: 'safe-write',
-  },
-  {
-    id: 'email-draft',
-    name: '邮件草稿',
-    description: '基于本地上下文生成中文商务邮件草稿和附件清单。',
-    output: 'Markdown',
-    riskLevel: 'safe-write',
-  },
+/**
+ * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
+ * @typedef {import('./recipe-helpers.js').SourceLike} SourceLike
+ * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string }} Recipe
+ * @typedef {{ recipeId?: string, trustedRoot?: string, prompt?: unknown, sources?: SourceLike[] }} BuildRecipeOptions
+ */
+
+/** @type {[string, string, string, string, string][]} */
+const RECIPE_ROWS = [
+  ['meeting-actions', '会议纪要转行动项', '从会议记录中提取结论、负责人、截止时间和待办清单。', 'Markdown + XLSX', 'safe-write'],
+  ['excel-cleaning', '表格清洗', '读取 CSV/XLSX，去空行、标记重复和缺失字段，生成清洗结果。', 'Markdown + XLSX', 'safe-write'],
+  ['reimbursement', '报销材料整理', '汇总发票、金额、供应商和缺失材料，生成报销清单。', 'CSV + Markdown', 'safe-write'],
+  ['folder-organize', '文件夹整理', '按类型和主题生成整理建议，默认只写计划不移动原文件。', 'Markdown', 'preview-only'],
+  ['contract-summary', '合同摘要', '提取合同主体、付款、续约、风险点和待确认事项。', 'Markdown', 'safe-write'],
+  ['feedback-clusters', '反馈聚类', '把用户反馈按主题、严重度和建议动作聚合。', 'Markdown', 'safe-write'],
+  ['summary-report', '总结报告', '把本地材料整理成结构化周报、项目总结或管理摘要。', 'Markdown + DOCX + PPTX + PDF', 'safe-write'],
+  ['email-draft', '邮件草稿', '基于本地上下文生成中文商务邮件草稿和附件清单。', 'Markdown', 'safe-write'],
 ];
 
+/** @type {Recipe[]} */
+const RECIPES = RECIPE_ROWS.map(([id, name, description, output, riskLevel]) => ({
+  id,
+  name,
+  description,
+  output,
+  riskLevel,
+}));
+
+/** @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {string} */
 function genericMarkdown(recipe, prompt, sources) {
   const text = combinedText(sources);
   const excerpt = text ? text.slice(0, 2000) : '暂无可读取正文。';
@@ -97,6 +67,7 @@ function genericMarkdown(recipe, prompt, sources) {
   ].join('\n');
 }
 
+/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
 function meetingRecipe(trustedRoot, recipe, prompt, sources) {
   const text = combinedText(sources);
   const rows = actionRows(text, prompt);
@@ -131,6 +102,7 @@ function meetingRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
+/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
 function excelRecipe(trustedRoot, recipe, prompt, sources) {
   const parsed = parseTableRows(combinedText(sources));
   const issueCount = parsed.rows.filter((row) => row[row.length - 1] !== '正常').length;
@@ -169,6 +141,7 @@ function excelRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
+/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
 function reimbursementRecipe(trustedRoot, recipe, prompt, sources) {
   const rows = reimbursementRows(combinedText(sources));
   return [
@@ -194,47 +167,54 @@ function reimbursementRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
+/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
 function summaryReportRecipe(trustedRoot, recipe, prompt, sources) {
   const markdown = genericMarkdown(recipe, prompt, sources);
   const text = combinedText(sources);
-  const bullets = (text || prompt || '请确认来源是否完整')
+  const promptText = String(prompt || '');
+  const bullets = (text || promptText || '请确认来源是否完整')
     .split(/\r?\n/)
     .map((line) => line.replace(/^[-*#\d.\s]+/, '').trim())
     .filter(Boolean)
     .slice(0, 8);
-  const title = prompt || recipe.name;
+  const title = promptText || recipe.name;
   return [
     markdownOperation(trustedRoot, recipe.id, `${recipe.name}.md`, markdown),
     binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title, paragraphs: bullets })),
     binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pptx`, createPptxPresentation({ title, slides: [{ title, bullets }] })),
-    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork Summary Report', lines: [prompt, ...bullets] })),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork Summary Report', lines: [promptText, ...bullets] })),
   ];
 }
 
+/** @returns {Recipe[]} */
 export function listRecipes() {
   return RECIPES.map((recipe) => ({ ...recipe }));
 }
 
+/** @param {string} recipeId @returns {Recipe | null} */
 export function getRecipe(recipeId) {
   return RECIPES.find((recipe) => recipe.id === recipeId) || null;
 }
 
+/** @param {BuildRecipeOptions} [options] @returns {FileOperationInput[]} */
 export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [] } = {}) {
-  const recipe = getRecipe(recipeId);
+  const id = typeof recipeId === 'string' ? recipeId : '';
+  const root = typeof trustedRoot === 'string' ? trustedRoot : '';
+  const recipe = getRecipe(id);
   if (!recipe) {
     throw new Error(`Unknown recipe: ${recipeId}`);
   }
   if (recipe.id === 'meeting-actions') {
-    return meetingRecipe(trustedRoot, recipe, prompt, sources);
+    return meetingRecipe(root, recipe, prompt, sources);
   }
   if (recipe.id === 'excel-cleaning') {
-    return excelRecipe(trustedRoot, recipe, prompt, sources);
+    return excelRecipe(root, recipe, prompt, sources);
   }
   if (recipe.id === 'reimbursement') {
-    return reimbursementRecipe(trustedRoot, recipe, prompt, sources);
+    return reimbursementRecipe(root, recipe, prompt, sources);
   }
   if (recipe.id === 'summary-report') {
-    return summaryReportRecipe(trustedRoot, recipe, prompt, sources);
+    return summaryReportRecipe(root, recipe, prompt, sources);
   }
-  return [markdownOperation(trustedRoot, recipe.id, `${recipe.name}.md`, genericMarkdown(recipe, prompt, sources))];
+  return [markdownOperation(root, recipe.id, `${recipe.name}.md`, genericMarkdown(recipe, prompt, sources))];
 }
