@@ -1,3 +1,5 @@
+// @ts-check
+
 import { createSqliteDatabase } from '../storage/sqlite.js';
 import {
   MAX_MEMORY_BYTES,
@@ -17,43 +19,71 @@ import {
   normaliseUserId,
 } from './memory-utils.js';
 
+/**
+ * @typedef {'project' | 'user' | 'session'} MemoryScope
+ * @typedef {{ key?: unknown, value?: unknown, scope?: unknown }} MemoryFactInput
+ * @typedef {{ key: string, value: string, scope: MemoryScope }} MemoryFact
+ * @typedef {{ traceId?: unknown, tenantId?: unknown, userId?: unknown, idempotencyKey?: unknown, auditBus?: import('../storage/audit-events.js').AuditEventBus }} MemoryContext
+ * @typedef {{ maxBytes?: number, context?: MemoryContext }} MemoryQueryOptions
+ * @typedef {{ name: string, size: number, modifiedAt: string, path?: string }} MemoryNote
+ * @typedef {{ fact_json: string }} MemoryFactRow
+ * @typedef {{ id: string, name: string, size: number, created_at: string, updated_at: string }} MemoryNoteRow
+ * @typedef {{ body: string }} MemoryNoteBodyRow
+ * @typedef {{ id: string, created_at: string }} MemoryExistingNoteRow
+ */
+
 export class SqliteMemoryStore {
+  /**
+   * @param {{ dbPath?: string, db?: import('../storage/sqlite.js').SqliteDatabase | null, now?: () => Date }} [options]
+   */
   constructor({ dbPath, db = null, now = () => new Date() } = {}) {
     if (!db && (!dbPath || typeof dbPath !== 'string')) {
       throw new Error('SqliteMemoryStore: dbPath is required');
     }
-    this.db = db || createSqliteDatabase(dbPath);
+    /** @type {import('../storage/sqlite.js').SqliteDatabase} */
+    this.db = db || createSqliteDatabase(/** @type {string} */ (dbPath));
+    /** @type {() => Date} */
     this.now = now;
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {MemoryContext} [context]
+   * @returns {string}
+   */
   readMainMemory(trustedRoot, context = {}) {
     ensureTrustedRoot(trustedRoot);
     const tenantId = normaliseTenantId(context.tenantId);
-    const rows = this.db.prepare(`
+    const rows = /** @type {MemoryFactRow[]} */ (this.db.prepare(`
       SELECT fact_json
       FROM memory_facts
       WHERE tenant_id = ?
       ORDER BY created_at ASC, id ASC
-    `).all(tenantId);
+    `).all(tenantId));
     if (!rows.length) {
       return '';
     }
     const lines = rows.map((row) => {
-      const fact = JSON.parse(row.fact_json);
+      const fact = /** @type {MemoryFact} */ (JSON.parse(row.fact_json));
       return `- **${fact.key}** (${fact.scope}): ${fact.value}\n`;
     });
     return clipUtf8(`${MEMORY_HEADER}${lines.join('')}`, MAX_MEMORY_BYTES);
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {MemoryContext} [context]
+   * @returns {MemoryNote[]}
+   */
   listMemoryNotes(trustedRoot, context = {}) {
     ensureTrustedRoot(trustedRoot);
     const tenantId = normaliseTenantId(context.tenantId);
-    const rows = this.db.prepare(`
+    const rows = /** @type {MemoryNoteRow[]} */ (this.db.prepare(`
       SELECT id, name, size, created_at, updated_at
       FROM memory_notes
       WHERE tenant_id = ?
       ORDER BY name ASC
-    `).all(tenantId);
+    `).all(tenantId));
     return rows.map((row) => ({
       name: row.name,
       size: Number(row.size) || 0,
@@ -62,6 +92,12 @@ export class SqliteMemoryStore {
     }));
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {string} noteName
+   * @param {MemoryContext} [context]
+   * @returns {string | null}
+   */
   readMemoryNote(trustedRoot, noteName, context = {}) {
     ensureTrustedRoot(trustedRoot);
     if (!NOTE_NAME_RE.test(String(noteName || ''))) {
@@ -73,9 +109,16 @@ export class SqliteMemoryStore {
       FROM memory_notes
       WHERE tenant_id = ? AND name = ?
     `).get(tenantId, noteName);
-    return row ? row.body : null;
+    return row ? (/** @type {MemoryNoteBodyRow} */ (row)).body : null;
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {string} noteName
+   * @param {unknown} body
+   * @param {MemoryContext} [context]
+   * @returns {string}
+   */
   writeMemoryNote(trustedRoot, noteName, body, context = {}) {
     const root = ensureTrustedRoot(trustedRoot);
     if (!NOTE_NAME_RE.test(String(noteName || ''))) {
@@ -88,14 +131,15 @@ export class SqliteMemoryStore {
       FROM memory_notes
       WHERE tenant_id = ? AND name = ?
     `).get(tenantId, noteName);
-    const id = existing?.id || memoryId('memnote');
+    const existingRow = /** @type {MemoryExistingNoteRow | null} */ (existing || null);
+    const id = existingRow?.id || memoryId('memnote');
     const now = this.now().toISOString();
     const safeBody = clipUtf8(String(body == null ? '' : body), MAX_MEMORY_BYTES);
     const note = {
       id,
       name: noteName,
       size: Buffer.byteLength(safeBody, 'utf8'),
-      createdAt: existing?.created_at || now,
+      createdAt: existingRow?.created_at || now,
       updatedAt: now,
     };
     this.db.prepare(`
@@ -127,6 +171,12 @@ export class SqliteMemoryStore {
     return `sqlite://memory_notes/${id}`;
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {MemoryFactInput} fact
+   * @param {MemoryContext} [context]
+   * @returns {{ file: string, fact: MemoryFact }}
+   */
   appendMemoryFact(trustedRoot, fact, context = {}) {
     const root = ensureTrustedRoot(trustedRoot);
     const key = cleanFactKey(fact?.key);
@@ -163,11 +213,21 @@ export class SqliteMemoryStore {
     };
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {MemoryQueryOptions} [options]
+   * @returns {string}
+   */
   buildMemorySystemBlock(trustedRoot, { maxBytes = 4096, context = {} } = {}) {
     const main = this.readMainMemory(trustedRoot, context);
     return buildMemorySystemBlockFromText(main, { maxBytes });
   }
 
+  /**
+   * @param {unknown} trustedRoot
+   * @param {MemoryQueryOptions} [options]
+   * @returns {{ enabled: boolean, bytes: number, text: string, notes: MemoryNote[] }}
+   */
   loadMemoryContext(trustedRoot, options = {}) {
     return loadMemoryContextFromStore(this, trustedRoot, options);
   }

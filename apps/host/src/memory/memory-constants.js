@@ -1,3 +1,5 @@
+// @ts-check
+
 import path from 'node:path';
 
 export const MEMORY_DIR_NAME = '.AgentCowork';
