@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SourceRef } from '../lib/types';
+import { Button } from './ui/Button';
 
 export interface SourcesFooterProps {
   sources: SourceRef[];
@@ -10,9 +11,9 @@ export function SourcesFooter({ sources }: SourcesFooterProps) {
   if (!sources.length) return null;
   return (
     <div className="sources-footer">
-      <button type="button" className="sources-toggle" onClick={() => setOpen((v) => !v)}>
+      <Button className="sources-toggle" size="sm" onClick={() => setOpen((v) => !v)}>
         来源 ({sources.length})
-      </button>
+      </Button>
       {open && (
         <ul>
           {sources.map((source, index) => (
