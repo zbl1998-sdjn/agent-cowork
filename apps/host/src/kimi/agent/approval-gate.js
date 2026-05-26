@@ -1,5 +1,26 @@
+// @ts-check
 import { todoItemsFromPlan } from './todo-state.js';
 
+/**
+ * @typedef {Record<string, unknown>} ToolArgs
+ * @typedef {{ name: string, mutating?: boolean, risk?: string, requiresApproval?: boolean, description?: string, parameters?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
+ * @typedef {{ publish(payload: Record<string, unknown>): unknown }} AuditBus
+ * @typedef {(kind: string, extra?: Record<string, unknown>) => void} AuditFn
+ * @typedef {(type: string, payload: Record<string, unknown>) => void} EmitFn
+ * @typedef {{ id?: unknown }} ToolCall
+ * @typedef {Array<Record<string, unknown>>} StepList
+ * @typedef {Array<Record<string, unknown>>} MessageList
+ * @typedef {{ tenantId?: unknown, userId?: unknown, [key: string]: unknown }} RequestContext
+ * @typedef {{ reason?: string }} HookBlock
+ * @typedef {{ run(event: string, payload: Record<string, unknown>): unknown | Promise<unknown>, blocked(result: unknown): false | HookBlock }} HookEngine
+ * @typedef {{ request(payload: Record<string, unknown>): { id: string, promise: Promise<string> } }} ApprovalRegistry
+ * @typedef {{ hooks?: HookEngine | null, name: string, args: ToolArgs, steps: StepList, audit: AuditFn, emit: EmitFn, messages: MessageList, call: ToolCall }} PreToolHookOptions
+ * @typedef {{ name: string, args: ToolArgs, hasApprovals: boolean, autoApprove: boolean, approvals?: ApprovalRegistry | null, runId?: unknown, emit: EmitFn, audit: AuditFn, steps: StepList, messages: MessageList, call: ToolCall, context?: RequestContext }} ExitPlanOptions
+ * @typedef {{ planMode: boolean, planApproved: boolean, needsApproval: boolean, name: string, tool?: AgentTool | null, steps: StepList, audit: AuditFn, emit: EmitFn, messages: MessageList, call: ToolCall }} PlanBlockOptions
+ * @typedef {{ needsApproval: boolean, hasApprovals: boolean, approvals?: ApprovalRegistry | null, sessionApproved: Set<string>, name: string, args: ToolArgs, tool: AgentTool, runId?: unknown, emit: EmitFn, audit: AuditFn, steps: StepList, messages: MessageList, call: ToolCall, autoApprove: boolean, planMode: boolean, planApproved: boolean, context?: RequestContext }} ToolApprovalOptions
+ */
+
+/** @param {AgentTool[]} agentTools @param {boolean} planMode */
 export function ensureExitPlanModeTool(agentTools, planMode) {
   if (!planMode || agentTools.some((t) => t.name === 'ExitPlanMode')) return;
   agentTools.push({
@@ -12,6 +33,7 @@ export function ensureExitPlanModeTool(agentTools, planMode) {
   });
 }
 
+/** @param {AuditBus | null | undefined} auditBus @param {RequestContext} [context] @returns {AuditFn} */
 export function makeAudit(auditBus, context) {
   return (kind, extra = {}) => {
     if (!auditBus) return;
@@ -19,11 +41,13 @@ export function makeAudit(auditBus, context) {
   };
 }
 
+/** @param {AgentTool | null | undefined} tool */
 export function toolNeedsApproval(tool) {
   const risk = String(tool?.risk || '').toLowerCase();
   return !!(tool && (tool.requiresApproval === true || tool.mutating === true || risk === 'high' || risk === 'critical'));
 }
 
+/** @param {RequestContext} [context] */
 function approvalScope(context = {}) {
   return {
     ...(context.tenantId ? { tenantId: context.tenantId } : {}),
@@ -31,6 +55,7 @@ function approvalScope(context = {}) {
   };
 }
 
+/** @param {PreToolHookOptions} options */
 export async function runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call }) {
   if (!hooks) return false;
   const blockedByHook = hooks.blocked(await hooks.run('pre_tool', { name, args }));
@@ -43,6 +68,7 @@ export async function runPreToolHook({ hooks, name, args, steps, audit, emit, me
   return true;
 }
 
+/** @param {ExitPlanOptions} options */
 export async function handleExitPlanMode({
   name,
   args,
@@ -60,7 +86,7 @@ export async function handleExitPlanMode({
   if (name !== 'ExitPlanMode') return { handled: false, planApproved: false };
   const plan = String((args && (args.plan || args.text)) || '').trim();
   let approved = true;
-  if (hasApprovals && !autoApprove) {
+  if (hasApprovals && !autoApprove && approvals) {
     const { id, promise } = approvals.request({ kind: 'plan', plan, runId, ...approvalScope(context) });
     emit('plan_proposed', { id, plan });
     audit('plan.proposed', { chars: plan.length });
@@ -80,6 +106,7 @@ export async function handleExitPlanMode({
   return { handled: true, planApproved: approved };
 }
 
+/** @param {PlanBlockOptions} options */
 export function blockUntilPlanApproved({
   planMode,
   planApproved,
@@ -101,6 +128,7 @@ export function blockUntilPlanApproved({
   return true;
 }
 
+/** @param {ToolApprovalOptions} options */
 export async function requestToolApproval({
   needsApproval,
   hasApprovals,
@@ -120,7 +148,7 @@ export async function requestToolApproval({
   planApproved,
   context,
 }) {
-  if (!needsApproval || !hasApprovals || sessionApproved.has(name)) return false;
+  if (!needsApproval || !hasApprovals || !approvals || sessionApproved.has(name)) return false;
   const planAuthorized = planMode && planApproved;
   if ((autoApprove || planAuthorized) && tool.risk !== 'high') {
     audit('tool.auto_approved', { tool: name, risk: tool.risk, via: autoApprove ? 'auto' : 'plan' });

@@ -30,6 +30,7 @@
     "apps/host/src/http/request-utils.js",
     "apps/host/src/http/middleware/common.js",
     "apps/host/src/http/static-assets.js",
+    "apps/host/src/kimi/agent/approval-gate.js",
     "apps/host/src/kimi/agent/arg-validator.js",
     "apps/host/src/kimi/agent/checkpoint-state.js",
     "apps/host/src/kimi/agent/clarification.js",
