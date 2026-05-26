@@ -1,6 +1,13 @@
+// @ts-check
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
+/** @typedef {{ writeHead(statusCode: number, headers?: Record<string, string | number>): unknown, end(chunk?: string | Buffer): unknown }} HttpResponseLike */
+/** @typedef {{ headers: Record<string, string | string[] | undefined>, on(event: string, listener: (...args: any[]) => void): unknown, resume?: () => unknown }} HttpRequestLike */
+/** @typedef {Error & { statusCode?: number, payload?: Record<string, unknown> }} HttpError */
+/** @typedef {{ requireJsonContentType?: boolean, maxBytes?: number }} JsonBodyOptions */
+
+/** @param {HttpResponseLike} response @param {number} status @param {unknown} payload */
 export function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
   response.writeHead(status, {
@@ -10,26 +17,31 @@ export function sendJson(response, status, payload) {
   response.end(body);
 }
 
+/** @param {HttpRequestLike} request @param {string} name @returns {string | undefined} */
 export function headerValue(request, name) {
   const value = request.headers[name.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** @param {unknown} value @param {string} fallback @returns {string} */
 export function stableHeader(value, fallback) {
   const text = String(value || '').trim();
   return /^[a-zA-Z0-9_.:-]{1,96}$/.test(text) ? text : fallback;
 }
 
+/** @param {HttpRequestLike} request @returns {boolean} */
 export function isJsonContentType(request) {
   const value = String(headerValue(request, 'content-type') || '').toLowerCase();
   return value.split(';')[0].trim() === 'application/json';
 }
 
+/** @param {unknown} hostname @returns {boolean} */
 export function isLoopbackHostname(hostname) {
   const value = String(hostname || '').toLowerCase();
   return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
 }
 
+/** @param {unknown} origin @returns {boolean} */
 export function isAllowedOrigin(origin) {
   const value = String(origin || '').trim();
   // No Origin header = same-origin navigation or a non-browser client (curl, the
@@ -60,20 +72,23 @@ export function isAllowedOrigin(origin) {
   }
 }
 
+/** @param {unknown} method @param {string} pathname @returns {boolean} */
 export function requiresOriginCheck(method, pathname) {
   return pathname.startsWith('/api/')
     && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
 }
 
+/** @param {unknown} value @returns {string | undefined} */
 export function stableJsonStringify(value) {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
   }
   if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
+    const record = /** @type {Record<string, unknown>} */ (value);
+    const entries = Object.keys(record)
       .sort()
       .map((key) => {
-        const encoded = stableJsonStringify(value[key]);
+        const encoded = stableJsonStringify(record[key]);
         return encoded === undefined ? undefined : `${JSON.stringify(key)}:${encoded}`;
       })
       .filter(Boolean);
@@ -82,6 +97,7 @@ export function stableJsonStringify(value) {
   return JSON.stringify(value);
 }
 
+/** @param {unknown} body @returns {string} */
 export function bodyFingerprint(body) {
   return crypto
     .createHash('sha256')
@@ -89,6 +105,7 @@ export function bodyFingerprint(body) {
     .digest('hex');
 }
 
+/** @param {HttpRequestLike} request @returns {{ traceId: string, tenantId: string, userId: string, authenticated: boolean, idempotencyKey: string }} */
 export function createRequestContext(request) {
   const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
   return {
@@ -104,14 +121,16 @@ export function createRequestContext(request) {
   };
 }
 
+/** @param {unknown} value @returns {string | null} */
 export function decodePathSegment(value) {
   try {
-    return decodeURIComponent(value);
+    return decodeURIComponent(String(value));
   } catch {
     return null;
   }
 }
 
+/** @param {HttpResponseLike} response @param {string} filePath @param {string} contentType */
 export function sendFile(response, filePath, contentType) {
   try {
     const body = fs.readFileSync(filePath);
@@ -122,12 +141,15 @@ export function sendFile(response, filePath, contentType) {
     });
     response.end(body);
   } catch (err) {
-    sendJson(response, 404, { error: `Static asset not found: ${err.message}` });
+    const error = /** @type {{ message?: string }} */ (err);
+    sendJson(response, 404, { error: `Static asset not found: ${error.message}` });
   }
 }
 
+/** @param {HttpRequestLike} request @param {{ maxBytes?: number }} [options] @returns {Promise<unknown>} */
 export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
   return new Promise((resolve, reject) => {
+    /** @type {Buffer[]} */
     const chunks = [];
     let totalBytes = 0;
     let rejected = false;
@@ -143,7 +165,7 @@ export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
         // caller can send a clear 413 response FIRST — Node then closes the
         // socket once the response finishes with the body still unread, instead
         // of the client seeing a bare connection reset.
-        const err = new Error(`Request body too large; max ${maxBytes} bytes`);
+        const err = /** @type {HttpError} */ (new Error(`Request body too large; max ${maxBytes} bytes`));
         err.statusCode = 413;
         // Drain & DISCARD the rest (don't buffer it) so the caller can send a
         // clean 413 and the connection closes normally — the client gets a real
@@ -159,7 +181,7 @@ export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
       if (rejected) {
         return;
       }
-      const raw = chunks.length ? Buffer.concat(chunks, totalBytes).toString('utf8') : '';
+      const raw = chunks.length ? Buffer.concat(chunks).toString('utf8') : '';
       if (!raw) {
         resolve({});
         return;
@@ -174,6 +196,7 @@ export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
   });
 }
 
+/** @param {HttpRequestLike} request @param {HttpResponseLike} response @param {(body: unknown) => void | Promise<void>} handler @param {JsonBodyOptions} [options] @returns {Promise<void>} */
 export async function withJsonBody(request, response, handler, options = {}) {
   if (options.requireJsonContentType !== false && !isJsonContentType(request)) {
     sendJson(response, 415, { error: 'content-type must be application/json' });
@@ -184,15 +207,17 @@ export async function withJsonBody(request, response, handler, options = {}) {
     body = await readJsonBody(request, options);
   } catch (err) {
     // 413 for oversized bodies, 400 for malformed JSON.
-    sendJson(response, err.statusCode || 400, { error: `Invalid JSON body: ${err.message}` });
+    const httpErr = /** @type {Partial<HttpError>} */ (err);
+    sendJson(response, httpErr.statusCode || 400, { error: `Invalid JSON body: ${httpErr.message}` });
     return;
   }
   try {
     await handler(body);
   } catch (err) {
-    sendJson(response, err.statusCode || 400, {
-      error: err.message,
-      ...(err.payload || {}),
+    const httpErr = /** @type {Partial<HttpError>} */ (err);
+    sendJson(response, httpErr.statusCode || 400, {
+      error: httpErr.message,
+      ...(httpErr.payload || {}),
     });
   }
 }

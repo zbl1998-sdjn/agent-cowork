@@ -1,15 +1,46 @@
+// @ts-check
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { stableJsonStringify } from '../http/request-utils.js';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * @typedef {{ tenantId?: unknown, userId?: unknown }} FileOperationApprovalContext
+ * @typedef {{ tenantId: string, userId: string }} FileOperationApprovalScope
+ * @typedef {{ kind: string, trustedRoot: string, operations?: unknown, context?: FileOperationApprovalContext }} FileOperationApprovalRequest
+ * @typedef {{
+ *   id: string,
+ *   kind: string,
+ *   trustedRoot: string,
+ *   operationsHash: string,
+ *   scope: FileOperationApprovalScope,
+ *   expiresAt: number,
+ *   used: boolean
+ * }} FileOperationApproval
+ * @typedef {{ ttlMs?: number, generateId?: () => string, now?: () => number }} FileOperationApprovalStoreOptions
+ * @typedef {{
+ *   issue(input: FileOperationApprovalRequest): string,
+ *   consume(id: unknown, input: FileOperationApprovalRequest): FileOperationApproval,
+ *   pendingCount(): number
+ * }} FileOperationApprovalStore
+ */
+
+/**
+ * @param {number} statusCode
+ * @param {string} message
+ * @returns {Error & { statusCode: number }}
+ */
 function makeHttpError(statusCode, message) {
-  const err = new Error(message);
+  const err = /** @type {Error & { statusCode: number }} */ (new Error(message));
   err.statusCode = statusCode;
   return err;
 }
 
+/**
+ * @param {FileOperationApprovalContext} [context]
+ * @returns {FileOperationApprovalScope}
+ */
 function scopeFromContext(context = {}) {
   return {
     tenantId: String(context.tenantId || 'tenant_local'),
@@ -17,6 +48,10 @@ function scopeFromContext(context = {}) {
   };
 }
 
+/**
+ * @param {{ kind: string, trustedRoot: string, operations?: unknown }} input
+ * @returns {string}
+ */
 function hashApproval({ kind, trustedRoot, operations }) {
   return crypto
     .createHash('sha256')
@@ -28,13 +63,19 @@ function hashApproval({ kind, trustedRoot, operations }) {
     .digest('hex');
 }
 
+/**
+ * @param {FileOperationApprovalStoreOptions} [options]
+ * @returns {FileOperationApprovalStore}
+ */
 export function createFileOperationApprovalStore({
   ttlMs = DEFAULT_TTL_MS,
   generateId = () => `fop_${crypto.randomUUID().replace(/-/g, '')}`,
   now = () => Date.now(),
 } = {}) {
+  /** @type {Map<string, FileOperationApproval>} */
   const approvals = new Map();
 
+  /** @returns {void} */
   function cleanup() {
     const current = now();
     for (const [id, approval] of approvals.entries()) {
@@ -44,6 +85,7 @@ export function createFileOperationApprovalStore({
     }
   }
 
+  /** @param {FileOperationApprovalRequest} input */
   function issue({ kind, trustedRoot, operations, context }) {
     cleanup();
     if (!kind) throw new Error('approval kind is required');
@@ -61,6 +103,10 @@ export function createFileOperationApprovalStore({
     return id;
   }
 
+  /**
+   * @param {unknown} id
+   * @param {FileOperationApprovalRequest} input
+   */
   function consume(id, { kind, trustedRoot, operations, context }) {
     cleanup();
     if (!id || typeof id !== 'string') {
