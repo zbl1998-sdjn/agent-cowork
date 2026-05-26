@@ -157,6 +157,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] FE-2b 局部迁移(产物面板控件):产物刷新、打开、重命名、保存、取消与重命名输入已迁移到 `Button`/`Input` 原语;新增 `ArtifactPanelItem` 状态单测锁定 primitive class、回调透传和非法文件名禁用提交。
 - [x] FE-2b 局部迁移(活页/定时任务控件):活页刷新/打开文件和定时任务刷新/取消已迁移到 `Button` 原语;新增状态/行组件单测锁定 primitive class、禁用规则和按 schedule id 取消回调。
 - [x] FE-2b 局部迁移(工具/提示优化/可视化控件):工具搜索/调用/计划、提示优化采纳/复制/清空、可视化活页渲染/重开已迁移到 `Button` 原语;新增组件/状态单测锁定 primitive class 与回调透传。
+- [x] FE-2b 局部迁移(头部/可观测/运行时/记忆/连接器控件):应用头部、可观测、运行时依赖、记忆、连接器搜索与连接动作已迁移到 `Button` 原语;新增单测覆盖忙碌/禁用文案与回调分支,全量 UI 和门禁通过。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
