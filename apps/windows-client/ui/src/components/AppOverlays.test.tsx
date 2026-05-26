@@ -5,13 +5,13 @@ import { AppOverlays } from './AppOverlays';
 
 const user: AuthIdentity = { tenantId: 'tenant-1', userId: 'user-1', username: 'Derrick' };
 
-function renderOverlays(settingsOpen: boolean): string {
+function renderOverlays({ settingsOpen = false, onboardingOpen = false } = {}): string {
   return renderToStaticMarkup(
     <AppOverlays
       cmdkOpen={false}
       commands={[]}
       previewPath={null}
-      onboardingOpen={false}
+      onboardingOpen={onboardingOpen}
       settingsOpen={settingsOpen}
       theme="light"
       trustedRoot="C:/work"
@@ -32,14 +32,21 @@ function renderOverlays(settingsOpen: boolean): string {
 
 describe('AppOverlays', () => {
   it('does not render the settings chunk when settings is closed', () => {
-    const html = renderOverlays(false);
+    const html = renderOverlays();
 
     expect(html).not.toContain('正在加载设置');
   });
 
   it('renders a fallback while the settings chunk loads', () => {
-    const html = renderOverlays(true);
+    const html = renderOverlays({ settingsOpen: true });
 
     expect(html).toContain('正在加载设置');
+  });
+
+  it('renders the onboarding overlay when first-run guidance is open', () => {
+    const html = renderOverlays({ onboardingOpen: true });
+
+    expect(html).toContain('首启引导');
+    expect(html).toContain('先按你的工作方式配一下');
   });
 });

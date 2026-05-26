@@ -3,7 +3,7 @@ import type { AuthIdentity, KimiInfo } from '../lib/api';
 import type { Command } from './CommandPalette';
 import { CommandPalette } from './CommandPalette';
 import { FilePreview } from './FilePreview';
-import { OnboardingPanel } from './OnboardingPanel';
+import { OnboardingPanel } from './overlays/OnboardingPanel';
 import { Loading } from './ui/StateViews';
 
 const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })));

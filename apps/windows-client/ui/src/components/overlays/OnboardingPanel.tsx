@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getJson, getOnboardingRecommendations } from '../lib/api';
+import { getJson, getOnboardingRecommendations } from '../../lib/api';
 import {
   getFallbackOnboarding,
   selectRecommendedDependencies,
@@ -9,7 +9,7 @@ import {
   type OnboardingRole,
   type OnboardingViewModel,
   type RuntimeDependencyItem,
-} from '../lib/onboarding';
+} from '../../lib/onboarding';
 
 interface RuntimeDependencyStatus {
   dependencies?: RuntimeDependencyItem[];
