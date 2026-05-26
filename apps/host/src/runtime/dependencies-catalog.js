@@ -1,3 +1,26 @@
+// @ts-check
+
+/**
+ * @typedef {'bundled' | 'system' | 'environment' | 'on-demand'} RuntimeDependencyInstallMode
+ * @typedef {'official' | 'vendor' | 'manual'} RuntimeDependencySourceKind
+ * @typedef {{ relativePath: string }} RuntimeDependencyCleanup
+ * @typedef {{
+ *   id: string,
+ *   section: string,
+ *   label: string,
+ *   description: string,
+ *   required: boolean,
+ *   installMode: RuntimeDependencyInstallMode,
+ *   estimatedDownloadBytes: number,
+ *   sourceKind?: RuntimeDependencySourceKind,
+ *   sourceUrl?: string | null,
+ *   sha256?: string | null,
+ *   signaturePolicy?: string,
+ *   cleanup?: RuntimeDependencyCleanup
+ * }} RuntimeDependencyCatalogItem
+ */
+
+/** @type {readonly RuntimeDependencyCatalogItem[]} */
 export const RUNTIME_DEPENDENCY_CATALOG = Object.freeze([
   {
     id: 'node',

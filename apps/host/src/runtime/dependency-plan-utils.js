@@ -1,20 +1,38 @@
+// @ts-check
 import path from 'node:path';
 import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
 
+/** @typedef {import('./dependencies-catalog.js').RuntimeDependencyCatalogItem} RuntimeDependencyCatalogItem */
+/** @typedef {{ ok: boolean, status: 'not_required' | 'ready' | 'blocked', reasons: string[] }} SupplyChainPrecheck */
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
 export function finiteBytes(value) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }
 
+/**
+ * @returns {Map<string, RuntimeDependencyCatalogItem>}
+ */
 export function dependencyById() {
   return new Map(RUNTIME_DEPENDENCY_CATALOG.map((item) => [item.id, item]));
 }
 
+/**
+ * @returns {string}
+ */
 export function defaultAppDataRoot() {
   const base = process.env.APPDATA || process.env.LOCALAPPDATA || process.cwd();
   return path.resolve(base, 'AgentCowork');
 }
 
+/**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
 export function normalizeAgentCoworkRoot(value) {
   const root = path.resolve(value || defaultAppDataRoot());
   if (path.basename(root).toLowerCase() !== 'agentcowork') {
@@ -23,6 +41,11 @@ export function normalizeAgentCoworkRoot(value) {
   return root;
 }
 
+/**
+ * @param {string} root
+ * @param {string} relativePath
+ * @returns {string}
+ */
 export function safeChild(root, relativePath) {
   const target = path.resolve(root, relativePath);
   const relative = path.relative(root, target);
@@ -32,20 +55,32 @@ export function safeChild(root, relativePath) {
   return target;
 }
 
+/**
+ * @returns {string[]}
+ */
 export function onDemandDependencyIds() {
   return RUNTIME_DEPENDENCY_CATALOG
     .filter((item) => item.installMode === 'on-demand')
     .map((item) => item.id);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is string}
+ */
 export function hasValidSha256(value) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
 }
 
+/**
+ * @param {RuntimeDependencyCatalogItem} item
+ * @returns {SupplyChainPrecheck}
+ */
 export function buildSupplyChainPrecheck(item) {
   if (item.installMode !== 'on-demand') {
     return { ok: true, status: 'not_required', reasons: [] };
   }
+  /** @type {string[]} */
   const reasons = [];
   if (!item.sourceKind) reasons.push('缺少下载来源类型。');
   if (!item.sourceUrl) reasons.push('缺少下载来源 URL。');
@@ -58,6 +93,11 @@ export function buildSupplyChainPrecheck(item) {
   };
 }
 
+/**
+ * @param {string} appDataRoot
+ * @param {string} relativePath
+ * @returns {string}
+ */
 export function retainedPath(appDataRoot, relativePath) {
   return relativePath === '.' ? appDataRoot : safeChild(appDataRoot, relativePath);
 }
