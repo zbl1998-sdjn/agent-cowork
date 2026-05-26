@@ -78,6 +78,14 @@ declare module 'node:child_process' {
     stderr?: T;
   }
 
+  export interface ExecFileError extends Error {
+    code?: number | string;
+    stdout?: string | Buffer;
+    stderr?: string | Buffer;
+  }
+
+  export type ExecFileCallback = (error: ExecFileError | null, stdout: string | Buffer, stderr: string | Buffer) => void;
+
   export function spawnSync(
     command: string,
     args?: readonly string[],
@@ -88,6 +96,16 @@ declare module 'node:child_process' {
     args?: readonly string[],
     options?: Record<string, unknown>
   ): ChildProcessLike;
+  export function execFile(
+    command: string,
+    args?: readonly string[],
+    options?: Record<string, unknown>,
+    callback?: ExecFileCallback
+  ): ChildProcessLike;
+}
+
+declare module 'node:util' {
+  export function promisify(fn: (...args: any[]) => unknown): any;
 }
 
 declare module 'node:fs' {

@@ -3,34 +3,50 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../../security/path-policy.js';
 
+/**
+ * @typedef {Error & { code?: number | string, stdout?: unknown, stderr?: unknown }} GitExecError
+ * @typedef {{ root: string, workspace: string }} ResolvedWorkspace
+ * @typedef {{ trustedRoot?: string, context?: unknown }} ToolContext
+ * @typedef {{ workspace?: unknown, short?: unknown, branch?: unknown, path?: unknown, staged?: unknown, stat?: unknown, context?: unknown, maxCount?: unknown, message?: unknown, all?: unknown, paths?: unknown }} GitToolArgs
+ * @typedef {{ trustedRoot?: unknown, workspace?: unknown, args: string[] }} RunGitOptions
+ * @typedef {{ ok: boolean, exitCode: number, workspace: string, stdout: string, stderr: string }} GitRunResult
+ */
+
+/** @type {(command: string, args: string[], options: Record<string, unknown>) => Promise<{ stdout?: unknown, stderr?: unknown }>} */
 const execFileAsync = promisify(execFile);
 const MAX_OUTPUT_BYTES = 12000;
 
+/** @param {unknown} text @param {number} [max] */
 function clip(text, max = MAX_OUTPUT_BYTES) {
   const s = String(text ?? '');
   return s.length > max ? `${s.slice(0, max)}\n...(truncated ${s.length - max} chars)` : s;
 }
 
+/** @param {unknown} value @param {number} fallback @param {number} min @param {number} max */
 function intInRange(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
+/** @param {unknown} trustedRoot @param {unknown} [workspace] @returns {ResolvedWorkspace} */
 function resolveWorkspace(trustedRoot, workspace = '.') {
   if (!trustedRoot) throw new Error('trustedRoot is required');
-  const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
+  const trustedRootText = String(trustedRoot);
+  const root = assertTrustedPath(path.resolve(trustedRootText), path.resolve(trustedRootText));
   const workspaceText = String(workspace || '.');
   const target = assertTrustedPath(path.isAbsolute(workspaceText) ? workspaceText : path.join(root, workspaceText), root);
   return { root, workspace: target };
 }
 
+/** @param {string} root @param {string} workspace @param {unknown} relPath */
 function resolveGitPath(root, workspace, relPath) {
   if (!relPath) return null;
   const full = assertTrustedPathForCreate(path.join(workspace, String(relPath)), root);
   return path.relative(workspace, full).replace(/\\/g, '/');
 }
 
+/** @param {RunGitOptions} options @returns {Promise<GitRunResult>} */
 async function runGit({ trustedRoot, workspace = '.', args }) {
   const resolved = resolveWorkspace(trustedRoot, workspace);
   const argv = [
@@ -55,12 +71,13 @@ async function runGit({ trustedRoot, workspace = '.', args }) {
       stderr: clip(result.stderr, 4000),
     };
   } catch (err) {
+    const error = /** @type {GitExecError} */ (err);
     return {
       ok: false,
-      exitCode: typeof err.code === 'number' ? err.code : 1,
+      exitCode: typeof error.code === 'number' ? error.code : 1,
       workspace: path.relative(resolved.root, resolved.workspace).replace(/\\/g, '/') || '.',
-      stdout: clip(err.stdout),
-      stderr: clip(err.stderr || err.message, 4000),
+      stdout: clip(error.stdout),
+      stderr: clip(error.stderr || error.message, 4000),
     };
   }
 }
@@ -79,9 +96,11 @@ export function createGitStatusTool() {
       },
     },
     handler: async (args = {}, ctx = {}) => {
-      const statusArgs = ['status', args.short === true ? '--short' : '--porcelain=v1'];
-      if (args.branch === true) statusArgs.push('--branch');
-      return runGit({ trustedRoot: ctx.trustedRoot, workspace: args.workspace, args: statusArgs });
+      const input = /** @type {GitToolArgs} */ (args);
+      const context = /** @type {ToolContext} */ (ctx);
+      const statusArgs = ['status', input.short === true ? '--short' : '--porcelain=v1'];
+      if (input.branch === true) statusArgs.push('--branch');
+      return runGit({ trustedRoot: context.trustedRoot, workspace: input.workspace, args: statusArgs });
     },
   };
 }
@@ -102,11 +121,13 @@ export function createGitDiffTool() {
       },
     },
     handler: async (args = {}, ctx = {}) => {
-      const { root, workspace } = resolveWorkspace(ctx.trustedRoot, args.workspace);
-      const diffArgs = ['diff', `--unified=${intInRange(args.context, 3, 0, 20)}`];
-      if (args.staged === true) diffArgs.push('--cached');
-      if (args.stat === true) diffArgs.push('--stat');
-      const relPath = resolveGitPath(root, workspace, args.path);
+      const input = /** @type {GitToolArgs} */ (args);
+      const context = /** @type {ToolContext} */ (ctx);
+      const { root, workspace } = resolveWorkspace(context.trustedRoot, input.workspace);
+      const diffArgs = ['diff', `--unified=${intInRange(input.context, 3, 0, 20)}`];
+      if (input.staged === true) diffArgs.push('--cached');
+      if (input.stat === true) diffArgs.push('--stat');
+      const relPath = resolveGitPath(root, workspace, input.path);
       if (relPath) diffArgs.push('--', relPath);
       return runGit({ trustedRoot: root, workspace, args: diffArgs });
     },
@@ -127,9 +148,11 @@ export function createGitLogTool() {
       },
     },
     handler: async (args = {}, ctx = {}) => {
-      const { root, workspace } = resolveWorkspace(ctx.trustedRoot, args.workspace);
-      const logArgs = ['log', '--oneline', '--decorate=short', `--max-count=${intInRange(args.maxCount, 10, 1, 50)}`];
-      const relPath = resolveGitPath(root, workspace, args.path);
+      const input = /** @type {GitToolArgs} */ (args);
+      const context = /** @type {ToolContext} */ (ctx);
+      const { root, workspace } = resolveWorkspace(context.trustedRoot, input.workspace);
+      const logArgs = ['log', '--oneline', '--decorate=short', `--max-count=${intInRange(input.maxCount, 10, 1, 50)}`];
+      const relPath = resolveGitPath(root, workspace, input.path);
       if (relPath) logArgs.push('--', relPath);
       return runGit({ trustedRoot: root, workspace, args: logArgs });
     },
@@ -153,15 +176,17 @@ export function createGitCommitTool() {
       required: ['message'],
     },
     handler: async (args = {}, ctx = {}) => {
-      const message = String(args.message || '').trim();
+      const input = /** @type {GitToolArgs} */ (args);
+      const context = /** @type {ToolContext} */ (ctx);
+      const message = String(input.message || '').trim();
       if (!message) throw new Error('message is required');
       if (message.length > 500) throw new Error('message is too long');
-      const { root, workspace } = resolveWorkspace(ctx.trustedRoot, args.workspace);
-      const rawPaths = Array.isArray(args.paths) ? args.paths.filter(Boolean) : [];
-      if (args.all === true && rawPaths.length) throw new Error('use either all=true or paths, not both');
+      const { root, workspace } = resolveWorkspace(context.trustedRoot, input.workspace);
+      const rawPaths = Array.isArray(input.paths) ? input.paths.filter(Boolean) : [];
+      if (input.all === true && rawPaths.length) throw new Error('use either all=true or paths, not both');
       if (rawPaths.length > 100) throw new Error('too many paths');
-      const paths = rawPaths.map((p) => resolveGitPath(root, workspace, p));
-      const addArgs = args.all === true
+      const paths = /** @type {string[]} */ (rawPaths.map((p) => resolveGitPath(root, workspace, p)));
+      const addArgs = input.all === true
         ? ['add', '-A', '--', '.']
         : paths.length
           ? ['add', '--', ...paths]
