@@ -4,16 +4,29 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+/**
+ * @typedef {{ tenantId?: unknown, userId?: unknown, provider?: unknown, accountId?: unknown }} CredentialIdentity
+ * @typedef {{ provider: string, accountId: string, tenantId: string, userId: string, scopes: string[], account: Record<string, unknown> | null, updatedAt: string }} CredentialSummary
+ * @typedef {{ summary: CredentialSummary, sealed: string }} CredentialEntry
+ * @typedef {{ schemaVersion: number, entries: Record<string, CredentialEntry> }} CredentialFile
+ * @typedef {{ protect(plainText: unknown): string, unprotect(sealedText: unknown): string }} CredentialProtector
+ * @typedef {{ filePath?: string, protector?: CredentialProtector }} CredentialStoreOptions
+ * @typedef {{ tenantId?: unknown, userId?: unknown, provider?: unknown, accountId?: unknown }} CredentialFilter
+ */
+
+/** @param {string} filePath */
 function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
+/** @param {unknown} value @param {unknown} fallback */
 function safePart(value, fallback) {
   const text = String(value || fallback || '').trim();
   if (!text) throw new Error('credential identity contains an empty key part');
   return encodeURIComponent(text);
 }
 
+/** @param {CredentialIdentity} identity */
 function credentialKey(identity) {
   return [
     safePart(identity.tenantId, 'tenant_local'),
@@ -23,22 +36,28 @@ function credentialKey(identity) {
   ].join('/');
 }
 
+/** @param {string} filePath @returns {CredentialFile} */
 function readStore(filePath) {
   if (!fs.existsSync(filePath)) {
     return { schemaVersion: 1, entries: {} };
   }
   const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const record = /** @type {{ entries?: unknown }} */ (data || {});
   return {
     schemaVersion: 1,
-    entries: data && data.entries && typeof data.entries === 'object' ? data.entries : {},
+    entries: record.entries && typeof record.entries === 'object'
+      ? /** @type {Record<string, CredentialEntry>} */ (record.entries)
+      : {},
   };
 }
 
+/** @param {string} filePath @param {CredentialFile} data */
 function writeStore(filePath, data) {
   ensureDir(filePath);
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
+/** @param {Record<string, unknown>} value */
 function scopesFrom(value) {
   if (Array.isArray(value.scopes)) {
     return value.scopes.map(String).map((s) => s.trim()).filter(Boolean);
@@ -46,9 +65,11 @@ function scopesFrom(value) {
   return String(value.scope || '').split(/\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
+/** @param {unknown} account @returns {Record<string, unknown> | null} */
 function safeAccount(account) {
   if (!account || typeof account !== 'object') return null;
   const source = /** @type {Record<string, unknown>} */ (account);
+  /** @type {Record<string, unknown>} */
   const out = {};
   for (const key of ['login', 'id', 'name', 'email']) {
     if (source[key] !== undefined && source[key] !== null) out[key] = source[key];
@@ -56,6 +77,7 @@ function safeAccount(account) {
   return Object.keys(out).length ? out : null;
 }
 
+/** @param {CredentialIdentity} identity @param {Record<string, unknown>} secret @returns {CredentialSummary} */
 function summarize(identity, secret) {
   const account = safeAccount(secret.account);
   return {
@@ -69,10 +91,12 @@ function summarize(identity, secret) {
   };
 }
 
+/** @param {unknown} keyMaterial */
 function aesKey(keyMaterial) {
   return crypto.createHash('sha256').update(String(keyMaterial || '')).digest();
 }
 
+/** @param {{ keyMaterial?: unknown }} [options] @returns {CredentialProtector} */
 export function createAesGcmProtector({ keyMaterial } = {}) {
   const key = aesKey(keyMaterial || process.env.KCW_CREDENTIAL_KEY || `${os.hostname()}:${os.userInfo().username}:${os.homedir()}`);
   return {
@@ -105,8 +129,9 @@ function powershellPath() {
   return fs.existsSync(windowsPowerShell) ? windowsPowerShell : 'powershell.exe';
 }
 
+/** @param {string} script @param {string} base64Input */
 function runDpapi(script, base64Input) {
-  return childProcess.execFileSync(powershellPath(), [
+  const output = childProcess.execFileSync(powershellPath(), [
     '-NoProfile',
     '-ExecutionPolicy',
     'Bypass',
@@ -117,9 +142,11 @@ function runDpapi(script, base64Input) {
     encoding: 'utf8',
     windowsHide: true,
     timeout: 5000,
-  }).trim();
+  });
+  return String(output).trim();
 }
 
+/** @returns {CredentialProtector} */
 export function createDpapiProtector() {
   const scope = '[System.Security.Cryptography.DataProtectionScope]::CurrentUser';
   return {
@@ -138,14 +165,17 @@ export function createDpapiProtector() {
   };
 }
 
+/** @returns {CredentialProtector} */
 export function createDefaultCredentialProtector() {
   if (process.platform === 'win32') return createDpapiProtector();
   return createAesGcmProtector();
 }
 
+/** @param {CredentialStoreOptions} [options] */
 export function createCredentialStore({ filePath, protector = createDefaultCredentialProtector() } = {}) {
   if (!filePath) throw new Error('createCredentialStore: filePath is required');
   return {
+    /** @param {CredentialIdentity} identity @param {Record<string, unknown>} secret */
     put(identity, secret) {
       const key = credentialKey(identity);
       const data = readStore(filePath);
@@ -157,12 +187,14 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
       writeStore(filePath, data);
       return { ...summary };
     },
+    /** @param {CredentialIdentity} identity */
     get(identity) {
       const data = readStore(filePath);
       const entry = data.entries[credentialKey(identity)];
       if (!entry) return null;
       return JSON.parse(protector.unprotect(entry.sealed));
     },
+    /** @param {CredentialFilter} [filter] */
     list(filter = {}) {
       const data = readStore(filePath);
       return Object.entries(data.entries)
@@ -175,6 +207,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
         })
         .map(([, entry]) => ({ ...(entry.summary || {}) }));
     },
+    /** @param {CredentialIdentity} identity */
     delete(identity) {
       const key = credentialKey(identity);
       const data = readStore(filePath);
@@ -183,6 +216,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
       if (existed) writeStore(filePath, data);
       return existed;
     },
+    /** @param {CredentialFilter} [filter] */
     deleteMany(filter = {}) {
       const data = readStore(filePath);
       let removed = 0;

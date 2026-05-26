@@ -45,6 +45,20 @@ declare module 'node:crypto' {
     digest(encoding: 'hex' | 'base64'): string;
   }
 
+  export interface Cipher {
+    update(data: Buffer | string, inputEncoding?: string): Buffer;
+    final(): Buffer;
+    getAuthTag(): Buffer;
+  }
+
+  export interface Decipher {
+    update(data: Buffer | string): Buffer;
+    final(): Buffer;
+    setAuthTag(tag: Buffer): void;
+  }
+
+  export function createCipheriv(algorithm: string, key: Buffer, iv: Buffer): Cipher;
+  export function createDecipheriv(algorithm: string, key: Buffer, iv: Buffer): Decipher;
   export function createHash(algorithm: string): Hash;
   export function createHmac(algorithm: string, key: Buffer | string): Hmac;
   export function randomBytes(size: number): Buffer;
@@ -102,6 +116,11 @@ declare module 'node:child_process' {
     options?: Record<string, unknown>,
     callback?: ExecFileCallback
   ): ChildProcessLike;
+  export function execFileSync(
+    command: string,
+    args?: readonly string[],
+    options?: Record<string, unknown>
+  ): string | Buffer;
 }
 
 declare module 'node:util' {
@@ -135,10 +154,17 @@ declare module 'node:fs' {
   export function statSync(path: string): Stats;
   export function unlinkSync(path: string): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
+  export function writeFileSync(path: string, data: Buffer | string, options?: Record<string, unknown>): void;
   export function realpathSync(path: string): string;
   export namespace realpathSync {
     export function native(path: string): string;
   }
+}
+
+declare module 'node:os' {
+  export function hostname(): string;
+  export function homedir(): string;
+  export function userInfo(): { username: string };
 }
 
 declare module 'node:path' {

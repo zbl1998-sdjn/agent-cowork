@@ -116,6 +116,7 @@
     "apps/host/src/sandbox/startup-probe.js",
     "apps/host/src/sandbox/vm-sandbox.js",
     "apps/host/src/sandbox/wsl-docker-runner.js",
+    "apps/host/src/security/credential-store.js",
     "apps/host/src/storage/audit-events.js",
     "apps/host/src/storage/json-store.js",
     "apps/host/src/storage/jsonl-writer.js",
