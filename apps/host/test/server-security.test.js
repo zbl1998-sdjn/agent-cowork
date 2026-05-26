@@ -130,6 +130,40 @@ test('request-supplied trustedRoot cannot escape configured workspace', async ()
     const memory = await jsonRequest(base, `/api/memory?trustedRoot=${encodeURIComponent(outsideRoot)}`);
     assert.equal(memory.status, 400);
 
+    const memoryProfile = await jsonRequest(base, `/api/memory/profile?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(memoryProfile.status, 400);
+
+    const memoryNote = await jsonRequest(
+      base,
+      `/api/memory/notes/projects.md?trustedRoot=${encodeURIComponent(outsideRoot)}`,
+    );
+    assert.equal(memoryNote.status, 400);
+
+    const memoryFact = await jsonRequest(base, '/api/memory/facts', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, key: 'secret', value: 'outside' },
+    });
+    assert.equal(memoryFact.status, 400);
+
+    const memoryNoteWrite = await jsonRequest(base, '/api/memory/notes', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, name: 'projects.md', body: 'outside' },
+    });
+    assert.equal(memoryNoteWrite.status, 400);
+
+    const memoryProfileLearn = await jsonRequest(base, '/api/memory/profile/learn', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, type: 'term', key: 'secret', value: 'outside' },
+    });
+    assert.equal(memoryProfileLearn.status, 400);
+
+    const memoryProfileForget = await jsonRequest(base, '/api/memory/profile/forget', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, key: 'secret' },
+    });
+    assert.equal(memoryProfileForget.status, 400);
+    assert.equal(fs.existsSync(path.join(outsideRoot, '.AgentCowork')), false);
+
     const artifacts = await jsonRequest(base, `/api/artifacts?trustedRoot=${encodeURIComponent(outsideRoot)}`);
     assert.equal(artifacts.status, 400);
 

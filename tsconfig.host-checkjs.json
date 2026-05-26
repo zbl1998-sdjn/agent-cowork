@@ -108,6 +108,7 @@
     "apps/host/src/routes/auth-routes.js",
     "apps/host/src/routes/connector-oauth-routes.js",
     "apps/host/src/routes/connector-routes.js",
+    "apps/host/src/routes/memory-routes.js",
     "apps/host/src/routes/onboarding-routes.js",
     "apps/host/src/routes/plan-routes.js",
     "apps/host/src/routes/prompt-routes.js",
