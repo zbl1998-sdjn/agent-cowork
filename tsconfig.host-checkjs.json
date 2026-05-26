@@ -142,6 +142,7 @@
     "apps/host/src/workspace/file-operation-utils.js",
     "apps/host/src/workspace/file-rollback.js",
     "apps/host/src/workspace/file-reader.js",
+    "apps/host/src/workspace/file-search.js",
     "apps/host/src/workspace/file-tree.js",
     "apps/host/src/workspace/image-loader.js",
     "apps/host/src/workspace/zip-utils.js",

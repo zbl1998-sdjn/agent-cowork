@@ -4,12 +4,19 @@ import { extractDocumentText, isExtractableDocument } from './document-extractor
 
 const DEFAULT_MAX_CONTENT_BYTES = 1024 * 1024;
 
+/**
+ * @typedef {{ trustedRoot?: string, root?: string, query?: unknown, maxResults?: number, includeContent?: boolean, maxContentBytes?: number }} SearchOptions
+ * @typedef {{ path: string, fullPath: string, size: number, mtimeMs: number, match: 'content' | 'name', excerpt: string, extension: string }} SearchResult
+ */
+
+/** @param {unknown} value @param {number} fallback @param {number} min @param {number} max @returns {number} */
 function cap(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), min), max);
 }
 
+/** @param {SearchOptions} [options] @returns {{ query: string, results: SearchResult[] }} */
 export function searchWorkspace(options = {}) {
   const trustedRoot = options.trustedRoot ?? options.root;
   if (!trustedRoot) {
@@ -27,6 +34,7 @@ export function searchWorkspace(options = {}) {
     includeDirectories: false,
   }).filter((entry) => entry.kind === 'file');
 
+  /** @type {SearchResult[]} */
   const results = [];
   for (const file of files) {
     const nameHit = file.path.toLowerCase().includes(query);
