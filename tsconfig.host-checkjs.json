@@ -32,6 +32,7 @@
     "apps/host/src/http/static-assets.js",
     "apps/host/src/kimi/agent/arg-validator.js",
     "apps/host/src/kimi/agent/checkpoint-state.js",
+    "apps/host/src/kimi/agent/finalize.js",
     "apps/host/src/kimi/agent/loop-guard.js",
     "apps/host/src/kimi/agent/model-resilience.js",
     "apps/host/src/kimi/agent/run-trace-events.js",
