@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +12,12 @@ import path from 'node:path';
 // Layers are concatenated lowest→highest precedence so later layers refine
 // earlier ones; the combined block is injected into the agent's system prompt.
 
+/**
+ * @typedef {'enterprise' | 'user' | 'project' | 'local' | 'session'} LayerName
+ * @typedef {{ trustedRoot?: string, userHome?: string, enterprisePath?: string, sessionMemory?: string, maxBytes?: number, perLayerBytes?: number }} LayeredMemoryOptions
+ */
+
+/** @type {Record<LayerName, string>} */
 const LAYER_LABELS = {
   enterprise: '企业策略',
   user: '用户记忆',
@@ -19,6 +26,7 @@ const LAYER_LABELS = {
   session: '会话记忆',
 };
 
+/** @param {string | null | undefined} filePath @param {number} maxBytes */
 function readIfFile(filePath, maxBytes) {
   try {
     if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
@@ -31,6 +39,7 @@ function readIfFile(filePath, maxBytes) {
   return '';
 }
 
+/** @param {LayeredMemoryOptions} [options] */
 export function loadLayeredMemory({
   trustedRoot,
   userHome = os.homedir(),
@@ -38,8 +47,9 @@ export function loadLayeredMemory({
   sessionMemory = '',
   maxBytes = 12000,
   perLayerBytes = 6000,
-} = {}) {
+  } = {}) {
   const projectDir = trustedRoot ? path.join(trustedRoot, '.AgentCowork') : null;
+  /** @type {Record<LayerName, string | null>} */
   const sources = {
     enterprise: enterprisePath || null,
     user: path.join(userHome, '.AgentCowork', 'MEMORY.md'),
@@ -47,6 +57,7 @@ export function loadLayeredMemory({
     local: projectDir ? path.join(projectDir, 'MEMORY.local.md') : null,
     session: '(session)',
   };
+  /** @type {LayerName[]} */
   const order = ['enterprise', 'user', 'project', 'local', 'session'];
   const layers = order.map((layer) => {
     const text = layer === 'session' ? String(sessionMemory || '') : readIfFile(sources[layer], perLayerBytes);

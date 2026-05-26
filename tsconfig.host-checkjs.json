@@ -47,6 +47,7 @@
     "apps/host/src/kimi/prompt/refiner.js",
     "apps/host/src/kimi/safety/untrusted-content.js",
     "apps/host/src/kimi/system-prompt.js",
+    "apps/host/src/memory/memory-layers.js",
     "apps/host/src/memory/memory-utils.js",
     "apps/host/src/memory/profile.js",
     "apps/host/src/mcp/connect.js",
