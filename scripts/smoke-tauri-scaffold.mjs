@@ -47,7 +47,11 @@ assert(config.bundle?.active === true, 'Tauri bundle must be active');
 assert(config.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be enabled');
 assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/agent-cowork-host']), 'Tauri bundle must declare host sidecar');
 assert(config.plugins?.updater?.pubkey, 'Tauri updater pubkey missing');
-assert((config.plugins?.updater?.endpoints || []).includes('http://127.0.0.1:3017/desktop-update/{{target}}/{{arch}}/{{current_version}}'), 'Tauri updater endpoint missing');
+const updaterEndpoints = config.plugins?.updater?.endpoints || [];
+assert(updaterEndpoints.includes('https://updates.agent-cowork.local/desktop-update/{{target}}/{{arch}}/{{current_version}}'), 'Tauri updater endpoint missing');
+for (const endpoint of updaterEndpoints) {
+  assert(endpoint.startsWith('https://'), 'Tauri updater endpoints must use HTTPS in release builds');
+}
 
 const cargoToml = fs.readFileSync(cargoPath, 'utf8');
 for (const crate of ['tauri =', 'tauri-plugin-shell', 'tauri-plugin-opener', 'tauri-plugin-notification', 'tauri-plugin-updater']) {

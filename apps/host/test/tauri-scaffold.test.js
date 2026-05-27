@@ -28,8 +28,11 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
   assert.ok(config.plugins?.updater?.pubkey, 'Tauri updater pubkey must be configured');
   assert.deepEqual(config.plugins.updater.endpoints, [
-    'http://127.0.0.1:3017/desktop-update/{{target}}/{{arch}}/{{current_version}}',
+    'https://updates.agent-cowork.local/desktop-update/{{target}}/{{arch}}/{{current_version}}',
   ]);
+  for (const endpoint of config.plugins.updater.endpoints) {
+    assert.ok(endpoint.startsWith('https://'), 'release updater endpoints must use HTTPS');
+  }
 });
 
 test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
