@@ -6,6 +6,7 @@ import path from 'node:path';
 // so a signed-in user's history follows their account across devices/instances
 // that share the same data root. Guests (tenant_local/user_local) get the same
 // treatment, which keeps the desktop's offline experience intact.
+// @ts-check
 
 const ROOT_DIR = '.AgentCowork';
 const CONV_DIR = 'conversations';
@@ -13,6 +14,19 @@ const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BYTES = 1024 * 1024; // hard cap per conversation document
 const MAX_TITLE = 200;
 
+/**
+ * @typedef {{ tenantId?: unknown, userId?: unknown }} ConversationContext
+ * @typedef {{ id: string, title: string, parentBranchId?: string, baseMessageId?: string, createdAt?: string, messages: unknown[] }} ConversationBranch
+ * @typedef {{ id?: unknown, title?: unknown, pinned?: unknown, messages?: unknown, activeBranchId?: unknown, branches?: unknown, createdAt?: unknown, updatedAt?: unknown }} ConversationInput
+ * @typedef {{ id: string, title: string, pinned: boolean, messages: unknown[], activeBranchId?: string, branches?: ConversationBranch[], createdAt?: unknown, updatedAt?: unknown }} ConversationRecord
+ * @typedef {{ id: string, title: string, pinned: boolean, messageCount: number, branchCount: number, activeBranchId?: string, createdAt?: unknown, updatedAt?: unknown }} ConversationSummary
+ * @typedef {{ q?: unknown, limit?: unknown, offset?: unknown }} ConversationQueryOptions
+ * @typedef {{ items: ConversationSummary[], total: number }} ConversationQueryResult
+ * @typedef {{ limit?: number }} ConversationListFullOptions
+ * @typedef {{ backend?: string, now?: () => Date }} ConversationStoreOptions
+ */
+
+/** @param {unknown} value @param {string} fallback @returns {string} */
 function normaliseSegment(value, fallback) {
   const text = String(value || '').trim();
   if (!text) return fallback;
@@ -22,35 +36,41 @@ function normaliseSegment(value, fallback) {
   return safe || fallback;
 }
 
+/** @param {unknown} trustedRoot @returns {string} */
 function ensureTrustedRoot(trustedRoot) {
   const root = String(trustedRoot || '').trim();
   if (!root) throw new Error('trustedRoot is required');
   return path.resolve(root);
 }
 
+/** @param {unknown} trustedRoot @param {ConversationContext} [context] @returns {string} */
 function userDir(trustedRoot, context = {}) {
   const tenant = normaliseSegment(context.tenantId, 'tenant_local');
   const user = normaliseSegment(context.userId, 'user_local');
   return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, CONV_DIR, tenant, user);
 }
 
+/** @param {unknown} id @returns {string} */
 function cleanId(id) {
   const text = String(id || '').trim();
   if (!ID_RE.test(text)) throw new Error('invalid conversation id');
   return text;
 }
 
+/** @param {unknown} messages @returns {unknown[]} */
 function sanitizeMessages(messages) {
   if (!Array.isArray(messages)) return [];
   // Cap the stored history so a runaway conversation can't blow the byte limit.
   return messages.slice(-200);
 }
 
+/** @param {unknown} value @returns {string} */
 function safeOptionalId(value) {
   const text = String(value || '').trim();
   return ID_RE.test(text) ? text : '';
 }
 
+/** @param {unknown} branches @returns {ConversationBranch[]} */
 function sanitizeBranches(branches) {
   if (!Array.isArray(branches)) return [];
   return branches.slice(-12).map((branch, index) => {
@@ -66,6 +86,7 @@ function sanitizeBranches(branches) {
   });
 }
 
+/** @param {ConversationRecord} conv @returns {ConversationSummary} */
 function summarise(conv) {
   return {
     id: conv.id,
@@ -80,32 +101,42 @@ function summarise(conv) {
 }
 
 export class FileConversationStore {
+  /** @param {ConversationStoreOptions} [options] */
   constructor({ now = () => new Date() } = {}) {
+    /** @type {() => Date} */
     this.now = now;
   }
 
+  /** @template T @param {unknown} trustedRoot @param {ConversationContext} context @param {(conv: ConversationRecord) => T} mapper @returns {T[]} */
   _readDir(trustedRoot, context, mapper) {
     const dir = userDir(trustedRoot, context);
     if (!fs.existsSync(dir)) return [];
+    /** @type {T[]} */
     const out = [];
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.json')) continue;
       try {
-        const conv = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+        const conv = /** @type {ConversationRecord} */ (JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')));
         if (conv && conv.id) out.push(mapper(conv));
       } catch {
         /* skip corrupt document */
       }
     }
-    out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    out.sort((a, b) => {
+      const left = /** @type {{ updatedAt?: unknown }} */ (a);
+      const right = /** @type {{ updatedAt?: unknown }} */ (b);
+      return String(right.updatedAt || '').localeCompare(String(left.updatedAt || ''));
+    });
     return out;
   }
 
+  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @returns {ConversationSummary[]} */
   list(trustedRoot, context = {}) {
     return this._readDir(trustedRoot, context, summarise);
   }
 
   // Paginated + title-searched summaries: { items, total }.
+  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationQueryOptions} [options] @returns {ConversationQueryResult} */
   query(trustedRoot, context = {}, { q = '', limit = 30, offset = 0 } = {}) {
     const all = this._readDir(trustedRoot, context, summarise);
     const ql = String(q || '').trim().toLowerCase();
@@ -115,21 +146,24 @@ export class FileConversationStore {
     return { items: filtered.slice(off, off + lim), total: filtered.length };
   }
 
+  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationListFullOptions} [options] @returns {ConversationRecord[]} */
   listFull(trustedRoot, context = {}, { limit } = {}) {
     const all = this._readDir(trustedRoot, context, (conv) => conv);
     return typeof limit === 'number' ? all.slice(0, Math.max(0, limit)) : all;
   }
 
+  /** @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {ConversationRecord | null} */
   get(trustedRoot, id, context = {}) {
     const file = path.join(userDir(trustedRoot, context), `${cleanId(id)}.json`);
     if (!fs.existsSync(file)) return null;
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
+      return /** @type {ConversationRecord} */ (JSON.parse(fs.readFileSync(file, 'utf8')));
     } catch {
       return null;
     }
   }
 
+  /** @param {unknown} trustedRoot @param {ConversationInput} conv @param {ConversationContext} [context] @returns {ConversationSummary} */
   save(trustedRoot, conv, context = {}) {
     const id = cleanId(conv && conv.id);
     const dir = userDir(trustedRoot, context);
@@ -161,14 +195,16 @@ export class FileConversationStore {
     return summarise(record);
   }
 
+  /** @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {boolean} */
   remove(trustedRoot, id, context = {}) {
     const file = path.join(userDir(trustedRoot, context), `${cleanId(id)}.json`);
     if (!fs.existsSync(file)) return false;
-    fs.rmSync(file, { force: true });
+    fs.unlinkSync(file);
     return true;
   }
 }
 
+/** @param {ConversationStoreOptions} [options] @returns {FileConversationStore} */
 export function createConversationStore({ backend = 'file', now } = {}) {
   // Postgres adapter (createPostgresConversationStore) mirrors this interface and
   // is selected by the server when KCW_STORE=postgres.

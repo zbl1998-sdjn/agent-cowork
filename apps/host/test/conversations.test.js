@@ -130,6 +130,7 @@ test('FileConversationStore rejects path-traversal ids and isolates by tenant', 
   assert.throws(() => store.save(trustedRoot, { id: '../escape', messages: [] }, { tenantId: 't1', userId: 'u1' }), /invalid conversation id/);
   store.save(trustedRoot, { id: 'k', title: 't', messages: [] }, { tenantId: 't1', userId: 'u1' });
   assert.deepEqual(store.list(trustedRoot, { tenantId: 't2', userId: 'u1' }), []);
+  assert.deepEqual(store.list(trustedRoot, { tenantId: 't1', userId: 'u2' }), []);
   assert.equal(store.list(trustedRoot, { tenantId: 't1', userId: 'u1' }).length, 1);
   const base = path.join(trustedRoot, '.AgentCowork', 'conversations');
   assert.ok(fs.existsSync(path.join(base, 't1', 'u1', 'k.json')));
