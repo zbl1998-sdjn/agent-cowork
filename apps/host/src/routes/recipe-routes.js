@@ -1,5 +1,6 @@
 import { getRecipe, listRecipes } from '../recipes/registry.js';
 import { runRecipe } from '../recipes/run-recipe.js';
+import { captureRun } from '../recipes/capture.js';
 import { previewFileOperations } from '../workspace/file-operations.js';
 import {
   bodyFingerprint,
@@ -15,8 +16,10 @@ const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
  * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
  * @typedef {{ tenantId?: string, userId?: string, traceId?: string, idempotencyKey?: string, [key: string]: unknown }} RequestContext
  * @typedef {{ trustedRoot?: unknown, prompt?: unknown, files?: unknown, maxSize?: unknown }} RecipeRunBody
+ * @typedef {{ runId?: unknown }} RecipeCaptureBody
  * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
- * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
+ * @typedef {{ runPath?: unknown }} RunIndexEntryLike
+ * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown, get?(runId: string, options?: { tenantId?: unknown }): RunIndexEntryLike | null | Promise<RunIndexEntryLike | null> }} RunsIndexLike
  * @typedef {{ issue(input: unknown): string }} FileOperationApprovalsLike
  * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string, fileOperationApprovals: FileOperationApprovalsLike }} RecipeRouteOptions
  */
@@ -39,6 +42,33 @@ export async function handleRecipeRoutes({
   if (request.method === 'GET' && pathname === '/api/recipes') {
     sendJson(response, 200, {
       recipes: listRecipes(),
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/recipes/capture') {
+    await withJsonBody(request, response, async (body) => {
+      const input = /** @type {RecipeCaptureBody} */ (body || {});
+      const runId = typeof input.runId === 'string' ? input.runId.trim() : '';
+      if (!runId || !RECIPE_ID_RE.test(runId)) {
+        sendJson(response, 400, { error: 'Invalid run id' });
+        return;
+      }
+      if (!runsIndex || typeof runsIndex.get !== 'function') {
+        sendJson(response, 503, { error: 'Runs index is not available' });
+        return;
+      }
+      const scopedRunsIndex = {
+        /** @param {string} id */
+        get(id) {
+          return runsIndex.get?.(id, { tenantId: requestContext.tenantId }) || null;
+        },
+      };
+      const result = await captureRun({ runId, runsIndex: scopedRunsIndex });
+      sendJson(response, 200, {
+        ...result,
+        context: requestContext,
+      });
     });
     return true;
   }

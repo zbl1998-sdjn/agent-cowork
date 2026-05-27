@@ -141,6 +141,58 @@ test('runs index: recipe-run upserts a tenant-scoped record', async () => {
   }
 });
 
+test('recipe capture route returns a tenant-scoped redacted draft', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: false,
+    requireAuth: false,
+    trustIdentityHeaders: true,
+  });
+  const base = await bind(server);
+  try {
+    const secret = 'sk-ABCDEFGHIJ1234567890';
+    const recipeRun = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'capture-run-source',
+      },
+      body: { prompt: `把会议纪要整理 api_key=${secret}`, files: [] },
+    });
+    assert.equal(recipeRun.status, 200);
+    assert.ok(recipeRun.body.runId);
+
+    const captured = await jsonRequest(base, '/api/recipes/capture', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+      body: { runId: recipeRun.body.runId },
+    });
+    assert.equal(captured.status, 200);
+    assert.equal(captured.body.recipe.draft, true);
+    assert.equal(captured.body.recipe.sourceRunId, recipeRun.body.runId);
+    assert.equal(captured.body.recipe.redacted, true);
+    assert.ok(captured.body.recipe.steps.length > 0);
+    assert.equal(JSON.stringify(captured.body.recipe).includes(secret), false);
+
+    const otherTenant = await jsonRequest(base, '/api/recipes/capture', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_bob', 'x-user-id': 'user_bob' },
+      body: { runId: recipeRun.body.runId },
+    });
+    assert.equal(otherTenant.status, 404);
+
+    const invalid = await jsonRequest(base, '/api/recipes/capture', {
+      method: 'POST',
+      body: { runId: '../escape' },
+    });
+    assert.equal(invalid.status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('recipe run endpoint replays duplicate idempotency key without creating a second run', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
