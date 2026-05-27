@@ -8,12 +8,12 @@
 - **MCP 协议栈**：完整四层实现（StdioTransport → JsonRpc → McpClient → connect），命名空间 `mcp__<server>__<tool>`
 - **生产级稳定性**：CircuitBreaker 三态机（closed/open/half-open）+ Token Bucket 限流 + ApprovalRegistry TTL 防挂起
 - **双存储后端**：SQLite（单机）/ PostgreSQL（多实例，含 LISTEN/NOTIFY 跨实例 approval）
-- **安全边界**：path-policy trusted root jail + 敏感段黑名单 + symlink 解析 + redaction 脱敏 + JWT 鉴权
+- **安全边界**：path-policy trusted root jail + 敏感段黑名单 + symlink 解析 + redaction 脱敏 + JWT 鉴权（HS256 锁定 + timingSafeEqual）+ 出站 SSRF 守卫（解析后 IP 判定 + 逐跳重定向复核）+ Host 头白名单（防 DNS-rebinding）+ 全链路 `shell:false`
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
 **测试覆盖：**
 - 后端 106 个测试文件（478 个测试用例，477 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 14 个测试文件（65 个测试用例），常规门禁通过
-- 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头等
+- 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头、出站 SSRF 守卫与 Host 头白名单等
 
 **已知限制：**
 - Host 启动时会探测 Docker/WSL。设置 `KCW_SANDBOX_DOCKER_IMAGE` 指向一个本地已有镜像后，如果 Docker daemon 和镜像都可用，默认选择 Docker VM 后端，并用 `--network=none` 执行 sandbox 工具。

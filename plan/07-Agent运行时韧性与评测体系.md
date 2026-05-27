@@ -169,6 +169,8 @@ G2 完成记录(2026-05-25):新增 `kimi/agent/arg-validator.js` 纯工具参数
 
 G3 完成记录(2026-05-25):回路安全红队护栏复用 A7 `eval/tasks/redteam/core.json`,当前覆盖危险 Shell、路径穿越、敏感文件覆盖、间接提示注入、Office macro、批量删除绕审批、分支历史外传等场景,并由 `eval-redteam.test.js` 锁定每个 redteam 任务必须包含阻断型断言。`npm run eval` 已验证 28/28 passed(100.0%),红队任务退化会在 eval/scorer/CI 门禁中体现为失败。
 
+G4 完成记录(2026-05-27,红队驱动):一次红队安全审计(见 `docs/红队安全审计报告-20260527.md`)后对出站与边界做加固。出站 `web.fetch`:新增 `tools/ssrf-guard.js`,把主机名**解析为真实 IP 再判定**,补全 `172.16/12`、IPv6 ULA(`fc00::/7`)/链路本地(`fe80::/10`)/多播、CGNAT `100.64/10`、`0.0.0.0/8` 等私网/保留段,规整十进制/十六进制/八进制数值 IP,并把 `web-fetch.js` 改为 `redirect:'manual'` **逐跳复核**(≤5 跳)防 `302→内网` 绕过——直接堵住"被间接注入的 agent 调用 web.fetch 探测内网/本机服务"这条回路。边界:新增 Host 头白名单(`http/request-utils.isAllowedHost` + `middleware/common`,对所有方法前置校验,仅放行 loopback/`tauri.localhost`,默认开,`KCW_VALIDATE_HOST=false` 可放宽)防 DNS-rebinding;`main.js` 在非 loopback 绑定或启用 `KCW_TRUST_IDENTITY_HEADERS` 时打印醒目告警。已补 19 个单测(私网/保留段含 v4+v6、数值 IP 编码、DNS 解析到内网的 rebinding、重定向跳内网拦截、Host 白名单),host 全量 703(702 pass/1 skip/0 fail)、ui 276 pass、门禁 4/4 通过。提交 `97fa436`、`fdc8109`。
+
 ---
 
 ## 排期建议(强标准下的推进顺序)
