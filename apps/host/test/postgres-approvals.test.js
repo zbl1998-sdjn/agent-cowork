@@ -135,3 +135,66 @@ test('cross-instance cancelByRun unblocks every pending request for a run', asyn
   assert.equal(await a2.promise, 'reject');
   assert.equal(await A.pendingCount(), 0, 'table drained after cancelByRun');
 });
+
+test('connectionString creates a PG client for LISTEN, INSERT, and NOTIFY', async () => {
+  const calls = [];
+  const listeners = new Set();
+  const rows = new Map();
+  class FakeClient {
+    constructor(options) {
+      calls.push(['constructor', options.connectionString]);
+    }
+
+    async connect() {
+      calls.push(['connect']);
+    }
+
+    on(evt, handler) {
+      calls.push(['on', evt]);
+      if (evt === 'notification') listeners.add(handler);
+    }
+
+    async query(text, params = []) {
+      calls.push(['query', text, params]);
+      const t = text.replace(/\s+/g, ' ').trim();
+      if (t.startsWith('INSERT INTO pending_approvals')) {
+        rows.set(params[0], { id: params[0], tenant_id: params[2], status: 'pending' });
+        return { rowCount: 1, rows: [] };
+      }
+      if (t.startsWith("UPDATE pending_approvals SET status='resolved'")) {
+        const row = rows.get(params[0]);
+        if (row && row.status === 'pending') {
+          row.status = 'resolved';
+          return { rowCount: 1, rows: [] };
+        }
+        return { rowCount: 0, rows: [] };
+      }
+      if (t.startsWith('SELECT pg_notify')) {
+        for (const handler of listeners) handler({ channel: params[0], payload: params[1] });
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  }
+
+  const store = new PostgresApprovalStore({
+    connectionString: 'postgres://example/db',
+    generateId: () => 'apr_conn',
+    pg: { Client: FakeClient },
+  });
+  await store.start();
+  const { id, promise } = store.request({ runId: 'r-conn', tenantId: 'tenant-1', kind: 'approval' });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(await store.resolve(id, 'once', { tenantId: 'tenant-1' }), true);
+  assert.equal(await promise, 'once');
+  assert.deepEqual(calls[0], ['constructor', 'postgres://example/db']);
+  assert.deepEqual(calls[1], ['connect']);
+  assert.equal(calls.some((call) => call[0] === 'query' && call[1] === 'LISTEN kcw_approvals'), true);
+});
+
+test('PostgresApprovalStore rejects unsafe channel names', () => {
+  assert.throws(
+    () => new PostgresApprovalStore({ client: mockCluster().makeClient(), channel: 'approvals;select x' }),
+    /invalid channel name/,
+  );
+});
