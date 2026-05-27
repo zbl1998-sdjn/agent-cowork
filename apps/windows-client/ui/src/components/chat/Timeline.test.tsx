@@ -45,6 +45,7 @@ function assistantTurnProps(overrides: Partial<AssistantTurnProps> = {}): Assist
     onOpenOrPreview: vi.fn(),
     onPatchAssistant: vi.fn(),
     onQuickSend: vi.fn(),
+    onCaptureRecipe: vi.fn(),
     onRegenerate: vi.fn(),
     onResumeRun: vi.fn(),
     ...overrides,
@@ -96,6 +97,7 @@ function renderTimelineWith(overrides: Partial<Parameters<typeof Timeline>[0]> =
       onOpenOrPreview={vi.fn()}
       onPatchAssistant={vi.fn()}
       onQuickSend={vi.fn()}
+      onCaptureRecipe={vi.fn()}
       onRegenerate={vi.fn()}
       onResumeRun={vi.fn()}
       onScrollToBottom={vi.fn()}
@@ -193,6 +195,7 @@ describe('Timeline', () => {
     expect(assistantTurnPropsEqual(props, { ...props })).toBe(true);
     expect(assistantTurnPropsEqual(props, { ...props, message: { ...baseAssistant } })).toBe(false);
     expect(assistantTurnPropsEqual(props, { ...props, streamingId: baseAssistant.id })).toBe(false);
+    expect(assistantTurnPropsEqual(props, { ...props, onCaptureRecipe: vi.fn() })).toBe(false);
     expect(assistantTurnPropsEqual(props, { ...props, onRegenerate: vi.fn() })).toBe(false);
     expect(assistantTurnPropsEqual(props, { ...props, onResumeRun: vi.fn() })).toBe(false);
   });
@@ -250,6 +253,42 @@ describe('Timeline', () => {
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('继续整理');
     expect(html).toContain('生成图表');
+  });
+
+  it('renders save-as-skill actions and captured drafts for completed runs', () => {
+    const saveAction = renderTimeline({
+      ...baseAssistant,
+      id: 'a-save-skill',
+      status: 'done',
+      text: '已完成。',
+      runId: 'run_save_skill',
+    });
+    const captured = renderTimeline({
+      ...baseAssistant,
+      id: 'a-draft',
+      status: 'done',
+      text: '已完成。',
+      runId: 'run_save_skill',
+      recipeCaptureStatus: 'captured',
+      recipeDraft: {
+        schemaVersion: 1,
+        draft: true,
+        sourceRunId: 'run_save_skill',
+        name: 'Captured meeting-actions',
+        description: '整理会议纪要',
+        prompt: '整理会议纪要',
+        steps: [{ index: 0, tool: 'recipe.operation', status: 'previewed' }],
+        artifacts: [{ path: 'notes.md', kind: 'file' }],
+        redacted: true,
+      },
+    });
+
+    expect(saveAction).toContain('存为技能');
+    expect(captured).toContain('已存草稿');
+    expect(captured).toContain('Captured meeting-actions');
+    expect(captured).toContain('已脱敏');
+    expect(captured).toContain('1 步');
+    expect(captured).toContain('1 产物');
   });
 
   it('renders the user edit trigger with the Button primitive when not streaming', () => {

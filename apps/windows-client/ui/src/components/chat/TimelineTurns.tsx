@@ -9,6 +9,7 @@ import { MessageBubble } from '../MessageBubble';
 import { MessageText } from '../MessageText';
 import { PreviewCard } from '../PreviewCard';
 import { ProgressLine } from '../ProgressLine';
+import { RecipeDraftCard } from '../RecipeDraftCard';
 import { SourcesFooter } from '../SourcesFooter';
 import { SubtaskGroups } from '../SubtaskGroups';
 import { TaskStatusBadge } from '../TaskStatusBadge';
@@ -105,6 +106,7 @@ export interface AssistantTurnProps {
   onOpenOrPreview: (path: string) => void;
   onPatchAssistant: PatchAssistant;
   onQuickSend: (text: string) => void;
+  onCaptureRecipe: (assistantId: string, runId: string) => void;
   onRegenerate: (assistantId: string) => void;
   onResumeRun: (runId: string) => void;
 }
@@ -124,13 +126,16 @@ export function assistantTurnPropsEqual(prev: AssistantTurnProps, next: Assistan
     && prev.onOpenOrPreview === next.onOpenOrPreview
     && prev.onPatchAssistant === next.onPatchAssistant
     && prev.onQuickSend === next.onQuickSend
+    && prev.onCaptureRecipe === next.onCaptureRecipe
     && prev.onRegenerate === next.onRegenerate
     && prev.onResumeRun === next.onResumeRun;
 }
 
-export const AssistantTurn = memo(function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandleApprove, onOpenOrPreview, onPatchAssistant, onQuickSend, onRegenerate, onResumeRun }: AssistantTurnProps) {
+export const AssistantTurn = memo(function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandleApprove, onOpenOrPreview, onPatchAssistant, onQuickSend, onCaptureRecipe, onRegenerate, onResumeRun }: AssistantTurnProps) {
   const canShowActions = Boolean(message.text && (message.status === 'done' || message.status === 'failed' || message.status === 'cancelled'));
   const canContinue = message.status === 'failed' || message.status === 'cancelled';
+  const canCaptureRecipe = Boolean(message.runId && message.status === 'done');
+  const captureRecipeLabel = message.recipeCaptureStatus === 'capturing' ? '保存中' : message.recipeCaptureStatus === 'captured' ? '已存草稿' : '存为技能';
   const resumeRunId = assistantContinueRunId(message);
   const continueRun = resumeRunId ? () => onResumeRun(resumeRunId) : () => onQuickSend('继续');
   return (
@@ -145,11 +150,13 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
       {message.question && <QuestionCard message={message} onPatchAssistant={onPatchAssistant} />}
       {message.approval && <ApprovalBar message={message} onPatchAssistant={onPatchAssistant} />}
       {message.text && <AssistantText message={message} streamingId={streamingId} trustedRoot={trustedRoot} onQuickSend={onQuickSend} />}
+      {message.recipeDraft && <RecipeDraftCard draft={message.recipeDraft} />}
+      {message.recipeCaptureStatus === 'failed' && message.recipeCaptureError && <div className="panel-error">{message.recipeCaptureError}</div>}
       {message.files && message.files.length > 0 && <div className="file-cards">{message.files.map((fp, i) => <ArtifactCard key={`${fp}-${i}`} file={{ path: `${trustedRoot}/${fp}`, relativePath: fp }} metadata={fp} onOpen={onOpenOrPreview} />)}</div>}
       {message.operations.length > 0 && <PreviewCard operations={message.operations} />}
       {message.operations.length > 0 && <ApprovalActions runId={message.runId || ''} operations={message.operations} approvalState={message.approvalState} onApprove={() => onHandleApprove(message)} onReject={() => onPatchAssistant(message.id, (m) => ({ ...m, approvalState: 'rejected' }))} />}
       <SourcesFooter sources={message.sources} />
-      {canShowActions && <MessageActions onCopy={() => onCopyText(extractSuggestions(message.text || '').text)} onContinue={canContinue ? continueRun : undefined} onRegenerate={() => onRegenerate(message.id)} />}
+      {canShowActions && <MessageActions onCopy={() => onCopyText(extractSuggestions(message.text || '').text)} onContinue={canContinue ? continueRun : undefined} onCaptureRecipe={canCaptureRecipe && message.runId ? () => onCaptureRecipe(message.id, message.runId || '') : undefined} captureRecipeDisabled={message.recipeCaptureStatus === 'capturing' || message.recipeCaptureStatus === 'captured'} captureRecipeLabel={canCaptureRecipe ? captureRecipeLabel : undefined} onRegenerate={() => onRegenerate(message.id)} />}
       {message.usage && message.usage.total_tokens ? <div className="usage-line">用量 {message.usage.total_tokens} tokens</div> : null}
       {message.operations.length > 0 && <TaskStatusBadge runId={message.runId} status={message.status} />}
       {message.approvalState === 'approved' && <ArtifactCard file={{ path: `${trustedRoot}/.AgentCowork/artifacts` }} metadata=".AgentCowork/artifacts" onOpen={(p) => void openPath(p)} />}

@@ -36,6 +36,9 @@ export interface AssistantMessage {
   question?: { id: string; question: string; options: Array<{ label: string; description?: string }> };
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   tools?: ToolCallItem[];
+  recipeDraft?: CapturedRecipeDraft;
+  recipeCaptureStatus?: 'capturing' | 'captured' | 'failed';
+  recipeCaptureError?: string;
 }
 
 export interface UserMessage { id: string; role: 'user'; text: string }
@@ -65,4 +68,36 @@ export interface RecipeRunResponse {
   operations: FileOperation[];
   sources: SourceRef[];
   fileOperationApprovalId?: string | null;
+}
+
+export interface CapturedRecipeStep {
+  index: number;
+  tool: string;
+  status?: string;
+  args?: unknown;
+  result?: unknown;
+  summary?: unknown;
+}
+
+export interface CapturedRecipeArtifact {
+  path: string;
+  kind?: string;
+  source?: unknown;
+}
+
+export interface CapturedRecipeDraft {
+  schemaVersion: number;
+  draft: boolean;
+  sourceRunId: string;
+  name: string;
+  description?: string;
+  prompt?: string;
+  steps: CapturedRecipeStep[];
+  artifacts: CapturedRecipeArtifact[];
+  redacted: boolean;
+}
+
+export interface RecipeCaptureResponse {
+  ok: boolean;
+  recipe: CapturedRecipeDraft;
 }

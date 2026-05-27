@@ -11,3 +11,7 @@ export async function runRecipe<TResponse = unknown>(
 ): Promise<TResponse> {
   return postJson<TResponse>(`/api/recipes/${encodeURIComponent(recipeId)}/run`, body);
 }
+
+export async function captureRecipeDraft<TResponse = unknown>(runId: string): Promise<TResponse> {
+  return postJson<TResponse>('/api/recipes/capture', { runId });
+}

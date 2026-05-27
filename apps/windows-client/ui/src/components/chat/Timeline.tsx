@@ -32,6 +32,7 @@ interface TimelineProps {
   onOpenOrPreview: (path: string) => void;
   onPatchAssistant: (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
   onQuickSend: (text: string) => void;
+  onCaptureRecipe: (assistantId: string, runId: string) => void;
   onRegenerate: (assistantId: string) => void;
   onResumeRun: (runId: string) => void;
   onScrollToBottom: () => void;
@@ -132,6 +133,7 @@ export function Timeline({
   onOpenOrPreview,
   onPatchAssistant,
   onQuickSend,
+  onCaptureRecipe,
   onRegenerate,
   onResumeRun,
   onScrollToBottom,
@@ -203,6 +205,7 @@ export function Timeline({
               onOpenOrPreview={onOpenOrPreview}
               onPatchAssistant={onPatchAssistant}
               onQuickSend={onQuickSend}
+              onCaptureRecipe={onCaptureRecipe}
               onRegenerate={onRegenerate}
               onResumeRun={onResumeRun}
             />

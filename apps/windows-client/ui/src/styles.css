@@ -93,6 +93,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .artifact-card { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
 .artifact-body { flex: 1; display: flex; flex-direction: column; }
 .artifact-body span { font-size: 12px; color: var(--muted); }
+.recipe-draft-card { border: 1px solid #d9ded5; background: #fbfaf7; border-radius: 8px; padding: 10px 12px; margin: 8px 0; display: grid; gap: 6px; }
+.recipe-draft-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.recipe-draft-head strong { font-size: 13px; overflow-wrap: anywhere; }
+.recipe-draft-head span { color: #0f6e56; font-size: 11px; white-space: nowrap; }
+.recipe-draft-card p { margin: 0; color: #6b6f66; font-size: 12px; overflow-wrap: anywhere; }
+.recipe-draft-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: #8a8f84; font-size: 11px; }
+.recipe-draft-meta code { color: #6b6f66; font-size: 11px; overflow-wrap: anywhere; }
 .artifact-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .artifact-panel-card { background: #fff; border: 1px solid #d9ded5; border-radius: 8px; padding: 10px 12px; }
 .artifact-panel-card p { margin: 6px 0 10px; font-size: 12px; color: #6b6f66; overflow-wrap: anywhere; }
