@@ -9,6 +9,7 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { webFetch } from '../tools/web-fetch.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
 import { analyzeDataFile } from '../tools/data/report.js';
+import { createDataChartArtifact } from '../tools/data/artifact.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
 
 // Agent tools aligned with the Kimi CLI / Claude Code native tool set:
@@ -22,7 +23,7 @@ import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
  * @typedef {{ allowTools?: string[] }} SandboxLimits
  * @typedef {{ backend?: string, exec(spec: unknown, options: { trustedRoot: string, context?: unknown }): Promise<{ exitCode?: unknown, stdout?: unknown, stderr?: unknown, timedOut?: unknown }> }} SandboxLike
  * @typedef {{ trustedRoot?: string, sandbox?: SandboxLike, sandboxLimits?: SandboxLimits, context?: unknown }} AgentToolsContext
- * @typedef {{ name: string, mutating?: boolean, risk?: string, description?: string, parameters?: unknown, inputSchema?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
+ * @typedef {{ name: string, mutating?: boolean, risk?: string, requiresApproval?: boolean, description?: string, parameters?: unknown, inputSchema?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
  */
 
 /** @param {AgentToolsContext} [ctx] @returns {AgentTool[]} */
@@ -158,6 +159,16 @@ export function createAgentTools(ctx = {}) {
         required: ['path'],
       },
       handler: async (args = {}) => analyzeDataFile({ trustedRoot: root, ...args }),
+    },
+    {
+      name: 'CreateDataChartArtifact', mutating: true, risk: 'high', requiresApproval: true,
+      description: '分析工作区内 CSV/TSV/XLSX 数据文件，并把推荐图表保存为 .AgentCowork/artifacts 活页 artifact。需要用户审批。',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' }, title: { type: 'string' }, id: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
+        required: ['path'],
+      },
+      handler: async (args = {}) => createDataChartArtifact({ trustedRoot: root, ...args }),
     },
     {
       name: 'WebFetch', mutating: false, risk: 'safe',

@@ -8,6 +8,7 @@ import { webFetch } from './web-fetch.js';
 import { createGitReadOnlyBuiltinTools } from './dev/git.js';
 import { profileDataFile } from './data/profile.js';
 import { analyzeDataFile } from './data/report.js';
+import { createDataChartArtifact } from './data/artifact.js';
 
 // Built-in tools wired to the host's existing capabilities. These are plain
 // descriptors with handlers; the registry stays decoupled from the concrete
@@ -150,6 +151,27 @@ export function createBuiltinTools({
       required: ['path'],
     },
     handler: async (args = {}, ctx = {}) => analyzeDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
+  });
+
+  tools.push({
+    name: 'data.createChartArtifact',
+    description: '写入：分析工作区内 CSV/TSV/XLSX 数据文件，并把推荐图表保存为 .AgentCowork/artifacts 活页 artifact。',
+    source: 'builtin',
+    risk: 'high',
+    mutating: true,
+    requiresApproval: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        title: { type: 'string' },
+        id: { type: 'string' },
+        maxRows: { type: 'number' },
+        maxBytes: { type: 'number' },
+      },
+      required: ['path'],
+    },
+    handler: async (args = {}, ctx = {}) => createDataChartArtifact({ trustedRoot: ctx.trustedRoot, ...args }),
   });
 
   tools.push({

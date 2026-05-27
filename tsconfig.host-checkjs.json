@@ -198,6 +198,7 @@
     "apps/host/src/storage/postgres-schedule-store.js",
     "apps/host/src/storage/projects.js",
     "apps/host/src/storage/sqlite.js",
+    "apps/host/src/tools/data/artifact.js",
     "apps/host/src/tools/data/profile.js",
     "apps/host/src/tools/data/report.js",
     "apps/host/src/tools/data/statistics.js",

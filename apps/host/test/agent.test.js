@@ -18,7 +18,7 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
   fs.writeFileSync(path.join(root, '.npmrc'), 'token=secret', 'utf8');
   const tools = createAgentTools({ trustedRoot: root });
   const byName = (n) => tools.find((t) => t.name === n);
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['AnalyzeDataFile', 'Edit', 'GitCommit', 'GitDiff', 'GitLog', 'GitStatus', 'Glob', 'Grep', 'PlanFileOrganization', 'Read', 'SearchWorkspace', 'WebFetch', 'Write']);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ['AnalyzeDataFile', 'CreateDataChartArtifact', 'Edit', 'GitCommit', 'GitDiff', 'GitLog', 'GitStatus', 'Glob', 'Grep', 'PlanFileOrganization', 'Read', 'SearchWorkspace', 'WebFetch', 'Write']);
   const glob = await byName('Glob').handler({ pattern: '*.txt' });
   assert.ok(glob.matches.includes('a.txt'));
   assert.equal(glob.matches.some((match) => match.includes('.npmrc')), false);
@@ -36,6 +36,9 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
   assert.equal(byName('SearchWorkspace').mutating, false);
   assert.equal(byName('PlanFileOrganization').mutating, false);
   assert.equal(byName('AnalyzeDataFile').mutating, false);
+  assert.equal(byName('CreateDataChartArtifact').mutating, true);
+  assert.equal(byName('CreateDataChartArtifact').risk, 'high');
+  assert.equal(byName('CreateDataChartArtifact').requiresApproval, true);
   assert.equal(byName('GitStatus').mutating, false);
   assert.equal(byName('GitCommit').mutating, true);
   assert.equal(byName('GitCommit').risk, 'high');

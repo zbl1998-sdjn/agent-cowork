@@ -8,6 +8,7 @@ import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { analyzeDataFile } from '../src/tools/data/report.js';
 import { profileDataFile } from '../src/tools/data/profile.js';
 import { createXlsxWorkbook } from '../src/artifacts/xlsx-writer.js';
+import { readArtifactManifest } from '../src/artifacts/live-artifact.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 function workspace() {
@@ -137,4 +138,47 @@ test('data analysis reads the first worksheet from xlsx files', () => {
   assert.deepEqual(analysis.chart.data.labels, ['North', 'South']);
   assert.deepEqual(analysis.chart.data.values, [15, 15]);
   assert.match(analysis.reportMarkdown, /Data analysis: sales\.xlsx/);
+});
+
+test('data analysis can persist a chart artifact through approval-gated tools', async () => {
+  const trustedRoot = workspace();
+  fs.writeFileSync(
+    path.join(trustedRoot, 'sales.csv'),
+    [
+      'region,revenue',
+      'North,10',
+      'South,15',
+      'North,5',
+    ].join('\n'),
+    'utf8',
+  );
+
+  const registry = new ToolRegistry().registerMany(createBuiltinTools({ sandbox: null }));
+  const descriptor = registry.descriptor('data.createChartArtifact');
+  assert.equal(descriptor?.mutating, true);
+  assert.equal(descriptor?.risk, 'high');
+  assert.equal(descriptor?.requiresApproval, true);
+
+  const result = await registry.call(
+    'data.createChartArtifact',
+    { path: 'sales.csv', id: 'sales_chart', title: 'Sales by region' },
+    { trustedRoot },
+  );
+  assert.equal(result.kind, 'data-chart-artifact');
+  assert.equal(result.chart.kind, 'bar');
+  assert.deepEqual(result.chart.data.labels, ['North', 'South']);
+  assert.equal(result.artifact.relativePath, '.AgentCowork/artifacts/sales_chart.html');
+  assert.equal(result.artifact.viewUrl, '/api/artifacts/live/sales_chart');
+  assert.equal(fs.existsSync(path.join(trustedRoot, '.AgentCowork', 'artifacts', 'sales_chart.html')), true);
+
+  const manifest = readArtifactManifest({ trustedRoot, id: 'sales_chart' });
+  assert.equal(manifest.title, 'Sales by region');
+  assert.equal(manifest.viz.kind, 'bar');
+
+  const agentTool = createAgentTools({ trustedRoot }).find((tool) => tool.name === 'CreateDataChartArtifact');
+  assert.equal(agentTool?.mutating, true);
+  assert.equal(agentTool?.risk, 'high');
+  assert.equal(agentTool?.requiresApproval, true);
+  const agentResult = await agentTool.handler({ path: 'sales.csv', id: 'agent_sales_chart' });
+  assert.equal(agentResult.artifact.relativePath, '.AgentCowork/artifacts/agent_sales_chart.html');
 });
