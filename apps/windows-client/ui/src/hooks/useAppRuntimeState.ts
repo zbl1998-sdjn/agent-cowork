@@ -78,6 +78,11 @@ export function useAppRuntimeState() {
       setModels(defaults.models);
     }
   }, []);
+  const upsertRecipe = useCallback((recipe: Recipe) => {
+    setRecipes((current) => (current.some((item) => item.id === recipe.id)
+      ? current.map((item) => (item.id === recipe.id ? recipe : item))
+      : [recipe, ...current]));
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -198,6 +203,7 @@ export function useAppRuntimeState() {
     theme,
     toggleTheme,
     trustedRoot,
+    upsertRecipe,
     user,
   };
 }

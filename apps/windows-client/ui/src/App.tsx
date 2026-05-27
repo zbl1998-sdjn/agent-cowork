@@ -59,9 +59,9 @@ export function App() {
     theme,
     toggleTheme,
     trustedRoot,
+    upsertRecipe,
     user,
   } = useAppRuntimeState();
-
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -69,7 +69,7 @@ export function App() {
   const patchAssistant = useCallback((id: string, patch: (m: AssistantMessage) => AssistantMessage) => {
     setMessages((list) => list.map((m) => (m.id === id && m.role === 'assistant' ? patch(m) : m)));
   }, []);
-  const captureRecipe = useRecipeCapture({ patchAssistant });
+  const captureRecipe = useRecipeCapture({ patchAssistant, onRecipeSaved: upsertRecipe });
   const { containerRef: timelineRef, isAtBottom, hasNewContent, scrollToBottom } = useStickToBottom(messages, conversations.activeConvId);
 
   const copyText = useCallback((t: string) => {
