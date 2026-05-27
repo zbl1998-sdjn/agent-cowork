@@ -12,7 +12,7 @@
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
 **测试覆盖：**
-- 后端 106 个测试文件（478 个测试用例，477 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 14 个测试文件（65 个测试用例），常规门禁通过
+- 后端 147 个测试文件（703 个测试用例，702 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 71 个测试文件（276 个测试用例），常规门禁通过
 - 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头、出站 SSRF 守卫与 Host 头白名单等
 
 **已知限制：**
