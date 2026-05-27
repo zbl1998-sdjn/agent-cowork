@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { captureRecipeDraft } from '../lib/api';
-import type { AssistantMessage, RecipeCaptureResponse } from '../lib/app-types';
+import { captureRecipeDraft, saveCustomRecipe } from '../lib/api';
+import type { AssistantMessage, RecipeCaptureResponse, RecipeSaveResponse } from '../lib/app-types';
 
 interface RecipeCaptureOptions {
   patchAssistant: (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
@@ -16,10 +16,11 @@ export function useRecipeCapture({ patchAssistant }: RecipeCaptureOptions) {
       recipeCaptureError: undefined,
     }));
     try {
-      const response = await captureRecipeDraft<RecipeCaptureResponse>(sourceRunId);
+      const captured = await captureRecipeDraft<RecipeCaptureResponse>(sourceRunId);
+      const saved = await saveCustomRecipe<RecipeSaveResponse>(captured.recipe);
       patchAssistant(assistantId, (message) => ({
         ...message,
-        recipeDraft: response.recipe,
+        recipeDraft: { ...captured.recipe, ...saved.recipe },
         recipeCaptureStatus: 'captured',
         recipeCaptureError: undefined,
       }));

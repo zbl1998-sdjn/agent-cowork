@@ -8,11 +8,12 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
 /**
  * @typedef {import('./recipe-helpers.js').SourceLike} RecipeSource
  * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
+ * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string, [key: string]: unknown }} RecipeDescriptor
  * @typedef {Error & { statusCode?: number, payload?: Record<string, unknown> }} RecipeError
  * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
  * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
- * @typedef {{ recipeId: string, trustedRoot: string, prompt?: unknown, files?: unknown[], maxSize?: unknown, context?: Record<string, unknown>, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null }} RunRecipeOptions
- * @typedef {{ ok: boolean, runId: string, runPath: string, recipe: NonNullable<ReturnType<typeof getRecipe>>, sources: RecipeSource[], operations: FileOperationInput[], events: Record<string, unknown>[] }} RunRecipeResult
+ * @typedef {{ recipeId: string, trustedRoot: string, prompt?: unknown, files?: unknown[], maxSize?: unknown, context?: Record<string, unknown>, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, recipe?: RecipeDescriptor | null }} RunRecipeOptions
+ * @typedef {{ ok: boolean, runId: string, runPath: string, recipe: RecipeDescriptor, sources: RecipeSource[], operations: FileOperationInput[], events: Record<string, unknown>[] }} RunRecipeResult
  */
 
 // Single source of truth for executing a recipe. Used by both the HTTP route
@@ -43,8 +44,9 @@ export function runRecipe({
   runStoreRoot,
   runEvents = null,
   runsIndex = null,
+  recipe: providedRecipe = null,
 }) {
-  const recipe = getRecipe(recipeId);
+  const recipe = providedRecipe || getRecipe(recipeId);
   if (!recipe) {
     const err = /** @type {RecipeError} */ (new Error('Recipe not found'));
     err.statusCode = 404;
@@ -111,7 +113,7 @@ export function runRecipe({
   /** @type {FileOperationInput[]} */
   let operations;
   try {
-    operations = buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources });
+    operations = buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
   } catch (err) {
     const error = /** @type {RecipeError} */ (err);
     emit('assistant_end', { status: 'failed', error: error.message });

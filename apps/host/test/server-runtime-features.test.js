@@ -193,6 +193,75 @@ test('recipe capture route returns a tenant-scoped redacted draft', async () => 
   }
 });
 
+test('custom recipes save redacted drafts and run tenant-scoped recipes', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: false,
+    requireAuth: false,
+    trustIdentityHeaders: true,
+  });
+  const base = await bind(server);
+  try {
+    const draft = {
+      name: 'Captured meeting-actions',
+      description: '整理会议纪要',
+      prompt: '整理会议纪要',
+      sourceRunId: 'run_custom_source',
+      redacted: true,
+      steps: [{ index: 0, tool: 'recipe.operation', status: 'previewed' }],
+      artifacts: [{ path: 'notes.md', kind: 'file' }],
+    };
+    const saved = await jsonRequest(base, '/api/recipes/custom', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'custom-recipe-save',
+      },
+      body: { recipe: draft },
+    });
+    assert.equal(saved.status, 200);
+    assert.match(saved.body.recipe.id, /^custom-/);
+    assert.equal(saved.body.recipe.custom, true);
+    assert.equal(saved.body.recipe.tenantId, 'tenant_alice');
+
+    const listed = await jsonRequest(base, '/api/recipes', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+    });
+    assert.equal(listed.status, 200);
+    assert.ok(listed.body.recipes.some((recipe) => recipe.id === saved.body.recipe.id));
+
+    const otherTenant = await jsonRequest(base, '/api/recipes', {
+      headers: { 'x-tenant-id': 'tenant_bob', 'x-user-id': 'user_bob' },
+    });
+    assert.equal(otherTenant.body.recipes.some((recipe) => recipe.id === saved.body.recipe.id), false);
+
+    const run = await jsonRequest(base, `/api/recipes/${encodeURIComponent(saved.body.recipe.id)}/run`, {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'custom-recipe-run',
+      },
+      body: { prompt: '用这个技能生成结果', files: [] },
+    });
+    assert.equal(run.status, 200);
+    assert.equal(run.body.recipe.id, saved.body.recipe.id);
+    assert.equal(run.body.operations.length, 1);
+    assert.match(run.body.operations[0].path, /custom-/);
+
+    const unsafe = await jsonRequest(base, '/api/recipes/custom', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'custom-recipe-unsafe' },
+      body: { recipe: { name: 'Unsafe draft', redacted: false } },
+    });
+    assert.equal(unsafe.status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('recipe run endpoint replays duplicate idempotency key without creating a second run', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });

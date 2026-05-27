@@ -17,7 +17,7 @@ export function RecipeDraftCard({ draft }: RecipeDraftCardProps) {
       <div className="recipe-draft-meta">
         <span>{stepCount} 步</span>
         <span>{artifactCount} 产物</span>
-        <code>{draft.sourceRunId}</code>
+        <code>{draft.id || draft.sourceRunId}</code>
       </div>
     </div>
   );

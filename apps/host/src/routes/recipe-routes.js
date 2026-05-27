@@ -1,6 +1,8 @@
+import path from 'node:path';
 import { getRecipe, listRecipes } from '../recipes/registry.js';
 import { runRecipe } from '../recipes/run-recipe.js';
 import { captureRun } from '../recipes/capture.js';
+import { createCustomRecipeStore } from '../recipes/custom-recipes.js';
 import { previewFileOperations } from '../workspace/file-operations.js';
 import {
   bodyFingerprint,
@@ -10,6 +12,12 @@ import {
 } from '../http/request-utils.js';
 
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
+
+/** @param {string} runStoreRoot */
+function customRecipeStoreFor(runStoreRoot) {
+  const agentRoot = path.dirname(path.resolve(runStoreRoot));
+  return createCustomRecipeStore({ storePath: path.join(agentRoot, 'recipes', 'custom-recipes.json') });
+}
 
 /**
  * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
@@ -39,9 +47,33 @@ export async function handleRecipeRoutes({
   safeTrustedRoot,
   fileOperationApprovals,
 }) {
+  const customRecipes = customRecipeStoreFor(runStoreRoot);
+
   if (request.method === 'GET' && pathname === '/api/recipes') {
     sendJson(response, 200, {
-      recipes: listRecipes(),
+      recipes: [...listRecipes(), ...customRecipes.list({ tenantId: requestContext.tenantId })],
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/recipes/custom') {
+    await withJsonBody(request, response, async (body) => {
+      if (!requireIdempotencyKey(response, requestContext)) {
+        return;
+      }
+      const fingerprint = bodyFingerprint(body);
+      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
+        return;
+      }
+      const input = /** @type {{ recipe?: Record<string, unknown> }} */ (body || {});
+      const recipeInput = input.recipe && typeof input.recipe === 'object' ? input.recipe : /** @type {Record<string, unknown>} */ (body || {});
+      const recipe = customRecipes.save(recipeInput, { tenantId: requestContext.tenantId, userId: requestContext.userId });
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
+        ok: true,
+        recipe,
+        context: requestContext,
+      });
     });
     return true;
   }
@@ -82,7 +114,9 @@ export async function handleRecipeRoutes({
         return;
       }
       const recipe = getRecipe(recipeId);
-      if (!recipe) {
+      const customRecipe = recipe ? null : customRecipes.get(recipeId, { tenantId: requestContext.tenantId });
+      const selectedRecipe = recipe || customRecipe;
+      if (!selectedRecipe) {
         sendJson(response, 404, { error: 'Recipe not found' });
         return;
       }
@@ -105,6 +139,7 @@ export async function handleRecipeRoutes({
         runStoreRoot,
         runEvents,
         runsIndex,
+        recipe: selectedRecipe,
       });
       const preview = result.operations.length
         ? previewFileOperations(result.operations, { trustedRoot: safeRoot })

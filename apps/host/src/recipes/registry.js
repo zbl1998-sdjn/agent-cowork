@@ -15,8 +15,8 @@ import {
 /**
  * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
  * @typedef {import('./recipe-helpers.js').SourceLike} SourceLike
- * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string }} Recipe
- * @typedef {{ recipeId?: string, trustedRoot?: string, prompt?: unknown, sources?: SourceLike[] }} BuildRecipeOptions
+ * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string, custom?: boolean, [key: string]: unknown }} Recipe
+ * @typedef {{ recipeId?: string, trustedRoot?: string, prompt?: unknown, sources?: SourceLike[], recipe?: Recipe | null }} BuildRecipeOptions
  */
 
 /** @type {[string, string, string, string, string][]} */
@@ -197,10 +197,10 @@ export function getRecipe(recipeId) {
 }
 
 /** @param {BuildRecipeOptions} [options] @returns {FileOperationInput[]} */
-export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [] } = {}) {
+export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [], recipe: providedRecipe = null } = {}) {
   const id = typeof recipeId === 'string' ? recipeId : '';
   const root = typeof trustedRoot === 'string' ? trustedRoot : '';
-  const recipe = getRecipe(id);
+  const recipe = providedRecipe || getRecipe(id);
   if (!recipe) {
     throw new Error(`Unknown recipe: ${recipeId}`);
   }

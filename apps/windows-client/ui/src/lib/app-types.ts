@@ -86,6 +86,7 @@ export interface CapturedRecipeArtifact {
 }
 
 export interface CapturedRecipeDraft {
+  id?: string;
   schemaVersion: number;
   draft: boolean;
   sourceRunId: string;
@@ -100,4 +101,9 @@ export interface CapturedRecipeDraft {
 export interface RecipeCaptureResponse {
   ok: boolean;
   recipe: CapturedRecipeDraft;
+}
+
+export interface RecipeSaveResponse {
+  ok: boolean;
+  recipe: CapturedRecipeDraft & { id: string; custom: true };
 }
