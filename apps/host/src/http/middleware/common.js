@@ -1,5 +1,6 @@
 import {
   headerValue,
+  isAllowedHost,
   isAllowedOrigin,
   requiresOriginCheck,
   sendJson,
@@ -32,7 +33,7 @@ function isPublicApiRoute(method, pathname) {
   return PUBLIC_API_ROUTES.some(([m, p]) => m === requestMethod && p === pathname);
 }
 
-/** @param {{ request: MiddlewareRequest, response: MiddlewareResponse, pathname: string, requestContext: RequestContext, rateLimiter?: RateLimiterLike | null, requireAuth?: boolean }} options */
+/** @param {{ request: MiddlewareRequest, response: MiddlewareResponse, pathname: string, requestContext: RequestContext, rateLimiter?: RateLimiterLike | null, requireAuth?: boolean, validateHost?: boolean }} options */
 export function applyRequestMiddleware({
   request,
   response,
@@ -40,7 +41,16 @@ export function applyRequestMiddleware({
   requestContext,
   rateLimiter,
   requireAuth,
+  validateHost,
 }) {
+  // Anti-DNS-rebinding: reject requests whose Host header isn't the loopback host
+  // or the tauri webview. Runs first and for ALL methods/paths (GET included),
+  // since the Origin check below only covers state-changing /api/* requests.
+  if (validateHost !== false && !isAllowedHost(headerValue(request, 'host'))) {
+    sendJson(response, 403, { error: 'Host not allowed' });
+    return true;
+  }
+
   response.setHeader('x-trace-id', requestContext.traceId);
   response.setHeader('x-tenant-id', requestContext.tenantId);
   response.setHeader('x-user-id', requestContext.userId);

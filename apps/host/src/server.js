@@ -49,6 +49,7 @@ export function createServer(config = {}) {
         requestContext,
         rateLimiter: state.rateLimiter,
         requireAuth: state.requireAuth,
+        validateHost: state.validateHost,
       })) {
         return;
       }

@@ -250,6 +250,23 @@ declare module 'node:zlib' {
   export function inflateRawSync(buffer: Buffer, options?: { maxOutputLength?: number }): Buffer;
 }
 
+declare module 'node:net' {
+  export function isIP(input: string): number;
+}
+
+declare module 'node:dns' {
+  export interface LookupAddress {
+    address: string;
+    family: number;
+  }
+  export namespace promises {
+    function lookup(
+      hostname: string,
+      options: { all: true; verbatim?: boolean }
+    ): Promise<LookupAddress[]>;
+  }
+}
+
 declare module 'pg' {
   export interface QueryResult {
     rows?: unknown[];

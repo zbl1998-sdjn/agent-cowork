@@ -166,6 +166,9 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.jwtSecret = config.jwtSecret || process.env.KCW_JWT_SECRET || null;
   state.requireAuth = config.requireAuth ?? (process.env.KCW_REQUIRE_AUTH !== 'false');
   state.trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');
+  // Anti-DNS-rebinding Host-header allowlist; on by default. Disable only when
+  // intentionally binding to a non-loopback address (KCW_VALIDATE_HOST=false).
+  state.validateHost = config.validateHost ?? (process.env.KCW_VALIDATE_HOST !== 'false');
 
   state.safeTrustedRoot = (requestedRoot = trustedRootDefault) => (
     assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault)

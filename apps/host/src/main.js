@@ -9,6 +9,18 @@ const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3001);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || process.cwd());
 
+// CFG-1: the host is designed as a loopback-only sidecar. Binding to a routable
+// address exposes the agent's file/sandbox/API surface to the network — warn
+// loudly so an accidental `HOST=0.0.0.0` never goes unnoticed.
+const isLoopbackBind = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(String(host).toLowerCase());
+if (!isLoopbackBind) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[host] WARNING: binding to non-loopback address "${host}" exposes the local agent API to the network. ` +
+    'Ensure authentication is enforced and set KCW_VALIDATE_HOST=false only if you intend remote access.',
+  );
+}
+
 const server = createServer({
   trustedRoot,
   kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,

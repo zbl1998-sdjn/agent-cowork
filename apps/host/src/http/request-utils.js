@@ -72,6 +72,26 @@ export function isAllowedOrigin(origin) {
   }
 }
 
+/** @param {unknown} hostHeader @returns {boolean} */
+export function isAllowedHost(hostHeader) {
+  const value = String(hostHeader || '').trim();
+  // No Host header = HTTP/1.0 or a non-browser client; not a DNS-rebinding vector,
+  // so we don't block it (the loopback bind already scopes who can reach us).
+  if (!value) {
+    return true;
+  }
+  let hostname;
+  try {
+    hostname = new URL(`http://${value}`).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  // Anti-DNS-rebinding: a malicious site that rebinds its name to 127.0.0.1 still
+  // sends its own name in the Host header. Only the loopback host / tauri webview
+  // are legitimate ways to address this server.
+  return isLoopbackHostname(hostname) || hostname === 'tauri.localhost';
+}
+
 /** @param {unknown} method @param {string} pathname @returns {boolean} */
 export function requiresOriginCheck(method, pathname) {
   return pathname.startsWith('/api/')
