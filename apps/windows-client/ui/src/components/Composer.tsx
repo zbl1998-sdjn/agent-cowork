@@ -5,16 +5,15 @@ import type { PromptRefineResult } from '../lib/api/prompt';
 import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
 import { buildHistorySuggestionItems, buildMentionSuggestionItems, buildTemplateSuggestionItems, findComposerTrigger, mentionInsertText } from '../lib/composer-trigger';
 import { useComposerRefine } from '../hooks/useComposerRefine';
-import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerAttachments } from './ComposerAttachments';
-import { ComposerModelControls } from './ComposerModelControls';
+import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
 import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
-export type ThinkingLevel = 'fast' | 'standard' | 'deep';
+export type { ThinkingLevel } from './ComposerFooter';
 export interface ComposerMeta {
   files: File[];
   model: string;
@@ -37,7 +36,6 @@ export interface ComposerProps {
   autoClarify?: boolean;
   onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
 }
-const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准' }, { value: 'deep', label: '深度' }];
 export function Composer({
   recipes,
   historyRuns,
@@ -233,17 +231,18 @@ export function Composer({
         onBlur={() => setTimeout(close, 120)}
       />
 
-      <div className="composer-footer">
-        <div className="composer-tools">
-          <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-          <ComposerToolActions listening={listening} refining={refining} canRefine={Boolean(value.trim() && canRefine)} onUpload={() => fileRef.current?.click()} onToggleVoice={toggleVoice} onRefine={() => void refineCurrent(value)} />
-          <ComposerModelControls model={model} modelOptions={modelOptions} provider={currentProvider} defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl} baseUrl={baseUrl} apiKey={apiKey} onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey} />
-          <select className="thinking-select" value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)} title="思考强度">
-            {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
-          </select>
-        </div>
-        <ComposerSendAction refining={refining} onSend={() => void send()} />
-      </div>
+      <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+      <ComposerFooter
+        listening={listening} refining={refining}
+        canRefine={Boolean(value.trim() && canRefine)}
+        model={model} modelOptions={modelOptions} provider={currentProvider}
+        defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl}
+        baseUrl={baseUrl} apiKey={apiKey} thinking={thinking}
+        onUpload={() => fileRef.current?.click()}
+        onToggleVoice={toggleVoice} onRefine={() => void refineCurrent(value)}
+        onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey}
+        onThinking={setThinking} onSend={() => void send()}
+      />
     </div>
   );
 }
