@@ -3,16 +3,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
-
+// @ts-check
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_STEPS = 10;
 const MAX_PROMPT_LENGTH = 8000;
 const MAX_OUTPUT_LENGTH = 256 * 1024;
-
+/**
+ * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }} PromptOptions
+ * @typedef {PromptOptions & { trustedRoot?: unknown, maxSteps?: unknown, model?: unknown }} CliArgsOptions
+ * @typedef {{ command?: string, argsBuilder?: (options: CliArgsOptions) => string[], timeoutMs?: unknown, maxSteps?: unknown, model?: unknown, resultMode?: string } & PromptOptions} RunTextOptions
+ */
+/** @param {unknown} value */
 function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
 }
-
+/** @param {Buffer[]} chunks */
 function decodeCliOutput(chunks) {
   const buffer = Buffer.concat(chunks);
   if (buffer.length === 0) {
@@ -31,7 +36,7 @@ function decodeCliOutput(chunks) {
     return buffer.toString('utf8');
   }
 }
-
+/** @param {unknown} memory */
 function buildMemoryBlock(memory) {
   const text = cleanText(memory).slice(0, 4096);
   if (!text) {
@@ -43,7 +48,7 @@ function buildMemoryBlock(memory) {
     '工作区记忆结束。',
   ].join('\n');
 }
-
+/** @param {PromptOptions} options */
 export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
@@ -68,7 +73,7 @@ export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork', mem
   );
   return lines.join('\n');
 }
-
+/** @param {PromptOptions} options */
 export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
@@ -93,7 +98,7 @@ export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
   );
   return lines.join('\n');
 }
-
+/** @param {CliArgsOptions} options */
 export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
@@ -112,7 +117,7 @@ export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSt
   args.push('--prompt', buildKimiPlanPrompt({ prompt, summary, mode, memory }));
   return args;
 }
-
+/** @param {CliArgsOptions} options */
 export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
@@ -131,7 +136,7 @@ export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = 
   args.push('--prompt', buildKimiChatPrompt({ prompt, summary, memory }));
   return args;
 }
-
+/** @param {RunTextOptions} [options] */
 function runKimiCliText({
   command = 'kimi',
   argsBuilder,
@@ -148,7 +153,8 @@ function runKimiCliText({
 
   // Use a temp work-dir so Kimi CLI does not resume a previous session.
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-kimi-'));
-  const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, memory, maxSteps, model });
+  const buildArgs = /** @type {(options: CliArgsOptions) => string[]} */ (argsBuilder);
+  const args = buildArgs({ trustedRoot: tempDir, prompt, summary, mode, memory, maxSteps, model });
 
   return new Promise((resolve, reject) => {
     const child = childProcess.spawn(command, args, {
@@ -163,8 +169,8 @@ function runKimiCliText({
       windowsHide: true,
     });
 
-    const stdout = [];
-    const stderr = [];
+    const stdout = /** @type {Buffer[]} */ ([]);
+    const stderr = /** @type {Buffer[]} */ ([]);
     let stdoutLength = 0;
     let timedOut = false;
     const timeout = setTimeout(() => {
@@ -173,14 +179,15 @@ function runKimiCliText({
     }, Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
 
     child.stdout.on('data', (chunk) => {
-      stdout.push(chunk);
-      stdoutLength += chunk.length;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      stdout.push(buffer);
+      stdoutLength += buffer.length;
       if (stdoutLength > MAX_OUTPUT_LENGTH) {
         child.kill();
       }
     });
     child.stderr.on('data', (chunk) => {
-      stderr.push(chunk);
+      stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
     });
     child.on('error', (error) => {
       clearTimeout(timeout);
@@ -222,7 +229,7 @@ function runKimiCliText({
     });
   });
 }
-
+/** @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
 export function runKimiCliPlan(options = {}) {
   return runKimiCliText({
     ...options,
@@ -230,7 +237,7 @@ export function runKimiCliPlan(options = {}) {
     resultMode: options.mode === 'code' ? 'code' : 'cowork',
   });
 }
-
+/** @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
 export function runKimiCliChat(options = {}) {
   return runKimiCliText({
     ...options,

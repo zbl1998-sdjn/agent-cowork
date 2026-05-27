@@ -128,6 +128,10 @@ declare module 'node:child_process' {
 }
 
 declare module 'node:util' {
+  export class TextDecoder {
+    constructor(label?: string, options?: { fatal?: boolean });
+    decode(input?: Buffer): string;
+  }
   export function promisify(fn: (...args: any[]) => unknown): any;
 }
 
@@ -150,12 +154,14 @@ declare module 'node:fs' {
   export function existsSync(path: string): boolean;
   export function appendFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function copyFileSync(src: string, dest: string): void;
+  export function mkdtempSync(prefix: string): string;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
   export function readFileSync(path: string): Buffer;
   export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string): string[];
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
   export function renameSync(oldPath: string, newPath: string): void;
+  export function rmSync(path: string, options?: { recursive?: boolean, force?: boolean }): void;
   export function statSync(path: string): Stats;
   export function unlinkSync(path: string): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
