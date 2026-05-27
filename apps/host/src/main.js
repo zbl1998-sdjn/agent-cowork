@@ -21,6 +21,19 @@ if (!isLoopbackBind) {
   );
 }
 
+// CFG-2: trusting client-supplied identity headers lets any caller that reaches
+// the server impersonate any tenant/user. It's off by default; if it's ever on,
+// say so loudly — it is only safe behind a reverse proxy that strips these
+// headers from external clients.
+if (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true') {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[host] WARNING: KCW_TRUST_IDENTITY_HEADERS=true trusts client-supplied x-tenant-id/x-user-id headers ' +
+    '(any caller can impersonate any tenant). Only enable this behind a reverse proxy that strips these ' +
+    'headers from external clients; never expose such an instance directly.',
+  );
+}
+
 const server = createServer({
   trustedRoot,
   kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
