@@ -88,3 +88,10 @@ test('PostgresRunsIndex without pool or connectionString throws on first query',
   const idx = new PostgresRunsIndex({});
   await assert.rejects(() => idx.size(), /pool or connectionString/);
 });
+
+test('PostgresRunsIndex rejects unsafe table names', () => {
+  assert.throws(
+    () => new PostgresRunsIndex({ pool: mockPool(), table: 'runs_index;bad' }),
+    /invalid table name/,
+  );
+});
