@@ -188,6 +188,7 @@
     "apps/host/src/storage/postgres-event-bus.js",
     "apps/host/src/storage/postgres-memory-store.js",
     "apps/host/src/storage/postgres-schedule-store.js",
+    "apps/host/src/storage/projects.js",
     "apps/host/src/storage/sqlite.js",
     "apps/host/src/tools/data/profile.js",
     "apps/host/src/tools/data/report.js",
