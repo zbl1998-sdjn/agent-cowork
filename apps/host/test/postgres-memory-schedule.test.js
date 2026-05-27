@@ -91,3 +91,10 @@ test('Postgres adapters without pool throw on first query', async () => {
   await assert.rejects(() => new PostgresScheduleStore({}).get('s'), /pool or connectionString/);
   await assert.rejects(() => new PostgresMemoryStore({}).readMainMemory('x', {}), /pool or connectionString/);
 });
+
+test('PostgresScheduleStore rejects unsafe table names', () => {
+  assert.throws(
+    () => new PostgresScheduleStore({ pool: schedPool(), table: 'schedules;select memory_facts' }),
+    /invalid table name/,
+  );
+});

@@ -167,6 +167,7 @@ declare module 'node:fs' {
 declare module 'node:os' {
   export function hostname(): string;
   export function homedir(): string;
+  export function tmpdir(): string;
   export function userInfo(): { username: string };
 }
 
@@ -201,4 +202,31 @@ declare module 'node:url' {
 
 declare module 'node:zlib' {
   export function inflateRawSync(buffer: Buffer, options?: { maxOutputLength?: number }): Buffer;
+}
+
+declare module 'pg' {
+  export interface QueryResult {
+    rows?: unknown[];
+    rowCount?: number | null;
+  }
+
+  export class Client {
+    constructor(options?: Record<string, unknown>);
+    connect(): Promise<void>;
+    end(): Promise<void>;
+    on(event: 'notification', listener: (message: { channel?: string; payload?: string | null }) => void): unknown;
+    query(text: string, params?: unknown[]): Promise<QueryResult>;
+  }
+
+  export class Pool {
+    constructor(options?: Record<string, unknown>);
+    end(): Promise<void>;
+    query(text: string, params?: unknown[]): Promise<QueryResult>;
+  }
+
+  const defaultExport: {
+    Client: typeof Client;
+    Pool: typeof Pool;
+  };
+  export default defaultExport;
 }

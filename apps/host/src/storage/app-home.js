@@ -1,7 +1,10 @@
+// @ts-check
+
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 
+/** @returns {string} */
 function resolveDefaultHome() {
   if (process.env.AGENT_COWORK_HOME) {
     return path.resolve(process.env.AGENT_COWORK_HOME);
@@ -26,12 +29,14 @@ function resolveDefaultHome() {
   return path.resolve(process.cwd(), '.AgentCowork');
 }
 
+/** @returns {string} */
 export function getAppHome() {
   const home = resolveDefaultHome();
   fs.mkdirSync(home, { recursive: true });
   return home;
 }
 
+/** @param {string} sessionId @returns {string} */
 export function getSessionPath(sessionId) {
   if (!sessionId || typeof sessionId !== 'string') {
     throw new Error('Session id must be a non-empty string');
