@@ -15,3 +15,4 @@ export * from './search';
 export * from './memory';
 export * from './onboarding';
 export * from './runtimeDependencies';
+export * from './desktopUpdates';

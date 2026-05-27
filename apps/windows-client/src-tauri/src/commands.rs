@@ -11,6 +11,7 @@ use crate::config;
 use crate::error::DesktopResult;
 use crate::security;
 use crate::sidecar::{HostSidecar, HostStatus};
+use crate::updater::{self, DesktopUpdateInstallResult, DesktopUpdateStatus};
 
 /// Report whether the host sidecar is running and at what URL.
 #[tauri::command]
@@ -41,4 +42,14 @@ pub fn open_path(app: AppHandle, path: String) -> DesktopResult<()> {
     app.opener()
         .open_path(safe.to_string_lossy().to_string(), None::<&str>)
         .map_err(|error| crate::error::DesktopError::Io(error.to_string()))
+}
+
+#[tauri::command]
+pub async fn check_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdateStatus> {
+    updater::check_desktop_update(app).await
+}
+
+#[tauri::command]
+pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdateInstallResult> {
+    updater::install_desktop_update(app).await
 }

@@ -158,6 +158,31 @@ function findInstallerFiles() {
     .map((entry) => path.join(installersDir, entry.name));
 }
 
+function findFilesUnder(root, predicate) {
+  if (!fs.existsSync(root)) return [];
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) return findFilesUnder(full, predicate);
+    return entry.isFile() && predicate(full) ? [full] : [];
+  });
+}
+
+function findUpdaterArtifacts() {
+  const bundleRoot = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri', 'target', 'release', 'bundle');
+  return ['nsis-updater', 'msi-updater', 'updater']
+    .flatMap((name) => findFilesUnder(path.join(bundleRoot, name), (file) => /\.(zip|sig)$/i.test(file)));
+}
+
+function updaterSignatureFor(filePath, artifactSet) {
+  const candidates = [`${filePath}.sig`, filePath.replace(/\.[^.]+$/, '.sig')];
+  return candidates.find((candidate) => artifactSet.has(candidate) && fs.existsSync(candidate)) || null;
+}
+
+function updateArtifactUrl(baseUrl, fileName) {
+  return `${baseUrl.replace(/\/+$/, '')}/${encodeURIComponent(fileName)}`;
+}
+
 function writeFilePlanned(filePath, content, execute) {
   if (!execute) {
     console.log(`[dry-run] write ${path.relative(repoRoot, filePath)}:`);
@@ -177,6 +202,7 @@ const bundlePath = path.join(releaseDir, `agent-cowork-${tag}.bundle`);
 const versionPath = path.join(releaseDir, 'VERSION.txt');
 const manifestPath = path.join(releaseDir, 'manifest.json');
 const installers = findInstallerFiles();
+const updaterArtifacts = findUpdaterArtifacts();
 const commit = gitCapture(['rev-parse', '--short', 'HEAD']) || readGitHeadShort() || 'unknown';
 const built = new Date().toISOString();
 
@@ -247,6 +273,44 @@ for (const installer of installers) {
   }
 }
 
+const archivedUpdaterArtifacts = [];
+for (const artifact of updaterArtifacts) {
+  const dest = path.join(releaseDir, path.basename(artifact));
+  archivedUpdaterArtifacts.push(path.relative(repoRoot, dest));
+  if (!options.execute) {
+    console.log(`[dry-run] copy ${path.relative(repoRoot, artifact)} -> ${path.relative(repoRoot, dest)}`);
+  } else {
+    fs.copyFileSync(artifact, dest);
+    console.log(`[exec] copied ${path.relative(repoRoot, dest)}`);
+  }
+}
+
+let updateManifest = null;
+const artifactSet = new Set(updaterArtifacts);
+const updatePayload = updaterArtifacts.find((artifact) => !/\.sig$/i.test(artifact));
+const updateSignature = updatePayload ? updaterSignatureFor(updatePayload, artifactSet) : null;
+if (updatePayload && updateSignature) {
+  const latestPath = path.join(releaseDir, 'latest.json');
+  const updateBaseUrl = process.env.KCW_UPDATE_BASE_URL || `https://updates.agent-cowork.local/${tag}`;
+  const latest = {
+    version,
+    notes: `Agent Cowork ${tag}`,
+    pub_date: built,
+    platforms: {
+      'windows-x86_64': {
+        signature: fs.readFileSync(updateSignature, 'utf8').trim(),
+        url: updateArtifactUrl(updateBaseUrl, path.basename(updatePayload)),
+      },
+    },
+  };
+  writeFilePlanned(latestPath, `${JSON.stringify(latest, null, 2)}\n`, options.execute);
+  updateManifest = path.relative(repoRoot, latestPath).replaceAll('\\', '/');
+} else if (updaterArtifacts.length) {
+  console.log('[plan] updater artifacts found but no signed payload/signature pair was detected');
+} else {
+  console.log('[plan] no Tauri updater artifacts found yet; build with TAURI_SIGNING_PRIVATE_KEY_PATH to create them');
+}
+
 const manifest = {
   version,
   tag,
@@ -255,6 +319,8 @@ const manifest = {
   packageName: packageJson.name,
   bundle: path.relative(repoRoot, bundlePath).replaceAll('\\', '/'),
   installers: archivedInstallers.map((item) => item.replaceAll('\\', '/')),
+  updaterArtifacts: archivedUpdaterArtifacts.map((item) => item.replaceAll('\\', '/')),
+  updateManifest,
 };
 writeFilePlanned(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, options.execute);
 

@@ -22,6 +22,8 @@ pub enum DesktopError {
     Lock(&'static str),
     /// An underlying I/O or platform call failed.
     Io(String),
+    /// The desktop updater failed to check, download, or install.
+    Update(String),
 }
 
 impl DesktopError {
@@ -32,6 +34,7 @@ impl DesktopError {
             DesktopError::Path(_) => "path",
             DesktopError::Lock(_) => "lock",
             DesktopError::Io(_) => "io",
+            DesktopError::Update(_) => "update",
         }
     }
 }
@@ -43,6 +46,7 @@ impl fmt::Display for DesktopError {
             DesktopError::Path(msg) => write!(f, "path error: {msg}"),
             DesktopError::Lock(what) => write!(f, "lock poisoned: {what}"),
             DesktopError::Io(msg) => write!(f, "io error: {msg}"),
+            DesktopError::Update(msg) => write!(f, "update error: {msg}"),
         }
     }
 }

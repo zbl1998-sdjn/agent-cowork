@@ -43,6 +43,16 @@ describe('Settings', () => {
     expect(html).not.toContain('用户名');
   });
 
+  it('opens on the desktop updates tab', () => {
+    const html = renderSettings('updates');
+
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('>更新</button>');
+    expect(html).toContain('正在加载更新状态');
+    expect(html).not.toContain('用户名');
+  });
+
   it('renders settings segmented controls through the shared primitive', () => {
     const appearance = renderSettings('appearance');
     const input = renderSettings('input');

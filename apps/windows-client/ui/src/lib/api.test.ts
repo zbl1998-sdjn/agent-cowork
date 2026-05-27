@@ -77,6 +77,7 @@ async function waitFor(assertion: () => void, timeoutMs = 500): Promise<void> {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+  Reflect.deleteProperty(globalThis, 'window');
 });
 
 describe('resolveUrl', () => {
@@ -596,6 +597,33 @@ describe('JSON requests', () => {
       resolved: 0,
       results: [{ id: 'apr_one', ok: false }, { id: 'apr_two', ok: false }],
     });
+  });
+});
+
+describe('desktop updater commands', () => {
+  it('checks and installs desktop updates through Tauri commands', async () => {
+    vi.resetModules();
+    setStorage();
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __TAURI_INTERNALS__: {},
+        location: { origin: 'tauri://localhost', port: '', protocol: 'tauri:' },
+      },
+    });
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => jsonResponse({ ok: true })) as unknown as typeof fetch;
+
+    const api = await import('./api');
+    const tauri = await import('@tauri-apps/api/core');
+    const invoke = vi.mocked(tauri.invoke);
+    invoke
+      .mockResolvedValueOnce({ available: false, currentVersion: '0.2.0' })
+      .mockResolvedValueOnce({ installed: false, currentVersion: '0.2.0' });
+
+    await expect(api.checkDesktopUpdate()).resolves.toEqual({ available: false, currentVersion: '0.2.0' });
+    await expect(api.installDesktopUpdate()).resolves.toEqual({ installed: false, currentVersion: '0.2.0' });
+    expect(invoke.mock.calls).toContainEqual(['check_desktop_update', undefined]);
+    expect(invoke.mock.calls).toContainEqual(['install_desktop_update', undefined]);
   });
 });
 

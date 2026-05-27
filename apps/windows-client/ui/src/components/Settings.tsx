@@ -5,8 +5,9 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
 
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((module) => ({ default: module.RuntimeDependenciesPanel })));
+const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((module) => ({ default: module.UpdatePanel })));
 
-export type SettingsTab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'selfcheck';
+export type SettingsTab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'updates' | 'selfcheck';
 
 const MODEL_PROVIDERS = [
   { value: 'kimi-api', label: 'Kimi' },
@@ -22,6 +23,7 @@ const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'input', label: '输入' },
   { value: 'api', label: 'API' },
   { value: 'runtime', label: '运行时' },
+  { value: 'updates', label: '更新' },
   { value: 'selfcheck', label: '自检' },
 ];
 
@@ -195,6 +197,11 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             {tab === 'runtime' && (
               <Suspense fallback={<Loading message="正在加载运行时状态…" />}>
                 <RuntimeDependenciesPanel />
+              </Suspense>
+            )}
+            {tab === 'updates' && (
+              <Suspense fallback={<Loading message="正在加载更新状态…" />}>
+                <UpdatePanel />
               </Suspense>
             )}
             {tab === 'selfcheck' && (

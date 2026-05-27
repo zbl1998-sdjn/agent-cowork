@@ -15,6 +15,7 @@ mod config;
 mod error;
 mod security;
 mod sidecar;
+mod updater;
 
 use tauri::Manager;
 
@@ -32,11 +33,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::host_status,
             commands::start_node_host,
             commands::stop_node_host,
             commands::open_path,
+            commands::check_desktop_update,
+            commands::install_desktop_update,
         ])
         .setup(|app| {
             if let Some(state) = app.try_state::<HostSidecar>() {

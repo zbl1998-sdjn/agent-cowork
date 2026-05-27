@@ -1,6 +1,7 @@
 import { modelBreakerStats } from '../runtime/model-breakers.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
+import { readDesktopUpdateManifest } from '../runtime/desktop-update-source.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 import {
   buildRuntimeDependencyCleanupPlan,
@@ -33,7 +34,7 @@ import {
  *   sandboxStartup?: SandboxStartupLike | null,
  *   storeBackend?: string,
  *   usePostgresState?: boolean,
- *   config: { runtimeDependencyEnv?: Record<string, string | undefined>, runtimeDependencyPlatform?: string, runtimeDependencyAppDataRoot?: string | null },
+ *   config: { runtimeDependencyEnv?: Record<string, string | undefined>, runtimeDependencyPlatform?: string, runtimeDependencyAppDataRoot?: string | null, desktopUpdateEnv?: Record<string, string | undefined> },
  *   trustedRootDefault: string,
  *   cancellation: CancellationLike,
  * }} HostStateLike
@@ -81,6 +82,23 @@ function safeModelBreakerStats() {
 export async function handleSystemRoutes({ request, response, pathname, requestContext, state }) {
   if (request.method === 'GET' && pathname === '/health') {
     sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
+    return true;
+  }
+
+  const updateMatch = /^\/desktop-update\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(pathname);
+  if (request.method === 'GET' && updateMatch) {
+    const manifest = readDesktopUpdateManifest({
+      env: state.config.desktopUpdateEnv || process.env,
+      target: decodeURIComponent(updateMatch[1]),
+      arch: decodeURIComponent(updateMatch[2]),
+      currentVersion: decodeURIComponent(updateMatch[3]),
+    });
+    if (!manifest) {
+      response.writeHead(204, SECURITY_HEADERS);
+      response.end();
+    } else {
+      sendJson(response, 200, manifest);
+    }
     return true;
   }
 

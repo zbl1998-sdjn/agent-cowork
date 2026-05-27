@@ -39,35 +39,46 @@ assert(fs.existsSync(manifestPath), 'missing component migration manifest');
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 assert(config.productName === 'Agent Cowork', 'Tauri product name mismatch');
-assert(config.build?.devUrl === 'http://127.0.0.1:3017', 'Tauri devUrl must target the Node host');
-assert(config.build?.frontendDist === '../resources', 'Tauri frontendDist must reuse static resources');
+assert(config.build?.devUrl === 'http://127.0.0.1:5173', 'Tauri devUrl must target the Vite dev server');
+assert(config.build?.frontendDist === '../ui-dist', 'Tauri frontendDist must use the built React UI');
 assert(config.app?.windows?.[0]?.label === 'main', 'Tauri main window label missing');
 assert(Boolean(config.app?.security?.csp), 'Tauri CSP must not be null');
 assert(config.bundle?.active === true, 'Tauri bundle must be active');
+assert(config.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be enabled');
 assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/agent-cowork-host']), 'Tauri bundle must declare host sidecar');
+assert(config.plugins?.updater?.pubkey, 'Tauri updater pubkey missing');
+assert((config.plugins?.updater?.endpoints || []).includes('http://127.0.0.1:3017/desktop-update/{{target}}/{{arch}}/{{current_version}}'), 'Tauri updater endpoint missing');
 
 const cargoToml = fs.readFileSync(cargoPath, 'utf8');
-for (const crate of ['tauri =', 'tauri-plugin-shell', 'tauri-plugin-opener', 'tauri-plugin-notification']) {
+for (const crate of ['tauri =', 'tauri-plugin-shell', 'tauri-plugin-opener', 'tauri-plugin-notification', 'tauri-plugin-updater']) {
   assert(cargoToml.includes(crate), `Cargo.toml missing ${crate}`);
 }
 
-const lib = fs.readFileSync(libPath, 'utf8');
+const lib = fs
+  .readdirSync(path.join(tauriRoot, 'src'))
+  .filter((name) => name.endsWith('.rs'))
+  .map((name) => fs.readFileSync(path.join(tauriRoot, 'src', name), 'utf8'))
+  .join('\n');
 for (const symbol of [
   'start_node_host',
   'host_status',
   'open_path',
-  '.sidecar("binaries/agent-cowork-host")',
+  'check_desktop_update',
+  'install_desktop_update',
+  'agent-cowork-host',
+  'Command::new',
   'assert_trusted_path',
   'tauri_plugin_shell::init()',
   'tauri_plugin_opener::init()',
   'tauri_plugin_notification::init()',
+  'tauri_plugin_updater::Builder',
 ]) {
   assert(lib.includes(symbol), `Tauri Rust entry missing ${symbol}`);
 }
 assert(!lib.includes('Command::new("node")'), 'Tauri Rust entry must use packaged sidecar instead of PATH node');
 
 const capability = JSON.parse(fs.readFileSync(capabilityPath, 'utf8'));
-assert((capability.permissions || []).includes('opener:default'), 'Tauri capability must include opener:default');
+assert(!(capability.permissions || []).includes('opener:default'), 'Tauri capability must not include broad opener:default');
 assert(!(capability.permissions || []).includes('shell:allow-open'), 'Tauri capability must not grant broad shell open');
 assert((capability.permissions || []).some((permission) => (
   permission?.identifier === 'shell:allow-execute'

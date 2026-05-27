@@ -22,7 +22,7 @@ export function isDesktop(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
-async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+export async function invokeDesktop<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isDesktop()) {
     throw new Error(`Tauri command "${command}" is unavailable outside the desktop shell`);
   }
@@ -40,7 +40,7 @@ async function probeHealth(): Promise<boolean> {
 
 export async function ensureHost(attempts = 40, intervalMs = 250): Promise<boolean> {
   if (isDesktop()) {
-    void invoke('start_node_host').catch(() => { /* host autostarted in setup; probe decides */ });
+    void invokeDesktop('start_node_host').catch(() => { /* host autostarted in setup; probe decides */ });
   }
   for (let i = 0; i < attempts; i += 1) {
     if (await probeHealth()) return true;
@@ -123,7 +123,7 @@ export async function sendJsonMethod<T>(method: string, route: string, body?: un
 
 export async function openPath(path: string): Promise<boolean> {
   if (isDesktop()) {
-    await invoke('open_path', { path });
+    await invokeDesktop('open_path', { path });
     return true;
   }
   return false;

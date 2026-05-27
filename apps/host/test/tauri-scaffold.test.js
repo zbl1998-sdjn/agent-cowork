@@ -21,10 +21,15 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.equal(config.app.windows[0].label, 'main');
   assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
+  assert.equal(config.bundle.createUpdaterArtifacts, true);
   assert.deepEqual(config.bundle.targets, ['nsis']);
   assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: 'embedBootstrapper' });
   assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
   assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
+  assert.ok(config.plugins?.updater?.pubkey, 'Tauri updater pubkey must be configured');
+  assert.deepEqual(config.plugins.updater.endpoints, [
+    'http://127.0.0.1:3017/desktop-update/{{target}}/{{arch}}/{{current_version}}',
+  ]);
 });
 
 test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
@@ -33,6 +38,7 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   assert.match(cargoToml, /tauri-plugin-shell/);
   assert.match(cargoToml, /tauri-plugin-opener/);
   assert.match(cargoToml, /tauri-plugin-notification/);
+  assert.match(cargoToml, /tauri-plugin-updater/);
 
   // Integration points live across src/*.rs, so scan the whole crate source.
   const srcDir = path.join(tauriRoot, 'src');
@@ -49,12 +55,15 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
     'start_node_host',
     'host_status',
     'open_path',
+    'check_desktop_update',
+    'install_desktop_update',
     'agent-cowork-host',
     'Command::new',
     'current_exe',
     '.setup',
     'tauri_plugin_opener::init',
     'tauri_plugin_notification::init',
+    'tauri_plugin_updater::Builder',
     'assert_trusted_path',
     'assert_openable_path',
     'hidden or sensitive path blocked',

@@ -29,6 +29,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "nsis"
     ],
@@ -51,5 +52,13 @@
     "externalBin": [
       "binaries/agent-cowork-host"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNFRjEyMzhFM0IwODI5ODcKUldTSEtRZzdqaVB4UHZGbFRVTm5zVUFVQ3RCeXdUUlhLNkR2OXBtQlFTTTF3UEw1bXd6b1huR0MK",
+      "endpoints": [
+        "http://127.0.0.1:3017/desktop-update/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
   }
 }
