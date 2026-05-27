@@ -196,6 +196,44 @@ declare module 'node:module' {
   export function createRequire(url: string): (specifier: string) => unknown;
 }
 
+declare module 'node:http' {
+  export interface IncomingMessage {
+    url?: string;
+    method?: string;
+    headers: Record<string, string | string[] | undefined>;
+    socket?: { remoteAddress?: string };
+    on(event: string, listener: (...args: any[]) => void): unknown;
+  }
+
+  export interface ServerResponse {
+    statusCode: number;
+    setHeader(name: string, value: string | number | string[]): void;
+    getHeader(name: string): string | number | string[] | undefined;
+    writeHead(statusCode: number, headers?: Record<string, string | number | string[]>): void;
+    write(chunk: string | Buffer): void;
+    end(chunk?: string | Buffer): void;
+  }
+
+  export interface AddressInfo {
+    port: number;
+    address: string;
+    family?: string;
+  }
+
+  export interface Server {
+    listen(port: number, host: string, callback?: () => void): Server;
+    listen(port: number, callback?: () => void): Server;
+    address(): AddressInfo | string | null;
+    close(callback?: (err?: Error) => void): Server;
+    on(event: 'error', listener: (error: Error & { code?: string }) => void): Server;
+    closeAllConnections?(): void;
+  }
+
+  export function createServer(
+    listener?: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
+  ): Server;
+}
+
 declare module 'node:url' {
   export function fileURLToPath(url: string): string;
 }

@@ -10,8 +10,18 @@ import { handleRouteChain } from './routes/route-chain.js';
 import { createHostState } from './runtime/host-state.js';
 import { redactText } from './security/redaction.js';
 
+// @ts-check
+
 const hostSrcDir = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * @typedef {import('./mcp/connect.js').McpServerSpec} McpServerSpec
+ * @typedef {import('./mcp/connect.js').ConnectedMcpClient} ConnectedMcpClient
+ * @typedef {{ [key: string]: any, mcpServers?: McpServerSpec[], connectMcpOnStart?: boolean }} ServerConfig
+ * @typedef {import('node:http').Server & { toolRegistry?: unknown, _mcpClients: ConnectedMcpClient[], connectMcpServers(servers?: McpServerSpec[]): Promise<unknown>, closeMcp(): void, isDraining(): boolean, shutdown(options?: { timeoutMs?: number }): Promise<void> }} HostServer
+ */
+
+/** @param {ServerConfig} [config] @returns {HostServer} */
 export function createServer(config = {}) {
   const state = createHostState(config, { hostSrcDir });
   const serveStatic = createStaticResponder({
@@ -20,7 +30,7 @@ export function createServer(config = {}) {
     uiDistEnabled: state.uiDistEnabled,
   });
 
-  const server = http.createServer(async (request, response) => {
+  const server = /** @type {HostServer} */ (http.createServer(async (request, response) => {
     try {
       const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
       const pathname = requestUrl.pathname;
@@ -51,17 +61,18 @@ export function createServer(config = {}) {
       sendJson(response, 404, { error: 'Not found' });
     } catch (err) {
       try {
-        console.error('[host] unhandled request error:', redactText(String((err && err.stack) || err)));
+        const errorText = err instanceof Error ? (err.stack || err.message) : String(err);
+        console.error('[host] unhandled request error:', redactText(errorText));
       } catch {
         /* ignore */
       }
       sendJson(response, 500, { error: 'internal server error' });
     }
-  });
+  }));
 
   server.toolRegistry = state.toolRegistry;
   server._mcpClients = [];
-  server.connectMcpServers = async (servers) => {
+  server.connectMcpServers = async (servers = []) => {
     const outcome = await connectMcpServers({ registry: state.toolRegistry, servers, spawn: config.mcpSpawn });
     server._mcpClients.push(...outcome.clients);
     return outcome;
@@ -89,7 +100,7 @@ export function createServer(config = {}) {
       } catch {
         /* ignore */
       }
-      server.close(() => { clearTimeout(timer); resolve(); });
+      server.close(() => { clearTimeout(timer); resolve(undefined); });
     });
   };
 

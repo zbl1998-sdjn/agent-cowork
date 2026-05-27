@@ -180,6 +180,7 @@
     "apps/host/src/sandbox/vm-sandbox.js",
     "apps/host/src/sandbox/wsl-docker-runner.js",
     "apps/host/src/security/credential-store.js",
+    "apps/host/src/server.js",
     "apps/host/src/skills/skill-registry.js",
     "apps/host/src/storage/app-home.js",
     "apps/host/src/storage/audit-events.js",
