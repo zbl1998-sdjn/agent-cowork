@@ -30,7 +30,9 @@ declare const process: {
   version: string;
   versions?: Record<string, string | undefined>;
   cwd(): string;
+  exit(code?: number): never;
   memoryUsage(): { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number };
+  once(event: string, listener: (...args: any[]) => void): unknown;
   uptime(): number;
 };
 

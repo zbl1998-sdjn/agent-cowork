@@ -3,6 +3,8 @@ import { createServer } from './server.js';
 import { JsonlWriter } from './storage/jsonl-writer.js';
 import { getSessionPath } from './storage/app-home.js';
 
+// @ts-check
+
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3001);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || process.cwd());

@@ -79,6 +79,7 @@
     "apps/host/src/memory/memory-utils.js",
     "apps/host/src/memory/profile.js",
     "apps/host/src/memory/sqlite-memory-store.js",
+    "apps/host/src/main.js",
     "apps/host/src/mcp/connect.js",
     "apps/host/src/mcp/json-rpc.js",
     "apps/host/src/mcp/mcp-client.js",
