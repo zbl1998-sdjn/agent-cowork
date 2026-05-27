@@ -113,9 +113,14 @@ export async function postJson<T>(route: string, body: PostBody): Promise<T> {
 
 export async function sendJsonMethod<T>(method: string, route: string, body?: unknown): Promise<T> {
   await hostReady;
+  const headers = authHeaders({ 'content-type': 'application/json' });
+  if (body && typeof body === 'object' && 'idempotencyKey' in body) {
+    const value = (body as { idempotencyKey?: unknown }).idempotencyKey;
+    if (typeof value === 'string' && value) headers['idempotency-key'] = value;
+  }
   const response = await fetch(resolveUrl(route), {
     method,
-    headers: authHeaders({ 'content-type': 'application/json' }),
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return parse<T>(response, route);

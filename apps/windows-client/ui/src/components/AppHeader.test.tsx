@@ -43,7 +43,7 @@ describe('AppHeader', () => {
   it('renders header actions with Button primitives', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(13);
+    expect(html.match(/class="ui-btn /g)?.length).toBe(14);
     expect(html).toContain('Agent Cowork');
     expect(html).toContain('header-user');
     expect(html).toContain('ui-btn--secondary');
@@ -69,7 +69,7 @@ describe('AppHeader', () => {
     });
     const buttons = collectByType(AppHeaderActions(componentProps), Button);
 
-    expect(buttons).toHaveLength(13);
+    expect(buttons).toHaveLength(14);
     buttons[0].props.onClick();
     buttons[1].props.onClick();
     buttons.find((button) => button.props.children === '计划模式·开')?.props.onClick();

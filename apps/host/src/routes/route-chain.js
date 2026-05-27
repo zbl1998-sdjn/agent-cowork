@@ -7,6 +7,7 @@ import { handleConversationRoutes } from './conversation-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
 import { handleOnboardingRoutes } from './onboarding-routes.js';
 import { handlePlanRoutes } from './plan-routes.js';
+import { handleProjectRoutes } from './project-routes.js';
 import { handlePromptRoutes } from './prompt-routes.js';
 import { handleRecipeRoutes } from './recipe-routes.js';
 import { handleRunRoutes } from './run-routes.js';
@@ -69,6 +70,19 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
     requestContext,
     trustedRootDefault: state.trustedRootDefault,
     memoryStore: state.memoryStore,
+  })) return true;
+  if (await handleProjectRoutes({
+    request,
+    response,
+    pathname,
+    requestUrl,
+    requestContext,
+    trustedRootDefault: state.trustedRootDefault,
+    safeTrustedRoot: state.safeTrustedRoot,
+    getProjectStore: state.getProjectStore,
+    cacheKeyFor: state.cacheKeyFor,
+    requireIdempotencyKey: state.requireIdempotencyKey,
+    sendCachedOrStore: state.sendCachedOrStore,
   })) return true;
   if (await handleConversationRoutes({
     request,

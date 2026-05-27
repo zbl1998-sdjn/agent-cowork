@@ -57,7 +57,7 @@ export interface Conversation {
   branches?: ConversationBranch[];
 }
 
-export type SidePanel = 'none' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'schedules' | 'memory' | 'observability';
+export type SidePanel = 'none' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'projects' | 'schedules' | 'memory' | 'observability';
 
 export interface WorkspaceInfo { trustedRoot: string }
 export interface RecipeRunResponse {

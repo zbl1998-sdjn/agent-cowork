@@ -25,6 +25,7 @@ const panelButtons: Array<{ panel: Exclude<SidePanel, 'none'>; label: string }> 
   { panel: 'viz', label: '可视化' },
   { panel: 'connectors', label: '连接器' },
   { panel: 'artifacts', label: '产物' },
+  { panel: 'projects', label: '项目' },
   { panel: 'schedules', label: '定时任务' },
   { panel: 'memory', label: '记忆' },
   { panel: 'observability', label: '可观测' },

@@ -16,3 +16,4 @@ export * from './memory';
 export * from './onboarding';
 export * from './runtimeDependencies';
 export * from './desktopUpdates';
+export * from './projects';

@@ -36,6 +36,7 @@ import {
   defaultUiDistRoot,
   isUiDistEnabled,
 } from '../http/static-assets.js';
+import { createProjectStoreResolver } from './project-stores.js';
 
 // @ts-check
 
@@ -102,6 +103,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.conversationStore = config.conversationStore || (state.usePostgresState
     ? createPostgresConversationStore({ connectionString: state.databaseUrl })
     : createConversationStore({ backend: state.storeBackend }));
+  Object.assign(state, createProjectStoreResolver(config));
   state.runEvents = config.runEventBus || (state.usePostgresState
     ? createPostgresEventBus({ connectionString: state.databaseUrl })
     : new RunEventBus());

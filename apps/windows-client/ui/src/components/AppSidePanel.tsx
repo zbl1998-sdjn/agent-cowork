@@ -9,6 +9,7 @@ const ToolsPanel = lazy(() => import('./panels/ToolsPanel').then((module) => ({ 
 const VizPanel = lazy(() => import('./panels/VizPanel').then((module) => ({ default: module.VizPanel })));
 const ConnectorsPanel = lazy(() => import('./panels/ConnectorsPanel').then((module) => ({ default: module.ConnectorsPanel })));
 const ArtifactsPanel = lazy(() => import('./panels/ArtifactsPanel').then((module) => ({ default: module.ArtifactsPanel })));
+const ProjectsPanel = lazy(() => import('./panels/ProjectsPanel').then((module) => ({ default: module.ProjectsPanel })));
 const SchedulesPanel = lazy(() => import('./panels/SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
 const MemoryPanel = lazy(() => import('./panels/MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
 const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
@@ -25,6 +26,7 @@ const PANEL_LABELS: Record<Exclude<SidePanel, 'none'>, string> = {
   viz: '可视化面板',
   connectors: '连接器面板',
   artifacts: '产物面板',
+  projects: '项目面板',
   schedules: '定时任务面板',
   memory: '记忆面板',
   observability: '可观测面板',
@@ -35,6 +37,7 @@ function panelContent(panel: Exclude<SidePanel, 'none'>, trustedRoot: string, on
   if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} />;
   if (panel === 'connectors') return <ConnectorsPanel trustedRoot={trustedRoot} />;
   if (panel === 'artifacts') return <ArtifactsPanel trustedRoot={trustedRoot} />;
+  if (panel === 'projects') return <ProjectsPanel trustedRoot={trustedRoot} />;
   if (panel === 'schedules') return <SchedulesPanel />;
   if (panel === 'memory') return <MemoryPanel trustedRoot={trustedRoot} />;
   return <ObservabilityPanel />;
