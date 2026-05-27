@@ -202,6 +202,7 @@
     "apps/host/src/tools/data/report.js",
     "apps/host/src/tools/data/statistics.js",
     "apps/host/src/tools/data/table.js",
+    "apps/host/src/tools/data/xlsx-table.js",
     "apps/host/src/tools/builtin-tools.js",
     "apps/host/src/tools/dev/git.js",
     "apps/host/src/tools/tool-registry.js",

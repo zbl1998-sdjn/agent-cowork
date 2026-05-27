@@ -7,6 +7,7 @@ import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { analyzeDataFile } from '../src/tools/data/report.js';
 import { profileDataFile } from '../src/tools/data/profile.js';
+import { createXlsxWorkbook } from '../src/artifacts/xlsx-writer.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 function workspace() {
@@ -108,4 +109,32 @@ test('data analysis builds a chart spec and markdown report', async () => {
   const builtin = await registry.call('data.analyze', { path: 'sales.csv' }, { trustedRoot });
   assert.equal(builtin.kind, 'data-analysis');
   assert.equal(builtin.chart.title, 'revenue by region');
+});
+
+test('data analysis reads the first worksheet from xlsx files', () => {
+  const trustedRoot = workspace();
+  fs.writeFileSync(
+    path.join(trustedRoot, 'sales.xlsx'),
+    createXlsxWorkbook({
+      sheetName: 'Sales',
+      columns: ['region', 'revenue'],
+      rows: [
+        ['North', 10],
+        ['South', 15],
+        ['North', 5],
+      ],
+    }),
+  );
+
+  const profile = profileDataFile({ trustedRoot, path: 'sales.xlsx' });
+  assert.equal(profile.delimiter, 'xlsx');
+  assert.equal(profile.rowCount, 3);
+  assert.equal(profile.columns.find((column) => column.name === 'revenue').type, 'number');
+
+  const analysis = analyzeDataFile({ trustedRoot, path: 'sales.xlsx' });
+  assert.equal(analysis.kind, 'data-analysis');
+  assert.equal(analysis.chart.kind, 'bar');
+  assert.deepEqual(analysis.chart.data.labels, ['North', 'South']);
+  assert.deepEqual(analysis.chart.data.values, [15, 15]);
+  assert.match(analysis.reportMarkdown, /Data analysis: sales\.xlsx/);
 });

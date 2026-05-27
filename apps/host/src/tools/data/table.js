@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../../security/path-policy.js';
+import { parseXlsxTable } from './xlsx-table.js';
 
 const DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_ROWS = 5000;
@@ -106,9 +107,11 @@ export function readDataTable({
   if (!trustedRoot) throw new Error('trustedRoot is required');
   const root = path.resolve(trustedRoot);
   const { safe, size } = safeDataFile(root, filePath, maxBytes);
-  const text = fs.readFileSync(safe, 'utf8');
-  const delimiter = delimiterFor(safe, text);
-  const table = parseTable(text, delimiter, Math.max(1, Math.min(Number(maxRows) || DEFAULT_MAX_ROWS, DEFAULT_MAX_ROWS)));
+  const rowLimit = Math.max(1, Math.min(Number(maxRows) || DEFAULT_MAX_ROWS, DEFAULT_MAX_ROWS));
+  const isXlsx = path.extname(safe).toLowerCase() === '.xlsx';
+  const text = isXlsx ? '' : fs.readFileSync(safe, 'utf8');
+  const delimiter = isXlsx ? 'xlsx' : delimiterFor(safe, text);
+  const table = isXlsx ? parseXlsxTable(fs.readFileSync(safe), rowLimit) : parseTable(text, delimiter, rowLimit);
   return {
     kind: 'data-table',
     path: path.relative(root, safe).replace(/\\/g, '/'),

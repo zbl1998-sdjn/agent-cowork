@@ -118,7 +118,7 @@ export function createBuiltinTools({
 
   tools.push({
     name: 'data.profile',
-    description: '只读：剖析工作区内 CSV/TSV 数据文件，返回列类型、缺失值、数值统计和图表建议。',
+    description: '只读：剖析工作区内 CSV/TSV/XLSX 数据文件，返回列类型、缺失值、数值统计和图表建议。',
     source: 'builtin',
     risk: 'low',
     mutating: false,
@@ -136,7 +136,7 @@ export function createBuiltinTools({
 
   tools.push({
     name: 'data.analyze',
-    description: '只读：分析工作区内 CSV/TSV 数据文件，返回列统计、图表数据和 Markdown 报告草稿。',
+    description: '只读：分析工作区内 CSV/TSV/XLSX 数据文件，返回列统计、图表数据和 Markdown 报告草稿。',
     source: 'builtin',
     risk: 'low',
     mutating: false,

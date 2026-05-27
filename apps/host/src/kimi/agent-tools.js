@@ -147,7 +147,7 @@ export function createAgentTools(ctx = {}) {
     },
     {
       name: 'AnalyzeDataFile', mutating: false, risk: 'safe',
-      description: '分析工作区内 CSV/TSV 数据文件，返回列统计、图表数据和 Markdown 报告草稿；不会修改文件。',
+      description: '分析工作区内 CSV/TSV/XLSX 数据文件，返回列统计、图表数据和 Markdown 报告草稿；不会修改文件。',
       parameters: {
         type: 'object',
         properties: {
