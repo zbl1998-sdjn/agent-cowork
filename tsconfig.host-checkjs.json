@@ -85,6 +85,7 @@
     "apps/host/src/mcp/stdio-transport.js",
     "apps/host/src/onboarding/recommendations.js",
     "apps/host/src/recipes/recipe-helpers.js",
+    "apps/host/src/recipes/capture.js",
     "apps/host/src/recipes/registry.js",
     "apps/host/src/recipes/run-recipe.js",
     "apps/host/src/security/redaction.js",
