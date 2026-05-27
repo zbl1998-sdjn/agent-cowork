@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getJson,
   getKimiInfo,
@@ -8,7 +8,8 @@ import {
   type AuthIdentity,
   type KimiInfo,
 } from '../lib/api';
-import { AUTO_CLARIFY_KEY, GUEST_KEY } from '../lib/app-constants';
+import { AUTO_CLARIFY_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
+import { buildContextualStarters } from '../lib/starter-suggestions';
 import type { WorkspaceInfo } from '../lib/app-types';
 import { ONBOARDING_DONE_KEY } from '../lib/onboarding';
 import type { RunSummary } from '../lib/types';
@@ -38,6 +39,10 @@ export function historyRunsFromIndex(runs: RunSummary[] = []): HistoryRun[] {
   return runs.map((run) => ({ id: run.id, promptPreview: run.promptPreview }));
 }
 
+export function runtimeStarters(recipes: Recipe[] = [], historyRuns: HistoryRun[] = []): string[] {
+  return buildContextualStarters({ base: STARTERS, recipes, historyRuns });
+}
+
 export function useAppRuntimeState() {
   const [trustedRoot, setTrustedRoot] = useState('');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -61,6 +66,7 @@ export function useAppRuntimeState() {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     try { return localStorage.getItem(ONBOARDING_DONE_KEY) !== '1'; } catch { return true; }
   });
+  const starters = useMemo(() => runtimeStarters(recipes, history), [recipes, history]);
 
   const applyKimiInfo = useCallback((info: Partial<KimiInfo> | null | undefined) => {
     const defaults = runtimeDefaultsFromKimiInfo(info);
@@ -188,6 +194,7 @@ export function useAppRuntimeState() {
     setTheme,
     settingsInitialTab,
     settingsOpen,
+    starters,
     theme,
     toggleTheme,
     trustedRoot,
