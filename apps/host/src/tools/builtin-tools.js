@@ -14,7 +14,15 @@ import { analyzeDataFile } from './data/report.js';
 // sandbox / recipe / web machinery, and tests can register fakes instead.
 //
 // Each handler receives (args, ctx) where ctx = { trustedRoot, context }.
+// @ts-check
 
+/**
+ * @typedef {{ trustedRoot?: string, context?: unknown }} ToolContext
+ * @typedef {{ name: string, description: string, source: string, risk?: string, mutating?: boolean, requiresApproval?: boolean, inputSchema?: Record<string, any>, handler(args?: Record<string, any>, ctx?: ToolContext): unknown | Promise<unknown> }} BuiltinTool
+ * @typedef {{ sandbox?: any, sandboxLimits?: Record<string, any>, runStoreRoot?: string, runEvents?: any, runsIndex?: any, enableWebTools?: boolean, fetchImpl?: any }} BuiltinToolsOptions
+ */
+
+/** @param {BuiltinToolsOptions} [options] @returns {BuiltinTool[]} */
 export function createBuiltinTools({
   sandbox,
   sandboxLimits = {},
@@ -24,6 +32,7 @@ export function createBuiltinTools({
   enableWebTools = true,
   fetchImpl,
 } = {}) {
+  /** @type {BuiltinTool[]} */
   const tools = [];
 
   if (sandbox) {
@@ -49,7 +58,7 @@ export function createBuiltinTools({
       requiresApproval: true,
       handler: async (args = {}, ctx = {}) =>
         runCode({
-          sandbox,
+          sandbox: /** @type {any} */ (sandbox),
           sandboxLimits,
           tool: args.tool,
           code: args.code,
@@ -57,11 +66,11 @@ export function createBuiltinTools({
           ext: args.ext,
           timeoutMs: args.timeoutMs,
           network: args.network === true,
-          trustedRoot: ctx.trustedRoot,
-          runStoreRoot,
+          trustedRoot: ctx.trustedRoot || '',
+          runStoreRoot: runStoreRoot || '',
           runEvents,
           runsIndex,
-          context: ctx.context,
+          context: /** @type {Record<string, unknown> | undefined} */ (ctx.context),
         }),
     });
   }
@@ -75,7 +84,7 @@ export function createBuiltinTools({
       requiresApproval: true,
       inputSchema: { type: 'object', properties: { url: { type: 'string' }, maxBytes: { type: 'number' }, timeoutMs: { type: 'number' } }, required: ['url'] },
       handler: async (args = {}) =>
-        webFetch({ url: args.url, timeoutMs: args.timeoutMs, maxBytes: args.maxBytes, allowInternal: args.allowInternal === true, fetchImpl }),
+        webFetch({ url: args.url, timeoutMs: args.timeoutMs, maxBytes: args.maxBytes, allowInternal: args.allowInternal === true, fetchImpl: /** @type {any} */ (fetchImpl) }),
     });
   }
 
@@ -105,7 +114,7 @@ export function createBuiltinTools({
       }),
   });
 
-  tools.push(...createGitReadOnlyBuiltinTools());
+  tools.push(.../** @type {BuiltinTool[]} */ (/** @type {unknown} */ (createGitReadOnlyBuiltinTools())));
 
   tools.push({
     name: 'data.profile',
@@ -172,12 +181,12 @@ export function createBuiltinTools({
       handler: async (args = {}, ctx = {}) =>
         runRecipe({
           recipeId: recipe.id,
-          trustedRoot: ctx.trustedRoot,
+          trustedRoot: ctx.trustedRoot || '',
           prompt: args.prompt || '',
           files: args.files || [],
           maxSize: args.maxSize,
-          context: ctx.context,
-          runStoreRoot,
+          context: /** @type {Record<string, unknown> | undefined} */ (ctx.context),
+          runStoreRoot: runStoreRoot || '',
           runEvents,
           runsIndex,
         }),
