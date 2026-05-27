@@ -38,6 +38,7 @@
     "smoke:windows-client": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-windows-client.ps1",
     "smoke:installed-tauri": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installed-tauri.ps1",
     "smoke:ui": "node scripts/smoke-ui-contract.mjs",
+    "prepare:embedded-python": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-embedded-python.ps1",
     "check:arch": "node scripts/check-arch.mjs",
     "check:filesize": "node scripts/check-filesize.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",

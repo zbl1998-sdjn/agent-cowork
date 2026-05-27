@@ -18,13 +18,18 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   assert.equal(config.productName, 'Agent Cowork');
   assert.equal(config.build.devUrl, 'http://127.0.0.1:5173');
   assert.equal(config.build.frontendDist, '../ui-dist');
+  assert.match(config.build.beforeBuildCommand, /prepare-embedded-python\.ps1/);
   assert.equal(config.app.windows[0].label, 'main');
   assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
   assert.equal(config.bundle.active, true);
   assert.equal(config.bundle.createUpdaterArtifacts, true);
+  assert.equal(config.bundle.useLocalToolsDir, true);
   assert.deepEqual(config.bundle.targets, ['nsis']);
   assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: 'embedBootstrapper' });
   assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
+  assert.deepEqual(config.bundle.resources, {
+    '../resources/python-embedded': 'python-embedded',
+  });
   assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
   assert.ok(config.plugins?.updater?.pubkey, 'Tauri updater pubkey must be configured');
   assert.deepEqual(config.plugins.updater.endpoints, [
@@ -33,6 +38,17 @@ test('Tauri scaffold keeps npm zero-deps and points at the Node host/static reso
   for (const endpoint of config.plugins.updater.endpoints) {
     assert.ok(endpoint.startsWith('https://'), 'release updater endpoints must use HTTPS');
   }
+});
+
+test('embedded Python staging script pins the official embeddable archive and verifies SHA256', () => {
+  const script = fs.readFileSync(path.join(workspaceRoot, 'scripts', 'prepare-embedded-python.ps1'), 'utf8');
+  assert.match(script, /python-\$Version-embeddable-\$Arch\.zip/);
+  assert.match(script, /3\.12\.10/);
+  assert.match(script, /156c7eea90d58cd7e91a23f28a0056616b13e9f4cf4901b7b99b837b7848c6da/);
+  assert.match(script, /Get-FileHash/);
+  assert.match(script, /Expand-Archive/);
+  assert.match(script, /PYTHON_EMBEDDED_MANIFEST\.json/);
+  assert.match(script, /Lib\\site-packages/);
 });
 
 test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
@@ -61,6 +77,10 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
     'check_desktop_update',
     'install_desktop_update',
     'agent-cowork-host',
+    'KCW_PYTHON_HOME',
+    'KCW_EMBEDDED_PYTHON',
+    'resource_dir',
+    'python-embedded',
     'Command::new',
     'current_exe',
     '.setup',

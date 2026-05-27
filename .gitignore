@@ -28,6 +28,11 @@ apps/windows-client/ui/*.tsbuildinfo
 # Keep the README/manifest in binaries/, just not the compiled exe.
 apps/windows-client/src-tauri/binaries/*.exe
 
+# Embedded Python is staged from the pinned official package during Tauri builds.
+# Keep the instructions tracked, not the generated runtime payload.
+apps/windows-client/resources/python-embedded/*
+!apps/windows-client/resources/python-embedded/README.md
+
 # Local runtime state / scratch (never part of the release baseline).
 *.sqlite
 *.sqlite-wal

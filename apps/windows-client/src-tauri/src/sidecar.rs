@@ -19,6 +19,8 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+#[cfg(windows)]
+use tauri::Manager;
 
 use crate::config::{HOST, HOST_URL, PORT};
 use crate::error::{DesktopError, DesktopResult};
@@ -33,6 +35,11 @@ pub const EVENT_HOST_STOPPED: &str = "kimi://host-stopped";
 const SIDECAR_FILE: &str = "agent-cowork-host.exe";
 #[cfg(not(windows))]
 const SIDECAR_FILE: &str = "agent-cowork-host";
+
+#[cfg(windows)]
+const EMBEDDED_PYTHON_DIR: &str = "python-embedded";
+#[cfg(windows)]
+const EMBEDDED_PYTHON_EXE: &str = "python.exe";
 
 /// Managed Tauri state holding the (optional) running host child.
 #[derive(Default)]
@@ -65,6 +72,27 @@ fn sidecar_path() -> DesktopResult<PathBuf> {
         .ok_or_else(|| DesktopError::Sidecar("cannot resolve executable directory".into()))?;
     Ok(dir.join(SIDECAR_FILE))
 }
+
+#[cfg(windows)]
+fn embedded_python_paths(app: &AppHandle) -> Option<(PathBuf, PathBuf)> {
+    let home = app.path().resource_dir().ok()?.join(EMBEDDED_PYTHON_DIR);
+    let exe = home.join(EMBEDDED_PYTHON_EXE);
+    if exe.is_file() {
+        Some((home, exe))
+    } else {
+        None
+    }
+}
+
+#[cfg(windows)]
+fn configure_embedded_python_env(command: &mut Command, app: &AppHandle) {
+    if let Some((home, exe)) = embedded_python_paths(app) {
+        command.env("KCW_PYTHON_HOME", home).env("KCW_EMBEDDED_PYTHON", exe);
+    }
+}
+
+#[cfg(not(windows))]
+fn configure_embedded_python_env(_command: &mut Command, _app: &AppHandle) {}
 
 impl HostSidecar {
     /// Current host status without mutating anything.
@@ -103,6 +131,7 @@ impl HostSidecar {
             .env("PORT", PORT)
             .env("TRUSTED_ROOT", trusted_root)
             .env("KCW_TAURI", "1");
+        configure_embedded_python_env(&mut command, app);
         // Don't pop a console window for the background host on Windows.
         #[cfg(windows)]
         {

@@ -30,27 +30,44 @@ const cargoPath = path.join(tauriRoot, 'Cargo.toml');
 const libPath = path.join(tauriRoot, 'src', 'lib.rs');
 const capabilityPath = path.join(tauriRoot, 'capabilities', 'default.json');
 const manifestPath = path.join(repoRoot, 'apps', 'windows-client', 'resources', 'component-manifest.json');
+const embeddedPythonScriptPath = path.join(repoRoot, 'scripts', 'prepare-embedded-python.ps1');
 
 assert(fs.existsSync(configPath), 'missing Tauri config');
 assert(fs.existsSync(cargoPath), 'missing Tauri Cargo.toml');
 assert(fs.existsSync(libPath), 'missing Tauri Rust entry');
 assert(fs.existsSync(capabilityPath), 'missing Tauri default capability');
 assert(fs.existsSync(manifestPath), 'missing component migration manifest');
+assert(fs.existsSync(embeddedPythonScriptPath), 'missing embedded Python staging script');
 
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 assert(config.productName === 'Agent Cowork', 'Tauri product name mismatch');
 assert(config.build?.devUrl === 'http://127.0.0.1:5173', 'Tauri devUrl must target the Vite dev server');
 assert(config.build?.frontendDist === '../ui-dist', 'Tauri frontendDist must use the built React UI');
+assert((config.build?.beforeBuildCommand || '').includes('prepare-embedded-python.ps1'), 'Tauri build must stage embedded Python before bundling');
 assert(config.app?.windows?.[0]?.label === 'main', 'Tauri main window label missing');
 assert(Boolean(config.app?.security?.csp), 'Tauri CSP must not be null');
 assert(config.bundle?.active === true, 'Tauri bundle must be active');
 assert(config.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be enabled');
+assert(config.bundle?.useLocalToolsDir === true, 'Tauri bundler tools must stay in target/.tauri for reproducible local builds');
+assert(config.bundle?.resources?.['../resources/python-embedded'] === 'python-embedded', 'Tauri bundle must package embedded Python resources');
 assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/agent-cowork-host']), 'Tauri bundle must declare host sidecar');
 assert(config.plugins?.updater?.pubkey, 'Tauri updater pubkey missing');
 const updaterEndpoints = config.plugins?.updater?.endpoints || [];
 assert(updaterEndpoints.includes('https://updates.agent-cowork.local/desktop-update/{{target}}/{{arch}}/{{current_version}}'), 'Tauri updater endpoint missing');
 for (const endpoint of updaterEndpoints) {
   assert(endpoint.startsWith('https://'), 'Tauri updater endpoints must use HTTPS in release builds');
+}
+
+const embeddedPythonScript = fs.readFileSync(embeddedPythonScriptPath, 'utf8');
+for (const token of [
+  'python-$Version-embeddable-$Arch.zip',
+  '3.12.10',
+  '156c7eea90d58cd7e91a23f28a0056616b13e9f4cf4901b7b99b837b7848c6da',
+  'Get-FileHash',
+  'Expand-Archive',
+  'PYTHON_EMBEDDED_MANIFEST.json',
+]) {
+  assert(embeddedPythonScript.includes(token), `embedded Python staging script missing ${token}`);
 }
 
 const cargoToml = fs.readFileSync(cargoPath, 'utf8');
@@ -70,6 +87,10 @@ for (const symbol of [
   'check_desktop_update',
   'install_desktop_update',
   'agent-cowork-host',
+  'KCW_PYTHON_HOME',
+  'KCW_EMBEDDED_PYTHON',
+  'resource_dir',
+  'python-embedded',
   'Command::new',
   'assert_trusted_path',
   'tauri_plugin_shell::init()',

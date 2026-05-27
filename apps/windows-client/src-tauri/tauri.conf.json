@@ -5,7 +5,7 @@
   "identifier": "com.agent.cowork",
   "build": {
     "beforeDevCommand": "node ../../../scripts/start-tauri-dev.mjs",
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/prepare-embedded-python.ps1",
     "devUrl": "http://127.0.0.1:5173",
     "frontendDist": "../ui-dist"
   },
@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
+    "useLocalToolsDir": true,
     "targets": [
       "nsis"
     ],
@@ -49,6 +50,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../resources/python-embedded": "python-embedded"
+    },
     "externalBin": [
       "binaries/agent-cowork-host"
     ]

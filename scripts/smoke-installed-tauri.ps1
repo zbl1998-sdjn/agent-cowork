@@ -220,6 +220,23 @@ function Get-WebViewInstallModeStatus {
     }
 }
 
+function Get-EmbeddedPythonProbe {
+    param(
+        [Parameter(Mandatory = $true)][string]$PythonExe,
+        [Parameter(Mandatory = $true)][string]$ExpectedHome
+    )
+
+    $probe = "import json,sys; print(json.dumps({'version':sys.version.split()[0],'executable':sys.executable,'prefix':sys.prefix}, ensure_ascii=True))"
+    $output = & $PythonExe -I -c $probe 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installed embedded Python failed to execute: $output"
+    }
+    $json = ($output | Select-Object -First 1) | ConvertFrom-Json
+    Assert-True ($json.executable -eq $PythonExe) "Embedded Python probe used unexpected executable: $($json | ConvertTo-Json -Compress)"
+    Assert-True ($json.prefix -eq $ExpectedHome) "Embedded Python probe used unexpected prefix: $($json | ConvertTo-Json -Compress)"
+    return $json
+}
+
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $workspace = Join-Path $repoRoot "build\installed-tauri-smoke-workspace"
@@ -269,6 +286,13 @@ try {
     $sidecar = Join-Path $installDir "agent-cowork-host.exe"
     $sidecarExists = Test-Path -LiteralPath $sidecar
     Assert-True $sidecarExists "Installed host sidecar not found: $sidecar"
+    $embeddedPythonHome = Join-Path $installDir "python-embedded"
+    $embeddedPythonExe = Join-Path $embeddedPythonHome "python.exe"
+    $embeddedPythonHomeExists = Test-Path -LiteralPath $embeddedPythonHome
+    $embeddedPythonExeExists = Test-Path -LiteralPath $embeddedPythonExe
+    Assert-True ($embeddedPythonHomeExists) "Installed embedded Python resource directory not found: $embeddedPythonHome"
+    Assert-True ($embeddedPythonExeExists) "Installed embedded Python executable not found: $embeddedPythonExe"
+    $embeddedPythonProbe = Get-EmbeddedPythonProbe -PythonExe $embeddedPythonExe -ExpectedHome $embeddedPythonHome
 
     $expectedInstallRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Agent Cowork")).TrimEnd("\")
     $resolvedInstallDir = [System.IO.Path]::GetFullPath($installDir).TrimEnd("\")
@@ -282,6 +306,13 @@ try {
     $report.installedExe = $exe
     $report.installDir = $installDir
     $report.sidecar = $sidecar
+    $report.embeddedPython = [ordered]@{
+        home = $embeddedPythonHome
+        exe = $embeddedPythonExe
+        homeExists = $embeddedPythonHomeExists
+        exeExists = $embeddedPythonExeExists
+        probe = $embeddedPythonProbe
+    }
     $report.signatures = [ordered]@{
         installedExe = Get-SignatureSummary -Path $exe
         installer = Get-SignatureSummary -Path $InstallerPath
@@ -300,6 +331,9 @@ try {
         $report.ok = $true
         $report.checks.installedExeExists = $true
         $report.checks.sidecarExists = $true
+        $report.checks.embeddedPythonHomeExists = "passed"
+        $report.checks.embeddedPythonExeExists = "passed"
+        $report.checks.bundledPythonProbe = "passed"
         $report.checks.perUserInstallRoot = "passed"
         $report.checks.hkcuUninstallEntry = "passed"
         $report.checks.hklmUninstallEntryAbsent = "passed"
@@ -342,6 +376,10 @@ try {
     $sqliteDependency = $runtimeDependencies.dependencies | Where-Object { $_.id -eq "sqlite" } | Select-Object -First 1
     Assert-True ($null -ne $sqliteDependency) "Runtime dependency catalog did not include sqlite"
     Assert-True ($sqliteDependency.status -eq "available") "Installed sidecar SQLite runtime unavailable: $($sqliteDependency | ConvertTo-Json -Compress)"
+    $pythonDependency = $runtimeDependencies.dependencies | Where-Object { $_.id -eq "python-embedded" } | Select-Object -First 1
+    Assert-True ($null -ne $pythonDependency) "Runtime dependency catalog did not include python-embedded"
+    Assert-True ($pythonDependency.status -eq "configured") "Installed sidecar did not discover bundled Python: $($pythonDependency | ConvertTo-Json -Compress)"
+    Assert-True (@("KCW_EMBEDDED_PYTHON", "KCW_PYTHON_HOME") -contains $pythonDependency.source) "Bundled Python was not discovered through sidecar env wiring: $($pythonDependency | ConvertTo-Json -Compress)"
 
     $memoryFact = Invoke-Json -Uri "$baseUrl/api/memory/facts" -Method POST -Headers $authHeaders -Body @{
         key = "安装版 SQLite"
@@ -430,8 +468,18 @@ try {
             schedule = $true
         }
     }
+    $report.python = [ordered]@{
+        dependency = $pythonDependency
+        home = $embeddedPythonHome
+        exe = $embeddedPythonExe
+        probe = $embeddedPythonProbe
+    }
     $report.checks.installedExeExists = $true
     $report.checks.sidecarExists = $true
+    $report.checks.embeddedPythonHomeExists = "passed"
+    $report.checks.embeddedPythonExeExists = "passed"
+    $report.checks.bundledPythonProbe = "passed"
+    $report.checks.bundledPythonRuntime = "passed"
     $report.checks.perUserInstallRoot = "passed"
     $report.checks.hkcuUninstallEntry = "passed"
     $report.checks.hklmUninstallEntryAbsent = "passed"
