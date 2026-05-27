@@ -37,6 +37,16 @@ import {
   isUiDistEnabled,
 } from '../http/static-assets.js';
 
+// @ts-check
+
+/**
+ * @typedef {{ [key: string]: any }} HostConfig
+ * @typedef {{ tenantId?: string, userId?: string, traceId?: string, idempotencyKey?: string }} RequestContextLike
+ * @typedef {{ id: string, tenantId?: string, userId?: string, traceId?: string | null, payload?: unknown }} ScheduleRecordLike
+ * @typedef {{ [key: string]: any, config: HostConfig, hostSrcDir: string, trustedRootDefault: string, staticRoot: string | null, uiDistRoot: string, uiDistEnabled: boolean, kimiConfigFile: string, kimiApiConfig: any, runStoreRoot: string, idempotencyStore: Map<string, any>, draining: boolean }} HostState
+ */
+
+/** @param {HostConfig} config @param {{ hostSrcDir: string }} options @returns {HostState} */
 export function createHostState(config = {}, { hostSrcDir }) {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
   const staticRoot = config.staticRoot === false
@@ -49,6 +59,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   const kimiApiConfig = resolveKimiApiConfig(config);
   applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
 
+  /** @type {HostState} */
   const state = {
     config,
     hostSrcDir,
@@ -157,6 +168,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.safeTrustedRoot = (requestedRoot = trustedRootDefault) => (
     assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault)
   );
+  /** @param {Record<string, any>} record @param {Record<string, unknown>} [ctx] */
   state.indexRun = (record, ctx) => {
     try {
       const context = ctx || record.context || {};
@@ -165,14 +177,17 @@ export function createHostState(config = {}, { hostSrcDir }) {
       // index failures must never break the request path
     }
   };
+  /** @param {RequestContextLike} context @param {string} method @param {string} pathname */
   state.cacheKeyFor = (context, method, pathname) => (
     context.idempotencyKey ? `${context.tenantId}:${context.userId}:${method}:${pathname}:${context.idempotencyKey}` : ''
   );
+  /** @param {any} response @param {RequestContextLike} context */
   state.requireIdempotencyKey = (response, context) => {
     if (context.idempotencyKey) return true;
     sendJson(response, 428, { error: 'Idempotency-Key header is required for this write operation' });
     return false;
   };
+  /** @param {any} response @param {string} cacheKey @param {string | undefined} fingerprint @param {number} status @param {any} payload */
   state.sendCachedOrStore = (response, cacheKey, fingerprint, status, payload) => {
     if (cacheKey && state.idempotencyStore.has(cacheKey)) {
       const cached = state.idempotencyStore.get(cacheKey);
@@ -191,8 +206,11 @@ export function createHostState(config = {}, { hostSrcDir }) {
 
   state.activeScheduler = config.scheduler || null;
   if (!state.activeScheduler && config.enableScheduler !== false) {
-    const executor = config.scheduleExecutor || (async (record) => {
-      const payload = record.payload || {};
+    /** @param {ScheduleRecordLike} record */
+    const defaultScheduleExecutor = async (record) => {
+      const payload = record.payload && typeof record.payload === 'object'
+        ? /** @type {Record<string, any>} */ (record.payload)
+        : {};
       if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
       const result = runRecipe({
         recipeId: payload.recipeId,
@@ -206,7 +224,8 @@ export function createHostState(config = {}, { hostSrcDir }) {
         runsIndex: state.runsIndex,
       });
       return { runId: result.runId, operations: result.operations.length };
-    });
+    };
+    const executor = config.scheduleExecutor || defaultScheduleExecutor;
     state.activeScheduler = new Scheduler({
       storeDir: path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules')),
       store: config.scheduleStore || (state.usePostgresState

@@ -110,6 +110,7 @@
     "apps/host/src/runtime/file-operation-approvals.js",
     "apps/host/src/runtime/git-runtime.js",
     "apps/host/src/runtime/hooks.js",
+    "apps/host/src/runtime/host-state.js",
     "apps/host/src/runtime/model-recorder.js",
     "apps/host/src/runtime/model-breakers.js",
     "apps/host/src/runtime/oauth-permission-approvals.js",
