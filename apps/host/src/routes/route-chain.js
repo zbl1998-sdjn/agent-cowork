@@ -20,7 +20,19 @@ import { handleVizRoutes } from './viz-routes.js';
 import { handleWorkspaceFileRoutes } from './workspace-file-routes.js';
 import { handleApprovalRoutes } from './approval-routes.js';
 import { handleKimiRoutes } from './kimi-routes.js';
+// @ts-check
 
+/**
+ * @typedef {any} RouteRequest
+ * @typedef {any} RouteResponse
+ * @typedef {{ tenantId: string, userId: string, traceId: string, idempotencyKey?: string, [key: string]: any }} RequestContext
+ * @typedef {{ name: string, command: string, args: string[] }} ConnectorSpec
+ * @typedef {{ connectMcpServers(servers: ConnectorSpec[]): Promise<any> }} RouteServer
+ * @typedef {any} RouteState
+ * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, state: RouteState, server: RouteServer }} RouteChainOptions
+ */
+
+/** @param {RouteChainOptions} options @returns {Promise<boolean>} */
 export async function handleRouteChain({ request, response, pathname, requestUrl, requestContext, state, server }) {
   if (await handleSystemRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleAuthRoutes({ request, response, pathname, requestContext, authStore: state.authStore })) return true;
@@ -82,7 +94,7 @@ export async function handleRouteChain({ request, response, pathname, requestUrl
   if (await handlePromptRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleSearchRoutes({ request, response, pathname, requestContext, state })) return true;
   if (await handleKimiRoutes({ request, response, pathname, requestContext, state })) return true;
-  if (await handleOnboardingRoutes({ request, response, pathname, requestContext, state })) return true;
+  if (await handleOnboardingRoutes({ request, response, pathname })) return true;
   if (await handleWorkspaceFileRoutes({
     request,
     response,
