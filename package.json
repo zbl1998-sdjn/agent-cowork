@@ -50,6 +50,7 @@
     "test:isolated": "cd apps/host && node --test",
     "build:ui": "node scripts/build-ui.mjs",
     "build:ui:fresh": "node scripts/build-ui.mjs --install",
+    "build:host": "node scripts/build-host.mjs",
     "test:host": "npm run check && cd apps/host && node --test --test-isolation=process --test-timeout=60000 --import ../../test-setup.mjs \"test/*.test.js\"",
     "test:ui": "npm --prefix apps/windows-client/ui run test"
   },
