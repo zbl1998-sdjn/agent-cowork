@@ -69,11 +69,12 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
 
   return (
     <section className="side-panel">
-      <h2>连接器</h2>
+      <h2>连接外部工具</h2>
+      <p className="panel-intro">连上以后,Kimi 就能帮你操作:Notion 文档、Gmail 邮件、GitHub 代码、自家数据库等等。点「连接」按钮授权一次,之后在对话里直接说「发个邮件」「记到 Notion」就行。</p>
       <div className="panel-row">
         <input
           value={query}
-          placeholder="搜索连接器（如 数据库 / git）"
+          placeholder="搜一搜要连什么(如 邮件 / 文档 / 数据库)"
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void onSearch(); }}
         />

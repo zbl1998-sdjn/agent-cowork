@@ -113,10 +113,11 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
   return (
     <section className="side-panel">
       <h2>工具</h2>
+      <p className="panel-intro">Kimi 自带的一组可调用能力。一般你不用进这里——直接对它说「读一下文件」「画个柱状图」即可,它会自动选工具。这里主要给你预览、调试、手动调用。</p>
       <div className="panel-row">
         <input
           value={query}
-          placeholder="搜索工具（懒加载）"
+          placeholder="按关键字搜工具"
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void onSearch(); }}
         />

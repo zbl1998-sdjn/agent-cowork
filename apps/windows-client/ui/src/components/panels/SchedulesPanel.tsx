@@ -48,6 +48,7 @@ export function SchedulesPanel() {
   return (
     <section className="side-panel">
       <h2>定时任务</h2>
+      <p className="panel-intro">这里能看到 Kimi 帮你安排的所有定时任务。要新建,直接在对话里说<em>「每天早上 8 点把今天的日程发我」</em>「每周一总结一下上周的邮件」这种话即可。</p>
       <div className="panel-row">
         <Button disabled={busy} onClick={() => void refresh()}>{busy ? '刷新中…' : '刷新'}</Button>
       </div>

@@ -10,6 +10,7 @@ import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
 import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
+import { Button } from './ui/Button';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
@@ -181,6 +182,29 @@ export function Composer({
     close();
   }
 
+  // Visual replacements for the cryptic /-@-# slash triggers. The user clicks
+  // a button and we insert the trigger character (with a leading space if the
+  // caret isn't already at a word boundary), refocus, then call onChange so the
+  // existing trigger-detection logic surfaces the right suggestion popup.
+  function insertTrigger(char: '/' | '@' | '#') {
+    const el = ref.current;
+    const caret = el?.selectionStart ?? value.length;
+    const head = value.slice(0, caret);
+    const tail = value.slice(caret);
+    const needsSpace = head.length > 0 && !/\s$/.test(head);
+    const insertion = needsSpace ? ` ${char}` : char;
+    const next = head + insertion + tail;
+    setValue(next);
+    setTimeout(() => {
+      const node = ref.current;
+      if (!node) return;
+      node.focus();
+      const pos = caret + insertion.length;
+      node.setSelectionRange(pos, pos);
+      onChange(next, pos);
+    }, 0);
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (mode && items.length) {
       if (event.key === 'Escape') { event.preventDefault(); close(); return; }
@@ -220,10 +244,16 @@ export function Composer({
       )}
       {refineNotice && <div className="composer-refine-notice">{refineNotice}</div>}
 
+      <div className="composer-triggers" role="group" aria-label="快捷插入">
+        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('/')} title="插入「/」从模板或命令里挑一个">📝 模板</Button>
+        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('@')} title="插入「@」搜索并引用工作区里的文件">📎 引用文件</Button>
+        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('#')} title="插入「#」翻最近的对话">🕘 历史</Button>
+      </div>
+
       <textarea
         ref={ref}
         value={value}
-        placeholder="今天想让 Kimi 做什么？ / 模板 · @文件 · #历史"
+        placeholder="今天想让 Kimi 做什么?"
         onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
         onKeyDown={onKeyDown}
         onBlur={() => setTimeout(close, 120)}

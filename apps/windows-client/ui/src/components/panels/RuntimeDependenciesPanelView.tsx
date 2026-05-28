@@ -47,11 +47,12 @@ export function RuntimeDependenciesPanelView({
   return (
     <div className="runtime-deps">
       <div className="runtime-deps-head">
-        <span className="set-label">运行时依赖</span>
+        <span className="set-label">组件状态</span>
         <Button variant="secondary" disabled={status === 'loading'} onClick={onLoad}>
           {status === 'loading' ? '检测中…' : '刷新'}
         </Button>
       </div>
+      <p className="panel-intro panel-intro--inline">Kimi 用到的本地组件。<strong>核心异常</strong>必须装上才能正常用;<strong>可选待补</strong>装上能解锁更多能力(数据分析、浏览器自动化、字体等)。缺失项右边会出现「📥 下载安装」按钮。</p>
 
       {status === 'loading' && !vm && <div className="modal-loading">正在读取依赖状态…</div>}
       {error && <div className="auth-error" role="alert">{error}</div>}
@@ -124,7 +125,7 @@ export function RuntimeDependenciesPanelView({
           </div>
 
           <p className="modal-note">
-            这里只展示检测结果和可审查安装/清理计划；真实安装、下载、删除会走后续按需组件或卸载流程，不会在此处执行。
+            缺失/降级项右边的「📥 下载安装」按钮会在浏览器里打开对应组件的下载页;清理/更新按钮预览计划后,你确认才会执行。
           </p>
         </>
       )}

@@ -63,7 +63,12 @@ export function ComposerFooter({
           onProvider={onProvider}
           onModel={onModel}
         />
-        <select className="thinking-select" value={thinking} onChange={(e) => onThinking(e.target.value as ThinkingLevel)} title="思考强度">
+        <select
+          className="thinking-select"
+          value={thinking}
+          onChange={(e) => onThinking(e.target.value as ThinkingLevel)}
+          title="思考强度:快速=秒回但浅,标准=平衡,深度=慢但仔细"
+        >
           {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
         </select>
       </div>
