@@ -55,8 +55,19 @@ const HOST_LAYER_WAIVERS = new Map([
   ['tools/builtin-tools.js -> runtime/subagent.js', 'builtin tool registry wires subagent adapter'],
 ]);
 
-const IMPORT_RE =
-  /\b(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+// Four targeted regexes, replacing one over-broad combined regex that used to
+// match string literals inside comments (e.g. a sample `import { X } from './Y'`
+// quoted in a JSDoc) as if they were real imports. The fix anchors static
+// import/export to start-of-line (with `m` flag) so commented lines like
+// `// import { x } from './y'` no longer qualify — `//` isn't whitespace.
+//
+// The `[^;'"]*?` inside the from-clause prevents the non-greedy span from
+// crossing into the NEXT statement when an export has no from at all (e.g.
+// `export const X = "y";` followed by another import on the next line).
+const STATIC_IMPORT_RE = /^\s*import\s+(?:[^;'"]*?\bfrom\s+)?['"]([^'"\n]+)['"]/gm;
+const STATIC_EXPORT_FROM_RE = /^\s*export\s+[^;'"]*?\bfrom\s+['"]([^'"\n]+)['"]/gm;
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join('/');
@@ -92,9 +103,10 @@ function isUiSource(filePath) {
 function readImports(filePath) {
   const text = fs.readFileSync(filePath, 'utf8');
   const imports = [];
-  for (const match of text.matchAll(IMPORT_RE)) {
-    imports.push(match[1] || match[2] || match[3]);
-  }
+  for (const match of text.matchAll(STATIC_IMPORT_RE)) imports.push(match[1]);
+  for (const match of text.matchAll(STATIC_EXPORT_FROM_RE)) imports.push(match[1]);
+  for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) imports.push(match[1]);
+  for (const match of text.matchAll(REQUIRE_RE)) imports.push(match[1]);
   return imports;
 }
 

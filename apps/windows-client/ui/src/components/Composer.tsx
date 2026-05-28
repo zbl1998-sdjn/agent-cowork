@@ -10,8 +10,7 @@ import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
 import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
 import type { ComposerProps, FileHit } from './composer-types';
-// AppComposerDock + Composer.test import ComposerMeta from this module; the
-// types live in composer-types but we re-export them here so import paths stay stable.
+// Re-export so `import { ComposerMeta } from '../components/Composer'` keeps working.
 export type { ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe } from './composer-types';
 export type { ThinkingLevel } from './ComposerFooter';
 export function Composer({
