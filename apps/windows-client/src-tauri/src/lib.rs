@@ -34,6 +34,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::host_status,
             commands::start_node_host,
@@ -41,6 +42,7 @@ pub fn run() {
             commands::open_path,
             commands::check_desktop_update,
             commands::install_desktop_update,
+            commands::reveal_bundled_installer,
         ])
         .setup(|app| {
             if let Some(state) = app.try_state::<HostSidecar>() {

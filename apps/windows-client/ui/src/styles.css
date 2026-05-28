@@ -1039,3 +1039,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 /* Composer refine — make the "no text" / "already clear" notice obviously visible */
 .composer-refine-notice { background: #fff7e0; border: 1px solid #f3d27a; color: #6b4f00; border-radius: 7px; padding: 7px 10px; font-size: 12.5px; margin: 6px 0; }
 [data-theme="dark"] .composer-refine-notice { background: #2a2515; border-color: #4a3e1c; color: #ffd97a; }
+
+/* Workspace popup: folder picker row */
+.workspace-popup-pick { align-items: center; margin-bottom: 10px; }
+.workspace-popup-or { font-size: 11px; color: #8a8f84; margin-left: 6px; }

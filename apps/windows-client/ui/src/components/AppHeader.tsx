@@ -1,7 +1,20 @@
 import type { AuthIdentity } from '../lib/api';
+import { invokeDesktop, isDesktop } from '../lib/api/transport';
 import type { SidePanel } from '../lib/app-types';
 import { Button } from './ui/Button';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+
+// Reveal the latest installer (target/release/bundle/{nsis,msi}/) in Explorer
+// so users can grab/share the .exe/.msi. Wrapped here so the click handler in
+// AppHeaderActions stays a thin one-liner.
+async function revealInstaller(): Promise<void> {
+  if (!isDesktop()) { window.alert('请在桌面端使用'); return; }
+  try {
+    await invokeDesktop<string>('reveal_bundled_installer');
+  } catch (error) {
+    window.alert('下载安装包失败:\n' + ((error as Error).message || '未知错误'));
+  }
+}
 
 export type AgentMode = 'plan' | 'execute' | 'yolo';
 
@@ -71,6 +84,7 @@ export function AppHeaderActions({
           {item.label}
         </Button>
       ))}
+      <Button onClick={() => void revealInstaller()} title="在文件管理器里打开安装包目录(latest .exe / .msi)">📦 安装包</Button>
       <Button onClick={onOpenSettings} title="API 设置">⚙ 设置</Button>
       <span className="header-user" title={`租户 ${user.tenantId}`}>{user.username}</span>
       <Button className="header-logout" onClick={onLogout} title="退出登录">退出</Button>

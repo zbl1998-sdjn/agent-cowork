@@ -42,10 +42,10 @@ describe('AppHeader', () => {
   it('renders header actions with Button primitives + a mode dropdown', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    // workspace-chip + ⌘K + theme + 8 panels + settings + logout = 13
+    // workspace-chip + ⌘K + theme + 8 panels + 📦 installer + settings + logout = 14
     // (the 3 mode buttons are gone — replaced by a single <select> so the
     // current mode is always visible.)
-    expect(html.match(/class="ui-btn /g)?.length).toBe(13);
+    expect(html.match(/class="ui-btn /g)?.length).toBe(14);
     expect(html).toContain('Agent Cowork');
     expect(html).toContain('header-user');
     expect(html).toContain('ui-btn--secondary');
@@ -76,7 +76,7 @@ describe('AppHeader', () => {
     const tree = AppHeaderActions(componentProps);
     const buttons = collectByType(tree, Button);
 
-    expect(buttons).toHaveLength(12);
+    expect(buttons).toHaveLength(13);
     buttons[0].props.onClick();
     buttons[1].props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();

@@ -53,3 +53,64 @@ pub async fn check_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdate
 pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdateInstallResult> {
     updater::install_desktop_update(app).await
 }
+
+/// Find the most recent installer next to the running executable (Tauri puts
+/// bundles under `target/release/bundle/{nsis,msi}/`) and reveal its folder in
+/// Explorer so the user can copy/share the installer. Returns the path that was
+/// found. Errors when no bundle has been built yet.
+#[tauri::command]
+pub fn reveal_bundled_installer(app: AppHandle) -> DesktopResult<String> {
+    use std::path::PathBuf;
+    use std::time::SystemTime;
+    use tauri_plugin_opener::OpenerExt;
+
+    let exe = std::env::current_exe()
+        .map_err(|error| crate::error::DesktopError::Io(error.to_string()))?;
+    let release_dir = exe
+        .parent()
+        .ok_or_else(|| crate::error::DesktopError::Io("无法解析可执行文件目录".into()))?;
+    let bundle_root = release_dir.join("bundle");
+
+    let mut newest: Option<(PathBuf, SystemTime)> = None;
+    for sub in ["nsis", "msi"] {
+        let dir = bundle_root.join(sub);
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("");
+            if ext != "exe" && ext != "msi" {
+                continue;
+            }
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(modified) = meta.modified() {
+                    let beats = newest
+                        .as_ref()
+                        .map(|(_, current)| modified > *current)
+                        .unwrap_or(true);
+                    if beats {
+                        newest = Some((path, modified));
+                    }
+                }
+            }
+        }
+    }
+
+    let installer = newest.map(|(path, _)| path).ok_or_else(|| {
+        crate::error::DesktopError::Io(
+            "找不到安装包(查找位置:target/release/bundle/{nsis,msi}/),请先 `npm run build:host` 后 `cargo tauri build`".into(),
+        )
+    })?;
+
+    // Open Explorer at the containing folder; the user can drag the .exe/.msi.
+    let folder = installer
+        .parent()
+        .ok_or_else(|| crate::error::DesktopError::Io("安装包路径异常".into()))?;
+    app.opener()
+        .open_path(folder.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|error| crate::error::DesktopError::Io(error.to_string()))?;
+
+    Ok(installer.to_string_lossy().to_string())
+}

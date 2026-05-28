@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { getJson } from '../lib/api';
+import { getJson, isDesktop } from '../lib/api';
 import { Button } from './ui/Button';
+
+// Tauri's native folder picker. Imported dynamically so the bundle still builds
+// in the browser (vite dev / vitest) where the plugin isn't reachable.
+async function pickDirectory(defaultPath?: string): Promise<string | null> {
+  if (!isDesktop()) return null;
+  try {
+    const module = await import('@tauri-apps/plugin-dialog');
+    const result = await module.open({ directory: true, multiple: false, defaultPath });
+    return typeof result === 'string' && result ? result : null;
+  } catch {
+    return null;
+  }
+}
 
 const RECENT_KEY = 'kcw.recentWorkspaces';
 const MAX_RECENT = 6;
@@ -107,6 +120,19 @@ export function WorkspaceSwitcher({ current, onSwitch }: WorkspaceSwitcherProps)
       </Button>
       {open && (
         <div className="workspace-popup" role="dialog" aria-label="切换工作区">
+          <div className="workspace-popup-actions workspace-popup-pick">
+            <Button
+              variant="primary"
+              onClick={async () => {
+                const picked = await pickDirectory(input || current);
+                if (picked) { setInput(picked); setValidateError(''); void apply(picked); }
+              }}
+              title="打开系统文件夹选择对话框"
+            >
+              📂 选择文件夹…
+            </Button>
+            <span className="workspace-popup-or">或粘贴路径</span>
+          </div>
           <label className="workspace-popup-label" htmlFor="workspace-input">工作区路径</label>
           <input
             id="workspace-input"
@@ -115,7 +141,6 @@ export function WorkspaceSwitcher({ current, onSwitch }: WorkspaceSwitcherProps)
             placeholder="如 C:\\Users\\you\\projects\\demo"
             onChange={(event) => { setInput(event.target.value); setValidateError(''); }}
             onKeyDown={(event) => { if (event.key === 'Enter') void apply(input); }}
-            autoFocus
             spellCheck={false}
           />
           {validateError && <p className="workspace-error" role="alert">⚠ {validateError}</p>}
