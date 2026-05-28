@@ -10,7 +10,7 @@ import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
 import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
-import { Button } from './ui/Button';
+import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
 export interface Recipe { id: string; name: string; summary?: string }
 export interface FileHit { path: string; relativePath?: string }
 export interface HistoryRun { id: string; promptPreview?: string | null }
@@ -186,7 +186,7 @@ export function Composer({
   // a button and we insert the trigger character (with a leading space if the
   // caret isn't already at a word boundary), refocus, then call onChange so the
   // existing trigger-detection logic surfaces the right suggestion popup.
-  function insertTrigger(char: '/' | '@' | '#') {
+  function insertTrigger(char: ComposerTriggerChar) {
     const el = ref.current;
     const caret = el?.selectionStart ?? value.length;
     const head = value.slice(0, caret);
@@ -244,11 +244,7 @@ export function Composer({
       )}
       {refineNotice && <div className="composer-refine-notice">{refineNotice}</div>}
 
-      <div className="composer-triggers" role="group" aria-label="快捷插入">
-        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('/')} title="插入「/」从模板或命令里挑一个">📝 模板</Button>
-        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('@')} title="插入「@」搜索并引用工作区里的文件">📎 引用文件</Button>
-        <Button variant="secondary" className="composer-trigger-btn" onClick={() => insertTrigger('#')} title="插入「#」翻最近的对话">🕘 历史</Button>
-      </div>
+      <ComposerTriggers onTrigger={insertTrigger} />
 
       <textarea
         ref={ref}

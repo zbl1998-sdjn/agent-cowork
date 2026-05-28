@@ -143,8 +143,11 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
       </ul>
       {selected && (
         <div className="panel-call">
-          <label>调用 <code>{selected}</code> · 参数 (JSON)</label>
-          <textarea value={argsText} rows={3} spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
+          <label>已选 <code>{selected}</code></label>
+          <details className="panel-advanced">
+            <summary>高级:调用参数(JSON)</summary>
+            <textarea value={argsText} rows={3} spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
+          </details>
           <ToolsPanelCallActions
             busy={busy}
             selectedRequiresApproval={selectedRequiresApproval}

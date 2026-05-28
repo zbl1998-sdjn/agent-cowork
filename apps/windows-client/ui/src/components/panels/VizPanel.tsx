@@ -72,6 +72,68 @@ export function VizTemplateButtons({ onPick }: { onPick: (key: keyof typeof VIZ_
   );
 }
 
+// Build a viz spec from plain form fields. Supports the 5 templates so a user
+// who can't write JSON can still get a chart by filling Title + Labels + Values.
+export function specFromForm(args: {
+  kind: keyof typeof VIZ_SAMPLES;
+  title: string;
+  labels: string;
+  values: string;
+}): string {
+  const splitTokens = (text: string) => text.split(/[,，\s]+/).map((token) => token.trim()).filter(Boolean);
+  const labels = splitTokens(args.labels);
+  const numeric = splitTokens(args.values).map((token) => Number(token)).filter((n) => Number.isFinite(n));
+  let spec: Record<string, unknown>;
+  if (args.kind === 'metric') {
+    spec = { title: args.title || '关键指标', kind: 'metric', data: { value: numeric[0] ?? 0, label: labels[0] || '' } };
+  } else if (args.kind === 'table') {
+    spec = { title: args.title || '表格', kind: 'table', data: { columns: labels, rows: [numeric] } };
+  } else {
+    spec = { title: args.title || '图表', kind: args.kind, data: { labels, values: numeric } };
+  }
+  return JSON.stringify(spec, null, 2);
+}
+
+export function VizFormBuilder({ onGenerate }: { onGenerate: (spec: string) => void }) {
+  const [kind, setKind] = useState<keyof typeof VIZ_SAMPLES>('bar');
+  const [title, setTitle] = useState('');
+  const [labels, setLabels] = useState('');
+  const [values, setValues] = useState('');
+  return (
+    <details className="viz-form-builder">
+      <summary>不会写 JSON?用填表方式生成 ▾</summary>
+      <div className="viz-form-grid">
+        <label>
+          <span>类型</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value as keyof typeof VIZ_SAMPLES)}>
+            {TEMPLATE_OPTIONS.map((opt) => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>标题</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="如:季度收入" />
+        </label>
+        <label>
+          <span>{kind === 'table' ? '列名(逗号分隔)' : kind === 'metric' ? '指标名' : '横轴标签(逗号分隔)'}</span>
+          <input value={labels} onChange={(e) => setLabels(e.target.value)} placeholder={kind === 'metric' ? '本月新签订单' : 'Q1, Q2, Q3, Q4'} />
+        </label>
+        <label>
+          <span>{kind === 'metric' ? '数值' : '数据(逗号分隔)'}</span>
+          <input value={values} onChange={(e) => setValues(e.target.value)} placeholder={kind === 'metric' ? '1247' : '12, 19, 8, 15'} />
+        </label>
+      </div>
+      <Button
+        variant="primary"
+        className="viz-form-submit"
+        onClick={() => onGenerate(specFromForm({ kind, title, labels, values }))}
+        disabled={!labels.trim() && !values.trim() && !title.trim()}
+      >
+        生成 JSON 并填入下方
+      </Button>
+    </details>
+  );
+}
+
 export function VizPanelActions({
   busy,
   viewUrl,
@@ -136,6 +198,7 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
     <section className="side-panel">
       <h2>可视化 / 活页</h2>
       <VizTemplateButtons onPick={(key) => setSpecText(VIZ_SAMPLES[key])} />
+      <VizFormBuilder onGenerate={(spec) => setSpecText(spec)} />
       <textarea value={specText} rows={8} spellCheck={false} onChange={(e) => setSpecText(e.target.value)} />
       {!validation.ok && (
         <p className="viz-json-error" role="alert">

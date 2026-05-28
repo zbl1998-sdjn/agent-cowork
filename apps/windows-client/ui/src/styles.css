@@ -1077,3 +1077,31 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 [data-theme="dark"] .panel-intro { color: #b8bcb1; }
 [data-theme="dark"] .panel-intro em { color: #ff9b78; background: rgba(201,100,66,.18); }
 .panel-intro--inline { margin: 6px 0 10px; font-size: 12px; }
+
+/* Generic "advanced" expander used in Tools panel + API settings + Viz form */
+.panel-advanced summary, .api-advanced summary, .viz-form-builder summary { font-size: 12px; color: #6b6f66; cursor: pointer; padding: 4px 0; }
+.panel-advanced[open] summary, .api-advanced[open] summary, .viz-form-builder[open] summary { color: #4a4e46; }
+[data-theme="dark"] .panel-advanced summary, [data-theme="dark"] .api-advanced summary, [data-theme="dark"] .viz-form-builder summary { color: #a8aca0; }
+
+/* Observability: expert-view checkbox in head */
+.observe-expert-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #6b6f66; margin-right: 8px; cursor: pointer; }
+.observe-expert-toggle input { cursor: pointer; }
+[data-theme="dark"] .observe-expert-toggle { color: #a8aca0; }
+
+/* API Settings: friendly help banner above credential fields */
+.api-help { background: #fff7e0; border: 1px solid #f3d27a; color: #6b4f00; border-radius: 7px; padding: 10px 12px; font-size: 12.5px; line-height: 1.6; margin-bottom: 12px; }
+.api-help p { margin: 0 0 4px; }
+.api-help p:last-child { margin-bottom: 0; }
+.api-help a { color: #c96442; text-decoration: underline; }
+[data-theme="dark"] .api-help { background: #2a2515; border-color: #4a3e1c; color: #ffd97a; }
+[data-theme="dark"] .api-help a { color: #ff9b78; }
+.api-advanced { margin: 6px 0 4px; padding: 6px 0; }
+
+/* Viz form builder: tiny grid above the JSON textarea */
+.viz-form-builder { margin: 0 0 8px; }
+.viz-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin: 8px 0; }
+.viz-form-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #4a4e46; }
+.viz-form-grid input, .viz-form-grid select { padding: 5px 7px; border: 1px solid #d9ded5; border-radius: 6px; font-size: 13px; font-family: inherit; }
+.viz-form-submit { margin-top: 4px; }
+[data-theme="dark"] .viz-form-grid label { color: #b8bcb1; }
+[data-theme="dark"] .viz-form-grid input, [data-theme="dark"] .viz-form-grid select { background: #1a1a17; color: var(--text); border-color: #3a3a35; }

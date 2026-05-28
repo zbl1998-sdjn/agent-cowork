@@ -89,6 +89,10 @@ export function ObservabilityPanel() {
   const [loading, setLoading] = useState(false);
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState('');
+  // Expert view shows the four engineering-oriented sections (tool reason,
+  // attribution, config, sources). Default off so the regular user just sees
+  // the high-level cards + 工具/耗时.
+  const [expert, setExpert] = useState(false);
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -138,9 +142,14 @@ export function ObservabilityPanel() {
   return (
     <section className="side-panel observability-panel">
       <div className="observe-head">
-        <h2>成本 / 可观测</h2>
+        <h2>运行记录</h2>
+        <label className="observe-expert-toggle" title="打开后显示工具原因 / 模型归因 / 配置快照 / 来源等工程字段">
+          <input type="checkbox" checked={expert} onChange={(e) => setExpert(e.target.checked)} />
+          <span>专家视图</span>
+        </label>
         <ObservabilityRefreshAction loading={loading} onRefresh={() => void loadRuns()} />
       </div>
+      <p className="panel-intro">每条对话执行后会记下用了多少 token、花了多久、调了哪些工具。<strong>专家视图</strong>能多看工具调用原因、模型归因等工程细节。</p>
       <ObservabilityErrorState error={error} onRetry={() => void loadRuns()} />
       <div className="observe-layout">
         <ObservabilityRunList records={records} selectedId={selectedId} onSelectRecord={setSelectedId} />
@@ -168,19 +177,23 @@ export function ObservabilityPanel() {
                 {view.toolNames.map((name) => <code key={name}>{name}</code>)}
                 {!view.toolNames.length && <ObservabilityEmptyState title="未记录工具调用" />}
               </div>
-              <Rows rows={view.toolReasonRows} empty="未记录工具调用原因" />
+              {expert && <Rows rows={view.toolReasonRows} empty="未记录工具调用原因" />}
 
               <h3>耗时 / 步骤</h3>
               <Rows rows={view.timingRows} empty="未记录耗时" />
 
-              <h3>模型归因</h3>
-              <Rows rows={view.attributionRows} empty="未记录模型归因" />
+              {expert && (
+                <>
+                  <h3>模型归因</h3>
+                  <Rows rows={view.attributionRows} empty="未记录模型归因" />
 
-              <h3>配置快照</h3>
-              <Rows rows={view.configRows} empty="未记录配置快照" />
+                  <h3>配置快照</h3>
+                  <Rows rows={view.configRows} empty="未记录配置快照" />
 
-              <h3>来源</h3>
-              <Rows rows={view.sourceRows} empty="未记录来源" />
+                  <h3>来源</h3>
+                  <Rows rows={view.sourceRows} empty="未记录来源" />
+                </>
+              )}
             </>
           ) : (
             <ObservabilityEmptyState title="选择一条运行记录查看明细" message="运行记录列表加载后可查看成本、工具和来源。" />

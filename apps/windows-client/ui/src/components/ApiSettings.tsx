@@ -97,18 +97,25 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
           <div className="modal-loading">加载中…</div>
         ) : (
           <div className="modal-body">
+            <div className="api-help">
+              <p><strong>如果你已有 Kimi(Moonshot)账号</strong>:把 API Key 填进下面那栏即可。</p>
+              <p><strong>如果还没账号</strong>:去 <a href="https://platform.moonshot.cn/console/api-keys" target="_blank" rel="noreferrer">platform.moonshot.cn</a> 注册,生成一个 sk-… 的 API Key 复制过来。</p>
+            </div>
             <label className="auth-field">
               <span>API Key {hasKey && <em className="key-set">已配置</em>}</span>
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置（留空保持不变）' : 'sk-...'} autoComplete="off" />
+              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置(留空保持不变)' : '从 Kimi 控制台复制的 sk-...'} autoComplete="off" />
             </label>
-            <label className="auth-field">
-              <span>Base URL</span>
-              <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.moonshot.cn/v1" />
-            </label>
-            <label className="auth-field">
-              <span>模型</span>
-              <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="kimi-k2-0905-preview" />
-            </label>
+            <details className="api-advanced">
+              <summary>高级设置(一般不用改)</summary>
+              <label className="auth-field">
+                <span>Base URL</span>
+                <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.moonshot.cn/v1" />
+              </label>
+              <label className="auth-field">
+                <span>模型</span>
+                <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="kimi-k2-0905-preview" />
+              </label>
+            </details>
             {error && <div className="auth-error" role="alert">{error}</div>}
             <ApiSettingsActions hasKey={hasKey} busy={busy} savedTip={savedTip} onClearKey={() => void save(true)} onCancel={onClose} onSave={() => void save(false)} />
             <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
