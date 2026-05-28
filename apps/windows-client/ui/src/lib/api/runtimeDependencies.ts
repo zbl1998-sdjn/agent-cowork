@@ -14,6 +14,9 @@ export interface RuntimeDependency {
   detail?: string;
   source?: string;
   version?: string;
+  // Catalog may provide a vendor download page so the UI can offer a one-click
+  // "open in browser" install path for the user instead of just stating "missing".
+  sourceUrl?: string | null;
 }
 
 export interface RuntimeDependencySummary {

@@ -91,20 +91,33 @@ export function RuntimeDependenciesPanelView({
               <section key={section.id} className="runtime-deps-section">
                 <h3>{section.title}</h3>
                 <ul>
-                  {section.items.map((item) => (
-                    <li key={item.id} className={`runtime-dep runtime-dep-${item.severity}`}>
-                      <div>
-                        <strong>{item.label}</strong>
-                        <span>{item.purposeLabel}</span>
-                        <span className="runtime-dep-detail">{item.detailLabel}</span>
-                      </div>
-                      <div className="runtime-dep-meta">
-                        <span>{item.statusLabel}</span>
-                        <span>{item.installModeLabel}</span>
-                        <span>{item.downloadLabel}</span>
-                      </div>
-                    </li>
-                  ))}
+                  {section.items.map((item) => {
+                    const showDownload = (item.status === 'missing' || item.status === 'degraded') && Boolean(item.sourceUrl);
+                    return (
+                      <li key={item.id} className={`runtime-dep runtime-dep-${item.severity}`}>
+                        <div>
+                          <strong>{item.label}</strong>
+                          <span>{item.purposeLabel}</span>
+                          <span className="runtime-dep-detail">{item.detailLabel}</span>
+                        </div>
+                        <div className="runtime-dep-meta">
+                          <span>{item.statusLabel}</span>
+                          <span>{item.installModeLabel}</span>
+                          <span>{item.downloadLabel}</span>
+                          {showDownload && (
+                            <Button
+                              variant="primary"
+                              className="runtime-dep-download"
+                              onClick={() => { if (item.sourceUrl) window.open(item.sourceUrl, '_blank'); }}
+                              title={`在浏览器里打开下载页:${item.sourceUrl}`}
+                            >
+                              📥 下载安装
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             ))}

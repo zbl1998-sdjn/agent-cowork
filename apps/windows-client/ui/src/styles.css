@@ -1043,3 +1043,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 /* Workspace popup: folder picker row */
 .workspace-popup-pick { align-items: center; margin-bottom: 10px; }
 .workspace-popup-or { font-size: 11px; color: #8a8f84; margin-left: 6px; }
+
+/* Memory panel — white-collar friendly rendering (drop <code> jargon) */
+.memory-panel .memory-intro { font-size: 12.5px; color: #4a4e46; margin: 4px 0 12px; line-height: 1.5; }
+.memory-list { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 8px; }
+.memory-entry { border: 1px solid #d9ded5; background: #fff; border-radius: 8px; padding: 10px 12px; }
+.memory-entry-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.memory-entry-kind { font-size: 11px; color: #6b6f66; background: #f0eee9; padding: 1px 6px; border-radius: 4px; }
+.memory-entry-key { font-weight: 600; font-size: 14px; color: #20211f; overflow-wrap: anywhere; }
+.memory-entry-value { margin: 4px 0 6px; font-size: 13px; color: #2c2d2a; line-height: 1.55; overflow-wrap: anywhere; }
+.memory-entry-evidence { margin: 4px 0 6px; font-size: 11.5px; color: #8a8f84; }
+.memory-form { border-top: 1px solid #ececea; padding-top: 12px; margin-top: 10px; }
+.memory-form h3 { margin: 0 0 8px; font-size: 13px; color: #20211f; }
+.memory-form textarea, .memory-form input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #d9ded5; border-radius: 7px; font-size: 13px; margin-bottom: 6px; font-family: inherit; }
+.memory-type-select { padding: 6px 9px; border: 1px solid #d9ded5; border-radius: 7px; font-size: 13px; background: #fff; }
+.memory-advanced summary { font-size: 12px; color: #6b6f66; cursor: pointer; margin: 6px 0; }
+[data-theme="dark"] .memory-entry { background: #232320; border-color: #3a3a35; }
+[data-theme="dark"] .memory-entry-kind { background: #2c2c28; color: #c4c8be; }
+[data-theme="dark"] .memory-entry-key, [data-theme="dark"] .memory-entry-value { color: var(--text); }
+[data-theme="dark"] .memory-form { border-color: #3a3a35; }
+[data-theme="dark"] .memory-form input, [data-theme="dark"] .memory-form textarea, [data-theme="dark"] .memory-type-select { background: #1a1a17; color: var(--text); border-color: #3a3a35; }
+
+/* Runtime dep: per-item "download installer" CTA */
+.runtime-dep-download { margin-left: 8px; font-size: 12px; padding: 4px 9px; }
