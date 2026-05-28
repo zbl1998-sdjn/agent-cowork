@@ -1,18 +1,20 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
-import { buildHistorySuggestionItems, buildMentionSuggestionItems, buildTemplateSuggestionItems, findComposerTrigger, mentionInsertText } from '../lib/composer-trigger';
+import { buildSessionModelConfig } from '../lib/composer-logic';
 import { useComposerRefine } from '../hooks/useComposerRefine';
+import { useComposerSuggestions } from '../hooks/useComposerSuggestions';
 import { ComposerAttachments } from './ComposerAttachments';
 import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
-import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggestionMode } from './ComposerSuggestions';
+import { ComposerSuggestions } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
-import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
-import type { ComposerProps, FileHit } from './composer-types';
-// Re-export so `import { ComposerMeta } from '../components/Composer'` keeps working.
+import { ComposerTriggers } from './ComposerTriggers';
+import type { ComposerProps } from './composer-types';
+// AppComposerDock + Composer.test import ComposerMeta from this module; the
+// types live in composer-types but we re-export them here so import paths stay stable.
 export type { ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe } from './composer-types';
 export type { ThinkingLevel } from './ComposerFooter';
+
 export function Composer({
   recipes,
   historyRuns,
@@ -31,20 +33,14 @@ export function Composer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
-  const [mode, setMode] = useState<ComposerSuggestionMode | null>(null);
-  const [items, setItems] = useState<ComposerSuggestionItem[]>([]);
-  const [active, setActive] = useState(0);
-  const [triggerStart, setTriggerStart] = useState(0);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [model, setModel] = useState('');
   const [provider, setProvider] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
   const [dragging, setDragging] = useState(false);
-  const searchToken = useRef(0);
-  const mentionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { listening, toggleVoice } = useComposerVoice({
     onTranscript: (transcript) => setValue((v) => (v ? `${v} ${transcript}` : transcript)),
-    onUnsupported: () => setValue((v) => `${v}${v ? '\n' : ''}（此浏览器不支持语音输入）`),
+    onUnsupported: () => setValue((v) => `${v}${v ? '\n' : ''}(此浏览器不支持语音输入)`),
   });
   const {
     refining,
@@ -66,17 +62,18 @@ export function Composer({
     },
   });
 
+  const {
+    mode, items, active, setActive,
+    onChange, close, insertTrigger,
+  } = useComposerSuggestions({
+    value, setValue, textareaRef: ref,
+    searchFiles, recipes, historyRuns, slashCommands,
+    onPickTemplate, onPickHistory, markChanged,
+  });
+
   const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
   const currentModel = model.trim() || defaultModel;
   const currentProvider = provider || defaultProvider || 'kimi-api';
-
-  function close() {
-    if (mentionTimer.current) clearTimeout(mentionTimer.current);
-    mentionTimer.current = null;
-    setMode(null);
-    setItems([]);
-    setActive(0);
-  }
 
   async function send() {
     const text = value.trim();
@@ -93,92 +90,6 @@ export function Composer({
     setAttachments([]);
     resetRefineAfterSend();
     close();
-  }
-
-  function replaceToken(insert: string) {
-    const el = ref.current;
-    const caret = el?.selectionStart ?? value.length;
-    const next = value.slice(0, triggerStart) + insert + value.slice(caret);
-    setValue(next);
-    close();
-    el?.focus();
-  }
-
-  async function refreshMentions(query: string) {
-    const token = ++searchToken.current;
-    let hits: FileHit[] = [];
-    try { hits = await searchFiles(query); } catch { hits = []; }
-    if (token !== searchToken.current) return;
-    setItems(buildMentionSuggestionItems(hits, (hit) => replaceToken(mentionInsertText(hit))));
-    setActive(0);
-  }
-
-  function scheduleMentions(query: string) {
-    if (mentionTimer.current) clearTimeout(mentionTimer.current);
-    mentionTimer.current = setTimeout(() => {
-      mentionTimer.current = null;
-      void refreshMentions(query);
-    }, MENTION_SEARCH_DEBOUNCE_MS);
-  }
-
-  function onChange(next: string, caret: number) {
-    setValue(next);
-    markChanged(next);
-    const trigger = findComposerTrigger(next.slice(0, caret));
-    if (trigger?.mode === 'template') {
-      setMode('template');
-      setTriggerStart(trigger.triggerStart);
-      setItems(buildTemplateSuggestionItems({
-        slashCommands,
-        recipes,
-        query: trigger.query,
-        onCommand: (command) => { replaceToken(''); command.run(); },
-        onRecipe: (recipe) => { onPickTemplate?.(recipe); setValue(`${recipe.name}：读取本地材料并生成可审批产物`); close(); },
-      }));
-      setActive(0);
-      return;
-    }
-    if (trigger?.mode === 'history') {
-      setMode('history');
-      setTriggerStart(trigger.triggerStart);
-      setItems(buildHistorySuggestionItems({
-        historyRuns,
-        query: trigger.query,
-        onPick: (run) => { onPickHistory?.(run); close(); },
-      }));
-      setActive(0);
-      return;
-    }
-    if (trigger?.mode === 'mention') {
-      setMode('mention');
-      setTriggerStart(trigger.triggerStart);
-      if (shouldDebounceMentionSearch(trigger.query)) scheduleMentions(trigger.query); else close();
-      return;
-    }
-    close();
-  }
-
-  // Visual replacements for the cryptic /-@-# slash triggers. The user clicks
-  // a button and we insert the trigger character (with a leading space if the
-  // caret isn't already at a word boundary), refocus, then call onChange so the
-  // existing trigger-detection logic surfaces the right suggestion popup.
-  function insertTrigger(char: ComposerTriggerChar) {
-    const el = ref.current;
-    const caret = el?.selectionStart ?? value.length;
-    const head = value.slice(0, caret);
-    const tail = value.slice(caret);
-    const needsSpace = head.length > 0 && !/\s$/.test(head);
-    const insertion = needsSpace ? ` ${char}` : char;
-    const next = head + insertion + tail;
-    setValue(next);
-    setTimeout(() => {
-      const node = ref.current;
-      if (!node) return;
-      node.focus();
-      const pos = caret + insertion.length;
-      node.setSelectionRange(pos, pos);
-      onChange(next, pos);
-    }, 0);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
