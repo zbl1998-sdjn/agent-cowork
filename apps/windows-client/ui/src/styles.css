@@ -1031,3 +1031,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 [data-theme="dark"] .workspace-recents button:hover { background: #2c2c28; }
 [data-theme="dark"] .workspace-recents button.is-current { background: rgba(201,100,66,.18); color: #ff9b78; border-color: #c96442; }
 .workspace-popup-hint { margin: 10px 0 0; font-size: 11px; color: #8a8f84; }
+
+/* Workspace switch — visible preflight failure */
+.workspace-error { color: #c0392b; background: #fdecea; border: 1px solid #f5c6c0; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin: 6px 0 0; }
+[data-theme="dark"] .workspace-error { background: #3a1f1c; border-color: #5c2e29; color: #ff8d76; }
+
+/* Composer refine — make the "no text" / "already clear" notice obviously visible */
+.composer-refine-notice { background: #fff7e0; border: 1px solid #f3d27a; color: #6b4f00; border-radius: 7px; padding: 7px 10px; font-size: 12.5px; margin: 6px 0; }
+[data-theme="dark"] .composer-refine-notice { background: #2a2515; border-color: #4a3e1c; color: #ffd97a; }

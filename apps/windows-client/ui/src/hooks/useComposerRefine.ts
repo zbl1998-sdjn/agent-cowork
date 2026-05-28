@@ -40,7 +40,14 @@ export function useComposerRefine({
 
   const refineCurrent = useCallback(async (value: string) => {
     const text = value.trim();
-    if (!text || !onRefinePrompt) return;
+    if (!onRefinePrompt) return;
+    if (!text) {
+      // The button is now always clickable so the user gets visible feedback
+      // instead of a silently disabled state — make the "missing input" case
+      // explicit rather than mysterious.
+      setRefineNotice('请先在输入框写一句要优化的提示,再点优化。');
+      return;
+    }
     const result = await fetchRefine(text, true);
     if (!result) return;
     if (result.changed || result.missing.length > 0) {

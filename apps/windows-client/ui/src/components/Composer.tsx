@@ -232,7 +232,7 @@ export function Composer({
       <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <ComposerFooter
         listening={listening} refining={refining}
-        canRefine={Boolean(value.trim() && canRefine)}
+        canRefine={canRefine}
         model={model} modelOptions={modelOptions} provider={currentProvider}
         defaultModel={defaultModel} thinking={thinking}
         onUpload={() => fileRef.current?.click()}
