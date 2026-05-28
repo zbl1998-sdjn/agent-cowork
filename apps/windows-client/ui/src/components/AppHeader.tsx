@@ -53,13 +53,17 @@ export function AppHeaderActions({
     <nav className="header-actions">
       <Button onClick={onOpenCommandPalette} title="命令面板 (Ctrl/Cmd+K)">⌘K</Button>
       <Button onClick={onToggleTheme} title="深色 / 浅色">{theme === 'dark' ? '☀' : '🌙'}</Button>
-      <div className="mode-switch" role="group" aria-label="运行模式">
+      <select
+        className="mode-select"
+        value={mode}
+        onChange={(e) => onSetMode(e.target.value as AgentMode)}
+        title={MODE_OPTIONS.find((o) => o.value === mode)?.title}
+        aria-label="运行模式"
+      >
         {MODE_OPTIONS.map((opt) => (
-          <Button key={opt.value} className={mode === opt.value ? 'is-active' : ''} onClick={() => onSetMode(opt.value)} title={opt.title}>
-            {opt.label}
-          </Button>
+          <option key={opt.value} value={opt.value}>模式·{opt.label}</option>
         ))}
-      </div>
+      </select>
       {panelButtons.map((item) => (
         <Button key={item.panel} className={panel === item.panel ? 'is-active' : ''} onClick={() => onTogglePanel(item.panel)}>
           {item.label}

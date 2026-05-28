@@ -135,10 +135,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .header-actions button.is-active { border-color: #c96442; color: #c96442; }
 
 .side-drawer {
-  position: fixed; top: 0; right: 0; width: 420px; max-width: 92vw; height: 100vh;
+  position: fixed; top: 0; right: 0; width: 560px; max-width: 92vw; height: 100vh;
   background: #f5f6f2; border-left: 1px solid #d9ded5; box-shadow: -8px 0 24px rgba(0,0,0,.08);
-  padding: 20px; overflow-y: auto; z-index: 40;
+  padding: 20px; overflow-y: auto; overflow-x: hidden; z-index: 40;
 }
+.side-drawer > section { min-width: 0; }
+.observability-panel .observe-card-grid > .observe-card { min-width: 0; overflow-wrap: anywhere; }
+.observability-panel .observe-chips code { max-width: 100%; }
 .drawer-close {
   position: absolute; top: 12px; right: 14px; border: none; background: transparent;
   font-size: 22px; line-height: 1; cursor: pointer; color: #6b6f66;

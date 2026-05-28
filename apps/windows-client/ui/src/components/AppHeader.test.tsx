@@ -38,16 +38,20 @@ function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parame
 }
 
 describe('AppHeader', () => {
-  it('renders header actions with Button primitives', () => {
+  it('renders header actions with Button primitives + a mode dropdown', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    // ⌘K + theme + 3 mode buttons + 8 panels + settings + logout = 15
-    expect(html.match(/class="ui-btn /g)?.length).toBe(15);
+    // ⌘K + theme + 8 panels + settings + logout = 12 (the 3 mode buttons are
+    // gone — replaced by a single <select> so the current mode is always visible).
+    expect(html.match(/class="ui-btn /g)?.length).toBe(12);
     expect(html).toContain('Agent Cowork');
     expect(html).toContain('header-user');
     expect(html).toContain('ui-btn--secondary');
     expect(html).toContain('is-active');
-    expect(html).toContain('mode-switch');
+    expect(html).toContain('class="mode-select"');
+    expect(html).toContain('模式·计划');
+    expect(html).toContain('模式·执行');
+    expect(html).toContain('模式·YOLO');
   });
 
   it('keeps header action callbacks wired', () => {
@@ -65,23 +69,29 @@ describe('AppHeader', () => {
       onOpenSettings,
       onLogout,
     });
-    const buttons = collectByType(AppHeaderActions(componentProps), Button);
+    const tree = AppHeaderActions(componentProps);
+    const buttons = collectByType(tree, Button);
 
-    expect(buttons).toHaveLength(15);
+    expect(buttons).toHaveLength(12);
     buttons[0].props.onClick();
     buttons[1].props.onClick();
-    buttons.find((button) => button.props.children === '计划')?.props.onClick();
-    buttons.find((button) => button.props.children === 'YOLO')?.props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();
     buttons.find((button) => button.props.children === '⚙ 设置')?.props.onClick();
     buttons.find((button) => button.props.children === '退出')?.props.onClick();
 
     expect(onOpenCommandPalette).toHaveBeenCalledOnce();
     expect(onToggleTheme).toHaveBeenCalledOnce();
-    expect(onSetMode).toHaveBeenCalledWith('plan');
-    expect(onSetMode).toHaveBeenCalledWith('yolo');
     expect(onTogglePanel).toHaveBeenCalledWith('memory' satisfies SidePanel);
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onLogout).toHaveBeenCalledOnce();
+
+    // mode <select> is the only one — simulate onChange to verify the callback wiring.
+    const selects = collectByType(tree, 'select');
+    const modeSelect = selects.find((s) => s.props.className === 'mode-select');
+    expect(modeSelect).toBeDefined();
+    modeSelect?.props.onChange({ target: { value: 'yolo' } });
+    modeSelect?.props.onChange({ target: { value: 'plan' } });
+    expect(onSetMode).toHaveBeenCalledWith('yolo');
+    expect(onSetMode).toHaveBeenCalledWith('plan');
   });
 });
