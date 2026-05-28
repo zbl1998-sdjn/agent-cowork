@@ -100,8 +100,69 @@ function isUiSource(filePath) {
   return /\.(ts|tsx)$/.test(filePath);
 }
 
+// Strip both line- and block-comments before regexing. Preserves newlines so
+// the line-anchored static-import regex still gets correct line boundaries.
+// Belt + braces against the regex flagging an `import` keyword that happens
+// to appear inside a doc comment — the regex already requires line-start, but
+// stripping comments outright also kills `/* import x from 'foo' */` style
+// trap strings that managed to land at column 0.
+export function stripComments(text) {
+  const out = [];
+  let i = 0;
+  let inLine = false;
+  let inBlock = false;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inLine) {
+      if (ch === '\n') { inLine = false; out.push(ch); }
+      i += 1;
+      continue;
+    }
+    if (inBlock) {
+      if (ch === '*' && next === '/') { inBlock = false; i += 2; continue; }
+      if (ch === '\n') out.push(ch); // keep line numbers stable
+      i += 1;
+      continue;
+    }
+    if (inSingle) {
+      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
+      if (ch === "'") inSingle = false;
+      out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
+      if (ch === '"') inDouble = false;
+      out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (inTemplate) {
+      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
+      if (ch === '`') inTemplate = false;
+      out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') { inLine = true; i += 2; continue; }
+    if (ch === '/' && next === '*') { inBlock = true; i += 2; continue; }
+    if (ch === "'") { inSingle = true; out.push(ch); i += 1; continue; }
+    if (ch === '"') { inDouble = true; out.push(ch); i += 1; continue; }
+    if (ch === '`') { inTemplate = true; out.push(ch); i += 1; continue; }
+    out.push(ch);
+    i += 1;
+  }
+  return out.join('');
+}
+
 function readImports(filePath) {
-  const text = fs.readFileSync(filePath, 'utf8');
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const text = stripComments(raw);
   const imports = [];
   for (const match of text.matchAll(STATIC_IMPORT_RE)) imports.push(match[1]);
   for (const match of text.matchAll(STATIC_EXPORT_FROM_RE)) imports.push(match[1]);
@@ -209,34 +270,42 @@ function findCycles(graph) {
   return cycles;
 }
 
-const files = [
-  ...walk(HOST_ROOT, isHostSource),
-  ...walk(UI_ROOT, isUiSource),
-];
-const fileSet = new Set(files);
-const graph = new Map(files.map((file) => [file, []]));
-const violations = [];
+function runMain() {
+  const files = [
+    ...walk(HOST_ROOT, isHostSource),
+    ...walk(UI_ROOT, isUiSource),
+  ];
+  const fileSet = new Set(files);
+  const graph = new Map(files.map((file) => [file, []]));
+  const violations = [];
 
-for (const file of files) {
-  for (const specifier of readImports(file)) {
-    const target = resolveImport(file, specifier);
-    if (!target) continue;
-    if (!fileSet.has(target)) continue;
-    graph.get(file).push(target);
-    checkBoundary(file, target, violations);
+  for (const file of files) {
+    for (const specifier of readImports(file)) {
+      const target = resolveImport(file, specifier);
+      if (!target) continue;
+      if (!fileSet.has(target)) continue;
+      graph.get(file).push(target);
+      checkBoundary(file, target, violations);
+    }
   }
-}
 
-for (const cycle of findCycles(graph)) {
-  violations.push(`import cycle: ${cycle.map(relFromRoot).join(' -> ')}`);
-}
-
-if (violations.length) {
-  console.error('Architecture check failed:');
-  for (const violation of violations) {
-    console.error(`- ${violation}`);
+  for (const cycle of findCycles(graph)) {
+    violations.push(`import cycle: ${cycle.map(relFromRoot).join(' -> ')}`);
   }
-  process.exit(1);
+
+  if (violations.length) {
+    console.error('Architecture check failed:');
+    for (const violation of violations) {
+      console.error(`- ${violation}`);
+    }
+    process.exit(1);
+  }
+
+  console.log(`Architecture check passed (${files.length} source files).`);
 }
 
-console.log(`Architecture check passed (${files.length} source files).`);
+// Only run the architecture scan when invoked as the main entrypoint.
+// `check-icons.mjs` imports `stripComments` from this file; without the guard
+// loading that import would run the scan a second time as a side-effect.
+const invokedAsMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedAsMain) runMain();
