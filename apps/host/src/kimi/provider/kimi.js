@@ -43,6 +43,11 @@ export function createKimiProvider() {
         tool_choice: 'auto',
         max_tokens: kimiConfig.maxTokens || 2048,
         stream: true,
+        // OpenAI-compatible providers only emit `usage` on the final SSE chunk
+        // when `stream_options.include_usage` is set. Without this flag every
+        // run records prompt/completion/total_tokens = 0 — which is what the
+        // Observability panel was correctly showing as empty.
+        stream_options: { include_usage: true },
       };
       if (Number.isFinite(kimiConfig.temperature)) body.temperature = /** @type {number} */ (kimiConfig.temperature);
       const fetcher = /** @type {typeof fetch} */ (fetchImpl);

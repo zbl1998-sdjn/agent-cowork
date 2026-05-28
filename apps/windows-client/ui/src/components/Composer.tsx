@@ -1,7 +1,5 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import type { ModelRunConfig } from '../lib/api/chat';
-import type { PromptRefineResult } from '../lib/api/prompt';
 import { buildSessionModelConfig, MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
 import { buildHistorySuggestionItems, buildMentionSuggestionItems, buildTemplateSuggestionItems, findComposerTrigger, mentionInsertText } from '../lib/composer-trigger';
 import { useComposerRefine } from '../hooks/useComposerRefine';
@@ -11,32 +9,10 @@ import { ComposerSuggestions, type ComposerSuggestionItem, type ComposerSuggesti
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
 import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
-export interface Recipe { id: string; name: string; summary?: string }
-export interface FileHit { path: string; relativePath?: string }
-export interface HistoryRun { id: string; promptPreview?: string | null }
+import type { ComposerProps, FileHit } from './composer-types';
+// Re-export so `import { ComposerMeta } from '../components/Composer'` keeps working.
+export type { ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe } from './composer-types';
 export type { ThinkingLevel } from './ComposerFooter';
-export interface ComposerMeta {
-  files: File[];
-  model: string;
-  modelConfig?: ModelRunConfig;
-  thinking: ThinkingLevel;
-}
-
-export interface ComposerProps {
-  recipes: Recipe[];
-  historyRuns: HistoryRun[];
-  searchFiles: (query: string) => Promise<FileHit[]>;
-  onSend: (text: string, meta: ComposerMeta) => void;
-  onPickTemplate?: (recipe: Recipe) => void;
-  onPickHistory?: (run: HistoryRun) => void;
-  slashCommands?: Array<{ id: string; label: string; run: () => void }>;
-  models?: string[];
-  defaultModel?: string;
-  defaultProvider?: string;
-  defaultBaseUrl?: string;
-  autoClarify?: boolean;
-  onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
-}
 export function Composer({
   recipes,
   historyRuns,

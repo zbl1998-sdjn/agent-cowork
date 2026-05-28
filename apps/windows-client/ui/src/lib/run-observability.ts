@@ -92,15 +92,39 @@ function sourceRefsFromRecord(record: RunRecord): SourceRef[] {
   });
 }
 
+function summariseArgs(args: unknown): string {
+  if (args == null) return '';
+  if (typeof args === 'string') return args.length > 140 ? args.slice(0, 138) + '…' : args;
+  if (typeof args !== 'object') return String(args);
+  const entries = Object.entries(args as Record<string, unknown>).slice(0, 4);
+  if (entries.length === 0) return '';
+  const parts = entries.map(([key, value]) => {
+    let valueText: string;
+    if (typeof value === 'string') valueText = value;
+    else if (typeof value === 'object' && value !== null) {
+      try { valueText = JSON.stringify(value); } catch { valueText = '[object]'; }
+    } else valueText = String(value);
+    if (valueText.length > 60) valueText = valueText.slice(0, 58) + '…';
+    return `${key}=${valueText}`;
+  });
+  const joined = parts.join(', ');
+  return joined.length > 140 ? joined.slice(0, 138) + '…' : joined;
+}
+
 function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
   const rows: ObservabilityRow[] = [];
   for (const event of (record.events || [])) {
     const source = event as Record<string, unknown>;
-    // Legacy event shape: { type:'tool_call', name, reason/why/rationale/... }
+    // Current event shape from agent-stream: { type:'tool_call', name, args }.
+    // No explicit reason field, so when none of the optional reason aliases is
+    // present we summarise the args instead — at least the user sees WHAT was
+    // called, not just a row that says "原因未记录".
     if (text(source.type) === 'tool_call') {
       const name = text(source.name || source.tool);
       if (!name) continue;
-      const reason = text(source.reason || source.why || source.rationale || source.detail || source.text) || '原因未记录';
+      const explicitReason = text(source.reason || source.why || source.rationale || source.detail || source.text);
+      const argsSummary = summariseArgs(source.args);
+      const reason = explicitReason || argsSummary || '(无参数)';
       rows.push({ label: name, value: reason });
       continue;
     }
