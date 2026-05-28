@@ -1,9 +1,17 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 
-function defaultHostBase(): string {
+export function defaultHostBase(): string {
   if (typeof window !== 'undefined') {
-    const { origin, port, protocol } = window.location;
-    if ((protocol === 'http:' || protocol === 'https:') && port !== '5173') return origin;
+    const { origin, port, protocol, hostname } = window.location;
+    // The packaged desktop webview serves the UI from the `tauri.localhost`
+    // custom protocol (and `tauri://` on some platforms); dev serves it from Vite
+    // on :5173. NONE of these is the Node host — calling them returns index.html
+    // and breaks JSON parsing. Only trust the page origin when the host itself
+    // served the page over http(s) (e.g. UI mounted behind the host).
+    const servedByTauri = protocol === 'tauri:' || hostname === 'tauri.localhost' || hostname === 'tauri';
+    if ((protocol === 'http:' || protocol === 'https:') && port !== '5173' && !servedByTauri) {
+      return origin;
+    }
   }
   return 'http://127.0.0.1:3017';
 }
