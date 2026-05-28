@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, respondApproval, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
-import { buildAgentChatStreamOptions, hasSessionModelAccess, mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
+import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
+import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
 import type { RunEvent } from './lib/types';
+import { buildChatStreamCallbacks, humanizeChatTurnError } from './lib/chat-stream-callbacks';
 import { humanizeError } from './lib/friendly-error';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
@@ -147,42 +148,8 @@ export function App() {
         planMode,
         images: uploaded.filter((p) => isImagePath(p)),
         resumeRunId,
-      }), {
-        onStart: (rid) => patchAssistant(assistantId, (m) => ({ ...m, runId: rid })),
-        onReasoning: (delta) => patchAssistant(assistantId, (m) => ({ ...m, reasoning: (m.reasoning || '') + delta })),
-        onToolCall: (name, args) => patchAssistant(assistantId, (m) => ({ ...m, status: 'running', tools: [...(m.tools || []), { name, args, status: 'running', startedAt: Date.now() }] })),
-        onToolResult: (name, st, result, meta) => patchAssistant(assistantId, (m) => {
-          const tools = [...(m.tools || [])];
-          const finishedAt = Date.now();
-          const error = result && typeof result === 'object' && 'error' in result ? String((result as { error?: unknown }).error || '') : undefined;
-          for (let i = tools.length - 1; i >= 0; i -= 1) {
-            const current = tools[i];
-            if (!current || current.name !== name || current.status !== 'running') continue;
-            const rawStartedAt = current.startedAt;
-            const startedAtMs = typeof rawStartedAt === 'number' && Number.isFinite(rawStartedAt) ? rawStartedAt : finishedAt;
-            tools[i] = { ...current, status: st, result, finishedAt, durationMs: meta?.durationMs ?? Math.max(0, finishedAt - startedAtMs), ...(error ? { error } : {}) };
-            break;
-          }
-          return { ...m, tools };
-        }),
-        onTodoSnapshot: (todos) => patchAssistant(assistantId, (m) => ({ ...m, todos })),
-        onTodoUpdate: (todo) => patchAssistant(assistantId, (m) => ({ ...m, todos: mergeTodoUpdate(m.todos, todo) })),
-        onApprovalRequest: (id, name) => {
-          // YOLO mode: auto-approve every request as it streams in (incl. high-risk
-          // tools the host's autoApprove gate leaves for explicit confirmation).
-          if (mode === 'yolo') { void respondApproval(id, 'once'); return; }
-          patchAssistant(assistantId, (m) => ({ ...m, approval: { id, name } }));
-        },
-        onFileWritten: (p) => patchAssistant(assistantId, (m) => ({ ...m, files: [...(m.files || []), p].filter((v, i, a) => a.indexOf(v) === i) })),
-        onVerifyStart: () => patchAssistant(assistantId, (m) => ({ ...m, verifying: true, progress: [...m.progress, { status: 'running', text: '自检产物中…' }] })),
-        onQuestion: (id, question, options) => patchAssistant(assistantId, (m) => ({ ...m, status: 'awaiting_approval', question: { id, question, options } })),
-        onPlanProposed: (id, plan) => patchAssistant(assistantId, (m) => ({ ...m, status: 'awaiting_approval', plan: { id, text: plan } })),
-        onToken: (delta) => patchAssistant(assistantId, (m) => ({ ...m, status: 'streaming', text: (m.text || '') + delta })),
-        onDone: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'done', verifying: false, text: full.text || m.text || '', runId: full.runId || m.runId, usage: full.usage || m.usage })); },
-        onCancelled: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'cancelled', verifying: false, text: full.text || m.text || '已取消本轮运行。可点击继续发起下一轮。', runId: full.runId || m.runId, usage: full.usage || m.usage })); },
-        onError: (msg) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: msg })); },
-      });
-    } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '本轮对话' }) })); }
+      }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
+    } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
   }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);

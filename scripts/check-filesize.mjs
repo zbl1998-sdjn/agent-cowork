@@ -17,7 +17,9 @@ const ROOTS = [
 const EXTENSIONS = new Set(['.js', '.mjs', '.ts', '.tsx', '.rs', '.go']);
 const HARD_WAIVERS = new Map([
   ['apps/host/src/server.js', 'P0-T2 splits server assembly, middleware, and routes'],
-  ['apps/windows-client/ui/src/App.tsx', 'P0-T4 splits App into hooks and child components'],
+  // P0-T4 retired: App.tsx is back under the soft limit after extracting the
+  // chat-stream callbacks (Settings tabs / composer types / app-types splits
+  // got it down earlier). Re-add if it ever creeps back over.
   ['apps/host/src/memory/memory-store.js', 'P0-T6 splits memory IO, layers, and query logic'],
 ]);
 
