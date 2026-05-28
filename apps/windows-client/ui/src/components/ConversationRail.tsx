@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Conversation } from '../lib/app-types';
 import { conversationBranchOptions } from '../lib/conversation-branches';
+import { ICONS } from '../lib/icons';
 import { Button, IconButton } from './ui/Button';
 
 interface ConversationRailProps {
@@ -94,7 +95,7 @@ export function ConversationRail({
               />
             ) : (
               <>
-                <Button variant="ghost" className="conv-title" onClick={() => onSwitch(c.id)} style={conversationTitleStyle}>{c.pinned ? '📌 ' : ''}{c.title || '新对话'}</Button>
+                <Button variant="ghost" className="conv-title" onClick={() => onSwitch(c.id)} style={conversationTitleStyle}>{c.pinned ? `${ICONS.PIN} ` : ''}{c.title || '新对话'}</Button>
                 <IconButton className="conv-act" label={c.pinned ? '取消置顶' : '置顶'} onClick={() => onTogglePin(c.id)} style={conversationActionStyle}>{c.pinned ? '☆' : '⤒'}</IconButton>
                 <IconButton className="conv-act" label="导出 Markdown" onClick={() => onExport(c.id)} style={conversationActionStyle}>⤓</IconButton>
                 <IconButton

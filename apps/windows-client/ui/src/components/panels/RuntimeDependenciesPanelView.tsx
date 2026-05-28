@@ -4,6 +4,7 @@ import type {
   RuntimeDependencyUpdatePlanViewModel,
   RuntimeDependencyViewModel,
 } from '../../lib/runtime-dependencies';
+import { ICONS } from '../../lib/icons';
 import { Button } from '../ui/Button';
 import { RuntimeDependencyPlanActions } from './RuntimeDependencyPlanActions';
 
@@ -112,7 +113,7 @@ export function RuntimeDependenciesPanelView({
                               onClick={() => { if (item.sourceUrl) window.open(item.sourceUrl, '_blank'); }}
                               title={`在浏览器里打开下载页:${item.sourceUrl}`}
                             >
-                              📥 下载安装
+                              {`${ICONS.DOWNLOAD} 下载安装`}
                             </Button>
                           )}
                         </div>

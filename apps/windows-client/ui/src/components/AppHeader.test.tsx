@@ -80,7 +80,7 @@ describe('AppHeader', () => {
     buttons[0].props.onClick();
     buttons[1].props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();
-    buttons.find((button) => button.props.children === '⚙ 设置')?.props.onClick();
+    buttons.find((button) => button.props.children === '⚙️ 设置')?.props.onClick();
     buttons.find((button) => button.props.children === '退出')?.props.onClick();
 
     expect(onOpenCommandPalette).toHaveBeenCalledOnce();

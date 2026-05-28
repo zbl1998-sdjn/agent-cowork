@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getJson, isDesktop } from '../lib/api';
+import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 
 // Tauri's native folder picker. Imported dynamically so the bundle still builds
@@ -116,7 +117,7 @@ export function WorkspaceSwitcher({ current, onSwitch }: WorkspaceSwitcherProps)
         onClick={() => setOpen((value) => !value)}
         title={`当前工作区:${current}\n点击切换`}
       >
-        📁 {abbreviatePath(current)} ▾
+        {`${ICONS.FOLDER} ${abbreviatePath(current)} ▾`}
       </Button>
       {open && (
         <div className="workspace-popup" role="dialog" aria-label="切换工作区">

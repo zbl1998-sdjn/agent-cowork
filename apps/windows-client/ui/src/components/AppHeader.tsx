@@ -1,6 +1,7 @@
 import type { AuthIdentity } from '../lib/api';
 import { invokeDesktop, isDesktop } from '../lib/api/transport';
 import type { SidePanel } from '../lib/app-types';
+import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
@@ -84,8 +85,8 @@ export function AppHeaderActions({
           {item.label}
         </Button>
       ))}
-      <Button onClick={() => void revealInstaller()} title="在文件管理器里打开安装包目录(latest .exe / .msi)">📦 安装包</Button>
-      <Button onClick={onOpenSettings} title="API 设置">⚙ 设置</Button>
+      <Button onClick={() => void revealInstaller()} title="在文件管理器里打开安装包目录(latest .exe / .msi)">{`${ICONS.PACKAGE} 安装包`}</Button>
+      <Button onClick={onOpenSettings} title="API 设置">{`${ICONS.SETTINGS} 设置`}</Button>
       <span className="header-user" title={`租户 ${user.tenantId}`}>{user.username}</span>
       <Button className="header-logout" onClick={onLogout} title="退出登录">退出</Button>
     </nav>

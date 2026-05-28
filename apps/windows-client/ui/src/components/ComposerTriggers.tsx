@@ -1,3 +1,4 @@
+import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 
 export type ComposerTriggerChar = '/' | '@' | '#';
@@ -18,7 +19,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
         onClick={() => onTrigger('/')}
         title="插入「/」从模板或命令里挑一个"
       >
-        📝 模板
+        {`${ICONS.TEMPLATE} 模板`}
       </Button>
       <Button
         variant="secondary"
@@ -26,7 +27,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
         onClick={() => onTrigger('@')}
         title="插入「@」搜索并引用工作区里的文件"
       >
-        📎 引用文件
+        {`${ICONS.PAPERCLIP} 引用文件`}
       </Button>
       <Button
         variant="secondary"
@@ -34,7 +35,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
         onClick={() => onTrigger('#')}
         title="插入「#」翻最近的对话"
       >
-        🕘 历史
+        {`${ICONS.HISTORY} 历史`}
       </Button>
     </div>
   );
