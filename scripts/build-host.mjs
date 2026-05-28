@@ -117,7 +117,13 @@ log('4/5 strip signature + postject inject NODE_SEA_BLOB');
 run(signtool, ['remove', '/s', exePath]);
 const fuse = extractFuse(exePath);
 log(`    fuse: ${fuse}`);
-run('npx', ['-y', 'postject', exePath, 'NODE_SEA_BLOB', path.relative(repoRoot, blobPath), '--sentinel-fuse', fuse], { cwd: repoRoot, shell: true });
+// With `shell: true` on Windows, child_process re-tokenises args via cmd.exe and
+// strips internal whitespace — so a path like `C:\Users\…\agent cowork\…\.exe`
+// splits at the space and postject sees "agent" + "cowork\…\.exe" as separate
+// resources, surfacing as "Can't read resource file". Manually double-quote any
+// arg with whitespace so cmd.exe leaves it intact.
+const quoteForShell = (arg) => (/\s/.test(arg) ? `"${arg}"` : arg);
+run('npx', ['-y', 'postject', quoteForShell(exePath), 'NODE_SEA_BLOB', quoteForShell(blobPath), '--sentinel-fuse', fuse], { cwd: repoRoot, shell: true });
 
 log('5/5 deploy to binaries/ and target/release/');
 fs.mkdirSync(binariesDir, { recursive: true });
