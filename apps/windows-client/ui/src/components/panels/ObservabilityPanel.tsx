@@ -4,6 +4,7 @@ import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } 
 import type { RunRecord } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
+import { humanizeError } from '../../lib/friendly-error';
 
 function runTitle(record: RunRecord): string {
   return record.promptPreview || record.prompt || record.id;
@@ -103,7 +104,7 @@ export function ObservabilityPanel() {
       setSelectedId((current) => selectInitialRunId(next, current));
       if (!next.length) setSelected(null);
     } catch (err) {
-      setError((err as Error).message || '读取运行记录失败');
+      setError(humanizeError(err, { action: '读取运行记录' }));
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ export function ObservabilityPanel() {
       })
       .catch((err) => {
         if (!alive) return;
-        setError((err as Error).message || '读取运行详情失败');
+        setError(humanizeError(err, { action: '读取运行详情' }));
         setSelected(null);
       })
       .finally(() => {

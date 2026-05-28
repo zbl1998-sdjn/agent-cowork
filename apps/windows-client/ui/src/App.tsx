@@ -4,6 +4,7 @@ import { buildAgentChatStreamOptions, hasSessionModelAccess, mergeTodoUpdate, re
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
 import type { RunEvent } from './lib/types';
+import { humanizeError } from './lib/friendly-error';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
 import { ConversationRail } from './components/ConversationRail';
@@ -107,7 +108,7 @@ export function App() {
       });
       patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, operations: res.operations || [], fileOperationApprovalId: res.fileOperationApprovalId || null, sources: res.sources || [], status: 'awaiting_approval', approvalState: (res.operations || []).length ? 'awaiting' : 'idle' }));
       wireEvents(assistantId, res.runId);
-    } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
+    } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '运行技能' }) })); }
   }, [trustedRoot, patchAssistant, wireEvents]);
 
   const handleSend = useCallback(async (text: string, meta: ComposerMeta & { resumeRunId?: string }) => {
@@ -181,7 +182,7 @@ export function App() {
         onCancelled: (full) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'cancelled', verifying: false, text: full.text || m.text || '已取消本轮运行。可点击继续发起下一轮。', runId: full.runId || m.runId, usage: full.usage || m.usage })); },
         onError: (msg) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: msg })); },
       });
-    } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
+    } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '本轮对话' }) })); }
   }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
@@ -219,7 +220,7 @@ export function App() {
     const assistantId = nextMessageId();
     setMessages((list) => [...list, { id: assistantId, role: 'assistant', status: 'thinking', progress: [], operations: [], sources: [], approvalState: 'idle' }]);
     try { const res = await runSubagent(goal, steps, trustedRoot); wireEvents(assistantId, res.runId); patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, status: res.ok ? 'done' : 'failed' })); }
-    catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
+    catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '子任务' }) })); }
   }, [trustedRoot, patchAssistant, wireEvents]);
   const handleApprove = useCallback(async (message: AssistantMessage) => {
     try {
@@ -230,7 +231,7 @@ export function App() {
         idempotencyKey: newIdempotencyKey('apply'),
       });
       patchAssistant(message.id, (m) => ({ ...m, rollbackApprovalId: applied.rollbackApprovalId || null, approvalState: 'approved', status: 'done' }));
-    } catch (error) { patchAssistant(message.id, (m) => ({ ...m, text: (error as Error).message })); }
+    } catch (error) { patchAssistant(message.id, (m) => ({ ...m, text: humanizeError(error, { action: '应用文件变更' }) })); }
   }, [trustedRoot, patchAssistant]);
   const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
 

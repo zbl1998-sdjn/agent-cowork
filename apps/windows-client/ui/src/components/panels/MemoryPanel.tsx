@@ -8,6 +8,7 @@ import {
 } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
+import { humanizeError } from '../../lib/friendly-error';
 
 interface MemoryPanelProps {
   trustedRoot: string;
@@ -96,7 +97,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
       const res = await getMemoryProfile(trustedRoot, query);
       setEntries(res.profile.entries || []);
     } catch (err) {
-      setError((err as Error).message || '记忆没读出来');
+      setError(humanizeError(err, { action: '读取记忆' }));
     } finally {
       setBusy(false);
     }
@@ -126,7 +127,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
       setValue('');
       setEvidence('');
     } catch (err) {
-      setError((err as Error).message || '没记上,稍后再试');
+      setError(humanizeError(err, { action: '记下来' }));
     } finally {
       setBusy(false);
     }
@@ -139,7 +140,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
       const res = await forgetMemoryProfile({ type: entry.type, key: entry.key }, trustedRoot);
       setEntries(res.profile.entries || []);
     } catch (err) {
-      setError((err as Error).message || '忘不掉,稍后再试');
+      setError(humanizeError(err, { action: '忘掉' }));
     } finally {
       setBusy(false);
     }

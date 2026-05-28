@@ -14,6 +14,7 @@ import {
 } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
+import { humanizeError } from '../../lib/friendly-error';
 
 interface ProjectsPanelProps { trustedRoot: string }
 
@@ -155,7 +156,7 @@ export function ProjectsPanel({ trustedRoot }: ProjectsPanelProps) {
       setConversations(conversationRes);
       setArtifacts(artifactRes);
     } catch (err) {
-      setError((err as Error).message || '项目读取失败');
+      setError(humanizeError(err, { action: '读取项目' }));
     } finally {
       setBusy(false);
     }
@@ -170,7 +171,7 @@ export function ProjectsPanel({ trustedRoot }: ProjectsPanelProps) {
       if (project) setSelectedId(project.id);
       await refresh();
     } catch (err) {
-      setError((err as Error).message || '项目操作失败');
+      setError(humanizeError(err, { action: '项目操作' }));
       setBusy(false);
     }
   };

@@ -17,6 +17,7 @@ import {
   type RuntimeDependencyViewModel,
 } from '../../lib/runtime-dependencies';
 import { RuntimeDependenciesPanelView } from './RuntimeDependenciesPanelView';
+import { humanizeError } from '../../lib/friendly-error';
 
 export { RuntimeDependenciesPanelView } from './RuntimeDependenciesPanelView';
 
@@ -52,7 +53,7 @@ export function RuntimeDependenciesPanel() {
         setStatus('ready');
       })
       .catch((err) => {
-        setError((err as Error).message || '依赖状态读取失败');
+        setError(humanizeError(err, { action: '读取组件状态' }));
         setStatus('failed');
       });
   };
@@ -77,7 +78,7 @@ export function RuntimeDependenciesPanel() {
         setPlanStatus('ready');
       })
       .catch((err) => {
-        setPlanError((err as Error).message || '安装计划预检失败');
+        setPlanError(humanizeError(err, { action: '安装计划预检' }));
         setPlanStatus('failed');
       });
   };
@@ -92,7 +93,7 @@ export function RuntimeDependenciesPanel() {
         setCleanupStatus('ready');
       })
       .catch((err) => {
-        setCleanupError((err as Error).message || '清理计划预检失败');
+        setCleanupError(humanizeError(err, { action: '清理计划预检' }));
         setCleanupStatus('failed');
       });
   };
@@ -107,7 +108,7 @@ export function RuntimeDependenciesPanel() {
         setUpdateStatus('ready');
       })
       .catch((err) => {
-        setUpdateError((err as Error).message || '更新保留计划预检失败');
+        setUpdateError(humanizeError(err, { action: '更新保留计划预检' }));
         setUpdateStatus('failed');
       });
   };
