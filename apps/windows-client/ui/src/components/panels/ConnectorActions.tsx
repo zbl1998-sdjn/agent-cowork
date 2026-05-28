@@ -25,9 +25,11 @@ export function ConnectorOAuthAction({
   onComplete: () => void;
   onRevoke: () => void;
 }) {
+  // Labels avoid "OAuth" wherever possible — non-technical users see "网页授权"
+  // instead. The 4-state machine (待审批 → 审批 → 开始 → 完成) stays intact.
   const label = busy
     ? (connected ? '撤销中…' : hasSession ? '确认中…' : approved ? '授权中…' : '审批中…')
-    : connected ? '撤销授权' : missingConfig ? '待配置 OAuth' : hasSession ? '完成授权' : approved ? '开始授权' : '审批权限';
+    : connected ? '撤销授权' : missingConfig ? '待配置 网页授权' : hasSession ? '完成授权' : approved ? '去登录授权' : '审批权限';
   const onClick = connected ? onRevoke : hasSession ? onComplete : approved ? onStart : onApprove;
   return (
     <Button disabled={busy || missingConfig} onClick={onClick}>
@@ -49,7 +51,7 @@ export function ConnectorBuiltinAction({
 }) {
   return (
     <Button disabled={busy} onClick={connected ? onDisconnect : onConnect}>
-      {busy ? (connected ? '断开中…' : '连接中…') : connected ? '断开' : '一键连接'}
+      {busy ? (connected ? '断开中…' : '连接中…') : connected ? '断开连接' : '一键连接'}
     </Button>
   );
 }

@@ -11,6 +11,7 @@ import {
   type ConnectorInfo,
   type OAuthStartResult,
 } from '../../lib/api';
+import { humanizeError } from '../../lib/friendly-error';
 import { readConnectorOAuthStatus, type OAuthStatusView } from './connectorOAuthStatus';
 import { connectorScopeKey, defaultConnectorScopes } from './connectorScopes';
 
@@ -48,7 +49,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       setConnected(res.connected || []);
       await refreshOAuthStatus(res.connectors);
     } catch (error) {
-      setMessage(`错误：${(error as Error).message}`);
+      setMessage(`错误：${humanizeError(error)}`);
     }
   };
 
@@ -60,7 +61,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       if (!query.trim()) { await refresh(); return; }
       setConnectors(await suggestConnectors(query, 8));
     } catch (error) {
-      setMessage(`错误：${(error as Error).message}`);
+      setMessage(`错误：${humanizeError(error)}`);
     }
   };
 
@@ -76,7 +77,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
         : `已连接 ${connector.name}（新增 ${res.connected} 个工具）`);
       onConnected?.(res.mcpServers || []);
     } catch (error) {
-      setMessage(`连接失败：${(error as Error).message}`);
+      setMessage(`连接失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }
@@ -93,7 +94,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
         : `${connector.name} 当前未连接`);
       onConnected?.(res.mcpServers || []);
     } catch (error) {
-      setMessage(`断开失败：${(error as Error).message}`);
+      setMessage(`断开失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }
@@ -116,7 +117,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       }
       setMessage(`打开 ${res.verificationUri}，输入 ${res.userCode} 后点击完成授权`);
     } catch (error) {
-      setMessage(`授权失败：${(error as Error).message}`);
+      setMessage(`授权失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }
@@ -138,7 +139,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       }));
       setMessage(`已审批 ${connector.name} 权限：${res.scopes.join('、')}`);
     } catch (error) {
-      setMessage(`审批失败：${(error as Error).message}`);
+      setMessage(`审批失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }
@@ -172,7 +173,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       const login = res.account?.login || res.credential?.accountId || connector.name;
       setMessage(`已授权 ${connector.name}：${login}`);
     } catch (error) {
-      setMessage(`授权确认失败：${(error as Error).message}`);
+      setMessage(`授权确认失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }
@@ -196,7 +197,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       await refreshOAuthStatus(connectors);
       setMessage(`已撤销 ${connector.name}（移除 ${res.removed} 个账户）`);
     } catch (error) {
-      setMessage(`撤销失败：${(error as Error).message}`);
+      setMessage(`撤销失败：${humanizeError(error)}`);
     } finally {
       setBusyId('');
     }

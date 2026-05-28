@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listSchedules, cancelSchedule, type ScheduleItem } from '../../lib/api';
+import { humanizeError } from '../../lib/friendly-error';
+import { humanizeScheduleLine, humanizeScheduleStatus } from '../../lib/schedule-humanize';
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 
@@ -7,20 +9,35 @@ export function SchedulesPanelStateViews({ error, onRetry }: { error: string; on
   if (error) {
     return <ErrorState title="定时任务加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
-  return <Empty title="还没有定时任务" message="可以对 Kimi 说「每天早上…」。" />;
+  return (
+    <Empty
+      title="还没有定时任务"
+      message="可以对 Kimi 说「每天早上 9 点把今天的日程发我」「每周一总结一下上周的邮件」这样的话,它就会帮你安排。"
+    />
+  );
 }
 
+// One row per scheduled task. The label, status chip and time line all go
+// through the humanize-* helpers so non-technical users see "每天 09:00 · 下次
+// 今天 09:00 · 运行中" instead of raw cron + ISO timestamps.
 export function SchedulePanelItem({ item, onCancel }: { item: ScheduleItem; onCancel: (id: string) => void }) {
+  const when = humanizeScheduleLine(item);
+  const status = humanizeScheduleStatus(item.status);
+  const askCancel = () => {
+    // Tiny confirm step so a misclick on a long-running schedule (e.g. daily
+    // briefing the user actually relies on) doesn't silently nuke it.
+    const friendlyName = item.name || '这个任务';
+    if (window.confirm(`确定要删掉「${friendlyName}」吗?之后想再开,需要重新让 Kimi 安排一次。`)) {
+      onCancel(item.id);
+    }
+  };
   return (
     <li>
-      <code>{item.name}</code>
-      <span className="tool-src">{item.status || 'pending'}</span>
-      <p>
-        {item.cronHuman || item.cron || (item.fireAt ? `一次性 ${item.fireAt}` : '')}
-        {item.nextFireAt ? ` · 下次 ${new Date(item.nextFireAt).toLocaleString()}` : ''}
-      </p>
+      <strong className="schedule-name">{item.name || '未命名任务'}</strong>
+      <span className="tool-src">{status}</span>
+      {when && <p className="schedule-when">{when}</p>}
       {item.status !== 'cancelled' && (
-        <Button onClick={() => onCancel(item.id)}>取消</Button>
+        <Button onClick={askCancel}>取消</Button>
       )}
     </li>
   );
@@ -36,13 +53,23 @@ export function SchedulesPanel() {
   const refresh = async () => {
     setBusy(true);
     setError('');
-    try { setItems(await listSchedules()); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try {
+      setItems(await listSchedules());
+    } catch (e) {
+      setError(humanizeError(e, { action: '读取定时任务' }));
+    } finally {
+      setBusy(false);
+    }
   };
   useEffect(() => { void refresh(); }, []);
 
   const onCancel = async (id: string) => {
-    await cancelSchedule(id);
-    await refresh();
+    try {
+      await cancelSchedule(id);
+      await refresh();
+    } catch (e) {
+      setError(humanizeError(e, { action: '取消定时任务' }));
+    }
   };
 
   return (

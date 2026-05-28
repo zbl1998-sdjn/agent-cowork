@@ -135,7 +135,7 @@ describe('ConnectorsPanel state views', () => {
     )[0];
 
     expect(missingHtml).toContain('ui-btn ui-btn--secondary');
-    expect(missingHtml).toContain('待配置 OAuth');
+    expect(missingHtml).toContain('待配置 网页授权');
     expect(missingHtml).toContain('disabled=""');
     approvedButton.props.onClick();
     completeButton.props.onClick();

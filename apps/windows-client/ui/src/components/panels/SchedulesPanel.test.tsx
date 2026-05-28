@@ -53,20 +53,53 @@ describe('SchedulesPanel state views', () => {
     expect(html).toContain('取消');
   });
 
-  it('keeps schedule cancellation wired to the item id', () => {
-    const onCancel = vi.fn();
-    const buttons = collectByType(
-      SchedulePanelItem({
-        item: { id: 'schedule-1', name: 'daily summary', cronHuman: '每天 09:00', status: 'active' },
-        onCancel,
-      }),
-      Button,
-    );
+  // The white-collar copy wraps cancellation in window.confirm so a misclick
+  // doesn't silently delete a daily briefing. Tests run in the default node env
+  // where `window` is undefined, so stub it via vi.stubGlobal (no jsdom dep).
+  function withConfirm<T>(result: boolean, run: (confirmFn: ReturnType<typeof vi.fn>) => T): T {
+    const confirmFn = vi.fn(() => result);
+    vi.stubGlobal('window', { confirm: confirmFn });
+    try {
+      return run(confirmFn);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
 
-    expect(buttons).toHaveLength(1);
-    buttons[0].props.onClick();
+  it('keeps schedule cancellation wired to the item id (after user confirms)', () => {
+    withConfirm(true, (confirmFn) => {
+      const onCancel = vi.fn();
+      const buttons = collectByType(
+        SchedulePanelItem({
+          item: { id: 'schedule-1', name: 'daily summary', cronHuman: '每天 09:00', status: 'active' },
+          onCancel,
+        }),
+        Button,
+      );
 
-    expect(onCancel).toHaveBeenCalledOnce();
-    expect(onCancel).toHaveBeenCalledWith('schedule-1');
+      expect(buttons).toHaveLength(1);
+      buttons[0].props.onClick();
+
+      expect(confirmFn).toHaveBeenCalledOnce();
+      expect(onCancel).toHaveBeenCalledOnce();
+      expect(onCancel).toHaveBeenCalledWith('schedule-1');
+    });
+  });
+
+  it('skips cancellation when user declines the confirm', () => {
+    withConfirm(false, (confirmFn) => {
+      const onCancel = vi.fn();
+      const buttons = collectByType(
+        SchedulePanelItem({
+          item: { id: 'schedule-1', name: 'daily summary', cronHuman: '每天 09:00', status: 'active' },
+          onCancel,
+        }),
+        Button,
+      );
+      buttons[0].props.onClick();
+
+      expect(confirmFn).toHaveBeenCalledOnce();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
   });
 });

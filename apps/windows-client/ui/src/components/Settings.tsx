@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
+import { humanizeError } from '../lib/friendly-error';
 import { Button, IconButton } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
@@ -10,21 +11,32 @@ const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((module) => (
 export type SettingsTab = 'account' | 'appearance' | 'model' | 'input' | 'api' | 'runtime' | 'updates' | 'selfcheck';
 
 const MODEL_PROVIDERS = [
-  { value: 'kimi-api', label: 'Kimi' },
-  { value: 'openai', label: 'OpenAI' },
+  { value: 'kimi-api', label: 'Kimi(月之暗面)' },
+  { value: 'openai', label: 'OpenAI(ChatGPT)' },
   { value: 'anthropic', label: 'Claude' },
-  { value: 'openai/local', label: '本地 OpenAI-compatible' },
+  { value: 'openai/local', label: '本机 / 自建(高级)' },
+];
+
+// Commonly used Kimi models. Free-form input still allowed so the user can
+// paste any model id their provider exposes — the datalist is just a quick
+// pick to spare non-technical users from typing "kimi-k2-0905-preview".
+const COMMON_KIMI_MODELS = [
+  'kimi-k2-0905-preview',
+  'kimi-latest',
+  'moonshot-v1-8k',
+  'moonshot-v1-32k',
+  'moonshot-v1-128k',
 ];
 
 const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'account', label: '账户' },
   { value: 'appearance', label: '外观' },
-  { value: 'model', label: '模型' },
-  { value: 'input', label: '输入' },
-  { value: 'api', label: 'API' },
-  { value: 'runtime', label: '运行时' },
+  { value: 'model', label: '默认模型' },
+  { value: 'input', label: '输入助手' },
+  { value: 'api', label: '密钥' },
+  { value: 'runtime', label: '组件' },
   { value: 'updates', label: '更新' },
-  { value: 'selfcheck', label: '自检' },
+  { value: 'selfcheck', label: '健康检查' },
 ];
 
 const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
@@ -99,7 +111,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
     setScLoading(true); setScError('');
     getSelfCheck()
       .then((r) => setSelfCheck(r))
-      .catch((e) => setScError((e as Error).message || '自检失败'))
+      .catch((e) => setScError(humanizeError(e, { action: '健康检查' })))
       .finally(() => setScLoading(false));
   };
   useEffect(() => {
@@ -121,7 +133,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
       setSavedTip(okMsg);
       setTimeout(() => setSavedTip(''), 2500);
     } catch (err) {
-      setError((err as Error).message || '保存失败，请重试');
+      setError(humanizeError(err, { action: '保存' }));
     } finally {
       setBusy(false);
     }
@@ -153,15 +165,19 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             {tab === 'model' && (
               <div>
                 <label className="auth-field">
-                  <span>默认提供商</span>
+                  <span>默认用哪家</span>
                   <select value={provider} onChange={(e) => setProvider(e.target.value)}>
                     {MODEL_PROVIDERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
                 <label className="auth-field">
-                  <span>默认模型</span>
-                  <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="kimi-k2-0905-preview" />
+                  <span>默认模型名称</span>
+                  <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="点开选一个,或直接粘贴" list="settings-common-models" />
+                  <datalist id="settings-common-models">
+                    {COMMON_KIMI_MODELS.map((m) => <option key={m} value={m} />)}
+                  </datalist>
                 </label>
+                <p className="modal-note">不知道选哪个就保持默认。后面在每轮对话里也可以临时换。</p>
                 <div className="modal-actions">
                   <span className="modal-actions-spacer" />
                   <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
@@ -169,28 +185,36 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
               </div>
             )}
             {tab === 'input' && (
-              <div className="set-row">
-                <span className="set-label">发送前澄清</span>
-                <SegmentedControl ariaLabel="发送前澄清" className="seg" value={autoClarify} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoClarify} />
+              <div>
+                <div className="set-row">
+                  <span className="set-label">发送前澄清</span>
+                  <SegmentedControl ariaLabel="发送前澄清" className="seg" value={autoClarify} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoClarify} />
+                </div>
+                <p className="modal-note">开启后,模糊请求(如「整理一下」)发出去之前,Kimi 会先反问一两个具体问题,确认要做什么,再开始干活。多花 3 秒,少返工一轮。</p>
               </div>
             )}
             {tab === 'api' && (
               loading ? <div className="modal-loading">加载中…</div> : (
                 <div>
+                  <p className="modal-note">还没有 Kimi 账号?去 <a href="https://platform.moonshot.cn" target="_blank" rel="noreferrer">platform.moonshot.cn</a> 注册,在「API Key 管理」里新建一个 sk- 开头的密钥贴进来即可。</p>
                   <label className="auth-field">
                     <span>API Key {hasKey && <em className="key-set">已配置</em>}</span>
-                    <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置（留空保持不变）' : 'sk-...'} autoComplete="off" />
+                    <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置(留空保持不变)' : 'sk-...'} autoComplete="off" />
                   </label>
-                  <label className="auth-field">
-                    <span>Base URL</span>
-                    <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.moonshot.cn/v1" />
-                  </label>
+                  <details className="api-advanced">
+                    <summary>高级:接口地址(一般不用改)</summary>
+                    <label className="auth-field">
+                      <span>Base URL</span>
+                      <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.moonshot.cn/v1" />
+                    </label>
+                    <p className="modal-note">国内访问 Kimi 用默认值即可。仅当用代理或自建 OpenAI 兼容接口时才需要修改。</p>
+                  </details>
                   <div className="modal-actions">
                     {hasKey && <Button variant="danger" className="btn-ghost-danger" disabled={busy} onClick={() => void persist({ clearKey: true }, '密钥已清除')}>清除密钥</Button>}
                     <span className="modal-actions-spacer" />
                     <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => void persist({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</Button>
                   </div>
-                  <p className="modal-note">密钥仅保存在本机 .AgentCowork/config.json，绝不回传或显示明文。</p>
+                  <p className="modal-note">密钥仅保存在你本机的 .AgentCowork/config.json,绝不会回传或显示出明文。</p>
                 </div>
               )
             )}
@@ -207,9 +231,10 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             {tab === 'selfcheck' && (
               <div className="selfcheck">
                 <div className="selfcheck-head">
-                  <span className="set-label">安全 / 韧性自检</span>
-                  <Button className="btn-secondary" disabled={scLoading} onClick={loadSelfCheck}>{scLoading ? '检测中…' : '刷新'}</Button>
+                  <span className="set-label">系统健康检查</span>
+                  <Button className="btn-secondary" disabled={scLoading} onClick={loadSelfCheck}>{scLoading ? '检测中…' : '重新检查'}</Button>
                 </div>
+                <p className="modal-note">这里把后台跑得是否健康一次性列出来,出问题时方便排查。普通使用一般不用看。</p>
                 {scError && <div className="auth-error" role="alert">{scError}</div>}
                 {selfCheck && (
                   <>
@@ -222,12 +247,15 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
                         </li>
                       ))}
                     </ul>
-                    <p className="modal-note">
-                      存储后端：{selfCheck.storage.backend}{selfCheck.storage.postgres ? '（多实例）' : ''} ·
-                      沙箱 {selfCheck.sandbox.backend || '关闭'}（{selfCheck.sandbox.networkIsolated ? '网络已隔离' : '本地不隔离网络'}） ·
-                      并发 {selfCheck.resilience.concurrency.active}/{selfCheck.resilience.concurrency.maxConcurrent} ·
-                      限流 {selfCheck.resilience.rateLimit.enabled ? `${selfCheck.resilience.rateLimit.ratePerSec}/s` : '关'}
-                    </p>
+                    <details className="selfcheck-detail">
+                      <summary>系统底层细节(技术信息)</summary>
+                      <p className="modal-note">
+                        数据存哪儿:{selfCheck.storage.backend}{selfCheck.storage.postgres ? '(多实例)' : ''} ·
+                        命令执行沙箱:{selfCheck.sandbox.backend || '未启用'}({selfCheck.sandbox.networkIsolated ? '已隔离网络' : '未隔离网络'}) ·
+                        正在跑的任务数:{selfCheck.resilience.concurrency.active}/{selfCheck.resilience.concurrency.maxConcurrent} ·
+                        限流:{selfCheck.resilience.rateLimit.enabled ? `${selfCheck.resilience.rateLimit.ratePerSec}/秒` : '未启用'}
+                      </p>
+                    </details>
                   </>
                 )}
               </div>

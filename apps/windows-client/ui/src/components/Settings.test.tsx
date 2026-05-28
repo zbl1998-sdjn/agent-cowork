@@ -26,7 +26,7 @@ describe('Settings', () => {
     expect(html).toContain('role="tablist"');
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain('ui-btn ui-btn--ghost ui-btn--md is-active');
-    expect(html).toContain('>API</button>');
+    expect(html).toContain('>密钥</button>');
     expect(html).toContain('加载中');
     expect(html).toContain('ui-icon-btn modal-close');
     expect(html).not.toContain('用户名');
@@ -37,8 +37,8 @@ describe('Settings', () => {
 
     expect(html).toContain('role="tablist"');
     expect(html).toContain('aria-selected="true"');
-    expect(html).toContain('>自检</button>');
-    expect(html).toContain('安全 / 韧性自检');
+    expect(html).toContain('>健康检查</button>');
+    expect(html).toContain('系统健康检查');
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).not.toContain('用户名');
   });

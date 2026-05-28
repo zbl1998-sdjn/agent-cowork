@@ -104,9 +104,9 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
             || Boolean(oauth?.connected);
           return (
             <li key={c.id}>
-              <code>{c.name}</code>
-              {c.builtin && <span className="tool-src">内置</span>}
-              {isOAuth && <span className="tool-src">OAuth</span>}
+              <strong className="connector-name">{c.name}</strong>
+              {c.builtin && <span className="tool-src">本机</span>}
+              {isOAuth && <span className="tool-src">网页授权</span>}
               {isOn && <span className="tool-src">已连接</span>}
               <p>{c.description}</p>
               {missingOAuthConfig && (
@@ -150,7 +150,11 @@ export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelPro
                   onDisconnect={() => void onDisconnect(c)}
                 />
               ) : (
-                <code className="connector-install">{c.install}</code>
+                <details className="connector-install-details">
+                  <summary>高级:手动安装命令</summary>
+                  <code className="connector-install">{c.install}</code>
+                  <p className="modal-note">在命令行运行上面这一行即可。装好之后回到这里点「一键连接」。</p>
+                </details>
               )}
             </li>
           );
