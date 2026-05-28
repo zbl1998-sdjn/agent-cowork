@@ -17,17 +17,12 @@ interface ComposerFooterProps {
   modelOptions: string[];
   provider: string;
   defaultModel: string;
-  defaultBaseUrl: string;
-  baseUrl: string;
-  apiKey: string;
   thinking: ThinkingLevel;
   onUpload: () => void;
   onToggleVoice: () => void;
   onRefine: () => void;
   onProvider: (value: string) => void;
   onModel: (value: string) => void;
-  onBaseUrl: (value: string) => void;
-  onApiKey: (value: string) => void;
   onThinking: (value: ThinkingLevel) => void;
   onSend: () => void;
 }
@@ -40,17 +35,12 @@ export function ComposerFooter({
   modelOptions,
   provider,
   defaultModel,
-  defaultBaseUrl,
-  baseUrl,
-  apiKey,
   thinking,
   onUpload,
   onToggleVoice,
   onRefine,
   onProvider,
   onModel,
-  onBaseUrl,
-  onApiKey,
   onThinking,
   onSend,
 }: ComposerFooterProps) {
@@ -70,13 +60,8 @@ export function ComposerFooter({
           modelOptions={modelOptions}
           provider={provider}
           defaultModel={defaultModel}
-          defaultBaseUrl={defaultBaseUrl}
-          baseUrl={baseUrl}
-          apiKey={apiKey}
           onProvider={onProvider}
           onModel={onModel}
-          onBaseUrl={onBaseUrl}
-          onApiKey={onApiKey}
         />
         <select className="thinking-select" value={thinking} onChange={(e) => onThinking(e.target.value as ThinkingLevel)} title="思考强度">
           {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}

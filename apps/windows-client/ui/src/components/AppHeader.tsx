@@ -2,18 +2,24 @@ import type { AuthIdentity } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
 import { Button } from './ui/Button';
 
+export type AgentMode = 'plan' | 'execute' | 'yolo';
+
+const MODE_OPTIONS: Array<{ value: AgentMode; label: string; title: string }> = [
+  { value: 'plan', label: '计划', title: '计划模式：先只读研究并提交计划草案，待你批准后再执行写操作' },
+  { value: 'execute', label: '执行', title: '执行模式：正常执行，文件改动需逐次批准（推荐）' },
+  { value: 'yolo', label: 'YOLO', title: 'YOLO 模式：自动批准一切操作（含高风险命令/连接器），放手跑——请谨慎使用' },
+];
+
 interface AppHeaderProps {
-  autoApprove: boolean;
+  mode: AgentMode;
   panel: SidePanel;
-  planMode: boolean;
   theme: 'light' | 'dark';
   trustedRoot: string;
   user: AuthIdentity;
   onLogout: () => void;
   onOpenCommandPalette: () => void;
   onOpenSettings: () => void;
-  onSetAutoApprove: (value: boolean) => void;
-  onSetPlanMode: (value: boolean) => void;
+  onSetMode: (value: AgentMode) => void;
   onTogglePanel: (panel: SidePanel) => void;
   onToggleTheme: () => void;
 }
@@ -32,16 +38,14 @@ const panelButtons: Array<{ panel: Exclude<SidePanel, 'none'>; label: string }> 
 ];
 
 export function AppHeaderActions({
-  autoApprove,
+  mode,
   panel,
-  planMode,
   theme,
   user,
   onLogout,
   onOpenCommandPalette,
   onOpenSettings,
-  onSetAutoApprove,
-  onSetPlanMode,
+  onSetMode,
   onTogglePanel,
   onToggleTheme,
 }: AppHeaderActionsProps) {
@@ -49,8 +53,13 @@ export function AppHeaderActions({
     <nav className="header-actions">
       <Button onClick={onOpenCommandPalette} title="命令面板 (Ctrl/Cmd+K)">⌘K</Button>
       <Button onClick={onToggleTheme} title="深色 / 浅色">{theme === 'dark' ? '☀' : '🌙'}</Button>
-      <Button className={planMode ? 'is-active' : ''} onClick={() => onSetPlanMode(!planMode)} title="开启后 Kimi 先只读研究并提交计划草案，待你批准后再执行写操作">{planMode ? '计划模式·开' : '计划模式·关'}</Button>
-      <Button className={autoApprove ? 'is-active' : ''} onClick={() => onSetAutoApprove(!autoApprove)} title="开启后自动批准文件改动；高风险操作（命令/外部连接器）仍需逐次确认">{autoApprove ? '自动批准·开' : '自动批准·关'}</Button>
+      <div className="mode-switch" role="group" aria-label="运行模式">
+        {MODE_OPTIONS.map((opt) => (
+          <Button key={opt.value} className={mode === opt.value ? 'is-active' : ''} onClick={() => onSetMode(opt.value)} title={opt.title}>
+            {opt.label}
+          </Button>
+        ))}
+      </div>
       {panelButtons.map((item) => (
         <Button key={item.panel} className={panel === item.panel ? 'is-active' : ''} onClick={() => onTogglePanel(item.panel)}>
           {item.label}
@@ -64,17 +73,15 @@ export function AppHeaderActions({
 }
 
 export function AppHeader({
-  autoApprove,
+  mode,
   panel,
-  planMode,
   theme,
   trustedRoot,
   user,
   onLogout,
   onOpenCommandPalette,
   onOpenSettings,
-  onSetAutoApprove,
-  onSetPlanMode,
+  onSetMode,
   onTogglePanel,
   onToggleTheme,
 }: AppHeaderProps) {
@@ -84,16 +91,14 @@ export function AppHeader({
       <h1>Agent Cowork</h1>
       <span className="workspace-path">{trustedRoot}</span>
       <AppHeaderActions
-        autoApprove={autoApprove}
+        mode={mode}
         panel={panel}
-        planMode={planMode}
         theme={theme}
         user={user}
         onLogout={onLogout}
         onOpenCommandPalette={onOpenCommandPalette}
         onOpenSettings={onOpenSettings}
-        onSetAutoApprove={onSetAutoApprove}
-        onSetPlanMode={onSetPlanMode}
+        onSetMode={onSetMode}
         onTogglePanel={onTogglePanel}
         onToggleTheme={onToggleTheme}
       />

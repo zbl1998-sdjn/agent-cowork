@@ -61,8 +61,6 @@ export function Composer({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [model, setModel] = useState('');
   const [provider, setProvider] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
   const [dragging, setDragging] = useState(false);
   const searchToken = useRef(0);
@@ -110,7 +108,7 @@ export function Composer({
     if (refineDecision.action === 'preview') return;
     const finalText = refineDecision.text;
     const modelConfig = buildSessionModelConfig(
-      { provider: currentProvider, model: currentModel, baseUrl, apiKey },
+      { provider: currentProvider, model: currentModel, baseUrl: '', apiKey: '' },
       { provider: defaultProvider, model: defaultModel, baseUrl: defaultBaseUrl },
     );
     onSend(finalText, { files: attachments, model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
@@ -236,11 +234,10 @@ export function Composer({
         listening={listening} refining={refining}
         canRefine={Boolean(value.trim() && canRefine)}
         model={model} modelOptions={modelOptions} provider={currentProvider}
-        defaultModel={defaultModel} defaultBaseUrl={defaultBaseUrl}
-        baseUrl={baseUrl} apiKey={apiKey} thinking={thinking}
+        defaultModel={defaultModel} thinking={thinking}
         onUpload={() => fileRef.current?.click()}
         onToggleVoice={toggleVoice} onRefine={() => void refineCurrent(value)}
-        onProvider={setProvider} onModel={setModel} onBaseUrl={setBaseUrl} onApiKey={setApiKey}
+        onProvider={setProvider} onModel={setModel}
         onThinking={setThinking} onSend={() => void send()}
       />
     </div>

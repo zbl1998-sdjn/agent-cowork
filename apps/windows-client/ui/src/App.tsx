@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
+import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, respondApproval, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, mergeTodoUpdate, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
@@ -7,7 +7,7 @@ import type { RunEvent } from './lib/types';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
 import { ConversationRail } from './components/ConversationRail';
-import { AppHeader } from './components/AppHeader';
+import { AppHeader, type AgentMode } from './components/AppHeader';
 import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
@@ -22,8 +22,9 @@ export function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0].messages || []);
   const [panel, setPanel] = useState<SidePanel>('none');
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [planMode, setPlanMode] = useState(false);
+  const [mode, setMode] = useState<AgentMode>('execute');
+  const planMode = mode === 'plan';
+  const autoApprove = mode === 'yolo';
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -160,7 +161,12 @@ export function App() {
         }),
         onTodoSnapshot: (todos) => patchAssistant(assistantId, (m) => ({ ...m, todos })),
         onTodoUpdate: (todo) => patchAssistant(assistantId, (m) => ({ ...m, todos: mergeTodoUpdate(m.todos, todo) })),
-        onApprovalRequest: (id, name) => patchAssistant(assistantId, (m) => ({ ...m, approval: { id, name } })),
+        onApprovalRequest: (id, name) => {
+          // YOLO mode: auto-approve every request as it streams in (incl. high-risk
+          // tools the host's autoApprove gate leaves for explicit confirmation).
+          if (mode === 'yolo') { void respondApproval(id, 'once'); return; }
+          patchAssistant(assistantId, (m) => ({ ...m, approval: { id, name } }));
+        },
         onFileWritten: (p) => patchAssistant(assistantId, (m) => ({ ...m, files: [...(m.files || []), p].filter((v, i, a) => a.indexOf(v) === i) })),
         onVerifyStart: () => patchAssistant(assistantId, (m) => ({ ...m, verifying: true, progress: [...m.progress, { status: 'running', text: '自检产物中…' }] })),
         onQuestion: (id, question, options) => patchAssistant(assistantId, (m) => ({ ...m, status: 'awaiting_approval', question: { id, question, options } })),
@@ -171,7 +177,7 @@ export function App() {
         onError: (msg) => { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: msg })); },
       });
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: (error as Error).message })); }
-  }, [autoApprove, chatEnabled, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
+  }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
@@ -224,12 +230,12 @@ export function App() {
   const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
 
   const commands = useMemo<Command[]>(() => [
-    { id: 'new', label: '新建对话', run: conversations.newConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'plan', label: planMode ? '关闭计划模式' : '开启计划模式', run: () => setPlanMode((v) => !v) },
-    { id: 'auto', label: autoApprove ? '关闭自动批准' : '开启自动批准', run: () => setAutoApprove((v) => !v) }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
+    { id: 'new', label: '新建对话', run: conversations.newConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
+    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-yolo', label: '模式：YOLO（自动批准一切）', run: () => setMode('yolo') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
     { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
     { id: 'settings', label: 'API 设置', run: () => openSettings('api') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
-  ], [autoApprove, autoClarify, conversations.newConversation, doLogout, openSettings, planMode, theme, toggleTheme]);
+  ], [autoClarify, conversations.newConversation, doLogout, openSettings, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
   if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;
@@ -238,7 +244,7 @@ export function App() {
     <div className="app-shell">
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
-        <AppHeader autoApprove={autoApprove} panel={panel} planMode={planMode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetAutoApprove={setAutoApprove} onSetPlanMode={setPlanMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
+        <AppHeader mode={mode} panel={panel} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetMode={setMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
         <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>

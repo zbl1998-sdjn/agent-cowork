@@ -22,17 +22,15 @@ function collectByType(node: ReactNode, type: unknown): ReactElement<Record<stri
 
 function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parameters<typeof AppHeader>[0] {
   return {
-    autoApprove: false,
+    mode: 'execute',
     panel: 'memory',
-    planMode: true,
     theme: 'dark',
     trustedRoot: 'C:/work',
     user: { userId: 'u1', tenantId: 't1', username: 'demo' },
     onLogout: vi.fn(),
     onOpenCommandPalette: vi.fn(),
     onOpenSettings: vi.fn(),
-    onSetAutoApprove: vi.fn(),
-    onSetPlanMode: vi.fn(),
+    onSetMode: vi.fn(),
     onTogglePanel: vi.fn(),
     onToggleTheme: vi.fn(),
     ...overrides,
@@ -43,45 +41,45 @@ describe('AppHeader', () => {
   it('renders header actions with Button primitives', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(14);
+    // ⌘K + theme + 3 mode buttons + 8 panels + settings + logout = 15
+    expect(html.match(/class="ui-btn /g)?.length).toBe(15);
     expect(html).toContain('Agent Cowork');
     expect(html).toContain('header-user');
     expect(html).toContain('ui-btn--secondary');
     expect(html).toContain('is-active');
+    expect(html).toContain('mode-switch');
   });
 
   it('keeps header action callbacks wired', () => {
     const onOpenCommandPalette = vi.fn();
     const onToggleTheme = vi.fn();
-    const onSetPlanMode = vi.fn();
-    const onSetAutoApprove = vi.fn();
+    const onSetMode = vi.fn();
     const onTogglePanel = vi.fn();
     const onOpenSettings = vi.fn();
     const onLogout = vi.fn();
     const componentProps = props({
       onOpenCommandPalette,
       onToggleTheme,
-      onSetPlanMode,
-      onSetAutoApprove,
+      onSetMode,
       onTogglePanel,
       onOpenSettings,
       onLogout,
     });
     const buttons = collectByType(AppHeaderActions(componentProps), Button);
 
-    expect(buttons).toHaveLength(14);
+    expect(buttons).toHaveLength(15);
     buttons[0].props.onClick();
     buttons[1].props.onClick();
-    buttons.find((button) => button.props.children === '计划模式·开')?.props.onClick();
-    buttons.find((button) => button.props.children === '自动批准·关')?.props.onClick();
+    buttons.find((button) => button.props.children === '计划')?.props.onClick();
+    buttons.find((button) => button.props.children === 'YOLO')?.props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();
     buttons.find((button) => button.props.children === '⚙ 设置')?.props.onClick();
     buttons.find((button) => button.props.children === '退出')?.props.onClick();
 
     expect(onOpenCommandPalette).toHaveBeenCalledOnce();
     expect(onToggleTheme).toHaveBeenCalledOnce();
-    expect(onSetPlanMode).toHaveBeenCalledWith(false);
-    expect(onSetAutoApprove).toHaveBeenCalledWith(true);
+    expect(onSetMode).toHaveBeenCalledWith('plan');
+    expect(onSetMode).toHaveBeenCalledWith('yolo');
     expect(onTogglePanel).toHaveBeenCalledWith('memory' satisfies SidePanel);
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onLogout).toHaveBeenCalledOnce();
