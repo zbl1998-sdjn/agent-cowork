@@ -93,14 +93,33 @@ function sourceRefsFromRecord(record: RunRecord): SourceRef[] {
 }
 
 function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
-  const rows = (record.events || []).flatMap((event) => {
+  const rows: ObservabilityRow[] = [];
+  for (const event of (record.events || [])) {
     const source = event as Record<string, unknown>;
-    if (text(source.type) !== 'tool_call') return [];
-    const name = text(source.name || source.tool);
-    if (!name) return [];
-    const reason = text(source.reason || source.why || source.rationale || source.detail || source.text) || '原因未记录';
-    return [{ label: name, value: reason }];
-  });
+    // Legacy event shape: { type:'tool_call', name, reason/why/rationale/... }
+    if (text(source.type) === 'tool_call') {
+      const name = text(source.name || source.tool);
+      if (!name) continue;
+      const reason = text(source.reason || source.why || source.rationale || source.detail || source.text) || '原因未记录';
+      rows.push({ label: name, value: reason });
+      continue;
+    }
+    // Current RunTrace shape: { kind:'tool_decision', step, modelMessage:{ content, tool_calls:[{function:{name,arguments}}] } }
+    // The reason is the assistant's text BEFORE calling the tool (modelMessage.content),
+    // and one row per tool call so the panel groups by tool name.
+    if (text(source.kind) === 'tool_decision') {
+      const modelMessage = source.modelMessage as Record<string, unknown> | null | undefined;
+      if (!modelMessage || typeof modelMessage !== 'object') continue;
+      const reason = text(modelMessage.content) || '(无推理文本)';
+      const calls = Array.isArray(modelMessage.tool_calls) ? (modelMessage.tool_calls as unknown[]) : [];
+      for (const call of calls) {
+        const fn = (call as { function?: { name?: unknown } } | null | undefined)?.function;
+        const name = text(fn?.name);
+        if (!name) continue;
+        rows.push({ label: name, value: reason });
+      }
+    }
+  }
   const seen = new Set<string>();
   return rows.filter((item) => {
     const key = `${item.label}:${item.value}`;
@@ -108,6 +127,21 @@ function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
     seen.add(key);
     return true;
   });
+}
+
+// Tokens may sit at metrics.tokens (preferred) OR — when the host only records
+// the agent outcome — under result.usage (OpenAI-compatible {prompt_tokens,
+// completion_tokens, total_tokens}). Read both so the card stops saying '—'.
+function resolveTokensFromRecord(record: RunRecord): Record<string, unknown> {
+  const metrics = (record.metrics || {}) as Record<string, unknown>;
+  const fromMetrics = metrics.tokens as Record<string, unknown> | undefined;
+  if (fromMetrics && typeof fromMetrics === 'object') return fromMetrics;
+  const result = (record as unknown as Record<string, unknown>).result;
+  if (result && typeof result === 'object') {
+    const usage = (result as Record<string, unknown>).usage;
+    if (usage && typeof usage === 'object') return usage as Record<string, unknown>;
+  }
+  return {};
 }
 
 export function selectInitialRunId(records: Array<Pick<RunRecord, 'id'>>, currentId: string | null): string | null {
@@ -119,7 +153,7 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
   const safeRecord: RunRecord = record || { id: '', type: 'run', status: 'unknown' };
   const metrics = safeRecord.metrics || {};
   const attribution = safeRecord.attribution || {};
-  const tokens = metrics.tokens || {};
+  const tokens = resolveTokensFromRecord(safeRecord);
   const cost = metrics.cost;
   const tools = metrics.tools || {};
   const failures = metrics.failures || {};
