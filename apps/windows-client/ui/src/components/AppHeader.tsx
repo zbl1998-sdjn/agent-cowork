@@ -1,6 +1,7 @@
 import type { AuthIdentity } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
 import { Button } from './ui/Button';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export type AgentMode = 'plan' | 'execute' | 'yolo';
 
@@ -20,11 +21,12 @@ interface AppHeaderProps {
   onOpenCommandPalette: () => void;
   onOpenSettings: () => void;
   onSetMode: (value: AgentMode) => void;
+  onSwitchWorkspace: (path: string) => void;
   onTogglePanel: (panel: SidePanel) => void;
   onToggleTheme: () => void;
 }
 
-type AppHeaderActionsProps = Omit<AppHeaderProps, 'trustedRoot'>;
+type AppHeaderActionsProps = Omit<AppHeaderProps, 'trustedRoot' | 'onSwitchWorkspace'>;
 
 const panelButtons: Array<{ panel: Exclude<SidePanel, 'none'>; label: string }> = [
   { panel: 'tools', label: '工具' },
@@ -86,6 +88,7 @@ export function AppHeader({
   onOpenCommandPalette,
   onOpenSettings,
   onSetMode,
+  onSwitchWorkspace,
   onTogglePanel,
   onToggleTheme,
 }: AppHeaderProps) {
@@ -93,7 +96,7 @@ export function AppHeader({
     <header className="app-header">
       <span className="brand-dot" aria-hidden="true" />
       <h1>Agent Cowork</h1>
-      <span className="workspace-path">{trustedRoot}</span>
+      <WorkspaceSwitcher current={trustedRoot} onSwitch={onSwitchWorkspace} />
       <AppHeaderActions
         mode={mode}
         panel={panel}

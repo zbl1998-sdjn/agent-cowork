@@ -31,6 +31,7 @@ function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parame
     onOpenCommandPalette: vi.fn(),
     onOpenSettings: vi.fn(),
     onSetMode: vi.fn(),
+    onSwitchWorkspace: vi.fn(),
     onTogglePanel: vi.fn(),
     onToggleTheme: vi.fn(),
     ...overrides,
@@ -41,9 +42,10 @@ describe('AppHeader', () => {
   it('renders header actions with Button primitives + a mode dropdown', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    // ⌘K + theme + 8 panels + settings + logout = 12 (the 3 mode buttons are
-    // gone — replaced by a single <select> so the current mode is always visible).
-    expect(html.match(/class="ui-btn /g)?.length).toBe(12);
+    // workspace-chip + ⌘K + theme + 8 panels + settings + logout = 13
+    // (the 3 mode buttons are gone — replaced by a single <select> so the
+    // current mode is always visible.)
+    expect(html.match(/class="ui-btn /g)?.length).toBe(13);
     expect(html).toContain('Agent Cowork');
     expect(html).toContain('header-user');
     expect(html).toContain('ui-btn--secondary');
@@ -52,6 +54,8 @@ describe('AppHeader', () => {
     expect(html).toContain('模式·计划');
     expect(html).toContain('模式·执行');
     expect(html).toContain('模式·YOLO');
+    expect(html).toContain('workspace-switcher');
+    expect(html).toContain('workspace-chip');
   });
 
   it('keeps header action callbacks wired', () => {

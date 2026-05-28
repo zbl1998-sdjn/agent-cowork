@@ -984,3 +984,50 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 .sc-id { font-weight: 600; color: var(--text); }
 .sc-detail { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-warn { border-color: #e0a10644; background: #e0a1060d; }
+
+/* === Viz panel polish (templates + json error) === */
+.viz-templates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.viz-templates-label { font-size: 12px; color: #6b6f66; }
+.viz-json-error { color: #c0392b; background: #fdecea; border: 1px solid #f5c6c0; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin: 6px 0 8px; }
+[data-theme="dark"] .viz-json-error { background: #3a1f1c; border-color: #5c2e29; color: #ff8d76; }
+
+/* === Live artifact toolbar (zoom / size / fullscreen / export) === */
+.live-artifact-toolbar { flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.viz-toolbar-label { font-size: 12px; color: #6b6f66; margin-right: 2px; }
+.viz-toolbar-sep { color: #cfcdc5; padding: 0 2px; }
+.viz-zoom-value { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 42px; text-align: center; color: #4a4e46; }
+[data-theme="dark"] .viz-toolbar-label, [data-theme="dark"] .viz-zoom-value { color: #a8aca0; }
+
+/* === Live artifact frame: zoomable scrolling box === */
+.viz-frame-wrapper { overflow: auto; border: 1px solid #d9ded5; border-radius: 8px; background: #fff; margin-top: 8px; }
+.viz-frame-inner { min-width: 100%; min-height: 100%; }
+.viz-frame { display: block; border: 0; background: #fff; }
+[data-theme="dark"] .viz-frame-wrapper { background: #1f1f1c; border-color: #2c2c28; }
+[data-theme="dark"] .viz-frame { background: transparent; }
+.live-artifact-view.is-fullscreen { position: fixed; inset: 0; z-index: 9999; background: #f5f6f2; padding: 16px; overflow: auto; box-shadow: 0 0 0 9999px rgba(0,0,0,.4); }
+[data-theme="dark"] .live-artifact-view.is-fullscreen { background: #1a1a17; }
+
+/* === Workspace switcher (header chip + popup) === */
+.workspace-switcher { position: relative; display: inline-flex; align-items: center; margin-right: 6px; }
+.workspace-chip { font-size: 12px; padding: 5px 10px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-popup {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 50;
+  min-width: 320px; max-width: 92vw;
+  background: #fff; border: 1px solid #d9ded5; border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.16); padding: 12px;
+}
+[data-theme="dark"] .workspace-popup { background: #232320; border-color: #3a3a35; box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+.workspace-popup-label { display: block; font-size: 11px; color: #6b6f66; margin-bottom: 4px; }
+.workspace-input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #d9ded5; border-radius: 7px; font-size: 13px; font-family: ui-monospace, Consolas, monospace; }
+[data-theme="dark"] .workspace-input { background: #1a1a17; color: var(--text); border-color: #3a3a35; }
+.workspace-popup-actions { display: flex; gap: 6px; margin-top: 8px; }
+.workspace-popup-sep { margin-top: 10px; font-size: 11px; color: #6b6f66; border-top: 1px solid #ececea; padding-top: 8px; }
+[data-theme="dark"] .workspace-popup-sep { border-color: #3a3a35; color: #a8aca0; }
+.workspace-recents { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; max-height: 180px; overflow-y: auto; }
+.workspace-recents button { width: 100%; text-align: left; padding: 6px 8px; border: 1px solid transparent; background: transparent; border-radius: 6px; cursor: pointer; font-size: 12px; color: #4a4e46; font-family: ui-monospace, Consolas, monospace; }
+.workspace-recents button:hover { background: #f0eee9; }
+.workspace-recents button.is-current { background: #f3eee9; border-color: #c96442; color: #c96442; }
+[data-theme="dark"] .workspace-recents button { color: #c4c8be; }
+[data-theme="dark"] .workspace-recents button:hover { background: #2c2c28; }
+[data-theme="dark"] .workspace-recents button.is-current { background: rgba(201,100,66,.18); color: #ff9b78; border-color: #c96442; }
+.workspace-popup-hint { margin: 10px 0 0; font-size: 11px; color: #8a8f84; }

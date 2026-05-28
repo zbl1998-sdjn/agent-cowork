@@ -59,10 +59,15 @@ export function App() {
     starters,
     theme,
     toggleTheme,
-    trustedRoot,
+    trustedRoot: hostTrustedRoot,
     upsertRecipe,
     user,
   } = useAppRuntimeState();
+  // Workspace switcher: a user-chosen override beats the host's default. Every
+  // call below already passes `trustedRoot` per-request, so the host validates
+  // it via path-policy — the UI just decides what to send.
+  const [workspaceOverride, setWorkspaceOverride] = useState<string | null>(null);
+  const trustedRoot = workspaceOverride || hostTrustedRoot;
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -244,7 +249,7 @@ export function App() {
     <div className="app-shell">
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
-        <AppHeader mode={mode} panel={panel} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetMode={setMode} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
+        <AppHeader mode={mode} panel={panel} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
         <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
         <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
       </div>
