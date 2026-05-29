@@ -5,6 +5,7 @@ import { listRecipes } from '../recipes/registry.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
 import { webFetch } from './web-fetch.js';
+import { webSearch } from './web-search.js';
 import { createGitReadOnlyBuiltinTools } from './dev/git.js';
 import { profileDataFile } from './data/profile.js';
 import { analyzeDataFile } from './data/report.js';
@@ -86,6 +87,34 @@ export function createBuiltinTools({
       inputSchema: { type: 'object', properties: { url: { type: 'string' }, maxBytes: { type: 'number' }, timeoutMs: { type: 'number' } }, required: ['url'] },
       handler: async (args = {}) =>
         webFetch({ url: args.url, timeoutMs: args.timeoutMs, maxBytes: args.maxBytes, allowInternal: args.allowInternal === true, fetchImpl: /** @type {any} */ (fetchImpl) }),
+    });
+    // P1-A: hard-code the current month into the description so the model
+    // uses the right year in queries. Without this it tends to default to
+    // training-cutoff dates (Kimi K2 baseline 2024-end).
+    const now = new Date();
+    const monthYear = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
+    tools.push({
+      name: 'WebSearch',
+      description: `联网搜索关键词 → 返回 5-8 条结果(每条含标题/URL/摘要)。当前是 ${monthYear},搜"最新/今天/最近"相关话题务必带当前年份(${now.getFullYear()})避免拉到 ${now.getFullYear() - 2} 年的旧结果。需要查最新信息(新闻、文档版本、价格、是否还活着)优先用 WebSearch;给定确切 URL 再用 web.fetch。`,
+      source: 'builtin',
+      risk: 'low',
+      mutating: false,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '搜索关键词,建议带年份' },
+          maxResults: { type: 'number', description: '返回结果数, 默认 8,最大 20' },
+          provider: { type: 'string', description: 'ddg(默认免费)/bing/tavily(需 API key)' },
+        },
+        required: ['query'],
+      },
+      handler: async (args = {}) =>
+        webSearch({
+          query: args.query,
+          maxResults: args.maxResults,
+          provider: args.provider,
+          fetchImpl: /** @type {any} */ (fetchImpl),
+        }),
     });
   }
 
