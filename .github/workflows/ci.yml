@@ -10,21 +10,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ── Job 1: Architecture & Quality Gates ────────────────────────────────────
   check:
     name: Architecture & Quality Gates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: L0-L4 Architecture compliance
         run: npm run check:arch
@@ -51,15 +53,14 @@ jobs:
       matrix:
         node-version: ["20", "22"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run host unit tests
         run: |
@@ -70,14 +71,8 @@ jobs:
             --import ../../test-setup.mjs \
             "test/*.test.js"
         env:
-          # Open auth gate so tokenless functional tests are not 401'd.
-          # auth-gate.test.js still verifies the gate by setting requireAuth:true.
           KCW_REQUIRE_AUTH: "false"
-          # Legacy multi-tenant tests pass tenant headers for isolation checks.
           KCW_TRUST_IDENTITY_HEADERS: "true"
-          # Use in-memory auth store; no auth.sqlite written to disk.
           KCW_AUTH_PERSIST: "false"
-          # Disable external Kimi API calls in unit tests.
           KCW_KIMI_API_KEY: ""
-          # Keep sandbox in local (non-Docker) mode so CI doesn't need Docker daemon.
           KCW_SANDBOX_DOCKER_IMAGE: ""
