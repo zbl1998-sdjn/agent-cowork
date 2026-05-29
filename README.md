@@ -1,5 +1,11 @@
 # Agent Cowork
 
+[![CI](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml/badge.svg)](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+![Tests](https://img.shields.io/badge/tests-703%20passing-brightgreen)
+![Security](https://img.shields.io/badge/red%20team-no%20high%20severity-success)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 一个生产级 Agentic Cowork 系统，让 AI Agent 真正帮你完成本地文件操作、代码执行和跨工具协作任务。
 
 **核心能力：**
