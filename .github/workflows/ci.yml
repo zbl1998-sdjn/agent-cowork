@@ -25,8 +25,11 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: npm install
+
+      - name: Install UI dependencies (provides TypeScript for host type-check)
+        run: npm install --prefix apps/windows-client/ui
 
       - name: L0-L4 Architecture compliance
         run: npm run check:arch
