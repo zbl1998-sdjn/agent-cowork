@@ -1,6 +1,7 @@
 // @ts-check
 import { createAgentTools } from '../agent-tools.js';
 import { buildSystemPrompt } from '../system-prompt.js';
+import { resolveAgentEnvFacts } from '../agent-env.js';
 import { defaultAgentModelCall } from '../model-call.js';
 import { ensureExitPlanModeTool, makeAudit } from './approval-gate.js';
 import {
@@ -62,7 +63,8 @@ export async function runAgentChat(options) {
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   const resumed = resumeState;
   const resumeUsage = (resumed && resumed.usage) || {};
-  const defaultMessages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode }) }, userMessage];
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const defaultMessages = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode, env: envFacts }) }, userMessage];
   /** @type {ChatMessage[]} */
   let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   /** @type {Array<Record<string, unknown>>} */

@@ -3,18 +3,51 @@
 // skills/memory injection + inline-viz/suggestions hints. Pure (no I/O), so it
 // is trivially unit-testable and kept out of the agent loop module.
 
-export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v1';
+export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v2';
+
+const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
+const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
 /**
  * @typedef {{ id: string, name: string, description?: string }} SkillDescriptor
+ * @typedef {{ now?: Date, trustedRoot?: string, osName?: string, appVersion?: string, provider?: string, model?: string }} EnvFacts
  */
 
 /**
- * @param {{ memoryText?: string, skills?: SkillDescriptor[], planMode?: boolean, developerMode?: boolean }} [options]
+ * Render the env block that pins the model to real-world facts: today's date,
+ * working directory, OS, app version, current model. Without this block the
+ * model answers "what year is it?" from its training cutoff (Kimi K2: ~2024-end).
+ * Designed to live at the very TOP of the system prompt so it survives any
+ * context-window compaction.
+ *
+ * @param {EnvFacts} facts
+ * @returns {string[]} lines (caller joins with '\n')
+ */
+export function buildEnvBlock({ now = new Date(), trustedRoot = '', osName = '', appVersion = '', provider = '', model = '' } = {}) {
+  const yyyy = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const weekday = WEEKDAYS_ZH[now.getDay()];
+  const monthLong = MONTHS_ZH[now.getMonth()];
+  const dateLine = `今天:${yyyy}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}(星期${weekday},${yyyy} 年 ${monthLong})`;
+  const lines = ['<env>', dateLine];
+  if (trustedRoot) lines.push(`工作目录:${trustedRoot}`);
+  if (osName) lines.push(`操作系统:${osName}`);
+  if (appVersion) lines.push(`应用版本:Agent Cowork v${appVersion}`);
+  if (provider || model) lines.push(`当前模型:${[provider, model].filter(Boolean).join(' / ')}`);
+  lines.push('</env>');
+  lines.push('上面 <env> 块给出的是真实世界的当前时间和环境,凡是涉及"今天/最近/现在"的问题都以此为准,不要凭训练截止时间猜测。');
+  return lines;
+}
+
+/**
+ * @param {{ memoryText?: string, skills?: SkillDescriptor[], planMode?: boolean, developerMode?: boolean, env?: EnvFacts }} [options]
  * @returns {string}
  */
-export function buildSystemPrompt({ memoryText = '', skills = [], planMode = false, developerMode = false } = {}) {
+export function buildSystemPrompt({ memoryText = '', skills = [], planMode = false, developerMode = false, env } = {}) {
   const lines = [
+    ...buildEnvBlock(env || {}),
+    '',
     '你是 Agent Cowork，一个运行在用户本地电脑上的 AI 助手。',
     '你可以调用提供的工具来读写工作区文件、运行命令、抓取网页、调用已连接的外部连接器(MCP)，真正完成用户的任务，而不只是给建议。',
     '文件工具：Read 读文件、Glob 找文件、Grep 搜内容、Write 写文件、Edit 精确替换；需要跑命令用 Shell；需要联网用 WebFetch；外部能力用 mcp__ 开头的工具。所有文件操作限定在工作区内。',
