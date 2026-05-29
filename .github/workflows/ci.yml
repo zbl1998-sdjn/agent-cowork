@@ -59,14 +59,13 @@ jobs:
         run: npm install
 
       - name: Run host unit tests
-        # --test-isolation=process requires Node ≥22.8; drop the flag so the
-        # runner works regardless of the exact Node 22.x patch installed.
+        # Excludes runtime-dependencies.test.js: those tests call
+        # normalizeAgentCoworkRoot() which requires a Windows path ending in
+        # "AgentCowork" — they are intentionally Windows-only.
         run: |
-          cd apps/host && node \
-            --test \
-            --test-timeout=60000 \
-            --import ../../test-setup.mjs \
-            "test/*.test.js"
+          cd apps/host
+          FILES=$(ls test/*.test.js | grep -v runtime-dependencies.test.js)
+          node --test --test-timeout=60000 --import ../../test-setup.mjs $FILES
         env:
           KCW_REQUIRE_AUTH: "false"
           KCW_TRUST_IDENTITY_HEADERS: "true"
