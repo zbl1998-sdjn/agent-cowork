@@ -8,7 +8,7 @@ export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-pro
 /**
  * @typedef {{ usage?: unknown, choices?: Array<{ message?: { content?: unknown }, delta?: { content?: unknown, reasoning_content?: unknown } }> }} KimiPayload
  * @typedef {{ ok: boolean, provider: string, model: string, mode: string, text: string, durationMs: number, usage?: unknown }} KimiTextResult
- * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider?: unknown, timeoutMs?: unknown, maxTokens?: unknown, fetchImpl?: typeof fetch, userAgent?: unknown, temperature?: unknown, promptBuilder?: (options: { prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }) => string, resultMode?: string }} KimiTextOptions
+ * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown, systemMessage?: string, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider?: unknown, timeoutMs?: unknown, maxTokens?: unknown, fetchImpl?: typeof fetch, userAgent?: unknown, temperature?: unknown, promptBuilder?: (options: { prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }) => string, resultMode?: string }} KimiTextOptions
  * @typedef {KimiTextOptions & { onToken?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} KimiStreamOptions
  */
 
@@ -152,6 +152,7 @@ export async function runKimiApiChatStream({
   prompt,
   summary = '',
   memory = '',
+  systemMessage = '',
   apiKey,
   baseUrl = DEFAULT_BASE_URL,
   model = DEFAULT_MODEL,
@@ -193,7 +194,11 @@ export async function runKimiApiChatStream({
       headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
-        messages: [{ role: 'user', content: apiPrompt }],
+        // Prepend the system message (env block etc.) when present so the
+        // model gets today's-date grounding before the user content.
+        messages: systemMessage
+          ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
+          : [{ role: 'user', content: apiPrompt }],
         ...(Number.isFinite(temperature) ? { temperature } : {}),
         max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         stream: true,

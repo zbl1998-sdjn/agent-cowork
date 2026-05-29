@@ -1,6 +1,8 @@
 // @ts-check
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { buildEnvBlock } from './system-prompt.js';
+import { resolveAgentEnvFacts } from './agent-env.js';
 
 // SSE streaming chat with cancellation support: opens text/event-stream, emits
 // `start`, a `token` frame per delta, then `done` (or `cancelled`/`error`), and
@@ -13,7 +15,7 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
  * @typedef {{ prompt?: unknown, summary?: unknown, thinking?: unknown, model?: unknown }} StreamBody
  * @typedef {{ provider?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown }} KimiConfig
  * @typedef {{ text?: string, model?: unknown, usage?: unknown }} StreamResult
- * @typedef {{ prompt?: unknown, summary?: unknown, thinking?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider: string, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown, signal?: AbortSignal, onToken(delta: string): void, onReasoning(delta: string): void }} StreamRunnerInput
+ * @typedef {{ systemMessage?: string, prompt?: unknown, summary?: unknown, thinking?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider: string, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown, signal?: AbortSignal, onToken(delta: string): void, onReasoning(delta: string): void }} StreamRunnerInput
  * @typedef {(input: StreamRunnerInput) => Promise<StreamResult> | StreamResult} StreamRunner
  * @typedef {{ upsert(summary: unknown, context?: RequestContext): unknown }} RunsIndexLike
  * @typedef {{ register(runId: string): AbortController, done(runId: string): unknown }} CancellationLike
@@ -85,9 +87,17 @@ export async function streamChat({
     return runPath;
   };
 
+  // Stamp a system message with today's real-world date / cwd / OS / model so
+  // chat mode (the simple non-agent endpoint) also gets the env-block grounding
+  // that agent mode picks up via buildSystemPrompt. Without this, "今天几号"
+  // would fall back to the model's training cutoff (Kimi K2: 2024-end).
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const systemMessage = buildEnvBlock(envFacts).join('\n');
+
   let text = '';
   try {
     const result = await streamRunner({
+      systemMessage,
       prompt: body.prompt,
       summary: body.summary,
       thinking: body.thinking,
