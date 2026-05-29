@@ -104,7 +104,7 @@ export function createBuiltinTools({
         properties: {
           query: { type: 'string', description: '搜索关键词,建议带年份' },
           maxResults: { type: 'number', description: '返回结果数, 默认 8,最大 20' },
-          provider: { type: 'string', description: 'ddg(默认免费)/bing/tavily(需 API key)' },
+          provider: { type: 'string', description: 'auto(默认,先 DDG 失败回退 Bing)/ddg/bing/tavily(需 API key)' },
         },
         required: ['query'],
       },
@@ -112,7 +112,7 @@ export function createBuiltinTools({
         webSearch({
           query: args.query,
           maxResults: args.maxResults,
-          provider: args.provider,
+          provider: args.provider || 'auto',
           fetchImpl: /** @type {any} */ (fetchImpl),
         }),
     });

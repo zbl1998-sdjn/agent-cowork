@@ -12,8 +12,10 @@
 // where Result = { title, url, snippet }
 import { assertPublicHost } from './ssrf-guard.js';
 import { parseDdgLiteResults } from './search-providers/ddg.js';
+import { parseBingResults } from './search-providers/bing.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
+const DDG_PROBE_TIMEOUT_MS = 5_000; // fail-fast on DDG so the auto-fallback to Bing doesn't make the user wait the full 12s
 const DEFAULT_MAX_RESULTS = 8;
 const RESULT_HARD_CAP = 20;
 
@@ -65,26 +67,38 @@ export async function webSearch(options = {}) {
     throw fail('no fetch implementation available', 500);
   }
 
-  if (providerName === 'ddg') {
-    return searchViaDdg({
-      query,
-      maxResults,
-      fetchImpl,
-      lookupImpl: options.lookupImpl,
-      allowInternal: options.allowInternal === true,
-      timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
-    });
+  const baseArgs = {
+    query,
+    maxResults,
+    fetchImpl,
+    lookupImpl: options.lookupImpl,
+    allowInternal: options.allowInternal === true,
+    timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
+  };
+
+  if (providerName === 'ddg') return searchViaDdg(baseArgs);
+  if (providerName === 'bing') return searchViaBing(baseArgs);
+
+  if (providerName === 'auto') {
+    // Try DDG with a short timeout first (DDG often connect-times-out from
+    // mainland China — wait 5s max, not the full 12s, before falling back).
+    try {
+      const ddg = await searchViaDdg({ ...baseArgs, timeoutMs: DDG_PROBE_TIMEOUT_MS });
+      if (ddg.ok && ddg.results.length > 0) return ddg;
+    } catch {
+      // DDG unreachable — fall through to Bing.
+    }
+    return searchViaBing(baseArgs);
   }
 
-  // Bing / Tavily / other providers are stubbed — they require an API key
-  // from Settings and will land in a follow-up commit. Return an empty list
-  // with a clear note so the model can fall back to ddg or tell the user.
+  // Tavily / other paid providers stubbed — they require an API key from
+  // Settings and will land in a follow-up commit.
   return {
     ok: false,
     provider: providerName,
     query,
     results: [],
-    note: `provider '${providerName}' is not configured yet — set search provider to 'ddg' in Settings, or wait for the Bing/Tavily integration.`,
+    note: `provider '${providerName}' is not configured yet — use 'auto' (default), 'ddg' or 'bing', or set up Tavily in Settings.`,
   };
 }
 
@@ -137,5 +151,53 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
     query,
     results,
     ...(results.length ? {} : { note: 'No results parsed from DDG response (page layout may have changed).' }),
+  };
+}
+
+/**
+ * Bing HTML SERP — practical fallback for users who can't reach DDG
+ * (mainland China etc.). Public, key-free, mostly stable HTML.
+ *
+ * @param {{ query: string, maxResults: number, fetchImpl: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown, allowInternal: boolean, timeoutMs: number }} args
+ * @returns {Promise<WebSearchResponse>}
+ */
+async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }) {
+  const url = new URL('https://www.bing.com/search');
+  url.searchParams.set('q', query);
+  url.searchParams.set('count', String(Math.min(maxResults * 2, 20)));
+  if (!allowInternal) {
+    await assertPublicHost(url.hostname, { lookupImpl });
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetchImpl(url.toString(), {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') {
+      throw fail(`bing search timed out after ${timeoutMs}ms`, 504);
+    }
+    throw fail(`bing search request failed: ${String(/** @type {Error} */ (err).message || err)}`, 502);
+  }
+  clearTimeout(timeout);
+  if (!response.ok) {
+    throw fail(`bing returned HTTP ${response.status}`, 502);
+  }
+  const html = await response.text();
+  const results = parseBingResults(html, maxResults);
+  return {
+    ok: true,
+    provider: 'bing',
+    query,
+    results,
+    ...(results.length ? {} : { note: 'No results parsed from Bing response (page layout may have changed).' }),
   };
 }

@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseDdgLiteResults, unwrapDdgRedirect } from '../src/tools/search-providers/ddg.js';
+import { parseBingResults } from '../src/tools/search-providers/bing.js';
 import { webSearch } from '../src/tools/web-search.js';
+
+const FIXTURE_BING = `
+<html><body>
+<ol id="b_results">
+  <li class="b_algo">
+    <h2><a href="https://www.anthropic.com/news/claude-4">Anthropic releases Claude 4</a></h2>
+    <div class="b_caption"><p>Anthropic announced Claude 4 with improved long-context reasoning.</p></div>
+  </li>
+  <li class="b_algo">
+    <h2><a href="https://blog.moonshot.cn/kimi-k2">Kimi K2 上线</a></h2>
+    <div class="b_caption"><p>Moonshot AI 发布 Kimi K2,中文推理能力提升 18%。</p></div>
+  </li>
+  <li class="b_pag"><!-- pagination, skip --></li>
+</ol>
+</body></html>
+`;
 
 const FIXTURE_DDG_LITE = `
 <html><body>
@@ -71,11 +88,66 @@ test('webSearch via DDG returns normalized results using injected fetch', async 
   assert.equal(out.results[0].url, 'https://www.anthropic.com/news/claude-4');
 });
 
-test('webSearch returns ok:false + note for unconfigured providers (bing/tavily)', async () => {
-  const out = await webSearch({ query: 'test', provider: 'bing' });
-  assert.equal(out.ok, false);
+test('parseBingResults extracts title/url/snippet per b_algo block, skips pagination', () => {
+  const results = parseBingResults(FIXTURE_BING, 8);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].url, 'https://www.anthropic.com/news/claude-4');
+  assert.match(results[0].title, /Claude 4/);
+  assert.match(results[0].snippet, /long-context/);
+  assert.equal(results[1].url, 'https://blog.moonshot.cn/kimi-k2');
+  assert.match(results[1].title, /Kimi K2/);
+});
+
+test('parseBingResults returns [] for empty / malformed HTML', () => {
+  assert.deepEqual(parseBingResults('', 8), []);
+  assert.deepEqual(parseBingResults('<html>no algos here</html>', 8), []);
+});
+
+test('webSearch via bing returns normalized results using injected fetch', async () => {
+  const fakeFetch = async () => ({ ok: true, status: 200, text: async () => FIXTURE_BING });
+  const out = await webSearch({
+    query: 'test',
+    provider: 'bing',
+    fetchImpl: /** @type {any} */ (fakeFetch),
+    lookupImpl: async () => '8.8.8.8',
+    maxResults: 5,
+  });
+  assert.equal(out.ok, true);
   assert.equal(out.provider, 'bing');
-  assert.equal(out.results.length, 0);
+  assert.equal(out.results.length, 2);
+});
+
+test('webSearch auto provider falls back to bing when DDG fails', async () => {
+  let calls = 0;
+  const fakeFetch = async (url) => {
+    calls += 1;
+    if (String(url).includes('duckduckgo')) {
+      const err = new Error('connect timeout');
+      throw err;
+    }
+    if (String(url).includes('bing.com')) {
+      return { ok: true, status: 200, text: async () => FIXTURE_BING };
+    }
+    throw new Error('unexpected url ' + url);
+  };
+  const out = await webSearch({
+    query: 'test',
+    // omit provider -> defaults to 'auto' via the handler; here we set it explicitly
+    provider: 'auto',
+    fetchImpl: /** @type {any} */ (fakeFetch),
+    lookupImpl: async () => '8.8.8.8',
+    maxResults: 5,
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.provider, 'bing', 'should have fallen back to bing after DDG failed');
+  assert.equal(out.results.length, 2);
+  assert.ok(calls >= 2, 'expected both DDG attempt and Bing fallback to fire');
+});
+
+test('webSearch returns ok:false + note for unknown providers (tavily etc.)', async () => {
+  const out = await webSearch({ query: 'test', provider: 'tavily' });
+  assert.equal(out.ok, false);
+  assert.equal(out.provider, 'tavily');
   assert.match(out.note || '', /not configured/);
 });
 
