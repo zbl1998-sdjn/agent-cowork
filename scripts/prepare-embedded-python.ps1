@@ -84,16 +84,76 @@ function Update-PythonPathFile {
         throw "Embedded Python ._pth file not found under $PythonHome"
     }
     $lines = Get-Content -LiteralPath $pth.FullName
+    $changed = $false
     if (-not ($lines -contains "Lib\site-packages")) {
-        $insertAt = [Math]::Max(0, $lines.Count - 1)
-        $updated = @()
-        if ($insertAt -gt 0) {
-            $updated += $lines[0..($insertAt - 1)]
-        }
-        $updated += "Lib\site-packages"
-        $updated += $lines[$insertAt..($lines.Count - 1)]
-        Set-Content -LiteralPath $pth.FullName -Encoding ascii -Value $updated
+        $lines = @($lines + "Lib\site-packages")
+        $changed = $true
     }
+    # Embedded Python ships with `#import site` commented out, which freezes
+    # sys.path to just python312.zip + the ._pth entries — that means pip
+    # CAN'T find its own modules even after `pip install`. Flip it to
+    # `import site` so packages installed into Lib\site-packages are
+    # actually importable.
+    $hasImportSite = $false
+    $resolved = @()
+    foreach ($line in $lines) {
+        if ($line -eq "import site") { $hasImportSite = $true }
+        if ($line -eq "#import site") {
+            $resolved += "import site"
+            $hasImportSite = $true
+            $changed = $true
+        } else {
+            $resolved += $line
+        }
+    }
+    if (-not $hasImportSite) {
+        $resolved += "import site"
+        $changed = $true
+    }
+    if ($changed) {
+        Set-Content -LiteralPath $pth.FullName -Encoding ascii -Value $resolved
+    }
+}
+
+function Install-PipBootstrap {
+    param(
+        [Parameter(Mandatory = $true)][string]$PythonExe,
+        [Parameter(Mandatory = $true)][string]$CacheDir
+    )
+    # Embedded Python doesn't ship pip. Bootstrap it via the official get-pip.py
+    # shim — kept in our cache after first download to keep subsequent runs
+    # offline-friendly.
+    $getPipPath = Join-Path $CacheDir "get-pip.py"
+    if (-not (Test-Path -LiteralPath $getPipPath)) {
+        Write-Host "[python] download get-pip.py"
+        Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPipPath -UseBasicParsing
+    }
+    Write-Host "[python] bootstrap pip via get-pip.py"
+    & $PythonExe $getPipPath --no-warn-script-location 2>&1 | Tee-Object -Variable getPipOutput | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Bootstrapping pip failed (exit $LASTEXITCODE)`n$($getPipOutput -join "`n")"
+    }
+}
+
+function Install-RequirementsLock {
+    param(
+        [Parameter(Mandatory = $true)][string]$PythonExe,
+        [Parameter(Mandatory = $true)][string]$RequirementsPath
+    )
+    if (-not (Test-Path -LiteralPath $RequirementsPath)) {
+        Write-Host "[python] no requirements.lock; skipping bulk install"
+        return @()
+    }
+    Write-Host "[python] pip install -r $RequirementsPath"
+    & $PythonExe -m pip install --no-warn-script-location --disable-pip-version-check -r $RequirementsPath 2>&1 | Tee-Object -Variable pipOutput | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "pip install -r requirements.lock failed (exit $LASTEXITCODE)`n$($pipOutput -join "`n")"
+    }
+    # Capture what actually got installed (resolved versions incl. transitive)
+    # so the manifest can record it for audit.
+    $listJson = & $PythonExe -m pip list --format=json --disable-pip-version-check 2>$null
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return ($listJson | ConvertFrom-Json | ForEach-Object { @{ name = $_.name; version = $_.version } })
 }
 
 function Test-EmbeddedPython {
@@ -145,6 +205,26 @@ if ($probe.version -ne $Version) {
     throw "Embedded Python version mismatch. expected=$Version actual=$($probe.version)"
 }
 
+# Bootstrap pip + install the locked data-analysis packages. Skipping pip is
+# what made `import pandas` fail inside sandbox.run-code — embedded Python
+# zip ships stdlib-only.
+$packages = @()
+# requirements.lock lives in resources/ (sibling of python-embedded/) so the
+# Clear-TargetDirectory pass above doesn't nuke it on every re-stage.
+$requirementsPath = Join-Path $resourceRoot "python-packages.lock"
+try {
+    Install-PipBootstrap -PythonExe $pythonExe -CacheDir $CacheDir
+    $installed = Install-RequirementsLock -PythonExe $pythonExe -RequirementsPath $requirementsPath
+    # PowerShell collapses an empty array return into $null; coerce to array.
+    $packages = @($installed)
+    Write-Host "[python] installed $($packages.Count) packages (incl. transitive deps)"
+} catch {
+    # Don't fail the whole bundle if pip install hits a network hiccup — the
+    # embeddable still works for stdlib-only sandbox tasks. The agent will
+    # surface ModuleNotFoundError gracefully via humanizeError on first use.
+    Write-Warning "[python] package install failed; proceeding with stdlib only: $($_.Exception.Message)"
+}
+
 $manifest = [ordered]@{
     id = "python-embedded"
     version = $Version
@@ -155,6 +235,7 @@ $manifest = [ordered]@{
     pythonExe = $pythonExe
     generatedAt = (Get-Date).ToUniversalTime().ToString("o")
     probe = $probe
+    packages = $packages
 }
 $manifestPath = Join-Path $TargetDir "PYTHON_EMBEDDED_MANIFEST.json"
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8
