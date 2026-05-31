@@ -1,9 +1,7 @@
-// @ts-check
 // Kimi CLI 输出解码:优先 UTF-8,Windows 下兼容 GB18030。
 import { TextDecoder } from 'node:util';
 
-/** @param {Buffer[]} chunks */
-export function decodeCliOutput(chunks) {
+export function decodeCliOutput(chunks: Buffer[]): string {
   const buffer = Buffer.concat(chunks);
   if (buffer.length === 0) return '';
   try {
