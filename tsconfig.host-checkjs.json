@@ -59,7 +59,7 @@
     "apps/host/src/kimi/cli-output.ts",
     "apps/host/src/kimi/cli-detect.ts",
     "apps/host/src/kimi/cli-runner.js",
-    "apps/host/src/kimi/config-store.js",
+    "apps/host/src/kimi/config-store.ts",
     "apps/host/src/kimi/context/context-manager.ts",
     "apps/host/src/kimi/context/history-compactor.ts",
     "apps/host/src/kimi/context/token-estimator.ts",

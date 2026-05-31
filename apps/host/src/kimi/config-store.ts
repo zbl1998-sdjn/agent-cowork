@@ -1,4 +1,3 @@
-// @ts-check
 // Kimi 配置持久化(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:读写磁盘上的 kimiApi 配置(provider/apiKey/baseUrl/model/fallbacks),
@@ -8,17 +7,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** 把 provider 归一为去空白的小写串。 @param {unknown} value */
-function cleanProvider(value) {
+type KimiConfigRecord = Record<string, unknown>;
+
+/** 把 provider 归一为去空白的小写串。 */
+function cleanProvider(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
-/** 清洗 fallback 列表:仅保留有效字段,丢弃完全为空的项。 @param {unknown} value @returns {Array<Record<string, unknown>>} */
-function cleanFallbacks(value) {
+/** 清洗 fallback 列表:仅保留有效字段,丢弃完全为空的项。 */
+function cleanFallbacks(value: unknown): KimiConfigRecord[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => {
-    const source = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : {};
-    const out = /** @type {Record<string, unknown>} */ ({});
+    const source = item && typeof item === 'object' ? item as KimiConfigRecord : {};
+    const out: KimiConfigRecord = {};
     if (typeof source.provider === 'string' && source.provider.trim()) out.provider = cleanProvider(source.provider);
     if (typeof source.apiKey === 'string' && source.apiKey.trim()) out.apiKey = source.apiKey.trim();
     if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) out.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
@@ -29,15 +30,15 @@ function cleanFallbacks(value) {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
-/** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);文件不存在或损坏则不动。 @param {string} file @param {Record<string, unknown>} target */
-export function applyPersistedKimiConfig(file, target) {
+/** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);文件不存在或损坏则不动。 */
+export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord): void {
   try {
     if (!fs.existsSync(file)) return;
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const config = raw && typeof raw === 'object' ? /** @type {Record<string, unknown>} */ (raw) : {};
+    const config = raw && typeof raw === 'object' ? raw as KimiConfigRecord : {};
     const kimi = config.kimiApi || config.kimi || config;
     if (!kimi || typeof kimi !== 'object') return;
-    const source = /** @type {Record<string, unknown>} */ (kimi);
+    const source = kimi as KimiConfigRecord;
     if (typeof source.provider === 'string' && source.provider.trim()) target.provider = cleanProvider(source.provider);
     if (Array.isArray(source.fallbacks)) target.fallbacks = cleanFallbacks(source.fallbacks);
     if (typeof source.apiKey === 'string' && source.apiKey.trim()) target.apiKey = source.apiKey.trim();
@@ -51,8 +52,8 @@ export function applyPersistedKimiConfig(file, target) {
   }
 }
 
-/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录)。 @param {string} file @param {Record<string, unknown>} source */
-export function persistKimiConfig(file, source) {
+/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录)。 */
+export function persistKimiConfig(file: string, source: KimiConfigRecord): void {
   const payload = {
     kimiApi: {
       apiKey: source.apiKey || '',
