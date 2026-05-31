@@ -2,61 +2,69 @@
 // ---------------------------------------------------------------------------
 // 职责:对「批量文件操作」预案的审批待决登记——把 write/rename/move 预案交用户确认后再 apply;带指纹防篡改、
 //       TTL 清理。是「副作用先批准」原则在文件操作上的落点。依赖:L0 request-utils + node:crypto/path。
-// @ts-check
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { stableJsonStringify } from '../http/request-utils.js';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
-/**
- * @typedef {{ tenantId?: unknown, userId?: unknown }} FileOperationApprovalContext
- * @typedef {{ tenantId: string, userId: string }} FileOperationApprovalScope
- * @typedef {{ kind: string, trustedRoot: string, operations?: unknown, context?: FileOperationApprovalContext }} FileOperationApprovalRequest
- * @typedef {{
- *   id: string,
- *   kind: string,
- *   trustedRoot: string,
- *   operationsHash: string,
- *   scope: FileOperationApprovalScope,
- *   expiresAt: number,
- *   used: boolean
- * }} FileOperationApproval
- * @typedef {{ ttlMs?: number, generateId?: () => string, now?: () => number }} FileOperationApprovalStoreOptions
- * @typedef {{
- *   issue(input: FileOperationApprovalRequest): string,
- *   consume(id: unknown, input: FileOperationApprovalRequest): FileOperationApproval,
- *   pendingCount(): number
- * }} FileOperationApprovalStore
- */
+export type FileOperationApprovalContext = {
+  tenantId?: unknown;
+  userId?: unknown;
+};
 
-/**
- * @param {number} statusCode
- * @param {string} message
- * @returns {Error & { statusCode: number }}
- */
-function makeHttpError(statusCode, message) {
-  const err = /** @type {Error & { statusCode: number }} */ (new Error(message));
+export type FileOperationApprovalScope = {
+  tenantId: string;
+  userId: string;
+};
+
+export type FileOperationApprovalRequest = {
+  kind: string;
+  trustedRoot: string;
+  operations?: unknown;
+  context?: FileOperationApprovalContext;
+};
+
+export type FileOperationApproval = {
+  id: string;
+  kind: string;
+  trustedRoot: string;
+  operationsHash: string;
+  scope: FileOperationApprovalScope;
+  expiresAt: number;
+  used: boolean;
+};
+
+export type FileOperationApprovalStoreOptions = {
+  ttlMs?: number;
+  generateId?: () => string;
+  now?: () => number;
+};
+
+export type FileOperationApprovalStore = {
+  issue(input: FileOperationApprovalRequest): string;
+  consume(id: unknown, input: FileOperationApprovalRequest): FileOperationApproval;
+  pendingCount(): number;
+};
+
+function makeHttpError(statusCode: number, message: string): Error & { statusCode: number } {
+  const err = new Error(message) as Error & { statusCode: number };
   err.statusCode = statusCode;
   return err;
 }
 
-/**
- * @param {FileOperationApprovalContext} [context]
- * @returns {FileOperationApprovalScope}
- */
-function scopeFromContext(context = {}) {
+function scopeFromContext(context: FileOperationApprovalContext = {}): FileOperationApprovalScope {
   return {
     tenantId: String(context.tenantId || 'tenant_local'),
     userId: String(context.userId || 'user_local'),
   };
 }
 
-/**
- * @param {{ kind: string, trustedRoot: string, operations?: unknown }} input
- * @returns {string}
- */
-function hashApproval({ kind, trustedRoot, operations }) {
+function hashApproval({
+  kind,
+  trustedRoot,
+  operations,
+}: Pick<FileOperationApprovalRequest, 'kind' | 'trustedRoot' | 'operations'>): string {
   return crypto
     .createHash('sha256')
     .update(stableJsonStringify({
@@ -67,20 +75,14 @@ function hashApproval({ kind, trustedRoot, operations }) {
     .digest('hex');
 }
 
-/**
- * @param {FileOperationApprovalStoreOptions} [options]
- * @returns {FileOperationApprovalStore}
- */
 export function createFileOperationApprovalStore({
   ttlMs = DEFAULT_TTL_MS,
   generateId = () => `fop_${crypto.randomUUID().replace(/-/g, '')}`,
   now = () => Date.now(),
-} = {}) {
-  /** @type {Map<string, FileOperationApproval>} */
-  const approvals = new Map();
+}: FileOperationApprovalStoreOptions = {}): FileOperationApprovalStore {
+  const approvals = new Map<string, FileOperationApproval>();
 
-  /** @returns {void} */
-  function cleanup() {
+  function cleanup(): void {
     const current = now();
     for (const [id, approval] of approvals.entries()) {
       if (approval.expiresAt <= current || approval.used) {
@@ -89,8 +91,7 @@ export function createFileOperationApprovalStore({
     }
   }
 
-  /** @param {FileOperationApprovalRequest} input */
-  function issue({ kind, trustedRoot, operations, context }) {
+  function issue({ kind, trustedRoot, operations, context }: FileOperationApprovalRequest): string {
     cleanup();
     if (!kind) throw new Error('approval kind is required');
     if (!trustedRoot) throw new Error('trustedRoot is required');
@@ -107,11 +108,10 @@ export function createFileOperationApprovalStore({
     return id;
   }
 
-  /**
-   * @param {unknown} id
-   * @param {FileOperationApprovalRequest} input
-   */
-  function consume(id, { kind, trustedRoot, operations, context }) {
+  function consume(
+    id: unknown,
+    { kind, trustedRoot, operations, context }: FileOperationApprovalRequest,
+  ): FileOperationApproval {
     cleanup();
     if (!id || typeof id !== 'string') {
       throw makeHttpError(428, 'file operation approval is required');
