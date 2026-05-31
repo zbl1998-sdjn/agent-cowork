@@ -2,71 +2,89 @@
 // ---------------------------------------------------------------------------
 // 职责:连接器 OAuth 授权前的「权限审批」待决登记——把待授予的权限项交给用户确认/勾选,带 TTL 清理。
 //       与 approvals.js 类似但专用于连接器授权范围。依赖:node:crypto。导出:OAuth 权限审批登记表。
-// @ts-check
-
 import crypto from 'node:crypto';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
-/**
- * @typedef {Error & { statusCode?: number }} HttpError
- * @typedef {{ tenantId?: unknown, userId?: unknown }} ApprovalContext
- * @typedef {{ tenantId: string, userId: string }} ApprovalScope
- * @typedef {{ connectorId: string, provider: string, scopes?: unknown }} ApprovalHashInput
- * @typedef {{ id: string, connectorId: string, provider: string, scopesHash: string, scope: ApprovalScope, expiresAt: number, used: boolean }} OAuthPermissionApproval
- * @typedef {{ ttlMs?: number, generateId?: () => string, now?: () => number }} OAuthPermissionApprovalStoreOptions
- * @typedef {{ connectorId: string, provider: string, scopes?: unknown, context?: ApprovalContext }} OAuthPermissionRequest
- */
+type HttpError = Error & { statusCode?: number };
 
-/**
- * @param {unknown} value
- * @returns {string | undefined}
- */
-function stableJsonStringify(value) {
+export type ApprovalContext = {
+  tenantId?: unknown;
+  userId?: unknown;
+};
+
+export type ApprovalScope = {
+  tenantId: string;
+  userId: string;
+};
+
+export type ApprovalHashInput = {
+  connectorId: string;
+  provider: string;
+  scopes?: unknown;
+};
+
+export type OAuthPermissionApproval = {
+  id: string;
+  connectorId: string;
+  provider: string;
+  scopesHash: string;
+  scope: ApprovalScope;
+  expiresAt: number;
+  used: boolean;
+};
+
+export type OAuthPermissionApprovalStoreOptions = {
+  ttlMs?: number;
+  generateId?: () => string;
+  now?: () => number;
+};
+
+export type OAuthPermissionRequest = {
+  connectorId: string;
+  provider: string;
+  scopes?: unknown;
+  context?: ApprovalContext;
+};
+
+export type OAuthPermissionApprovalStore = {
+  issue(request: OAuthPermissionRequest): { id: string; expiresAt: number };
+  consume(id: unknown, request: OAuthPermissionRequest): OAuthPermissionApproval;
+  pendingCount(): number;
+};
+
+function stableJsonStringify(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
   }
   if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
+    const record = value as Record<string, unknown>;
+    const entries = Object.keys(record)
       .sort()
       .map((key) => {
-        const record = /** @type {Record<string, unknown>} */ (value);
         const encoded = stableJsonStringify(record[key]);
         return encoded === undefined ? undefined : `${JSON.stringify(key)}:${encoded}`;
       })
-      .filter(Boolean);
+      .filter((entry): entry is string => Boolean(entry));
     return `{${entries.join(',')}}`;
   }
   return JSON.stringify(value);
 }
 
-/**
- * @param {number} statusCode
- * @param {string} message
- * @returns {HttpError}
- */
-function makeHttpError(statusCode, message) {
-  const err = /** @type {HttpError} */ (new Error(message));
+function makeHttpError(statusCode: number, message: string): HttpError {
+  const err = new Error(message) as HttpError;
   err.statusCode = statusCode;
   return err;
 }
 
-/**
- * @param {ApprovalContext} [context]
- * @returns {ApprovalScope}
- */
-function scopeFromContext(context = {}) {
+function scopeFromContext(context: ApprovalContext = {}): ApprovalScope {
   return {
     tenantId: String(context.tenantId || 'tenant_local'),
     userId: String(context.userId || 'user_local'),
   };
 }
 
-/**
- * @param {ApprovalHashInput} input
- * @returns {string}
- */
-function approvalHash({ connectorId, provider, scopes }) {
+function approvalHash({ connectorId, provider, scopes }: ApprovalHashInput): string {
   return crypto
     .createHash('sha256')
     .update(stableJsonStringify({
@@ -78,29 +96,24 @@ function approvalHash({ connectorId, provider, scopes }) {
     .digest('hex');
 }
 
-/**
- * @param {OAuthPermissionApprovalStoreOptions} [options]
- */
 export function createOAuthPermissionApprovalStore({
   ttlMs = DEFAULT_TTL_MS,
   generateId = () => `oauth_apr_${crypto.randomUUID().replace(/-/g, '')}`,
   now = () => Date.now(),
-} = {}) {
-  /** @type {Map<string, OAuthPermissionApproval>} */
-  const approvals = new Map();
+}: OAuthPermissionApprovalStoreOptions = {}): OAuthPermissionApprovalStore {
+  const approvals = new Map<string, OAuthPermissionApproval>();
 
-  function cleanup() {
+  function cleanup(): void {
     const current = now();
     for (const [id, approval] of approvals.entries()) {
       if (approval.expiresAt <= current || approval.used) approvals.delete(id);
     }
   }
 
-  /**
-   * @param {OAuthPermissionRequest} request
-   * @returns {{ id: string, expiresAt: number }}
-   */
-  function issue({ connectorId, provider, scopes, context }) {
+  function issue({ connectorId, provider, scopes, context }: OAuthPermissionRequest): {
+    id: string;
+    expiresAt: number;
+  } {
     cleanup();
     const id = generateId();
     const expiresAt = now() + ttlMs;
@@ -116,12 +129,10 @@ export function createOAuthPermissionApprovalStore({
     return { id, expiresAt };
   }
 
-  /**
-   * @param {unknown} id
-   * @param {OAuthPermissionRequest} request
-   * @returns {OAuthPermissionApproval}
-   */
-  function consume(id, { connectorId, provider, scopes, context }) {
+  function consume(
+    id: unknown,
+    { connectorId, provider, scopes, context }: OAuthPermissionRequest,
+  ): OAuthPermissionApproval {
     cleanup();
     if (!id || typeof id !== 'string') {
       throw makeHttpError(428, 'OAuth permission approval is required');
@@ -149,9 +160,6 @@ export function createOAuthPermissionApprovalStore({
   return {
     issue,
     consume,
-    /**
-     * @returns {number}
-     */
     pendingCount: () => {
       cleanup();
       return approvals.size;

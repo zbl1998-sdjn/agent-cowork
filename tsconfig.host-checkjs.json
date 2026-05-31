@@ -127,7 +127,7 @@
     "apps/host/src/runtime/host-state.js",
     "apps/host/src/runtime/model-recorder.js",
     "apps/host/src/runtime/model-breakers.ts",
-    "apps/host/src/runtime/oauth-permission-approvals.js",
+    "apps/host/src/runtime/oauth-permission-approvals.ts",
     "apps/host/src/runtime/ocr-runtime.ts",
     "apps/host/src/runtime/pandoc-runtime.ts",
     "apps/host/src/runtime/plan-builder.ts",
