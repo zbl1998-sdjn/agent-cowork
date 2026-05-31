@@ -1,3 +1,11 @@
+// 跨实例审批存储(PostgreSQL + LISTEN/NOTIFY)(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:把待审批请求持久化到 pending_approvals 表,用 LISTEN/NOTIFY 做跨实例 pub/sub——
+//       任一实例 resolve/respond/cancelByRun 都能唤醒持有 awaiting promise 的那个实例。
+//       request() 保持同步(本地生成 id + fire-and-forget INSERT),不需改造 agent 循环。
+// 依赖:仅标准库(crypto);pg 运行时按需 import。后端:PostgreSQL。
+// 导出:PostgresApprovalStore(类) · createPostgresApprovalStore(工厂)。
+//
 // Cross-instance approval store backed by PostgreSQL + LISTEN/NOTIFY.
 //
 // The in-memory registry only works within one process. To run the host behind
@@ -27,12 +35,12 @@ import crypto from 'node:crypto';
  * @typedef {{ client?: PgClient | null, pool?: PgPool | null, connectionString?: string | null, channel?: string, generateId?: () => string, pg?: PgModule | null }} PostgresApprovalStoreOptions
  */
 
-/** @returns {string} */
+/** 生成默认审批 id(apr_ 前缀)。 @returns {string} */
 function defaultId() {
   return `apr_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
-/** @param {unknown} value @returns {string} */
+/** 校验 NOTIFY 通道名合法(防 SQL 注入,通道名不能参数化)。 @param {unknown} value @returns {string} */
 function safePgIdentifier(value) {
   const text = String(value || '').trim();
   if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
@@ -41,11 +49,12 @@ function safePgIdentifier(value) {
   return text;
 }
 
-/** @param {ApprovalMeta} [meta] @param {ApprovalContext | null} [context] @returns {boolean} */
+/** 租户隔离:无 tenantId 视为公共,否则要求上下文租户匹配。 @param {ApprovalMeta} [meta] @param {ApprovalContext | null} [context] @returns {boolean} */
 function sameTenant(meta = {}, context = null) {
   return !meta.tenantId || !!(context && context.tenantId === meta.tenantId);
 }
 
+/** 跨实例审批存储:PG 表持久化 + LISTEN/NOTIFY 跨实例唤醒本地 awaiting promise。 */
 export class PostgresApprovalStore {
   /** @param {PostgresApprovalStoreOptions} [options] */
   constructor({ client = null, pool = null, connectionString = null, channel = 'kcw_approvals', generateId = defaultId, pg = null } = {}) {
@@ -69,7 +78,7 @@ export class PostgresApprovalStore {
     this._started = false;
   }
 
-  /** @returns {Promise<PgClient>} */
+  /** 取/建专用 LISTEN 连接(pg 按需 import,缺包给出安装提示)。 @returns {Promise<PgClient>} */
   async _getClient() {
     if (this._client) return this._client;
     if (!this._connectionString) throw new Error('PostgresApprovalStore: client or connectionString is required');
@@ -88,13 +97,13 @@ export class PostgresApprovalStore {
     return client;
   }
 
-  /** @returns {Promise<PgPool>} */
+  /** 取查询连接池(无则退回到 LISTEN 连接)。 @returns {Promise<PgPool>} */
   async _getPool() {
     if (this._pool) return this._pool;
     return this._getClient();
   }
 
-  /** @returns {Promise<void>} */
+  /** 启动跨实例监听:订阅通道,收到 NOTIFY 时唤醒本地匹配的 awaiter。 @returns {Promise<void>} */
   async start() {
     if (this._started) return;
     this._started = true;
@@ -109,7 +118,7 @@ export class PostgresApprovalStore {
     await client.query(`LISTEN ${this._channel}`);
   }
 
-  /** @param {ApprovalMeta} [meta] @returns {{ id: string, promise: Promise<unknown> }} */
+  /** 同步发起审批:本地生成 id 与 promise,持久化为 fire-and-forget INSERT。 @param {ApprovalMeta} [meta] @returns {{ id: string, promise: Promise<unknown> }} */
   request(meta = {}) {
     const id = this._generateId();
     /** @type {ApprovalResolve} */
@@ -126,7 +135,7 @@ export class PostgresApprovalStore {
     return { id, promise };
   }
 
-  /** @param {string} id @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
+  /** 把行置为 resolved 并 NOTIFY,同时走本地快路径唤醒;返回是否命中(行或本地)。 @param {string} id @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
   async _resolveRow(id, decision, context = null) {
     const params = [id, decision];
     const tenantClause = context && context.tenantId
@@ -149,13 +158,13 @@ export class PostgresApprovalStore {
     return rowMatched || localMatched;
   }
 
-  /** @param {string} id @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
+  /** 解析审批决定:仅允许 once/session/reject,非法回落为 reject。 @param {string} id @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
   async resolve(id, decision, context = null) {
     const DEC = new Set(['once', 'session', 'reject']);
     return this._resolveRow(id, typeof decision === 'string' && DEC.has(decision) ? decision : 'reject', context);
   }
 
-  /** @param {unknown} ids @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<Array<{ id: string, ok: boolean }>>} */
+  /** 批量按相同决定解析多个审批(去重后逐个 resolve)。 @param {unknown} ids @param {unknown} decision @param {ApprovalContext | null} [context] @returns {Promise<Array<{ id: string, ok: boolean }>>} */
   async resolveMany(ids, decision, context = null) {
     const uniqueIds = [...new Set(Array.isArray(ids) ? ids.map((id) => String(id)) : [])];
     const results = [];
@@ -165,12 +174,12 @@ export class PostgresApprovalStore {
     return results;
   }
 
-  /** @param {string} id @param {unknown} value @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
+  /** 以任意值响应审批(不受 once/session/reject 限制),用于自由表单决定。 @param {string} id @param {unknown} value @param {ApprovalContext | null} [context] @returns {Promise<boolean>} */
   async respond(id, value, context = null) {
     return this._resolveRow(id, value, context);
   }
 
-  /** @param {unknown} runId @param {unknown} [decision] @returns {Promise<number>} */
+  /** 取消某次 run 名下所有 pending 审批(NOTIFY + 唤醒本地),返回取消数。 @param {unknown} runId @param {unknown} [decision] @returns {Promise<number>} */
   async cancelByRun(runId, decision = 'reject') {
     if (!runId) return 0;
     const pool = await this._getPool();
@@ -188,7 +197,7 @@ export class PostgresApprovalStore {
     return Number(rows.rowCount || ids.length || 0);
   }
 
-  /** @returns {Promise<number>} */
+  /** 统计当前 pending 审批行数。 @returns {Promise<number>} */
   async pendingCount() {
     const pool = await this._getPool();
     const r = await pool.query(`SELECT COUNT(*)::int AS count FROM pending_approvals WHERE status='pending'`, []);
@@ -197,7 +206,7 @@ export class PostgresApprovalStore {
 
   // Expire abandoned pending rows (cron-style sweep) so the table never grows
   // unbounded; locally resolves any matching awaiter with 'reject'.
-  /** @param {number} [ttlMs] @returns {Promise<number>} */
+  /** 清理超 TTL 的遗留 pending 行(置 expired),并本地以 reject 唤醒对应 awaiter。 @param {number} [ttlMs] @returns {Promise<number>} */
   async prune(ttlMs = 15 * 60 * 1000) {
     const pool = await this._getPool();
     const rows = await pool.query(
@@ -214,7 +223,7 @@ export class PostgresApprovalStore {
   }
 }
 
-/** @param {PostgresApprovalStoreOptions} [options] @returns {PostgresApprovalStore} */
+/** 工厂:构造跨实例 Postgres 审批存储。 @param {PostgresApprovalStoreOptions} [options] @returns {PostgresApprovalStore} */
 export function createPostgresApprovalStore(options = {}) {
   return new PostgresApprovalStore(options);
 }

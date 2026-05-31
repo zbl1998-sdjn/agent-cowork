@@ -1,4 +1,11 @@
 // @ts-check
+// 实时制品·渲染阶段:把 viz 规格渲染成带「刷新」按钮的单页活页 HTML(host · L1 领域层 · artifacts)
+// ---------------------------------------------------------------------------
+// 职责:实时制品流水线「规格→渲染→刷新」的中间环——产出快照页面,内置共享的
+//       客户端渲染器(Chart.js / Mermaid / 表格),并接入 fetch(dataUrl) 与
+//       postMessage 两条刷新通道。数据一律以文本节点/JSON 注入,绝不当 HTML 拼接。
+// 依赖:live-spec(CHART_KINDS);图表库走 cdnjs。
+// 导出:renderLivePage(生成活页 HTML 字符串)
 import { CHART_KINDS } from './live-spec.js';
 
 const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
@@ -8,7 +15,7 @@ const U2029 = new RegExp(String.fromCharCode(0x2029), 'g');
 
 /** @typedef {{ kind?: string, [key: string]: unknown }} VizSpec */
 
-/** @param {unknown} value @returns {string} */
+/** 序列化成可安全嵌入 <script> 的 JSON,转义 < > & 与行/段分隔符以防脚本逃逸。 @param {unknown} value @returns {string} */
 function safeJson(value) {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
@@ -18,7 +25,7 @@ function safeJson(value) {
     .replace(U2029, '\\u2029');
 }
 
-/** @param {unknown} value @returns {string} */
+/** HTML 转义,用于标题等注入正文的文本。 @param {unknown} value @returns {string} */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -28,7 +35,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-/** @param {unknown} kind @returns {string} */
+/** 按 viz.kind 决定要插入哪个 cdnjs 脚本标签(图表用 Chart.js,流程图用 Mermaid)。 @param {unknown} kind @returns {string} */
 function libTag(kind) {
   const value = String(kind || '');
   if (CHART_KINDS.has(value)) {
@@ -88,7 +95,7 @@ const CLIENT_RENDERER = `
           else { renderChart(root, spec); }
         }`;
 
-/** @param {{ title?: unknown, viz: VizSpec, dataUrl?: string }} options @returns {string} */
+/** 生成实时制品活页:首屏渲染 viz 快照,并支持按钮 fetch(dataUrl) 与 postMessage 两种刷新。 @param {{ title?: unknown, viz: VizSpec, dataUrl?: string }} options @returns {string} */
 export function renderLivePage({ title, viz, dataUrl }) {
   const safeTitle = escapeHtml(title || '活页 Artifact');
   return `<!doctype html>

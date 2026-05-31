@@ -1,4 +1,10 @@
 // @ts-check
+// 制品目录登记:列出/重命名 .AgentCowork/artifacts 下的制品并生成只读预览页(host · L1 领域层 · artifacts)
+// ---------------------------------------------------------------------------
+// 职责:扫描制品根目录、按类型归类(markdown/table/word/...)、安全重命名、把
+//       文本制品渲染成单页 HTML 预览。所有路径都经过 path-jail 校验,严禁逃出制品目录。
+// 依赖:node:fs、node:path、security/path-policy(assertTrustedPath 路径围栏)
+// 导出:listArtifacts(列目录)、renameArtifact(改名)、renderArtifactHtml(预览页)
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -14,27 +20,27 @@ const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.json', '.html', '.htm'
  * @typedef {{ trustedRoot?: string, artifactPath?: string, maxBytes?: number }} RenderArtifactOptions
  */
 
-/** @param {string} message @param {number} statusCode @returns {Error & { statusCode: number }} */
+/** 构造带 HTTP 状态码的错误(供路由层映射成响应)。 @param {string} message @param {number} statusCode @returns {Error & { statusCode: number }} */
 function httpError(message, statusCode) {
   const err = /** @type {Error & { statusCode: number }} */ (new Error(message));
   err.statusCode = statusCode;
   return err;
 }
 
-/** @param {string} trustedRoot @returns {ArtifactRoot} */
+/** 把可信工作根解析成受围栏保护的制品根目录(.AgentCowork/artifacts)。 @param {string} trustedRoot @returns {ArtifactRoot} */
 function safeArtifactRoot(trustedRoot) {
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const root = assertTrustedPath(path.join(safeRoot, ...ARTIFACT_ROOT_PARTS), safeRoot);
   return { safeRoot, root };
 }
 
-/** @param {string} parent @param {string} candidate @returns {boolean} */
+/** 判断 candidate 是否落在 parent 目录内(用相对路径不以 .. 开头来判定)。 @param {string} parent @param {string} candidate @returns {boolean} */
 function isInside(parent, candidate) {
   const relative = path.relative(parent, candidate);
   return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-/** @param {string} trustedRoot @param {string} artifactPath @returns {{ root: string, safe: string }} */
+/** 校验单个制品文件路径必须留在制品目录内,返回围栏后的安全路径。 @param {string} trustedRoot @param {string} artifactPath @returns {{ root: string, safe: string }} */
 function safeArtifactPath(trustedRoot, artifactPath) {
   const { root } = safeArtifactRoot(trustedRoot);
   const safe = assertTrustedPath(path.resolve(artifactPath), root);
@@ -44,7 +50,7 @@ function safeArtifactPath(trustedRoot, artifactPath) {
   return { root, safe };
 }
 
-/** @param {unknown} value @returns {string} */
+/** HTML 转义,防止制品内容在预览页里被当作标签注入。 @param {unknown} value @returns {string} */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -54,7 +60,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-/** @param {string} filePath @returns {string} */
+/** 按扩展名把制品归类成前端可识别的 kind(html/markdown/word/...)。 @param {string} filePath @returns {string} */
 function artifactKind(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.html' || ext === '.htm') {
@@ -87,13 +93,13 @@ function artifactKind(filePath) {
   return 'binary';
 }
 
-/** @param {string} root @param {string} filePath @returns {string} */
+/** 生成对外展示的相对路径(统一用正斜杠,带 .AgentCowork/artifacts 前缀)。 @param {string} root @param {string} filePath @returns {string} */
 function artifactRelativePath(root, filePath) {
   const relative = path.relative(root, filePath).replace(/\\/g, '/');
   return ['.AgentCowork', 'artifacts', relative].join('/');
 }
 
-/** @param {string} root @param {string} filePath @returns {ArtifactItem} */
+/** 读取文件 stat,组装成对外的制品条目(含大小、修改时间、kind 等)。 @param {string} root @param {string} filePath @returns {ArtifactItem} */
 function artifactItem(root, filePath) {
   const stat = fs.statSync(filePath);
   const name = path.basename(filePath);
@@ -109,7 +115,7 @@ function artifactItem(root, filePath) {
   };
 }
 
-/** @param {unknown} newName @returns {string} */
+/** 校验重命名目标只能是纯文件名(禁止含路径分隔符或 . / ..),防止目录穿越。 @param {unknown} newName @returns {string} */
 function safeArtifactName(newName) {
   const name = String(newName || '').trim();
   if (!name) {
@@ -124,7 +130,7 @@ function safeArtifactName(newName) {
   return name;
 }
 
-/** @param {string} root @param {string} current @param {ArtifactItem[]} files @param {number} limit */
+/** 递归收集制品文件至 limit 条;跳过符号链接以避免越权读到目录外。 @param {string} root @param {string} current @param {ArtifactItem[]} files @param {number} limit */
 function collectFiles(root, current, files, limit) {
   if (files.length >= limit || !fs.existsSync(current)) {
     return;
@@ -145,7 +151,7 @@ function collectFiles(root, current, files, limit) {
   }
 }
 
-/** @param {ListArtifactsOptions} [options] @returns {ArtifactItem[]} */
+/** 列出制品目录下的文件,按修改时间倒序返回(limit 夹在 1..100)。 @param {ListArtifactsOptions} [options] @returns {ArtifactItem[]} */
 export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
@@ -159,7 +165,7 @@ export function listArtifacts({ trustedRoot, limit = 20 } = {}) {
     .slice(0, Math.max(1, Math.min(Number(limit) || 20, 100)));
 }
 
-/** @param {RenameArtifactOptions} [options] @returns {ArtifactItem} */
+/** 在制品目录内重命名一个文件;目标已存在或越界都会报错。 @param {RenameArtifactOptions} [options] @returns {ArtifactItem} */
 export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
@@ -185,7 +191,7 @@ export function renameArtifact({ trustedRoot, artifactPath, newName } = {}) {
   return artifactItem(root, target);
 }
 
-/** @param {RenderArtifactOptions} [options] @returns {string} */
+/** 把单个制品渲染成只读 HTML 预览页;文本类才内联内容,二进制/超大只展示元数据。 @param {RenderArtifactOptions} [options] @returns {string} */
 export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 * 1024 } = {}) {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');

@@ -1,3 +1,11 @@
+// 用户画像(术语/项目/偏好)的存取与召回(host · L1 领域层 · memory)
+// ---------------------------------------------------------------------------
+// 职责:把用户长期画像以 JSON 形式存进一条记忆笔记(profile.md),提供
+//       学习(增量去重)、召回(按查询打分排序)、遗忘(按类型/键过滤)等能力,
+//       供上层在对话中读取偏好/术语/当前项目。底层读写委托给注入的 memoryStore。
+// 依赖:注入的 MemoryStoreLike(读写记忆笔记);仅标准库,无直接 IO。
+// 导出:UserProfile 类、createUserProfile 工厂。
+
 const PROFILE_NOTE = 'profile.md';
 const ALLOWED_TYPES = new Set(['term', 'project', 'preference']);
 const MAX_PROFILE_ENTRIES = 200;
@@ -80,7 +88,7 @@ function entryId(entry) {
   return `${entry.type}:${entry.scope}:${entry.key}`.toLowerCase();
 }
 
-/** @param {ProfileEntry} entry @param {unknown} query @returns {number} */
+/** 按查询给条目打分(命中正文最高、其次键被查询包含),无查询时项目类优先,用于召回排序。 @param {ProfileEntry} entry @param {unknown} query @returns {number} */
 function scoreEntry(entry, query) {
   const q = String(query || '').toLowerCase();
   if (!q) return entry.type === 'project' ? 3 : 1;
@@ -95,6 +103,7 @@ function termText(entry) {
   return entry.key === entry.value ? entry.key : `${entry.key} = ${entry.value}`;
 }
 
+/** 用户画像门面:以注入的 memoryStore 为后端,封装画像的加载/保存/学习/召回/遗忘。 */
 export class UserProfile {
   /** @type {MemoryStoreLike} */
   memoryStore;
@@ -109,13 +118,13 @@ export class UserProfile {
     this.now = now;
   }
 
-  /** @param {string} trustedRoot @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
+  /** 读取并解析画像笔记;不存在或损坏时返回空画像。 @param {string} trustedRoot @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
   async load(trustedRoot, context = {}) {
     const body = await this.memoryStore.readMemoryNote(trustedRoot, PROFILE_NOTE, context);
     return parseProfile(body);
   }
 
-  /** @param {string} trustedRoot @param {{ entries?: ProfileEntry[] }} profile @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
+  /** 把画像序列化写回笔记(尾部截断到 MAX_PROFILE_ENTRIES 条以限制体积)。 @param {string} trustedRoot @param {{ entries?: ProfileEntry[] }} profile @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
   async save(trustedRoot, profile, context = {}) {
     const entries = (profile.entries || []).slice(-MAX_PROFILE_ENTRIES);
     /** @type {UserProfileData} */
@@ -124,7 +133,7 @@ export class UserProfile {
     return next;
   }
 
-  /** @param {string} trustedRoot @param {ProfileEntryInput | ProfileBulkInput} input @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
+  /** 学习单条或批量条目:按 entryId(类型:作用域:键)去重合并到现有画像后保存。 @param {string} trustedRoot @param {ProfileEntryInput | ProfileBulkInput} input @param {Record<string, unknown>} [context] @returns {Promise<UserProfileData>} */
   async learn(trustedRoot, input, context = {}) {
     const profile = await this.load(trustedRoot, context);
     const bulk = /** @type {ProfileBulkInput} */ (input || {});
@@ -137,7 +146,7 @@ export class UserProfile {
     return this.save(trustedRoot, { entries: Array.from(map.values()) }, context);
   }
 
-  /** @param {string} trustedRoot @param {ProfileRecallOptions} [options] @returns {Promise<{ project: string, terms: string[], entries: ProfileEntry[] }>} */
+  /** 召回画像:按查询打分排序取前 limit 条(夹在 [1,20]),并析出当前项目与术语列表。 @param {string} trustedRoot @param {ProfileRecallOptions} [options] @returns {Promise<{ project: string, terms: string[], entries: ProfileEntry[] }>} */
   async recall(trustedRoot, { query = '', limit = 8, context = {} } = {}) {
     const profile = await this.load(trustedRoot, context);
     const entries = profile.entries
@@ -150,7 +159,7 @@ export class UserProfile {
     return { project, terms, entries };
   }
 
-  /** @param {string} trustedRoot @param {ProfileForgetFilter} [filter] @param {Record<string, unknown>} [context] @returns {Promise<{ removed: number, profile: UserProfileData }>} */
+  /** 遗忘条目:按 type 和/或 key 过滤删除(两者皆空则抛错以防误清空),返回删除数与新画像。 @param {string} trustedRoot @param {ProfileForgetFilter} [filter] @param {Record<string, unknown>} [context] @returns {Promise<{ removed: number, profile: UserProfileData }>} */
   async forget(trustedRoot, filter = {}, context = {}) {
     const type = filter.type ? normalizeType(filter.type) : '';
     const key = String(filter.key || '').trim().toLowerCase();
@@ -166,7 +175,7 @@ export class UserProfile {
   }
 }
 
-/** @param {UserProfileOptions} [options] @returns {UserProfile} */
+/** 工厂:构造 UserProfile(便于注入 memoryStore 与 now)。 @param {UserProfileOptions} [options] @returns {UserProfile} */
 export function createUserProfile(options = {}) {
   return new UserProfile(options);
 }

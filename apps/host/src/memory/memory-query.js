@@ -1,4 +1,11 @@
 // @ts-check
+// 记忆查询/组块的后端无关逻辑(host · L1 领域层 · memory)
+// ---------------------------------------------------------------------------
+// 职责:把"读主记忆文本→裁剪成 system 块""列笔记元信息"等只读拼装逻辑抽出,
+//       让 file/sqlite 两种后端共用同一套构建函数(后端只需实现 SyncMemoryStoreLike)。
+// 依赖:同目录 memory-constants(上限)、memory-utils(clipUtf8)。
+// 导出:buildMemorySystemBlockFromText / buildMemorySystemBlockFromStore /
+//       loadMemoryContextFromStore。
 
 import { MAX_MEMORY_BYTES } from './memory-constants.js';
 import { clipUtf8 } from './memory-utils.js';
@@ -10,6 +17,7 @@ import { clipUtf8 } from './memory-utils.js';
  */
 
 /**
+ * 把主记忆原文裁成可注入的 system 块:空白则返回空串,否则按 [512, MAX] 夹取后截断去空白。
  * @param {string} main
  * @param {{ maxBytes?: number }} [options]
  * @returns {string}
@@ -23,6 +31,7 @@ export function buildMemorySystemBlockFromText(main, { maxBytes = 4096 } = {}) {
 }
 
 /**
+ * 从后端读主记忆再构建 system 块;任何读取异常都吞掉并降级为空串(注入失败不应阻断对话)。
  * @param {SyncMemoryStoreLike} store
  * @param {unknown} trustedRoot
  * @param {MemoryQueryOptions} [options]
@@ -37,6 +46,7 @@ export function buildMemorySystemBlockFromStore(store, trustedRoot, options = {}
 }
 
 /**
+ * 汇总记忆上下文:system 块文本 + 字节数 + 是否启用 + 笔记元信息列表(仅暴露 name/size/modifiedAt)。
  * @param {SyncMemoryStoreLike} store
  * @param {unknown} trustedRoot
  * @param {MemoryQueryOptions} [options]

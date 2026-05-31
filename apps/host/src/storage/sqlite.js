@@ -1,4 +1,10 @@
 // @ts-check
+// SQLite 数据库的打开与迁移(单机后端基座)(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:基于 node:sqlite 打开数据库(开 WAL/外键/busy_timeout),并按 schema_migrations
+//       逐条事务化执行迁移;迁移取自 migrations/ 目录,目录为空时回落内置 EMBEDDED 建表。
+// 依赖:仅标准库(fs/path/module/url,node:sqlite 按需 require)。后端:SQLite(单机)。
+// 导出:openSqliteDatabase · migrateSqliteDatabase · createSqliteDatabase。
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -106,7 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_schedules_tenant_created_at
   },
 ]);
 
-/** @returns {new (dbPath: string) => SqliteDatabase} */
+/** 懒加载并缓存 node:sqlite 的 DatabaseSync 构造器。 @returns {new (dbPath: string) => SqliteDatabase} */
 function loadDatabaseSync() {
   if (!DatabaseSync) {
     const sqliteModule = /** @type {{ DatabaseSync: new (dbPath: string) => SqliteDatabase }} */ (require('node:sqlite'));
@@ -115,13 +121,13 @@ function loadDatabaseSync() {
   return DatabaseSync;
 }
 
-/** @param {string} dir @returns {string} */
+/** 递归创建目录并返回其路径。 @param {string} dir @returns {string} */
 function ensureDirSync(dir) {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-/** @param {string} [dir] @returns {string[]} */
+/** 列出迁移目录中形如 NNNN_*.sql 的文件,按名排序返回绝对路径。 @param {string} [dir] @returns {string[]} */
 function listMigrationFiles(dir = migrationsDir) {
   if (!fs.existsSync(dir)) {
     return [];
@@ -134,6 +140,7 @@ function listMigrationFiles(dir = migrationsDir) {
 }
 
 /**
+ * 汇总迁移条目:优先用目录中的 .sql 文件;目录为空且允许时回落内置 EMBEDDED 迁移。
  * @param {string} [dir]
  * @param {{ useEmbeddedMigrations?: boolean }} [options]
  * @returns {MigrationEntry[]}
@@ -152,7 +159,7 @@ function listMigrationEntries(dir = migrationsDir, { useEmbeddedMigrations = fal
   }));
 }
 
-/** @param {string} dbPath @returns {SqliteDatabase} */
+/** 打开 SQLite 数据库并设好 PRAGMA(外键/WAL/busy_timeout);不支持 WAL 时优雅降级。 @param {string} dbPath @returns {SqliteDatabase} */
 export function openSqliteDatabase(dbPath) {
   if (!dbPath || typeof dbPath !== 'string') {
     throw new Error('SQLite dbPath is required');
@@ -175,6 +182,7 @@ export function openSqliteDatabase(dbPath) {
 }
 
 /**
+ * 按 schema_migrations 表幂等地逐条执行迁移,每条在独立事务里运行,失败回滚并抛原始错误。
  * @param {SqliteDatabase} db
  * @param {MigrationOptions} [options]
  * @returns {SqliteDatabase}
@@ -217,7 +225,7 @@ export function migrateSqliteDatabase(db, { migrationsPath = migrationsDir, useE
   return db;
 }
 
-/** @param {string} dbPath @param {MigrationOptions} [options] @returns {SqliteDatabase} */
+/** 便捷入口:打开数据库并立即迁移到最新 schema。 @param {string} dbPath @param {MigrationOptions} [options] @returns {SqliteDatabase} */
 export function createSqliteDatabase(dbPath, options = {}) {
   const db = openSqliteDatabase(dbPath);
   return migrateSqliteDatabase(db, options);

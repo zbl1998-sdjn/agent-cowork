@@ -1,3 +1,9 @@
+// xlsx 文件写出:零依赖手写单 sheet 工作簿(host · L1 领域层 · artifacts)
+// ---------------------------------------------------------------------------
+// 职责:把列定义+行数据(数组行或对象行)拼成 SpreadsheetML(OOXML)并打成 .xlsx 包;
+//       单元格统一用 inlineStr 内联字符串,文本入 XML 前先转义。
+// 依赖:workspace/zip-utils(createZip 打包)
+// 导出:createXlsxWorkbook(返回 .xlsx 的 Buffer)
 import { createZip } from '../workspace/zip-utils.js';
 
 /**
@@ -6,7 +12,7 @@ import { createZip } from '../workspace/zip-utils.js';
  * @typedef {{ sheetName?: unknown, columns?: unknown[], rows?: WorkbookRow[] }} WorkbookSpec
  */
 
-/** @param {unknown} value @returns {string} */
+/** XML 转义,确保单元格文本安全嵌入 SpreadsheetML。 @param {unknown} value @returns {string} */
 function escapeXml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -16,7 +22,7 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-/** @param {number} index @returns {string} */
+/** 把 0 基列序号转成 Excel 列名(0→A、25→Z、26→AA…),26 进制无零。 @param {number} index @returns {string} */
 function columnName(index) {
   let n = index + 1;
   let name = '';
@@ -28,13 +34,13 @@ function columnName(index) {
   return name;
 }
 
-/** @param {unknown} value @param {number} rowIndex @param {number} columnIndex @returns {string} */
+/** 生成单个单元格 XML:计算 A1 引用并以 inlineStr 内联字符串输出。 @param {unknown} value @param {number} rowIndex @param {number} columnIndex @returns {string} */
 function cellXml(value, rowIndex, columnIndex) {
   const ref = `${columnName(columnIndex)}${rowIndex + 1}`;
   return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
 }
 
-/** @param {WorkbookRow} row @param {unknown} column @param {number} index @returns {string} */
+/** 取一行里某列的值:数组行按下标取,对象行按列名取,统一转字符串。 @param {WorkbookRow} row @param {unknown} column @param {number} index @returns {string} */
 function rowValue(row, column, index) {
   if (Array.isArray(row)) {
     return String(row[index] ?? '');
@@ -43,7 +49,7 @@ function rowValue(row, column, index) {
   return String(record[String(column)] ?? '');
 }
 
-/** @param {unknown[]} columns @param {WorkbookRow[]} rows @returns {string} */
+/** 生成 worksheet XML:首行写表头,随后逐行写数据;列/行为空时用占位兜底,并算出 dimension 范围。 @param {unknown[]} columns @param {WorkbookRow[]} rows @returns {string} */
 function sheetXml(columns, rows) {
   const safeColumns = columns.length > 0 ? columns : ['内容'];
   const safeRows = rows.length > 0 ? rows : [['']];
@@ -66,7 +72,7 @@ function sheetXml(columns, rows) {
   ].join('');
 }
 
-/** @param {WorkbookSpec} [spec] @returns {Buffer} */
+/** 由列+行生成最小可打开的 .xlsx;sheet 名截断到 31 字符(Excel 上限),返回 zip 包 Buffer。 @param {WorkbookSpec} [spec] @returns {Buffer} */
 export function createXlsxWorkbook({ sheetName = 'Sheet1', columns = [], rows = [] } = {}) {
   const safeSheetName = escapeXml(String(sheetName || 'Sheet1').slice(0, 31));
   return createZip([

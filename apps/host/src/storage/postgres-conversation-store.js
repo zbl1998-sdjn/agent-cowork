@@ -1,3 +1,10 @@
+// 按用户对话历史的 PostgreSQL 适配(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:与 FileConversationStore 同接口的 PG 后端——按 tenant/user/workspace_key 隔离,
+//       提供 list/query/listFull/get/save(upsert)/remove;沿用同样的 id/分支/消息清洗。
+// 依赖:仅标准库(crypto/path);pg 运行时按需 import。后端:PostgreSQL(conversations 表)。
+// 导出:PostgresConversationStore(类) · createPostgresConversationStore(工厂)。
+//
 // PostgreSQL adapter for per-user conversation history. Tests inject a mock pool.
 // @ts-check
 
@@ -31,28 +38,28 @@ const normTenant = (v) => clampId(v, 'tenant_local');
 /** @param {unknown} v @returns {string} */
 const normUser = (v) => clampId(v, 'user_local');
 
-/** @param {unknown} trustedRoot @returns {string} */
+/** 用受信根目录的 sha256 作为工作区隔离键,使同库不同工作区互不串数据。 @param {unknown} trustedRoot @returns {string} */
 function workspaceKey(trustedRoot) {
   const root = path.resolve(String(trustedRoot || ''));
   return crypto.createHash('sha256').update(root).digest('hex');
 }
 
-/** @param {unknown} id @returns {string} */
+/** 校验对话 id 合法性,非法抛错。 @param {unknown} id @returns {string} */
 function cleanId(id) {
   const t = String(id || '').trim();
   if (!ID_RE.test(t)) throw new Error('invalid conversation id');
   return t;
 }
-/** @param {unknown} messages @returns {unknown[]} */
+/** 仅保留最近 200 条消息。 @param {unknown} messages @returns {unknown[]} */
 function sanitizeMessages(messages) {
   return Array.isArray(messages) ? messages.slice(-200) : [];
 }
-/** @param {unknown} value @returns {string} */
+/** 校验可选 id,非法返回空串。 @param {unknown} value @returns {string} */
 function safeOptionalId(value) {
   const t = String(value || '').trim();
   return ID_RE.test(t) ? t : '';
 }
-/** @param {unknown} branches @returns {ConversationBranch[]} */
+/** 清洗分支列表(限 12 条、补默认 id/标题、逐分支裁剪消息)。 @param {unknown} branches @returns {ConversationBranch[]} */
 function sanitizeBranches(branches) {
   if (!Array.isArray(branches)) return [];
   return branches.slice(-12).map((branch, index) => {
@@ -68,16 +75,16 @@ function sanitizeBranches(branches) {
   });
 }
 
-/** @param {unknown} value @returns {unknown[]} */
+/** 把列值解析为数组:已是数组直接用,字符串则尝试 JSON.parse,失败返回空数组。 @param {unknown} value @returns {unknown[]} */
 function parseJsonArray(value) {
   if (Array.isArray(value)) return value;
   if (typeof value !== 'string') return [];
   try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
 }
 
-/** @param {ConversationRow} row @returns {ConversationBranch[]} */
+/** 从行解析分支数组。 @param {ConversationRow} row @returns {ConversationBranch[]} */
 function parseBranches(row) { return /** @type {ConversationBranch[]} */ (parseJsonArray(row.branches)); }
-/** @param {ConversationRow} row @returns {ConversationSummary} */
+/** 把 DB 行映射为列表摘要(Date 列转 ISO 串)。 @param {ConversationRow} row @returns {ConversationSummary} */
 function summariseRow(row) {
   return {
     id: String(row.id || ''),
@@ -90,9 +97,9 @@ function summariseRow(row) {
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
 }
-/** @param {ConversationRow} row @returns {unknown[]} */
+/** 从行解析消息数组。 @param {ConversationRow} row @returns {unknown[]} */
 function parseMessages(row) { return parseJsonArray(row.messages); }
-/** @param {ConversationRow} row @returns {ConversationRecord} */
+/** 把 DB 行映射为完整对话记录(含消息/分支正文,Date 列转 ISO 串)。 @param {ConversationRow} row @returns {ConversationRecord} */
 function fullRow(row) {
   return {
     id: String(row.id || ''),
@@ -106,6 +113,7 @@ function fullRow(row) {
   };
 }
 
+/** 对话历史的 PG 后端,接口与 FileConversationStore 对齐,按 tenant/user/workspace 隔离。 */
 export class PostgresConversationStore {
   /** @param {PostgresConversationStoreOptions} [options] */
   constructor({ pool = null, connectionString = null, now = () => new Date() } = {}) {
@@ -117,7 +125,7 @@ export class PostgresConversationStore {
     this._now = now;
   }
 
-  /** @returns {Promise<PgPool>} */
+  /** 取/建连接池(pg 按需 import,缺包给出安装提示)。 @returns {Promise<PgPool>} */
   async _getPool() {
     if (this._pool) return this._pool;
     if (!this._connectionString) throw new Error('PostgresConversationStore: pool or connectionString is required');
@@ -130,10 +138,10 @@ export class PostgresConversationStore {
     return pool;
   }
 
-  /** @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
+  /** 取池后执行参数化查询。 @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
   async _query(text, params = []) { const pool = await this._getPool(); return pool.query(text, params); }
 
-  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @returns {Promise<ConversationSummary[]>} */
+  /** 列出该 tenant/user/workspace 的对话摘要(更新时间倒序)。 @param {unknown} trustedRoot @param {ConversationContext} [context] @returns {Promise<ConversationSummary[]>} */
   async list(trustedRoot, context = {}) {
     const r = await this._query(
       `SELECT id, title, pinned, jsonb_array_length(messages) AS message_count,
@@ -145,7 +153,7 @@ export class PostgresConversationStore {
     return (r.rows || []).map((row) => summariseRow(/** @type {ConversationRow} */ (row)));
   }
 
-  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationQueryOptions} [options] @returns {Promise<ConversationQueryResult>} */
+  /** 标题 ILIKE 搜索 + 分页,返回 { items, total };limit 夹在 1~200。 @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationQueryOptions} [options] @returns {Promise<ConversationQueryResult>} */
   async query(trustedRoot, context = {}, { q = '', limit = 30, offset = 0 } = {}) {
     const tenantId = normTenant(context.tenantId);
     const userId = normUser(context.userId);
@@ -171,7 +179,7 @@ export class PostgresConversationStore {
     return { items: (rowsRes.rows || []).map((row) => summariseRow(/** @type {ConversationRow} */ (row))), total };
   }
 
-  /** @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationListFullOptions} [options] @returns {Promise<ConversationRecord[]>} */
+  /** 返回完整对话记录(含消息/分支正文),可选 limit。 @param {unknown} trustedRoot @param {ConversationContext} [context] @param {ConversationListFullOptions} [options] @returns {Promise<ConversationRecord[]>} */
   async listFull(trustedRoot, context = {}, { limit } = {}) {
     const hasLimit = typeof limit === 'number';
     const r = await this._query(
@@ -184,7 +192,7 @@ export class PostgresConversationStore {
     return (r.rows || []).map((row) => fullRow(/** @type {ConversationRow} */ (row)));
   }
 
-  /** @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {Promise<ConversationRecord | null>} */
+  /** 取单个对话完整记录,不存在返回 null。 @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {Promise<ConversationRecord | null>} */
   async get(trustedRoot, id, context = {}) {
     const r = await this._query(
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
@@ -195,7 +203,7 @@ export class PostgresConversationStore {
     return row ? fullRow(row) : null;
   }
 
-  /** @param {unknown} trustedRoot @param {ConversationInput} conv @param {ConversationContext} [context] @returns {Promise<ConversationSummary>} */
+  /** upsert 对话(按 tenant/user/workspace/id 冲突更新),清洗后写入并返回摘要。 @param {unknown} trustedRoot @param {ConversationInput} conv @param {ConversationContext} [context] @returns {Promise<ConversationSummary>} */
   async save(trustedRoot, conv, context = {}) {
     const id = cleanId(conv && conv.id);
     const tenantId = normTenant(context.tenantId);
@@ -228,7 +236,7 @@ export class PostgresConversationStore {
     return summariseRow(row);
   }
 
-  /** @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {Promise<boolean>} */
+  /** 删除单个对话,返回是否真的删除。 @param {unknown} trustedRoot @param {unknown} id @param {ConversationContext} [context] @returns {Promise<boolean>} */
   async remove(trustedRoot, id, context = {}) {
     const r = await this._query(
       `DELETE FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
@@ -237,11 +245,11 @@ export class PostgresConversationStore {
     return (r.rowCount || 0) > 0;
   }
 
-  /** @returns {Promise<void>} */
+  /** 关闭连接池。 @returns {Promise<void>} */
   async close() { if (this._pool && typeof this._pool.end === 'function') await this._pool.end(); }
 }
 
-/** @param {PostgresConversationStoreOptions} [options] @returns {PostgresConversationStore} */
+/** 工厂:构造 PG 后端对话存储。 @param {PostgresConversationStoreOptions} [options] @returns {PostgresConversationStore} */
 export function createPostgresConversationStore(options = {}) {
   return new PostgresConversationStore(options);
 }

@@ -1,3 +1,10 @@
+// 运行索引(runs index)的 PostgreSQL 适配(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:把每次 run 的元数据 upsert 到索引表并支持 get/list/size/stats,字段做归一与截断;
+//       附带 withSafeWrites 包装,让 fire-and-forget 的写不会冒出 unhandledRejection。
+// 依赖:无(仅 pg 运行时按需 import)。后端:PostgreSQL(表名经 safePgIdentifier 校验)。
+// 导出:PostgresRunsIndex(类) · createPostgresRunsIndex(工厂) · withSafeWrites(写包装)。
+//
 // PostgreSQL adapter for the runs index. Async methods stay await-compatible
 // with sync file/sqlite adapters. `pg` is optional and lazily imported; tests
 // inject a mock pool.
@@ -31,7 +38,7 @@ const normaliseTenantId = (v) => clampId(v, 'tenant_local');
 /** @param {unknown} v @returns {string} */
 const normaliseUserId = (v) => clampId(v, 'user_local');
 
-/** @param {unknown} value @returns {string} */
+/** 校验表名合法(表名拼进 SQL 不能参数化,需防注入)。 @param {unknown} value @returns {string} */
 function safePgIdentifier(value) {
   const text = String(value || '').trim();
   if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
@@ -40,7 +47,7 @@ function safePgIdentifier(value) {
   return text;
 }
 
-/** @param {unknown} record @returns {RunRecord} */
+/** 归一一条 run 记录:必填 id 校验、租户/用户回落、字段截断与默认版本。 @param {unknown} record @returns {RunRecord} */
 function normaliseRecord(record) {
   if (!record || typeof record !== 'object') throw new Error('runs-index: record must be an object');
   const input = /** @type {RunRecordInput} */ (record);
@@ -67,13 +74,14 @@ function normaliseRecord(record) {
   };
 }
 
-/** @param {unknown} row @returns {RunRecord | null} */
+/** 从行的 record_json 列还原 RunRecord(字符串则 parse,兼容 jsonb 直返)。 @param {unknown} row @returns {RunRecord | null} */
 function parseRecord(row) {
   if (!row) return null;
   const raw = (/** @type {RunsIndexRow} */ (row)).record_json;
   return /** @type {RunRecord | null} */ (typeof raw === 'string' ? JSON.parse(raw) : raw || null);
 }
 
+/** 运行索引的 PG 后端:upsert 写入并提供 get/list/size/stats 查询。 */
 export class PostgresRunsIndex {
   /** @param {PostgresRunsIndexOptions} [options] */
   constructor({ pool = null, connectionString = null, table = 'runs_index', now = () => new Date() } = {}) {
@@ -87,7 +95,7 @@ export class PostgresRunsIndex {
     this._now = now;
   }
 
-  /** @returns {Promise<PgPool>} */
+  /** 取/建连接池(pg 按需 import,缺包给出安装提示)。 @returns {Promise<PgPool>} */
   async _getPool() {
     if (this._pool) return this._pool;
     if (!this._connectionString) throw new Error('PostgresRunsIndex: pool or connectionString is required');
@@ -102,13 +110,13 @@ export class PostgresRunsIndex {
     return pool;
   }
 
-  /** @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
+  /** 取池后执行参数化查询。 @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
   async _query(text, params = []) {
     const pool = await this._getPool();
     return pool.query(text, params);
   }
 
-  /** @param {RunRecordInput} record @param {RunContext} [context] @returns {Promise<RunRecord>} */
+  /** 插入或更新一条 run 记录(已存在则版本号 +1),返回归一后的记录。 @param {RunRecordInput} record @param {RunContext} [context] @returns {Promise<RunRecord>} */
   async upsert(record, context = {}) {
     const n = normaliseRecord(record);
     const existing = await this.get(n.id);
@@ -135,13 +143,13 @@ export class PostgresRunsIndex {
     return n;
   }
 
-  /** @param {string} id @returns {Promise<boolean>} */
+  /** 按 id 删除一条记录,返回是否真的删除。 @param {string} id @returns {Promise<boolean>} */
   async remove(id) {
     const r = await this._query(`DELETE FROM ${this._table} WHERE id=$1`, [id]);
     return Number(r.rowCount || 0) > 0;
   }
 
-  /** @param {string} id @param {RunsGetOptions} [options] @returns {Promise<RunRecord | null>} */
+  /** 取单条记录;若给定 tenantId 且不匹配则视为不可见返回 null。 @param {string} id @param {RunsGetOptions} [options] @returns {Promise<RunRecord | null>} */
   async get(id, { tenantId } = {}) {
     const r = await this._query(`SELECT record_json FROM ${this._table} WHERE id=$1`, [id]);
     const rec = parseRecord(r.rows && r.rows[0]);
@@ -150,7 +158,7 @@ export class PostgresRunsIndex {
     return rec;
   }
 
-  /** @param {RunsListOptions} [options] @returns {Promise<RunRecord[]>} */
+  /** 按可选条件(租户/用户/状态/类型/recipe)动态拼 WHERE 列表,按时间倒序,limit 夹在 1~500。 @param {RunsListOptions} [options] @returns {Promise<RunRecord[]>} */
   async list({ tenantId, userId, limit = 50, status, type, recipeId } = {}) {
     /** @type {string[]} */
     const where = [];
@@ -174,14 +182,14 @@ export class PostgresRunsIndex {
     return /** @type {RunRecord[]} */ ((r.rows || []).map(parseRecord).filter(Boolean));
   }
 
-  /** @returns {Promise<number>} */
+  /** 返回索引表总行数。 @returns {Promise<number>} */
   async size() {
     const r = await this._query(`SELECT COUNT(*)::int AS count FROM ${this._table}`, []);
     const row = /** @type {RunsIndexRow | undefined} */ (r.rows && r.rows[0]);
     return Number((row && row.count) || 0);
   }
 
-  /** @param {RunsStatsOptions} [options] @returns {Promise<RunsStats>} */
+  /** 统计运行总数及按 status/type 的分组计数(可选按租户过滤)。 @param {RunsStatsOptions} [options] @returns {Promise<RunsStats>} */
   async stats({ tenantId } = {}) {
     /** @type {string[]} */
     const where = [];
@@ -208,13 +216,13 @@ export class PostgresRunsIndex {
     return { total: Number((totalRow && totalRow.count) || 0), byStatus, byType };
   }
 
-  /** @returns {Promise<void>} */
+  /** 关闭连接池。 @returns {Promise<void>} */
   async close() {
     if (this._pool && typeof this._pool.end === 'function') await this._pool.end();
   }
 }
 
-/** @param {PostgresRunsIndexOptions} [options] @returns {PostgresRunsIndex} */
+/** 工厂:构造 PG 后端运行索引。 @param {PostgresRunsIndexOptions} [options] @returns {PostgresRunsIndex} */
 export function createPostgresRunsIndex(options = {}) {
   return new PostgresRunsIndex(options);
 }
@@ -222,7 +230,7 @@ export function createPostgresRunsIndex(options = {}) {
 // Wrap an async index so unawaited write calls (upsert/remove are fire-and-forget
 // at ~8 call sites) never surface as unhandledRejection, while awaited callers
 // still receive the resolved value. Reads stay plain (route handlers await them).
-/** @param {AsyncRunsIndex} index @returns {AsyncRunsIndex} */
+/** 包装异步索引,使 upsert/remove 的 fire-and-forget 写吞掉 rejection,读方法原样透传。 @param {AsyncRunsIndex} index @returns {AsyncRunsIndex} */
 export function withSafeWrites(index) {
   const close = index.close;
   return {

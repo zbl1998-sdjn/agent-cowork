@@ -1,4 +1,10 @@
 // @ts-check
+// 数据可视化渲染器:把 viz 规格渲染成自包含的单页 HTML(host · L1 领域层 · artifacts)
+// ---------------------------------------------------------------------------
+// 职责:支持 chart(Chart.js)/ mermaid(流程图)/ table(纯内联 HTML)三类;
+//       全部用户文本经 HTML 转义、注入 <script> 的数据经编码,杜绝脚本逃逸。
+// 依赖:仅标准库与 cdnjs 上的两个图表库;不依赖本仓其他模块。
+// 导出:renderViz(渲染单页)、常量 VIZ_KINDS(支持的可视化种类清单)
 
 // Inline visualization renderer (the show_widget analog).
 //
@@ -23,6 +29,7 @@ const PARA_SEP = new RegExp(String.fromCharCode(0x2029), "g");
  */
 
 /**
+ * 构造带 statusCode 的可视化错误(消息统一加 "viz: " 前缀)。
  * @param {string} message
  * @param {number} [statusCode]
  * @returns {HttpError}
@@ -33,7 +40,7 @@ function fail(message, statusCode = 400) {
   return error;
 }
 
-/** @param {unknown} value */
+/** HTML 转义,防止用户文本在页面里被当作标签注入。 @param {unknown} value */
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -44,7 +51,7 @@ function escapeHtml(value) {
 }
 
 // JSON safe to embed inside a <script> tag.
-/** @param {unknown} value */
+/** 序列化成可安全嵌入 <script> 的 JSON(转义 < > & 与行/段分隔符)。 @param {unknown} value */
 function safeJson(value) {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
@@ -54,7 +61,7 @@ function safeJson(value) {
     .replace(PARA_SEP, '\\u2029');
 }
 
-/** @param {{ title: string, headExtra?: string, body: string }} options */
+/** 统一的页面外壳:套上 doctype/样式/标题,把 headExtra(脚本标签)与 body 填进去。 @param {{ title: string, headExtra?: string, body: string }} options */
 function htmlShell({ title, headExtra = '', body }) {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -86,7 +93,7 @@ ${body}
 </html>`;
 }
 
-/** @param {any} data */
+/** 规范化图表数据:兼容 datasets 多系列写法与 labels/values 简写,统一成 Chart.js 结构。 @param {any} data */
 function normalizeChartData(data) {
   if (data && Array.isArray(data.datasets)) {
     return { labels: Array.isArray(data.labels) ? data.labels : [], datasets: data.datasets };
@@ -97,6 +104,7 @@ function normalizeChartData(data) {
 }
 
 /**
+ * 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。
  * @param {string} kind
  * @param {string} title
  * @param {VizSpec} spec
@@ -118,6 +126,7 @@ function renderChart(kind, title, spec) {
 }
 
 /**
+ * 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。
  * @param {string} title
  * @param {VizSpec} spec
  */
@@ -137,6 +146,7 @@ function renderMermaid(title, spec) {
 }
 
 /**
+ * 渲染表格页:纯内联 HTML(无 JS),每个单元格都经 HTML 转义。
  * @param {string} title
  * @param {VizSpec} spec
  */
@@ -161,7 +171,7 @@ ${head}          <tbody>
   return htmlShell({ title, body });
 }
 
-/** @param {VizSpec} [spec] */
+/** 可视化渲染入口:按 spec.kind 分发到 chart/mermaid/table,未知种类抛 400。 @param {VizSpec} [spec] */
 export function renderViz(spec = {}) {
   const title = spec.title ? String(spec.title) : '可视化';
   const kind = String(spec.kind || '').toLowerCase();

@@ -1,4 +1,10 @@
 // @ts-check
+// 追加式 JSONL 写入器(按大小轮转)(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:逐行追加 JSON 记录到日志文件;文件将超过 maxBytes 时按 file→file.1→file.2…
+//       轮转(超出 maxFiles 的最旧代丢弃),防止审计/事件日志无限膨胀。
+// 依赖:仅标准库(fs/path)。后端:本地文件系统。
+// 导出:JsonlWriter(类)。
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,6 +17,7 @@ import path from 'node:path';
 const DEFAULT_MAX_BYTES = Number(process.env.KCW_LOG_MAX_BYTES || 8 * 1024 * 1024);
 const DEFAULT_MAX_FILES = Math.max(1, Number(process.env.KCW_LOG_MAX_FILES || 3));
 
+/** 追加式 JSONL 写入器:append 逐行写入,超阈值时按代轮转。 */
 export class JsonlWriter {
   /**
    * @param {string} filePath
@@ -26,6 +33,7 @@ export class JsonlWriter {
   }
 
   /**
+   * 若追加 incomingBytes 后将超过 maxBytes,则轮转日志代次并清空当前文件。
    * @param {number} incomingBytes
    * @returns {void}
    */
@@ -46,6 +54,7 @@ export class JsonlWriter {
   }
 
   /**
+   * 将一条记录序列化为一行 JSON 追加写入(必要时先轮转、自动建目录)。
    * @param {unknown} record
    * @returns {void}
    */

@@ -1,3 +1,11 @@
+// 跨实例 run 事件 pub/sub(PostgreSQL LISTEN/NOTIFY)(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:把本地 RunEventBus 包装成多实例可用——publish 只走 NOTIFY,发布者自己的 LISTEN
+//       连接收回并注入本地总线,保证每实例本地恰好投递一次;subscribe/replay/count 透传本地。
+// 依赖:runtime/run-events(L2,架构基线已显式豁免:本总线适配 runtime 的事件形状)。
+//       pg 运行时按需 import。后端:PostgreSQL(NOTIFY 通道)。
+// 导出:PostgresEventBus(类) · createPostgresEventBus(工厂)。
+//
 // Cross-instance run-event pub/sub backed by PostgreSQL LISTEN/NOTIFY.
 //
 // Keeps the RunEventBus surface (publish / subscribe / replay / subscriberCount)
@@ -17,7 +25,7 @@ import { RunEventBus } from '../runtime/run-events.js';
  * @typedef {{ local?: RunEventBus, client?: PgNotifyClient | null, pool?: PgNotifyPool | null, connectionString?: string | null, channel?: string, pg?: PgModule | null }} PostgresEventBusOptions
  */
 
-/** @param {unknown} value @returns {string} */
+/** 校验 NOTIFY 通道名合法(通道名不能参数化,需防注入)。 @param {unknown} value @returns {string} */
 function safePgIdentifier(value) {
   const text = String(value || '').trim();
   if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
@@ -26,6 +34,7 @@ function safePgIdentifier(value) {
   return text;
 }
 
+/** 跨实例 run 事件总线:本地 RunEventBus + PG NOTIFY 扇出,保持其原有订阅/回放接口。 */
 export class PostgresEventBus {
   /** @param {PostgresEventBusOptions} [options] */
   constructor({ local = new RunEventBus(), client = null, pool = null, connectionString = null, channel = 'kcw_run_events', pg = null } = {}) {
@@ -45,7 +54,7 @@ export class PostgresEventBus {
     this._started = false;
   }
 
-  /** @returns {Promise<PgNotifyClient>} */
+  /** 取/建专用 LISTEN 连接(pg 按需 import,缺包给出安装提示)。 @returns {Promise<PgNotifyClient>} */
   async _getClient() {
     if (this._client) return this._client;
     if (!this._connectionString) {
@@ -72,7 +81,7 @@ export class PostgresEventBus {
     return client;
   }
 
-  /** @returns {Promise<void>} */
+  /** 启动监听:订阅通道,收到合法 NOTIFY 后把远端事件重新注入本地总线。 @returns {Promise<void>} */
   async start() {
     if (this._started) return;
     this._started = true;
@@ -91,7 +100,7 @@ export class PostgresEventBus {
 
   // Fan out via NOTIFY only; the publisher's own LISTEN connection delivers it
   // back locally, so subscribers (here or on any instance) receive it exactly once.
-  /** @param {string} runId @param {import('../runtime/run-events.js').RunEventPublishInput} event @returns {Promise<void>} */
+  /** 仅通过 NOTIFY 扇出事件(本地由自身 LISTEN 连接收回投递)。 @param {string} runId @param {import('../runtime/run-events.js').RunEventPublishInput} event @returns {Promise<void>} */
   publish(runId, event) {
     if (!runId) throw new Error('PostgresEventBus.publish: runId required');
     if (!event || !event.type) throw new Error('PostgresEventBus.publish: event.type required');
@@ -101,15 +110,15 @@ export class PostgresEventBus {
       .catch(() => {});
   }
 
-  /** @param {string} runId @param {import('../runtime/run-events.js').RunEventHandler} handler @returns {() => void} */
+  /** 订阅某 run 的事件(透传本地总线)。 @param {string} runId @param {import('../runtime/run-events.js').RunEventHandler} handler @returns {() => void} */
   subscribe(runId, handler) { return this._local.subscribe(runId, handler); }
-  /** @param {string} runId @param {number} [afterSeq] @returns {import('../runtime/run-events.js').RunEvent[]} */
+  /** 回放某 run 自 afterSeq 之后的事件(透传本地总线)。 @param {string} runId @param {number} [afterSeq] @returns {import('../runtime/run-events.js').RunEvent[]} */
   replay(runId, afterSeq = 0) { return this._local.replay(runId, afterSeq); }
-  /** @param {string} runId @returns {number} */
+  /** 返回某 run 的本地订阅者数量。 @param {string} runId @returns {number} */
   subscriberCount(runId) { return this._local.subscriberCount(runId); }
 }
 
-/** @param {PostgresEventBusOptions} [options] @returns {PostgresEventBus} */
+/** 工厂:构造跨实例 PG run 事件总线。 @param {PostgresEventBusOptions} [options] @returns {PostgresEventBus} */
 export function createPostgresEventBus(options = {}) {
   return new PostgresEventBus(options);
 }

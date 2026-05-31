@@ -1,3 +1,10 @@
+// 计划任务的 PostgreSQL 适配(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:SqliteScheduleStore 的多实例 PG 镜像——把调度记录 upsert 到 schedules 表,
+//       提供 list(可按租户/用户过滤、按 nextFireAt 排序)/get/save/remove,整记录存 schedule_json。
+// 依赖:无(仅 pg 运行时按需 import)。后端:PostgreSQL(表名经 safePgIdentifier 校验)。
+// 导出:PostgresScheduleStore(类) · createPostgresScheduleStore(工厂)。
+//
 // PostgreSQL adapter for scheduled tasks — the multi-instance backend mirror of
 // SqliteScheduleStore. Async (pg is promise-based); `pg` is lazily/optionally
 // imported. Tests inject a mock pool.
@@ -14,7 +21,7 @@
 
 /** @param {unknown} v @param {string} fb @returns {string} */
 function clampId(v, fb) { const t = String(v || '').trim(); return t ? (t.length > 96 ? t.slice(0, 96) : t) : fb; }
-/** @param {unknown} value @returns {string} */
+/** 校验表名合法(表名拼进 SQL 不能参数化,需防注入)。 @param {unknown} value @returns {string} */
 function safePgIdentifier(value) {
   const text = String(value || '').trim();
   if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
@@ -26,13 +33,14 @@ function safePgIdentifier(value) {
 const normTenant = (v) => clampId(v, 'tenant_local');
 /** @param {unknown} v @returns {string} */
 const normUser = (v) => clampId(v, 'user_local');
-/** @param {unknown} row @returns {ScheduleRecord | null} */
+/** 从行的 schedule_json 列还原调度记录(字符串则 parse,兼容 jsonb 直返)。 @param {unknown} row @returns {ScheduleRecord | null} */
 function parseJson(row) {
   if (!row) return null;
   const r = (/** @type {ScheduleRow} */ (row)).schedule_json;
   return typeof r === 'string' ? /** @type {ScheduleRecord} */ (JSON.parse(r)) : /** @type {ScheduleRecord | null} */ (r || null);
 }
 
+/** 计划任务的 PG 后端:整记录存 schedule_json,提供 list/get/save(upsert)/remove。 */
 export class PostgresScheduleStore {
   /** @param {PostgresScheduleStoreOptions} [options] */
   constructor({ pool = null, connectionString = null, table = 'schedules' } = {}) {
@@ -44,7 +52,7 @@ export class PostgresScheduleStore {
     this._table = safePgIdentifier(table);
   }
 
-  /** @returns {Promise<PgPool>} */
+  /** 取/建连接池(pg 按需 import,缺包给出安装提示)。 @returns {Promise<PgPool>} */
   async _getPool() {
     if (this._pool) return this._pool;
     if (!this._connectionString) throw new Error('PostgresScheduleStore: pool or connectionString is required');
@@ -60,10 +68,10 @@ export class PostgresScheduleStore {
     return pool;
   }
 
-  /** @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
+  /** 取池后执行参数化查询。 @param {string} text @param {unknown[]} [params] @returns {Promise<PgResult>} */
   async _query(text, params = []) { const pool = await this._getPool(); return pool.query(text, params); }
 
-  /** @param {ScheduleListOptions} [options] @returns {Promise<ScheduleRecord[]>} */
+  /** 列出调度记录,可按租户/用户过滤,按 next_fire_at 升序(NULL 排最后)。 @param {ScheduleListOptions} [options] @returns {Promise<ScheduleRecord[]>} */
   async list({ tenantId, userId } = {}) {
     const where = [];
     const params = [];
@@ -79,13 +87,13 @@ export class PostgresScheduleStore {
     return (r.rows || []).map(parseJson).filter((record) => record !== null);
   }
 
-  /** @param {string} id @returns {Promise<ScheduleRecord | null>} */
+  /** 按 id 取单条调度记录,不存在返回 null。 @param {string} id @returns {Promise<ScheduleRecord | null>} */
   async get(id) {
     const r = await this._query(`SELECT schedule_json FROM ${this._table} WHERE id=$1`, [id]);
     return parseJson(r.rows && r.rows[0]);
   }
 
-  /** @param {ScheduleRecord} record @returns {Promise<ScheduleRecord>} */
+  /** upsert 调度记录(按 id 冲突更新,各列与 schedule_json 同步),返回入参记录。 @param {ScheduleRecord} record @returns {Promise<ScheduleRecord>} */
   async save(record) {
     await this._query(
       `INSERT INTO ${this._table}
@@ -107,17 +115,17 @@ export class PostgresScheduleStore {
     return record;
   }
 
-  /** @param {string} id @returns {Promise<boolean>} */
+  /** 按 id 删除一条调度记录,返回是否真的删除。 @param {string} id @returns {Promise<boolean>} */
   async remove(id) {
     const r = await this._query(`DELETE FROM ${this._table} WHERE id=$1`, [id]);
     return Number(r.rowCount || 0) > 0;
   }
 
-  /** @returns {Promise<void>} */
+  /** 关闭连接池。 @returns {Promise<void>} */
   async close() { if (this._pool && typeof this._pool.end === 'function') await this._pool.end(); }
 }
 
-/** @param {PostgresScheduleStoreOptions} [options] @returns {PostgresScheduleStore} */
+/** 工厂:构造 PG 后端调度存储。 @param {PostgresScheduleStoreOptions} [options] @returns {PostgresScheduleStore} */
 export function createPostgresScheduleStore(options = {}) {
   return new PostgresScheduleStore(options);
 }

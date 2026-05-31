@@ -1,4 +1,13 @@
 // @ts-check
+// 文件系统后端:主记忆与笔记的读写(host · L1 领域层 · memory)
+// ---------------------------------------------------------------------------
+// 职责:在 <root>/.AgentCowork 下以 Markdown 文件实现记忆读写——读主记忆、列/读/写笔记、
+//       追加事实行,并把构建 system 块/上下文委托给 memory-query;写操作经路径 jail
+//       校验并产生审计事件。同时导出独立函数族与等价的 FileMemoryStore 类两种用法。
+// 依赖:标准库(fs/path)、security/path-policy(路径边界)、同目录 memory-constants/
+//       memory-audit/memory-utils/memory-query。
+// 导出:readMainMemory / listMemoryNotes / readMemoryNote / writeMemoryNote /
+//       appendMemoryFact / buildMemorySystemBlock / loadMemoryContext、FileMemoryStore 类。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,6 +43,7 @@ import {
  */
 
 /**
+ * 读取主记忆文件全文;文件不存在时返回空串。
  * @param {unknown} trustedRoot
  * @returns {string}
  */
@@ -46,6 +56,7 @@ export function readMainMemory(trustedRoot) {
 }
 
 /**
+ * 列出笔记目录下符合命名规则的笔记元信息(名/大小/修改时间/路径),按名排序。
  * @param {unknown} trustedRoot
  * @returns {MemoryNote[]}
  */
@@ -71,6 +82,7 @@ export function listMemoryNotes(trustedRoot) {
 }
 
 /**
+ * 读取单条笔记正文;笔记名非法时抛错,文件不存在时返回 null。
  * @param {unknown} trustedRoot
  * @param {string} noteName
  * @returns {string | null}
@@ -87,6 +99,7 @@ export function readMemoryNote(trustedRoot, noteName) {
 }
 
 /**
+ * 写入单条笔记:校验笔记名、经路径 jail 确认落点在 root 内、按字节上限裁剪后写盘并发审计。
  * @param {unknown} trustedRoot
  * @param {string} noteName
  * @param {unknown} body
@@ -114,6 +127,7 @@ export function writeMemoryNote(trustedRoot, noteName, body, context = {}) {
 }
 
 /**
+ * 向主记忆追加一条事实行:清洗键/值/作用域,空文件先注入表头,保证以换行衔接,按上限裁剪后写盘并发审计。
  * @param {unknown} trustedRoot
  * @param {MemoryFactInput} fact
  * @param {MemoryContext} [context]
@@ -152,6 +166,7 @@ export function appendMemoryFact(trustedRoot, fact, context = {}) {
 }
 
 /**
+ * 构建可注入的记忆 system 块(委托 memory-query,以本文件函数族为只读后端)。
  * @param {unknown} trustedRoot
  * @param {MemoryQueryOptions} [options]
  * @returns {string}
@@ -161,6 +176,7 @@ export function buildMemorySystemBlock(trustedRoot, options = {}) {
 }
 
 /**
+ * 汇总记忆上下文(块文本 + 字节数 + 笔记列表,委托 memory-query)。
  * @param {unknown} trustedRoot
  * @param {MemoryQueryOptions} [options]
  * @returns {{ enabled: boolean, bytes: number, text: string, notes: MemoryNote[] }}
@@ -169,6 +185,7 @@ export function loadMemoryContext(trustedRoot, options = {}) {
   return loadMemoryContextFromStore(fileMemoryApi, trustedRoot, options);
 }
 
+// 把本文件的只读函数打包成 SyncMemoryStoreLike,供 memory-query 复用而不必经过类实例。
 /** @type {import('./memory-query.js').SyncMemoryStoreLike} */
 const fileMemoryApi = {
   readMainMemory,
@@ -176,6 +193,7 @@ const fileMemoryApi = {
   buildMemorySystemBlock,
 };
 
+/** 文件后端的类封装:把上面的独立函数族包成实例方法,实现与 SqliteMemoryStore 一致的接口。 */
 export class FileMemoryStore {
   /** @param {unknown} trustedRoot @returns {string} */
   readMainMemory(trustedRoot) {

@@ -1,4 +1,13 @@
 // @ts-check
+// SQLite 后端:用数据库表实现记忆读写(host · L1 领域层 · memory)
+// ---------------------------------------------------------------------------
+// 职责:以 memory_facts / memory_notes 两张表替代文件存储,按 tenant 隔离做事实追加与
+//       笔记 upsert(冲突按 tenant_id+name 更新),读主记忆时把事实行重组为 Markdown,
+//       构建 system 块/上下文委托 memory-query;写操作产生与文件后端一致的审计事件。
+//       接口与 FileMemoryStore 等价,二者经 createMemoryStore 互换。
+// 依赖:storage/sqlite(数据库句柄)、同目录 memory-constants/memory-audit/
+//       memory-query/memory-utils。
+// 导出:SqliteMemoryStore 类。
 
 import { createSqliteDatabase } from '../storage/sqlite.js';
 import {
@@ -32,8 +41,10 @@ import {
  * @typedef {{ id: string, created_at: string }} MemoryExistingNoteRow
  */
 
+/** SQLite 后端实现,接口对齐 FileMemoryStore;事实/笔记落库并按租户隔离。 */
 export class SqliteMemoryStore {
   /**
+   * 构造:复用传入的 db 句柄,或据 dbPath 新建;db 与 dbPath 均缺失则抛错。
    * @param {{ dbPath?: string, db?: import('../storage/sqlite.js').SqliteDatabase | null, now?: () => Date }} [options]
    */
   constructor({ dbPath, db = null, now = () => new Date() } = {}) {
@@ -47,6 +58,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 读主记忆:按租户取全部事实(按创建/ID 排序),重组为 Markdown 表头 + 事实行并按上限裁剪;无事实返回空串。
    * @param {unknown} trustedRoot
    * @param {MemoryContext} [context]
    * @returns {string}
@@ -71,6 +83,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 列出某租户的笔记元信息(path 用 sqlite:// 伪路径表示),按名排序。
    * @param {unknown} trustedRoot
    * @param {MemoryContext} [context]
    * @returns {MemoryNote[]}
@@ -93,6 +106,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 按租户 + 笔记名读取正文;名非法抛错,无记录返回 null。
    * @param {unknown} trustedRoot
    * @param {string} noteName
    * @param {MemoryContext} [context]
@@ -113,6 +127,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 写笔记:upsert(按 tenant_id+name 冲突更新),复用既有 id 与 created_at 以保留首次创建时间,裁剪正文后发审计。
    * @param {unknown} trustedRoot
    * @param {string} noteName
    * @param {unknown} body
@@ -172,6 +187,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 追加事实:清洗键/值/作用域,生成 ID 后 INSERT 一行(不更新历史,纯追加),并发审计。
    * @param {unknown} trustedRoot
    * @param {MemoryFactInput} fact
    * @param {MemoryContext} [context]
@@ -214,6 +230,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 构建记忆 system 块:先重组主记忆文本,再交给 memory-query 裁剪。
    * @param {unknown} trustedRoot
    * @param {MemoryQueryOptions} [options]
    * @returns {string}
@@ -224,6 +241,7 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * 汇总记忆上下文(委托 memory-query,以本实例为后端)。
    * @param {unknown} trustedRoot
    * @param {MemoryQueryOptions} [options]
    * @returns {{ enabled: boolean, bytes: number, text: string, notes: MemoryNote[] }}

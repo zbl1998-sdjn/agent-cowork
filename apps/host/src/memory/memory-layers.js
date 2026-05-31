@@ -1,4 +1,11 @@
 // @ts-check
+// 分层记忆装载(企业/用户/项目/本地/会话 五层)(host · L1 领域层 · memory)
+// ---------------------------------------------------------------------------
+// 职责:仿 Claude Code 的 CLAUDE.md 层级,从五个来源读取记忆文本,按"低→高"优先级
+//       拼成一段带标签的合并块,供注入到 agent 的 system 段;同时返回各层存在性/字节数。
+// 依赖:仅标准库(node:fs / node:os / node:path)。
+// 导出:loadLayeredMemory。
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,7 +33,7 @@ const LAYER_LABELS = {
   session: '会话记忆',
 };
 
-/** @param {string | null | undefined} filePath @param {number} maxBytes */
+/** 安全读取某层文件并按 maxBytes 截断;路径缺失或不可读时静默返回空串。 @param {string | null | undefined} filePath @param {number} maxBytes */
 function readIfFile(filePath, maxBytes) {
   try {
     if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
@@ -39,7 +46,7 @@ function readIfFile(filePath, maxBytes) {
   return '';
 }
 
-/** @param {LayeredMemoryOptions} [options] */
+/** 装载五层记忆并合并为单段 system 文本;另回报各层来源与字节数(便于诊断)。 @param {LayeredMemoryOptions} [options] */
 export function loadLayeredMemory({
   trustedRoot,
   userHome = os.homedir(),
