@@ -65,7 +65,6 @@ test('OAuth route utilities normalize identities, client id, and status codes', 
       accountId: 'octocat',
     });
     assert.deepEqual(oauthFilter({ tenantId: 123, userId: 'user-a' }, 'github'), {
-      tenantId: undefined,
       userId: 'user-a',
       provider: 'github',
     });
@@ -329,6 +328,43 @@ test('GitHub OAuth start requires approved connector scopes', async () => {
     });
     assert.equal(replay.status, 403);
     assert.equal(calls.length, 1);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('GitHub OAuth routes validate approval and session route tokens', async () => {
+  const root = tmp();
+  const credentialStore = createCredentialStore({
+    filePath: path.join(root, 'credentials.json'),
+    protector: testProtector(),
+  });
+  let fetchCalled = false;
+  const server = createServer({
+    trustedRoot: root,
+    requireAuth: false,
+    enableScheduler: false,
+    credentialStore,
+    oauthFetch: async () => {
+      fetchCalled = true;
+      return jsonResponse({});
+    },
+    oauthConfig: { github: { clientId: 'test-client' } },
+  });
+  const base = await bind(server);
+  try {
+    const invalidApproval = await J(base, '/api/connectors/oauth/start', {
+      method: 'POST',
+      body: { id: 'github', scopes: ['read:user'], approvalId: '../bad' },
+    });
+    assert.equal(invalidApproval.status, 400);
+
+    const invalidSession = await J(base, '/api/connectors/oauth/complete', {
+      method: 'POST',
+      body: { id: 'github', sessionId: '../bad' },
+    });
+    assert.equal(invalidSession.status, 400);
+    assert.equal(fetchCalled, false);
   } finally {
     await closeTestServer(server);
   }

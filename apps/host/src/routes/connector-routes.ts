@@ -5,8 +5,12 @@
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { listConnectors, suggestConnectors } from '../connectors/catalog.js';
+import { omitUndefined } from '../util/object.js';
 import { handleConnectorOAuthRoutes } from './connector-oauth-routes.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { CredentialStore } from '../security/credential-store.js';
+import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
+import type { ConnectorOAuthSession } from './connector-oauth-routes.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteError = Error & { statusCode?: number };
@@ -25,9 +29,9 @@ type ConnectorRouteOptions = {
   requestContext: RequestContext;
   connectMcp?: (servers: ConnectorSpec[]) => Promise<ConnectMcpResult>;
   toolRegistry?: ToolRegistryLike | null;
-  credentialStore?: unknown;
-  oauthPermissionApprovals?: unknown;
-  oauthSessions: Map<string, unknown>;
+  credentialStore?: CredentialStore;
+  oauthPermissionApprovals?: OAuthPermissionApprovalStore;
+  oauthSessions: Map<string, ConnectorOAuthSession>;
   oauthFetch?: typeof globalThis.fetch;
   oauthConfig?: { github?: { clientId?: unknown } };
   safeTrustedRoot(input?: unknown): string;
@@ -113,7 +117,7 @@ export async function handleConnectorRoutes({
   }
 
   if (pathname.startsWith('/api/connectors/oauth/')) {
-    return handleConnectorOAuthRoutes({
+    return handleConnectorOAuthRoutes(omitUndefined({
       request,
       response,
       pathname,
@@ -124,7 +128,7 @@ export async function handleConnectorRoutes({
       oauthSessions,
       oauthFetch,
       oauthConfig,
-    });
+    }));
   }
 
   if (request.method === 'POST' && pathname === '/api/connectors/connect') {
@@ -140,7 +144,7 @@ export async function handleConnectorRoutes({
         return;
       }
       const trustedRoot = safeTrustedRoot(input.trustedRoot);
-      const spec = buildConnectorSpec(input.id, { fsServerPath, trustedRoot });
+      const spec = buildConnectorSpec(input.id, omitUndefined({ fsServerPath, trustedRoot }));
       if (!spec) {
         sendJson(response, 400, { error: 'unsupported connector: only host-defined builtins can be connected (client-supplied commands are not allowed)' });
         return;

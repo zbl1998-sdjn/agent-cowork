@@ -4,12 +4,12 @@
 //       (审批/工具调用/收尾),全程发事件并落 run 记录/trace。是用户聊天体验的核心路由。
 // 依赖:L1 kimi/agent(tool-loop/toolset/finalize)+ memory/workspace + L2 hooks/action-audit/run-trace
 //       + 同层 agent-resume/session-model-config 等。导出:streamAgentChat。
-// @ts-check
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createRunTrace } from '../runtime/run-trace.js';
 import { loadImageContentParts } from '../workspace/image-loader.js';
+import { omitUndefined } from '../util/object.js';
 import { friendlyAgentError } from '../kimi/agent/model-resilience.js';
 import { sse } from '../kimi/agent/finalize.js';
 import { runAgentChat } from '../kimi/agent/tool-loop.js';
@@ -18,26 +18,59 @@ import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
+import { parseAgentStreamBody } from './agent-stream-schemas.js';
+import type { HttpResponseLike } from '../http/request-utils.js';
+import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
+import type { ModelCall } from '../kimi/agent/model-resilience.js';
+import type { RunAgentChatOptions } from '../kimi/agent/tool-loop.js';
+import type { RequestContext, ApprovalRegistry as AgentApprovalRegistry } from '../kimi/agent/approval-gate.js';
+import type { SandboxLike, SandboxLimits } from '../kimi/agent-tools.js';
+import type { AgentDeps, Scheduler, SkillRegistry, ToolRegistry } from '../kimi/agent/toolset-builder.js';
+import type { RunsIndexLike } from './agent-stream-record.js';
 
-/**
- * @typedef {Record<string, unknown> & { prompt?: unknown, images?: unknown, autoApprove?: unknown, maxSteps?: unknown, verify?: unknown, thinking?: unknown, planMode?: unknown, developerMode?: unknown, mode?: unknown, clarifyBeforeModel?: unknown, autoClarify?: unknown }} RequestBody
- * @typedef {{ write(chunk?: string | Buffer): unknown, writeHead(status: number, headers?: Record<string, string>): unknown, end(chunk?: string): unknown, on?(event: string, listener: () => void): unknown }} ResponseLike
- * @typedef {{ on?(event: string, listener: () => void): unknown }} RequestLike
- * @typedef {{ signal: AbortSignal }} RunController
- * @typedef {{ register(runId: string): RunController, cancel(runId: string): unknown, done(runId: string): unknown }} CancellationRegistry
- * @typedef {import('../kimi/agent/toolset-builder.js').SkillRegistry & { enabledSkills?: () => Array<{ id: unknown, name: unknown, description?: unknown }> }} SkillRegistryLike
- * @typedef {import('../kimi/agent/approval-gate.js').RequestContext} RequestContext
- * @typedef {import('../kimi/agent/approval-gate.js').ApprovalRegistry & { cancelByRun?: (runId: string) => unknown }} ApprovalRegistry
- * @typedef {{ publish(runId: string, event: Record<string, unknown>): unknown }} RunEventsLike
- * @typedef {{ text: unknown, steps: unknown[], usage?: unknown }} AgentOutcome
- * @typedef {{ response: ResponseLike, requestContext: RequestContext, body: RequestBody, kimiConfig: Record<string, unknown>, trustedRoot: string, runStoreRoot: string, runsIndex: import('./agent-stream-record.js').RunsIndexLike, modelCall?: import('../kimi/agent/model-resilience.js').ModelCall, sandbox?: import('../kimi/agent-tools.js').SandboxLike, sandboxLimits?: import('../kimi/agent-tools.js').SandboxLimits, runEvents?: RunEventsLike | null, approvals?: ApprovalRegistry | null, toolRegistry?: import('../kimi/agent/toolset-builder.js').ToolRegistry | null, skillRegistry?: SkillRegistryLike | null, userHome?: string, cancellation?: CancellationRegistry | null, request?: RequestLike | null, scheduler?: import('../kimi/agent/toolset-builder.js').Scheduler | null }} StreamAgentChatOptions
- */
+type ResponseLike = HttpResponseLike & {
+  write(chunk?: string | Buffer): unknown;
+  on?(event: string, listener: () => void): unknown;
+};
+type RequestLike = { on?(event: string, listener: () => void): unknown };
+type RunController = { signal: AbortSignal };
+type CancellationRegistry = {
+  register(runId: string): RunController;
+  cancel(runId: string): unknown;
+  done(runId: string): unknown;
+};
+type SkillRegistryLike = SkillRegistry & {
+  enabledSkills?: () => Array<{ id: unknown; name: unknown; description?: unknown }>;
+};
+type StreamRequestContext = RequestContext & { traceId?: unknown };
+type ApprovalRegistry = AgentApprovalRegistry & { cancelByRun?: (runId: string) => unknown };
+type RunEventsLike = { publish(runId: string, event: Record<string, unknown>): unknown };
+type AgentOutcome = { text: string; steps: Array<Record<string, unknown>>; usage?: unknown };
+export type StreamAgentChatOptions = {
+  response: ResponseLike;
+  requestContext: StreamRequestContext;
+  body: unknown;
+  kimiConfig: unknown;
+  trustedRoot: string;
+  runStoreRoot: string;
+  runsIndex: RunsIndexLike;
+  modelCall?: ModelCall;
+  sandbox?: SandboxLike | null;
+  sandboxLimits?: SandboxLimits;
+  runEvents?: RunEventsLike | null;
+  approvals?: ApprovalRegistry | null;
+  toolRegistry?: ToolRegistry | null;
+  skillRegistry?: SkillRegistryLike | null;
+  userHome?: string;
+  cancellation?: CancellationRegistry | null;
+  request?: RequestLike | null;
+  scheduler?: Scheduler | null;
+};
 
-/** @param {StreamAgentChatOptions} options */
 export async function streamAgentChat({
   response,
   requestContext,
-  body,
+  body: rawBody,
   kimiConfig,
   trustedRoot,
   runStoreRoot,
@@ -53,7 +86,8 @@ export async function streamAgentChat({
   cancellation = null,
   request = null,
   scheduler = null,
-}) {
+}: StreamAgentChatOptions): Promise<void> {
+  const body = parseAgentStreamBody(rawBody);
   const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot });
   const runKimiConfig = applySessionModelConfig(kimiConfig, body);
   if (resumed && !resumeState) {
@@ -79,27 +113,29 @@ export async function streamAgentChat({
   if (response && typeof response.on === 'function') response.on('close', onDisconnect);
   if (request && typeof request.on === 'function') request.on('close', onDisconnect);
 
-  /** @type {Array<Record<string, unknown>>} */
-  const events = [];
-  /** @type {(type: string, data: Record<string, unknown>) => void} */
-  const emit = (type, data) => { events.push({ type, ...data }); sse(response, type, data); };
-  /** @type {AgentOutcome} */
-  let outcome = { text: '', steps: [] };
+  const events: Array<Record<string, unknown>> = [];
+  const emit = (type: string, data: unknown): void => {
+    const eventData = data && typeof data === 'object' && !Array.isArray(data)
+      ? data as Record<string, unknown>
+      : { value: data };
+    events.push({ type, ...eventData });
+    sse(response, type, data);
+  };
+  let outcome: AgentOutcome = { text: '', steps: [] };
   let status = 'succeeded';
   try {
     const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext };
-    const hooks = loadHooksConfig({
+    const hooks = loadHooksConfig(omitUndefined({
       trustedRoot,
-      sandbox: /** @type {import('../runtime/hooks.js').SandboxLike | null | undefined} */ (/** @type {unknown} */ (sandbox)),
+      sandbox: sandbox as unknown as HookSandboxLike | null | undefined,
       sandboxLimits,
-    });
+    })) as unknown as RunAgentChatOptions['hooks'];
     const auditBus = getActionAuditBus(trustedRoot);
     const imageParts = Array.isArray(body.images) && body.images.length
       ? loadImageContentParts({ trustedRoot, paths: body.images })
       : [];
     const userContent = imageParts.length ? [{ type: 'text', text: String(body.prompt || '') }, ...imageParts] : null;
-    /** @type {NonNullable<import('../kimi/agent/toolset-builder.js').AgentDeps['runAgentChat']>} */
-    const subAgentRunner = (args) => runAgentChat(/** @type {Parameters<typeof runAgentChat>[0]} */ (/** @type {unknown} */ (args)));
+    const subAgentRunner: NonNullable<AgentDeps['runAgentChat']> = (args) => runAgentChat(args as RunAgentChatOptions);
     const agentTools = buildAgentToolset({
       ctx: agentCtx,
       toolRegistry,
@@ -120,14 +156,20 @@ export async function streamAgentChat({
     });
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
-    const memory = loadLayeredMemory({ trustedRoot, userHome });
+    const memory = loadLayeredMemory(omitUndefined({ trustedRoot, userHome }));
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
-    const budgetGuard = createAgentBudgetGuard({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs });
-    const runTrace = createRunTrace({ runId, runEvents });
+    const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
+    const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
-      ? skillRegistry.enabledSkills().map((sk) => ({ id: sk.id, name: sk.name, description: sk.description }))
+      ? skillRegistry.enabledSkills()
+        .map((sk) => ({
+          id: String(sk.id || ''),
+          name: String(sk.name || ''),
+          description: typeof sk.description === 'string' ? sk.description : undefined,
+        }))
+        .filter((sk) => sk.id && sk.name)
       : [];
-    outcome = await runAgentChat(/** @type {Parameters<typeof runAgentChat>[0]} */ ({
+    outcome = await runAgentChat({
       prompt: body.prompt,
       kimiConfig: runKimiConfig,
       trustedRoot,
@@ -158,9 +200,9 @@ export async function streamAgentChat({
       budgetGuard,
       runTimeoutMs,
       checkpointer,
-      resumeState,
+      resumeState: resumeState as RunAgentChatOptions['resumeState'],
       runTrace,
-    }));
+    });
     if (controller && controller.signal.aborted) {
       status = 'cancelled';
       sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });
@@ -169,7 +211,7 @@ export async function streamAgentChat({
     }
   } catch (err) {
     status = 'failed';
-    sse(response, 'error', { error: friendlyAgentError(err, /** @type {{ traceId?: unknown }} */ (requestContext)), runId });
+    sse(response, 'error', { error: friendlyAgentError(err, requestContext), runId });
   } finally {
     finished = true;
     if (cancellation) cancellation.done(runId);

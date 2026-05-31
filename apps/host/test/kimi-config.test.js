@@ -89,6 +89,29 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
   });
 });
 
+test('POST /api/kimi/config rejects non-object JSON bodies without changing config', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-kimicfg-invalid-body');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    await fetch(`${baseUrl}/api/kimi/config`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ apiKey: SECRET, model: 'stable-model' }),
+    });
+
+    const res = await fetch(`${baseUrl}/api/kimi/config`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify([]),
+    });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /invalid kimi config request/i);
+
+    const info = await (await fetch(`${baseUrl}/api/kimi/info`)).json();
+    assert.equal(info.hasKey, true);
+    assert.equal(info.model, 'stable-model');
+  });
+});
+
 test('POST /api/kimi/config stores provider without echoing the key', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-provider');
   await withServer({ trustedRoot }, async (baseUrl) => {

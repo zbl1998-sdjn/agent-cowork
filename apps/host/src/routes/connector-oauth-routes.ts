@@ -1,31 +1,76 @@
 // 连接器 OAuth 路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/connectors/*/oauth/* —— 发起 OAuth(如 GitHub 设备码)、轮询换 token、保存加密凭据、撤销授权。
-//       授权范围先经 L2 oauth-permission-approvals 审批。依赖:同层 connector-oauth-route-utils + L1 connectors/security。
+//       授权范围先经 L2 oauth-permission-approvals 审批。依赖:同层 route schemas/utils + L1 connectors/security。
 // 导出:handleConnectorOAuthRoutes。
 import crypto from 'node:crypto';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { completeGitHubDeviceFlow, fetchGitHubViewer, startGitHubDeviceFlow } from '../connectors/oauth-github.js';
 import { normalizeOAuthScopes, oauthPermissions, selectedOAuthPermissions } from '../connectors/oauth-permissions.js';
-import { errorMessage, errorStatus, GITHUB_CLIENT_ID_ENV_KEYS, githubClientId, githubConnector, isGitHub, oauthFilter, oauthIdentity } from './connector-oauth-route-utils.js';
+import {
+  errorMessage,
+  errorStatus,
+  GITHUB_CLIENT_ID_ENV_KEYS,
+  githubClientId,
+  githubConnector,
+  isGitHub,
+  oauthFilter,
+  oauthIdentity,
+} from './connector-oauth-route-utils.js';
+import { parseConnectorOAuthBody } from './connector-oauth-route-schemas.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { OAuthPermission } from '../connectors/oauth-permissions.js';
+import type { CredentialStore } from '../security/credential-store.js';
+import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
+import type { RequestContext } from './connector-oauth-route-utils.js';
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {import('./connector-oauth-route-utils.js').RequestContext} RequestContext
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, credentialStore?: any, oauthPermissionApprovals?: any, oauthSessions: Map<string, any>, oauthFetch?: typeof globalThis.fetch, oauthConfig?: { github?: { clientId?: unknown } } }} ConnectorOAuthRouteOptions
- * @typedef {{ id?: unknown, scopes?: unknown, approvalId?: unknown, oauthApprovalId?: unknown, clientSecret?: unknown, sessionId?: unknown }} ConnectorOAuthBody
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type GitHubOAuthConfig = { github?: { clientId?: unknown } };
 
-/** @param {ConnectorOAuthRouteOptions} options */
+export type ConnectorOAuthSession = {
+  provider: 'github';
+  clientId: string;
+  deviceCode: string;
+  scopes: string[];
+  permissions?: OAuthPermission[];
+  tenantId?: string;
+  userId?: string;
+  expiresAtMs: number;
+};
+
+export type ConnectorOAuthRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestUrl: URL;
+  requestContext: RequestContext;
+  credentialStore?: CredentialStore;
+  oauthPermissionApprovals?: OAuthPermissionApprovalStore;
+  oauthSessions: Map<string, ConnectorOAuthSession>;
+  oauthFetch?: typeof globalThis.fetch;
+  oauthConfig?: GitHubOAuthConfig;
+};
+
+function unsupportedOAuthConnector(response: HttpResponseLike): void {
+  sendJson(response, 400, { error: 'unsupported OAuth connector' });
+}
+
 export async function handleConnectorOAuthRoutes({
-  request, response, pathname, requestUrl, requestContext,
-  credentialStore, oauthPermissionApprovals, oauthSessions, oauthFetch, oauthConfig,
-}) {
+  request,
+  response,
+  pathname,
+  requestUrl,
+  requestContext,
+  credentialStore,
+  oauthPermissionApprovals,
+  oauthSessions,
+  oauthFetch,
+  oauthConfig,
+}: ConnectorOAuthRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/connectors/oauth/status') {
     const id = requestUrl.searchParams.get('id') || requestUrl.searchParams.get('provider') || '';
     if (!isGitHub(id) || !credentialStore) {
-      sendJson(response, 400, { error: 'unsupported OAuth connector' });
+      unsupportedOAuthConnector(response);
       return true;
     }
     const accounts = credentialStore.list(oauthFilter(requestContext, 'github'));
@@ -46,9 +91,10 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/approve') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      const input = parseConnectorOAuthBody(response, body);
+      if (!input) return;
       if (!isGitHub(input.id) || !oauthPermissionApprovals) {
-        sendJson(response, 400, { error: 'unsupported OAuth connector' });
+        unsupportedOAuthConnector(response);
         return;
       }
       try {
@@ -77,9 +123,10 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/start') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {ConnectorOAuthBody} */ (body || {});
-      if (!isGitHub(input.id)) {
-        sendJson(response, 400, { error: 'unsupported OAuth connector' });
+      const input = parseConnectorOAuthBody(response, body);
+      if (!input) return;
+      if (!isGitHub(input.id) || !oauthPermissionApprovals) {
+        unsupportedOAuthConnector(response);
         return;
       }
       if (input.clientSecret) {
@@ -143,9 +190,10 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/complete') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {ConnectorOAuthBody} */ (body || {});
-      const sessionId = String(input.sessionId || '');
-      const session = oauthSessions && oauthSessions.get(sessionId);
+      const input = parseConnectorOAuthBody(response, body);
+      if (!input) return;
+      const sessionId = input.sessionId || '';
+      const session = oauthSessions.get(sessionId);
       if (!isGitHub(input.id) || !session || session.provider !== 'github') {
         sendJson(response, 404, { error: 'OAuth session not found' });
         return;
@@ -157,6 +205,10 @@ export async function handleConnectorOAuthRoutes({
       if (Date.now() > session.expiresAtMs) {
         oauthSessions.delete(sessionId);
         sendJson(response, 410, { error: 'OAuth session expired' });
+        return;
+      }
+      if (!credentialStore) {
+        unsupportedOAuthConnector(response);
         return;
       }
       try {
@@ -200,9 +252,10 @@ export async function handleConnectorOAuthRoutes({
 
   if (request.method === 'POST' && pathname === '/api/connectors/oauth/revoke') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {ConnectorOAuthBody} */ (body || {});
+      const input = parseConnectorOAuthBody(response, body);
+      if (!input) return;
       if (!isGitHub(input.id) || !credentialStore) {
-        sendJson(response, 400, { error: 'unsupported OAuth connector' });
+        unsupportedOAuthConnector(response);
         return;
       }
       const removed = credentialStore.deleteMany(oauthFilter(requestContext, 'github'));
