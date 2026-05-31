@@ -163,7 +163,7 @@
     "apps/host/src/routes/agent-config-snapshot.ts",
     "apps/host/src/routes/agent-stream.js",
     "apps/host/src/routes/agent-stream-budget.ts",
-    "apps/host/src/routes/agent-stream-record.js",
+    "apps/host/src/routes/agent-stream-record.ts",
     "apps/host/src/routes/agent-resume.ts",
     "apps/host/src/routes/approval-routes.js",
     "apps/host/src/routes/artifact-routes.js",

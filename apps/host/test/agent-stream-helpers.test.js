@@ -116,4 +116,19 @@ test('recordAgentRun normalizes provider, writes index summary, and swallows rec
     outcome: {},
     events: [],
   }));
+
+  assert.doesNotThrow(() => recordAgentRun({
+    runStoreRoot,
+    runsIndex,
+    requestContext: {},
+    runId: 'run_invalid_started_at',
+    kimiConfig: {},
+    body: {},
+    trustedRoot: runStoreRoot,
+    startedAt: 'not-a-date',
+    status: 'failed',
+    prompt: '',
+    outcome: {},
+    events: [],
+  }));
 });
