@@ -135,7 +135,7 @@
     "apps/host/src/runtime/rate-limit.ts",
     "apps/host/src/runtime/resilience.ts",
     "apps/host/src/runtime/run-attribution.ts",
-    "apps/host/src/runtime/run-checkpoint.js",
+    "apps/host/src/runtime/run-checkpoint.ts",
     "apps/host/src/runtime/run-trace-sanitizers.ts",
     "apps/host/src/runtime/run-trace-normalizers.ts",
     "apps/host/src/runtime/run-trace.js",
