@@ -83,7 +83,7 @@
     "apps/host/src/memory/file-memory-store.js",
     "apps/host/src/memory/memory-audit.ts",
     "apps/host/src/memory/memory-constants.ts",
-    "apps/host/src/memory/memory-layers.js",
+    "apps/host/src/memory/memory-layers.ts",
     "apps/host/src/memory/memory-query.ts",
     "apps/host/src/memory/memory-store.ts",
     "apps/host/src/memory/memory-utils.ts",
