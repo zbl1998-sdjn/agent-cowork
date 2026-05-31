@@ -15,7 +15,7 @@ export type SqliteStatement = {
   run(...params: unknown[]): { changes?: number };
   all(...params: unknown[]): unknown[];
 };
-export type SqliteDatabase = { prepare(sql: string): SqliteStatement };
+export type SqliteDatabase = { exec(sql: string): unknown; prepare(sql: string): SqliteStatement };
 export type CreateRunsIndexOptions = {
   backend?: string;
   indexRoot?: string;

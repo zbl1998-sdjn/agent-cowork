@@ -2,37 +2,41 @@
 // ---------------------------------------------------------------------------
 // 职责:运行索引的 SQLite 持久化后端,与文件后端同接口(端口与适配器),适合需要高效查询/大量历史的场景。
 // 依赖:storage/sqlite + 同层 runs-index-utils。导出:SqliteRunsIndex。
-// @ts-check
-import { createSqliteDatabase } from '../storage/sqlite.js';
-import { normaliseRecord, normaliseTenantId, normaliseUserId } from './runs-index-utils.js';
+import { createSqliteDatabase, type SqliteDatabase } from '../storage/sqlite.js';
+import {
+  normaliseRecord,
+  normaliseTenantId,
+  normaliseUserId,
+  type NormalisedRunRecord,
+} from './runs-index-utils.js';
 
-/**
- * @typedef {{ get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number }, all(...params: unknown[]): unknown[] }} SqliteStatement
- * @typedef {{ prepare(sql: string): SqliteStatement }} SqliteDatabase
- * @typedef {{ id: string, tenantId: string, userId: string, traceId: string, type: string, status: string, startedAt?: unknown, updatedAt?: unknown, version?: number, [key: string]: unknown }} RunIndexRecord
- * @typedef {{ dbPath?: string, db?: SqliteDatabase | null, now?: () => Date }} SqliteRunsIndexOptions
- * @typedef {{ traceId?: unknown }} RunsIndexContext
- * @typedef {{ tenantId?: unknown, userId?: unknown, limit?: unknown, status?: unknown, type?: unknown, recipeId?: unknown }} RunsIndexListOptions
- * @typedef {{ record_json?: string, count?: unknown, status?: unknown, type?: unknown }} RunsIndexRow
- */
+export type RunIndexRecord = NormalisedRunRecord & Record<string, unknown>;
+export type SqliteRunsIndexOptions = { dbPath?: string; db?: SqliteDatabase | null; now?: () => Date };
+export type RunsIndexContext = { traceId?: unknown };
+export type RunsIndexListOptions = {
+  tenantId?: unknown;
+  userId?: unknown;
+  limit?: unknown;
+  status?: unknown;
+  type?: unknown;
+  recipeId?: unknown;
+};
+type RunsIndexRow = { record_json?: string; count?: unknown; status?: unknown; type?: unknown };
 
 export class SqliteRunsIndex {
-  /** @param {SqliteRunsIndexOptions} [options] */
-  constructor({ dbPath, db = null, now = () => new Date() } = {}) {
+  readonly db: SqliteDatabase;
+  readonly now: () => Date;
+
+  constructor({ dbPath, db = null, now = () => new Date() }: SqliteRunsIndexOptions = {}) {
     if (!db && (!dbPath || typeof dbPath !== 'string')) {
       throw new Error('SqliteRunsIndex: dbPath is required');
     }
-    this.db = db || createSqliteDatabase(/** @type {string} */ (dbPath));
+    this.db = db || createSqliteDatabase(dbPath as string);
     this.now = now;
   }
 
-  /**
-   * @param {unknown} record
-   * @param {RunsIndexContext} [context]
-   * @returns {RunIndexRecord}
-   */
-  upsert(record, context = {}) {
-    const normalised = normaliseRecord(record);
+  upsert(record: unknown, context: RunsIndexContext = {}): RunIndexRecord {
+    const normalised = normaliseRecord(record) as RunIndexRecord;
     const existing = this.get(normalised.id);
     const now = this.now().toISOString();
     if (existing) {
@@ -89,35 +93,33 @@ export class SqliteRunsIndex {
     return normalised;
   }
 
-  /** @param {unknown} id @returns {boolean} */
-  remove(id) {
+  remove(id: unknown): boolean {
     const result = this.db.prepare('DELETE FROM runs_index WHERE id = ?').run(id);
     return Number(result.changes) > 0;
   }
 
-  /**
-   * @param {unknown} id
-   * @param {{ tenantId?: unknown }} [options]
-   * @returns {RunIndexRecord | null}
-   */
-  get(id, { tenantId } = {}) {
-    const row = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare('SELECT record_json FROM runs_index WHERE id = ?').get(id));
+  get(id: unknown, { tenantId }: { tenantId?: unknown } = {}): RunIndexRecord | null {
+    const row = this.db.prepare('SELECT record_json FROM runs_index WHERE id = ?').get(id) as RunsIndexRow | null | undefined;
     if (!row) {
       return null;
     }
-    const record = /** @type {RunIndexRecord} */ (JSON.parse(String(row.record_json || '{}')));
+    const record = JSON.parse(String(row.record_json || '{}')) as RunIndexRecord;
     if (tenantId && record.tenantId !== normaliseTenantId(tenantId)) {
       return null;
     }
     return record;
   }
 
-  /** @param {RunsIndexListOptions} [options] @returns {RunIndexRecord[]} */
-  list({ tenantId, userId, limit = 50, status, type, recipeId } = {}) {
-    /** @type {string[]} */
-    const where = [];
-    /** @type {unknown[]} */
-    const params = [];
+  list({
+    tenantId,
+    userId,
+    limit = 50,
+    status,
+    type,
+    recipeId,
+  }: RunsIndexListOptions = {}): RunIndexRecord[] {
+    const where: string[] = [];
+    const params: unknown[] = [];
     if (tenantId) {
       where.push('tenant_id = ?');
       params.push(normaliseTenantId(tenantId));
@@ -145,44 +147,39 @@ export class SqliteRunsIndex {
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY COALESCE(started_at, updated_at, created_at) DESC
       LIMIT ?
-    `).all(...params, cap);
-    return rows.map((row) => JSON.parse(String(/** @type {RunsIndexRow} */ (row).record_json || '{}')));
+    `).all(...params, cap) as RunsIndexRow[];
+    return rows.map((row) => JSON.parse(String(row.record_json || '{}')) as RunIndexRecord);
   }
 
-  /** @returns {number} */
-  size() {
-    const row = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare('SELECT COUNT(*) AS count FROM runs_index').get());
+  size(): number {
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM runs_index').get() as RunsIndexRow | null | undefined;
     return Number(row?.count || 0);
   }
 
-  /**
-   * @param {{ tenantId?: unknown }} [options]
-   * @returns {{ total: number, byStatus: Record<string, number>, byType: Record<string, number> }}
-   */
-  stats({ tenantId } = {}) {
-    /** @type {string[]} */
-    const where = [];
-    /** @type {unknown[]} */
-    const params = [];
+  stats({ tenantId }: { tenantId?: unknown } = {}): {
+    total: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+  } {
+    const where: string[] = [];
+    const params: unknown[] = [];
     if (tenantId) {
       where.push('tenant_id = ?');
       params.push(normaliseTenantId(tenantId));
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const totalRow = /** @type {RunsIndexRow | null | undefined} */ (this.db.prepare(`SELECT COUNT(*) AS count FROM runs_index ${whereSql}`).get(...params));
-    /** @type {Record<string, number>} */
-    const byStatus = Object.create(null);
-    /** @type {Record<string, number>} */
-    const byType = Object.create(null);
-    const statusRows = /** @type {RunsIndexRow[]} */ (this.db.prepare(`
+    const totalRow = this.db.prepare(`SELECT COUNT(*) AS count FROM runs_index ${whereSql}`).get(...params) as RunsIndexRow | null | undefined;
+    const byStatus: Record<string, number> = Object.create(null);
+    const byType: Record<string, number> = Object.create(null);
+    const statusRows = this.db.prepare(`
       SELECT status, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY status
-    `).all(...params));
+    `).all(...params) as RunsIndexRow[];
     for (const row of statusRows) {
       byStatus[String(row.status || '')] = Number(row.count) || 0;
     }
-    const typeRows = /** @type {RunsIndexRow[]} */ (this.db.prepare(`
+    const typeRows = this.db.prepare(`
       SELECT type, COUNT(*) AS count FROM runs_index ${whereSql} GROUP BY type
-    `).all(...params));
+    `).all(...params) as RunsIndexRow[];
     for (const row of typeRows) {
       byType[String(row.type || '')] = Number(row.count) || 0;
     }
