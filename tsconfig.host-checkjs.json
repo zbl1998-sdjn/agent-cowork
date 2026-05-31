@@ -36,7 +36,7 @@
     "apps/host/src/kimi/agent/clarification.ts",
     "apps/host/src/kimi/agent/finalize.ts",
     "apps/host/src/kimi/agent/loop-guard.ts",
-    "apps/host/src/kimi/agent/model-resilience.js",
+    "apps/host/src/kimi/agent/model-resilience.ts",
     "apps/host/src/kimi/agent/parallel-agent-tool.js",
     "apps/host/src/kimi/agent/run-trace-events.ts",
     "apps/host/src/kimi/agent/run-timeout.ts",
