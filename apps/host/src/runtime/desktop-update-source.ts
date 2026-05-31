@@ -4,6 +4,7 @@
 // 依赖:node:fs/path。导出:桌面更新源解析函数。
 import fs from 'node:fs';
 import path from 'node:path';
+import { omitUndefined } from '../util/object.js';
 
 const VERSION_RE = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
 
@@ -37,7 +38,9 @@ function cleanText(value: unknown, max = 4000): string {
 
 function versionTuple(value: string): [number, number, number] | null {
   const match = VERSION_RE.exec(String(value || '').trim());
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+  if (!match) return null;
+  const [, major = '0', minor = '0', patch = '0'] = match;
+  return [Number(major), Number(minor), Number(patch)];
 }
 
 function isNewerVersion(candidate: string, current: string): boolean {
@@ -45,8 +48,10 @@ function isNewerVersion(candidate: string, current: string): boolean {
   const prev = versionTuple(current);
   if (!next || !prev) return false;
   for (let i = 0; i < next.length; i += 1) {
-    if (next[i] > prev[i]) return true;
-    if (next[i] < prev[i]) return false;
+    const nextPart = next[i] ?? 0;
+    const prevPart = prev[i] ?? 0;
+    if (nextPart > prevPart) return true;
+    if (nextPart < prevPart) return false;
   }
   return false;
 }
@@ -90,11 +95,11 @@ export function readDesktopUpdateManifest(options: DesktopUpdateManifestOptions 
   const signature = cleanText(platform.signature || manifest.signature, 4096);
   if (!signature) throw new Error('desktop update manifest missing signature');
 
-  return {
+  return omitUndefined({
     version,
     pub_date: cleanText(manifest.pub_date || manifest.date, 80) || undefined,
     url: safeUpdateUrl(platform.url || manifest.url),
     signature,
     notes: cleanText(manifest.notes || manifest.body, 4000) || undefined,
-  };
+  });
 }
