@@ -61,6 +61,22 @@ test('POST /api/onboarding/recommendations returns recommendations', async () =>
   });
 });
 
+test('POST /api/onboarding/recommendations sanitizes invalid optional fields', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-onboarding-sanitize');
+  await withServer({ trustedRoot, requireAuth: false }, async (base) => {
+    const response = await fetch(`${base}/api/onboarding/recommendations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ role: ['developer'], workspaceType: { kind: 'repo' } }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.selectedRole, 'office');
+    assert.equal(body.workspaceType, 'local');
+  });
+});
+
 test('unauthenticated onboarding API is blocked by auth gate', async () => {
   const trustedRoot = makeTestWorkspace('kcw-onboarding-gate');
   await withServer({ trustedRoot, requireAuth: true, trustIdentityHeaders: false }, async (base) => {
