@@ -1,3 +1,7 @@
+// 运行归因(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:为运行记录补充「归因」上下文(租户/用户/trace 等)并对上下文做有界、脱敏的深拷贝(限深 4、限数组 25、
+//       抹密钥),避免把敏感或超大对象写进 run 记录。依赖:L0 redaction。导出:withRunAttribution。
 // @ts-check
 import crypto from 'node:crypto';
 import { redactText } from '../security/redaction.js';

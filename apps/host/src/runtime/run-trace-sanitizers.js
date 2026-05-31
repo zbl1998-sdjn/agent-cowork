@@ -1,3 +1,7 @@
+// 运行追踪·脱敏器(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:run-trace 的取值清洗与脱敏——递归处理对象/数组,抹掉密钥字段,保证 trace 可安全展示/存储。
+// 依赖:L0 redaction。导出:sanitizeValue 等。
 // @ts-check
 import { redactText } from '../security/redaction.js';
 

@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 韧性助手(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:超时、带退避的重试、分层降级链。与熔断器(circuit-breaker.js)一起实现优雅降级:调用限时、
+//       瞬时故障重试若干次、最终经 fallback 层降级而非硬失败。依赖:无。导出:TimeoutError + withTimeout/retry/fallback。
+//
 // Resilience helpers — timeout, retry-with-backoff, and a layered fallback chain.
 // Together with the circuit breaker (circuit-breaker.js) these implement graceful
 // degradation: a call is bounded in time, retried a few times for transient

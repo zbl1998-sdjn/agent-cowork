@@ -1,3 +1,7 @@
+// 模型调用录制(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:把模型请求/响应「录制」落盘以便回放与评测(eval/replay)。落盘前剔除不可序列化键(fetchImpl/回调/signal)
+//       并对密钥字段脱敏,绝不写入明文凭据。依赖:L0 redaction。导出:模型录制器工厂。
 // @ts-check
 import crypto from 'node:crypto';
 import fs from 'node:fs';

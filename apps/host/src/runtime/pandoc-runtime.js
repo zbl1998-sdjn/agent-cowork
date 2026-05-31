@@ -1,3 +1,7 @@
+// Pandoc 运行时探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测 pandoc 是否就绪(文档格式互转能力),供制品导出/格式转换能力开关。依赖:node:fs/path。
+// 导出:detectPandocRuntime。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

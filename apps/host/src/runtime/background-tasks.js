@@ -1,4 +1,10 @@
 // @ts-check
+//
+// 后台长任务登记表(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:跟踪长时间运行的任务,使 UI 能显示进度、外壳能在完成时弹通知。纯内存、无外部依赖——真正的系统
+//       通知经 onComplete 订阅者接入,从而保持分层干净(L2,无上行依赖)且完全可测。
+// 依赖:无。导出:后台任务登记表工厂。
 // Background long-task registry (05-B6).
 //
 // Tracks long-running tasks so the UI can show progress and the shell can fire

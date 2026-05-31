@@ -1,4 +1,11 @@
 // @ts-check
+//
+// 运行事件总线(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:进程内的运行时间线事件总线 + SSE 辅助。每个 run 有单调 seq,事件形如 { seq, ts, type, ... };
+//       每 run 一个有界环形缓冲,支持断线/迟到的 SSE 客户端用 Last-Event-ID 重放近期事件。
+// 可扩展:这是 EventBus 端口的 A 阶段适配器,B 阶段可换 NATS/Redis 而 publish/subscribe/replay 契约不变。
+// 依赖:无。导出:运行事件总线工厂与 SSE 辅助。
 // In-process event bus for run timelines + SSE helpers. Zero-dep.
 //
 // Each run has a monotonic seq counter. Events carry { seq, ts, type, ...payload }.

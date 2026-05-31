@@ -1,3 +1,8 @@
+// 调度存储(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:计划任务(日程)的持久化——文件后端 FileScheduleStore 与 SQLite 后端 SqliteScheduleStore 同接口
+//       (端口与适配器),按 tenant/user 隔离地增删查日程记录。依赖:storage/sqlite + node:fs/path。
+// 导出:FileScheduleStore / SqliteScheduleStore / createScheduleStore + tenant/user 归一化。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

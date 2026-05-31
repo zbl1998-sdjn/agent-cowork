@@ -1,3 +1,8 @@
+// 子代理编排(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:plan-then-execute 的「执行」一半——把固定计划(一串 { tool, args, note } 步骤)经 ToolRegistry
+//       依次执行,记录一条形如 recipe/sandbox 的 `subagent-run`(带事件时间线),使历史/时间线 UI 无需改动。
+// 依赖:L0 path-policy + 同层 run-store / runs-index。导出:执行子代理计划的函数。
 // @ts-check
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';

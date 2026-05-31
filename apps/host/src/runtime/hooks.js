@@ -1,3 +1,7 @@
+// 钩子引擎(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:在 Agent 事件上触发用户配置的钩子——pre_tool(工具运行前,可 BLOCK)、post_tool 等,实现
+//       「在某事发生前/后自动做某事」的可编程拦截。钩子命令经沙箱规格化执行。依赖:sandbox + node:fs/path。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

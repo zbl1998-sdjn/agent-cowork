@@ -1,3 +1,7 @@
+// Git 运行时探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测宿主机是否安装可用的 git(版本/路径),供依赖聚合与 Git 工具能力开关。依赖:node:child_process。
+// 导出:detectGitRuntime。
 // @ts-check
 import childProcess from 'node:child_process';
 

@@ -1,3 +1,7 @@
+// 运行指标(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:为每条运行记录补充指标——成功/失败判定、用量与费用透明化、耗时分阶段汇总,供 run-store 写入。
+// 依赖:同层 usage。导出:withRunMetrics(给 run 记录附加指标)。
 // @ts-check
 import { buildUsageTransparency } from './usage.js';
 

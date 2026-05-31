@@ -1,3 +1,7 @@
+// Chromium 运行时探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测可用的 Chromium/浏览器内核(用于网页抓取、HTML→PDF 等),供相关能力开关。依赖:node:fs/path。
+// 导出:detectChromiumRuntime。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

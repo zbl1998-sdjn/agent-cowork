@@ -1,3 +1,7 @@
+// 数据科学运行时探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测数据科学运行时(内置/系统 Python 及 pandas/numpy 等)是否就绪,供数据分析类能力开关。依赖:node:fs/path。
+// 导出:detectDataScienceRuntime。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

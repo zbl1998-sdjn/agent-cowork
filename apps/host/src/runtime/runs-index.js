@@ -1,4 +1,10 @@
 // @ts-check
+//
+// 运行索引(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:为「运行历史」提供可查询索引的统一入口与后端选择(文件 / SQLite,同一接口、端口与适配器)。
+//       供历史列表/检索使用,避免逐条读 run 记录文件。
+// 依赖:同层 runs-index-file / runs-index-sqlite / runs-index-utils。导出:RunsIndex / SqliteRunsIndex / createUlid。
 import { RunsIndex } from './runs-index-file.js';
 import { SqliteRunsIndex } from './runs-index-sqlite.js';
 

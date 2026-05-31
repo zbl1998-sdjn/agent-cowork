@@ -1,3 +1,8 @@
+// 运行时依赖目录(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:声明式列出所有可探测/可安装的外部运行时依赖(id、安装方式 bundled/system/environment/on-demand、
+//       来源、清理路径等)。是 dependencies(探测)与 dependency-install-plan(安装)的单一事实来源。
+// 依赖:无(纯数据)。导出:RUNTIME_DEPENDENCY_CATALOG 及查询辅助。
 // @ts-check
 
 /**

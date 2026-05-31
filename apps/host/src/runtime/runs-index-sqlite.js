@@ -1,3 +1,7 @@
+// 运行索引·SQLite 后端(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:运行索引的 SQLite 持久化后端,与文件后端同接口(端口与适配器),适合需要高效查询/大量历史的场景。
+// 依赖:storage/sqlite + 同层 runs-index-utils。导出:SqliteRunsIndex。
 // @ts-check
 import { createSqliteDatabase } from '../storage/sqlite.js';
 import { normaliseRecord, normaliseTenantId, normaliseUserId } from './runs-index-utils.js';

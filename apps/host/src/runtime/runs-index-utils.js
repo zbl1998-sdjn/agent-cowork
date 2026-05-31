@@ -1,3 +1,7 @@
+// 运行索引·共用工具(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:文件/SQLite 两个运行索引后端共用的纯函数——ULID 生成、记录归一化、tenant/user 归一化。
+// 依赖:node:crypto。导出:createUlid / normaliseRecord / normaliseTenantId / normaliseUserId。
 // @ts-check
 import crypto from 'node:crypto';
 

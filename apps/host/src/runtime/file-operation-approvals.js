@@ -1,3 +1,7 @@
+// 文件操作审批(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:对「批量文件操作」预案的审批待决登记——把 write/rename/move 预案交用户确认后再 apply;带指纹防篡改、
+//       TTL 清理。是「副作用先批准」原则在文件操作上的落点。依赖:L0 request-utils + node:crypto/path。
 // @ts-check
 import crypto from 'node:crypto';
 import path from 'node:path';

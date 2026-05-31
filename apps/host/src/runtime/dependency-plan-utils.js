@@ -1,3 +1,7 @@
+// 依赖安装计划·工具(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:dependency-install-plan 用到的纯工具——按 id 查目录项、供应链预检、归一化 AgentCowork 根、
+//       字节数校验、保留路径与安全子路径拼装。便于单测。依赖:同层 dependencies-catalog。
 // @ts-check
 import path from 'node:path';
 import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';

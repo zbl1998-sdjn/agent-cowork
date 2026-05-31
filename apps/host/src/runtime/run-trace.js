@@ -1,3 +1,8 @@
+// 运行追踪(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:把一次运行的完整「轨迹」(消息、工具决策、工具结果)归一化、清洗与脱敏成可展示/可存储的 trace,
+//       供回放与调试。文本按上限截断,敏感内容经 sanitizer 处理。
+// 依赖:同层 run-trace-normalizers / run-trace-sanitizers。导出:构建运行 trace 的函数。
 // @ts-check
 import {
   DEFAULT_MAX_TEXT_CHARS,

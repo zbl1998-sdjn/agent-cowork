@@ -1,3 +1,8 @@
+// 运行索引·文件后端(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:基于「事件日志(jsonl)」的运行索引文件后端——以 upsert 事件追加方式维护可查询索引,
+//       按 tenant/user/trace 归一化记录。与 SQLite 后端同接口(端口与适配器)。
+// 依赖:node:fs/path + 同层 runs-index-utils。导出:RunsIndex。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

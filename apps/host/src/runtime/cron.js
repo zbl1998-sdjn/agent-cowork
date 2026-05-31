@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// Cron 解析(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:零依赖的 5 字段 cron 解析 + 下次触发时间计算 + 人类可读描述,供调度器使用。
+// 依赖:无。导出:parseCron / nextFireAt / describeCron。
+//
 // Minimal 5-field cron parser + next-fire calculator. Zero-dep.
 //
 // Fields (5): minute hour day-of-month month day-of-week

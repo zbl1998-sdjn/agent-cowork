@@ -1,4 +1,10 @@
 // @ts-check
+//
+// 调度器(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:管理计划任务(cron 周期 / 定时 fireAt):创建/列出/删除日程,按 tick 到点触发注入的 executor
+//       (通常是跑配方),记录上次/下次触发与错误。多租户隔离,幂等键防重复触发。
+// 依赖:同层 cron(解析/算下次)、runs-index(ULID)、scheduler-store(持久化)。导出:Scheduler 及存储转出。
 import { nextFireAt, parseCron, describeCron } from './cron.js';
 import { createUlid } from './runs-index.js';
 import { FileScheduleStore, normaliseTenantId, normaliseUserId } from './scheduler-store.js';

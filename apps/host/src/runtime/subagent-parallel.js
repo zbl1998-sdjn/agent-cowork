@@ -1,3 +1,7 @@
+// 并行子代理(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:并发执行多个子代理计划(受并发上限约束),各自独立产出 run 记录与事件;用于把可并行的子任务一次性铺开。
+//       与 subagent.js(单计划顺序执行)互补。依赖:L0 path-policy + 同层 run-store/runs-index。
 // @ts-check
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';

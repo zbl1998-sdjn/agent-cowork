@@ -1,3 +1,7 @@
+// 运行续跑(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:基于 run-checkpoint 落下的检查点,把中断的长任务从「上次步骤」续跑而非重头开始(可继续能力)。
+// 依赖:同层 run-checkpoint。导出:运行续跑相关函数。
 // @ts-check
 
 import { createRunCheckpointer } from './run-checkpoint.js';

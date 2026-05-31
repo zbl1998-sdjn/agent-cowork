@@ -1,3 +1,7 @@
+// OCR 运行时探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测 OCR 运行时(如 Tesseract/内置 OCR)是否就绪,供图片/扫描件取字能力开关。依赖:node:fs/path。
+// 导出:detectOcrRuntime。
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,5 +1,11 @@
 // @ts-check
-
+//
+// 限流(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:按租户的 HTTP 限流(令牌桶):每租户一个以 ratePerSec 回填、上限 burst 的桶,取不到令牌即拒绝并给
+//       Retry-After。允许短时突发(体验好)同时约束持续速率(防洪)。与 concurrency.js(限并发流数)互补。
+// 可扩展:状态在进程内,多实例可换共享存储(Redis)。依赖:无。导出:限流器工厂。
+//
 // Per-tenant HTTP rate limiter (gap #1). concurrency.js caps how many agent
 // streams run *at once*; this caps how many requests a tenant may make *per
 // second*, which is the missing protection against request floods / abusive

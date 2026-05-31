@@ -1,3 +1,8 @@
+// 运行时依赖探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:汇总探测各「外部运行时依赖」是否就绪(Chromium、数据科学、CJK 字体、Git、OCR、Pandoc、VC 运行库),
+//       供安装引导与能力开关使用。各探测器分散在同层独立文件,这里聚合并对结果脱敏。
+// 依赖:L0 redaction + 同层各 *-runtime 探测器 + dependencies-catalog。导出:聚合探测函数与目录转出。
 // @ts-check
 import { redactText } from '../security/redaction.js';
 import { detectChromiumRuntime } from './chromium-runtime.js';

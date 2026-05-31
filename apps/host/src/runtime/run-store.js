@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 运行记录存储(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:生成 runId 并把每次「运行」(agent/recipe/sandbox)的完整记录落盘为 JSON——含输入、状态、
+//       结果、嵌入的事件时间线。写入前补充归因(租户/用户/trace)与指标(耗时/用量)。是可观测/可回放的底座。
+// 依赖:node:crypto/fs/path + 同层 run-attribution / run-metrics。导出:createRunId / writeRunRecord 等。
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,3 +1,7 @@
+// 预算护栏(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:为 Agent 运行设「token/费用预算」护栏——累计用量,逼近/超过上限时给出告警或阻断,防止单次运行失控烧钱。
+// 依赖:同层 usage。导出:预算护栏工厂(createNoopBudgetGuard 等)。
 // @ts-check
 
 import { estimateTokenCost, normalizeTokenUsage } from './usage.js';

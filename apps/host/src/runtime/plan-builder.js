@@ -1,4 +1,9 @@
 // @ts-check
+//
+// 计划构建(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:计划模式——把自然语言目标转成有序的工具调用清单({ tool, args, rationale })而「不」执行。UI 展示计划、
+//       用户批准后再由 runSubagent 执行。planner 可注入,默认实现可被真·模型 planner 替换。依赖:无(注入式)。
 // Plan mode: propose a structured, approvable plan before executing it.
 //
 // buildPlan turns a natural-language goal into an ordered list of tool calls

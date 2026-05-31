@@ -1,5 +1,9 @@
 // @ts-check
-
+//
+// 取消登记表(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:让长任务(流式聊天、Agent 运行)可按 runId 被中断——即「停止」按钮。run 在自己 runId 下注册一个
+//       AbortController,取消请求即 abort 其 signal,run 观察到后提前停止。条目随结束清理。依赖:无。
 // Cancellation registry: lets long-running turns (streaming chat, future
 // agent runs) be interrupted by runId — the Claude Cowork "stop" button.
 //

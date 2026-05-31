@@ -1,4 +1,11 @@
 // @ts-check
+//
+// 审批登记表(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:Agent 想运行高危/变更类工具(Write/Edit/Shell)时在此登记并 await 决定:once(本次)/
+//       session(本次并整轮自动放行该工具)/reject(跳过)。UI POST /api/approvals/:id 解决该 promise。
+// 健壮性:待决项带时间戳并按 TTL 清理、map 有上限;cancelByRun 在流断开时释放该 run 的待决请求,杜绝泄漏/卡死。
+// 依赖:node:crypto。导出:审批登记表工厂。
 // Approval registry for the agent loop (Kimi CLI / Claude Cowork style).
 //
 // When the agent wants to run a mutating tool (Write/Edit/Shell), it asks for

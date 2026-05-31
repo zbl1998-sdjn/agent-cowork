@@ -1,3 +1,9 @@
+// 主机运行时状态装配(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:把 host 运行所需的各类「单例状态/服务」装配到一处——运行索引、调度器、事件总线、会话/记忆存储、
+//       沙箱、Kimi API 配置等(文件 or Postgres 后端按配置择一)。供 server.js 在组装根注入路由使用。
+// 注:这是 L2 内的「运行时状态聚合」,仍只依赖 L0/L1 与同层;真正的 HTTP 装配在 L4 server.js。
+// 依赖:kimi/api-runner、storage/*、memory、sandbox 及同层 runs-index/scheduler/run-events 等。导出:host 状态工厂。
 import path from 'node:path';
 import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../kimi/api-runner.js';
 import { createRunsIndex, summariseRunForIndex } from './runs-index.js';

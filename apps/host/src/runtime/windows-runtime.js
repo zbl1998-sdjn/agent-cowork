@@ -1,3 +1,7 @@
+// Windows 运行库探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:探测 Windows 上的 VC++ 运行库(VC Redist)等系统依赖是否就绪,供需要它的原生组件能力开关。依赖:node:child_process。
+// 导出:detectVcRuntime。
 // @ts-check
 import childProcess from 'node:child_process';
 

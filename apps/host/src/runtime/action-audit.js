@@ -1,3 +1,7 @@
+// 动作审计(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:对 Agent「动作决策」(审批/自动放行/拒绝/计划门禁/变更类工具执行)做带缓存的 JSONL 审计落盘,
+//       形成不可抵赖的操作留痕。依赖:node:path + 同层 audit-events。导出:动作审计总线。
 // @ts-check
 import path from 'node:path';
 import { AuditEventBus, createJsonlAuditSubscriber } from './audit-events.js';

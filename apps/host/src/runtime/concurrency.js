@@ -1,3 +1,7 @@
+// 并发限制(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:限制「同时运行」的 Agent 流数量——全局上限 + 每租户上限。tryAcquire 取到则返回释放句柄,取不到返回 null。
+//       与 rate-limit.js(限每秒请求数)互补。状态在进程内,多实例可换共享存储。依赖:无。导出:并发限制器工厂。
 /**
  * @typedef {() => void} ReleaseHandle
  * @typedef {{ maxConcurrent?: number, maxPerTenant?: number }} ConcurrencyLimiterOptions
