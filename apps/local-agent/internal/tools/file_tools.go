@@ -1,5 +1,6 @@
 package tools
 
+// 本文件:只读文件能力 —— ListFiles(遍历可信根文件树,跳过敏感/噪声目录)、ReadTextFile(读文本 + SHA-256)。
 import (
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"agent-cowork/apps/local-agent/internal/policy"
+	"kimi-cowork/apps/local-agent/internal/policy"
 )
 
 const DefaultMaxReadBytes int64 = 256 * 1024
@@ -40,7 +41,7 @@ func ListFiles(root string, maxEntries int) ([]FileEntry, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if path != trustedRoot && policy.IsSensitivePath(path) {
+		if path != trustedRoot && policy.IsSensitivePath(path, trustedRoot) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}

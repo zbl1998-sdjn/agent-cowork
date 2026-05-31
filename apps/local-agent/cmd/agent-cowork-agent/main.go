@@ -1,3 +1,7 @@
+// local-agent 命令行入口(apps/local-agent · Go)。
+// 职责:零依赖的本地代理 CLI,以子命令暴露受控文件能力:health、list(列文件树)、
+// read(读文本)、apply(批量文件操作,经审批 JSON + 审计 journal);所有操作限定在 --root 可信根内。
+// 说明:这是与 Node host 并行的轻量本地代理;真正逻辑在 internal/(tools/journal/policy)。
 package main
 
 import (
@@ -7,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"agent-cowork/apps/local-agent/internal/journal"
-	"agent-cowork/apps/local-agent/internal/tools"
+	"kimi-cowork/apps/local-agent/internal/journal"
+	"kimi-cowork/apps/local-agent/internal/tools"
 )
 
 const version = "0.1.0-v0.3"

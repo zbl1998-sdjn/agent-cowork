@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"agent-cowork/apps/local-agent/internal/tools"
+	"kimi-cowork/apps/local-agent/internal/tools"
 )
 
 func TestCLIEndToEnd(t *testing.T) {
