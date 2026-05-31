@@ -1,5 +1,3 @@
-// @ts-check
-
 // 不可信内容防护(host · L1 领域层 · kimi/safety)
 // ---------------------------------------------------------------------------
 // 职责:把工具/外部来源的输出用显式边界包成「仅作数据」的不可信块,并扫描
@@ -30,19 +28,17 @@ const INJECTION_PATTERNS = [
   },
 ];
 
-/**
- * @typedef {{ source?: string, toolName?: string }} InjectionGuardMeta
- * @typedef {{
- *   content: string,
- *   wrapped: boolean,
- *   alreadyWrapped: boolean,
- *   flagged: boolean,
- *   reasons: string[],
- * }} GuardedContent
- */
+export type InjectionGuardMeta = { source?: string; toolName?: string };
 
-/** @param {unknown} value @returns {string} */
-function stableText(value) {
+export type GuardedContent = {
+  content: string;
+  wrapped: boolean;
+  alreadyWrapped: boolean;
+  flagged: boolean;
+  reasons: string[];
+};
+
+function stableText(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
@@ -53,28 +49,19 @@ function stableText(value) {
   }
 }
 
-/** @param {string} text @returns {boolean} */
-function isAlreadyWrapped(text) {
+function isAlreadyWrapped(text: string): boolean {
   return text.includes(UNTRUSTED_DATA_START) && text.includes(UNTRUSTED_DATA_END);
 }
 
-/**
- * @param {string} text
- * @returns {string[]}
- */
-function detectReasons(text) {
-  const reasons = [];
+function detectReasons(text: string): string[] {
+  const reasons: string[] = [];
   for (const { id, pattern } of INJECTION_PATTERNS) {
     if (pattern.test(text)) reasons.push(id);
   }
   return reasons;
 }
 
-/**
- * @param {InjectionGuardMeta} meta
- * @returns {string}
- */
-function sourceLabel(meta) {
+function sourceLabel(meta: InjectionGuardMeta): string {
   const source = String(meta.source || 'tool').replace(/[^\w.-]+/gu, '_') || 'tool';
   const toolName = meta.toolName ? String(meta.toolName).replace(/[^\w.-]+/gu, '_') : '';
   return toolName ? `${source}:${toolName}` : source;
@@ -83,11 +70,8 @@ function sourceLabel(meta) {
 export class InjectionGuard {
   /**
    * 包裹不可信内容:已带边界则仅复检,否则加上来源标注、安全提示与数据边界。
-   * @param {unknown} value
-   * @param {InjectionGuardMeta} [meta]
-   * @returns {GuardedContent}
    */
-  wrap(value, meta = {}) {
+  wrap(value: unknown, meta: InjectionGuardMeta = {}): GuardedContent {
     const content = stableText(value);
     const reasons = detectReasons(content);
     if (isAlreadyWrapped(content)) {
@@ -107,7 +91,7 @@ export class InjectionGuard {
   }
 }
 
-/** 创建 InjectionGuard 实例的工厂。 @returns {InjectionGuard} */
-export function createInjectionGuard() {
+/** 创建 InjectionGuard 实例的工厂。 */
+export function createInjectionGuard(): InjectionGuard {
   return new InjectionGuard();
 }
