@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
 const nodeBin = process.execPath;
+const runHostNodeScript = path.join(repoRoot, 'scripts', 'run-host-node.mjs');
 const args = new Set(process.argv.slice(2));
 const includeWindowsClient =
   args.has('--windows-client') || process.env.VERIFY_WINDOWS_CLIENT === '1';
@@ -63,6 +64,10 @@ function summarize(checks) {
 }
 
 fs.mkdirSync(buildDir, { recursive: true });
+
+function hostScriptArgs(scriptName) {
+  return [runHostNodeScript, path.join(repoRoot, 'scripts', scriptName)];
+}
 
 const checks = [
   {
@@ -163,42 +168,42 @@ const checks = [
   {
     name: 'host local operation smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-local-operations.mjs')],
+    commandArgs: hostScriptArgs('smoke-local-operations.mjs'),
   },
   {
     name: 'mvp runtime lifecycle smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
+    commandArgs: hostScriptArgs('smoke-mvp-runtime.mjs'),
   },
   {
     name: 'plan closed-loop smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-plan-closed-loop.mjs')],
+    commandArgs: hostScriptArgs('smoke-plan-closed-loop.mjs'),
   },
   {
     name: 'ui to host api contract smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-ui-contract.mjs')],
+    commandArgs: hostScriptArgs('smoke-ui-contract.mjs'),
   },
   {
     name: 'rendered browser ui smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
+    commandArgs: hostScriptArgs('smoke-rendered-ui.mjs'),
   },
   {
     name: 'react timeline scroll smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
+    commandArgs: hostScriptArgs('smoke-react-scroll.mjs'),
   },
   {
     name: 'react artifacts panel smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-artifacts-panel.mjs')],
+    commandArgs: hostScriptArgs('smoke-react-artifacts-panel.mjs'),
   },
   {
     name: 'react branches smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-react-branches.mjs')],
+    commandArgs: hostScriptArgs('smoke-react-branches.mjs'),
   },
   {
     name: 'windows client static resource smoke',

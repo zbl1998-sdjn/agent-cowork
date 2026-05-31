@@ -10,10 +10,23 @@ const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
 const reportPath = path.join(buildDir, 'mvp-runtime-smoke-report.json');
 const nodeBin = process.execPath;
+const runHostNodeScript = path.join(repoRoot, 'scripts', 'run-host-node.mjs');
 
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
+  }
+}
+
+function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -58,7 +71,7 @@ async function getHealth(url, timeoutMs = 8000) {
 }
 
 function runNodeScript(script, env) {
-  return spawnSync(nodeBin, [path.join(repoRoot, 'scripts', script)], {
+  return spawnSync(nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', script)], {
     cwd: repoRoot,
     env,
     encoding: 'utf8',
@@ -80,7 +93,7 @@ async function main() {
     NO_OPEN: '1',
   };
 
-  const child = spawn(nodeBin, [path.join(repoRoot, 'scripts', 'start-mvp.mjs')], {
+  const child = spawn(nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'start-mvp.mjs')], {
     cwd: repoRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -96,7 +109,7 @@ async function main() {
     assert(health.ok === true && health.service === 'agent-cowork-host', 'runtime health check failed');
     assert(fs.existsSync(runtimeFile), 'runtime file was not written by start:mvp');
     const runtime = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
-    assert(runtime.pid === child.pid, 'runtime pid does not match child process');
+    assert(isPidAlive(runtime.pid), 'runtime pid is not alive');
     assert(runtime.port === port, 'runtime port mismatch');
     assert(runtime.workspace === workspace, 'runtime workspace mismatch');
 
