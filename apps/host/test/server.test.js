@@ -601,3 +601,29 @@ test('file tree rejects roots outside configured trusted root', async () => {
     assert.match(body.error, /trusted root/i);
   });
 });
+
+test('workspace file routes reject malformed request bodies', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-trusted');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const upload = await fetch(`${baseUrl}/api/uploads/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, files: 'not-an-array' }),
+    });
+    assert.equal(upload.status, 400);
+
+    const search = await fetch(`${baseUrl}/api/files/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, query: '' }),
+    });
+    assert.equal(search.status, 400);
+
+    const bundle = await fetch(`${baseUrl}/api/context/bundle`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, paths: '../escape.txt' }),
+    });
+    assert.equal(bundle.status, 400);
+  });
+});
