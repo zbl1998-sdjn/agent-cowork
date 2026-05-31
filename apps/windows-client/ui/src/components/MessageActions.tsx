@@ -1,3 +1,4 @@
+// MessageActions(UI · components):消息悬浮操作——复制/重答(分叉)/编辑等单条消息动作。纯展示+回调。
 import { useState } from 'react';
 import { Button } from './ui/Button';
 

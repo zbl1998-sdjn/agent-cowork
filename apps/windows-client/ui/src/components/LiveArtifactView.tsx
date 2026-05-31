@@ -1,3 +1,4 @@
+// LiveArtifactView(UI · components):活页制品视图——在 iframe/容器内展示可刷新的实时制品 HTML,支持手动刷新。纯展示+回调。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLiveArtifactData, openPath, type LiveArtifactData } from '../lib/api';
 import { Button } from './ui/Button';

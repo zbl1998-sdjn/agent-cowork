@@ -1,3 +1,4 @@
+// SettingsTabsContent(UI · components):设置各标签内容——按当前标签 lazy 渲染 API/外观/连接器/更新等设置区。纯展示+回调。
 import { lazy, Suspense } from 'react';
 import type { SelfCheckResult } from '../lib/api';
 import { Button } from './ui/Button';

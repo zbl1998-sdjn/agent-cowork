@@ -1,3 +1,4 @@
+// ApiSettings(UI · components):API/模型设置表单——填写并测试 Kimi/模型配置(base URL、key、模型),保存到 host。纯展示+回调。
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, type KimiInfo } from '../lib/api';
 import { Button, IconButton } from './ui/Button';

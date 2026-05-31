@@ -1,3 +1,4 @@
+// SegmentedControl(UI · components/ui 基础组件):分段切换控件(多选一 tab 样式),纯展示+回调。
 import type { CSSProperties } from 'react';
 import { Button } from './Button';
 

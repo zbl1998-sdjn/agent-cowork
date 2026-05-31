@@ -1,3 +1,4 @@
+// ToolCallCard(UI · components):工具调用卡——展示一次工具调用(名称/参数摘要/结果/状态),可展开看详情。纯展示+回调。
 import { useState, type CSSProperties } from 'react';
 import type { ToolCallItem } from '../lib/app-types';
 import { Button } from './ui/Button';

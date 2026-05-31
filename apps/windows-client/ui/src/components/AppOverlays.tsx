@@ -1,3 +1,4 @@
+// AppOverlays(UI · components):应用级浮层聚合——按需(lazy)挂载设置/命令面板/引导等模态,集中管理浮层显隐。
 import { lazy, Suspense } from 'react';
 import type { AuthIdentity, KimiInfo } from '../lib/api';
 import type { Command } from './CommandPalette';

@@ -1,3 +1,4 @@
+// TaskStatusBadge(UI · components):任务状态徽标——把运行状态(运行中/成功/失败/取消等)渲染成带色徽标。纯展示。
 import type { RunStatus } from '../lib/types';
 
 export interface TaskStatusBadgeProps {

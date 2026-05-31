@@ -1,3 +1,4 @@
+// Login(UI · components):登录界面——账号登录/注册/访客进入,提交给 /api/auth 并保存会话。纯展示+回调。
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { login as apiLogin, register as apiRegister, type AuthIdentity } from '../lib/api';
 import { Button } from './ui/Button';

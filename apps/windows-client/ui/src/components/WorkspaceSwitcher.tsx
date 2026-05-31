@@ -1,3 +1,4 @@
+// WorkspaceSwitcher(UI · components):工作区切换器——选择/切换当前可信工作区目录(经 Tauri 选目录),影响后续文件操作根。纯展示+回调。
 import { useEffect, useRef, useState } from 'react';
 import { getJson, isDesktop } from '../lib/api';
 import { ICONS } from '../lib/icons';

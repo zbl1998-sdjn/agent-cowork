@@ -1,3 +1,4 @@
+// Button(UI · components/ui 基础组件):统一样式的按钮(变体/尺寸/禁用/加载),纯展示+回调,全站复用。
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 
 // UI primitives (FE-2a): Button + IconButton. Typed, accessible, themeable via

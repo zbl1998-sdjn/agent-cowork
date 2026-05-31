@@ -1,3 +1,4 @@
+// RuntimeDependencyPlanPreviews(UI · components/panels):依赖安装计划预览——展示将下载/安装的内容、来源与体积,供用户确认。纯展示。
 import type {
   RuntimeDependencyCleanupPlanViewModel,
   RuntimeDependencyInstallPlanViewModel,

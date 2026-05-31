@@ -1,3 +1,7 @@
+// useComposerSuggestions(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:驱动输入框的智能建议弹窗——监听触发(/模板、@提及、↑历史)、维护候选列表与高亮项、处理键盘选择/插入。
+//       依赖:lib/composer-trigger 纯逻辑 + 起步建议数据源。
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';

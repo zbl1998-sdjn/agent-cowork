@@ -1,3 +1,4 @@
+// VizPanel(UI · components/panels):可视化面板——把数据/图表规格渲染成图(chart/mermaid/table)并可存为制品。纯展示+回调。
 import { useMemo, useState } from 'react';
 import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../../lib/api';
 import { LiveArtifactView } from '../LiveArtifactView';

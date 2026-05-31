@@ -1,3 +1,6 @@
+// useVirtualWindow(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:简单的列表虚拟化——只渲染可视区附近的条目,长会话/长列表也保持流畅。依赖:无。
 import { useCallback, useMemo, useState } from 'react';
 
 // Lightweight, zero-dependency list virtualization (FE-5).

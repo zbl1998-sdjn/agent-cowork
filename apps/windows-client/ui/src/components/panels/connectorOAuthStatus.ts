@@ -1,3 +1,4 @@
+// 连接器 OAuth 状态(UI · components/panels):查询并归一化连接器的授权状态(已连/未连/授权范围),供连接器面板展示。纯逻辑。
 import { getOAuthConnectorStatus, type ConnectorInfo } from '../../lib/api';
 
 export type OAuthStatusView = {

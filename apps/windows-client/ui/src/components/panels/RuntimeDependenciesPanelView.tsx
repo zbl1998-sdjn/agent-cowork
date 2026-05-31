@@ -1,3 +1,4 @@
+// RuntimeDependenciesPanelView(UI · components/panels):依赖面板的纯展示视图——按就绪/缺失/可安装渲染依赖列表与操作入口(不含数据加载)。
 import type {
   RuntimeDependencyCleanupPlanViewModel,
   RuntimeDependencyInstallPlanViewModel,

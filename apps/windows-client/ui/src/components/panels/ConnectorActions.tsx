@@ -1,3 +1,4 @@
+// ConnectorActions(UI · components/panels):连接器的操作按钮组(连接/断开/授权/重连),从面板抽出复用。纯展示+回调。
 import { Button } from '../ui/Button';
 
 export function ConnectorSearchAction({ onSearch }: { onSearch: () => void }) {

@@ -1,3 +1,4 @@
+// 输入框类型(UI · components):Composer 及其子组件共享的 props/状态类型,避免跨组件类型重复。
 import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import type { ThinkingLevel } from './ComposerFooter';

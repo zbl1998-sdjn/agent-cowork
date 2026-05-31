@@ -1,3 +1,4 @@
+// ArtifactsPanel(UI · components/panels):制品面板——列出/打开/重命名生成的制品(文档/图表/活页)。纯展示+回调。
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../../lib/api';

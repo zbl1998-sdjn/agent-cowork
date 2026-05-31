@@ -1,3 +1,4 @@
+// ToolsPanel(UI · components/panels):工具面板——检索并浏览可用工具(内置 + MCP),查看其描述/风险/输入模式。纯展示+回调。
 import { useState } from 'react';
 import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../../lib/api';
 import { Button } from '../ui/Button';

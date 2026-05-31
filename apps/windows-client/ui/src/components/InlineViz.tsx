@@ -1,3 +1,4 @@
+// InlineViz(UI · components):聊天内嵌可视化——在消息流里直接渲染图表/表格(chart/mermaid/table)。纯展示。
 import { useEffect, useState } from 'react';
 import { renderViz, type VizSpec } from '../lib/api';
 import { ErrorState, Loading } from './ui/StateViews';

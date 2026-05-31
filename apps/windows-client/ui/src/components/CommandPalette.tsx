@@ -1,3 +1,4 @@
+// CommandPalette(UI · components):命令面板(⌘K 式)——模糊搜索并执行命令(切换会话、打开面板、运行配方等)。纯展示+回调。
 import { useEffect, useRef, useState } from 'react';
 import { MenuItemButton } from './ui/MenuItemButton';
 

@@ -1,3 +1,7 @@
+// useConversations(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:封装多会话的全部状态与副作用——加载/创建/切换/改名/删除会话、与 host 会话 API 同步、本地缓存。
+//       让 App 只编排、组件只渲染(plan/00:数据逻辑进 hooks)。依赖:lib/api + lib/conversations 纯逻辑。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   activeConversationMessages,

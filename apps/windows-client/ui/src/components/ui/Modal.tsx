@@ -1,3 +1,4 @@
+// Modal(UI · components/ui 基础组件):模态对话框(遮罩、Esc/点遮罩关闭、焦点管理),纯展示+回调。
 import type { CSSProperties, ReactNode } from 'react';
 import { IconButton } from './Button';
 

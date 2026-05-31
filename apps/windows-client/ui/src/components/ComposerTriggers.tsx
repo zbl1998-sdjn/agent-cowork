@@ -1,3 +1,4 @@
+// ComposerTriggers(UI · components):输入框触发按钮组——快捷插入模板/提及/历史触发符,提示可用的智能输入入口。纯展示+回调。
 import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 

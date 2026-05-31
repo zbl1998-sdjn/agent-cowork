@@ -1,3 +1,4 @@
+// AppHeader(UI · components):顶部栏——标题、当前项目/会话、登录身份、设置/面板切换等入口。纯展示+回调。
 import type { AuthIdentity } from '../lib/api';
 import { invokeDesktop, isDesktop } from '../lib/api/transport';
 import type { SidePanel } from '../lib/app-types';

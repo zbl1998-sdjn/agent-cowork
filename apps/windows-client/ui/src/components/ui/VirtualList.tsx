@@ -1,3 +1,4 @@
+// VirtualList(UI · components/ui 基础组件):虚拟滚动列表,只渲染可视区条目以支撑超长列表的流畅渲染。
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
 

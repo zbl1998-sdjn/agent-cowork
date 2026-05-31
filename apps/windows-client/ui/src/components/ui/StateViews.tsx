@@ -1,3 +1,4 @@
+// StateViews(UI · components/ui 基础组件):统一的「空/加载/错误」状态视图,避免各处重复写占位 UI。
 import type { CSSProperties, ReactNode } from 'react';
 import { Button } from './Button';
 

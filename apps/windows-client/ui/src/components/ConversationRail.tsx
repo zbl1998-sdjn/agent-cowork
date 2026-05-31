@@ -1,3 +1,4 @@
+// ConversationRail(UI · components):左侧会话栏——列出历史会话、切换/新建/改名/删除,显示当前选中。纯展示+回调。
 import type { CSSProperties } from 'react';
 import type { Conversation } from '../lib/app-types';
 import { conversationBranchOptions } from '../lib/conversation-branches';

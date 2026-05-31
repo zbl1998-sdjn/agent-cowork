@@ -1,3 +1,4 @@
+// TimelineTurns(UI · components/chat):把一个「回合」(用户消息 + 助手响应/工具调用/进度)渲染成一组气泡;memo 优化。
 import { memo, type CSSProperties } from 'react';
 import { answerQuestion, openPath, respondApproval } from '../../lib/api';
 import type { AssistantMessage, UserMessage } from '../../lib/app-types';

@@ -1,3 +1,7 @@
+// useStickToBottom(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:聊天滚动「粘底」逻辑——新消息流入时若用户在底部则自动滚到底,用户上滑查看历史时则不打扰,并提供回到底部。
+//       依赖:无(仅 DOM 滚动测量)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const DEFAULT_THRESHOLD_PX = 48;

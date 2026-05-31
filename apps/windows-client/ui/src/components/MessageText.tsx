@@ -1,3 +1,4 @@
+// MessageText(UI · components):消息正文渲染——把文本经安全 Markdown 渲染(lib/md),处理链接/代码块/文件引用点击。纯展示+回调。
 import type { MouseEvent } from 'react';
 import { renderMarkdown, splitVizBlocks } from '../lib/md';
 import { InlineViz } from './InlineViz';

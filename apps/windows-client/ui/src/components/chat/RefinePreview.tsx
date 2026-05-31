@@ -1,3 +1,4 @@
+// RefinePreview(UI · components/chat):提示词精炼结果预览——展示「原稿 vs 精炼后」并提供采纳/放弃。纯展示+回调。
 import { useState } from 'react';
 import type { PromptRefineResult } from '../../lib/api/prompt';
 import { Button } from '../ui/Button';

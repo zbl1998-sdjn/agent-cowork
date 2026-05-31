@@ -1,3 +1,6 @@
+// useComposerVoice(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:输入框语音输入——封装浏览器语音识别(开始/停止/转写结果回填),并处理不支持时的降级。依赖:无(Web Speech API)。
 import { useCallback, useRef, useState } from 'react';
 
 type SpeechRecognitionLike = {

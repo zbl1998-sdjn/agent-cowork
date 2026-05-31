@@ -1,3 +1,5 @@
+// ConnectorsPanel(UI · components/panels):连接器面板——列出/建议连接器、展示授权状态、发起 OAuth 与安装。
+// 数据逻辑在 useConnectorsPanelState,本组件只渲染+回调。
 import { Empty, ErrorState } from '../ui/StateViews';
 import { ConnectorBuiltinAction, ConnectorOAuthAction, ConnectorSearchAction } from './ConnectorActions';
 import { connectorPermissions } from './connectorScopes';

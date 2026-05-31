@@ -1,3 +1,4 @@
+// ObservabilityPanel(UI · components/panels):可观测面板——展示运行历史、事件时间线、用量/费用/耗时与工具调用详情。纯展示+回调。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRunRecord, listRunRecords, openPath } from '../../lib/api';
 import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../../lib/run-observability';

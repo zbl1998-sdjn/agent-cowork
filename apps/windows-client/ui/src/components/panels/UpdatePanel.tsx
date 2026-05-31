@@ -1,3 +1,4 @@
+// UpdatePanel(UI · components/panels):桌面更新面板——检查更新、展示版本/进度、触发安装(经 Tauri updater)。纯展示+回调。
 import { useState } from 'react';
 import { checkDesktopUpdate, installDesktopUpdate, isDesktop, type DesktopUpdateStatus } from '../../lib/api';
 import { Button } from '../ui/Button';

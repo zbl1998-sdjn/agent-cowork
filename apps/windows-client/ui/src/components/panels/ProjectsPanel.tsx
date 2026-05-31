@@ -1,3 +1,4 @@
+// ProjectsPanel(UI · components/panels):项目面板——列出/新建/切换/删除项目(对应不同可信工作区)。纯展示+回调。
 import { useEffect, useMemo, useState } from 'react';
 import {
   assignProjectArtifact,

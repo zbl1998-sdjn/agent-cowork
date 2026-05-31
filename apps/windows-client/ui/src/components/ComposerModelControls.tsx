@@ -1,3 +1,4 @@
+// ComposerModelControls(UI · components):输入框模型控制——选择提供商/模型、临时调参(会话级覆盖)。纯展示+回调。
 const PROVIDER_OPTIONS = [
   { value: 'kimi-api', label: 'Kimi' },
   { value: 'openai', label: 'OpenAI' },

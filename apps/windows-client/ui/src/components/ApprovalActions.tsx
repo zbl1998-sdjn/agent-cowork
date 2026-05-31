@@ -1,3 +1,4 @@
+// ApprovalActions(UI · components):审批操作条——展示待审批的高危/写操作,提供「本次/本轮/拒绝」按钮回传决定。纯展示+回调。
 import type { ApprovalState, FileOperation } from '../lib/types';
 import { Button } from './ui/Button';
 

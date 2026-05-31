@@ -1,3 +1,4 @@
+// SchedulesPanel(UI · components/panels):计划任务面板——列出/新建/暂停/删除定时任务,展示下次触发时间(人话化)。纯展示+回调。
 import { useEffect, useState } from 'react';
 import { listSchedules, cancelSchedule, type ScheduleItem } from '../../lib/api';
 import { humanizeError } from '../../lib/friendly-error';

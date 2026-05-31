@@ -1,3 +1,4 @@
+// AppSidePanel(UI · components):右侧侧边面板容器——按当前选中的标签 lazy 加载对应面板(制品/工具/记忆/项目等)。
 import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';

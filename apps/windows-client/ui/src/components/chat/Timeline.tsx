@@ -1,3 +1,4 @@
+// Timeline(UI · components/chat):聊天主时间线容器——渲染消息/事件流、驱动滚动粘底与虚拟化,按回合分组。纯展示+回调。
 import { useCallback, useMemo, useState, type CSSProperties, type RefObject, type UIEvent } from 'react';
 import { respondApprovals } from '../../lib/api';
 import type { AssistantMessage, Message } from '../../lib/app-types';

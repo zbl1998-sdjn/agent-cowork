@@ -1,3 +1,4 @@
+// PreviewCard(UI · components):文件操作预览卡——展示待审批的 write/rename/move 预案(前后哈希、目标路径)供用户确认。纯展示+回调。
 import type { FileOperation } from '../lib/types';
 
 export interface PreviewCardProps {

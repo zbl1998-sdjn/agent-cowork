@@ -1,3 +1,6 @@
+// useComposerRefine(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:输入框「提示词精炼」交互态——发起精炼、展示候选/对比、采纳或撤销,管理加载/错误。依赖:lib/api/prompt。
 import { useCallback, useRef, useState } from 'react';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import { resolveRefineSendDecision, shouldRefineBeforeSend } from '../lib/composer-logic';

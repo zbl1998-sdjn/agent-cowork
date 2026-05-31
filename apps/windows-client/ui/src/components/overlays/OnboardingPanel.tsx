@@ -1,3 +1,4 @@
+// OnboardingPanel(UI · components/overlays):新用户引导浮层——选择角色、展示推荐配方/连接器、引导完成。纯展示+回调。
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { getJson, getOnboardingRecommendations } from '../../lib/api';
 import {

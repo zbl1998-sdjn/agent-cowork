@@ -1,3 +1,4 @@
+// ErrorBoundary(UI · components/ui 基础组件):React 错误边界——子树渲染抛错时兜底显示可读错误而非白屏,呼应「永不空交代」。
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ErrorState } from './StateViews';
 

@@ -1,3 +1,4 @@
+// FilePreview(UI · components):文件预览——按类型渲染图片/PDF/文本/表格预览(数据来自 /api/files 预览)。纯展示+回调。
 import { useEffect, useState } from 'react';
 import { previewFile, openPath, type FilePreviewResult } from '../lib/api';
 import { renderMarkdown } from '../lib/md';

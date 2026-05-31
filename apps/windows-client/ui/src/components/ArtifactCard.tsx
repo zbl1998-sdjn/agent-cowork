@@ -1,3 +1,4 @@
+// ArtifactCard(UI · components):时间线里的制品卡片——展示一个生成制品(名称/类型/预览)并提供打开/下载。纯展示+回调。
 import type { ArtifactFile } from '../lib/types';
 import { Button } from './ui/Button';
 

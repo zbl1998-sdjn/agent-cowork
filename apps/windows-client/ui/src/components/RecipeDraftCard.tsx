@@ -1,3 +1,4 @@
+// RecipeDraftCard(UI · components):配方草稿卡——展示「把这次运行存为配方」的草稿(步骤/产物),供命名后保存。纯展示+回调。
 import type { CapturedRecipeDraft } from '../lib/app-types';
 
 interface RecipeDraftCardProps {

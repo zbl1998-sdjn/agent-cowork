@@ -1,3 +1,8 @@
+// App 根组件(UI · 应用编排层)
+// ---------------------------------------------------------------------------
+// 职责:顶层布局编排——组合各 hooks(会话/运行时/输入/流)与子组件(侧栏/时间线/输入框/面板),把用户操作接到
+//       lib/api。本身只做编排与连线,具体数据逻辑在 hooks、渲染在 components(plan/00 目标:App < 250 行)。
+// 依赖:hooks/* + components/* + lib/api + lib/app-logic 纯逻辑。
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
