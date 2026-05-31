@@ -295,6 +295,26 @@ test('POST /api/viz/render persistent writes require a scoped approval receipt',
   }
 });
 
+test('POST /api/viz/render/preview rejects malformed artifact ids before issuing approval', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/viz/render/preview', {
+      method: 'POST',
+      body: {
+        id: '../bad',
+        kind: 'table',
+        data: { columns: ['a'], rows: [['1']] },
+      },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /artifact id/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('POST /api/viz/render persists a live artifact with a refreshable file-json data source', async () => {
   const trustedRoot = tempRoot();
   const sourceRel = 'data/refresh.json';
@@ -518,6 +538,19 @@ test('GET /api/artifacts/data/:id 404s an unknown artifact', async () => {
   try {
     const res = await jsonRequest(base, '/api/artifacts/data/viz_00000000000000_deadbeef');
     assert.equal(res.status, 404);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/artifacts/data/:id rejects encoded path separators at the route boundary', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/artifacts/data/viz_bad%2Fescape');
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /invalid artifact id/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

@@ -1,11 +1,26 @@
 // 可视化路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/viz/* —— 把图表规格渲染为可视化(chart/mermaid/table),或落成活页制品。
-// 依赖:L0 request-utils + L1 artifacts/viz(经参数注入)。导出:handleVizRoutes。
+// 依赖:L0 request-utils + L1 artifacts/viz/live-artifact + L2 文件操作审批。导出:handleVizRoutes。
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { renderViz } from '../artifacts/viz.js';
 import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync } from '../artifacts/live-artifact.js';
 import { artifactPaths, normalizeLiveArtifactSpec, resolveLiveArtifactDataSourcePath } from '../artifacts/live-spec.js';
+import { errorMessage, errorStatus } from './route-error-utils.js';
+import {
+  parseArtifactIdPath,
+  parseVizBody,
+} from './viz-route-schemas.js';
+import type { z } from 'zod';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { RequestContext } from '../http/middleware/common.js';
+import type { VizSpec } from '../artifacts/viz.js';
+import type { ToolRegistryLike } from '../artifacts/live-refresh.js';
+import type { vizRenderBodySchema } from './viz-route-schemas.js';
+import type {
+  FileOperationApprovalRequest,
+  FileOperationApprovalStore,
+} from '../runtime/file-operation-approvals.js';
 
 // Inline-viz + live-artifact routes.
 //
@@ -22,39 +37,33 @@ const DATA_PREFIX = '/api/artifacts/data/';
 const LIVE_PREFIX = '/api/artifacts/live/';
 const VIZ_RENDER_APPROVAL_KIND = 'viz:render';
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
- * @typedef {import('../artifacts/viz.js').VizSpec} VizSpec
- * @typedef {{ source?: string, name?: string, risk?: unknown, mutating?: boolean, requiresApproval?: boolean }} ToolDescriptor
- * @typedef {{ type: string, path: string, [key: string]: unknown }} FileOperationLike
- * @typedef {{ id: string, relativePath: string, dataUrl: string, viewUrl: string, operations: FileOperationLike[] }} VizApprovalPlan
- * @typedef {{ issue(input: unknown): string, consume(id: unknown, input: unknown): unknown }} FileOperationApprovalsLike
- * @typedef {{ descriptor(name: string): ToolDescriptor | null | undefined, call(name: string, args: Record<string, unknown>, ctx: { trustedRoot: string, context?: unknown }): unknown | Promise<unknown> }} ToolRegistryLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, trustedRootDefault: string, safeTrustedRoot(input?: unknown): string, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, toolRegistry?: ToolRegistryLike | null, fileOperationApprovals: FileOperationApprovalsLike }} VizRouteOptions
- * @typedef {Error & { statusCode?: number }} HttpError
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type VizRouteBody = z.output<typeof vizRenderBodySchema>;
+type FileOperationLike = FileOperationApprovalRequest['operations'];
+type VizApprovalPlan = {
+  id: string;
+  relativePath: string;
+  dataUrl: string;
+  viewUrl: string;
+  operations: FileOperationLike;
+};
+type VizRequestContext = RequestContext & { idempotencyKey?: string; [key: string]: unknown };
+type VizRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestUrl: URL;
+  requestContext: VizRequestContext;
+  trustedRootDefault: string;
+  safeTrustedRoot(input?: unknown): string;
+  cacheKeyFor(context: VizRequestContext, method?: string, pathname?: string): string;
+  requireIdempotencyKey(response: HttpResponseLike, context: VizRequestContext): boolean;
+  sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | undefined;
+  toolRegistry?: ToolRegistryLike | null;
+  fileOperationApprovals: Pick<FileOperationApprovalStore, 'issue' | 'consume'>;
+};
 
-/** @param {unknown} body @returns {Record<string, unknown>} */
-function objectBody(body) {
-  return body && typeof body === 'object' && !Array.isArray(body)
-    ? /** @type {Record<string, unknown>} */ (body)
-    : {};
-}
-
-/** @param {unknown} err @returns {number} */
-function errorStatus(err) {
-  return Number(/** @type {Partial<HttpError>} */ (err)?.statusCode) || 400;
-}
-
-/** @param {unknown} err @returns {string} */
-function errorMessage(err) {
-  return /** @type {Partial<HttpError>} */ (err)?.message || String(err || 'request failed');
-}
-
-/** @param {RouteResponse} response @param {number} status @param {string} body */
-function sendHtml(response, status, body) {
+function sendHtml(response: HttpResponseLike, status: number, body: string): void {
   response.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'content-length': Buffer.byteLength(body),
@@ -63,23 +72,24 @@ function sendHtml(response, status, body) {
   response.end(body);
 }
 
-/** @param {unknown} body @returns {VizSpec} */
-function vizFromBody(body) {
-  const input = objectBody(body);
+function vizFromBody(input: VizRouteBody): VizSpec {
   return {
-    title: typeof input.title === 'string' ? input.title : undefined,
-    kind: typeof input.kind === 'string' ? input.kind : undefined,
+    title: input.title,
+    kind: input.kind,
     data: input.data,
     options: input.options,
-    code: typeof input.code === 'string' ? input.code : undefined,
-    definition: typeof input.definition === 'string' ? input.definition : undefined,
+    code: input.code,
+    definition: input.definition,
   };
 }
 
-/** @param {{ trustedRoot: string, body: Record<string, unknown>, viz: VizSpec }} options @returns {VizApprovalPlan} */
-function buildVizRenderApprovalPlan({ trustedRoot, body, viz }) {
+function buildVizRenderApprovalPlan({ trustedRoot, body, viz }: {
+  trustedRoot: string;
+  body: VizRouteBody;
+  viz: VizSpec;
+}): VizApprovalPlan {
   const spec = normalizeLiveArtifactSpec({
-    id: typeof body.id === 'string' ? body.id : undefined,
+    id: body.id,
     title: viz.title,
     viz,
     dataSource: body.dataSource,
@@ -109,7 +119,6 @@ function buildVizRenderApprovalPlan({ trustedRoot, body, viz }) {
   };
 }
 
-/** @param {VizRouteOptions} options @returns {Promise<boolean>} */
 export async function handleVizRoutes({
   request,
   response,
@@ -123,17 +132,18 @@ export async function handleVizRoutes({
   sendCachedOrStore,
   toolRegistry,
   fileOperationApprovals,
-}) {
+}: VizRouteOptions): Promise<boolean> {
   if (request.method === 'POST' && pathname === '/api/viz/render/preview') {
     await withJsonBody(request, response, async (body) => {
-      const input = objectBody(body);
+      const input = parseVizBody(response, body, 'invalid viz preview request');
+      if (!input) return;
       const trustedRoot = safeTrustedRoot(input.trustedRoot);
       const viz = vizFromBody(input);
       let plan;
       try {
         plan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz });
       } catch (err) {
-        sendJson(response, errorStatus(err), { error: errorMessage(err) });
+        sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
         return;
       }
       const fileOperationApprovalId = fileOperationApprovals.issue({
@@ -153,7 +163,8 @@ export async function handleVizRoutes({
 
   if (request.method === 'POST' && pathname === '/api/viz/render') {
     await withJsonBody(request, response, async (body) => {
-      const input = objectBody(body);
+      const input = parseVizBody(response, body, 'invalid viz render request');
+      if (!input) return;
       if (!requireIdempotencyKey(response, requestContext)) {
         return;
       }
@@ -167,11 +178,10 @@ export async function handleVizRoutes({
       try {
         html = renderViz(viz);
       } catch (err) {
-        sendJson(response, errorStatus(err), { error: errorMessage(err) });
+        sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
         return;
       }
-      /** @type {Record<string, unknown>} */
-      const payload = { context: requestContext, kind: String(viz.kind || '').toLowerCase(), html };
+      const payload: Record<string, unknown> = { context: requestContext, kind: String(viz.kind || '').toLowerCase(), html };
       if (input.persist !== false) {
         const trustedRoot = safeTrustedRoot(input.trustedRoot);
         const approvalPlan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz });
@@ -185,7 +195,7 @@ export async function handleVizRoutes({
         try {
           artifact = buildLiveArtifact({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource });
         } catch (err) {
-          sendJson(response, errorStatus(err), { error: errorMessage(err) });
+          sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
           return;
         }
         payload.persisted = true;
@@ -202,7 +212,8 @@ export async function handleVizRoutes({
   }
 
   if (request.method === 'GET' && pathname.startsWith(DATA_PREFIX)) {
-    const id = decodeURIComponent(pathname.slice(DATA_PREFIX.length));
+    const id = parseArtifactIdPath(response, pathname, DATA_PREFIX);
+    if (!id) return true;
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
       const artifactData = await refreshLiveArtifactDataAsync({
@@ -216,19 +227,20 @@ export async function handleVizRoutes({
         ...artifactData,
       });
     } catch (err) {
-      sendJson(response, errorStatus(err), { error: errorMessage(err) });
+      sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
     }
     return true;
   }
 
   if (request.method === 'GET' && pathname.startsWith(LIVE_PREFIX)) {
-    const id = decodeURIComponent(pathname.slice(LIVE_PREFIX.length));
+    const id = parseArtifactIdPath(response, pathname, LIVE_PREFIX);
+    if (!id) return true;
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
       const html = readLiveArtifactHtml({ trustedRoot, id });
       sendHtml(response, 200, html);
     } catch (err) {
-      sendJson(response, errorStatus(err), { error: errorMessage(err) });
+      sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
     }
     return true;
   }
