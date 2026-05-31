@@ -6,14 +6,16 @@
 // 导出:createXlsxWorkbook(返回 .xlsx 的 Buffer)
 import { createZip } from '../workspace/zip-utils.js';
 
-/**
- * @typedef {Record<string, unknown>} WorkbookRowObject
- * @typedef {unknown[] | WorkbookRowObject} WorkbookRow
- * @typedef {{ sheetName?: unknown, columns?: unknown[], rows?: WorkbookRow[] }} WorkbookSpec
- */
+export type WorkbookRowObject = Record<string, unknown>;
+export type WorkbookRow = unknown[] | WorkbookRowObject;
+export type WorkbookSpec = {
+  sheetName?: unknown;
+  columns?: unknown[];
+  rows?: WorkbookRow[];
+};
 
-/** XML 转义,确保单元格文本安全嵌入 SpreadsheetML。 @param {unknown} value @returns {string} */
-function escapeXml(value) {
+/** XML 转义,确保单元格文本安全嵌入 SpreadsheetML。 */
+function escapeXml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -22,8 +24,8 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-/** 把 0 基列序号转成 Excel 列名(0→A、25→Z、26→AA…),26 进制无零。 @param {number} index @returns {string} */
-function columnName(index) {
+/** 把 0 基列序号转成 Excel 列名(0→A、25→Z、26→AA…),26 进制无零。 */
+function columnName(index: number): string {
   let n = index + 1;
   let name = '';
   while (n > 0) {
@@ -34,25 +36,25 @@ function columnName(index) {
   return name;
 }
 
-/** 生成单个单元格 XML:计算 A1 引用并以 inlineStr 内联字符串输出。 @param {unknown} value @param {number} rowIndex @param {number} columnIndex @returns {string} */
-function cellXml(value, rowIndex, columnIndex) {
+/** 生成单个单元格 XML:计算 A1 引用并以 inlineStr 内联字符串输出。 */
+function cellXml(value: unknown, rowIndex: number, columnIndex: number): string {
   const ref = `${columnName(columnIndex)}${rowIndex + 1}`;
   return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
 }
 
-/** 取一行里某列的值:数组行按下标取,对象行按列名取,统一转字符串。 @param {WorkbookRow} row @param {unknown} column @param {number} index @returns {string} */
-function rowValue(row, column, index) {
+/** 取一行里某列的值:数组行按下标取,对象行按列名取,统一转字符串。 */
+function rowValue(row: WorkbookRow, column: unknown, index: number): string {
   if (Array.isArray(row)) {
     return String(row[index] ?? '');
   }
-  const record = /** @type {WorkbookRowObject} */ (row && typeof row === 'object' ? row : {});
+  const record = row && typeof row === 'object' ? row : {};
   return String(record[String(column)] ?? '');
 }
 
-/** 生成 worksheet XML:首行写表头,随后逐行写数据;列/行为空时用占位兜底,并算出 dimension 范围。 @param {unknown[]} columns @param {WorkbookRow[]} rows @returns {string} */
-function sheetXml(columns, rows) {
+/** 生成 worksheet XML:首行写表头,随后逐行写数据;列/行为空时用占位兜底,并算出 dimension 范围。 */
+function sheetXml(columns: unknown[], rows: WorkbookRow[]): string {
   const safeColumns = columns.length > 0 ? columns : ['内容'];
-  const safeRows = rows.length > 0 ? rows : [['']];
+  const safeRows: WorkbookRow[] = rows.length > 0 ? rows : [['']];
   const renderedRows = [
     safeColumns.map((column) => String(column ?? '')),
     ...safeRows.map((row) => safeColumns.map((column, index) => rowValue(row, column, index))),
@@ -72,8 +74,8 @@ function sheetXml(columns, rows) {
   ].join('');
 }
 
-/** 由列+行生成最小可打开的 .xlsx;sheet 名截断到 31 字符(Excel 上限),返回 zip 包 Buffer。 @param {WorkbookSpec} [spec] @returns {Buffer} */
-export function createXlsxWorkbook({ sheetName = 'Sheet1', columns = [], rows = [] } = {}) {
+/** 由列+行生成最小可打开的 .xlsx;sheet 名截断到 31 字符(Excel 上限),返回 zip 包 Buffer。 */
+export function createXlsxWorkbook({ sheetName = 'Sheet1', columns = [], rows = [] }: WorkbookSpec = {}): Buffer {
   const safeSheetName = escapeXml(String(sheetName || 'Sheet1').slice(0, 31));
   return createZip([
     {
