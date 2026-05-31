@@ -26,7 +26,7 @@ export type RunRecord = {
   startedAt?: unknown;
   finishedAt?: unknown;
   durationMs?: unknown;
-  input?: { prompt?: unknown };
+  input?: { prompt?: unknown; [key: string]: unknown };
   error?: { message?: unknown };
   [key: string]: unknown;
 };

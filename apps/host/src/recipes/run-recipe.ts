@@ -11,17 +11,9 @@ import { assertTrustedPath } from '../security/path-policy.js';
 import { buildRecipeOperations, getRecipe } from './registry.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
-
-/**
- * @typedef {import('./recipe-helpers.js').SourceLike} RecipeSource
- * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
- * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string, [key: string]: unknown }} RecipeDescriptor
- * @typedef {Error & { statusCode?: number, payload?: Record<string, unknown> }} RecipeError
- * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
- * @typedef {{ upsert(summary: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
- * @typedef {{ recipeId: string, trustedRoot: string, prompt?: unknown, files?: unknown[], maxSize?: unknown, context?: Record<string, unknown>, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, recipe?: RecipeDescriptor | null }} RunRecipeOptions
- * @typedef {{ ok: boolean, runId: string, runPath: string, recipe: RecipeDescriptor, sources: RecipeSource[], operations: FileOperationInput[], events: Record<string, unknown>[] }} RunRecipeResult
- */
+import type { FileOperationInput } from '../workspace/file-operations.js';
+import type { RunRecord } from '../runtime/run-store.js';
+import type { RecipeError, RecipeSource, RunRecipeOptions, RunRecipeResult } from './run-recipe-types.js';
 
 // Single source of truth for executing a recipe. Used by both the HTTP route
 // (POST /api/recipes/:id/run) and the scheduler executor, so a scheduled run
@@ -35,12 +27,68 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
 //
 // Returns { ok, runId, runPath, recipe, sources, operations, events }.
 
-/** @param {RecipeSource[]} sources @returns {number} */
-function bytesOf(sources) {
-  return sources.reduce((sum, s) => sum + (Number(s.size) || 0), 0);
+function bytesOf(sources: RecipeSource[]): number {
+  return sources.reduce((sum, source) => sum + (Number(source.size) || 0), 0);
 }
 
-/** 执行一个配方:读来源→构建可审批操作→发事件并写 run 记录,返回 { ok, runId, recipe, sources, operations, events }。 @param {RunRecipeOptions} options @returns {RunRecipeResult} */
+function recipeError(error: unknown): RecipeError {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function filePathFromRequest(item: unknown): string {
+  const fileRecord = item && typeof item === 'object' ? item as { fullPath?: unknown; path?: unknown } : {};
+  return typeof item === 'string'
+    ? item
+    : typeof fileRecord.fullPath === 'string'
+      ? fileRecord.fullPath
+      : typeof fileRecord.path === 'string'
+        ? fileRecord.path
+        : '';
+}
+
+function emitFailedRun({
+  error,
+  runId,
+  recipeId,
+  safeRoot,
+  startedAt,
+  context,
+  prompt,
+  events,
+  runStoreRoot,
+}: {
+  error: RecipeError;
+  runId: string;
+  recipeId: string;
+  safeRoot: string;
+  startedAt: Date;
+  context: Record<string, unknown>;
+  prompt: unknown;
+  events: Record<string, unknown>[];
+  runStoreRoot: string;
+}): { failRecord: RunRecord; runPath: string } {
+  const finishedAt = new Date();
+  const failRecord: RunRecord = {
+    id: runId,
+    type: 'recipe-run',
+    provider: 'agent-cowork-host',
+    command: recipeId,
+    recipeId,
+    mode: 'cowork',
+    trustedRoot: safeRoot,
+    startedAt: startedAt.toISOString(),
+    finishedAt: finishedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    status: 'failed',
+    context,
+    input: { prompt: String(prompt || '') },
+    error: { message: error.message },
+    events,
+  };
+  return { failRecord, runPath: writeRunRecord(runStoreRoot, failRecord) };
+}
+
+/** 执行一个配方:读来源→构建可审批操作→发事件并写 run 记录,返回 { ok, runId, recipe, sources, operations, events }。 */
 export function runRecipe({
   recipeId,
   trustedRoot,
@@ -52,10 +100,10 @@ export function runRecipe({
   runEvents = null,
   runsIndex = null,
   recipe: providedRecipe = null,
-}) {
+}: RunRecipeOptions): RunRecipeResult {
   const recipe = providedRecipe || getRecipe(recipeId);
   if (!recipe) {
-    const err = /** @type {RecipeError} */ (new Error('Recipe not found'));
+    const err: RecipeError = new Error('Recipe not found');
     err.statusCode = 404;
     throw err;
   }
@@ -65,17 +113,12 @@ export function runRecipe({
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const startedAt = new Date();
   const runId = createRunId();
-  /** @type {Record<string, unknown>[]} */
-  const events = [];
+  const events: Record<string, unknown>[] = [];
 
-  /** @param {string} type @param {Record<string, unknown>} [payload] @returns {Record<string, unknown>} */
-  const emit = (type, payload = {}) => {
-    let enriched;
-    if (runEvents) {
-      enriched = runEvents.publish(runId, { type, ...payload });
-    } else {
-      enriched = { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
-    }
+  const emit = (type: string, payload: Record<string, unknown> = {}): Record<string, unknown> => {
+    const enriched = runEvents
+      ? runEvents.publish(runId, { type, ...payload })
+      : { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
     events.push(enriched);
     return enriched;
   };
@@ -84,26 +127,16 @@ export function runRecipe({
   emit('assistant_start', { status: 'planning', recipeId, recipeName: recipe.name });
 
   const requestedFiles = Array.isArray(files) ? files.slice(0, 12) : [];
-  /** @type {RecipeSource[]} */
-  const sources = [];
+  const sources: RecipeSource[] = [];
   for (const item of requestedFiles) {
-    const fileRecord = /** @type {{ fullPath?: unknown, path?: unknown }} */ (
-      item && typeof item === 'object' ? item : {}
-    );
-    const filePath = typeof item === 'string'
-      ? item
-      : typeof fileRecord.fullPath === 'string'
-        ? fileRecord.fullPath
-        : typeof fileRecord.path === 'string'
-          ? fileRecord.path
-          : '';
+    const filePath = filePathFromRequest(item);
     if (!filePath) {
       continue;
     }
     try {
       sources.push(extractDocumentText(filePath, { trustedRoot: safeRoot, maxSize }));
     } catch (err) {
-      const error = /** @type {Error} */ (err);
+      const error = recipeError(err);
       const safePath = assertTrustedPath(filePath, safeRoot);
       sources.push({
         path: safePath,
@@ -117,32 +150,23 @@ export function runRecipe({
     text: `已读取 ${sources.length} 个来源 (${bytesOf(sources)} 字节)`,
   });
 
-  /** @type {FileOperationInput[]} */
-  let operations;
+  let operations: FileOperationInput[];
   try {
     operations = buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
   } catch (err) {
-    const error = /** @type {RecipeError} */ (err);
+    const error = recipeError(err);
     emit('assistant_end', { status: 'failed', error: error.message });
-    const finishedAt = new Date();
-    const failRecord = {
-      id: runId,
-      type: 'recipe-run',
-      provider: 'agent-cowork-host',
-      command: recipeId,
+    const { failRecord, runPath } = emitFailedRun({
+      error,
+      runId,
       recipeId,
-      mode: 'cowork',
-      trustedRoot: safeRoot,
-      startedAt: startedAt.toISOString(),
-      finishedAt: finishedAt.toISOString(),
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      status: 'failed',
+      safeRoot,
+      startedAt,
       context,
-      input: { prompt: String(prompt || '') },
-      error: { message: error.message },
+      prompt,
       events,
-    };
-    const runPath = writeRunRecord(runStoreRoot, failRecord);
+      runStoreRoot,
+    });
     if (runsIndex) {
       try {
         runsIndex.upsert(summariseRunForIndex({ ...failRecord, runPath }, context), context);
@@ -158,7 +182,7 @@ export function runRecipe({
   emit('preview', { operations, count: operations.length });
   emit('awaiting_approval', { count: operations.length });
 
-  const sourceSummaries = sources.map((source) => ({
+  const sourceSummaries: RecipeSource[] = sources.map((source) => ({
     path: source.path,
     relativePath: source.relativePath,
     kind: source.kind,
@@ -173,7 +197,7 @@ export function runRecipe({
   const durationMs = finishedAt.getTime() - startedAt.getTime();
   emit('assistant_end', { status: 'succeeded', durationMs });
 
-  const record = {
+  const record: RunRecord = {
     id: runId,
     type: 'recipe-run',
     provider: 'agent-cowork-host',
