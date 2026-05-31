@@ -1,4 +1,3 @@
-// @ts-check
 // Office/PDF 文件写出:零依赖手写 docx / pptx / pdf 二进制(host · L1 领域层 · artifacts)
 // ---------------------------------------------------------------------------
 // 职责:把简单的标题+段落/幻灯片/行文本规格,直接拼成 OOXML(打包成 zip)或
@@ -7,19 +6,29 @@
 // 导出:createDocxDocument / createPptxPresentation / createPdfDocument(均返回 Buffer)
 import { createZip } from '../workspace/zip-utils.js';
 
-/**
- * @typedef {{ title?: string, paragraphs?: string[] }} DocxDocumentSpec
- * @typedef {{ title?: string, bullets?: string[], body?: string[] | string }} PptxSlideSpec
- * @typedef {{ title?: string, slides?: PptxSlideSpec[] }} PptxPresentationSpec
- * @typedef {{ title?: string, lines?: string[] }} PdfDocumentSpec
- */
+export type DocxDocumentSpec = {
+  title?: string;
+  paragraphs?: string[];
+};
 
-/**
- * XML 转义,确保文本安全嵌入 OOXML(含 ' → &apos;)。
- * @param {unknown} value
- * @returns {string}
- */
-function escapeXml(value) {
+export type PptxSlideSpec = {
+  title?: string;
+  bullets?: string[];
+  body?: string[] | string;
+};
+
+export type PptxPresentationSpec = {
+  title?: string;
+  slides?: PptxSlideSpec[];
+};
+
+export type PdfDocumentSpec = {
+  title?: string;
+  lines?: string[];
+};
+
+/** XML 转义,确保文本安全嵌入 OOXML(含 ' → &apos;)。 */
+function escapeXml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -28,13 +37,8 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-/**
- * 把任意输入摊平成去空、去首尾空白的文本行,最多 80 行;全空则用 fallback 兜底。
- * @param {unknown[] | unknown} values
- * @param {string} [fallback]
- * @returns {string[]}
- */
-function normalizedLines(values, fallback = 'Agent Cowork 产物') {
+/** 把任意输入摊平成去空、去首尾空白的文本行,最多 80 行;全空则用 fallback 兜底。 */
+function normalizedLines(values: unknown[] | unknown, fallback = 'Agent Cowork 产物'): string[] {
   const lines = (Array.isArray(values) ? values : [values])
     .flatMap((value) => String(value ?? '').split(/\r?\n/))
     .map((line) => line.trim())
@@ -42,21 +46,13 @@ function normalizedLines(values, fallback = 'Agent Cowork 产物') {
   return lines.length ? lines.slice(0, 80) : [fallback];
 }
 
-/**
- * 生成一个 Word 段落 XML(保留空白,文本转义)。
- * @param {string} text
- * @returns {string}
- */
-function xmlParagraph(text) {
+/** 生成一个 Word 段落 XML(保留空白,文本转义)。 */
+function xmlParagraph(text: string): string {
   return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
 }
 
-/**
- * 由标题+段落生成最小可打开的 .docx(OOXML zip 包)Buffer。
- * @param {DocxDocumentSpec} [spec]
- * @returns {Buffer}
- */
-export function createDocxDocument(spec = {}) {
+/** 由标题+段落生成最小可打开的 .docx(OOXML zip 包)Buffer。 */
+export function createDocxDocument(spec: DocxDocumentSpec = {}): Buffer {
   const { title = 'Agent Cowork 文档', paragraphs = [] } = spec;
   const lines = normalizedLines([title, ...paragraphs], title);
   const documentXml =
@@ -87,19 +83,8 @@ export function createDocxDocument(spec = {}) {
   ]);
 }
 
-/**
- * 生成一个幻灯片文本框形状 XML(坐标/尺寸单位为 EMU,字号为 OOXML 半点单位)。
- * @param {number} id
- * @param {string} name
- * @param {string} text
- * @param {number} x
- * @param {number} y
- * @param {number} cx
- * @param {number} cy
- * @param {number} [fontSize]
- * @returns {string}
- */
-function slideShape(id, name, text, x, y, cx, cy, fontSize = 1800) {
+/** 生成一个幻灯片文本框形状 XML(坐标/尺寸单位为 EMU,字号为 OOXML 半点单位)。 */
+function slideShape(id: number, name: string, text: string, x: number, y: number, cx: number, cy: number, fontSize = 1800): string {
   return '<p:sp>' +
     `<p:nvSpPr><p:cNvPr id="${id}" name="${escapeXml(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>` +
     `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>` +
@@ -107,13 +92,8 @@ function slideShape(id, name, text, x, y, cx, cy, fontSize = 1800) {
     '</p:sp>';
 }
 
-/**
- * 生成单页幻灯片 XML:一个标题框 + 一个项目符号正文框。
- * @param {PptxSlideSpec} slide
- * @param {number} index
- * @returns {string}
- */
-function slideXml(slide, index) {
+/** 生成单页幻灯片 XML:一个标题框 + 一个项目符号正文框。 */
+function slideXml(slide: PptxSlideSpec, index: number): string {
   const title = String(slide?.title || `Slide ${index + 1}`);
   const bullets = normalizedLines(slide?.bullets || slide?.body || [], '');
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -124,14 +104,10 @@ function slideXml(slide, index) {
     '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>';
 }
 
-/**
- * 由标题+多张幻灯片生成最小可打开的 .pptx;空 slides 用占位页兜底,并同步生成各 part 的关系/类型声明。
- * @param {PptxPresentationSpec} [spec]
- * @returns {Buffer}
- */
-export function createPptxPresentation(spec = {}) {
+/** 由标题+多张幻灯片生成最小可打开的 .pptx;空 slides 用占位页兜底,并同步生成各 part 的关系/类型声明。 */
+export function createPptxPresentation(spec: PptxPresentationSpec = {}): Buffer {
   const { title = 'Agent Cowork 演示', slides = [] } = spec;
-  const safeSlides = slides.length ? slides : [{ title, bullets: ['暂无内容'] }];
+  const safeSlides: PptxSlideSpec[] = slides.length ? slides : [{ title, bullets: ['暂无内容'] }];
   const slideEntries = safeSlides.map((slide, index) => ({
     name: `ppt/slides/slide${index + 1}.xml`,
     content: slideXml(slide, index),
@@ -180,12 +156,8 @@ export function createPptxPresentation(spec = {}) {
   ]);
 }
 
-/**
- * 转义 PDF 文本字面量:非 ASCII 字符降级为 ?,并转义反斜杠与圆括号。
- * @param {unknown} value
- * @returns {string}
- */
-function pdfLiteral(value) {
+/** 转义 PDF 文本字面量:非 ASCII 字符降级为 ?,并转义反斜杠与圆括号。 */
+function pdfLiteral(value: unknown): string {
   return String(value ?? '')
     .replace(/[^\x20-\x7e]/g, '?')
     .replace(/\\/g, '\\\\')
@@ -193,12 +165,8 @@ function pdfLiteral(value) {
     .replace(/\)/g, '\\)');
 }
 
-/**
- * 手写最小单页 PDF:逐对象拼字节并计算 xref 偏移,Helvetica 12pt 自上而下排行(最多 36 行)。
- * @param {PdfDocumentSpec} [spec]
- * @returns {Buffer}
- */
-export function createPdfDocument(spec = {}) {
+/** 手写最小单页 PDF:逐对象拼字节并计算 xref 偏移,Helvetica 12pt 自上而下排行(最多 36 行)。 */
+export function createPdfDocument(spec: PdfDocumentSpec = {}): Buffer {
   const { title = 'Agent Cowork PDF', lines = [] } = spec;
   const textLines = normalizedLines([title, ...lines], title).slice(0, 36);
   const stream = textLines
