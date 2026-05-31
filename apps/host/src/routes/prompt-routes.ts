@@ -38,6 +38,7 @@ type PromptRouteOptions = {
 };
 
 const recordSchema = z.record(z.string(), z.unknown());
+const MAX_PROMPT_LENGTH = 16_000;
 
 function objectOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -48,8 +49,13 @@ function objectOrEmpty(value: unknown): Record<string, unknown> {
 const promptRefineBodySchema = z.preprocess(
   objectOrEmpty,
   z.object({
-    prompt: z.preprocess((value) => (typeof value === 'string' ? value : ''), z.string()),
+    prompt: z.string()
+      .trim()
+      .min(1, 'prompt is required')
+      .max(MAX_PROMPT_LENGTH, 'prompt is too long'),
     trustedRoot: z.unknown().optional(),
+    // Context is optional user metadata. Keep it tolerant while preventing
+    // arrays/scalars from leaking numeric keys into the refiner context.
     context: z.preprocess(objectOrEmpty, recordSchema),
   }).passthrough(),
 );
@@ -111,7 +117,12 @@ export async function handlePromptRoutes({
   }
 
   await withJsonBody(request, response, async (body) => {
-    const input = promptRefineBodySchema.parse(body);
+    const parsed = promptRefineBodySchema.safeParse(body);
+    if (!parsed.success) {
+      sendJson(response, 400, { error: parsed.error.issues[0]?.message || 'invalid prompt request' });
+      return;
+    }
+    const input = parsed.data;
     const trustedRoot = state.safeTrustedRoot(input.trustedRoot || state.trustedRootDefault);
     const refiner = state.config.promptRefiner || createPromptRefiner({
       modelCall: state.config.promptRefineModelCall,

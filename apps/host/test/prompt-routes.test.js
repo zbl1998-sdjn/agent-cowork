@@ -75,7 +75,7 @@ test('prompt refine route can use an injected refiner and preserves request iden
   });
 });
 
-test('prompt refine route normalizes malformed optional body fields', async () => {
+test('prompt refine route rejects malformed required prompt and normalizes optional context', async () => {
   const trustedRoot = makeTestWorkspace('prompt-refine-normalize');
   let capturedRaw;
   let capturedContext;
@@ -94,14 +94,23 @@ test('prompt refine route normalizes malformed optional body fields', async () =
       },
     },
   }, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/prompt/refine`, {
+    const invalidPrompt = await fetch(`${baseUrl}/api/prompt/refine`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ prompt: ['bad'], trustedRoot, context: ['not-object'] }),
     });
 
+    assert.equal(invalidPrompt.status, 400);
+    assert.equal(capturedRaw, undefined);
+
+    const response = await fetch(`${baseUrl}/api/prompt/refine`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: '继续优化', trustedRoot, context: ['not-object'] }),
+    });
+
     assert.equal(response.status, 200);
-    assert.equal(capturedRaw, '');
+    assert.equal(capturedRaw, '继续优化');
     assert.equal(capturedContext.trustedRoot, trustedRoot);
     assert.equal(capturedContext.tenantId, 'tenant_local');
     assert.equal(Object.hasOwn(capturedContext, '0'), false);
