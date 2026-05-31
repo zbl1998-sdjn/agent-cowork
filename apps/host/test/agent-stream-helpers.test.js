@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from '../src/routes/agent-stream-budget.js';
 import { buildAgentConfigSnapshot } from '../src/routes/agent-config-snapshot.js';
+import { resolveAgentRunStart } from '../src/routes/agent-resume.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
 import { readRunRecord } from '../src/runtime/run-store.js';
 
@@ -59,6 +60,20 @@ test('agent config snapshot normalizes diagnostics without leaking fallback keys
   assert.equal(snapshot.fallbacks[0].hasKey, true);
   assert.equal(Object.hasOwn(snapshot.fallbacks[0], 'apiKey'), false);
   assert.equal(snapshot.fallbacks[1].hasKey, false);
+});
+
+test('agent resume helper trims resume ids and keeps seeded ids deterministic', () => {
+  const resumed = resolveAgentRunStart({ body: { resumeRunId: ' run_resume_123 ' }, runStoreRoot: null });
+  assert.equal(resumed.runId, 'run_resume_123');
+  assert.equal(resumed.resumed, true);
+  assert.equal(resumed.checkpointer, null);
+  assert.equal(resumed.resumeState, null);
+
+  const seededA = resolveAgentRunStart({ body: { resumeRunId: ['ignored'], runSeed: ' fixed-seed ' }, runStoreRoot: null });
+  const seededB = resolveAgentRunStart({ body: { runSeed: 'fixed-seed' }, runStoreRoot: null });
+  assert.equal(seededA.resumed, false);
+  assert.equal(seededA.runId, seededB.runId);
+  assert.equal(seededA.startedAt.toISOString(), seededB.startedAt.toISOString());
 });
 
 test('recordAgentRun normalizes provider, writes index summary, and swallows record failures', () => {
