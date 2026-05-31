@@ -8,9 +8,7 @@ import path from 'node:path';
 import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../kimi/api-runner.js';
 import { createRunsIndex, summariseRunForIndex } from './runs-index.js';
 import { createPostgresRunsIndex, withSafeWrites } from '../storage/postgres-runs-index.js';
-import { Scheduler, createScheduleStore } from './scheduler.js';
 import { RunEventBus } from './run-events.js';
-import { runRecipe } from '../recipes/run-recipe.js';
 import { createMemoryStore } from '../memory/memory-store.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createConversationStore } from '../storage/conversation-store.js';
@@ -23,7 +21,6 @@ import { createCancellationRegistry } from './cancellation.js';
 import { createPostgresApprovalStore } from '../storage/postgres-approvals.js';
 import { createPostgresEventBus } from '../storage/postgres-event-bus.js';
 import { createPostgresMemoryStore } from '../storage/postgres-memory-store.js';
-import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule-store.js';
 import { createConcurrencyLimiter } from './concurrency.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createApprovalRegistry } from './approvals.js';
@@ -44,18 +41,30 @@ import {
   isUiDistEnabled,
 } from '../http/static-assets.js';
 import { createProjectStoreResolver } from './project-stores.js';
+import { configureHostScheduler } from './host-scheduler.js';
 
-// @ts-check
+export type HostConfig = Record<string, any>;
+export type RequestContextLike = {
+  tenantId?: string;
+  userId?: string;
+  traceId?: string;
+  idempotencyKey?: string;
+};
+export type HostState = Record<string, any> & {
+  config: HostConfig;
+  hostSrcDir: string;
+  trustedRootDefault: string;
+  staticRoot: string | null;
+  uiDistRoot: string;
+  uiDistEnabled: boolean;
+  kimiConfigFile: string;
+  kimiApiConfig: any;
+  runStoreRoot: string;
+  idempotencyStore: Map<string, any>;
+  draining: boolean;
+};
 
-/**
- * @typedef {{ [key: string]: any }} HostConfig
- * @typedef {{ tenantId?: string, userId?: string, traceId?: string, idempotencyKey?: string }} RequestContextLike
- * @typedef {{ id: string, tenantId?: string, userId?: string, traceId?: string | null, payload?: unknown }} ScheduleRecordLike
- * @typedef {{ [key: string]: any, config: HostConfig, hostSrcDir: string, trustedRootDefault: string, staticRoot: string | null, uiDistRoot: string, uiDistEnabled: boolean, kimiConfigFile: string, kimiApiConfig: any, runStoreRoot: string, idempotencyStore: Map<string, any>, draining: boolean }} HostState
- */
-
-/** @param {HostConfig} config @param {{ hostSrcDir: string }} options @returns {HostState} */
-export function createHostState(config = {}, { hostSrcDir }) {
+export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
   const staticRoot = config.staticRoot === false
     ? null
@@ -67,8 +76,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   const kimiApiConfig = resolveKimiApiConfig(config);
   applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
 
-  /** @type {HostState} */
-  const state = {
+  const state: HostState = {
     config,
     hostSrcDir,
     trustedRootDefault,
@@ -174,8 +182,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.safeTrustedRoot = (requestedRoot = trustedRootDefault) => (
     assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault)
   );
-  /** @param {Record<string, any>} record @param {Record<string, unknown>} [ctx] */
-  state.indexRun = (record, ctx) => {
+  state.indexRun = (record: Record<string, any>, ctx?: Record<string, unknown>): void => {
     try {
       const context = ctx || record.context || {};
       state.runsIndex.upsert(summariseRunForIndex({ ...record, runPath: record.runPath }, context), context);
@@ -183,18 +190,21 @@ export function createHostState(config = {}, { hostSrcDir }) {
       // index failures must never break the request path
     }
   };
-  /** @param {RequestContextLike} context @param {string} method @param {string} pathname */
-  state.cacheKeyFor = (context, method, pathname) => (
+  state.cacheKeyFor = (context: RequestContextLike, method: string, pathname: string): string => (
     context.idempotencyKey ? `${context.tenantId}:${context.userId}:${method}:${pathname}:${context.idempotencyKey}` : ''
   );
-  /** @param {any} response @param {RequestContextLike} context */
-  state.requireIdempotencyKey = (response, context) => {
+  state.requireIdempotencyKey = (response: any, context: RequestContextLike): boolean => {
     if (context.idempotencyKey) return true;
     sendJson(response, 428, { error: 'Idempotency-Key header is required for this write operation' });
     return false;
   };
-  /** @param {any} response @param {string} cacheKey @param {string | undefined} fingerprint @param {number} status @param {any} payload */
-  state.sendCachedOrStore = (response, cacheKey, fingerprint, status, payload) => {
+  state.sendCachedOrStore = (
+    response: any,
+    cacheKey: string,
+    fingerprint: string | undefined,
+    status: number,
+    payload: any,
+  ): boolean => {
     if (cacheKey && state.idempotencyStore.has(cacheKey)) {
       const cached = state.idempotencyStore.get(cacheKey);
       if (fingerprint && cached.fingerprint && cached.fingerprint !== fingerprint) {
@@ -210,38 +220,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
     return false;
   };
 
-  state.activeScheduler = config.scheduler || null;
-  if (!state.activeScheduler && config.enableScheduler !== false) {
-    /** @param {ScheduleRecordLike} record */
-    const defaultScheduleExecutor = async (record) => {
-      const payload = record.payload && typeof record.payload === 'object'
-        ? /** @type {Record<string, any>} */ (record.payload)
-        : {};
-      if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
-      const result = runRecipe({
-        recipeId: payload.recipeId,
-        trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
-        prompt: payload.prompt || '',
-        files: payload.files || [],
-        maxSize: payload.maxSize,
-        context: { tenantId: record.tenantId, userId: record.userId, traceId: record.traceId || '' },
-        runStoreRoot: state.runStoreRoot,
-        runEvents: state.runEvents,
-        runsIndex: state.runsIndex,
-      });
-      return { runId: result.runId, operations: result.operations.length };
-    };
-    const executor = config.scheduleExecutor || defaultScheduleExecutor;
-    state.activeScheduler = new Scheduler({
-      storeDir: path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules')),
-      store: config.scheduleStore || (state.usePostgresState
-        ? createCachedPostgresScheduleStore({ connectionString: state.databaseUrl })
-        : createScheduleStore({ backend: state.storeBackend, storeDir: path.resolve(config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules')), dbPath: state.sqliteDbPath })),
-      executor,
-      tickIntervalMs: config.schedulerTickMs || 30_000,
-    });
-    if (config.startScheduler !== false) state.activeScheduler.start();
-  }
+  configureHostScheduler({ config, state, trustedRootDefault });
 
   return state;
 }
