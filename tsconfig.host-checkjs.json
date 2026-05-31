@@ -151,7 +151,7 @@
     "apps/host/src/runtime/scheduler-store.ts",
     "apps/host/src/runtime/store-backend-config.ts",
     "apps/host/src/runtime/subagent-parallel.ts",
-    "apps/host/src/runtime/subagent.js",
+    "apps/host/src/runtime/subagent.ts",
     "apps/host/src/runtime/task-presenter.ts",
     "apps/host/src/runtime/usage.ts",
     "apps/host/src/runtime/windows-runtime.ts",

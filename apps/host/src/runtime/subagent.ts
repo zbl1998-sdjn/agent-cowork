@@ -3,7 +3,6 @@
 // 职责:plan-then-execute 的「执行」一半——把固定计划(一串 { tool, args, note } 步骤)经 ToolRegistry
 //       依次执行,记录一条形如 recipe/sandbox 的 `subagent-run`(带事件时间线),使历史/时间线 UI 无需改动。
 // 依赖:L0 path-policy + 同层 run-store / runs-index。导出:执行子代理计划的函数。
-// @ts-check
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createRunId, writeRunRecord } from './run-store.js';
@@ -15,36 +14,61 @@ import { summariseRunForIndex } from './runs-index.js';
 // unchanged. This is the "execute" half of plan-then-execute; the plan itself is
 // just an array of { tool, args, note } steps decided upstream (by a planner,
 // the model, or the UI).
-//
-// Returns { ok, runId, runPath, goal, steps, events }.
 
-const DEFAULT_CONTEXT_BUDGET_BYTES = 32 * 1024;
-const DEFAULT_MAX_STEPS = 20;
+export const DEFAULT_CONTEXT_BUDGET_BYTES = 32 * 1024;
+export const DEFAULT_MAX_STEPS = 20;
 
-export { DEFAULT_CONTEXT_BUDGET_BYTES, DEFAULT_MAX_STEPS };
+export type SubagentStep = { tool?: unknown; args?: unknown; note?: unknown; rationale?: unknown };
+export type ToolRegistryLike = {
+  has(name: string): boolean;
+  call(
+    name: string,
+    args: Record<string, unknown>,
+    context: { trustedRoot: string; context: Record<string, unknown> },
+  ): unknown | Promise<unknown>;
+};
+export type RunEventsLike = { publish(runId: string, payload: Record<string, unknown>): SubagentEvent };
+export type RunsIndexLike = { upsert(record: unknown, context?: Record<string, unknown>): unknown };
+export type HttpErrorFields = { statusCode?: number; payload?: Record<string, unknown> };
+export type HttpError = Error & HttpErrorFields;
+export type SubagentEvent = { seq?: number; ts?: string; type: string; [key: string]: unknown };
+export type SubagentStepResult =
+  | { index: number; tool: string; status: 'succeeded'; summary: Record<string, unknown> }
+  | { index: number; tool: string; status: 'failed'; error: string };
+export type ContextLimits = { contextBytes: number; contextBudgetBytes: number; maxSteps: number };
+export type RunSubagentOptions = {
+  goal?: unknown;
+  steps?: SubagentStep[];
+  registry: ToolRegistryLike;
+  trustedRoot: string;
+  runStoreRoot: string;
+  runEvents?: RunEventsLike | null;
+  runsIndex?: RunsIndexLike | null;
+  context?: Record<string, unknown>;
+  stopOnError?: boolean;
+  contextBudgetBytes?: number;
+  maxSteps?: number;
+};
+export type RunSubagentResult = {
+  ok: boolean;
+  runId: string;
+  runPath: string;
+  goal: string;
+  steps: SubagentStepResult[];
+  events: SubagentEvent[];
+};
 
-/**
- * @typedef {{ tool?: unknown, args?: unknown, note?: unknown, rationale?: unknown }} SubagentStep
- * @typedef {{ has(name: string): boolean, call(name: string, args: Record<string, unknown>, context: { trustedRoot: string, context: Record<string, unknown> }): unknown | Promise<unknown> }} ToolRegistryLike
- * @typedef {{ publish(runId: string, payload: Record<string, unknown>): SubagentEvent }} RunEventsLike
- * @typedef {{ upsert(record: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
- * @typedef {{ statusCode?: number, payload?: Record<string, unknown> }} HttpErrorFields
- * @typedef {Error & HttpErrorFields} HttpError
- * @typedef {{ seq?: number, ts?: string, type: string, [key: string]: unknown }} SubagentEvent
- * @typedef {{ index: number, tool: string, status: 'succeeded', summary: Record<string, unknown> } | { index: number, tool: string, status: 'failed', error: string }} SubagentStepResult
- * @typedef {{ goal?: unknown, steps?: SubagentStep[], registry: ToolRegistryLike, trustedRoot: string, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, context?: Record<string, unknown>, stopOnError?: boolean, contextBudgetBytes?: number, maxSteps?: number }} RunSubagentOptions
- */
-
-/** @param {number} statusCode @param {string} message @param {Record<string, unknown>} [payload] @returns {HttpError} */
-export function makeHttpError(statusCode, message, payload = {}) {
-  const err = /** @type {HttpError} */ (new Error(message));
+export function makeHttpError(statusCode: number, message: string, payload: Record<string, unknown> = {}): HttpError {
+  const err = new Error(message) as HttpError;
   err.statusCode = statusCode;
   err.payload = payload;
   return err;
 }
 
-/** @param {{ goal: unknown, steps: SubagentStep[] }} input */
-function contextSnapshot({ goal, steps }) {
+function contextSnapshot({ goal, steps }: { goal: unknown; steps: SubagentStep[] }): {
+  goal: string;
+  steps: Array<{ tool: string; note?: string; rationale?: string; args: unknown }>;
+} {
   return {
     goal: String(goal || ''),
     steps: steps.map((step) => ({
@@ -56,8 +80,17 @@ function contextSnapshot({ goal, steps }) {
   };
 }
 
-/** @param {{ goal?: unknown, steps: SubagentStep[], contextBudgetBytes?: number, maxSteps?: number }} input */
-export function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, maxSteps }) {
+export function enforceSubagentContextBudget({
+  goal,
+  steps,
+  contextBudgetBytes,
+  maxSteps,
+}: {
+  goal?: unknown;
+  steps: SubagentStep[];
+  contextBudgetBytes?: number;
+  maxSteps?: number;
+}): ContextLimits {
   const stepLimit = Math.max(1, Number(maxSteps) || DEFAULT_MAX_STEPS);
   if (steps.length > stepLimit) {
     throw makeHttpError(400, `runSubagent: too many steps; max ${stepLimit}`, { maxSteps: stepLimit });
@@ -74,33 +107,31 @@ export function enforceSubagentContextBudget({ goal, steps, contextBudgetBytes, 
   return { contextBytes, contextBudgetBytes: budget, maxSteps: stepLimit };
 }
 
-/** @param {{ steps?: SubagentStep[], registry: ToolRegistryLike }} input */
-export function validateSubagentSteps({ steps, registry }) {
+export function validateSubagentSteps({ steps, registry }: { steps?: SubagentStep[]; registry: ToolRegistryLike }): void {
   if (!Array.isArray(steps) || steps.length === 0) {
-    const err = /** @type {HttpError} */ (new Error('runSubagent: steps must be a non-empty array'));
+    const err = new Error('runSubagent: steps must be a non-empty array') as HttpError;
     err.statusCode = 400;
     throw err;
   }
   steps.forEach((step, i) => {
     if (!step || typeof step.tool !== 'string' || !step.tool.trim()) {
-      const err = /** @type {HttpError} */ (new Error(`runSubagent: steps[${i}].tool is required`));
+      const err = new Error(`runSubagent: steps[${i}].tool is required`) as HttpError;
       err.statusCode = 400;
       throw err;
     }
     if (!registry.has(step.tool)) {
-      const err = /** @type {HttpError} */ (new Error(`runSubagent: unknown tool "${step.tool}"`));
+      const err = new Error(`runSubagent: unknown tool "${step.tool}"`) as HttpError;
       err.statusCode = 400;
       throw err;
     }
   });
 }
 
-/** @param {unknown} result @returns {Record<string, unknown>} */
-function summariseResult(result) {
+function summariseResult(result: unknown): Record<string, unknown> {
   if (result == null || typeof result !== 'object') {
     return { value: result === undefined ? null : result };
   }
-  const objectResult = /** @type {Record<string, unknown>} */ (result);
+  const objectResult = result as Record<string, unknown>;
   if (typeof objectResult.runId === 'string') {
     return { runId: objectResult.runId, ok: objectResult.ok !== false };
   }
@@ -110,7 +141,7 @@ function summariseResult(result) {
   if (Array.isArray(objectResult.content)) {
     const text = objectResult.content
       .map((part) => {
-        const contentPart = /** @type {{ text?: unknown } | null | undefined} */ (part);
+        const contentPart = part as { text?: unknown } | null | undefined;
         return contentPart && typeof contentPart.text === 'string' ? contentPart.text : '';
       })
       .join(' ')
@@ -120,7 +151,6 @@ function summariseResult(result) {
   return { keys: Object.keys(objectResult).slice(0, 8) };
 }
 
-/** @param {RunSubagentOptions} options */
 export async function runSubagent({
   goal = '',
   steps = [],
@@ -133,7 +163,7 @@ export async function runSubagent({
   stopOnError = true,
   contextBudgetBytes = DEFAULT_CONTEXT_BUDGET_BYTES,
   maxSteps = DEFAULT_MAX_STEPS,
-}) {
+}: RunSubagentOptions): Promise<RunSubagentResult> {
   if (!registry) {
     throw new Error('runSubagent: registry is required');
   }
@@ -146,10 +176,8 @@ export async function runSubagent({
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const runId = createRunId();
   const startedAt = new Date();
-  /** @type {SubagentEvent[]} */
-  const events = [];
-  /** @param {string} type @param {Record<string, unknown>} [payload] */
-  const emit = (type, payload = {}) => {
+  const events: SubagentEvent[] = [];
+  const emit = (type: string, payload: Record<string, unknown> = {}): SubagentEvent => {
     const enriched = runEvents
       ? runEvents.publish(runId, { type, ...payload })
       : { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
@@ -160,15 +188,14 @@ export async function runSubagent({
   emit('user_message', { text: String(goal || '').slice(0, 2000) || `子任务 (${steps.length} 步)` });
   emit('assistant_start', { status: 'running', stepCount: steps.length });
 
-  /** @type {SubagentStepResult[]} */
-  const stepResults = [];
+  const stepResults: SubagentStepResult[] = [];
   let ok = true;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const tool = String(step.tool || '');
     emit('progress', { icon: 'loader', text: `步骤 ${i + 1}/${steps.length}: 调用 ${tool}` });
     try {
-      const result = await registry.call(tool, /** @type {Record<string, unknown>} */ (step.args || {}), { trustedRoot: safeRoot, context });
+      const result = await registry.call(tool, (step.args || {}) as Record<string, unknown>, { trustedRoot: safeRoot, context });
       const summary = summariseResult(result);
       stepResults.push({ index: i, tool, status: 'succeeded', summary });
       emit('tool_result', { index: i, tool, status: 'succeeded', summary });
@@ -209,7 +236,7 @@ export async function runSubagent({
     try {
       runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, context), context);
     } catch {
-      // index failures never break the run
+      // 索引失败不应影响子代理主流程,历史记录已由 run-store 落盘。
     }
   }
 
