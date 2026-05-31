@@ -47,6 +47,38 @@ test('workspace search route returns chunks with source line references', async 
   });
 });
 
+test('workspace search route validates required query and sanitizes optional fields', async () => {
+  const trustedRoot = makeTestWorkspace('workspace-search-validation');
+  fs.writeFileSync(path.join(trustedRoot, 'notes.md'), 'Validation route keeps search inputs bounded\n', 'utf8');
+
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const invalid = await fetch(`${baseUrl}/api/workspace/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: ['validation'] }),
+    });
+    assert.equal(invalid.status, 400);
+
+    const response = await fetch(`${baseUrl}/api/workspace/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        trustedRoot: ['not-a-root'],
+        query: 'validation',
+        limit: '1',
+        maxFiles: 'bad-limit',
+        maxChunkLines: '1',
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.root, trustedRoot);
+    assert.equal(body.sources.length, 1);
+    assert.equal(body.sources[0].relativePath, 'notes.md');
+  });
+});
+
 test('SearchWorkspace builtin tool is read-only and jailed to the trusted root', async () => {
   const trustedRoot = makeTestWorkspace('workspace-search-tool');
   fs.writeFileSync(path.join(trustedRoot, 'guide.md'), 'Alpha project glossary lives here\n', 'utf8');
