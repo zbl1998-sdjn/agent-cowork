@@ -9,7 +9,7 @@ test('golden eval tasks load with schema coverage required by plan/07 A1', async
   assert.equal(new Set(tasks.map((task) => task.id)).size, tasks.length, 'task ids must be unique');
 
   const categories = new Set(tasks.map((task) => task.category));
-  for (const required of [
+  const requiredCategories = [
     'file-read',
     'file-write',
     'workspace-search',
@@ -18,7 +18,8 @@ test('golden eval tasks load with schema coverage required by plan/07 A1', async
     'office-artifact',
     'batch-files',
     'conversation-branches',
-  ]) {
+  ] as const;
+  for (const required of requiredCategories) {
     assert.ok(categories.has(required), `missing required eval category: ${required}`);
   }
 

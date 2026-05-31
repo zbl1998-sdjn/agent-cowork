@@ -5,8 +5,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hostSourceRoot = path.join(repoRoot, 'apps', 'host', 'src');
+const hostTestRoot = path.join(repoRoot, 'apps', 'host', 'test');
 const evalSourceRoot = path.join(repoRoot, 'eval');
-const runtimeTypescriptRoots = [hostSourceRoot, evalSourceRoot];
+const runtimeTypescriptRoots = [hostSourceRoot, hostTestRoot, evalSourceRoot];
 const require = createRequire(import.meta.url);
 
 function isInsideRuntimeTypescriptRoot(filePath) {

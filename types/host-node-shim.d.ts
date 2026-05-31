@@ -267,6 +267,30 @@ declare module 'node:dns' {
   }
 }
 
+declare module 'node:test' {
+  export type TestFunction = (context?: unknown) => unknown | Promise<unknown>;
+  export default function test(name: string, fn: TestFunction): unknown;
+}
+
+declare module 'node:assert/strict' {
+  export interface Assert {
+    ok(value: unknown, message?: string): asserts value;
+    equal(actual: unknown, expected: unknown, message?: string): void;
+    deepEqual(actual: unknown, expected: unknown, message?: string): void;
+    match(actual: string, expected: RegExp, message?: string): void;
+    throws(block: () => unknown, validator?: RegExp | ((error: unknown) => boolean), message?: string): void;
+    rejects(
+      block: () => unknown | Promise<unknown>,
+      validator?: RegExp | ((error: unknown) => boolean),
+      message?: string
+    ): Promise<void>;
+    doesNotThrow(block: () => unknown, message?: string): void;
+  }
+
+  const assert: Assert;
+  export default assert;
+}
+
 declare module 'pg' {
   export interface QueryResult {
     rows?: unknown[];

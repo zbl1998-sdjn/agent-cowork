@@ -3,12 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { EvalTask } from '../../../eval/tasks/schema.js';
 
-const TASKS = [
+type ScoreLike = {
+  passed: boolean;
+};
+
+function assertScoreLike(score: unknown): asserts score is ScoreLike {
+  assert.ok(score && typeof score === 'object' && 'passed' in score);
+  assert.equal(typeof score.passed, 'boolean');
+}
+
+const TASKS: EvalTask[] = [
   {
     id: 'file-read-runner-one',
     title: 'Read one file',
     category: 'file-read',
+    tags: [],
     prompt: 'Read input.txt and report the value.',
     maxSteps: 3,
     fixture: { files: [{ path: 'input.txt', content: 'value: 42\n' }] },
@@ -21,6 +32,7 @@ const TASKS = [
     id: 'file-write-runner-two',
     title: 'Write one file',
     category: 'file-write',
+    tags: [],
     prompt: 'Write result.md with the final answer.',
     maxSteps: 4,
     fixture: { files: [{ path: 'notes/source.md', content: 'answer: stable\n' }] },
@@ -34,15 +46,17 @@ const TASKS = [
 test('EvalRunner runs tasks in isolated trusted roots and aggregates scores', async () => {
   const { runEvalTasks } = await import('../../../eval/runner.js');
   const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-runner-'));
-  const seenRoots = [];
+  const seenRoots: string[] = [];
   try {
     const summary = await runEvalTasks({
       tasks: TASKS,
       workRoot,
       executor: async ({ task, trustedRoot }) => {
         seenRoots.push(trustedRoot);
+        const firstFixtureFile = task.fixture.files.at(0);
+        assert.ok(firstFixtureFile);
         assert.ok(trustedRoot.startsWith(workRoot));
-        assert.ok(fs.existsSync(path.join(trustedRoot, task.fixture.files[0].path)));
+        assert.ok(fs.existsSync(path.join(trustedRoot, firstFixtureFile.path)));
         if (task.id === 'file-write-runner-two') {
           fs.writeFileSync(path.join(trustedRoot, 'result.md'), 'stable result\n');
           return {
@@ -71,7 +85,10 @@ test('EvalRunner runs tasks in isolated trusted roots and aggregates scores', as
     assert.equal(summary.passRate, 1);
     assert.equal(summary.results.length, 2);
     assert.equal(new Set(seenRoots).size, 2);
-    assert.ok(summary.results.every((result) => result.score.passed));
+    assert.ok(summary.results.every((result) => {
+      assertScoreLike(result.score);
+      return result.score.passed;
+    }));
   } finally {
     fs.rmSync(workRoot, { recursive: true, force: true });
   }
@@ -101,9 +118,15 @@ test('EvalRunner records task errors without aborting the remaining batch', asyn
     assert.equal(summary.passedTasks, 1);
     assert.equal(summary.failedTasks, 1);
     assert.equal(summary.passRate, 0.5);
-    assert.equal(summary.results[0].error.message, 'model replay miss');
-    assert.equal(summary.results[0].score.passed, false);
-    assert.equal(summary.results[1].score.passed, true);
+    const firstResult = summary.results.at(0);
+    const secondResult = summary.results.at(1);
+    assert.ok(firstResult);
+    assert.ok(secondResult);
+    assert.equal(firstResult.error?.message, 'model replay miss');
+    assertScoreLike(firstResult.score);
+    assertScoreLike(secondResult.score);
+    assert.equal(firstResult.score.passed, false);
+    assert.equal(secondResult.score.passed, true);
   } finally {
     fs.rmSync(workRoot, { recursive: true, force: true });
   }

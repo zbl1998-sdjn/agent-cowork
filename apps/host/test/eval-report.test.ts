@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+type PackageJson = {
+  scripts?: {
+    eval?: unknown;
+  };
+};
+
 test('Eval report emits JSON, HTML, and baseline regression metadata', async () => {
   const { generateEvalReport } = await import('../../../eval/report.js');
   const report = generateEvalReport({
@@ -12,8 +18,8 @@ test('Eval report emits JSON, HTML, and baseline regression metadata', async () 
     failedTasks: 1,
     passRate: 0.5,
     results: [
-      { taskId: 'passing-task', score: { passed: true, score: 1, dimensions: {} } },
-      { taskId: 'failing-task', score: { passed: false, score: 0, dimensions: {} } },
+      { taskId: 'passing-task', score: { passed: true, score: 1 } },
+      { taskId: 'failing-task', score: { passed: false, score: 0 } },
     ],
   }, {
     baseline: { passRate: 0.75 },
@@ -31,8 +37,8 @@ test('Eval report emits JSON, HTML, and baseline regression metadata', async () 
 });
 
 test('package exposes npm run eval command', () => {
-  const pkg = JSON.parse(fs.readFileSync('../../package.json', 'utf8'));
-  assert.equal(pkg.scripts.eval, 'node scripts/run-host-node.mjs scripts/eval.mjs');
+  const pkg = JSON.parse(fs.readFileSync('../../package.json', 'utf8')) as PackageJson;
+  assert.equal(pkg.scripts?.eval, 'node scripts/run-host-node.mjs scripts/eval.mjs');
 });
 
 test('eval executor requires replay records by default', async () => {
@@ -40,7 +46,14 @@ test('eval executor requires replay records by default', async () => {
 
   assert.throws(
     () => createEvalExecutorFromEnv({ recordsPath: null, allowContractExecutor: false }),
-    (error) => error.code === 'EVAL_REPLAY_RECORDS_REQUIRED' && /KCW_EVAL_REPLAY_RECORDS/.test(error.message),
+    (error) => (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && 'message' in error
+      && error.code === 'EVAL_REPLAY_RECORDS_REQUIRED'
+      && /KCW_EVAL_REPLAY_RECORDS/.test(String(error.message))
+    ),
   );
 });
 
@@ -52,10 +65,16 @@ test('eval contract executor is explicit opt-in only', async () => {
   const result = await executor({
     task: {
       id: 'contract-dry-run',
+      title: 'Contract dry run',
+      category: 'file-read',
+      tags: [],
+      prompt: 'Read the dry run fixture and report the result.',
       fixture: { files: [] },
       assertions: [{ type: 'responseContains', contains: 'dry run ok' }],
       maxSteps: 2,
     },
+    trustedRoot: 'unused',
+    taskIndex: 0,
   });
 
   assert.equal(result.response, 'dry run ok');
@@ -74,7 +93,10 @@ test('eval replay records loader accepts JSONL ModelRecorder files', async () =>
   );
 
   const records = readReplayRecords(filePath);
+  assert.ok(records);
+  const firstRecord = records.at(0);
 
   assert.equal(records.length, 2);
-  assert.equal(records[0].fingerprint, 'sha256:one');
+  assert.ok(firstRecord);
+  assert.equal(firstRecord.fingerprint, 'sha256:one');
 });

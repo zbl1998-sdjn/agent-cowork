@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { EvalTask } from '../../../eval/tasks/schema.js';
 
-const TASK = {
+const TASK: EvalTask = {
   id: 'file-read-contract-summary',
   title: 'Read a contract and summarize obligations',
   category: 'file-read',
+  tags: [],
   prompt: 'Read contract.txt and summarize the renewal date and payment obligation.',
   maxSteps: 4,
   fixture: {
