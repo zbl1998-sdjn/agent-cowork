@@ -67,6 +67,14 @@ test('project routes scope projects per signed-in user and manage memberships', 
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.project.conversations, ['conv_1']);
 
+    res = await jsonRequest(baseUrl, `/api/projects/${project.id}/conversations`, {
+      method: 'POST',
+      token: tokenA,
+      idem: 'proj-conv-malformed',
+      body: { conversationId: ['conv_bad'] },
+    });
+    assert.equal(res.status, 400);
+
     res = await jsonRequest(baseUrl, `/api/projects/${project.id}/artifacts`, {
       method: 'POST',
       token: tokenA,
@@ -92,6 +100,14 @@ test('project routes scope projects per signed-in user and manage memberships', 
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.project.archived, true);
+
+    res = await jsonRequest(baseUrl, `/api/projects/${project.id}`, {
+      method: 'PATCH',
+      token: tokenA,
+      idem: 'proj-archive-malformed',
+      body: { archived: 'false' },
+    });
+    assert.equal(res.status, 400);
 
     res = await jsonRequest(baseUrl, '/api/projects', { token: tokenA });
     assert.equal(res.status, 200);
