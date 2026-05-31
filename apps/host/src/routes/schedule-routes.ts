@@ -2,6 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/schedules/* —— 创建/列出/暂停/删除计划任务(cron 或定时),交由 L2 调度器执行。
 // 依赖:L0 request-utils + L2 scheduler/scheduler-store(经参数注入)。导出:handleScheduleRoutes。
+import { z } from 'zod';
 import {
   bodyFingerprint,
   decodePathSegment,
@@ -9,31 +10,70 @@ import {
   stableHeader,
   withJsonBody,
 } from '../http/request-utils.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { ScheduleCreateInput, ScheduleRecord, SchedulerFireResult } from '../runtime/scheduler.js';
 
 const SCHEDULE_ID_RE = /^[a-z0-9_-]+$/i;
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {import('../runtime/scheduler.js').ScheduleRecord} ScheduleRecord
- * @typedef {import('../runtime/scheduler.js').SchedulerFireResult} SchedulerFireResult
- * @typedef {{ tenantId: string, userId?: string, traceId?: string, idempotencyKey?: string, [key: string]: unknown }} RequestContext
- * @typedef {{ payload?: unknown, name?: unknown, cron?: unknown, fireAt?: unknown }} ScheduleBody
- * @typedef {{ list(options?: { tenantId?: unknown, userId?: unknown }): ScheduleRecord[], create(input: unknown): ScheduleRecord, get(id: string): ScheduleRecord | null, cancel(id: string): boolean, remove(id: string): boolean, tickOnce(filter?: { tenantId?: unknown, userId?: unknown }): Promise<SchedulerFireResult[]> }} SchedulerLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, activeScheduler?: SchedulerLike | null, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string }} ScheduleRouteOptions
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type RequestContext = {
+  tenantId: string;
+  userId?: string;
+  traceId?: string;
+  idempotencyKey?: string;
+  [key: string]: unknown;
+};
+type SchedulerLike = {
+  list(options?: { tenantId?: unknown; userId?: unknown }): ScheduleRecord[];
+  create(input: ScheduleCreateInput): ScheduleRecord;
+  get(id: string): ScheduleRecord | null;
+  cancel(id: string): boolean;
+  remove(id: string): boolean;
+  tickOnce(filter?: { tenantId?: unknown; userId?: unknown }): Promise<SchedulerFireResult[]>;
+};
+type ScheduleRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestUrl: URL;
+  requestContext: RequestContext;
+  activeScheduler?: SchedulerLike | null;
+  cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string;
+  requireIdempotencyKey(response: HttpResponseLike, context: RequestContext): boolean;
+  sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): unknown;
+  safeTrustedRoot(input?: unknown): string;
+};
 
-/** @param {ScheduleRecord | null | undefined} record @param {RequestContext} context @returns {boolean} */
-function scheduleVisibleToContext(record, context) {
+const objectBody = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+);
+const stringOrNullSchema = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().nullable().optional(),
+);
+const payloadSchema = z.preprocess(
+  (value) => (value == null ? {} : value),
+  z.object({}).passthrough(),
+);
+const scheduleCreateBodySchema = z.preprocess(objectBody, z.object({
+  name: z.string().trim().min(1, 'name is required'),
+  cron: stringOrNullSchema,
+  fireAt: stringOrNullSchema,
+  payload: payloadSchema,
+}).passthrough());
+
+function scheduleVisibleToContext(record: ScheduleRecord | null | undefined, context: RequestContext): boolean {
   return Boolean(record) && stableHeader(record?.tenantId, 'tenant_local') === context.tenantId;
 }
 
-/** @returns {string} */
-function emptyBodyFingerprint() {
+function emptyBodyFingerprint(): string {
   return bodyFingerprint({});
 }
 
-/** @param {ScheduleRouteOptions} options @returns {Promise<boolean>} */
+function zodMessage(err: z.ZodError, fallback: string): string {
+  return err.issues[0]?.message || fallback;
+}
+
 export async function handleScheduleRoutes({
   request,
   response,
@@ -45,7 +85,7 @@ export async function handleScheduleRoutes({
   requireIdempotencyKey,
   sendCachedOrStore,
   safeTrustedRoot,
-}) {
+}: ScheduleRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/schedules') {
     const userId = requestUrl.searchParams.get('userId') || undefined;
     const list = activeScheduler ? activeScheduler.list({
@@ -62,7 +102,6 @@ export async function handleScheduleRoutes({
 
   if (request.method === 'POST' && pathname === '/api/schedules') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {ScheduleBody} */ (body || {});
       if (!activeScheduler) {
         sendJson(response, 503, { error: 'Scheduler is not enabled in this host.' });
         return;
@@ -70,16 +109,18 @@ export async function handleScheduleRoutes({
       if (!requireIdempotencyKey(response, requestContext)) {
         return;
       }
+      const parsed = scheduleCreateBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: zodMessage(parsed.error, 'invalid schedule request') });
+        return;
+      }
       const fingerprint = bodyFingerprint(body);
       const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
         return;
       }
-      const payload = /** @type {Record<string, unknown>} */ (
-        input.payload && typeof input.payload === 'object' && !Array.isArray(input.payload)
-          ? { ...input.payload }
-          : {}
-      );
+      const input = parsed.data;
+      const payload = { ...input.payload };
       if (payload.trustedRoot) {
         payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
       }

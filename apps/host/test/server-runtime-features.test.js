@@ -470,6 +470,34 @@ test('schedules disabled returns 503 when enableScheduler:false', async () => {
   }
 });
 
+test('schedules reject malformed create bodies', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    scheduleExecutor: async () => ({ runId: 'r1' }),
+  });
+  const base = await bind(server);
+  try {
+    const badName = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'sched-bad-name' },
+      body: { name: '', cron: '* * * * *', payload: {} },
+    });
+    assert.equal(badName.status, 400);
+
+    const badPayload = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'sched-bad-payload' },
+      body: { name: 'bad payload', cron: '* * * * *', payload: 'not-an-object' },
+    });
+    assert.equal(badPayload.status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('SSE: /api/runs/:id/events replays a completed recipe run timeline', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
