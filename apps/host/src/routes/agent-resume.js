@@ -1,3 +1,7 @@
+// Agent 续跑解析(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:解析 Agent 运行的「起点」——是新建 run 还是从某检查点续跑(resume),并据 seed 构造确定性 ID 源(供回放)。
+//       是 agent-stream 的辅助。依赖:L2 run-checkpoint/run-resume/run-store + L0 util/ids。导出:resolveAgentRunStart。
 // @ts-check
 
 import { createRunCheckpointer } from '../runtime/run-checkpoint.js';

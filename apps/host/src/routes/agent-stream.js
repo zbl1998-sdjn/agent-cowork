@@ -1,3 +1,9 @@
+// Agent 流式聊天路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:Agent 对话主入口——以 SSE 流式驱动「工具循环」:装配工具集、装载分层记忆/图片、跑 Agent 循环
+//       (审批/工具调用/收尾),全程发事件并落 run 记录/trace。是用户聊天体验的核心路由。
+// 依赖:L1 kimi/agent(tool-loop/toolset/finalize)+ memory/workspace + L2 hooks/action-audit/run-trace
+//       + 同层 agent-resume/session-model-config 等。导出:streamAgentChat。
 // @ts-check
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { loadHooksConfig } from '../runtime/hooks.js';

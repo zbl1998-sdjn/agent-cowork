@@ -1,3 +1,7 @@
+// 引导路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/onboarding/* —— 返回按角色的配方/连接器推荐,供新用户引导界面。
+// 依赖:L0 request-utils + L1 onboarding 推荐。导出:handleOnboardingRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { buildOnboardingRecommendations } from '../onboarding/recommendations.js';
 

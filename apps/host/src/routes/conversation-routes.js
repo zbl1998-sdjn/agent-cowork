@@ -1,3 +1,7 @@
+// 会话路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/conversations/* —— 会话的列出/读取/创建/改名/删除(多租户隔离)。
+// 依赖:L1 storage 会话存储(经参数注入)。导出:handleConversationRoutes。
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';

@@ -1,3 +1,7 @@
+// 连接器 OAuth 路由·工具(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:connector-oauth-routes 用到的纯工具——识别 GitHub、取客户端 id、由请求上下文构造凭据身份/过滤器、
+//       归一化错误状态码与消息。便于单测、保持路由处理精简。依赖:L1 connectors/catalog。
 import { getConnector } from '../connectors/catalog.js';
 
 export const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);

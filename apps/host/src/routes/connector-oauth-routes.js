@@ -1,3 +1,8 @@
+// 连接器 OAuth 路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/connectors/*/oauth/* —— 发起 OAuth(如 GitHub 设备码)、轮询换 token、保存加密凭据、撤销授权。
+//       授权范围先经 L2 oauth-permission-approvals 审批。依赖:同层 connector-oauth-route-utils + L1 connectors/security。
+// 导出:handleConnectorOAuthRoutes。
 import crypto from 'node:crypto';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { completeGitHubDeviceFlow, fetchGitHubViewer, startGitHubDeviceFlow } from '../connectors/oauth-github.js';

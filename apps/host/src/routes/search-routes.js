@@ -1,3 +1,7 @@
+// 搜索路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/search/* —— 在可信工作区内做文件名/内容或 RAG 检索,返回命中与摘录。
+// 依赖:L0 request-utils + L1 workspace 检索(经 state 注入)。导出:handleSearchRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 

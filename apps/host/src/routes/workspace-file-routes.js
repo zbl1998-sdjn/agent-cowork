@@ -1,3 +1,8 @@
+// 工作区文件路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/files/* 与 /api/workspace/* —— 列文件树、读/预览文件、上传、批量文件操作(预览+审批+apply)、回滚。
+//       所有路径经 L0 path-policy 围栏;写操作走 L2 file-operation-approvals 审批。
+// 依赖:L1 workspace(file-tree/reader/preview/uploads/operations)+ L2 审批(经参数注入)。导出:handleWorkspaceFileRoutes。
 import fs from 'node:fs';
 import path from 'node:path';
 import { listWorkspaceTree } from '../workspace/file-tree.js';

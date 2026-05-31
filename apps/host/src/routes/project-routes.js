@@ -1,3 +1,7 @@
+// 项目路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/projects/* —— 项目的增删查与切换(多租户隔离),写操作带幂等键去重。
+// 依赖:L0 request-utils + L2 project-stores(经参数注入)。导出:handleProjectRoutes。
 import { bodyFingerprint, decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
 
 /**

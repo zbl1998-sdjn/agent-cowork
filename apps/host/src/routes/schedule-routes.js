@@ -1,3 +1,7 @@
+// 调度路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/schedules/* —— 创建/列出/暂停/删除计划任务(cron 或定时),交由 L2 调度器执行。
+// 依赖:L0 request-utils + L2 scheduler/scheduler-store(经参数注入)。导出:handleScheduleRoutes。
 import {
   bodyFingerprint,
   decodePathSegment,

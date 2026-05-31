@@ -1,3 +1,7 @@
+// 鉴权路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/auth/* —— 注册/登录/访客/登出/会话查询,签发会话 token。
+// 依赖:L0 request-utils + L1 auth 用户存储(经参数注入)。导出:handleAuthRoutes。
 import { sendJson, withJsonBody, headerValue } from '../http/request-utils.js';
 
 /**

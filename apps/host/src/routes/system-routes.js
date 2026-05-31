@@ -1,3 +1,7 @@
+// 系统路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理系统类端点 —— 健康检查、指标、熔断器/限流状态、运行时依赖探测、能力开关等运维可见性。
+// 依赖:L2 runtime 各状态源(model-breakers/dependencies 等,经 state 注入)。导出:handleSystemRoutes。
 import { modelBreakerStats } from '../runtime/model-breakers.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';

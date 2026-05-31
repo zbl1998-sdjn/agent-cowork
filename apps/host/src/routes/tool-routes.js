@@ -1,3 +1,7 @@
+// 工具路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/tools/* —— 列出/检索工具(ToolSearch)、调用单个工具(写操作走幂等键与审批)。
+// 依赖:L0 request-utils + L1 tools 注册表(经参数注入)。导出:handleToolRoutes。
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { runSubagent } from '../runtime/subagent.js';
 import { runSubagentsParallel } from '../runtime/subagent-parallel.js';

@@ -1,3 +1,7 @@
+// Agent 运行记录(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:把一次 Agent 流式运行收尾落成 run 记录(含配置快照、系统提示词版本)并写入运行索引。是 agent-stream 的辅助。
+// 依赖:L2 run-store/runs-index + L1 system-prompt + 同层 agent-config-snapshot。导出:recordAgentRun。
 // @ts-check
 import { writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';

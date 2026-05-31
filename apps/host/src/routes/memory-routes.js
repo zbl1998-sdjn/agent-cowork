@@ -1,3 +1,7 @@
+// 记忆路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/memory/* —— 记忆的写入/查询/分层读取与用户画像存取(多租户隔离)。
+// 依赖:L1 memory 存储(经参数注入)。导出:handleMemoryRoutes。
 import path from 'node:path';
 import { MEMORY_LIMITS } from '../memory/memory-constants.js';
 import { createUserProfile } from '../memory/profile.js';

@@ -1,3 +1,7 @@
+// 制品路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/artifacts/* —— 列出制品、重命名、渲染活页制品 HTML(含实时刷新)。
+// 依赖:L1 artifacts(artifact-catalog/live-artifact)。导出:handleArtifactRoutes。
 import { listArtifacts, renameArtifact, renderArtifactHtml } from '../artifacts/artifact-catalog.js';
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 

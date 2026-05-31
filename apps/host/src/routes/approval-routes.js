@@ -1,3 +1,7 @@
+// 审批路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/approvals/* —— UI 把审批决定(once/session/reject)回传,解决审批登记表中的待决项。
+// 依赖:L0 request-utils + L2 approvals 登记表(经参数注入)。导出:handleApprovalRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 
 const APPROVAL_ID_RE = /^[a-zA-Z0-9_-]+$/;

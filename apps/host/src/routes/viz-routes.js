@@ -1,3 +1,7 @@
+// 可视化路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/viz/* —— 把图表规格渲染为可视化(chart/mermaid/table),或落成活页制品。
+// 依赖:L0 request-utils + L1 artifacts/viz(经参数注入)。导出:handleVizRoutes。
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { renderViz } from '../artifacts/viz.js';
 import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync } from '../artifacts/live-artifact.js';

@@ -1,3 +1,9 @@
+// HTTP 服务器组装根(host · L4 组装根 · server.js)
+// ---------------------------------------------------------------------------
+// 职责:唯一「连线」层——创建运行时依赖(host-state)、装中间件(安全头/CORS/限流)、按身份附着请求上下文、
+//       挂载静态资源与路由链,接入 MCP、提供优雅停机。本层不写业务逻辑,只做组装(plan/00 L4)。
+// 依赖:L0 http/* · L1 auth/mcp/security · L2 runtime/host-state · L3 routes/route-chain。导出:createServer。
+// 注:这是 plan/00 标注的 P0 上帝类(体积白名单),目标后续把中间件/路由进一步下沉,server.js 只留装配。
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,3 +1,7 @@
+// 运行历史路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/runs/* —— 列出运行历史(经索引)、读取单条 run 记录与事件时间线/trace,供历史与回放 UI。
+// 依赖:L2 run-store / runs-index(经参数注入)。导出:handleRunRoutes。
 import { listRunRecords, readRunRecord } from '../runtime/run-store.js';
 import { formatSseFrame, parseLastEventId } from '../runtime/run-events.js';
 import { taskFromRun } from '../runtime/task-presenter.js';

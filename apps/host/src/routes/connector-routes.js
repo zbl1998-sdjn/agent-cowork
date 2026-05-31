@@ -1,3 +1,7 @@
+// 连接器路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/connectors/* —— 列出/按关键词建议连接器、接入或吊销 MCP 连接器并导入其工具。
+// 依赖:L0 request-utils + L1 connectors/mcp + L1 tools 注册表(经参数注入)。导出:handleConnectorRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { listConnectors, suggestConnectors } from '../connectors/catalog.js';
 import { handleConnectorOAuthRoutes } from './connector-oauth-routes.js';

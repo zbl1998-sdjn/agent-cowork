@@ -1,3 +1,8 @@
+// 路由链(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:把各 /api 子路由按顺序串联成一条「责任链」——依次调用 handleXRoutes,谁处理了就短路返回。
+//       这是 L3 路由层的总入口,被 L4 server.js 挂载。每个子路由只认自己的 /api/* 前缀。
+// 依赖:同层全部 handleXRoutes。导出:handleRouteChain。
 import path from 'node:path';
 import { handleArtifactRoutes } from './artifact-routes.js';
 import { handleAuthRoutes } from './auth-routes.js';

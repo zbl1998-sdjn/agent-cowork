@@ -1,3 +1,7 @@
+// Agent 运行预算(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:从请求体/模型配置解析单次 Agent 运行的超时与 token/费用预算,并据此构建预算护栏。是 agent-stream 的辅助。
+// 依赖:L2 budget-guard。导出:resolveAgentRunTimeoutMs / createAgentBudgetGuard。
 // @ts-check
 import { createBudgetGuard } from '../runtime/budget-guard.js';
 

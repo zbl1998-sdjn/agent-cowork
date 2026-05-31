@@ -1,3 +1,7 @@
+// 技能路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/skills/* —— 列出技能、按 id 开关启用状态。
+// 依赖:L0 request-utils + L1 skills 注册表(经参数注入)。导出:handleSkillRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 
 /** @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest */

@@ -1,3 +1,7 @@
+// 计划路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/plan/* —— 把目标交给 planner 生成可审批计划,或将批准后的计划交子代理执行。
+// 依赖:L0 request-utils + L2 plan-builder/subagent + L1 tools 注册表(经参数注入)。导出:handlePlanRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { buildPlan } from '../runtime/plan-builder.js';
 

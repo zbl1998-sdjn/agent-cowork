@@ -1,3 +1,8 @@
+// 配方路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/recipes/* —— 列出配方、运行配方(POST /api/recipes/:id/run)、保存自定义配方。
+//       运行委派给 L1 run-recipe(与调度器共用),产出可审批操作 + run 记录。
+// 依赖:L1 recipes(经参数注入)。导出:handleRecipeRoutes。
 import path from 'node:path';
 import { getRecipe, listRecipes } from '../recipes/registry.js';
 import { runRecipe } from '../recipes/run-recipe.js';

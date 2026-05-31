@@ -1,3 +1,8 @@
+// 进程入口(host · L4 组装根 · main.js)
+// ---------------------------------------------------------------------------
+// 职责:读环境变量装配并启动 HTTP 服务器(createServer),绑定回环地址(非回环会大声告警——本服务设计为
+//       仅 loopback 的 sidecar),处理端口占用与启动失败,并在 SIGINT/SIGTERM 时优雅停机。
+// 依赖:L4 server.js + L1 storage(事件 jsonl 写入 / 会话路径)。无导出(可执行入口)。
 import path from 'node:path';
 import { createServer } from './server.js';
 import { JsonlWriter } from './storage/jsonl-writer.js';

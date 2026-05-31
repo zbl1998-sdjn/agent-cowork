@@ -1,3 +1,8 @@
+// 通用 HTTP 中间件(host · L0 基础层 · http/middleware)
+// ---------------------------------------------------------------------------
+// 职责:请求进入路由前的统一前置处理——注入安全响应头、CORS/Host 同源校验(防 DNS rebinding/CSRF)、
+//       按租户限流。命中拦截即直接响应并短路。是 L4 server.js 装配在路由链之前的安全闸门。
+// 依赖:同层 request-utils(同源/限流原语)。导出:SECURITY_HEADERS / applyRequestMiddleware。
 import {
   headerValue,
   isAllowedHost,

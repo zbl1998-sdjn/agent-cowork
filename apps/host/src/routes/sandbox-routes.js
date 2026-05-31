@@ -1,3 +1,8 @@
+// 沙箱路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/sandbox/* —— 运行内联代码(POST run-code,需幂等键、默认禁直接执行)、查询沙箱后端探测信息。
+//       执行委派 L1 code-runner,落 run 记录。依赖:L0 request-utils + L1 sandbox + L2 run-store/runs-index。
+// 导出:handleSandboxRoutes。
 // @ts-check
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { normalizeSandboxSpec } from '../sandbox/index.js';

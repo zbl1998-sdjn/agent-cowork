@@ -1,3 +1,7 @@
+// 澄清路由(host · L3 路由层 · routes)
+// ---------------------------------------------------------------------------
+// 职责:处理 /api/clarifications/* —— UI 回传对澄清提问(AskUserQuestion)的选择,解决待决问题。
+// 依赖:L0 request-utils + L2 clarifications 登记表(经参数注入)。导出:handleClarifyRoutes。
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 
 // Clarification (AskUserQuestion) routes.
