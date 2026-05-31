@@ -177,7 +177,7 @@
     "apps/host/src/routes/memory-routes.js",
     "apps/host/src/routes/onboarding-routes.ts",
     "apps/host/src/routes/plan-routes.ts",
-    "apps/host/src/routes/prompt-routes.js",
+    "apps/host/src/routes/prompt-routes.ts",
     "apps/host/src/routes/project-routes.js",
     "apps/host/src/routes/recipe-routes.js",
     "apps/host/src/routes/route-chain.js",

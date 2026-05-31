@@ -75,6 +75,39 @@ test('prompt refine route can use an injected refiner and preserves request iden
   });
 });
 
+test('prompt refine route normalizes malformed optional body fields', async () => {
+  const trustedRoot = makeTestWorkspace('prompt-refine-normalize');
+  let capturedRaw;
+  let capturedContext;
+  await withServer({
+    trustedRoot,
+    promptRefiner: {
+      async refine(raw, ctx) {
+        capturedRaw = raw;
+        capturedContext = ctx;
+        return {
+          refined: String(raw),
+          changed: false,
+          intent: 'unknown',
+          missing: [],
+        };
+      },
+    },
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/prompt/refine`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: ['bad'], trustedRoot, context: ['not-object'] }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(capturedRaw, '');
+    assert.equal(capturedContext.trustedRoot, trustedRoot);
+    assert.equal(capturedContext.tenantId, 'tenant_local');
+    assert.equal(Object.hasOwn(capturedContext, '0'), false);
+  });
+});
+
 test('prompt refine route injects recalled user profile into refinement context', async () => {
   const trustedRoot = makeTestWorkspace('prompt-refine-profile');
   let capturedContext;
