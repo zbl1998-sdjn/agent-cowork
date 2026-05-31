@@ -3,7 +3,43 @@
 // 职责:新用户引导——按角色(办公/开发者/研究/运营等)推荐合适的配方与连接器,降低上手门槛。
 //       ROLES/各项 label/description 是面向用户的运行时中文字符串(非注释)。
 // 依赖:无(纯数据 + 推荐逻辑)。导出:角色清单与推荐函数。
-const ROLES = [
+type RoleId = 'office' | 'developer' | 'research' | 'operations';
+
+export type OnboardingRole = {
+  id: RoleId;
+  label: string;
+  description: string;
+};
+
+export type OnboardingRecommendationItem = {
+  id: string;
+  label: string;
+  reason: string;
+};
+
+export type RoleRecommendations = {
+  skills: OnboardingRecommendationItem[];
+  connectors: OnboardingRecommendationItem[];
+  setup: OnboardingRecommendationItem[];
+};
+
+export type OnboardingInput = {
+  role?: unknown;
+  workspaceType?: unknown;
+};
+
+export type OnboardingRecommendationsResult = {
+  roles: OnboardingRole[];
+  selectedRole: RoleId;
+  workspaceType: string;
+  recommendations: RoleRecommendations;
+  dependencyCheck: {
+    route: '/api/runtime/dependencies';
+    recommendedIds: string[];
+  };
+};
+
+const ROLES: OnboardingRole[] = [
   {
     id: 'office',
     label: '办公协作',
@@ -28,7 +64,7 @@ const ROLES = [
 
 const BASE_DEPENDENCY_IDS = ['node', 'python-embedded', 'cjk-fonts', 'webview2', 'sqlite'];
 
-const RECOMMENDATIONS_BY_ROLE = {
+const RECOMMENDATIONS_BY_ROLE: Record<RoleId, RoleRecommendations> = {
   office: {
     skills: [
       { id: 'office-writer', label: '办公文档生成', reason: '快速起草、改写和整理 Word/Markdown 文档。' },
@@ -91,41 +127,26 @@ const RECOMMENDATIONS_BY_ROLE = {
   },
 };
 
-const ROLE_DEPENDENCY_IDS = {
+const ROLE_DEPENDENCY_IDS: Record<RoleId, string[]> = {
   office: ['data-science', 'tesseract-ocr', 'pandoc'],
   developer: ['mingit'],
   research: ['data-science', 'tesseract-ocr', 'pandoc'],
   operations: ['pandoc'],
 };
 
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function normalizeText(value) {
+function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-/**
- * @param {string} role
- * @returns {role is keyof typeof RECOMMENDATIONS_BY_ROLE}
- */
-function isKnownRole(role) {
+function isKnownRole(role: string): role is RoleId {
   return Object.prototype.hasOwnProperty.call(RECOMMENDATIONS_BY_ROLE, role);
 }
 
-/**
- * @param {string[]} ids
- * @returns {string[]}
- */
-function uniqueIds(ids) {
+function uniqueIds(ids: string[]): string[] {
   return [...new Set(ids)];
 }
 
-/**
- * @param {{ role?: unknown, workspaceType?: unknown }} [input]
- */
-export function buildOnboardingRecommendations(input = {}) {
+export function buildOnboardingRecommendations(input: OnboardingInput = {}): OnboardingRecommendationsResult {
   const requestedRole = normalizeText(input.role);
   const selectedRole = isKnownRole(requestedRole) ? requestedRole : 'office';
   const workspaceType = normalizeText(input.workspaceType) || 'local';
