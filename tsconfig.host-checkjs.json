@@ -87,7 +87,7 @@
     "apps/host/src/memory/memory-query.ts",
     "apps/host/src/memory/memory-store.ts",
     "apps/host/src/memory/memory-utils.ts",
-    "apps/host/src/memory/profile.js",
+    "apps/host/src/memory/profile.ts",
     "apps/host/src/memory/sqlite-memory-store.ts",
     "apps/host/src/main.js",
     "apps/host/src/mcp/connect.ts",
