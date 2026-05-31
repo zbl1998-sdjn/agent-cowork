@@ -5,21 +5,16 @@
 // 依赖:同层 refine-policy(策略判定);其余仅标准库。
 // 导出:refinePrompt(异步函数)、createPromptRefiner(工厂)。
 
-import { analyzePromptForRefine } from './refine-policy.js';
+import { analyzePromptForRefine, type PromptAnalyzeOptions, type PromptIntent, type PromptMissing, type PromptPolicy } from './refine-policy.js';
 
-/**
- * @typedef {import('./refine-policy.js').PromptIntent} PromptIntent
- * @typedef {import('./refine-policy.js').PromptPolicy} PromptPolicy
- * @typedef {{ terms?: unknown[], project?: unknown, entries?: unknown[] }} ProfileLike
- * @typedef {{ profile?: ProfileLike | null, userProfile?: ProfileLike | null, project?: unknown, [key: string]: unknown }} PromptContext
- * @typedef {{ prompt: string, context: PromptContext, intent: PromptIntent, missing: string[] }} PromptModelInput
- * @typedef {(input: PromptModelInput) => unknown | Promise<unknown>} PromptModelCall
- * @typedef {{ modelCall?: PromptModelCall, timeoutMs?: number, maxLength?: number }} PromptRefinerOptions
- * @typedef {{ refined: string, changed: boolean, intent: PromptIntent, missing: string[] }} PromptRefineResult
- * @typedef {{ refine(raw: unknown, ctx?: PromptContext): Promise<PromptRefineResult> }} PromptRefiner
- */
+type ProfileLike = { terms?: unknown[]; project?: unknown; entries?: unknown[] };
+export type PromptContext = { profile?: ProfileLike | null; userProfile?: ProfileLike | null; project?: unknown; [key: string]: unknown };
+type PromptModelInput = { prompt: string; context: PromptContext; intent: PromptIntent; missing: PromptMissing[] };
+export type PromptModelCall = (input: PromptModelInput) => unknown | Promise<unknown>;
+type PromptRefinerOptions = PromptAnalyzeOptions & { modelCall?: PromptModelCall; timeoutMs?: number };
+export type PromptRefineResult = { refined: string; changed: boolean; intent: PromptIntent; missing: PromptMissing[] };
+export type PromptRefiner = { refine(raw: unknown, ctx?: PromptContext): Promise<PromptRefineResult> };
 
-/** @type {Record<PromptIntent, string>} */
 const INTENT_LABELS = {
   create: '创建/实现',
   fix: '修复',
@@ -30,8 +25,7 @@ const INTENT_LABELS = {
   unknown: '未知',
 };
 
-/** @param {PromptContext} [ctx] @returns {string[]} */
-function contextTerms(ctx = {}) {
+function contextTerms(ctx: PromptContext = {}): string[] {
   const profile = ctx.profile || ctx.userProfile || {};
   const terms = Array.isArray(profile.terms) ? profile.terms : [];
   const project = typeof ctx.project === 'string' && ctx.project.trim()
@@ -42,8 +36,7 @@ function contextTerms(ctx = {}) {
   return [project, ...terms.map((term) => String(term).trim())].filter(Boolean).slice(0, 6);
 }
 
-/** @param {string} original @param {PromptPolicy} policy @param {PromptContext} ctx @returns {string} */
-function fallbackRefinement(original, policy, ctx) {
+function fallbackRefinement(original: string, policy: PromptPolicy, ctx: PromptContext): string {
   const lines = [
     `请基于以下原始需求执行任务：${original}`,
     `任务类型：${INTENT_LABELS[policy.intent] || INTENT_LABELS.general}`,
@@ -56,8 +49,7 @@ function fallbackRefinement(original, policy, ctx) {
   return lines.join('\n');
 }
 
-/** @param {PromptPolicy} policy @returns {PromptRefineResult} */
-function resultFromPolicy(policy) {
+function resultFromPolicy(policy: PromptPolicy): PromptRefineResult {
   return {
     refined: policy.normalized,
     changed: false,
@@ -66,27 +58,24 @@ function resultFromPolicy(policy) {
   };
 }
 
-/** @param {unknown} output @returns {string} */
-function modelText(output) {
+function modelText(output: unknown): string {
   if (typeof output === 'string') return output;
-  const record = /** @type {{ text?: unknown, content?: unknown } | null} */ (
-    output && typeof output === 'object' ? output : null
-  );
+  const record = output && typeof output === 'object'
+    ? output as { text?: unknown; content?: unknown }
+    : null;
   if (typeof record?.text === 'string') return record.text;
   if (typeof record?.content === 'string') return record.content;
   return '';
 }
 
-/** @template T @param {T | Promise<T>} value @param {number | undefined} timeoutMs @returns {Promise<T>} */
-async function withTimeout(value, timeoutMs) {
+async function withTimeout<T>(value: T | Promise<T>, timeoutMs?: number): Promise<T> {
   const promise = Promise.resolve(value);
   if (!timeoutMs || timeoutMs <= 0) return promise;
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let timer;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
-      new Promise((_, reject) => {
+      new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(`Prompt refinement timed out after ${timeoutMs}ms`)), timeoutMs);
       }),
     ]);
@@ -95,8 +84,8 @@ async function withTimeout(value, timeoutMs) {
   }
 }
 
-/** 精炼一条 prompt:能精炼则调模型/兜底改写,需追问或已明确则原样返回。 @param {unknown} raw @param {PromptContext} [ctx] @param {PromptRefinerOptions} [options] @returns {Promise<PromptRefineResult>} */
-export async function refinePrompt(raw, ctx = {}, options = {}) {
+/** 精炼一条 prompt:能精炼则调模型/兜底改写,需追问或已明确则原样返回。 */
+export async function refinePrompt(raw: unknown, ctx: PromptContext = {}, options: PromptRefinerOptions = {}): Promise<PromptRefineResult> {
   const policy = analyzePromptForRefine(raw, options);
   if (policy.needsClarification || !policy.shouldRefine) {
     return resultFromPolicy(policy);
@@ -129,11 +118,10 @@ export async function refinePrompt(raw, ctx = {}, options = {}) {
   };
 }
 
-/** 创建绑定好选项的精炼器对象(暴露 refine 方法)。 @param {PromptRefinerOptions} [options] @returns {PromptRefiner} */
-export function createPromptRefiner(options = {}) {
+/** 创建绑定好选项的精炼器对象(暴露 refine 方法)。 */
+export function createPromptRefiner(options: PromptRefinerOptions = {}): PromptRefiner {
   return {
-    /** @param {unknown} raw @param {PromptContext} [ctx] */
-    refine(raw, ctx = {}) {
+    refine(raw: unknown, ctx: PromptContext = {}) {
       return refinePrompt(raw, ctx, options);
     },
   };
