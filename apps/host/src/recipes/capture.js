@@ -198,8 +198,10 @@ function titleFromRecord(record, runId) {
   return `Captured run ${runId}`;
 }
 
-/** @param {{ runId?: unknown, runStoreRoot?: string | null, runsIndex?: RunsIndexLike | null, recordReader?: RecordReader | null }} [options] */
-/** 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。 */
+/**
+ * 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。
+ * @param {{ runId?: unknown, runStoreRoot?: string | null, runsIndex?: RunsIndexLike | null, recordReader?: RecordReader | null }} [options]
+ */
 export async function captureRun({ runId, runStoreRoot = null, runsIndex = null, recordReader = null } = {}) {
   if (!runId || typeof runId !== 'string') {
     const err = /** @type {Error & { statusCode?: number }} */ (new Error('captureRun: runId is required'));

@@ -28,7 +28,9 @@ pub enum DesktopError {
 }
 
 impl DesktopError {
+    /// 稳定的错误「类别」短字符串,供日志/指标打标使用;有意保留的公共诊断 API,暂未在内部调用。
     /// Short, stable category string. Useful for logging / metrics tags.
+    #[allow(dead_code)] // intentionally-public diagnostic helper kept for logging/metrics tags
     pub fn kind(&self) -> &'static str {
         match self {
             DesktopError::Sidecar(_) => "sidecar",
