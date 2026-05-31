@@ -125,6 +125,13 @@ test('createBuiltinTools exposes sandbox + recipe tools and sandbox.exec actuall
   assert.equal(result.stdout, 'agent-ok');
 });
 
+test('createBuiltinTools rejects unknown assembly options', () => {
+  assert.throws(
+    () => createBuiltinTools({ sandbox: null, raw: true }),
+    /createBuiltinTools: .*raw/i,
+  );
+});
+
 // ---- subagent orchestrator ----
 
 test('runSubagent executes steps in order and records a subagent-run', async () => {

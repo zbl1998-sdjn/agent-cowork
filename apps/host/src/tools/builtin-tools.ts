@@ -1,10 +1,7 @@
 // 内置工具清单(host · L1 领域层)
 // ---------------------------------------------------------------------------
-// 职责:把 host 已有能力(沙箱执行/内联代码、联网抓取/搜索、工作区检索、Git 只读、
-//       数据剖析/分析/图表、文件整理预案、各 recipe)封装成「工具描述符 + handler」,
-//       供 ToolRegistry 登记。注册表因此与具体沙箱/recipe/web 机制解耦,测试可注入假实现。
-// 约定:handler 收到 (args, ctx),ctx = { trustedRoot, context };高危/写操作标 requiresApproval。
-// 注:各工具的 description 是面向模型的运行时中文字符串(非注释)。导出:createBuiltinTools。
+// 职责:把 host 已有能力封装成「工具描述符 + handler」,供 ToolRegistry 登记。
+//       本层只负责组装和注入依赖;具体工具输入继续由各领域实现做细粒度校验。
 
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
@@ -17,32 +14,22 @@ import { createGitReadOnlyBuiltinTools } from './dev/git.js';
 import { profileDataFile } from './data/profile.js';
 import { analyzeDataFile } from './data/report.js';
 import { createDataChartArtifact } from './data/artifact.js';
+import { argsRecord, contextRecord, parseBuiltinToolsOptions } from './builtin-tool-options.js';
+import type { BuiltinToolsOptionsInput } from './builtin-tool-options.js';
+import type { ToolEntry } from './tool-registry.js';
 
-// Built-in tools wired to the host's existing capabilities. These are plain
-// descriptors with handlers; the registry stays decoupled from the concrete
-// sandbox / recipe / web machinery, and tests can register fakes instead.
-//
-// Each handler receives (args, ctx) where ctx = { trustedRoot, context }.
-// @ts-check
-
-/**
- * @typedef {{ trustedRoot?: string, context?: unknown }} ToolContext
- * @typedef {{ name: string, description: string, source: string, risk?: string, mutating?: boolean, requiresApproval?: boolean, inputSchema?: Record<string, any>, handler(args?: Record<string, any>, ctx?: ToolContext): unknown | Promise<unknown> }} BuiltinTool
- * @typedef {{ sandbox?: any, sandboxLimits?: Record<string, any>, runStoreRoot?: string, runEvents?: any, runsIndex?: any, enableWebTools?: boolean, fetchImpl?: any }} BuiltinToolsOptions
- */
-
-/** 按运行环境(是否有沙箱、是否启用 web 工具等)组装并返回全部内置工具描述符。 @param {BuiltinToolsOptions} [options] @returns {BuiltinTool[]} */
-export function createBuiltinTools({
-  sandbox,
-  sandboxLimits = {},
-  runStoreRoot,
-  runEvents = null,
-  runsIndex = null,
-  enableWebTools = true,
-  fetchImpl,
-} = {}) {
-  /** @type {BuiltinTool[]} */
-  const tools = [];
+/** 按运行环境组装全部内置工具描述符。 */
+export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): ToolEntry[] {
+  const {
+    sandbox,
+    sandboxLimits = {},
+    runStoreRoot,
+    runEvents = null,
+    runsIndex = null,
+    enableWebTools = true,
+    fetchImpl,
+  } = parseBuiltinToolsOptions(options);
+  const tools: ToolEntry[] = [];
 
   if (sandbox) {
     tools.push({
@@ -52,8 +39,10 @@ export function createBuiltinTools({
       risk: 'high',
       mutating: true,
       requiresApproval: true,
-      handler: async (args, ctx = {}) => {
-        const spec = normalizeSandboxSpec(args?.spec || args, sandboxLimits);
+      handler: async (rawArgs, rawCtx) => {
+        const args = argsRecord(rawArgs);
+        const ctx = contextRecord(rawCtx);
+        const spec = normalizeSandboxSpec(args.spec || args, sandboxLimits);
         return sandbox.exec(spec, { trustedRoot: ctx.trustedRoot, context: ctx.context });
       },
     });
@@ -65,9 +54,11 @@ export function createBuiltinTools({
       risk: 'high',
       mutating: true,
       requiresApproval: true,
-      handler: async (args = {}, ctx = {}) =>
-        runCode({
-          sandbox: /** @type {any} */ (sandbox),
+      handler: async (rawArgs, rawCtx) => {
+        const args = argsRecord(rawArgs);
+        const ctx = contextRecord(rawCtx);
+        return runCode({
+          sandbox,
           sandboxLimits,
           tool: args.tool,
           code: args.code,
@@ -79,13 +70,14 @@ export function createBuiltinTools({
           runStoreRoot: runStoreRoot || '',
           runEvents,
           runsIndex,
-          context: /** @type {Record<string, unknown> | undefined} */ (ctx.context),
-        }),
+          context: ctx.context,
+        });
+      },
     });
   }
 
   if (enableWebTools) {
-    tools.push(.../** @type {BuiltinTool[]} */ (createWebBuiltinTools({ fetchImpl })));
+    tools.push(...createWebBuiltinTools({ fetchImpl }));
   }
 
   tools.push({
@@ -104,17 +96,20 @@ export function createBuiltinTools({
       },
       required: ['query'],
     },
-    handler: async (args = {}, ctx = {}) =>
-      searchWorkspaceIndex({
+    handler: async (rawArgs, rawCtx) => {
+      const args = argsRecord(rawArgs);
+      const ctx = contextRecord(rawCtx);
+      return searchWorkspaceIndex({
         root: ctx.trustedRoot,
         query: args.query,
         limit: args.limit,
         maxFiles: args.maxFiles,
         maxFileBytes: args.maxFileBytes,
-      }),
+      });
+    },
   });
 
-  tools.push(.../** @type {BuiltinTool[]} */ (/** @type {unknown} */ (createGitReadOnlyBuiltinTools())));
+  tools.push(...createGitReadOnlyBuiltinTools());
 
   tools.push({
     name: 'data.profile',
@@ -124,14 +119,10 @@ export function createBuiltinTools({
     mutating: false,
     inputSchema: {
       type: 'object',
-      properties: {
-        path: { type: 'string' },
-        maxRows: { type: 'number' },
-        maxBytes: { type: 'number' },
-      },
+      properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
     },
-    handler: async (args = {}, ctx = {}) => profileDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
+    handler: async (rawArgs, rawCtx) => profileDataFile({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
   });
 
   tools.push({
@@ -142,14 +133,10 @@ export function createBuiltinTools({
     mutating: false,
     inputSchema: {
       type: 'object',
-      properties: {
-        path: { type: 'string' },
-        maxRows: { type: 'number' },
-        maxBytes: { type: 'number' },
-      },
+      properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
     },
-    handler: async (args = {}, ctx = {}) => analyzeDataFile({ trustedRoot: ctx.trustedRoot, ...args }),
+    handler: async (rawArgs, rawCtx) => analyzeDataFile({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
   });
 
   tools.push({
@@ -170,7 +157,7 @@ export function createBuiltinTools({
       },
       required: ['path'],
     },
-    handler: async (args = {}, ctx = {}) => createDataChartArtifact({ trustedRoot: ctx.trustedRoot, ...args }),
+    handler: async (rawArgs, rawCtx) => createDataChartArtifact({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
   });
 
   tools.push({
@@ -189,7 +176,7 @@ export function createBuiltinTools({
       },
       required: ['files'],
     },
-    handler: async (args = {}, ctx = {}) => planFileOrganization({ trustedRoot: ctx.trustedRoot, ...args }),
+    handler: async (rawArgs, rawCtx) => planFileOrganization({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
   });
 
   for (const recipe of listRecipes()) {
@@ -199,18 +186,21 @@ export function createBuiltinTools({
       source: 'recipe',
       risk: 'low',
       mutating: false,
-      handler: async (args = {}, ctx = {}) =>
-        runRecipe({
+      handler: async (rawArgs, rawCtx) => {
+        const args = argsRecord(rawArgs);
+        const ctx = contextRecord(rawCtx);
+        return runRecipe({
           recipeId: recipe.id,
           trustedRoot: ctx.trustedRoot || '',
           prompt: args.prompt || '',
-          files: args.files || [],
+          files: Array.isArray(args.files) ? args.files : [],
           maxSize: args.maxSize,
-          context: /** @type {Record<string, unknown> | undefined} */ (ctx.context),
+          context: ctx.context,
           runStoreRoot: runStoreRoot || '',
           runEvents,
           runsIndex,
-        }),
+        });
+      },
     });
   }
 
