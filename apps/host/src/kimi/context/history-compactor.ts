@@ -1,5 +1,3 @@
-// @ts-check
-
 // 历史消息压缩器(host · L1 领域层 · kimi/context)
 // ---------------------------------------------------------------------------
 // 职责:超出上下文预算时,保留最近若干条、把更早的历史折叠为一条 system 摘要
@@ -14,14 +12,23 @@ const DEFAULT_KEEP_RECENT_MESSAGES = 16;
 const DEFAULT_MAX_FACTS = 24;
 const FACT_RE = /\b(?:fact|important|decision|constraint|preference)\s*:|(?:关键事实|重要|决定|约束|用户偏好|偏好)\s*[:：]/iu;
 
-/**
- * @typedef {{ role?: string, content?: unknown, name?: string, tool_call_id?: string, tool_calls?: unknown[] }} ChatMessageLike
- * @typedef {{ estimateText(value: unknown): number, estimateMessages(messages: ChatMessageLike[]): { totalTokens: number } }} TokenEstimatorLike
- * @typedef {{ compacted: boolean, beforeTokens: number, afterTokens: number, messages: ChatMessageLike[], keyFacts: string[], summary: string }} CompactResult
- */
+type ChatMessageLike = { role?: string; content?: unknown; name?: string; tool_call_id?: string; tool_calls?: unknown[] };
 
-/** @param {unknown} value @returns {string} */
-function stableText(value) {
+type TokenEstimatorLike = {
+  estimateText(value: unknown): number;
+  estimateMessages(messages: ChatMessageLike[]): { totalTokens: number };
+};
+
+type HistoryCompactorOptions = { estimator?: TokenEstimatorLike; maxContextTokens?: number; keepRecentMessages?: number; maxFacts?: number };
+
+export type CompactResult = {
+  compacted: boolean; beforeTokens: number; afterTokens: number; messages: ChatMessageLike[];
+  keyFacts: string[]; summary: string;
+};
+
+type EnforcedBudget = { messages: ChatMessageLike[]; tokens: number };
+
+function stableText(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
@@ -32,20 +39,17 @@ function stableText(value) {
   }
 }
 
-/** @param {string} text @param {number} maxChars @returns {string} */
-function clipText(text, maxChars) {
+function clipText(text: string, maxChars: number): string {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, Math.max(0, maxChars - 18)).trim()} ...[truncated]`;
 }
 
-/** @param {ChatMessageLike} message @returns {ChatMessageLike} */
-function cloneMessage(message) {
+function cloneMessage(message: ChatMessageLike): ChatMessageLike {
   return { ...message };
 }
 
-/** @param {ChatMessageLike} message @returns {string} */
-function contentText(message) {
+function contentText(message: ChatMessageLike): string {
   const parts = [message.role, message.name, message.tool_call_id, stableText(message.content)];
   if (Array.isArray(message.tool_calls)) {
     parts.push(stableText(message.tool_calls));
@@ -53,17 +57,15 @@ function contentText(message) {
   return parts.filter(Boolean).join('\n');
 }
 
-/** @param {unknown[]} messages @returns {ChatMessageLike[]} */
-function normalizeMessages(messages) {
+function normalizeMessages(messages: unknown[]): ChatMessageLike[] {
   return Array.isArray(messages)
-    ? messages.filter((message) => message && typeof message === 'object').map((message) => cloneMessage(/** @type {ChatMessageLike} */ (message)))
+    ? messages.filter((message) => message && typeof message === 'object').map((message) => cloneMessage(message as ChatMessageLike))
     : [];
 }
 
-/** @param {ChatMessageLike[]} messages @param {number} maxFacts @returns {string[]} */
-function extractKeyFacts(messages, maxFacts) {
-  const seen = new Set();
-  const facts = [];
+function extractKeyFacts(messages: ChatMessageLike[], maxFacts: number): string[] {
+  const seen = new Set<string>();
+  const facts: string[] = [];
   for (const message of messages) {
     const chunks = stableText(message.content).split(/\r?\n|[。；;]/u);
     for (const chunk of chunks) {
@@ -79,17 +81,15 @@ function extractKeyFacts(messages, maxFacts) {
   return facts;
 }
 
-/** @param {ChatMessageLike[]} messages @returns {Record<string, number>} */
-function roleCounts(messages) {
+function roleCounts(messages: ChatMessageLike[]): Record<string, number> {
   return messages.reduce((counts, message) => {
     const role = String(message.role || 'unknown');
     counts[role] = (counts[role] || 0) + 1;
     return counts;
-  }, /** @type {Record<string, number>} */ ({}));
+  }, {} as Record<string, number>);
 }
 
-/** @param {ChatMessageLike[]} oldMessages @param {string[]} keyFacts @returns {string} */
-function buildSummary(oldMessages, keyFacts) {
+function buildSummary(oldMessages: ChatMessageLike[], keyFacts: string[]): string {
   const counts = Object.entries(roleCounts(oldMessages)).map(([role, count]) => `${role}:${count}`).join(', ');
   const sample = [...oldMessages.slice(0, 3), ...oldMessages.slice(-3)]
     .map((message) => `- ${message.role || 'unknown'}: ${clipText(stableText(message.content), 180)}`)
@@ -105,13 +105,11 @@ function buildSummary(oldMessages, keyFacts) {
   ].join('\n');
 }
 
-/** @param {TokenEstimatorLike} estimator @param {ChatMessageLike[]} messages @returns {number} */
-function estimateMessages(estimator, messages) {
+function estimateMessages(estimator: TokenEstimatorLike, messages: ChatMessageLike[]): number {
   return Math.max(0, Math.round(estimator.estimateMessages(messages).totalTokens || 0));
 }
 
-/** @param {string} text @param {number} maxTokens @param {TokenEstimatorLike} estimator @returns {string} */
-function clipToTokenBudget(text, maxTokens, estimator) {
+function clipToTokenBudget(text: string, maxTokens: number, estimator: TokenEstimatorLike): string {
   if (maxTokens <= 0) return '';
   if (estimator.estimateText(text) <= maxTokens) return text;
   let low = 0;
@@ -125,16 +123,18 @@ function clipToTokenBudget(text, maxTokens, estimator) {
   return `${text.slice(0, low).trim()} ...[truncated]`;
 }
 
-/** @param {ChatMessageLike} message @param {number} maxTokens @param {TokenEstimatorLike} estimator @returns {ChatMessageLike} */
-function trimMessageContent(message, maxTokens, estimator) {
+function trimMessageContent(message: ChatMessageLike, maxTokens: number, estimator: TokenEstimatorLike): ChatMessageLike {
   const marker = '[content compacted to fit context]';
   const text = stableText(message.content);
   const body = clipToTokenBudget(text, Math.max(1, maxTokens - estimator.estimateText(marker)), estimator);
   return { ...message, content: body ? `${marker}\n${body}` : marker };
 }
 
-/** @param {ChatMessageLike} message @param {number} maxMessageTokens @param {TokenEstimatorLike} estimator @returns {ChatMessageLike} */
-function trimWholeMessageToBudget(message, maxMessageTokens, estimator) {
+function trimWholeMessageToBudget(
+  message: ChatMessageLike,
+  maxMessageTokens: number,
+  estimator: TokenEstimatorLike,
+): ChatMessageLike {
   const marker = '[content compacted to fit context]';
   const original = stableText(message.content);
   let best = { ...message, content: marker };
@@ -158,12 +158,8 @@ function trimWholeMessageToBudget(message, maxMessageTokens, estimator) {
 
 /**
  * 多级强制收敛:依次裁中间消息正文、裁首条、丢弃中段、裁次条,直至落入预算。
- * @param {ChatMessageLike[]} messages
- * @param {number} maxContextTokens
- * @param {TokenEstimatorLike} estimator
- * @returns {{ messages: ChatMessageLike[], tokens: number }}
  */
-function enforceBudget(messages, maxContextTokens, estimator) {
+function enforceBudget(messages: ChatMessageLike[], maxContextTokens: number, estimator: TokenEstimatorLike): EnforcedBudget {
   let compacted = messages.map(cloneMessage);
   let tokens = estimateMessages(estimator, compacted);
   for (let i = 1; i < compacted.length - 1 && tokens > maxContextTokens; i += 1) {
@@ -193,10 +189,12 @@ function enforceBudget(messages, maxContextTokens, estimator) {
 }
 
 export class HistoryCompactor {
-  /**
-   * @param {{ estimator?: TokenEstimatorLike, maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
-   */
-  constructor(options = {}) {
+  estimator: TokenEstimatorLike;
+  maxContextTokens: number;
+  keepRecentMessages: number;
+  maxFacts: number;
+
+  constructor(options: HistoryCompactorOptions = {}) {
     this.estimator = options.estimator || createHeuristicTokenEstimator();
     this.maxContextTokens = Math.max(1, Math.round(Number(options.maxContextTokens) || DEFAULT_MAX_CONTEXT_TOKENS));
     this.keepRecentMessages = Math.max(1, Math.round(Number(options.keepRecentMessages) || DEFAULT_KEEP_RECENT_MESSAGES));
@@ -205,11 +203,8 @@ export class HistoryCompactor {
 
   /**
    * 压缩历史:未超预算则原样返回;否则折叠旧消息为摘要并强制收敛到预算内。
-   * @param {unknown[]} messages
-   * @param {{ maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
-   * @returns {CompactResult}
    */
-  compact(messages, options = {}) {
+  compact(messages: unknown[], options: Omit<HistoryCompactorOptions, 'estimator'> = {}): CompactResult {
     const normalized = normalizeMessages(messages);
     const maxContextTokens = Math.max(1, Math.round(Number(options.maxContextTokens) || this.maxContextTokens));
     const keepRecentMessages = Math.max(1, Math.round(Number(options.keepRecentMessages) || this.keepRecentMessages));
@@ -223,7 +218,7 @@ export class HistoryCompactor {
     const recent = normalized.slice(-keepRecentMessages);
     const old = normalized.slice(0, Math.max(0, normalized.length - recent.length));
     let summary = buildSummary(old, keyFacts);
-    let compacted = [{ role: 'system', name: 'history_compactor', content: summary }, ...recent];
+    let compacted: ChatMessageLike[] = [{ role: 'system', name: 'history_compactor', content: summary }, ...recent];
     let afterTokens = estimateMessages(this.estimator, compacted);
     if (afterTokens > maxContextTokens) {
       const recentTokens = estimateMessages(this.estimator, recent);
@@ -247,11 +242,7 @@ export class HistoryCompactor {
   }
 }
 
-/**
- * 创建 HistoryCompactor 实例的工厂(便于注入估算器与阈值)。
- * @param {{ estimator?: TokenEstimatorLike, maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
- * @returns {HistoryCompactor}
- */
-export function createHistoryCompactor(options = {}) {
+/** 创建 HistoryCompactor 实例的工厂(便于注入估算器与阈值)。 */
+export function createHistoryCompactor(options: HistoryCompactorOptions = {}): HistoryCompactor {
   return new HistoryCompactor(options);
 }
