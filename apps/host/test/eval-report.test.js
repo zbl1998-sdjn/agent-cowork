@@ -32,7 +32,7 @@ test('Eval report emits JSON, HTML, and baseline regression metadata', async () 
 
 test('package exposes npm run eval command', () => {
   const pkg = JSON.parse(fs.readFileSync('../../package.json', 'utf8'));
-  assert.equal(pkg.scripts.eval, 'node scripts/eval.mjs');
+  assert.equal(pkg.scripts.eval, 'node scripts/run-host-node.mjs scripts/eval.mjs');
 });
 
 test('eval executor requires replay records by default', async () => {

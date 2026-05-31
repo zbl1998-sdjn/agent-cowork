@@ -15,12 +15,12 @@ const reportPath = path.join(
   includeWindowsClient ? 'mvp-verification-report-windows.json' : 'mvp-verification-report.json',
 );
 
-function runCheck({ name, command, commandArgs, cwd = repoRoot, detectAsr = false }) {
+function runCheck({ name, command, commandArgs, cwd = repoRoot, detectAsr = false, extraEnv = {} }) {
   const startedAt = Date.now();
   const result = spawnSync(command, commandArgs, {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, CI: '1' },
+    env: { ...process.env, ...extraEnv, CI: '1' },
     shell: false,
     windowsHide: true,
   });
@@ -67,6 +67,18 @@ fs.mkdirSync(buildDir, { recursive: true });
 
 function hostScriptArgs(scriptName) {
   return [runHostNodeScript, path.join(repoRoot, 'scripts', scriptName)];
+}
+
+function localStaticUnitGateEnv() {
+  if (
+    process.env.KCW_CI_CHANGED_FILES ||
+    process.env.CHANGED_FILES ||
+    process.env.KCW_CI_FORCE_EVAL === '1' ||
+    process.env.KCW_EVAL_REPLAY_RECORDS
+  ) {
+    return {};
+  }
+  return { KCW_CI_CHANGED_FILES: 'scripts/verify-mvp.mjs' };
 }
 
 const checks = [
@@ -164,6 +176,7 @@ const checks = [
     name: 'ci static and unit gates',
     command: nodeBin,
     commandArgs: [path.join(repoRoot, 'scripts', 'ci.mjs')],
+    extraEnv: localStaticUnitGateEnv(),
   },
   {
     name: 'host local operation smoke',
