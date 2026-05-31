@@ -167,7 +167,7 @@
     "apps/host/src/routes/agent-resume.ts",
     "apps/host/src/routes/approval-routes.ts",
     "apps/host/src/routes/artifact-routes.js",
-    "apps/host/src/routes/clarify-routes.js",
+    "apps/host/src/routes/clarify-routes.ts",
     "apps/host/src/routes/connector-oauth-route-utils.ts",
     "apps/host/src/routes/auth-routes.js",
     "apps/host/src/routes/conversation-routes.js",

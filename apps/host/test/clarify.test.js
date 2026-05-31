@@ -42,6 +42,20 @@ test('clarify routes: create -> get -> answer round-trip', async () => {
     assert.equal(answered.body.clarification.answer, 'csv');
     const missing = await J(base, '/api/clarify/clr_missing');
     assert.equal(missing.status, 404);
+
+    const invalid = await J(base, '/api/clarify', { method: 'POST', body: { question: ['bad'], options: ['x'] } });
+    assert.equal(invalid.status, 400);
+
+    const nonArrayOptions = await J(base, '/api/clarify', { method: 'POST', body: { question: '继续吗?', options: 'yes' } });
+    assert.equal(nonArrayOptions.status, 200);
+    assert.deepEqual(nonArrayOptions.body.clarification.options, []);
+
+    const manyOptions = await J(base, '/api/clarify', {
+      method: 'POST',
+      body: { question: '选项过多时?', options: Array.from({ length: 10 }, (_, i) => `选项${i + 1}`) },
+    });
+    assert.equal(manyOptions.status, 200);
+    assert.equal(manyOptions.body.clarification.options.length, 8);
   } finally {
     await new Promise((r) => server.close(r));
   }
