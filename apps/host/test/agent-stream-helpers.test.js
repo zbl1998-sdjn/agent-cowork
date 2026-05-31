@@ -31,6 +31,13 @@ test('agent stream budget helpers ignore non-positive limits and choose the tigh
   assert.equal(tokenDecision.maximum, 12);
 });
 
+test('agent stream budget helpers reject malformed budget fields', () => {
+  assert.throws(
+    () => resolveAgentRunTimeoutMs({ budget: { maxWallClockMs: ['bad'] } }, {}),
+    /agent stream budget: budget\.maxWallClockMs:/,
+  );
+});
+
 test('recordAgentRun normalizes provider, writes index summary, and swallows record failures', () => {
   const runStoreRoot = tmp();
   const summaries = [];
