@@ -241,7 +241,7 @@
     "apps/host/src/tools/tool-registry.js",
     "apps/host/src/tools/ssrf-guard.ts",
     "apps/host/src/tools/web-search.js",
-    "apps/host/src/tools/web-fetch.js",
+    "apps/host/src/tools/web-fetch.ts",
     "apps/host/src/util/ids.ts",
     "apps/host/src/workspace/context-bundle.ts",
     "apps/host/src/workspace/attachment-context.ts",

@@ -17,26 +17,43 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_BYTES = 512 * 1024;
 const MAX_REDIRECTS = 5;
 
-/**
- * @typedef {Error & { statusCode?: number }} WebFetchError
- * @typedef {{ url?: unknown, timeoutMs?: unknown, maxBytes?: unknown, allowInternal?: boolean, fetchImpl?: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown }} WebFetchOptions
- * @typedef {{ ok: boolean, status: number, url: string, contentType: string, bytes: number, truncated: boolean, text: string }} WebFetchResult
- */
+export type WebFetchError = Error & { statusCode?: number };
+export type WebFetchResponse = {
+  ok?: boolean;
+  status?: number;
+  headers?: { get(name: string): string | null } | null;
+  arrayBuffer(): Promise<ArrayBuffer> | ArrayBuffer;
+};
+export type WebFetchLike = (
+  input: string,
+  init: { signal: AbortSignal; redirect: 'manual' },
+) => Promise<WebFetchResponse> | WebFetchResponse;
+export type WebFetchOptions = {
+  url?: unknown;
+  timeoutMs?: unknown;
+  maxBytes?: unknown;
+  allowInternal?: boolean;
+  fetchImpl?: WebFetchLike;
+  lookupImpl?: (host: string) => Promise<unknown> | unknown;
+};
+export type WebFetchResult = {
+  ok: boolean;
+  status: number;
+  url: string;
+  contentType: string;
+  bytes: number;
+  truncated: boolean;
+  text: string;
+};
 
-/**
- * @param {string} message
- * @param {number} [statusCode]
- * @returns {WebFetchError}
- */
-function fail(message, statusCode = 400) {
-  const error = /** @type {WebFetchError} */ (new Error(`web.fetch: ${message}`));
+function fail(message: string, statusCode = 400): WebFetchError {
+  const error = new Error(`web.fetch: ${message}`) as WebFetchError;
   error.statusCode = statusCode;
   return error;
 }
 
-/** @param {unknown} value @returns {URL} */
-function parseHttpUrl(value) {
-  let parsed;
+function parseHttpUrl(value: unknown): URL {
+  let parsed: URL;
   try {
     parsed = new URL(String(value || ''));
   } catch {
@@ -50,17 +67,15 @@ function parseHttpUrl(value) {
 
 /**
  * 抓取一个 http(s) URL:SSRF 校验 → 手动跟随重定向(每跳复校验)→ 读回限长文本体。
- * @param {WebFetchOptions} [options]
- * @returns {Promise<WebFetchResult>}
  */
 export async function webFetch({
   url,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxBytes = DEFAULT_MAX_BYTES,
   allowInternal = false,
-  fetchImpl = globalThis.fetch,
+  fetchImpl = globalThis.fetch as unknown as WebFetchLike,
   lookupImpl,
-} = {}) {
+}: WebFetchOptions = {}): Promise<WebFetchResult> {
   if (typeof fetchImpl !== 'function') {
     throw fail('no fetch implementation available', 500);
   }
@@ -73,7 +88,7 @@ export async function webFetch({
   const cap = Math.min(Math.max(Number(maxBytes) || DEFAULT_MAX_BYTES, 1), 4 * 1024 * 1024);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), budget);
-  let response;
+  let response: WebFetchResponse | undefined;
   try {
     // Follow redirects manually so each hop's host is re-validated by the SSRF
     // guard — `redirect: 'follow'` would silently chase a 302 to an internal IP.
@@ -105,7 +120,7 @@ export async function webFetch({
       parsed = next;
     }
   } catch (err) {
-    const wfErr = /** @type {WebFetchError} */ (err);
+    const wfErr = err as WebFetchError;
     if (typeof wfErr.statusCode === 'number') throw wfErr;
     const message = err instanceof Error ? err.message : String(err);
     throw fail(`request failed: ${message}`, 502);
@@ -113,6 +128,9 @@ export async function webFetch({
     clearTimeout(timer);
   }
 
+  if (!response) {
+    throw fail('request failed: empty response', 502);
+  }
   const contentType = (response.headers && typeof response.headers.get === 'function'
     ? response.headers.get('content-type')
     : '') || '';
@@ -120,7 +138,7 @@ export async function webFetch({
   const truncated = buffer.length > cap;
   return {
     ok: Boolean(response.ok),
-    status: response.status,
+    status: Number(response.status) || 0,
     url: parsed.href,
     contentType,
     bytes: buffer.length,
