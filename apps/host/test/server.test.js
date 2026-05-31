@@ -486,6 +486,17 @@ test('artifact endpoints list local artifacts and render safe HTML views', async
       }),
     });
     assert.equal(escape.status, 400);
+
+    const malformed = await fetch(`${baseUrl}/api/artifacts/rename`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'artifact-rename-malformed' },
+      body: JSON.stringify({
+        trustedRoot,
+        path: [path.join(artifactDir, 'report-final.md')],
+        newName: 'bad.md',
+      }),
+    });
+    assert.equal(malformed.status, 400);
   });
 });
 
