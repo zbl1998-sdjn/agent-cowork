@@ -52,6 +52,10 @@ test('GET /api/skills + POST /api/skills/:id/toggle', async () => {
     const flip = await J(base, '/api/skills/contract-summary/toggle', { method: 'POST', body: {} });
     assert.equal(flip.body.skill.enabled, true);
 
+    const sanitized = await J(base, '/api/skills/contract-summary/toggle', { method: 'POST', body: { enabled: 'false' } });
+    assert.equal(sanitized.status, 200);
+    assert.equal(sanitized.body.skill.enabled, false);
+
     const bad = await J(base, '/api/skills/ghost/toggle', { method: 'POST', body: { enabled: false } });
     assert.equal(bad.status, 404);
   } finally {

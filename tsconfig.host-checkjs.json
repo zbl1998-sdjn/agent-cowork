@@ -187,7 +187,7 @@
     "apps/host/src/routes/search-routes.ts",
     "apps/host/src/routes/schedule-routes.js",
     "apps/host/src/routes/session-model-config.ts",
-    "apps/host/src/routes/skill-routes.js",
+    "apps/host/src/routes/skill-routes.ts",
     "apps/host/src/routes/system-routes.js",
     "apps/host/src/routes/tool-routes.js",
     "apps/host/src/routes/viz-routes.js",
