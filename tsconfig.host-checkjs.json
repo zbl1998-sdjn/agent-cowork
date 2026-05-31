@@ -49,7 +49,7 @@
     "apps/host/src/kimi/agent/toolset-builder.ts",
     "apps/host/src/kimi/api-runner-config.js",
     "apps/host/src/kimi/api-runner-payload.ts",
-    "apps/host/src/kimi/api-runner-prompts.js",
+    "apps/host/src/kimi/api-runner-prompts.ts",
     "apps/host/src/kimi/api-runner.js",
     "apps/host/src/kimi/agent-tools-support.ts",
     "apps/host/src/kimi/agent-tools.js",
