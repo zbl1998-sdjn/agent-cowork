@@ -179,7 +179,7 @@
     "apps/host/src/routes/plan-routes.ts",
     "apps/host/src/routes/prompt-routes.ts",
     "apps/host/src/routes/project-routes.ts",
-    "apps/host/src/routes/recipe-routes.js",
+    "apps/host/src/routes/recipe-routes.ts",
     "apps/host/src/routes/route-chain.js",
     "apps/host/src/routes/route-error-utils.ts",
     "apps/host/src/routes/run-routes.js",

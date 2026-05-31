@@ -269,6 +269,18 @@ test('custom recipes save redacted drafts and run tenant-scoped recipes', async 
       body: { recipe: { name: 'Unsafe draft', redacted: false } },
     });
     assert.equal(unsafe.status, 400);
+
+    const malformedCustom = await jsonRequest(base, '/api/recipes/custom', {
+      method: 'POST',
+      body: { recipe: ['not-valid'] },
+    });
+    assert.equal(malformedCustom.status, 400);
+
+    const malformedRun = await jsonRequest(base, `/api/recipes/${encodeURIComponent(saved.body.recipe.id)}/run`, {
+      method: 'POST',
+      body: { prompt: '用这个技能生成结果', files: { path: 'notes.md' } },
+    });
+    assert.equal(malformedRun.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -325,6 +337,23 @@ test('recipe run invalid route id returns 400', async () => {
     assert.equal(response.status, 400);
     const body = await response.json();
     assert.match(body.error, /Invalid recipe id/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('recipe run rejects malformed body before executing the recipe', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const response = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'bad-recipe-body' },
+      body: { prompt: 'x', files: 'not-an-array' },
+    });
+    assert.equal(response.status, 400);
+    assert.match(response.body.error, /files must be an array/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
