@@ -4,6 +4,7 @@
 //       凭据身份/过滤器、归一化错误状态码与消息。依赖:L1 connectors/catalog。
 import { z } from 'zod';
 import { getConnector } from '../connectors/catalog.js';
+import { omitUndefined } from '../util/object.js';
 import type { ConnectorDescriptor } from '../connectors/catalog.js';
 
 export const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
@@ -53,7 +54,7 @@ function objectOrEmpty(value: unknown): Record<string, unknown> {
 
 function requestContext(value: unknown): RequestContext {
   const result = requestContextSchema.safeParse(objectOrEmpty(value));
-  return result.success ? result.data : {};
+  return result.success ? omitUndefined(result.data) : {};
 }
 
 export function isGitHub(id: unknown): boolean {
@@ -73,21 +74,21 @@ export function githubClientId(oauthConfig?: unknown): string {
 
 export function oauthIdentity(requestContextInput: RequestContext, providerInput: string, accountIdInput = 'default'): OAuthIdentity {
   const context = requestContext(requestContextInput);
-  return {
+  return omitUndefined({
     tenantId: context.tenantId,
     userId: context.userId,
     provider: providerSchema.parse(providerInput),
     accountId: accountIdSchema.parse(accountIdInput),
-  };
+  });
 }
 
 export function oauthFilter(requestContextInput: RequestContext, providerInput: string): OAuthFilter {
   const context = requestContext(requestContextInput);
-  return {
+  return omitUndefined({
     tenantId: context.tenantId,
     userId: context.userId,
     provider: providerSchema.parse(providerInput),
-  };
+  });
 }
 
 export function githubConnector(): ConnectorDescriptor {

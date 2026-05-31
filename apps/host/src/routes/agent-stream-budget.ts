@@ -4,22 +4,23 @@
 // 依赖:L2 budget-guard。导出:resolveAgentRunTimeoutMs / createAgentBudgetGuard。
 import { z } from 'zod';
 import { createBudgetGuard } from '../runtime/budget-guard.js';
+import { omitUndefined } from '../util/object.js';
 
 type NumericLimit = number | string;
 type ModelConfig = {
-  model?: string;
-  maxRunTokens?: NumericLimit;
-  maxSessionTokens?: NumericLimit;
-  maxRunCostUsd?: NumericLimit;
-  maxSessionCostUsd?: NumericLimit;
-  maxAgentWallClockMs?: NumericLimit;
+  model?: string | undefined;
+  maxRunTokens?: NumericLimit | undefined;
+  maxSessionTokens?: NumericLimit | undefined;
+  maxRunCostUsd?: NumericLimit | undefined;
+  maxSessionCostUsd?: NumericLimit | undefined;
+  maxAgentWallClockMs?: NumericLimit | undefined;
 };
 type RequestBudget = {
-  maxRunTokens?: NumericLimit;
-  maxSessionTokens?: NumericLimit;
-  maxRunCostUsd?: NumericLimit;
-  maxSessionCostUsd?: NumericLimit;
-  maxWallClockMs?: NumericLimit;
+  maxRunTokens?: NumericLimit | undefined;
+  maxSessionTokens?: NumericLimit | undefined;
+  maxRunCostUsd?: NumericLimit | undefined;
+  maxSessionCostUsd?: NumericLimit | undefined;
+  maxWallClockMs?: NumericLimit | undefined;
 };
 type RequestBody = RequestBudget & { budget?: RequestBudget };
 type AgentBudgetInputs = { requestBody: RequestBody; config: ModelConfig; requestBudget: RequestBudget };
@@ -29,7 +30,7 @@ export type AgentBudgetGuardOptions = {
   body: unknown;
   kimiConfig: unknown;
   startedAt: Date;
-  runTimeoutMs?: number;
+  runTimeoutMs?: number | undefined;
 };
 
 const numericLimitSchema = z.union([z.number(), z.string()]);
@@ -110,7 +111,7 @@ export function createAgentBudgetGuard({
   runTimeoutMs,
 }: AgentBudgetGuardOptions): ReturnType<typeof createBudgetGuard> {
   const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
-  return createBudgetGuard({
+  return createBudgetGuard(omitUndefined({
     maxRunTokens: tightestLimit(config.maxRunTokens, requestBudget.maxRunTokens ?? requestBody.maxRunTokens),
     maxSessionTokens: tightestLimit(config.maxSessionTokens, requestBudget.maxSessionTokens ?? requestBody.maxSessionTokens),
     maxRunCostUsd: tightestLimit(config.maxRunCostUsd, requestBudget.maxRunCostUsd ?? requestBody.maxRunCostUsd),
@@ -118,5 +119,5 @@ export function createAgentBudgetGuard({
     maxWallClockMs: runTimeoutMs,
     model: config.model,
     startedAtMs: startedAt.getTime(),
-  });
+  }));
 }

@@ -5,6 +5,7 @@
 import path from 'node:path';
 import { runRecipe } from '../recipes/run-recipe.js';
 import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule-store.js';
+import { omitUndefined } from '../util/object.js';
 import { Scheduler, createScheduleStore } from './scheduler.js';
 import type { RunEventsLike, RunsIndexLike } from '../recipes/run-recipe-types.js';
 import type { ScheduleStore, SchedulerExecutor } from './scheduler.js';
@@ -69,7 +70,7 @@ export function configureHostScheduler({
   const defaultScheduleExecutor = async (record: ScheduleRecordLike) => {
     const payload = schedulePayload(record.payload);
     if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
-    const result = runRecipe({
+    const result = runRecipe(omitUndefined({
       recipeId: String(payload.recipeId),
       trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
       prompt: payload.prompt || '',
@@ -79,19 +80,21 @@ export function configureHostScheduler({
       runStoreRoot: state.runStoreRoot,
       runEvents: state.runEvents as RunEventsLike | null | undefined,
       runsIndex: state.runsIndex as RunsIndexLike | null | undefined,
-    });
+    }));
     return { runId: result.runId, operations: result.operations.length };
   };
   const executor = config.scheduleExecutor || defaultScheduleExecutor;
   state.activeScheduler = new Scheduler({
     storeDir: scheduleStoreDir,
-    store: config.scheduleStore || (state.usePostgresState
-      ? createCachedPostgresScheduleStore({ connectionString: state.databaseUrl }) as unknown as ScheduleStore
-      : createScheduleStore({
+    store: config.scheduleStore || (
+      state.usePostgresState
+      ? createCachedPostgresScheduleStore(omitUndefined({ connectionString: state.databaseUrl })) as unknown as ScheduleStore
+      : createScheduleStore(omitUndefined({
         backend: state.storeBackend,
         storeDir: scheduleStoreDir,
         dbPath: state.sqliteDbPath,
-      })),
+      }))
+    ),
     executor,
     tickIntervalMs: config.schedulerTickMs || 30_000,
   });

@@ -4,6 +4,7 @@
 // 依赖:同层 usage。导出:预算护栏工厂(createBudgetGuard)。
 
 import { estimateTokenCost, normalizeTokenUsage } from './usage.js';
+import { omitUndefined } from '../util/object.js';
 import type { TokenUsage, UsagePricing } from './usage.js';
 
 export type BudgetGuardOptions = {
@@ -98,7 +99,7 @@ export class BudgetGuard {
     this.sessionUsage = normalizeTokenUsage(options.sessionUsage);
     this.runCostUsd = 0;
     this.sessionBaseCostUsd = positiveLimit(options.sessionCostUsd)
-      ?? estimateTokenCost(this.sessionUsage, { model: this.model, pricing: this.pricing }).total;
+      ?? estimateTokenCost(this.sessionUsage, omitUndefined({ model: this.model, pricing: this.pricing })).total;
     this.sessionCostUsd = this.sessionBaseCostUsd;
     this.lastDecision = makeDecision({}, this.snapshot());
   }
@@ -118,7 +119,7 @@ export class BudgetGuard {
     const normal = normalizeTokenUsage(usage);
     addUsage(this.runUsage, normal);
     addUsage(this.sessionUsage, normal);
-    this.runCostUsd = estimateTokenCost(this.runUsage, { model: this.model, pricing: this.pricing }).total;
+    this.runCostUsd = estimateTokenCost(this.runUsage, omitUndefined({ model: this.model, pricing: this.pricing })).total;
     this.sessionCostUsd = roundCost(this.sessionBaseCostUsd + this.runCostUsd);
     return this.check();
   }
