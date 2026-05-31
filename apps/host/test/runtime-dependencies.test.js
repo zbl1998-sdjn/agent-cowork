@@ -566,6 +566,18 @@ test('runtime dependency plan routes expose install cleanup and update plans wit
   });
 });
 
+test('runtime dependency plan routes reject malformed body fields before planning', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-invalid');
+  await withServer({ trustedRoot }, async (base) => {
+    const response = await postJson(base, '/api/runtime/dependencies/install-plan', {
+      selectedIds: 'data-science',
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(response.body.error, /selectedIds/);
+  });
+});
+
 test('runtime dependency install plan blocks downloads when disk space is insufficient', () => {
   const plan = buildRuntimeDependencyInstallPlan({
     selectedIds: ['data-science', 'playwright-chromium', 'pandoc', 'ffmpeg', 'mingit'],

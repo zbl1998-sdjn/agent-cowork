@@ -3,7 +3,7 @@
 // 职责:处理系统类端点 —— 健康检查、指标、熔断器/限流状态、运行时依赖探测、能力开关等运维可见性。
 // 依赖:L2 runtime 各状态源(model-breakers/dependencies 等,经 state 注入)。导出:handleSystemRoutes。
 import { modelBreakerStats } from '../runtime/model-breakers.js';
-import { sendJson, withJsonBody } from '../http/request-utils.js';
+import { sendJson } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
 import { readDesktopUpdateManifest } from '../runtime/desktop-update-source.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
@@ -12,78 +12,77 @@ import {
   buildRuntimeDependencyInstallPlan,
   buildRuntimeDependencyUpdatePlan,
 } from '../runtime/dependency-install-plan.js';
+import {
+  dependencyPlanOptions,
+  parseCancelRunId,
+  parseDesktopUpdateParams,
+  withParsedDependencyPlanBody,
+} from './system-route-schemas.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { KimiApiConfig } from '../kimi/api-runner-config.js';
+import type { CircuitBreakerStats } from '../runtime/circuit-breaker.js';
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
- * @typedef {import('../runtime/dependency-install-plan.js').RuntimeDependencyInstallPlanOptions & import('../runtime/dependency-install-plan.js').RuntimeDependencyCleanupPlanOptions & import('../runtime/dependency-install-plan.js').RuntimeDependencyUpdatePlanOptions} RuntimeDependencyPlanOptions
- * @typedef {{ state?: string, name?: string }} ModelBreakerStats
- * @typedef {{ active?: number, maxConcurrent?: number, tenants?: number, [key: string]: unknown }} ConcurrencyStats
- * @typedef {{ tenants?: number, ratePerSec?: unknown, burst?: unknown, [key: string]: unknown }} RateLimitStats
- * @typedef {{ stats(): ConcurrencyStats }} AgentConcurrencyLike
- * @typedef {{ stats(): RateLimitStats }} RateLimiterLike
- * @typedef {{ cancel(id: string): boolean }} CancellationLike
- * @typedef {{ configured: boolean, apiKey?: unknown, provider?: unknown, baseUrl?: unknown, model?: unknown }} KimiApiConfigLike
- * @typedef {{ backend?: string, networkIsolated?: boolean }} SandboxLike
- * @typedef {{ info?: { backend?: string, networkIsolated?: boolean, userMessage?: string, [key: string]: unknown } }} SandboxStartupLike
- * @typedef {{
- *   agentConcurrency: AgentConcurrencyLike,
- *   rateLimiter?: RateLimiterLike | null,
- *   draining?: boolean,
- *   kimiApiConfig: KimiApiConfigLike,
- *   kimiApiEnabled?: boolean,
- *   sandboxEnabled?: boolean,
- *   sandbox?: SandboxLike | null,
- *   sandboxStartup?: SandboxStartupLike | null,
- *   storeBackend?: string,
- *   usePostgresState?: boolean,
- *   config: { runtimeDependencyEnv?: Record<string, string | undefined>, runtimeDependencyPlatform?: string, runtimeDependencyAppDataRoot?: string | null, desktopUpdateEnv?: Record<string, string | undefined> },
- *   trustedRootDefault: string,
- *   cancellation: CancellationLike,
- * }} HostStateLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, state: HostStateLike }} SystemRouteOptions
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type ConcurrencyStats = { active: number; maxConcurrent: number; tenants: number; [key: string]: unknown };
+type RateLimitStats = { tenants: number; ratePerSec?: unknown; burst?: unknown; [key: string]: unknown };
+type AgentConcurrencyLike = { stats(): ConcurrencyStats };
+type RateLimiterLike = { stats(): RateLimitStats };
+type CancellationLike = { cancel(id: string): boolean };
+type SystemRequestContext = {
+  traceId: string;
+  tenantId: string;
+  userId: string;
+  authenticated?: boolean;
+  idempotencyKey?: string;
+};
+type KimiApiConfigLike = Pick<KimiApiConfig, 'configured' | 'apiKey' | 'provider' | 'baseUrl' | 'model'>;
+type SandboxLike = { backend?: string; networkIsolated?: boolean };
+type SandboxStartupLike = {
+  info?: { backend?: string; networkIsolated?: boolean; userMessage?: string; [key: string]: unknown };
+};
+type SystemRouteConfig = {
+  runtimeDependencyEnv?: Record<string, string | undefined>;
+  runtimeDependencyPlatform?: string;
+  runtimeDependencyAppDataRoot?: string | null;
+  desktopUpdateEnv?: Record<string, string | undefined>;
+};
+type SelfCheck = { id: string; status: 'pass' | 'warn'; detail: unknown };
+type HostStateLike = {
+  agentConcurrency: AgentConcurrencyLike;
+  rateLimiter?: RateLimiterLike | null;
+  draining?: boolean;
+  kimiApiConfig: KimiApiConfigLike;
+  kimiApiEnabled?: boolean;
+  sandboxEnabled?: boolean;
+  sandbox?: SandboxLike | null;
+  sandboxStartup?: SandboxStartupLike | null;
+  storeBackend?: string;
+  usePostgresState?: boolean;
+  config: SystemRouteConfig;
+  trustedRootDefault: string;
+  cancellation: CancellationLike;
+};
+export type SystemRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestContext: SystemRequestContext;
+  state: HostStateLike;
+};
 
-/** @param {unknown} body @returns {Record<string, unknown>} */
-function objectBody(body) {
-  return body && typeof body === 'object' && !Array.isArray(body)
-    ? /** @type {Record<string, unknown>} */ (body)
-    : {};
-}
-
-/** @param {KimiApiConfigLike | null | undefined} kimiConfig @returns {string} */
-function modelProvider(kimiConfig) {
+function modelProvider(kimiConfig: KimiApiConfigLike | null | undefined): string {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
-/** @param {unknown} body @param {HostStateLike} state @returns {RuntimeDependencyPlanOptions} */
-function dependencyPlanOptions(body, state) {
-  const input = objectBody(body);
-  const appDataRoot = typeof input.appDataRoot === 'string'
-    ? input.appDataRoot
-    : state.config.runtimeDependencyAppDataRoot;
-  return {
-    selectedIds: Array.isArray(input.selectedIds) ? input.selectedIds : undefined,
-    freeBytes: input.freeBytes,
-    keepUserData: typeof input.keepUserData === 'boolean' ? input.keepUserData : undefined,
-    currentVersion: input.currentVersion,
-    targetVersion: input.targetVersion,
-    appDataRoot,
-  };
-}
-
-/** @returns {ModelBreakerStats[]} */
-function safeModelBreakerStats() {
+function safeModelBreakerStats(): CircuitBreakerStats[] {
   try {
-    return /** @type {ModelBreakerStats[]} */ (modelBreakerStats());
+    return modelBreakerStats();
   } catch {
     return [];
   }
 }
 
-/** @param {SystemRouteOptions} options @returns {Promise<boolean>} */
-export async function handleSystemRoutes({ request, response, pathname, requestContext, state }) {
+export async function handleSystemRoutes({ request, response, pathname, requestContext, state }: SystemRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/health') {
     sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
     return true;
@@ -91,11 +90,13 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
 
   const updateMatch = /^\/desktop-update\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(pathname);
   if (request.method === 'GET' && updateMatch) {
+    const params = parseDesktopUpdateParams(response, updateMatch);
+    if (!params) return true;
     const manifest = readDesktopUpdateManifest({
       env: state.config.desktopUpdateEnv || process.env,
-      target: decodeURIComponent(updateMatch[1]),
-      arch: decodeURIComponent(updateMatch[2]),
-      currentVersion: decodeURIComponent(updateMatch[3]),
+      target: params.target,
+      arch: params.arch,
+      currentVersion: params.currentVersion,
     });
     if (!manifest) {
       response.writeHead(204, SECURITY_HEADERS);
@@ -142,15 +143,16 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
 
   if (request.method === 'GET' && pathname === '/api/selfcheck') {
     const breakers = safeModelBreakerStats();
-    const rateLimit = state.rateLimiter ? { enabled: true, ...state.rateLimiter.stats() } : { enabled: false };
-    /** @type {Array<{ id: string, status: 'pass' | 'warn', detail: unknown }>} */
-    const checks = [];
-    /** @param {string} id @param {boolean} ok @param {unknown} detail */
-    const add = (id, ok, detail) => checks.push({ id, status: ok ? 'pass' : 'warn', detail });
+    const rateLimitStats = state.rateLimiter ? state.rateLimiter.stats() : null;
+    const rateLimit = rateLimitStats ? { enabled: true, ...rateLimitStats } : { enabled: false };
+    const checks: SelfCheck[] = [];
+    const add = (id: string, ok: boolean, detail: unknown): void => {
+      checks.push({ id, status: ok ? 'pass' : 'warn', detail });
+    };
     add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
     add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
-    add('rate-limit', Boolean(state.rateLimiter), state.rateLimiter ? `${rateLimit.ratePerSec}/s · burst ${rateLimit.burst}` : '限流未启用');
+    add('rate-limit', Boolean(rateLimitStats), rateLimitStats ? `${rateLimitStats.ratePerSec}/s · burst ${rateLimitStats.burst}` : '限流未启用');
     add('model-circuit', !breakers.some((b) => b.state === 'open'), breakers.length ? breakers.map((b) => `${b.name}:${b.state}`).join(', ') : '尚无模型调用');
     add(
       'sandbox-network-isolation',
@@ -195,22 +197,22 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
   }
 
   if (request.method === 'POST' && pathname === '/api/runtime/dependencies/install-plan') {
-    await withJsonBody(request, response, (body) => {
-      sendJson(response, 200, buildRuntimeDependencyInstallPlan(dependencyPlanOptions(body, state)));
+    await withParsedDependencyPlanBody(request, response, 'invalid runtime dependency install plan request', (body) => {
+      sendJson(response, 200, buildRuntimeDependencyInstallPlan(dependencyPlanOptions(body, state.config.runtimeDependencyAppDataRoot)));
     });
     return true;
   }
 
   if (request.method === 'POST' && pathname === '/api/runtime/dependencies/cleanup-plan') {
-    await withJsonBody(request, response, (body) => {
-      sendJson(response, 200, buildRuntimeDependencyCleanupPlan(dependencyPlanOptions(body, state)));
+    await withParsedDependencyPlanBody(request, response, 'invalid runtime dependency cleanup plan request', (body) => {
+      sendJson(response, 200, buildRuntimeDependencyCleanupPlan(dependencyPlanOptions(body, state.config.runtimeDependencyAppDataRoot)));
     });
     return true;
   }
 
   if (request.method === 'POST' && pathname === '/api/runtime/dependencies/update-plan') {
-    await withJsonBody(request, response, (body) => {
-      sendJson(response, 200, buildRuntimeDependencyUpdatePlan(dependencyPlanOptions(body, state)));
+    await withParsedDependencyPlanBody(request, response, 'invalid runtime dependency update plan request', (body) => {
+      sendJson(response, 200, buildRuntimeDependencyUpdatePlan(dependencyPlanOptions(body, state.config.runtimeDependencyAppDataRoot)));
     });
     return true;
   }
@@ -232,8 +234,10 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
     return true;
   }
 
-  if (request.method === 'POST' && /^\/api\/runs\/[a-zA-Z0-9_-]+\/cancel$/.test(pathname)) {
-    const id = pathname.split('/')[3];
+  const cancelMatch = /^\/api\/runs\/([^/]+)\/cancel$/.exec(pathname);
+  if (request.method === 'POST' && cancelMatch) {
+    const id = parseCancelRunId(response, cancelMatch[1] ?? '');
+    if (!id) return true;
     sendJson(response, 200, { context: requestContext, runId: id, cancelled: state.cancellation.cancel(id) });
     return true;
   }

@@ -35,6 +35,19 @@ test('POST /api/runs/:id/cancel returns cancelled:false for an unknown run', asy
   }
 });
 
+test('POST /api/runs/:id/cancel rejects encoded path escapes in run id', async () => {
+  const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/runs/run_bad%2Fescape/cancel`, { method: 'POST' });
+    const body = await res.json();
+    assert.equal(res.status, 400);
+    assert.match(body.error, /runId|run id/i);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
 test('streaming chat can be cancelled mid-flight via /api/runs/:id/cancel', async () => {
   const fakeStream = async ({ onToken, signal }) => {
     onToken('部分');
