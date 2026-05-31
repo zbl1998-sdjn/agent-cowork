@@ -18,16 +18,28 @@ import {
   sourceBlock,
   xlsxOperation,
 } from './recipe-helpers.js';
+import type { FileOperationInput } from '../workspace/file-operations.js';
+import type { SourceLike } from './recipe-helpers.js';
 
-/**
- * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
- * @typedef {import('./recipe-helpers.js').SourceLike} SourceLike
- * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string, custom?: boolean, [key: string]: unknown }} Recipe
- * @typedef {{ recipeId?: string, trustedRoot?: string, prompt?: unknown, sources?: SourceLike[], recipe?: Recipe | null }} BuildRecipeOptions
- */
+export type Recipe = {
+  id: string;
+  name: string;
+  description: string;
+  output: string;
+  riskLevel: string;
+  custom?: boolean;
+  [key: string]: unknown;
+};
 
-/** @type {[string, string, string, string, string][]} */
-const RECIPE_ROWS = [
+export type BuildRecipeOptions = {
+  recipeId?: string;
+  trustedRoot?: string;
+  prompt?: unknown;
+  sources?: SourceLike[];
+  recipe?: Recipe | null;
+};
+
+const RECIPE_ROWS: [string, string, string, string, string][] = [
   ['meeting-actions', '会议纪要转行动项', '从会议记录中提取结论、负责人、截止时间和待办清单。', 'Markdown + XLSX', 'safe-write'],
   ['excel-cleaning', '表格清洗', '读取 CSV/XLSX，去空行、标记重复和缺失字段，生成清洗结果。', 'Markdown + XLSX', 'safe-write'],
   ['reimbursement', '报销材料整理', '汇总发票、金额、供应商和缺失材料，生成报销清单。', 'CSV + Markdown', 'safe-write'],
@@ -38,8 +50,7 @@ const RECIPE_ROWS = [
   ['email-draft', '邮件草稿', '基于本地上下文生成中文商务邮件草稿和附件清单。', 'Markdown', 'safe-write'],
 ];
 
-/** @type {Recipe[]} */
-const RECIPES = RECIPE_ROWS.map(([id, name, description, output, riskLevel]) => ({
+const RECIPES: Recipe[] = RECIPE_ROWS.map(([id, name, description, output, riskLevel]) => ({
   id,
   name,
   description,
@@ -47,8 +58,7 @@ const RECIPES = RECIPE_ROWS.map(([id, name, description, output, riskLevel]) => 
   riskLevel,
 }));
 
-/** @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {string} */
-function genericMarkdown(recipe, prompt, sources) {
+function genericMarkdown(recipe: Recipe, prompt: unknown, sources: SourceLike[]): string {
   const text = combinedText(sources);
   const excerpt = text ? text.slice(0, 2000) : '暂无可读取正文。';
   return [
@@ -74,8 +84,7 @@ function genericMarkdown(recipe, prompt, sources) {
   ].join('\n');
 }
 
-/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
-function meetingRecipe(trustedRoot, recipe, prompt, sources) {
+function meetingRecipe(trustedRoot: string, recipe: Recipe, prompt: unknown, sources: SourceLike[]): FileOperationInput[] {
   const text = combinedText(sources);
   const rows = actionRows(text, prompt);
   return [
@@ -109,8 +118,7 @@ function meetingRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
-/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
-function excelRecipe(trustedRoot, recipe, prompt, sources) {
+function excelRecipe(trustedRoot: string, recipe: Recipe, prompt: unknown, sources: SourceLike[]): FileOperationInput[] {
   const parsed = parseTableRows(combinedText(sources));
   const issueCount = parsed.rows.filter((row) => row[row.length - 1] !== '正常').length;
   return [
@@ -148,8 +156,7 @@ function excelRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
-/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
-function reimbursementRecipe(trustedRoot, recipe, prompt, sources) {
+function reimbursementRecipe(trustedRoot: string, recipe: Recipe, prompt: unknown, sources: SourceLike[]): FileOperationInput[] {
   const rows = reimbursementRows(combinedText(sources));
   return [
     csvOperation(trustedRoot, recipe.id, '报销清单.csv', [['序号', '供应商/项目', '金额', '状态', '来源摘录'], ...rows]),
@@ -174,8 +181,7 @@ function reimbursementRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
-/** @param {string} trustedRoot @param {Recipe} recipe @param {unknown} prompt @param {SourceLike[]} sources @returns {FileOperationInput[]} */
-function summaryReportRecipe(trustedRoot, recipe, prompt, sources) {
+function summaryReportRecipe(trustedRoot: string, recipe: Recipe, prompt: unknown, sources: SourceLike[]): FileOperationInput[] {
   const markdown = genericMarkdown(recipe, prompt, sources);
   const text = combinedText(sources);
   const promptText = String(prompt || '');
@@ -193,18 +199,18 @@ function summaryReportRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
-/** 列出全部内置配方(浅拷贝,不泄露内部引用)。 @returns {Recipe[]} */
-export function listRecipes() {
+/** 列出全部内置配方(浅拷贝,不泄露内部引用)。 */
+export function listRecipes(): Recipe[] {
   return RECIPES.map((recipe) => ({ ...recipe }));
 }
 
-/** 按 id 取配方,不存在返回 null。 @param {string} recipeId @returns {Recipe | null} */
-export function getRecipe(recipeId) {
+/** 按 id 取配方,不存在返回 null。 */
+export function getRecipe(recipeId: string): Recipe | null {
   return RECIPES.find((recipe) => recipe.id === recipeId) || null;
 }
 
-/** 据配方 id 把来源材料构建成「可审批的文件操作」数组(各配方有专属构建器,其余走通用 Markdown)。 @param {BuildRecipeOptions} [options] @returns {FileOperationInput[]} */
-export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [], recipe: providedRecipe = null } = {}) {
+/** 据配方 id 把来源材料构建成「可审批的文件操作」数组(各配方有专属构建器,其余走通用 Markdown)。 */
+export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [], recipe: providedRecipe = null }: BuildRecipeOptions = {}): FileOperationInput[] {
   const id = typeof recipeId === 'string' ? recipeId : '';
   const root = typeof trustedRoot === 'string' ? trustedRoot : '';
   const recipe = providedRecipe || getRecipe(id);

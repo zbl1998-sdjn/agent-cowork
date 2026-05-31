@@ -99,7 +99,7 @@
     "apps/host/src/recipes/capture-types.ts",
     "apps/host/src/recipes/recipe-helpers.ts",
     "apps/host/src/recipes/capture.ts",
-    "apps/host/src/recipes/registry.js",
+    "apps/host/src/recipes/registry.ts",
     "apps/host/src/recipes/run-recipe.js",
     "apps/host/src/security/redaction.ts",
     "apps/host/src/security/path-policy.ts",
