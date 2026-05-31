@@ -5,12 +5,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const hostNode = (scriptPath) => `node scripts/run-host-node.mjs ${scriptPath}`;
 
 test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-  assert.equal(packageJson.scripts['smoke:e2e'], 'node scripts/e2e-smoke.mjs');
-  assert.equal(packageJson.scripts.bench, 'node scripts/bench.mjs');
-  assert.equal(packageJson.scripts['smoke:kimi-api'], 'node scripts/smoke-kimi-api.mjs');
+  assert.equal(packageJson.scripts['smoke:e2e'], hostNode('scripts/e2e-smoke.mjs'));
+  assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.mjs'));
+  assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.mjs'));
   assert.equal(packageJson.scripts['check:secrets'], 'node scripts/check-secrets.mjs');
   assert.match(packageJson.scripts['smoke:windows-client'], /smoke-windows-client\.ps1/);
 

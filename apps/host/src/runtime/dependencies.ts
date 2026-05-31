@@ -1,0 +1,167 @@
+// 运行时依赖探测(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:汇总探测各「外部运行时依赖」是否就绪(Chromium、数据科学、CJK 字体、Git、OCR、Pandoc、VC 运行库),
+//       供安装引导与能力开关使用。各探测器分散在同层独立文件,这里聚合并对结果脱敏。
+// 依赖:L0 redaction + 同层各 *-runtime 探测器 + dependencies-catalog。导出:聚合探测函数与目录转出。
+import { redactText } from '../security/redaction.js';
+import { detectChromiumRuntime } from './chromium-runtime.js';
+import type { StatFs as ChromiumFs } from './chromium-runtime.js';
+import { detectDataScienceRuntime } from './data-science-runtime.js';
+import type { ExistsFs as DataScienceFs } from './data-science-runtime.js';
+import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
+import type { RuntimeDependencyCatalogItem } from './dependencies-catalog.js';
+import { detectCjkFonts } from './font-runtime.js';
+import type { FontFs } from './font-runtime.js';
+import { detectGitRuntime } from './git-runtime.js';
+import type { SpawnSyncLike as GitSpawnSyncLike } from './git-runtime.js';
+import { detectOcrRuntime } from './ocr-runtime.js';
+import type { ExistsFs as OcrFs } from './ocr-runtime.js';
+import { detectPandocRuntime } from './pandoc-runtime.js';
+import type { StatFs as PandocFs } from './pandoc-runtime.js';
+import { detectVcRuntime } from './windows-runtime.js';
+import type { SpawnSyncLike as VcSpawnSyncLike } from './windows-runtime.js';
+
+export { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
+
+export type EnvLike = Record<string, string | undefined>;
+type RuntimeFsImpl = Partial<FontFs & DataScienceFs & ChromiumFs & OcrFs & PandocFs>;
+type RuntimeSpawnSync = GitSpawnSyncLike | VcSpawnSyncLike;
+type SandboxStartup = { info?: { backend?: string; networkIsolated?: boolean; userMessage?: string } };
+export type RuntimeDependencyStatusOptions = {
+  env?: EnvLike;
+  platform?: string;
+  sandboxStartup?: SandboxStartup | null;
+  fsImpl?: RuntimeFsImpl;
+  spawnSync?: RuntimeSpawnSync;
+  now?: Date;
+};
+export type RuntimeDependencyDetection = { status: string; source?: string; version?: unknown; detail?: unknown };
+export type RuntimeDependencyStatusItem = RuntimeDependencyCatalogItem & RuntimeDependencyDetection;
+export type RuntimeDependencyStatus = {
+  ok: true;
+  service: 'agent-cowork-host';
+  generatedAt: string;
+  platform: string;
+  arch: string;
+  dependencies: RuntimeDependencyStatusItem[];
+  summary: ReturnType<typeof summarize>;
+};
+
+function envValue(env: EnvLike, keys: string[]): { key: string; value: string } | null {
+  for (const key of keys) {
+    const value = env?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      return { key, value: value.trim() };
+    }
+  }
+  return null;
+}
+
+function redactProxyUrl(value: unknown): string {
+  const text = redactText(value) || '';
+  return text.replace(/^([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+):([^@/\s]+)@/i, '$1$2:[REDACTED]@');
+}
+
+function configuredFromEnv(env: EnvLike, keys: string[], detail: string): RuntimeDependencyDetection {
+  const match = envValue(env, keys);
+  if (!match) return { status: 'missing', detail };
+  return { status: 'configured', source: match.key, detail };
+}
+
+function detectDependency(item: RuntimeDependencyCatalogItem, options: RuntimeDependencyStatusOptions): RuntimeDependencyDetection {
+  const env = options.env || {};
+  const platform = options.platform || process.platform;
+  const sandboxStartup = options.sandboxStartup || null;
+
+  if (item.id === 'node') {
+    return {
+      status: 'available',
+      version: process.version,
+      detail: process.execPath ? 'host 进程正在使用该运行时' : '当前进程运行时可用',
+    };
+  }
+
+  if (item.id === 'sqlite') {
+    return process.versions?.sqlite
+      ? { status: 'available', version: process.versions.sqlite, detail: 'node:sqlite 可用' }
+      : { status: 'unknown', detail: '当前端点未探测 SQLite 绑定' };
+  }
+
+  if (item.id === 'webview2') {
+    const configured = envValue(env, ['KCW_WEBVIEW2_MODE', 'WEBVIEW2_RELEASE_CHANNEL_PREFERENCE']);
+    if (configured) return { status: 'configured', source: configured.key, detail: `WebView2 模式: ${configured.value}` };
+    return platform === 'win32'
+      ? { status: 'unknown', detail: '需要安装器或 Windows 运行时探测确认' }
+      : { status: 'not_applicable', detail: '仅 Windows 需要' };
+  }
+
+  if (item.id === 'python-embedded') {
+    return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], '内置 Python 路径已配置');
+  }
+
+  if (item.id === 'cjk-fonts') return detectCjkFonts({ env, fsImpl: options.fsImpl as FontFs | undefined });
+
+  if (item.id === 'vc-runtime') return detectVcRuntime({ env, platform, spawnSync: options.spawnSync as VcSpawnSyncLike | undefined });
+
+  if (item.id === 'proxy') {
+    const proxy = envValue(env, ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']);
+    if (!proxy) return { status: 'unknown', detail: '未配置代理环境变量' };
+    return { status: 'configured', source: proxy.key, detail: redactProxyUrl(proxy.value) };
+  }
+
+  if (item.id === 'sandbox-isolation') {
+    if (sandboxStartup?.info?.backend) {
+      return {
+        status: sandboxStartup.info.networkIsolated ? 'available' : 'degraded',
+        detail: redactText(sandboxStartup.info.userMessage || sandboxStartup.info.backend),
+      };
+    }
+    return { status: 'unknown', detail: '尚未接入沙箱启动探测' };
+  }
+
+  if (item.id === 'data-science') return detectDataScienceRuntime({ env, fsImpl: options.fsImpl as DataScienceFs | undefined });
+
+  if (item.id === 'playwright-chromium') return detectChromiumRuntime({ env, fsImpl: options.fsImpl as ChromiumFs | undefined });
+
+  if (item.id === 'tesseract-ocr') return detectOcrRuntime({ env, fsImpl: options.fsImpl as OcrFs | undefined });
+
+  if (item.id === 'pandoc') return detectPandocRuntime({ env, fsImpl: options.fsImpl as PandocFs | undefined });
+
+  if (item.id === 'mingit') return detectGitRuntime({ env, spawnSync: options.spawnSync as GitSpawnSyncLike | undefined });
+
+  const marker = envValue(env, [`KCW_${item.id.toUpperCase().replace(/-/g, '_')}_HOME`]);
+  if (marker) return { status: 'configured', source: marker.key, detail: `${item.label} 路径已配置` };
+  return { status: 'missing', detail: '可选按需组件尚未安装' };
+}
+
+function summarize(dependencies: RuntimeDependencyStatusItem[]): { total: number; requiredMissing: number; byStatus: Record<string, number> } {
+  const byStatus: Record<string, number> = {};
+  let requiredMissing = 0;
+  for (const item of dependencies) {
+    byStatus[item.status] = (byStatus[item.status] || 0) + 1;
+    if (item.required && (item.status === 'missing' || item.status === 'degraded')) {
+      requiredMissing += 1;
+    }
+  }
+  return {
+    total: dependencies.length,
+    requiredMissing,
+    byStatus,
+  };
+}
+
+export function getRuntimeDependencyStatus(options: RuntimeDependencyStatusOptions = {}): RuntimeDependencyStatus {
+  const dependencies = RUNTIME_DEPENDENCY_CATALOG.map((item) => ({
+    ...item,
+    ...detectDependency(item, options),
+  }));
+  return {
+    ok: true,
+    service: 'agent-cowork-host',
+    generatedAt: (options.now || new Date()).toISOString(),
+    platform: options.platform || process.platform,
+    arch: process.arch,
+    dependencies,
+    summary: summarize(dependencies),
+  };
+}

@@ -1,24 +1,18 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  assertHostTypeCoverage,
+  findHostTypeCoverageIssues,
+  hostCheckConfigPath,
+  runTypeScriptProject,
+} from './host-ts-support.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const configPath = path.join(root, 'tsconfig.host-checkjs.json');
-const candidates = [
-  path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'),
-  path.join(root, 'apps', 'windows-client', 'ui', 'node_modules', 'typescript', 'bin', 'tsc'),
-];
+export { findHostTypeCoverageIssues };
 
-const tscPath = candidates.find((candidate) => fs.existsSync(candidate));
-if (!tscPath) {
-  console.error('[check-host-types] TypeScript compiler not found. Run npm install in apps/windows-client/ui first.');
-  process.exit(1);
+function runMain() {
+  assertHostTypeCoverage();
+  process.exit(runTypeScriptProject(hostCheckConfigPath));
 }
 
-const result = spawnSync(process.execPath, [tscPath, '-p', configPath, '--pretty', 'false'], {
-  cwd: root,
-  stdio: 'inherit',
-});
-
-process.exit(result.status ?? 1);
+const invokedAsMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedAsMain) runMain();

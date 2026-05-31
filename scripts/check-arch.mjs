@@ -209,6 +209,14 @@ function hostLayer(filePath) {
   return null;
 }
 
+function waiverRel(filePath) {
+  const rel = toPosix(path.relative(HOST_ROOT, filePath));
+  // During JS->TS migration source imports intentionally keep NodeNext-style
+  // `.js` specifiers. Normalize waiver keys so existing debt markers survive a
+  // mechanical `.js` -> `.ts` source move without weakening the boundary check.
+  return rel.replace(/\.(?:js|ts)$/u, '.js');
+}
+
 function checkBoundary(fromFile, targetFile, violations) {
   const fromRel = relFromRoot(fromFile);
   const targetRel = relFromRoot(targetFile);
@@ -233,7 +241,7 @@ function checkBoundary(fromFile, targetFile, violations) {
     const targetLayer = hostLayer(targetFile);
     if (!fromLayer || !targetLayer) return;
     if (targetLayer.rank > fromLayer.rank && fromFile !== targetFile) {
-      const key = `${toPosix(path.relative(HOST_ROOT, fromFile))} -> ${toPosix(path.relative(HOST_ROOT, targetFile))}`;
+      const key = `${waiverRel(fromFile)} -> ${waiverRel(targetFile)}`;
       if (!HOST_LAYER_WAIVERS.has(key)) {
         violations.push(
           `${fromRel} (${fromLayer.name}) imports ${targetRel} (${targetLayer.name}); host imports must point inward to lower layers`,

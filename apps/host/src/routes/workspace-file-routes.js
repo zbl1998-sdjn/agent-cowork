@@ -144,7 +144,7 @@ export async function handleWorkspaceFileRoutes({
         root: trustedRoot,
         paths: body.paths,
         maxTextSize: body.maxTextSize,
-        fsStatFn: (candidate) => {
+        fsStatFn: (/** @type {string} */ candidate) => {
           const safe = assertTrustedPath(candidate, trustedRoot);
           return fs.statSync(safe);
         },

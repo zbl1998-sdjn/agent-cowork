@@ -15,10 +15,16 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertHostTypeCoverage,
+  hostBuildConfigPath,
+  runTypeScriptProject,
+} from './host-ts-support.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const hostDir = path.join(repoRoot, 'apps', 'host');
 const distDir = path.join(hostDir, 'dist');
+const compiledHostDir = path.join(repoRoot, 'build', 'host-src');
 const tauriDir = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri');
 const binariesDir = path.join(tauriDir, 'binaries');
 const targetReleaseDir = path.join(tauriDir, 'target', 'release');
@@ -32,10 +38,25 @@ function run(cmd, args, options = {}) {
   if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmd}`);
 }
 
+function runShell(cmdline, options = {}) {
+  log(`$ ${cmdline}`);
+  const result = spawnSync(cmdline, { stdio: 'inherit', shell: true, ...options });
+  if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmdline}`);
+}
+
 function runCapture(cmd, args, options = {}) {
   const result = spawnSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false, ...options });
   if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmd}\n${result.stderr?.toString() || ''}`);
   return result.stdout?.toString() || '';
+}
+
+function cleanCompiledHostDir() {
+  const relative = path.relative(path.join(repoRoot, 'build'), compiledHostDir);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    die(`refusing to clean outside build/: ${compiledHostDir}`);
+  }
+  fs.rmSync(compiledHostDir, { recursive: true, force: true });
+  fs.mkdirSync(compiledHostDir, { recursive: true });
 }
 
 function findEsbuild() {
@@ -92,10 +113,16 @@ const bundlePath = path.join(distDir, 'host-bundle.cjs');
 const blobPath = path.join(distDir, 'host.blob');
 const exePath = path.join(distDir, 'agent-cowork-host.exe');
 
-log('1/5 esbuild — bundling apps/host/src/main.js → dist/host-bundle.cjs');
+log('1/6 tsc — compiling apps/host/src → build/host-src');
+assertHostTypeCoverage();
+cleanCompiledHostDir();
+const tscStatus = runTypeScriptProject(hostBuildConfigPath, repoRoot);
+if (tscStatus !== 0) die(`TypeScript host compile failed (exit ${tscStatus})`);
+
+log('2/6 esbuild — bundling build/host-src/main.js → dist/host-bundle.cjs');
 run(process.execPath, [
   esbuild,
-  path.join('apps', 'host', 'src', 'main.js'),
+  path.join('build', 'host-src', 'main.js'),
   '--bundle',
   '--platform=node',
   '--format=cjs',
@@ -107,13 +134,13 @@ run(process.execPath, [
   '--define:import.meta.url="file:///C:/host-bundle.cjs"',
 ], { cwd: repoRoot });
 
-log('2/5 node --experimental-sea-config → dist/host.blob');
+log('3/6 node --experimental-sea-config → dist/host.blob');
 run(process.execPath, ['--experimental-sea-config', 'sea-config.json'], { cwd: hostDir });
 
-log(`3/5 copy ${process.execPath} → ${path.relative(repoRoot, exePath)}`);
+log(`4/6 copy ${process.execPath} → ${path.relative(repoRoot, exePath)}`);
 fs.copyFileSync(process.execPath, exePath);
 
-log('4/5 strip signature + postject inject NODE_SEA_BLOB');
+log('5/6 strip signature + postject inject NODE_SEA_BLOB');
 run(signtool, ['remove', '/s', exePath]);
 const fuse = extractFuse(exePath);
 log(`    fuse: ${fuse}`);
@@ -123,9 +150,9 @@ log(`    fuse: ${fuse}`);
 // resources, surfacing as "Can't read resource file". Manually double-quote any
 // arg with whitespace so cmd.exe leaves it intact.
 const quoteForShell = (arg) => (/\s/.test(arg) ? `"${arg}"` : arg);
-run('npx', ['-y', 'postject', quoteForShell(exePath), 'NODE_SEA_BLOB', quoteForShell(blobPath), '--sentinel-fuse', fuse], { cwd: repoRoot, shell: true });
+runShell(['npx', '-y', 'postject', quoteForShell(exePath), 'NODE_SEA_BLOB', quoteForShell(blobPath), '--sentinel-fuse', fuse].join(' '), { cwd: repoRoot });
 
-log('5/5 deploy to binaries/ and target/release/');
+log('6/6 deploy to binaries/ and target/release/');
 fs.mkdirSync(binariesDir, { recursive: true });
 const binaryDest = path.join(binariesDir, 'agent-cowork-host-x86_64-pc-windows-msvc.exe');
 fs.copyFileSync(exePath, binaryDest);
