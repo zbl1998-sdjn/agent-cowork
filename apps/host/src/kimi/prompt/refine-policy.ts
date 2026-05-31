@@ -27,20 +27,24 @@ const OUTPUT_PATTERNS = [
   /\b(output|return|list|format|steps|plan|table|report|summary|checklist|patch)\b/iu,
 ];
 
-/**
- * @typedef {'create' | 'fix' | 'review' | 'summarize' | 'translate' | 'general' | 'unknown'} PromptIntent
- * @typedef {'goal' | 'action' | 'target' | 'desiredOutput'} PromptMissing
- * @typedef {{ maxLength?: number }} PromptAnalyzeOptions
- * @typedef {{ normalized: string, intent: PromptIntent, missing: PromptMissing[], shouldRefine: boolean, needsClarification: boolean, explicit: boolean }} PromptPolicy
- */
+export type PromptIntent = 'create' | 'fix' | 'review' | 'summarize' | 'translate' | 'general' | 'unknown';
+export type PromptMissing = 'goal' | 'action' | 'target' | 'desiredOutput';
+export type PromptAnalyzeOptions = { maxLength?: number };
+export type PromptPolicy = {
+  normalized: string;
+  intent: PromptIntent;
+  missing: PromptMissing[];
+  shouldRefine: boolean;
+  needsClarification: boolean;
+  explicit: boolean;
+};
 
-/** @param {RegExp[]} patterns @param {string} text @returns {boolean} */
-function textIncludes(patterns, text) {
+function textIncludes(patterns: RegExp[], text: string): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-/** 归一化原始输入:统一换行、压空白、裁到最大长度。 @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {string} */
-export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
+/** 归一化原始输入:统一换行、压空白、裁到最大长度。 */
+export function normalizePrompt(raw: unknown, { maxLength = 8000 }: PromptAnalyzeOptions = {}): string {
   return String(raw ?? '')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
@@ -48,8 +52,8 @@ export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
     .slice(0, maxLength);
 }
 
-/** 按关键词判定任务意图(修复/创建/审查/总结/翻译/通用)。 @param {string} text @returns {PromptIntent} */
-export function detectPromptIntent(text) {
+/** 按关键词判定任务意图(修复/创建/审查/总结/翻译/通用)。 */
+export function detectPromptIntent(text: string): PromptIntent {
   if (/修复|报错|失败|fix|error|fail/iu.test(text)) return 'fix';
   if (/实现|新增|创建|生成|导出|保存|转换|build|implement|create|generate|export|save|convert/iu.test(text)) return 'create';
   if (/审查|检查|分析|review|analy[sz]e|inspect/iu.test(text)) return 'review';
@@ -58,11 +62,10 @@ export function detectPromptIntent(text) {
   return 'general';
 }
 
-/** 综合分析 prompt,产出意图、缺失要素与「精炼/追问/已明确」决策。 @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {PromptPolicy} */
-export function analyzePromptForRefine(raw, options = {}) {
+/** 综合分析 prompt,产出意图、缺失要素与「精炼/追问/已明确」决策。 */
+export function analyzePromptForRefine(raw: unknown, options: PromptAnalyzeOptions = {}): PromptPolicy {
   const normalized = normalizePrompt(raw, options);
-  /** @type {PromptMissing[]} */
-  const missing = [];
+  const missing: PromptMissing[] = [];
   if (!normalized) {
     return {
       normalized,
