@@ -47,7 +47,7 @@
     "apps/host/src/kimi/agent/tool-loop-support.ts",
     "apps/host/src/kimi/agent/tool-retry.ts",
     "apps/host/src/kimi/agent/toolset-builder.ts",
-    "apps/host/src/kimi/api-runner-config.js",
+    "apps/host/src/kimi/api-runner-config.ts",
     "apps/host/src/kimi/api-runner-payload.ts",
     "apps/host/src/kimi/api-runner-prompts.ts",
     "apps/host/src/kimi/api-runner.js",
