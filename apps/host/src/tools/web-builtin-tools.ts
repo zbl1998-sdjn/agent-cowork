@@ -1,15 +1,28 @@
-// @ts-check
 // Web 内置工具描述符(host · L1 领域层 · tools):隔离联网工具的描述与 handler。
 
 import { webFetch } from './web-fetch.js';
 import { webSearch } from './web-search.js';
+import type { WebFetchLike } from './web-fetch.js';
+import type { WebSearchFetchLike } from './web-search.js';
 
-/**
- * @typedef {{ name: string, description: string, source: string, risk?: string, mutating?: boolean, requiresApproval?: boolean, inputSchema?: Record<string, any>, handler(args?: Record<string, any>): unknown | Promise<unknown> }} BuiltinTool
- */
+type BuiltinToolArgs = Record<string, unknown>;
+type BuiltinTool = {
+  name: string;
+  description: string;
+  source: string;
+  risk?: string;
+  mutating?: boolean;
+  requiresApproval?: boolean;
+  inputSchema?: Record<string, unknown>;
+  handler(args?: BuiltinToolArgs): unknown | Promise<unknown>;
+};
+type CreateWebBuiltinToolsOptions = {
+  fetchImpl?: WebFetchLike | WebSearchFetchLike;
+  now?: Date;
+};
 
-/** @param {{ fetchImpl?: any, now?: Date }} [options] @returns {BuiltinTool[]} */
-export function createWebBuiltinTools({ fetchImpl, now = new Date() } = {}) {
+/** 组装联网工具描述符;当前日期注入只用于提示模型搜索「最新/今天」时带年份。 */
+export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWebBuiltinToolsOptions = {}): BuiltinTool[] {
   const monthYear = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
   return [
     {
@@ -29,7 +42,7 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() } = {}) {
           timeoutMs: args.timeoutMs,
           maxBytes: args.maxBytes,
           allowInternal: args.allowInternal === true,
-          fetchImpl: /** @type {any} */ (fetchImpl),
+          fetchImpl: fetchImpl as WebFetchLike | undefined,
         }),
     },
     {
@@ -52,7 +65,7 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() } = {}) {
           query: args.query,
           maxResults: args.maxResults,
           provider: args.provider || 'auto',
-          fetchImpl: /** @type {any} */ (fetchImpl),
+          fetchImpl: fetchImpl as WebSearchFetchLike | undefined,
         }),
     },
   ];

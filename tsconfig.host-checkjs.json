@@ -234,7 +234,7 @@
     "apps/host/src/tools/data/table.ts",
     "apps/host/src/tools/data/xlsx-table.ts",
     "apps/host/src/tools/builtin-tools.js",
-    "apps/host/src/tools/web-builtin-tools.js",
+    "apps/host/src/tools/web-builtin-tools.ts",
     "apps/host/src/tools/dev/git.js",
     "apps/host/src/tools/search-providers/bing.ts",
     "apps/host/src/tools/search-providers/ddg.ts",
