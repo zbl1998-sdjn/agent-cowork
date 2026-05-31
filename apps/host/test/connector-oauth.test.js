@@ -5,6 +5,14 @@ import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
 import { createCredentialStore } from '../src/security/credential-store.js';
+import {
+  errorStatus,
+  githubClientId,
+  githubConnector,
+  isGitHub,
+  oauthFilter,
+  oauthIdentity,
+} from '../src/routes/connector-oauth-route-utils.js';
 import { closeTestServer } from './helpers/close-server.js';
 
 function tmp() {
@@ -43,6 +51,32 @@ function jsonResponse(body, status = 200) {
     headers: { 'content-type': 'application/json' },
   });
 }
+
+test('OAuth route utilities normalize identities, client id, and status codes', () => {
+  const previousClientId = process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+  process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'env-client-id';
+  try {
+    assert.equal(isGitHub('GitHub'), true);
+    assert.equal(githubClientId({ github: { clientId: ['bad-client'] } }), 'env-client-id');
+    assert.deepEqual(oauthIdentity({ tenantId: 'tenant-a', userId: 'user-a' }, 'github', 'octocat'), {
+      tenantId: 'tenant-a',
+      userId: 'user-a',
+      provider: 'github',
+      accountId: 'octocat',
+    });
+    assert.deepEqual(oauthFilter({ tenantId: 123, userId: 'user-a' }, 'github'), {
+      tenantId: undefined,
+      userId: 'user-a',
+      provider: 'github',
+    });
+    assert.equal(githubConnector().id, 'github');
+    assert.equal(errorStatus({ statusCode: 418 }, 502), 418);
+    assert.equal(errorStatus({ statusCode: '418' }, 502), 502);
+  } finally {
+    if (previousClientId === undefined) delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+    else process.env.KCW_GITHUB_OAUTH_CLIENT_ID = previousClientId;
+  }
+});
 
 test('GitHub OAuth device flow stores the token sealed and returns only safe connector state', async () => {
   const root = tmp();
