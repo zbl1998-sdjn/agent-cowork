@@ -1,6 +1,6 @@
 // Package domain 是 orchestrator 服务的领域核心(services/orchestrator · Go)。
-// 职责:定义编排域的实体(BaseEntity 等)、强类型 ID(ids.go)与对外端口接口(ports.go,仓储/总线的抽象,
-//       便于依赖倒置与测试)。是六边形架构的「内核」,不依赖具体基础设施。
+// 职责:定义编排域的实体(BaseEntity 等)、强类型 ID(ids.go)与对外端口接口(ports.go,仓储/总线的
+// 抽象,便于依赖倒置与测试)。是六边形架构的「内核」,不依赖具体基础设施。
 package domain
 
 import "time"

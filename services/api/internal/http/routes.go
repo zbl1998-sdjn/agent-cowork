@@ -1,6 +1,6 @@
 // Package httpapi 是 api 服务的 HTTP 路由与中间件层(services/api · Go)。
-// 职责:声明 /health 与 /v1/* 路由;中间件统一注入请求上下文(trace/租户/用户/幂等键),并强制 POST /v1/* 必须带
-//       Idempotency-Key。身份从请求头清洗而来(与 Node host 的 request-utils 思路一致)。依赖:标准库。
+// 职责:声明 /health 与 /v1/* 路由;中间件统一注入请求上下文(trace/租户/用户/幂等键),
+// 并强制 POST /v1/* 必须带 Idempotency-Key;身份从请求头清洗而来(与 Node host 的 request-utils 思路一致)。
 package httpapi
 
 import (
