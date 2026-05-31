@@ -1,5 +1,3 @@
-// @ts-check
-//
 // 连接器目录(host · L1 领域层 · connectors)
 // ---------------------------------------------------------------------------
 // 职责:精选的 MCP 连接器清单 + 关键词推荐(类比「建议连接器」)。每项含命令/安装模板与可选 OAuth
@@ -10,23 +8,38 @@
 // analog). A curated list of MCP connectors with command/install templates;
 // builtin:true means the capability already ships in this host.
 
-/**
- * @typedef {{
- *   id: string,
- *   name: string,
- *   description: string,
- *   keywords: string[],
- *   builtin?: boolean,
- *   auth?: { type: string, provider: string, scopes?: string[], permissions?: Array<{ id: string, label: string, description?: string, risk?: string, default?: boolean }> },
- *   command?: string,
- *   args?: string[],
- *   install?: string,
- *   score?: number
- * }} ConnectorDescriptor
- * @typedef {{ limit?: number }} SuggestConnectorOptions
- */
+export type OAuthPermissionDescriptor = {
+  id: string;
+  label: string;
+  description?: string;
+  risk?: string;
+  default?: boolean;
+};
 
-/** @type {ConnectorDescriptor[]} */
+export type ConnectorAuth = {
+  type: string;
+  provider: string;
+  scopes?: string[];
+  permissions?: OAuthPermissionDescriptor[];
+};
+
+export type ConnectorDescriptor = {
+  id: string;
+  name: string;
+  description: string;
+  keywords: string[];
+  builtin?: boolean;
+  auth?: ConnectorAuth;
+  command?: string;
+  args?: string[];
+  install?: string;
+  score?: number;
+};
+
+type SuggestConnectorOptions = {
+  limit?: number;
+};
+
 const CONNECTORS = [
   {
     id: 'filesystem', name: '文件系统', description: '读取/列出本地目录, jail 在指定 root 内',
@@ -86,34 +99,20 @@ const CONNECTORS = [
   },
 ];
 
-/**
- * @param {unknown} text
- * @returns {string[]}
- */
-function tokenize(text) {
+function tokenize(text: unknown): string[] {
   return String(text || '').toLowerCase().split(/[^a-z0-9一-鿿]+/).filter(Boolean);
 }
 
-/** @returns {ConnectorDescriptor[]} */
-export function listConnectors() {
+export function listConnectors(): ConnectorDescriptor[] {
   return CONNECTORS.map((c) => ({ ...c }));
 }
 
-/**
- * @param {unknown} id
- * @returns {ConnectorDescriptor | null}
- */
-export function getConnector(id) {
+export function getConnector(id: unknown): ConnectorDescriptor | null {
   const key = String(id || '').toLowerCase();
   return listConnectors().find((connector) => connector.id.toLowerCase() === key) || null;
 }
 
-/**
- * @param {unknown} query
- * @param {SuggestConnectorOptions} [options]
- * @returns {ConnectorDescriptor[]}
- */
-export function suggestConnectors(query, { limit = 5 } = {}) {
+export function suggestConnectors(query: unknown, { limit = 5 }: SuggestConnectorOptions = {}): ConnectorDescriptor[] {
   const terms = tokenize(query);
   const all = listConnectors();
   if (terms.length === 0) {

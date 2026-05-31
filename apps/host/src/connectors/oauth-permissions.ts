@@ -1,40 +1,46 @@
-// @ts-check
-//
 // OAuth 权限(host · L1 领域层 · connectors)
 // ---------------------------------------------------------------------------
 // 职责:校验并归一化连接器声明的 OAuth 权限项(id/label/风险/默认勾选),供前端展示与授权选择。
 //       最小权限原则:默认只勾必要项,高危项需用户显式选择。依赖:无。
 // 导出:权限解析/校验相关函数。
 //
-/**
- * @typedef {Error & { statusCode?: number }} HttpError
- * @typedef {{ id?: string, label?: string, description?: string, risk?: string, default?: boolean }} OAuthPermissionInput
- * @typedef {{ auth?: { permissions?: OAuthPermissionInput[], scopes?: string[] } }} OAuthConnector
- * @typedef {{ id: string, label: string, description: string, risk: string, default: boolean }} OAuthPermission
- */
+type HttpError = Error & { statusCode?: number };
 
-/**
- * @param {number} statusCode
- * @param {string} message
- * @returns {HttpError}
- */
-function makeHttpError(statusCode, message) {
-  const err = /** @type {HttpError} */ (new Error(message));
+type OAuthPermissionInput = {
+  id?: string;
+  label?: string;
+  description?: string;
+  risk?: string;
+  default?: boolean;
+};
+
+type OAuthConnector = {
+  auth?: {
+    permissions?: OAuthPermissionInput[];
+    scopes?: string[];
+  };
+};
+
+export type OAuthPermission = {
+  id: string;
+  label: string;
+  description: string;
+  risk: string;
+  default: boolean;
+};
+
+function makeHttpError(statusCode: number, message: string): HttpError {
+  const err = new Error(message) as HttpError;
   err.statusCode = statusCode;
   return err;
 }
 
-/** @param {unknown} scopes */
-function rawRequestedScopes(scopes) {
+function rawRequestedScopes(scopes: unknown): string[] {
   const list = Array.isArray(scopes) ? scopes : String(scopes || '').split(/\s+/);
   return list.map((scope) => String(scope).trim()).filter(Boolean);
 }
 
-/**
- * @param {OAuthConnector} connector
- * @returns {OAuthPermission[]}
- */
-export function oauthPermissions(connector) {
+export function oauthPermissions(connector: OAuthConnector): OAuthPermission[] {
   const auth = connector?.auth || {};
   if (Array.isArray(auth.permissions) && auth.permissions.length > 0) {
     return auth.permissions.map((permission) => ({
@@ -54,12 +60,7 @@ export function oauthPermissions(connector) {
   }));
 }
 
-/**
- * @param {OAuthConnector} connector
- * @param {unknown} requestedScopes
- * @returns {string[]}
- */
-export function normalizeOAuthScopes(connector, requestedScopes) {
+export function normalizeOAuthScopes(connector: OAuthConnector, requestedScopes: unknown): string[] {
   const permissions = oauthPermissions(connector);
   const allowed = new Set(permissions.map((permission) => permission.id));
   const requested = rawRequestedScopes(requestedScopes);
@@ -79,12 +80,7 @@ export function normalizeOAuthScopes(connector, requestedScopes) {
   return selected;
 }
 
-/**
- * @param {OAuthConnector} connector
- * @param {string[]} scopes
- * @returns {OAuthPermission[]}
- */
-export function selectedOAuthPermissions(connector, scopes) {
+export function selectedOAuthPermissions(connector: OAuthConnector, scopes: string[]): OAuthPermission[] {
   const selected = new Set(scopes || []);
   return oauthPermissions(connector).filter((permission) => selected.has(permission.id));
 }
