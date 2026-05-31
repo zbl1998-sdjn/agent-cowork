@@ -52,7 +52,7 @@ function sharedStrings(entries: ZipReadEntry[]): string[] {
   }
   const strings: string[] = [];
   for (const match of xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/gi)) {
-    strings.push(xmlToText(match[1]));
+    strings.push(xmlToText(match[1] ?? ''));
   }
   return strings;
 }
@@ -116,7 +116,7 @@ function extractPdf(buffer: Buffer): string {
   const latin1 = buffer.toString('latin1');
   const literals: string[] = [];
   for (const match of latin1.matchAll(/\(((?:\\.|[^\\()]){1,2000})\)\s*(?:Tj|'|"|TJ)?/g)) {
-    literals.push(decodePdfLiteral(match[1]));
+    literals.push(decodePdfLiteral(match[1] ?? ''));
   }
   const literalText = compactLines(literals.join('\n'));
   if (literalText.length >= 8) {

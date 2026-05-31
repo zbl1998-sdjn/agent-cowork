@@ -6,6 +6,7 @@ import { listRunRecords, readRunRecord } from '../runtime/run-store.js';
 import { formatSseFrame, parseLastEventId } from '../runtime/run-events.js';
 import { taskFromRun } from '../runtime/task-presenter.js';
 import { decodePathSegment, headerValue, sendJson, stableHeader } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import {
   parseRunQuery,
   runIndexQuerySchema,
@@ -112,14 +113,14 @@ export async function handleRunRoutes({
     if (!query) return true;
     // await: transparent for the sync file/sqlite adapters, required for the
     // async PostgreSQL adapter (multi-instance backend).
-    const records = await runsIndex.list({
+    const records = await runsIndex.list(omitUndefined({
       tenantId: requestContext.tenantId,
       userId: query.userId,
       limit: query.limit,
       status: query.status,
       type: query.type,
       recipeId: query.recipeId,
-    });
+    }));
     const stats = await runsIndex.stats({ tenantId: requestContext.tenantId });
     sendJson(response, 200, {
       context: requestContext,

@@ -4,11 +4,11 @@ import { Button } from './ui/Button';
 
 interface MessageActionsProps {
   onCopy: () => void;
-  onContinue?: () => void;
-  onCaptureRecipe?: () => void;
-  captureRecipeDisabled?: boolean;
-  captureRecipeLabel?: string;
-  onRegenerate?: () => void;
+  onContinue?: (() => void) | undefined;
+  onCaptureRecipe?: (() => void) | undefined;
+  captureRecipeDisabled?: boolean | undefined;
+  captureRecipeLabel?: string | undefined;
+  onRegenerate?: (() => void) | undefined;
 }
 
 // Inline actions under a completed assistant message.

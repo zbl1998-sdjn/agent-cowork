@@ -11,7 +11,7 @@ export interface ComposerTrigger {
 export interface ComposerSuggestionLike {
   key: string;
   title: string;
-  detail?: string;
+  detail?: string | undefined;
   apply: () => void;
 }
 
@@ -24,31 +24,34 @@ export interface SlashCommandLike {
 export interface RecipeLike {
   id: string;
   name: string;
-  summary?: string;
+  summary?: string | undefined;
 }
 
 export interface HistoryRunLike {
   id: string;
-  promptPreview?: string | null;
+  promptPreview?: string | null | undefined;
 }
 
 export interface FileHitLike {
   path: string;
-  relativePath?: string;
+  relativePath?: string | undefined;
 }
 
 export function findComposerTrigger(beforeCaret: string): ComposerTrigger | null {
   const slash = beforeCaret.match(/(?:^|\n)\/([^\s/]*)$/);
-  if (slash) {
-    return { mode: 'template', query: slash[1], triggerStart: beforeCaret.length - slash[1].length - 1 };
+  const slashQuery = slash?.[1];
+  if (slashQuery !== undefined) {
+    return { mode: 'template', query: slashQuery, triggerStart: beforeCaret.length - slashQuery.length - 1 };
   }
   const hash = beforeCaret.match(/(?:^|\n)#([^\s#]*)$/);
-  if (hash) {
-    return { mode: 'history', query: hash[1], triggerStart: beforeCaret.length - hash[1].length - 1 };
+  const hashQuery = hash?.[1];
+  if (hashQuery !== undefined) {
+    return { mode: 'history', query: hashQuery, triggerStart: beforeCaret.length - hashQuery.length - 1 };
   }
   const at = beforeCaret.match(/@([^\s@]*)$/);
-  if (at) {
-    return { mode: 'mention', query: at[1], triggerStart: beforeCaret.length - at[1].length - 1 };
+  const atQuery = at?.[1];
+  if (atQuery !== undefined) {
+    return { mode: 'mention', query: atQuery, triggerStart: beforeCaret.length - atQuery.length - 1 };
   }
   return null;
 }

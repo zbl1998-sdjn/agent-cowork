@@ -23,7 +23,7 @@ const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export type MemoryScope = 'project' | 'user' | 'session';
 
 function pickAlphabet(byte: number): string {
-  return ULID_ALPHABET[byte & 0x1f];
+  return ULID_ALPHABET[byte & 0x1f] ?? '0';
 }
 
 function timestampPart(ms: number): string {
@@ -31,7 +31,7 @@ function timestampPart(ms: number): string {
   const base = BigInt(32);
   const out = new Array<string>(10);
   for (let i = 9; i >= 0; i -= 1) {
-    out[i] = ULID_ALPHABET[Number(value % base)];
+    out[i] = ULID_ALPHABET[Number(value % base)] ?? '';
     value /= base;
   }
   return out.join('');
@@ -105,7 +105,7 @@ export function clipUtf8(text: unknown, maxBytes: number): string {
     return buffer.toString('utf8');
   }
   let end = maxBytes;
-  while (end > 0 && (buffer[end] & 0xc0) === 0x80) {
+  while (end > 0 && ((buffer[end] ?? 0) & 0xc0) === 0x80) {
     end -= 1;
   }
   return buffer.slice(0, end).toString('utf8');

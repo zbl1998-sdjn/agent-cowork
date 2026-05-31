@@ -15,6 +15,7 @@ import { importUploadedFiles } from '../workspace/uploads.js';
 import { buildAttachmentContext } from '../workspace/attachment-context.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { sendJson } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import { handleWorkspaceFileOperationRoutes } from './workspace-file-operation-routes.js';
 import {
   attachmentContextBodySchema,
@@ -92,10 +93,10 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/files/read') {
     await withParsedWorkspaceBody(request, response, readBodySchema, 'invalid file read request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const file = readTextFile(body.path, {
+      const file = readTextFile(body.path, omitUndefined({
         trustedRoot,
         maxSize: body.maxSize,
-      });
+      }));
       sendJson(response, 200, file);
     });
     return true;
@@ -105,7 +106,7 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, previewBodySchema, 'invalid file preview request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
       try {
-        const preview = readFilePreview(body.path, { trustedRoot, maxBytes: body.maxBytes });
+        const preview = readFilePreview(body.path, omitUndefined({ trustedRoot, maxBytes: body.maxBytes }));
         sendJson(response, 200, preview);
       } catch (err) {
         const error = err as Error & { statusCode?: number };
@@ -132,13 +133,13 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, searchBodySchema, 'invalid file search request', async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-      const results = searchWorkspace({
+      const results = searchWorkspace(omitUndefined({
         trustedRoot: safeRoot,
         query: body.query,
         maxResults: body.maxResults,
         includeContent: body.includeContent,
         maxContentBytes: body.maxContentBytes,
-      });
+      }));
       sendJson(response, 200, results);
     });
     return true;
@@ -147,7 +148,7 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/context/bundle') {
     await withParsedWorkspaceBody(request, response, contextBundleBodySchema, 'invalid context bundle request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const bundle = buildContextBundle({
+      const bundle = buildContextBundle(omitUndefined({
         root: trustedRoot,
         paths: body.paths,
         maxTextSize: body.maxTextSize,
@@ -155,7 +156,7 @@ export async function handleWorkspaceFileRoutes({
           const safe = assertTrustedPath(candidate, trustedRoot);
           return fs.statSync(safe);
         },
-      });
+      }));
       sendJson(response, 200, bundle);
     });
     return true;
@@ -179,7 +180,7 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/attachments/context') {
     await withParsedWorkspaceBody(request, response, attachmentContextBodySchema, 'invalid attachment context request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const result = buildAttachmentContext({ files: body.files, trustedRoot, maxSize: body.maxSize });
+      const result = buildAttachmentContext(omitUndefined({ files: body.files, trustedRoot, maxSize: body.maxSize }));
       sendJson(response, 200, { context: requestContext, ...result });
     });
     return true;

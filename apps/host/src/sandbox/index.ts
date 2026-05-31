@@ -16,6 +16,7 @@ import { LocalSubprocessSandbox } from './local-sandbox.js';
 import { VmSandbox } from './vm-sandbox.js';
 import { createWslDockerRunner } from './wsl-docker-runner.js';
 import { normalizeSandboxSpec, SANDBOX_DEFAULTS } from './sandbox-spec.js';
+import { omitUndefined } from '../util/object.js';
 import type { SpawnLike } from './exec-child.js';
 import type { VmRunner } from './vm-sandbox.js';
 
@@ -62,21 +63,21 @@ export function createSandbox(options: SandboxOptions = {}): LocalSubprocessSand
         (vmBackend === 'docker' && Boolean(options.image)) ||
         (vmBackend === 'wsl');
       if (canProvision) {
-        runner = createWslDockerRunner({
+        runner = createWslDockerRunner(omitUndefined({
           backend: vmBackend,
           image: options.image,
           distro: options.distro,
           spawn: options.spawn,
-        });
+        }));
       }
     }
-    return new VmSandbox({
+    return new VmSandbox(omitUndefined({
       backend: vmBackend,
       image: options.image,
       distro: options.distro,
       runner,
       provisioned: Boolean(runner),
-    });
+    }));
   }
 
   throw new Error(`createSandbox: unknown backend "${backend}"`);

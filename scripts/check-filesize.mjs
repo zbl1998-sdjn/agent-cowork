@@ -16,7 +16,7 @@ const ROOTS = [
 
 const EXTENSIONS = new Set(['.js', '.mjs', '.ts', '.tsx', '.rs', '.go']);
 const HARD_WAIVERS = new Map([
-  ['apps/host/src/server.js', 'P0-T2 splits server assembly, middleware, and routes'],
+  ['apps/host/src/server.ts', 'P0-T2 splits server assembly, middleware, and routes'],
   // P0-T4 retired: App.tsx is back under the soft limit after extracting the
   // chat-stream callbacks (Settings tabs / composer types / app-types splits
   // got it down earlier). Re-add if it ever creeps back over.

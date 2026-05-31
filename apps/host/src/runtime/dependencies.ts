@@ -4,6 +4,7 @@
 //       供安装引导与能力开关使用。各探测器分散在同层独立文件,这里聚合并对结果脱敏。
 // 依赖:L0 redaction + 同层各 *-runtime 探测器 + dependencies-catalog。导出:聚合探测函数与目录转出。
 import { redactText } from '../security/redaction.js';
+import { omitUndefined } from '../util/object.js';
 import { detectChromiumRuntime } from './chromium-runtime.js';
 import type { StatFs as ChromiumFs } from './chromium-runtime.js';
 import { detectDataScienceRuntime } from './data-science-runtime.js';
@@ -99,9 +100,9 @@ function detectDependency(item: RuntimeDependencyCatalogItem, options: RuntimeDe
     return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], '内置 Python 路径已配置');
   }
 
-  if (item.id === 'cjk-fonts') return detectCjkFonts({ env, fsImpl: options.fsImpl as FontFs | undefined });
+  if (item.id === 'cjk-fonts') return detectCjkFonts(omitUndefined({ env, fsImpl: options.fsImpl as FontFs | undefined }));
 
-  if (item.id === 'vc-runtime') return detectVcRuntime({ env, platform, spawnSync: options.spawnSync as VcSpawnSyncLike | undefined });
+  if (item.id === 'vc-runtime') return detectVcRuntime(omitUndefined({ env, platform, spawnSync: options.spawnSync as VcSpawnSyncLike | undefined }));
 
   if (item.id === 'proxy') {
     const proxy = envValue(env, ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']);
@@ -119,15 +120,15 @@ function detectDependency(item: RuntimeDependencyCatalogItem, options: RuntimeDe
     return { status: 'unknown', detail: '尚未接入沙箱启动探测' };
   }
 
-  if (item.id === 'data-science') return detectDataScienceRuntime({ env, fsImpl: options.fsImpl as DataScienceFs | undefined });
+  if (item.id === 'data-science') return detectDataScienceRuntime(omitUndefined({ env, fsImpl: options.fsImpl as DataScienceFs | undefined }));
 
-  if (item.id === 'playwright-chromium') return detectChromiumRuntime({ env, fsImpl: options.fsImpl as ChromiumFs | undefined });
+  if (item.id === 'playwright-chromium') return detectChromiumRuntime(omitUndefined({ env, fsImpl: options.fsImpl as ChromiumFs | undefined }));
 
-  if (item.id === 'tesseract-ocr') return detectOcrRuntime({ env, fsImpl: options.fsImpl as OcrFs | undefined });
+  if (item.id === 'tesseract-ocr') return detectOcrRuntime(omitUndefined({ env, fsImpl: options.fsImpl as OcrFs | undefined }));
 
-  if (item.id === 'pandoc') return detectPandocRuntime({ env, fsImpl: options.fsImpl as PandocFs | undefined });
+  if (item.id === 'pandoc') return detectPandocRuntime(omitUndefined({ env, fsImpl: options.fsImpl as PandocFs | undefined }));
 
-  if (item.id === 'mingit') return detectGitRuntime({ env, spawnSync: options.spawnSync as GitSpawnSyncLike | undefined });
+  if (item.id === 'mingit') return detectGitRuntime(omitUndefined({ env, spawnSync: options.spawnSync as GitSpawnSyncLike | undefined }));
 
   const marker = envValue(env, [`KCW_${item.id.toUpperCase().replace(/-/g, '_')}_HOME`]);
   if (marker) return { status: 'configured', source: marker.key, detail: `${item.label} 路径已配置` };

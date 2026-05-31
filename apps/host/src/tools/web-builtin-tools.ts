@@ -2,6 +2,7 @@
 
 import { webFetch } from './web-fetch.js';
 import { webSearch } from './web-search.js';
+import { omitUndefined } from '../util/object.js';
 import type { WebFetchLike } from './web-fetch.js';
 import type { WebSearchFetchLike } from './web-search.js';
 
@@ -37,13 +38,13 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWeb
         required: ['url'],
       },
       handler: async (args = {}) =>
-        webFetch({
+        webFetch(omitUndefined({
           url: args.url,
           timeoutMs: args.timeoutMs,
           maxBytes: args.maxBytes,
           allowInternal: args.allowInternal === true,
           fetchImpl: fetchImpl as WebFetchLike | undefined,
-        }),
+        })),
     },
     {
       name: 'WebSearch',
@@ -61,12 +62,12 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWeb
         required: ['query'],
       },
       handler: async (args = {}) =>
-        webSearch({
+        webSearch(omitUndefined({
           query: args.query,
           maxResults: args.maxResults,
           provider: args.provider || 'auto',
           fetchImpl: fetchImpl as WebSearchFetchLike | undefined,
-        }),
+        })),
     },
   ];
 }

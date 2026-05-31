@@ -115,6 +115,7 @@ export function ConversationRail({
                   const branchOptions = conversationBranchOptions(c);
                   const activeBranch = branchOptions.find((branch) => branch.id === (c.activeBranchId || 'main')) || branchOptions[0];
                   if (branchOptions.length <= 1) return null;
+                  if (!activeBranch) return null;
                   return (
                     <div className="conv-branch-row">
                       <select

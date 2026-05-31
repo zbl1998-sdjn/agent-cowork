@@ -5,6 +5,7 @@
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { runSubagent } from '../runtime/subagent.js';
 import { runSubagentsParallel } from '../runtime/subagent-parallel.js';
+import { omitUndefined } from '../util/object.js';
 import {
   parseToolBody,
   parseToolSearchQuery,
@@ -109,7 +110,7 @@ export async function handleToolRoutes({
     sendJson(response, 200, {
       context: requestContext,
       query: query.query,
-      tools: toolRegistry.search(query.query, { limit: query.limit }),
+      tools: toolRegistry.search(query.query, omitUndefined({ limit: query.limit })),
     });
     return true;
   }
@@ -163,7 +164,7 @@ export async function handleToolRoutes({
       }
       let outcome;
       try {
-        outcome = await runSubagent({
+        outcome = await runSubagent(omitUndefined({
           goal: input.goal,
           steps,
           registry: toolRegistry,
@@ -173,7 +174,7 @@ export async function handleToolRoutes({
           runsIndex,
           context: requestContext,
           stopOnError: input.stopOnError !== false,
-        });
+        }));
       } catch (err) {
         sendJson(response, errorStatus(err, 502), errorPayload(err));
         return;
@@ -211,7 +212,7 @@ export async function handleToolRoutes({
       }
       let outcome;
       try {
-        outcome = await runSubagentsParallel({
+        outcome = await runSubagentsParallel(omitUndefined({
           goal: input.goal,
           agents,
           registry: toolRegistry,
@@ -222,7 +223,7 @@ export async function handleToolRoutes({
           context: requestContext,
           stopOnError: input.stopOnError !== false,
           maxConcurrency: input.maxConcurrency,
-        });
+        }));
       } catch (err) {
         sendJson(response, errorStatus(err, 502), errorPayload(err));
         return;

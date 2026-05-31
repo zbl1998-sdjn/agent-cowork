@@ -37,11 +37,16 @@ function findBranchMessage(branches: ConversationBranch[], messageId: string | u
 
 function commonPrefixCount(left: Message[], right: Message[]): number {
   let count = 0;
-  while (count < left.length && count < right.length && left[count].id === right[count].id) count += 1;
+  while (count < left.length && count < right.length) {
+    const leftMessage = left[count];
+    const rightMessage = right[count];
+    if (!leftMessage || !rightMessage || leftMessage.id !== rightMessage.id) break;
+    count += 1;
+  }
   return count;
 }
 
-export function normalizeConversationBranches(conversation: Conversation): Required<Pick<Conversation, 'activeBranchId' | 'branches'>> {
+export function normalizeConversationBranches(conversation: Conversation): { activeBranchId: string; branches: ConversationBranch[] } {
   const rawBranches = Array.isArray(conversation.branches) ? conversation.branches : [];
   const branches = rawBranches.length > 0
     ? rawBranches.map((branch, index) => ({
@@ -56,7 +61,7 @@ export function normalizeConversationBranches(conversation: Conversation): Requi
   const requestedBranchId = conversation.activeBranchId;
   const activeBranchId = requestedBranchId && branches.some((branch) => branch.id === requestedBranchId)
     ? requestedBranchId
-    : branches[0].id;
+    : (branches[0]?.id || MAIN_BRANCH_ID);
   return { activeBranchId, branches };
 }
 
@@ -107,12 +112,13 @@ export function compareConversationBranches(
 
 export function conversationBranchOptions(conversation: Conversation): Array<{ id: string; label: string; description: string }> {
   const { branches } = normalizeConversationBranches(conversation);
+  const mainBranchId = branches[0]?.id || MAIN_BRANCH_ID;
   return branches.map((branch, index) => ({
     id: branch.id,
     label: branch.title || branchTitle(index),
     description: index === 0
       ? `${branch.messages.length} 条消息`
-      : (compareConversationBranches(conversation, branch.parentBranchId || branches[0].id, branch.id)?.summary || `${branch.messages.length} 条消息`),
+      : (compareConversationBranches(conversation, branch.parentBranchId || mainBranchId, branch.id)?.summary || `${branch.messages.length} 条消息`),
   }));
 }
 

@@ -2,9 +2,9 @@
 import type { RunStatus } from '../lib/types';
 
 export interface TaskStatusBadgeProps {
-  runId?: string;
+  runId?: string | undefined;
   status: RunStatus | string;
-  activeForm?: string;
+  activeForm?: string | undefined;
 }
 
 const LABEL: Record<string, string> = {

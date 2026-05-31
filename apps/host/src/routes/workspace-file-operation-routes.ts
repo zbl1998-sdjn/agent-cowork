@@ -4,6 +4,7 @@
 // 依赖:L0 request-utils + L1 workspace/file-operations + L2 file-operation-approvals(经参数注入)。
 import { z } from 'zod';
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import {
   previewFileOperations,
@@ -184,10 +185,10 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
           operations: preview.operations,
           context: requestContext,
         });
-        const applied = applyFileOperations(body.operations, {
+        const applied = applyFileOperations(body.operations, omitUndefined({
           trustedRoot,
           journalWriter: config.journalWriter,
-        });
+        }));
         const rollbackApprovalId = applied.applied.length
           ? fileOperationApprovals.issue({
             kind: 'file-ops:rollback',
@@ -210,17 +211,17 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
     await withParsedFileOpsBody(request, response, rollbackBodySchema, async (body) => {
       cachedWrite(options, body, () => {
         const trustedRoot = safeTrustedRoot(body.trustedRoot);
-        const entries = body.rollback ?? body.applied ?? body.operations;
+        const entries = body.rollback ?? body.applied ?? body.operations ?? [];
         fileOperationApprovals.consume(body.rollbackApprovalId || body.fileOperationApprovalId || body.approvalId, {
           kind: 'file-ops:rollback',
           trustedRoot,
           operations: entries,
           context: requestContext,
         });
-        const rollback = rollbackFileOperations(entries, {
+        const rollback = rollbackFileOperations(entries, omitUndefined({
           trustedRoot,
           journalWriter: config.journalWriter,
-        });
+        }));
         return {
           ...rollback,
           context: requestContext,

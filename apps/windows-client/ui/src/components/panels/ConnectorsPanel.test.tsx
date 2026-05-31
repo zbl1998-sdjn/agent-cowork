@@ -69,7 +69,7 @@ describe('ConnectorsPanel state views', () => {
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('搜索');
     expect(buttons).toHaveLength(1);
-    buttons[0].props.onClick();
+    buttons[0]!.props.onClick();
     expect(onSearch).toHaveBeenCalledOnce();
   });
 
@@ -137,9 +137,9 @@ describe('ConnectorsPanel state views', () => {
     expect(missingHtml).toContain('ui-btn ui-btn--secondary');
     expect(missingHtml).toContain('待配置 网页授权');
     expect(missingHtml).toContain('disabled=""');
-    approvedButton.props.onClick();
-    completeButton.props.onClick();
-    revokeButton.props.onClick();
+    approvedButton!.props.onClick();
+    completeButton!.props.onClick();
+    revokeButton!.props.onClick();
     expect(onStart).toHaveBeenCalledOnce();
     expect(onComplete).toHaveBeenCalledOnce();
     expect(onRevoke).toHaveBeenCalledOnce();
@@ -164,8 +164,8 @@ describe('ConnectorsPanel state views', () => {
     expect(busyHtml).toContain('ui-btn ui-btn--secondary');
     expect(busyHtml).toContain('连接中…');
     expect(busyHtml).toContain('disabled=""');
-    connectButton.props.onClick();
-    disconnectButton.props.onClick();
+    connectButton!.props.onClick();
+    disconnectButton!.props.onClick();
     expect(onConnect).toHaveBeenCalledOnce();
     expect(onDisconnect).toHaveBeenCalledOnce();
   });

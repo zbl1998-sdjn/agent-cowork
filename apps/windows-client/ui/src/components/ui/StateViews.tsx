@@ -22,10 +22,10 @@ const titleStyle: CSSProperties = { fontSize: 14, fontWeight: 600, color: 'var(-
 const messageStyle: CSSProperties = { fontSize: 13, lineHeight: 1.5 };
 
 export interface EmptyProps {
-  title?: string;
-  message?: string;
-  icon?: ReactNode;
-  action?: ReactNode;
+  title?: string | undefined;
+  message?: string | undefined;
+  icon?: ReactNode | undefined;
+  action?: ReactNode | undefined;
 }
 
 export function Empty({ title = '暂无内容', message, icon, action }: EmptyProps) {
@@ -40,7 +40,7 @@ export function Empty({ title = '暂无内容', message, icon, action }: EmptyPr
 }
 
 export interface LoadingProps {
-  message?: string;
+  message?: string | undefined;
 }
 
 export function Loading({ message = '加载中…' }: LoadingProps) {
@@ -66,10 +66,10 @@ export function Loading({ message = '加载中…' }: LoadingProps) {
 }
 
 export interface ErrorStateProps {
-  title?: string;
-  message?: string;
-  onRetry?: () => void;
-  retryLabel?: string;
+  title?: string | undefined;
+  message?: string | undefined;
+  onRetry?: (() => void) | undefined;
+  retryLabel?: string | undefined;
 }
 
 export function ErrorState({

@@ -46,6 +46,7 @@ export const DEFAULT_USAGE_PRICING: UsagePricing = Object.freeze({
   'moonshot-v1-32k': { inputUsdPerMillionTokens: 1.73, outputUsdPerMillionTokens: 1.73 },
   'moonshot-v1-128k': { inputUsdPerMillionTokens: 1.73, outputUsdPerMillionTokens: 1.73 },
 });
+const ZERO_USAGE_RATE: UsageRate = { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 };
 
 function finiteNumber(value: unknown, fallback = 0): number {
   const n = Number(value);
@@ -93,11 +94,12 @@ function cleanText(value: unknown): string {
 }
 
 function resolvePricing(model: unknown, pricing: UsagePricing, provider: unknown = ''): UsageRate {
-  if (!pricing || typeof pricing !== 'object') return DEFAULT_USAGE_PRICING.default;
+  const fallback = DEFAULT_USAGE_PRICING.default ?? ZERO_USAGE_RATE;
+  if (!pricing || typeof pricing !== 'object') return fallback;
   const modelKey = cleanText(model);
   const providerKey = cleanText(provider).toLowerCase();
   const combinedKey = providerKey && modelKey ? `${providerKey}:${modelKey}` : '';
-  return pricing[combinedKey] || pricing[modelKey] || pricing[providerKey] || pricing.default || DEFAULT_USAGE_PRICING.default;
+  return pricing[combinedKey] || pricing[modelKey] || pricing[providerKey] || pricing.default || fallback;
 }
 
 export function estimateTokenCost(usage: unknown, {

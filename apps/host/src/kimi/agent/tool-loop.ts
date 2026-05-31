@@ -28,34 +28,24 @@ import { createCheckpointRecorder } from './checkpoint-state.js';
 import { traceModelContext, traceToolDecision } from './run-trace-events.js';
 import { addLazySearchTool, createNoopBudgetGuard } from './tool-loop-support.js';
 import { executeToolCall } from './tool-call-executor.js';
-import type { SkillDescriptor } from '../system-prompt.js';
-import type { ApprovalRegistry, AuditBus, HookEngine, RequestContext } from './approval-gate.js';
+import { omitUndefined } from '../../util/object.js';
 import type { AskTool } from './clarification.js';
-import type { Checkpointer } from './checkpoint-state.js';
-import type { Message as FinalizeMessage, Usage, UsageTotals } from './finalize.js';
-import type { ModelCall } from './model-resilience.js';
-import type { RunTraceLike } from './run-trace-events.js';
-import type { AgentTool, ContextManager as ToolResultContextManager, LoopGuard, RetryPolicy, ToolCall } from './tool-call-executor.js';
+import type { AgentTool } from './tool-call-executor.js';
+import type { BudgetDecision, ChatMessage, ContextManagerLike, ModelMessage, RunAgentChatOptions, RunAgentChatResult } from './tool-loop-types.js';
 
-export type ModelConfig = Record<string, unknown> & { timeoutMs?: number };
-export type ChatMessage = FinalizeMessage & { [key: string]: unknown };
-export type ModelMessage = { content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; usage?: Usage };
-export type EmitFn = (type: string, payload: unknown) => void;
-export type BudgetDecision = Record<string, unknown> & { shouldAbort?: boolean; limit?: unknown; actual?: unknown; maximum?: unknown; reason?: unknown; snapshot?: unknown };
-export type BudgetGuardLike = { check(): BudgetDecision; recordUsage(usage?: Usage): BudgetDecision; stopMessage(decision?: BudgetDecision): string };
-export type ContextPrepareResult = { messages?: ChatMessage[]; compacted?: boolean; beforeTokens?: unknown; afterTokens?: unknown; keyFacts?: unknown[] };
-export type ContextManagerLike = { prepareMessages(messages: ChatMessage[]): ContextPrepareResult; formatToolResult: ToolResultContextManager['formatToolResult'] };
-export type ResumeState = { usage?: Usage; messages?: ChatMessage[]; approvedTools?: string[]; todos?: unknown[] };
-export type RunAgentChatOptions = {
-  prompt?: unknown; kimiConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall; maxSteps?: number;
-  approvals?: ApprovalRegistry | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
-  memoryText?: string; skills?: SkillDescriptor[]; emit?: EmitFn; sandbox?: unknown; sandboxLimits?: unknown; runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknown;
-  context?: RequestContext; fetchImpl?: unknown; lazyTools?: AgentTool[]; verify?: boolean; maxVerifySteps?: number; signal?: AbortSignal | null; runId?: string | null;
-  userContent?: unknown; clarifyBeforeModel?: boolean; contextManager?: ContextManagerLike | null; contextOptions?: unknown; loopGuard?: LoopGuard | null; loopGuardOptions?: unknown;
-  retryPolicy?: RetryPolicy | null; retryOptions?: unknown; budgetGuard?: BudgetGuardLike | null; runTimeoutMs?: number; checkpointer?: Checkpointer | null;
-  resumeState?: ResumeState | null; runTrace?: RunTraceLike | null;
-};
-export type RunAgentChatResult = { text: string; steps: Array<Record<string, unknown>>; usage: UsageTotals; cancelled: boolean; budgetStopped: boolean; timeoutStopped: boolean };
+export type {
+  BudgetDecision,
+  BudgetGuardLike,
+  ChatMessage,
+  ContextManagerLike,
+  ContextPrepareResult,
+  EmitFn,
+  ModelConfig,
+  ModelMessage,
+  ResumeState,
+  RunAgentChatOptions,
+  RunAgentChatResult,
+} from './tool-loop-types.js';
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
@@ -174,7 +164,11 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           signal: runTimeout.signal,
           onContent,
           onReasoning,
-        }, { kimiConfig, timeoutMs: modelTimeoutMs, onFallback: (event) => emit('model_fallback', event) }) as ModelMessage;
+        }, omitUndefined({
+          kimiConfig,
+          timeoutMs: modelTimeoutMs,
+          onFallback: (event: { failed: unknown; next: unknown; error: string }) => emit('model_fallback', event),
+        })) as ModelMessage;
       } catch (err) {
         if (runTimeout.aborted() && isAbortLikeError(err)) {
           if (runTimeout.timedOut()) stopOnTimeout();
@@ -227,7 +221,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       }
     }
 
-    finalText = (await summarizeAfterBudget({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals })) || '';
+    finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
     finalText = applyStaticBackstop(finalText, runTimeout.signal, emit);
     if ((stopForBudget || stopForTimeout || stopForLoopGuard) && finalText) {
       const phase = stopForBudget ? 'budget_stopped' : (stopForTimeout ? 'timeout_stopped' : 'loop_guard_stopped');

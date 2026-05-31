@@ -60,14 +60,15 @@ export function parseBingResults(html: unknown, limit = 8): ParsedResult[] {
   const results: ParsedResult[] = [];
   for (const block of html.matchAll(ALGO_BLOCK_RE)) {
     const blockHtml = block[1];
+    if (!blockHtml) continue;
     const anchorMatch = FIRST_ANCHOR_RE.exec(blockHtml);
     if (!anchorMatch) continue;
-    const url = anchorMatch[1];
-    const title = clean(anchorMatch[2]);
+    const url = anchorMatch[1] ?? '';
+    const title = clean(anchorMatch[2] ?? '');
     if (!url || !title) continue;
     if (!/^https?:\/\//i.test(url)) continue;
     const captionMatch = CAPTION_RE.exec(blockHtml);
-    const snippet = captionMatch ? clean(captionMatch[1]) : '';
+    const snippet = captionMatch ? clean(captionMatch[1] ?? '') : '';
     results.push({ title, url, snippet });
     if (results.length >= safeLimit) break;
   }

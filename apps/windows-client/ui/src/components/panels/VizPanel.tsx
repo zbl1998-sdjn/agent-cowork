@@ -11,13 +11,13 @@ interface VizPanelProps {
 
 // Concrete spec templates so users can click → tweak → render, instead of staring
 // at a single JSON example and having to invent the schema.
-export const VIZ_SAMPLES: Record<string, string> = {
+export const VIZ_SAMPLES = {
   bar: JSON.stringify({ title: '季度收入', kind: 'bar', data: { labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [12, 19, 8, 15] } }, null, 2),
   line: JSON.stringify({ title: '月度访问', kind: 'line', data: { labels: ['1月', '2月', '3月', '4月', '5月', '6月'], values: [320, 480, 510, 620, 580, 700] } }, null, 2),
   pie: JSON.stringify({ title: '渠道占比', kind: 'pie', data: { labels: ['搜索', '直接', '社交', '邮件'], values: [42, 30, 18, 10] } }, null, 2),
   table: JSON.stringify({ title: '团队季度', kind: 'table', data: { columns: ['部门', 'Q3', 'Q4', '环比'], rows: [['销售', 180, 210, '+17%'], ['市场', 120, 140, '+17%'], ['研发', 95, 98, '+3%']] } }, null, 2),
   metric: JSON.stringify({ title: '关键指标', kind: 'metric', data: { value: 1247, label: '本月新签订单', delta: '+8.3%' } }, null, 2),
-};
+} satisfies Record<string, string>;
 
 const TEMPLATE_OPTIONS: Array<{ key: keyof typeof VIZ_SAMPLES; label: string }> = [
   { key: 'bar', label: '柱状' },
@@ -29,10 +29,10 @@ const TEMPLATE_OPTIONS: Array<{ key: keyof typeof VIZ_SAMPLES; label: string }> 
 
 export interface JsonValidation {
   ok: boolean;
-  message?: string;
-  position?: number;
-  line?: number;
-  column?: number;
+  message?: string | undefined;
+  position?: number | undefined;
+  line?: number | undefined;
+  column?: number | undefined;
 }
 
 // Pure helper: returns {ok} or a friendly error with line/column when possible.

@@ -7,6 +7,7 @@ import {
   sendJson,
   withJsonBody,
 } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import type {
   HttpRequestLike,
   HttpResponseLike,
@@ -104,14 +105,14 @@ export function dependencyPlanOptions(
   body: z.output<typeof dependencyPlanBodySchema>,
   fallbackAppDataRoot: string | null | undefined,
 ): RuntimeDependencyPlanOptions {
-  return {
+  return omitUndefined({
     selectedIds: body.selectedIds,
     freeBytes: body.freeBytes,
     keepUserData: body.keepUserData,
     currentVersion: body.currentVersion,
     targetVersion: body.targetVersion,
     appDataRoot: body.appDataRoot ?? fallbackAppDataRoot,
-  };
+  });
 }
 
 export async function withParsedDependencyPlanBody(

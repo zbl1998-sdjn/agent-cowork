@@ -21,7 +21,7 @@ function onCodeCopy(e: MouseEvent<HTMLDivElement>) {
 
 // Assistant message body: Markdown prose with any ```chart/```mermaid blocks
 // rendered as live inline charts, and ```code blocks with copy + light highlight.
-export function MessageText({ text, trustedRoot }: { text: string; trustedRoot?: string }) {
+export function MessageText({ text, trustedRoot }: { text: string; trustedRoot?: string | undefined }) {
   const segments = splitVizBlocks(text);
   return (
     <div className="message-text markdown" onClick={onCodeCopy}>

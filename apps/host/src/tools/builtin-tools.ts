@@ -15,6 +15,7 @@ import { profileDataFile } from './data/profile.js';
 import { analyzeDataFile } from './data/report.js';
 import { createDataChartArtifact } from './data/artifact.js';
 import { argsRecord, contextRecord, parseBuiltinToolsOptions } from './builtin-tool-options.js';
+import { omitUndefined } from '../util/object.js';
 import type { BuiltinToolsOptionsInput } from './builtin-tool-options.js';
 import type { ToolEntry } from './tool-registry.js';
 
@@ -43,7 +44,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
         const args = argsRecord(rawArgs);
         const ctx = contextRecord(rawCtx);
         const spec = normalizeSandboxSpec(args.spec || args, sandboxLimits);
-        return sandbox.exec(spec, { trustedRoot: ctx.trustedRoot, context: ctx.context });
+        return sandbox.exec(spec, omitUndefined({ trustedRoot: ctx.trustedRoot, context: ctx.context }));
       },
     });
 
@@ -57,7 +58,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       handler: async (rawArgs, rawCtx) => {
         const args = argsRecord(rawArgs);
         const ctx = contextRecord(rawCtx);
-        return runCode({
+        return runCode(omitUndefined({
           sandbox,
           sandboxLimits,
           tool: args.tool,
@@ -71,13 +72,13 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
           runEvents,
           runsIndex,
           context: ctx.context,
-        });
+        }));
       },
     });
   }
 
   if (enableWebTools) {
-    tools.push(...createWebBuiltinTools({ fetchImpl }));
+    tools.push(...createWebBuiltinTools(omitUndefined({ fetchImpl })));
   }
 
   tools.push({
@@ -122,7 +123,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
     },
-    handler: async (rawArgs, rawCtx) => profileDataFile({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
+    handler: async (rawArgs, rawCtx) => profileDataFile(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
   });
 
   tools.push({
@@ -136,7 +137,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
     },
-    handler: async (rawArgs, rawCtx) => analyzeDataFile({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
+    handler: async (rawArgs, rawCtx) => analyzeDataFile(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
   });
 
   tools.push({
@@ -157,7 +158,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       },
       required: ['path'],
     },
-    handler: async (rawArgs, rawCtx) => createDataChartArtifact({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
+    handler: async (rawArgs, rawCtx) => createDataChartArtifact(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
   });
 
   tools.push({
@@ -176,7 +177,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       },
       required: ['files'],
     },
-    handler: async (rawArgs, rawCtx) => planFileOrganization({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) }),
+    handler: async (rawArgs, rawCtx) => planFileOrganization(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
   });
 
   for (const recipe of listRecipes()) {
@@ -189,7 +190,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       handler: async (rawArgs, rawCtx) => {
         const args = argsRecord(rawArgs);
         const ctx = contextRecord(rawCtx);
-        return runRecipe({
+        return runRecipe(omitUndefined({
           recipeId: recipe.id,
           trustedRoot: ctx.trustedRoot || '',
           prompt: args.prompt || '',
@@ -199,7 +200,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
           runStoreRoot: runStoreRoot || '',
           runEvents,
           runsIndex,
-        });
+        }));
       },
     });
   }

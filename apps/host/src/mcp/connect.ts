@@ -4,6 +4,7 @@
 //       单个服务器连接失败只记入 errors、不影响其余——一个坏连接器不能拖垮整个 host。
 // 依赖:node:child_process + 同层 stdio-transport/mcp-client。导出:connectMcpServers(及相关)。
 import childProcess from 'node:child_process';
+import { omitUndefined } from '../util/object.js';
 import { StdioTransport, type SpawnFn } from './stdio-transport.js';
 import { McpClient } from './mcp-client.js';
 
@@ -55,13 +56,13 @@ export async function connectMcpServers({
       continue;
     }
     try {
-      const transport = new StdioTransport({
+      const transport = new StdioTransport(omitUndefined({
         command: spec.command,
         args: spec.args || [],
         env: spec.env || {},
         cwd: spec.cwd,
         spawn,
-      });
+      }));
       const client = new McpClient({ transport, timeoutMs: spec.timeoutMs || timeoutMs });
       const count = await registry.registerMcpClient(spec.name, client);
       clients.push({ name: spec.name, client });

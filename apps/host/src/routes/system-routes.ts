@@ -5,6 +5,7 @@
 import { modelBreakerStats } from '../runtime/model-breakers.js';
 import { sendJson } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
+import { omitUndefined } from '../util/object.js';
 import { readDesktopUpdateManifest } from '../runtime/desktop-update-source.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 import {
@@ -188,11 +189,11 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
   }
 
   if (request.method === 'GET' && pathname === '/api/runtime/dependencies') {
-    sendJson(response, 200, getRuntimeDependencyStatus({
+    sendJson(response, 200, getRuntimeDependencyStatus(omitUndefined({
       env: state.config.runtimeDependencyEnv || process.env,
       platform: state.config.runtimeDependencyPlatform || process.platform,
       sandboxStartup: state.sandboxStartup,
-    }));
+    })));
     return true;
   }
 

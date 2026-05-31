@@ -162,14 +162,14 @@ export async function streamAgentChat({
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills()
-        .map((sk) => ({
+        .map((sk) => omitUndefined({
           id: String(sk.id || ''),
           name: String(sk.name || ''),
           description: typeof sk.description === 'string' ? sk.description : undefined,
         }))
         .filter((sk) => sk.id && sk.name)
       : [];
-    outcome = await runAgentChat({
+    outcome = await runAgentChat(omitUndefined({
       prompt: body.prompt,
       kimiConfig: runKimiConfig,
       trustedRoot,
@@ -202,7 +202,7 @@ export async function streamAgentChat({
       checkpointer,
       resumeState: resumeState as RunAgentChatOptions['resumeState'],
       runTrace,
-    });
+    }) as RunAgentChatOptions);
     if (controller && controller.signal.aborted) {
       status = 'cancelled';
       sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });

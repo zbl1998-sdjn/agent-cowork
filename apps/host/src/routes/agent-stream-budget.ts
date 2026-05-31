@@ -94,8 +94,8 @@ function tightestLimit(configValue: NumericLimit | undefined, requestValue: Nume
 }
 
 function budgetInputs(body: unknown, kimiConfig: unknown): AgentBudgetInputs {
-  const requestBody = parseSchema(requestBodySchema, objectOrEmpty(body));
-  const config = parseSchema(modelConfigSchema, objectOrEmpty(kimiConfig));
+  const requestBody = omitUndefined(parseSchema(requestBodySchema, objectOrEmpty(body))) as RequestBody;
+  const config = omitUndefined(parseSchema(modelConfigSchema, objectOrEmpty(kimiConfig))) as ModelConfig;
   return { requestBody, config, requestBudget: requestBody.budget ?? {} };
 }
 

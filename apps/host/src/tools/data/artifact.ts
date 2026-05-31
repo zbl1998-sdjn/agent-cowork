@@ -4,6 +4,7 @@
 // 依赖:artifacts/live-artifact(落盘) + 同目录 report(分析)。导出:createDataChartArtifact。
 
 import { buildLiveArtifact } from '../../artifacts/live-artifact.js';
+import { omitUndefined } from '../../util/object.js';
 import { analyzeDataFile } from './report.js';
 
 export type DataChartArtifactOptions = {
@@ -56,12 +57,12 @@ export function createDataChartArtifact(options: DataChartArtifactOptions = {}):
     data: analysis.chart.data,
     options: { responsive: true },
   };
-  const artifact = buildLiveArtifact({
+  const artifact = buildLiveArtifact(omitUndefined({
     trustedRoot,
     id: cleanText(options.id) || undefined,
     title,
     viz,
-  });
+  }));
   return {
     kind: 'data-chart-artifact',
     source: {

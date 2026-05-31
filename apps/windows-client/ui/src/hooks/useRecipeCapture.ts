@@ -7,7 +7,7 @@ import type { AssistantMessage, RecipeCaptureResponse, RecipeSaveResponse } from
 
 interface RecipeCaptureOptions {
   patchAssistant: (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
-  onRecipeSaved?: (recipe: { id: string; name: string; summary?: string }) => void;
+  onRecipeSaved?: ((recipe: { id: string; name: string; summary?: string | undefined }) => void) | undefined;
 }
 
 export function useRecipeCapture({ patchAssistant, onRecipeSaved }: RecipeCaptureOptions) {

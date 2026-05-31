@@ -108,7 +108,7 @@ export function createWslDockerRunner(options: WslDockerRunnerOptions = {}): Wsl
 
     const core = await runConstrainedChild({
       spawn,
-      command: argv[0],
+      command: argv[0] ?? '',
       args: argv.slice(1),
       // The container/distro provides the real cwd (/work); on the host side we
       // launch the wrapper from the mounted root.

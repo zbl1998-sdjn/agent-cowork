@@ -94,7 +94,9 @@ export class BudgetGuard {
     this.now = options.now || Date.now;
     this.startedAtMs = Number.isFinite(Number(options.startedAtMs)) ? Number(options.startedAtMs) : this.now();
     this.model = String(options.model || 'default');
-    this.pricing = options.pricing;
+    if (options.pricing) {
+      this.pricing = options.pricing;
+    }
     this.runUsage = emptyUsage();
     this.sessionUsage = normalizeTokenUsage(options.sessionUsage);
     this.runCostUsd = 0;

@@ -124,6 +124,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
           next += 1;
           if (index >= tasks.length) return;
           const task = tasks[index];
+          if (!task) return;
           emitChild('child_start', { index, goal: task.task, stepCount: maxSteps });
           try {
             const sub = await runAgentChat({
@@ -148,13 +149,14 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
             children[index] = { index, task: task.task, ok: true, text: sub.text, steps: Array.isArray(sub.steps) ? sub.steps.length : 0 };
             emitChild('child_end', { index, goal: task.task, status: 'succeeded', stepCount: Array.isArray(sub.steps) ? sub.steps.length : 0 });
           } catch (err) {
-            children[index] = {
+            const childResult: ChildResult = {
               index,
               task: task.task,
               ok: false,
               error: err instanceof Error ? err.message : String(err),
             };
-            emitChild('child_end', { index, goal: task.task, status: 'failed', error: children[index].error });
+            children[index] = childResult;
+            emitChild('child_end', { index, goal: task.task, status: 'failed', error: childResult.error });
           }
         }
       }

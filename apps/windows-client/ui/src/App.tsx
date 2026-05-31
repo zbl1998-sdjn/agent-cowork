@@ -27,7 +27,7 @@ import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
 export function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0].messages || []);
+  const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0]?.messages || []);
   const [panel, setPanel] = useState<SidePanel>('none');
   const [mode, setMode] = useState<AgentMode>('execute');
   const planMode = mode === 'plan';
@@ -163,7 +163,8 @@ export function App() {
     const currentMessages = messagesRef.current;
     const idx = currentMessages.findIndex((m) => m.id === assistantId);
     for (let i = idx - 1; i >= 0; i -= 1) {
-      const text = currentMessages[i].role === 'user' ? currentMessages[i].text : '';
+      const candidate = currentMessages[i];
+      const text = candidate?.role === 'user' ? candidate.text : '';
       if (text) { quickSend(text); return; }
     }
   }, [quickSend]);

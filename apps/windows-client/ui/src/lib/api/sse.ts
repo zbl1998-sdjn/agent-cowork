@@ -17,16 +17,17 @@ export async function streamSse(response: Response, onFrame: (type: string, data
       buffer = buffer.slice(idx + 2);
       const evMatch = /^event:\s*(.*)$/m.exec(frame);
       const dataMatch = /^data:\s*(.*)$/m.exec(frame);
-      if (!evMatch) continue;
+      const eventType = evMatch?.[1];
+      if (!eventType) continue;
 
       let data: SsePayload = {};
       try {
-        const parsed = dataMatch ? JSON.parse(dataMatch[1]) : {};
+        const parsed = dataMatch?.[1] ? JSON.parse(dataMatch[1]) : {};
         if (parsed && typeof parsed === 'object') data = parsed as SsePayload;
       } catch {
         /* ignore malformed frame */
       }
-      onFrame(evMatch[1].trim(), data);
+      onFrame(eventType.trim(), data);
     }
   }
 }

@@ -30,15 +30,15 @@ export type NormalisedRunRecord = {
 };
 
 function pickAlphabet(byte: number): string {
-  return ULID_ALPHABET[byte & 0x1f];
+  return ULID_ALPHABET[byte & 0x1f] ?? '0';
 }
 
 function timestampPart(ms: number): string {
   let value = BigInt(ms);
   const base = BigInt(32);
-  const out = new Array(10);
+  const out = new Array<string>(10);
   for (let i = 9; i >= 0; i -= 1) {
-    out[i] = ULID_ALPHABET[Number(value % base)];
+    out[i] = ULID_ALPHABET[Number(value % base)] ?? '0';
     value /= base;
   }
   return out.join('');

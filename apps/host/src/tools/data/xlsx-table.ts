@@ -58,7 +58,9 @@ function firstWorksheet(entries: ZipReadEntry[]): ZipReadEntry {
 function parseAttrs(attrs: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const match of String(attrs || '').matchAll(/\b([A-Za-z_:][\w:.-]*)="([^"]*)"/g)) {
-    out[match[1]] = decodeXmlEntities(match[2]);
+    const key = match[1];
+    if (!key) continue;
+    out[key] = decodeXmlEntities(match[2] ?? '');
   }
   return out;
 }
@@ -83,7 +85,7 @@ function readRow(rowXml: string, sharedStrings: string[]): string[] {
   let nextIndex = 0;
   for (const match of rowXml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)) {
     const attrs = parseAttrs(match[1] || '');
-    const index = columnIndexFromRef(attrs.r) ?? nextIndex;
+    const index = columnIndexFromRef(attrs.r ?? '') ?? nextIndex;
     values[index] = cellValue(match[2] || '', attrs, sharedStrings);
     nextIndex = index + 1;
   }

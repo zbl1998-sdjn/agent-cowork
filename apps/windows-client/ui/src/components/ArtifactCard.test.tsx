@@ -28,7 +28,7 @@ describe('ArtifactCard', () => {
 
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('在系统中打开');
-    buttons[0].props.onClick();
+    buttons[0]!.props.onClick();
     expect(onOpen).toHaveBeenCalledWith('C:/work/report.md');
   });
 });

@@ -3,6 +3,7 @@
 // 职责:为每条运行记录补充指标——成功/失败判定、用量与费用透明化、耗时分阶段汇总,供 run-store 写入。
 // 依赖:同层 usage。导出:withRunMetrics(给 run 记录附加指标)。
 import { buildUsageTransparency, type TimingInput } from './usage.js';
+import { omitUndefined } from '../util/object.js';
 
 type StepStats = { total: number; succeeded: number; failed: number };
 type ToolStats = { calls: number; succeeded: number; failed: number; unique: string[] };
@@ -87,11 +88,11 @@ function usageInput(record: Record<string, unknown>): UsageInput {
     usage: record.usage || result.usage || result.usageTotals || existingMetrics.tokens || null,
     provider: text(record.provider || result.provider || attributionModel.provider || existingMetrics.provider || 'unknown') || 'unknown',
     model: text(record.model || result.model || attributionModel.model || existingMetrics.model || 'default') || 'default',
-    timing: {
+    timing: omitUndefined({
       startedAt: timingStamp(record.startedAt),
       finishedAt: timingStamp(record.finishedAt),
       durationMs: timingDuration(record.durationMs),
-    },
+    }),
   };
 }
 

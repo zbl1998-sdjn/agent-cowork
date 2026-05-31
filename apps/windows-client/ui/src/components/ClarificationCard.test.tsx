@@ -36,7 +36,7 @@ describe('ClarificationCard', () => {
     const onAnswer = vi.fn();
     const choices = collectChoices(ClarificationCard({ question: '你想做什么？', options, onAnswer }));
 
-    choices[1].props.onClick();
+    choices[1]!.props.onClick();
     expect(onAnswer).toHaveBeenCalledWith(options[1]);
   });
 });

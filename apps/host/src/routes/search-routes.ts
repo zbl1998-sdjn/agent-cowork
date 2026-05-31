@@ -4,6 +4,7 @@
 // 依赖:L0 request-utils + L1 workspace 检索(经 state 注入)。导出:handleSearchRoutes。
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { SearchWorkspaceOptions } from '../workspace/index/search.js';
@@ -47,7 +48,7 @@ const workspaceSearchBodySchema = z.preprocess(
 
 function parseWorkspaceSearchBody(body: unknown, state: SearchState): SearchWorkspaceOptions {
   const input = workspaceSearchBodySchema.parse(body);
-  return {
+  return omitUndefined({
     root: state.safeTrustedRoot(input.trustedRoot || state.trustedRootDefault),
     query: input.query,
     limit: input.limit,
@@ -55,7 +56,7 @@ function parseWorkspaceSearchBody(body: unknown, state: SearchState): SearchWork
     maxFileBytes: input.maxFileBytes,
     maxChunkLines: input.maxChunkLines,
     maxChunkBytes: input.maxChunkBytes,
-  };
+  });
 }
 
 export async function handleSearchRoutes({

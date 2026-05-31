@@ -5,6 +5,8 @@
 // 依赖:仅标准库(读 process.env)。
 // 导出:常量(DEFAULT_*、MAX_PROMPT_LENGTH、KIMI_API_NOT_CONFIGURED_MESSAGE)、
 //       cleanText、cleanProvider、resolveKimiApiConfig。
+import { omitUndefined } from '../util/object.js';
+
 export const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
 export const DEFAULT_MODEL = 'kimi-k2.6';
 export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
@@ -99,7 +101,7 @@ export function resolveKimiApiConfig(
   const userAgent = String(config.kimiUserAgent || env.KIMI_USER_AGENT || '').trim();
   const tempRaw = config.kimiTemperature != null ? config.kimiTemperature : env.KIMI_TEMPERATURE;
   const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
-  return {
+  return omitUndefined({
     provider,
     configured: Boolean(apiKey),
     apiKey,
@@ -110,5 +112,5 @@ export function resolveKimiApiConfig(
     temperature,
     userAgent,
     fallbacks: cleanModelFallbacks(fallbackInput),
-  };
+  });
 }

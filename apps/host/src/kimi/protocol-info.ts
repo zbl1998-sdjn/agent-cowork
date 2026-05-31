@@ -11,7 +11,7 @@ export function parseKimiVersion(text: unknown): string {
   if (!match) {
     throw new Error(`Unable to parse kimi --version output: ${raw}`);
   }
-  return match[1];
+  return match[1] ?? '';
 }
 
 export type KimiInfo = {
@@ -30,7 +30,7 @@ export function parseKimiInfo(text: unknown): KimiInfo {
     if (parts.length < 2) {
       continue;
     }
-    const key = parts[0].trim().toLowerCase();
+    const key = (parts[0] ?? '').trim().toLowerCase();
     const value = parts.slice(1).join(':').trim();
     if (!value) {
       continue;

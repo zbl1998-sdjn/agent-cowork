@@ -40,11 +40,11 @@ const AUTO_CLARIFY_OPTIONS: Array<{ value: boolean; label: string }> = [
 ];
 
 export interface SettingsPersistPayload {
-  provider?: string;
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-  clearKey?: boolean;
+  provider?: string | undefined;
+  apiKey?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+  clearKey?: boolean | undefined;
 }
 
 export interface SettingsTabsContentProps {

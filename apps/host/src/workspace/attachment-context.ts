@@ -4,9 +4,10 @@
 //       作为引用携带(交给视觉模型)。供 chat/recipe 层把附件转成提示词上下文。
 // 依赖:同层 document-extractor。导出:buildAttachmentContext。
 import path from 'node:path';
+import { omitUndefined } from '../util/object.js';
 import { extractDocumentText } from './document-extractor.js';
 
-export type AttachmentInput = { path?: string; fullPath?: string; relativePath?: string };
+export type AttachmentInput = { path?: string | undefined; fullPath?: string | undefined; relativePath?: string | undefined };
 export type AttachmentItem = {
   path: string;
   kind: string;
@@ -52,18 +53,18 @@ export function buildAttachmentContext(
       continue;
     }
     try {
-      const doc = extractDocumentText(filePath, { trustedRoot, maxSize });
-      items.push({
+      const doc = extractDocumentText(filePath, omitUndefined({ trustedRoot, maxSize }));
+      items.push(omitUndefined({
         path: doc.path,
         relativePath: doc.relativePath,
         kind: doc.kind || 'text',
         size: doc.size,
         sha256: doc.sha256,
         excerpt: (doc.content || '').slice(0, excerptBytes),
-      });
+      }));
     } catch (err) {
       const error = (err || {}) as { message?: string };
-      items.push({ path: filePath, kind: 'error', error: error.message });
+      items.push(omitUndefined({ path: filePath, kind: 'error', error: error.message }));
     }
   }
   return {

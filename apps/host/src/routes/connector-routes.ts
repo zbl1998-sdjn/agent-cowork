@@ -10,7 +10,7 @@ import { handleConnectorOAuthRoutes } from './connector-oauth-routes.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { CredentialStore } from '../security/credential-store.js';
 import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
-import type { ConnectorOAuthSession } from './connector-oauth-routes.js';
+import type { ConnectorOAuthSession } from './connector-oauth-session.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteError = Error & { statusCode?: number };

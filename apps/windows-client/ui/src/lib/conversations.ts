@@ -4,8 +4,8 @@
 // App.tsx so they can be unit-tested without a DOM/React harness.
 import { extractSuggestions } from './md';
 
-export interface ConvMessageLike { role: string; text?: string }
-export interface ConvLike { title?: string; messages: ConvMessageLike[] }
+export interface ConvMessageLike { role: string; text?: string | undefined }
+export interface ConvLike { title?: string | undefined; messages: ConvMessageLike[] }
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 

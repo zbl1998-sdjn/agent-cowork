@@ -63,7 +63,7 @@ export function stableHeader(value: unknown, fallback: string): string {
 /** 请求体是否声明为 application/json。 */
 export function isJsonContentType(request: HttpRequestLike): boolean {
   const value = String(headerValue(request, 'content-type') || '').toLowerCase();
-  return value.split(';')[0].trim() === 'application/json';
+  return (value.split(';')[0] ?? '').trim() === 'application/json';
 }
 
 /** 稳定序列化:对象键按字典序排序,使「相同内容」总得到相同字符串(用于指纹/幂等)。 */

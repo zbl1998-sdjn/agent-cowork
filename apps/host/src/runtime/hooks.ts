@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
+import { omitUndefined } from '../util/object.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 
 // Hook engine (Claude Code / Kimi CLI style). Hooks fire on agent events:
@@ -95,7 +96,7 @@ export function loadHooksConfig({ trustedRoot, sandbox, sandboxLimits, configPat
         if (!parts.length) return undefined;
         let spec;
         try { spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits); } catch { return undefined; }
-        const res = await sandbox.exec(spec, { trustedRoot, context: { hook: h.event, tool: payload.name } });
+        const res = await sandbox.exec(spec, omitUndefined({ trustedRoot, context: { hook: h.event, tool: payload.name } }));
         if (h.event === 'pre_tool' && res.exitCode !== 0) {
           return { block: true, reason: (res.stderr || res.stdout || `hook exit ${res.exitCode}`).slice(0, 300) };
         }

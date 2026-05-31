@@ -42,7 +42,7 @@ export type ParsedCron = {
   dowStar: boolean;
 };
 
-const FIELD_LIMITS: FieldLimit[] = [
+const FIELD_LIMITS: [FieldLimit, FieldLimit, FieldLimit, FieldLimit, FieldLimit] = [
   { min: 0, max: 59 },
   { min: 0, max: 23 },
   { min: 1, max: 31 },
@@ -68,7 +68,7 @@ function parseField(token: string, { min, max }: FieldLimit): Set<number> {
     if (!Number.isInteger(step) || step <= 0) {
       throw new Error(`cron: step must be positive integer in '${part}'`);
     }
-    const rangePart = stepSplit[0];
+    const rangePart = stepSplit[0] ?? '';
     let start: number;
     let end: number;
     if (rangePart === '*') {
@@ -111,7 +111,7 @@ export function parseCron(expression: string): ParsedCron {
   if (tokens.length !== 5) {
     throw new Error('cron: expression must have exactly 5 fields');
   }
-  const [minute, hour, dom, month, dow] = tokens;
+  const [minute, hour, dom, month, dow] = tokens as [string, string, string, string, string];
   return {
     minute: parseField(minute, FIELD_LIMITS[0]),
     hour: parseField(hour, FIELD_LIMITS[1]),
@@ -163,7 +163,7 @@ export function describeCron(expression: string): string {
     return `invalid: ${err instanceof Error ? err.message : String(err)}`;
   }
   const tokens = expression.trim().split(/\s+/);
-  const [minute, hour, dom, month, dow] = tokens;
+  const [minute, hour, dom, month, dow] = tokens as [string, string, string, string, string];
   if (minute === '0' && hour === '9' && dom === '*' && month === '*' && dow === '1') {
     return '每周一上午 9:00';
   }

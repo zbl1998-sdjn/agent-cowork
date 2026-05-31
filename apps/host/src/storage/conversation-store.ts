@@ -14,6 +14,7 @@ import {
   sanitizeConversationBranches,
   sanitizeConversationMessages,
 } from './conversation-sanitizers.js';
+import { omitUndefined } from '../util/object.js';
 import type {
   ConversationContext,
   ConversationInput,
@@ -72,7 +73,7 @@ function userDir(trustedRoot: unknown, context: ConversationContext = {}): strin
 
 /** 把完整对话记录压成列表用的摘要(含消息/分支计数)。 */
 function summarise(conv: ConversationRecord): ConversationSummary {
-  return {
+  return omitUndefined({
     id: conv.id,
     title: conv.title || '新对话',
     pinned: Boolean(conv.pinned),
@@ -81,7 +82,7 @@ function summarise(conv: ConversationRecord): ConversationSummary {
     activeBranchId: conv.activeBranchId,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
-  };
+  });
 }
 
 /** 基于文件系统的对话存储:每个对话一份 JSON 文档,按 tenant/user 分目录。 */
@@ -160,15 +161,15 @@ export class FileConversationStore {
     const activeBranchId = branches.some((branch) => branch.id === requestedActive)
       ? requestedActive
       : branches[0]?.id;
-    const record: ConversationRecord = {
+    const record: ConversationRecord = omitUndefined({
       id,
       title: String((conv && conv.title) || '新对话').slice(0, MAX_CONVERSATION_TITLE),
       pinned: Boolean(conv && conv.pinned),
       messages: sanitizeConversationMessages(conv && conv.messages),
-      ...(branches.length ? { activeBranchId, branches } : {}),
+      ...(branches.length ? omitUndefined({ activeBranchId, branches }) : {}),
       createdAt: existing?.createdAt || now,
       updatedAt: now,
-    };
+    });
     let body = JSON.stringify(record);
     if (Buffer.byteLength(body, 'utf8') > MAX_BYTES) {
       // Trim history further until it fits rather than rejecting the save.
@@ -193,5 +194,5 @@ export function createConversationStore({ backend = 'file', now }: ConversationS
   // Postgres adapter (createPostgresConversationStore) mirrors this interface and
   // is selected by the server when KCW_STORE=postgres.
   void backend;
-  return new FileConversationStore({ now });
+  return new FileConversationStore(omitUndefined({ now }));
 }

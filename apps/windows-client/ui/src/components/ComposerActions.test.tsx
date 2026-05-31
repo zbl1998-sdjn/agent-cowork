@@ -55,9 +55,9 @@ describe('ComposerActions', () => {
     );
 
     expect(buttons).toHaveLength(3);
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
-    buttons[2].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
+    buttons[2]!.props.onClick();
     expect(onUpload).toHaveBeenCalledOnce();
     expect(onToggleVoice).toHaveBeenCalledOnce();
     expect(onRefine).toHaveBeenCalledOnce();
@@ -71,7 +71,7 @@ describe('ComposerActions', () => {
     expect(html).toContain('ui-btn ui-btn--primary');
     expect(html).toContain('send-button');
     expect(html).toContain('disabled=""');
-    buttons[0].props.onClick();
+    buttons[0]!.props.onClick();
     expect(onSend).toHaveBeenCalledOnce();
   });
 });

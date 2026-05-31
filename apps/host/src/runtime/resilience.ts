@@ -83,8 +83,10 @@ export async function fallbackChain<T>(
 ): Promise<T> {
   const errors: unknown[] = [];
   for (let i = 0; i < layers.length; i += 1) {
+    const layer = layers[i];
+    if (!layer) continue;
     try {
-      return await layers[i](i);
+      return await layer(i);
     } catch (err) {
       errors.push(err);
       if (typeof onLayerError === 'function') {

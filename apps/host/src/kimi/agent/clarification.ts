@@ -6,6 +6,7 @@
 // 依赖:同层 prompt/refine-policy.js(分析提示完整度);AskUserQuestion 工具(可选)。
 // 导出:buildPromptClarification / clarifyPromptBeforeModel
 import { analyzePromptForRefine } from '../prompt/refine-policy.js';
+import { omitUndefined } from '../../util/object.js';
 
 export type MissingKey = 'action' | 'target' | 'desiredOutput' | 'goal';
 export type ClarificationPolicy = { missing?: unknown[]; needsClarification?: boolean; normalized?: string };
@@ -62,9 +63,9 @@ export async function clarifyPromptBeforeModel({ prompt, userContent, toolMap }:
     return { prompt: policy.normalized || String(prompt || ''), clarified: false };
   }
   const base = policy.normalized || String(prompt || '').trim();
-  return {
+  return omitUndefined({
     prompt: `${base}\n\n[用户澄清]\n${answer}`,
     clarified: true,
     missing: policy.missing,
-  };
+  });
 }

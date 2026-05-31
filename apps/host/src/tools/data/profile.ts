@@ -161,7 +161,10 @@ function buildReport({
     `Detected ${numeric} numeric column${numeric === 1 ? '' : 's'}.`,
   ];
   if (missing.length > 0) lines.push(`Columns with missing values: ${missing.slice(0, 5).join(', ')}.`);
-  if (suggestions.length > 0) lines.push(`Suggested chart: ${suggestions[0].type} using ${suggestions[0].x}${suggestions[0].y ? ` and ${suggestions[0].y}` : ''}.`);
+  const firstSuggestion = suggestions[0];
+  if (firstSuggestion) {
+    lines.push(`Suggested chart: ${firstSuggestion.type} using ${firstSuggestion.x}${firstSuggestion.y ? ` and ${firstSuggestion.y}` : ''}.`);
+  }
   return lines.join(' ');
 }
 

@@ -20,7 +20,7 @@ export function globToRegExp(pattern: unknown): RegExp {
   let re = '';
   const p = String(pattern).replace(/\\/g, '/');
   for (let i = 0; i < p.length; i += 1) {
-    const c = p[i];
+    const c = p[i] ?? '';
     if (c === '*') {
       if (p[i + 1] === '*') { re += '.*'; i += 1; if (p[i + 1] === '/') i += 1; }
       else re += '[^/]*';

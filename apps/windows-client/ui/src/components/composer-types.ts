@@ -10,23 +10,23 @@ import type { ThinkingLevel } from './ComposerFooter';
 export interface Recipe {
   id: string;
   name: string;
-  summary?: string;
+  summary?: string | undefined;
 }
 
 export interface FileHit {
   path: string;
-  relativePath?: string;
+  relativePath?: string | undefined;
 }
 
 export interface HistoryRun {
   id: string;
-  promptPreview?: string | null;
+  promptPreview?: string | null | undefined;
 }
 
 export interface ComposerMeta {
   files: File[];
   model: string;
-  modelConfig?: ModelRunConfig;
+  modelConfig?: ModelRunConfig | undefined;
   thinking: ThinkingLevel;
 }
 
@@ -35,13 +35,13 @@ export interface ComposerProps {
   historyRuns: HistoryRun[];
   searchFiles: (query: string) => Promise<FileHit[]>;
   onSend: (text: string, meta: ComposerMeta) => void;
-  onPickTemplate?: (recipe: Recipe) => void;
-  onPickHistory?: (run: HistoryRun) => void;
-  slashCommands?: Array<{ id: string; label: string; run: () => void }>;
-  models?: string[];
-  defaultModel?: string;
-  defaultProvider?: string;
-  defaultBaseUrl?: string;
-  autoClarify?: boolean;
-  onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
+  onPickTemplate?: ((recipe: Recipe) => void) | undefined;
+  onPickHistory?: ((run: HistoryRun) => void) | undefined;
+  slashCommands?: Array<{ id: string; label: string; run: () => void }> | undefined;
+  models?: string[] | undefined;
+  defaultModel?: string | undefined;
+  defaultProvider?: string | undefined;
+  defaultBaseUrl?: string | undefined;
+  autoClarify?: boolean | undefined;
+  onRefinePrompt?: ((text: string) => Promise<PromptRefineResult>) | undefined;
 }

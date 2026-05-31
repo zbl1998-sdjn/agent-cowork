@@ -3,6 +3,7 @@
 // 职责:集中校验 Git 工具外部入参。所有 schema 都是 strict,未知字段会在进入
 //       path jail 与命令执行前失败。
 import { z } from 'zod';
+import { omitUndefined } from '../../util/object.js';
 
 export type GitStatusArgs = { workspace?: string; short?: boolean; branch?: boolean };
 export type GitDiffArgs = { workspace?: string; path?: string; staged?: boolean; stat?: boolean; context?: number };
@@ -52,21 +53,21 @@ function parseArgs<T>(toolName: string, schema: z.ZodType<T>, args: unknown): T 
   if (!result.success) {
     throw inputError(toolName, result.error.issues.map(zodIssueMessage).join('; '));
   }
-  return result.data;
+  return omitUndefined(result.data as Record<string, unknown>) as T;
 }
 
 export function parseGitStatusArgs(args: unknown): GitStatusArgs {
-  return parseArgs('git.status', gitStatusArgsSchema, args);
+  return parseArgs('git.status', gitStatusArgsSchema, args) as GitStatusArgs;
 }
 
 export function parseGitDiffArgs(args: unknown): GitDiffArgs {
-  return parseArgs('git.diff', gitDiffArgsSchema, args);
+  return parseArgs('git.diff', gitDiffArgsSchema, args) as GitDiffArgs;
 }
 
 export function parseGitLogArgs(args: unknown): GitLogArgs {
-  return parseArgs('git.log', gitLogArgsSchema, args);
+  return parseArgs('git.log', gitLogArgsSchema, args) as GitLogArgs;
 }
 
 export function parseGitWriteArgs(toolName: string, args: unknown): GitWriteArgs {
-  return parseArgs(toolName, gitWriteArgsSchema, args);
+  return parseArgs(toolName, gitWriteArgsSchema, args) as GitWriteArgs;
 }

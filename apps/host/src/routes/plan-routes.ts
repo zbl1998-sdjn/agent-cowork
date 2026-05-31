@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { buildPlan } from '../runtime/plan-builder.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { Planner, PlanToolRegistry } from '../runtime/plan-builder.js';
 
@@ -45,7 +46,7 @@ export async function handlePlanRoutes({
     await withJsonBody(request, response, async (body) => {
       try {
         const input = planBodySchema.parse(body);
-        const plan = await buildPlan({ goal: input.goal, registry: toolRegistry, planner });
+        const plan = await buildPlan(omitUndefined({ goal: input.goal, registry: toolRegistry, planner }));
         sendJson(response, 200, { context: requestContext, ...plan });
       } catch (err) {
         const error = err as RouteError;

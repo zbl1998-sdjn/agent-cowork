@@ -12,7 +12,12 @@ const DEFAULT_MAX_FILES = 80;
 const DEFAULT_MAX_TOTAL_BYTES = 12 * 1024 * 1024;
 const DEFAULT_MAX_FILE_BYTES = 8 * 1024 * 1024;
 
-export type UploadFile = { relativePath?: string; name?: string; contentBase64?: string; size?: number };
+export type UploadFile = {
+  relativePath?: string | undefined;
+  name?: string | undefined;
+  contentBase64?: string | undefined;
+  size?: number | undefined;
+};
 export type UploadOptions = {
   trustedRoot?: string;
   files?: UploadFile[];
@@ -59,7 +64,11 @@ export function sanitizeUploadRelativePath(input: unknown): string {
   if (parts.length === 0) {
     throw new Error('Upload relativePath is required');
   }
-  const ext = path.extname(parts[parts.length - 1]).toLowerCase();
+  const filename = parts[parts.length - 1];
+  if (!filename) {
+    throw new Error('Upload relativePath is required');
+  }
+  const ext = path.extname(filename).toLowerCase();
   if (BLOCKED_UPLOAD_EXTENSIONS.has(ext)) {
     throw new Error(`Upload type not allowed: ${ext} (active content is blocked)`);
   }

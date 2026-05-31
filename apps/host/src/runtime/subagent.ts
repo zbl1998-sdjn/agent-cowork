@@ -5,6 +5,7 @@
 // 依赖:L0 path-policy + 同层 run-store / runs-index。导出:执行子代理计划的函数。
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
+import { omitUndefined } from '../util/object.js';
 import { createRunId, writeRunRecord } from './run-store.js';
 import { summariseRunForIndex } from './runs-index.js';
 
@@ -71,7 +72,7 @@ function contextSnapshot({ goal, steps }: { goal: unknown; steps: SubagentStep[]
 } {
   return {
     goal: String(goal || ''),
-    steps: steps.map((step) => ({
+    steps: steps.map((step) => omitUndefined({
       tool: String(step.tool || ''),
       note: step.note == null ? undefined : String(step.note),
       rationale: step.rationale == null ? undefined : String(step.rationale),
@@ -192,6 +193,7 @@ export async function runSubagent({
   let ok = true;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+    if (!step) continue;
     const tool = String(step.tool || '');
     emit('progress', { icon: 'loader', text: `步骤 ${i + 1}/${steps.length}: 调用 ${tool}` });
     try {

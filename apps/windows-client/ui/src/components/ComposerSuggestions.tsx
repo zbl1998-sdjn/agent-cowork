@@ -6,7 +6,7 @@ export type ComposerSuggestionMode = 'template' | 'mention' | 'history';
 export interface ComposerSuggestionItem {
   key: string;
   title: string;
-  detail?: string;
+  detail?: string | undefined;
   apply: () => void;
 }
 

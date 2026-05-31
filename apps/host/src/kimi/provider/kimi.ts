@@ -5,6 +5,7 @@
 // 依赖:上层常量 ../api-runner.js(未配置文案);其余仅标准库。
 // 导出:createKimiProvider(工厂,供注册表登记)、parseOpenAiCompatibleStream(共用流解析)。
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
+import { omitUndefined } from '../../util/object.js';
 import type { Provider, ProviderChatArgs } from './types.js';
 
 type StreamToolCallDelta = {
@@ -74,7 +75,7 @@ export function createKimiProvider(): Provider {
         body.temperature = kimiConfig.temperature;
       }
       const fetcher = fetchImpl as FetchLike;
-      const resp = await fetcher(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal });
+      const resp = await fetcher(endpoint, omitUndefined({ method: 'POST', headers, body: JSON.stringify(body), signal }));
       if (!resp.ok) {
         throw new Error(`Kimi API request failed with status ${resp.status}`);
       }
@@ -83,7 +84,7 @@ export function createKimiProvider(): Provider {
         const json = await resp.json() as { choices?: Array<{ message?: unknown }> };
         return (json.choices && json.choices[0] && json.choices[0].message) || { content: '' };
       }
-      return parseOpenAiCompatibleStream(reader, { onContent, onReasoning });
+      return parseOpenAiCompatibleStream(reader, omitUndefined({ onContent, onReasoning }));
     },
   };
 }
@@ -175,7 +176,8 @@ export async function parseOpenAiCompatibleStream(
       }
       json = json && typeof json === 'object' ? json : {};
       if (json.usage) usage = json.usage;
-      const delta = json.choices && json.choices[0] ? (json.choices[0].delta || {}) : {};
+      const firstChoice = json.choices?.[0];
+      const delta = firstChoice ? (firstChoice.delta || {}) : {};
       if (typeof delta.reasoning_content === 'string') {
         reasoning += delta.reasoning_content;
         if (typeof onReasoning === 'function') onReasoning(delta.reasoning_content);
@@ -191,9 +193,11 @@ export async function parseOpenAiCompatibleStream(
           if (!toolCalls[idx]) {
             toolCalls[idx] = { id: call.id || `call_${idx}`, type: 'function', function: { name: '', arguments: '' } };
           }
-          if (call.id) toolCalls[idx].id = call.id;
-          if (call.function && call.function.name) toolCalls[idx].function.name = call.function.name;
-          if (call.function && call.function.arguments) toolCalls[idx].function.arguments += call.function.arguments;
+          const current = toolCalls[idx];
+          if (!current) continue;
+          if (call.id) current.id = call.id;
+          if (call.function && call.function.name) current.function.name = call.function.name;
+          if (call.function && call.function.arguments) current.function.arguments += call.function.arguments;
         }
       }
     }

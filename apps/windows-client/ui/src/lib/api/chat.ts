@@ -6,13 +6,13 @@ import type { TodoItem, TodoStatus } from '../types';
 export interface ChatResult {
   ok: boolean;
   text: string;
-  model?: string;
-  runId?: string;
+  model?: string | undefined;
+  runId?: string | undefined;
 }
 
 export async function chat(
   prompt: string,
-  opts: { trustedRoot?: string; model?: string; thinking?: string } = {},
+  opts: { trustedRoot?: string | undefined; model?: string | undefined; thinking?: string | undefined } = {},
 ): Promise<ChatResult> {
   return postJson('/api/kimi/chat', {
     prompt,
@@ -23,10 +23,10 @@ export async function chat(
 }
 
 export interface ChatStreamHandlers {
-  onToken?: (delta: string) => void;
-  onReasoning?: (delta: string) => void;
-  onDone?: (full: { text: string; runId?: string; model?: string }) => void;
-  onError?: (message: string) => void;
+  onToken?: ((delta: string) => void) | undefined;
+  onReasoning?: ((delta: string) => void) | undefined;
+  onDone?: ((full: { text: string; runId?: string | undefined; model?: string | undefined }) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
 }
 
 function str(data: SsePayload, key: string): string | undefined {
@@ -36,7 +36,7 @@ function str(data: SsePayload, key: string): string | undefined {
 
 export async function chatStream(
   prompt: string,
-  opts: { trustedRoot?: string; model?: string; thinking?: string } = {},
+  opts: { trustedRoot?: string | undefined; model?: string | undefined; thinking?: string | undefined } = {},
   handlers: ChatStreamHandlers = {},
 ): Promise<void> {
   await hostReady;
@@ -61,34 +61,34 @@ export async function chatStream(
 }
 
 export interface AgentStreamHandlers {
-  onToken?: (delta: string) => void;
-  onApprovalRequest?: (id: string, name: string, args: unknown) => void;
-  onPlanProposed?: (id: string, plan: string) => void;
-  onTodoSnapshot?: (todos: TodoItem[]) => void;
-  onTodoUpdate?: (todo: TodoItem) => void;
-  onReasoning?: (delta: string) => void;
-  onToolCall?: (name: string, args: unknown) => void;
-  onToolResult?: (name: string, status: string, result?: unknown, meta?: { durationMs?: number }) => void;
-  onFileWritten?: (path: string) => void;
-  onVerifyStart?: () => void;
-  onQuestion?: (id: string, question: string, options: Array<{ label: string; description?: string }>) => void;
-  onStart?: (runId: string, meta?: { resumed?: boolean }) => void;
-  onDone?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
-  onCancelled?: (full: { text: string; runId?: string; usage?: TokenUsage }) => void;
-  onError?: (message: string) => void;
+  onToken?: ((delta: string) => void) | undefined;
+  onApprovalRequest?: ((id: string, name: string, args: unknown) => void) | undefined;
+  onPlanProposed?: ((id: string, plan: string) => void) | undefined;
+  onTodoSnapshot?: ((todos: TodoItem[]) => void) | undefined;
+  onTodoUpdate?: ((todo: TodoItem) => void) | undefined;
+  onReasoning?: ((delta: string) => void) | undefined;
+  onToolCall?: ((name: string, args: unknown) => void) | undefined;
+  onToolResult?: ((name: string, status: string, result?: unknown, meta?: { durationMs?: number | undefined }) => void) | undefined;
+  onFileWritten?: ((path: string) => void) | undefined;
+  onVerifyStart?: (() => void) | undefined;
+  onQuestion?: ((id: string, question: string, options: Array<{ label: string; description?: string | undefined }>) => void) | undefined;
+  onStart?: ((runId: string, meta?: { resumed?: boolean | undefined }) => void) | undefined;
+  onDone?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
+  onCancelled?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
+  onError?: ((message: string) => void) | undefined;
 }
 
 export interface TokenUsage {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
+  prompt_tokens?: number | undefined;
+  completion_tokens?: number | undefined;
+  total_tokens?: number | undefined;
 }
 
 export interface ModelRunConfig {
-  provider?: string;
-  model?: string;
-  baseUrl?: string;
-  apiKey?: string;
+  provider?: string | undefined;
+  model?: string | undefined;
+  baseUrl?: string | undefined;
+  apiKey?: string | undefined;
 }
 
 function usage(data: SsePayload): TokenUsage | undefined {
@@ -100,8 +100,8 @@ function num(data: SsePayload, key: string): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-function questionOptions(data: SsePayload): Array<{ label: string; description?: string }> {
-  return Array.isArray(data.options) ? data.options as Array<{ label: string; description?: string }> : [];
+function questionOptions(data: SsePayload): Array<{ label: string; description?: string | undefined }> {
+  return Array.isArray(data.options) ? data.options as Array<{ label: string; description?: string | undefined }> : [];
 }
 
 const TODO_STATUSES = new Set<TodoStatus>(['pending', 'running', 'done', 'failed', 'blocked', 'rejected']);
@@ -133,14 +133,14 @@ function todoList(data: SsePayload): TodoItem[] {
 export async function agentChatStream(
   prompt: string,
   opts: {
-    trustedRoot?: string;
-    model?: string;
-    modelConfig?: ModelRunConfig;
-    thinking?: string;
-    autoApprove?: boolean;
-    planMode?: boolean;
-    images?: string[];
-    resumeRunId?: string;
+    trustedRoot?: string | undefined;
+    model?: string | undefined;
+    modelConfig?: ModelRunConfig | undefined;
+    thinking?: string | undefined;
+    autoApprove?: boolean | undefined;
+    planMode?: boolean | undefined;
+    images?: string[] | undefined;
+    resumeRunId?: string | undefined;
   } = {},
   handlers: AgentStreamHandlers = {},
 ): Promise<void> {

@@ -13,7 +13,7 @@ export function useComposerRefine({
   onPreviewResolved,
 }: {
   autoClarify: boolean;
-  onRefinePrompt?: (text: string) => Promise<PromptRefineResult>;
+  onRefinePrompt?: ((text: string) => Promise<PromptRefineResult>) | undefined;
   onPreviewResolved: (prompt: string) => void;
 }) {
   const [refining, setRefining] = useState(false);

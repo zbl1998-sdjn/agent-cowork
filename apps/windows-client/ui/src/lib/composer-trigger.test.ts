@@ -33,8 +33,8 @@ describe('composer suggestion builders', () => {
     });
 
     expect(items.map((item) => item.key)).toEqual(['cmd:new-chat', 'summary-report']);
-    items[0].apply();
-    items[1].apply();
+    items[0]!.apply();
+    items[1]!.apply();
     expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: 'new-chat' }));
     expect(onRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 'summary-report' }));
   });

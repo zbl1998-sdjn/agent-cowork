@@ -37,9 +37,11 @@ export function VirtualList<T>({
 
   const rows: ReactNode[] = [];
   for (let i = win.startIndex; i <= win.endIndex; i += 1) {
+    const item = items[i];
+    if (item === undefined) continue;
     rows.push(
       <div key={i} className="virtual-list__row" style={{ height: itemHeight }}>
-        {renderItem(items[i], i)}
+        {renderItem(item, i)}
       </div>,
     );
   }

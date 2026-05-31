@@ -95,13 +95,17 @@ export function computeColumnStats(values: unknown[] | undefined = []): ColumnSt
       .filter((value): value is number => value !== null)
       .sort((a, b) => a - b);
     const n = nums.length;
+    if (n === 0) {
+      return stats;
+    }
     const sum = nums.reduce((acc, x) => acc + x, 0);
     const mean = sum / n;
-    const median = n % 2 ? nums[(n - 1) / 2] : (nums[n / 2 - 1] + nums[n / 2]) / 2;
+    const middle = Math.floor(n / 2);
+    const median = n % 2 ? nums[middle] ?? 0 : ((nums[middle - 1] ?? 0) + (nums[middle] ?? 0)) / 2;
     const variance = nums.reduce((acc, x) => acc + (x - mean) ** 2, 0) / n;
     stats.numeric = {
-      min: nums[0],
-      max: nums[n - 1],
+      min: nums[0] ?? 0,
+      max: nums[n - 1] ?? 0,
       sum,
       mean,
       median,

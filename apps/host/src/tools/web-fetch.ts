@@ -13,6 +13,7 @@
 // every redirect hop so a 302 → internal address can't bypass the guard.
 import { assertPublicHost } from './ssrf-guard.js';
 import { parseWebFetchOptions } from './web-tool-inputs.js';
+import { omitUndefined } from '../util/object.js';
 import type { WebFetchError, WebFetchLike, WebFetchOptions, WebFetchResponse } from './web-tool-inputs.js';
 
 export type { WebFetchError, WebFetchLike, WebFetchOptions } from './web-tool-inputs.js';
@@ -67,7 +68,7 @@ export async function webFetch(options: WebFetchOptions = {}): Promise<WebFetchR
   }
   let parsed = parseHttpUrl(url);
   if (!allowInternal) {
-    await assertPublicHost(parsed.hostname, { lookupImpl });
+    await assertPublicHost(parsed.hostname, omitUndefined({ lookupImpl }));
   }
 
   const budget = Math.min(Math.max(Number(timeoutMs) || DEFAULT_TIMEOUT_MS, 1), 60_000);
@@ -97,7 +98,7 @@ export async function webFetch(options: WebFetchOptions = {}): Promise<WebFetchR
         throw fail('redirect to non-http(s) blocked', 502);
       }
       if (!allowInternal) {
-        await assertPublicHost(next.hostname, { lookupImpl });
+        await assertPublicHost(next.hostname, omitUndefined({ lookupImpl }));
       }
       // Free the redirect response's socket before chasing the next hop.
       if (typeof response.arrayBuffer === 'function') {

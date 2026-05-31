@@ -31,7 +31,7 @@ const HOST_LAYERS = [
   },
   { name: 'L2', rank: 2, prefixes: ['runtime/'] },
   { name: 'L3', rank: 3, prefixes: ['routes/'] },
-  { name: 'L4', rank: 4, files: ['server.js', 'main.js'] },
+  { name: 'L4', rank: 4, files: ['server.ts', 'main.ts'] },
 ];
 
 // Known debt from plan/00, kept explicit so the guard still catches new

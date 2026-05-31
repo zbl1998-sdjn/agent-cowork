@@ -10,6 +10,7 @@ import {
   stableHeader,
   withJsonBody,
 } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { ScheduleCreateInput, ScheduleRecord, SchedulerFireResult } from '../runtime/scheduler.js';
 
@@ -88,10 +89,10 @@ export async function handleScheduleRoutes({
 }: ScheduleRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/schedules') {
     const userId = requestUrl.searchParams.get('userId') || undefined;
-    const list = activeScheduler ? activeScheduler.list({
+    const list = activeScheduler ? activeScheduler.list(omitUndefined({
       tenantId: requestContext.tenantId,
       userId,
-    }) : [];
+    })) : [];
     sendJson(response, 200, {
       context: requestContext,
       schedules: list,
@@ -124,7 +125,7 @@ export async function handleScheduleRoutes({
       if (payload.trustedRoot) {
         payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
       }
-      const record = activeScheduler.create({
+      const record = activeScheduler.create(omitUndefined({
         name: input.name,
         cron: input.cron,
         fireAt: input.fireAt,
@@ -133,7 +134,7 @@ export async function handleScheduleRoutes({
         userId: requestContext.userId,
         traceId: requestContext.traceId,
         idempotencyKey: requestContext.idempotencyKey,
-      });
+      }));
       sendCachedOrStore(response, cacheKey, fingerprint, 200, { schedule: record, context: requestContext });
     });
     return true;

@@ -32,6 +32,7 @@ import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
 import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import { resolveStoreBackendConfig } from './store-backend-config.js';
@@ -104,34 +105,34 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.AgentCowork', 'index'));
   Object.assign(state, resolveStoreBackendConfig(config, trustedRootDefault));
   state.runsIndex = config.runsIndex || (state.storeBackend === 'postgres'
-    ? withSafeWrites(createPostgresRunsIndex({ connectionString: state.databaseUrl }))
-    : createRunsIndex({ backend: state.storeBackend, indexRoot: runsIndexRoot, dbPath: state.sqliteDbPath }));
+    ? withSafeWrites(createPostgresRunsIndex(omitUndefined({ connectionString: state.databaseUrl })))
+    : createRunsIndex(omitUndefined({ backend: state.storeBackend, indexRoot: runsIndexRoot, dbPath: state.sqliteDbPath })));
   state.memoryStore = config.memoryStore || (state.usePostgresState
-    ? createPostgresMemoryStore({ connectionString: state.databaseUrl })
-    : createMemoryStore({ backend: state.storeBackend, dbPath: state.sqliteDbPath }));
+    ? createPostgresMemoryStore(omitUndefined({ connectionString: state.databaseUrl }))
+    : createMemoryStore(omitUndefined({ backend: state.storeBackend, dbPath: state.sqliteDbPath })));
   state.conversationStore = config.conversationStore || (state.usePostgresState
-    ? createPostgresConversationStore({ connectionString: state.databaseUrl })
-    : createConversationStore({ backend: state.storeBackend }));
+    ? createPostgresConversationStore(omitUndefined({ connectionString: state.databaseUrl }))
+    : createConversationStore(omitUndefined({ backend: state.storeBackend })));
   Object.assign(state, createProjectStoreResolver(config));
   state.runEvents = (config.runEventBus || (state.usePostgresState
-    ? createPostgresEventBus({ connectionString: state.databaseUrl })
+    ? createPostgresEventBus(omitUndefined({ connectionString: state.databaseUrl }))
     : new RunEventBus())) as RunEventsState;
 
   state.sandboxEnabled = config.enableSandbox !== false;
-  state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup({
+  state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup(omitUndefined({
     requestedBackend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'auto',
     sandboxOptions: config.sandboxOptions || {},
     env: process.env,
     spawnSync: config.sandboxProbeSpawnSync,
     timeoutMs: config.sandboxProbeTimeoutMs,
-  });
+  }));
   state.sandbox = config.sandbox || createSandbox(state.sandboxStartup.options);
-  state.sandboxLimits = {
+  state.sandboxLimits = omitUndefined({
     allowTools: config.sandboxAllowTools || [...DEFAULT_ALLOW_TOOLS],
     allowEnv: config.sandboxAllowEnv || [],
     maxTimeoutMs: config.sandboxMaxTimeoutMs,
     defaultMaxOutputBytes: config.sandboxMaxOutputBytes,
-  };
+  });
   state.toolRegistry = (config.toolRegistry || createToolRegistry().registerMany(createBuiltinTools({
     sandbox: state.sandboxEnabled ? state.sandbox : null,
     sandboxLimits: state.sandboxLimits,
@@ -142,14 +143,14 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.skillRegistry = config.skillRegistry || createSkillRegistry();
   state.cancellation = config.cancellation || createCancellationRegistry();
   state.approvalRegistry = (config.approvalRegistry || (state.usePostgresState
-    ? createPostgresApprovalStore({ connectionString: state.databaseUrl })
+    ? createPostgresApprovalStore(omitUndefined({ connectionString: state.databaseUrl }))
     : createApprovalRegistry())) as ApprovalRegistryLike;
-  state.fileOperationApprovals = config.fileOperationApprovals || createFileOperationApprovalStore({
+  state.fileOperationApprovals = config.fileOperationApprovals || createFileOperationApprovalStore(omitUndefined({
     ttlMs: config.fileOperationApprovalTtlMs,
-  });
-  state.oauthPermissionApprovals = config.oauthPermissionApprovals || createOAuthPermissionApprovalStore({
+  }));
+  state.oauthPermissionApprovals = config.oauthPermissionApprovals || createOAuthPermissionApprovalStore(omitUndefined({
     ttlMs: config.oauthPermissionApprovalTtlMs,
-  });
+  }));
   if (state.usePostgresState) {
     if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => undefined);
     if (state.runEvents?.start) Promise.resolve(state.runEvents.start()).catch(() => undefined);
@@ -219,7 +220,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
       return true;
     }
     if (payload === undefined) return false;
-    if (cacheKey) state.idempotencyStore.set(cacheKey, { status, payload, fingerprint });
+    if (cacheKey) state.idempotencyStore.set(cacheKey, omitUndefined({ status, payload, fingerprint }));
     sendJson(response, status, payload);
     return false;
   };

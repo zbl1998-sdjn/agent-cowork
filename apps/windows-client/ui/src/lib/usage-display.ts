@@ -1,30 +1,30 @@
 // 用量展示(UI · lib):把 token 数、费用、时长格式化成易读字符串(如 1.2k tokens、$0.003、1.4s),供可观测/计费展示。依赖:无。
 export interface UsageTransparency {
-  schemaVersion?: number;
-  model?: string;
+  schemaVersion?: number | undefined;
+  model?: string | undefined;
   tokens?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
+    prompt_tokens?: number | undefined;
+    completion_tokens?: number | undefined;
+    total_tokens?: number | undefined;
+  } | undefined;
   cost?: {
-    currency?: string;
-    input?: number;
-    output?: number;
-    total?: number;
-    estimated?: boolean;
-    source?: string;
-  };
+    currency?: string | undefined;
+    input?: number | undefined;
+    output?: number | undefined;
+    total?: number | undefined;
+    estimated?: boolean | undefined;
+    source?: string | undefined;
+  } | undefined;
   duration?: {
-    totalMs?: number;
-    phases?: Array<{ key?: string; label?: string; durationMs?: number; percent?: number }>;
-    unaccountedMs?: number;
-  };
+    totalMs?: number | undefined;
+    phases?: Array<{ key?: string | undefined; label?: string | undefined; durationMs?: number | undefined; percent?: number | undefined }> | undefined;
+    unaccountedMs?: number | undefined;
+  } | undefined;
   disclosure?: {
-    estimated?: boolean;
-    source?: string;
-    requiresSecret?: boolean;
-  };
+    estimated?: boolean | undefined;
+    source?: string | undefined;
+    requiresSecret?: boolean | undefined;
+  } | undefined;
 }
 
 export interface UsageDisplayRow {
@@ -84,4 +84,3 @@ export function buildUsageDisplayRows(summary: UsageTransparency | null | undefi
   }
   return rows;
 }
-

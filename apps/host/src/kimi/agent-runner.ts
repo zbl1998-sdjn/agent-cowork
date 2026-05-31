@@ -9,6 +9,7 @@
 import { defaultAgentModelCall } from './model-call.js';
 import { runAgentChat } from './agent/tool-loop.js';
 import { buildAgentToolset as baseBuildAgentToolset } from './agent/toolset-builder.js';
+import { omitUndefined } from '../util/object.js';
 import type { RunAgentChatOptions } from './agent/tool-loop.js';
 import type { AgentDeps, BuildToolsetOptions } from './agent/toolset-builder.js';
 
@@ -31,5 +32,5 @@ export function buildAgentToolset(options: BuildToolsetOptions) {
   const agentDeps = options?.agentDeps
     ? { ...options.agentDeps, runAgentChat: options.agentDeps.runAgentChat || defaultSubAgentRunner }
     : options?.agentDeps;
-  return baseBuildAgentToolset({ ...options, agentDeps });
+  return baseBuildAgentToolset(omitUndefined({ ...options, agentDeps }));
 }

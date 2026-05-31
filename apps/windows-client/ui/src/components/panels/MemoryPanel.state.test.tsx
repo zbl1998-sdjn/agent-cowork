@@ -50,7 +50,7 @@ describe('MemoryPanel state views', () => {
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('disabled=""');
     expect(buttons).toHaveLength(1);
-    buttons[0].props.onClick();
+    buttons[0]!.props.onClick();
     expect(onForget).toHaveBeenCalledWith(entry);
   });
 
@@ -63,7 +63,7 @@ describe('MemoryPanel state views', () => {
     expect(html).toContain('ui-btn ui-btn--primary');
     expect(html).toContain('记着…');
     expect(html).toContain('disabled=""');
-    buttons[0].props.onClick();
+    buttons[0]!.props.onClick();
     expect(onLearn).toHaveBeenCalledOnce();
   });
 });

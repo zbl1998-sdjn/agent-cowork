@@ -6,6 +6,7 @@
 // 导出:ToolResultSummarizer(类)、createToolResultSummarizer(工厂)。
 
 import { createHeuristicTokenEstimator } from './token-estimator.js';
+import { omitUndefined } from '../../util/object.js';
 
 const DEFAULT_MAX_TOKENS = 2_000;
 const DEFAULT_MAX_SOURCES = 16;
@@ -157,7 +158,7 @@ function inspectValue(value: unknown, state: InspectState): void {
     if (SOURCE_KEY_RE.test(key) && typeof child === 'string') {
       pushUnique(state.sources, child.replace(/\\/g, '/'), state.maxSources);
     }
-    inspectValue(child, { ...state, pathHint, depth: state.depth + 1 });
+    inspectValue(child, omitUndefined({ ...state, pathHint, depth: state.depth + 1 }));
   }
 }
 

@@ -8,11 +8,11 @@
 export type ScheduleStatusLike = string | null | undefined;
 
 export type HumanizableSchedule = {
-  cron?: string | null;
-  cronHuman?: string | null;
-  fireAt?: string | null;
-  nextFireAt?: string | null;
-  status?: ScheduleStatusLike;
+  cron?: string | null | undefined;
+  cronHuman?: string | null | undefined;
+  fireAt?: string | null | undefined;
+  nextFireAt?: string | null | undefined;
+  status?: ScheduleStatusLike | undefined;
 };
 
 const STATUS_MAP: Record<string, string> = {
@@ -27,7 +27,7 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 export function humanizeScheduleStatus(status: ScheduleStatusLike): string {
-  if (!status) return STATUS_MAP.pending;
+  if (!status) return STATUS_MAP.pending || '等待中';
   const key = String(status).toLowerCase();
   return STATUS_MAP[key] || String(status);
 }
@@ -50,11 +50,13 @@ export function humanizeCron(cron: string): string {
   const parts = raw.split(/\s+/);
   if (parts.length !== 5) return raw;
   const [min, hour, dom, mon, dow] = parts;
+  if (!min || !hour || !dom || !mon || !dow) return raw;
 
   // Every-N-minute shorthand: "*/N * * * *"
   const everyN = /^\*\/(\d+)$/.exec(min);
-  if (everyN && hour === '*' && dom === '*' && mon === '*' && dow === '*') {
-    return `每 ${everyN[1]} 分钟`;
+  const everyNMinutes = everyN?.[1];
+  if (everyNMinutes && hour === '*' && dom === '*' && mon === '*' && dow === '*') {
+    return `每 ${everyNMinutes} 分钟`;
   }
 
   if (!/^\d+$/.test(min) || !/^\d+$/.test(hour)) return raw;
@@ -68,7 +70,8 @@ export function humanizeCron(cron: string): string {
     if (dow === '1-5') return `工作日 ${time}`;
     if (dow === '0,6' || dow === '6,0') return `周末 ${time}`;
     const single = /^[0-6]$/.exec(dow);
-    if (single) return `每${WEEKDAY[Number(single[0])]} ${time}`;
+    const weekday = single?.[0] ? WEEKDAY[Number(single[0])] : undefined;
+    if (weekday) return `每${weekday} ${time}`;
   }
 
   if (mon === '*' && dow === '*' && /^\d+$/.test(dom)) {

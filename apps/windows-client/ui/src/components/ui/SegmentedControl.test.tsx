@@ -34,7 +34,7 @@ describe('SegmentedControl', () => {
       SegmentedControl({ ariaLabel: '开关', className: 'seg', value: false, options: [{ value: false, label: '关' }, { value: true, label: '开' }], onChange }),
     );
 
-    buttons[1].props.onClick();
+    buttons[1]!.props.onClick();
     expect(onChange).toHaveBeenCalledWith(true);
   });
 });

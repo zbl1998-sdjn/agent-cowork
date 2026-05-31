@@ -10,7 +10,11 @@ async function pickDirectory(defaultPath?: string): Promise<string | null> {
   if (!isDesktop()) return null;
   try {
     const module = await import('@tauri-apps/plugin-dialog');
-    const result = await module.open({ directory: true, multiple: false, defaultPath });
+    const result = await module.open({
+      directory: true,
+      multiple: false,
+      ...(defaultPath ? { defaultPath } : {}),
+    });
     return typeof result === 'string' && result ? result : null;
   } catch {
     return null;

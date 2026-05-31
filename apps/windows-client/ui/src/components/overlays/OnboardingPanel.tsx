@@ -16,14 +16,14 @@ import {
 import { Button, IconButton } from '../ui/Button';
 
 interface RuntimeDependencyStatus {
-  dependencies?: RuntimeDependencyItem[];
+  dependencies?: RuntimeDependencyItem[] | undefined;
 }
 
 interface OnboardingPanelProps {
-  workspaceType?: string;
+  workspaceType?: string | undefined;
   onComplete: () => void;
   onOpenSettings: () => void;
-  onOpenSettingsTab?: (tab: OnboardingSettingsTab) => void;
+  onOpenSettingsTab?: ((tab: OnboardingSettingsTab) => void) | undefined;
 }
 
 const closeButtonStyle: CSSProperties = {

@@ -55,7 +55,7 @@ export function verifyJwtHS256(
   if (!token || typeof token !== 'string' || !secret) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
-  const [h, p, sig] = parts;
+  const [h, p, sig] = parts as [string, string, string];
   let header: { alg?: unknown } | null;
   let payload: JwtPayload | null;
   try {

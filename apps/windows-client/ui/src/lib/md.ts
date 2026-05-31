@@ -93,14 +93,16 @@ export function renderMarkdown(src: string): string {
     const heading = raw.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       flushList();
-      const level = Math.min(heading[1].length + 2, 6);
-      html += `<h${level}>${inline(heading[2])}</h${level}>`;
+      const marker = heading[1] || '';
+      const body = heading[2] || '';
+      const level = Math.min(marker.length + 2, 6);
+      html += `<h${level}>${inline(body)}</h${level}>`;
       continue;
     }
     const li = raw.match(/^\s*[-*]\s+(.*)$/);
     if (li) {
       if (!listOpen) { html += '<ul>'; listOpen = true; }
-      html += `<li>${inline(li[1])}</li>`;
+      html += `<li>${inline(li[1] || '')}</li>`;
       continue;
     }
     if (raw.trim() === '') { flushList(); continue; }
@@ -129,8 +131,8 @@ export function splitVizBlocks(src: string): MdSegment[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) segments.push({ type: 'md', text: text.slice(last, m.index) });
-    const lang = m[1];
-    const inner = m[2].trim();
+    const lang = m[1] || '';
+    const inner = (m[2] || '').trim();
     let spec: { kind: string; [key: string]: unknown } | null = null;
     if (lang === 'mermaid') {
       spec = { kind: 'mermaid', definition: inner };
@@ -141,7 +143,7 @@ export function splitVizBlocks(src: string): MdSegment[] {
       } catch { spec = null; }
     }
     if (spec && spec.kind) segments.push({ type: 'viz', spec });
-    else segments.push({ type: 'md', text: m[0] });
+    else segments.push({ type: 'md', text: m[0] || '' });
     last = re.lastIndex;
   }
   if (last < text.length) segments.push({ type: 'md', text: text.slice(last) });
@@ -156,7 +158,7 @@ export function extractSuggestions(src: string): { text: string; suggestions: st
   const re = /```suggestions\n([\s\S]*?)```/;
   const m = re.exec(text);
   if (!m) return { text, suggestions: [] };
-  const suggestions = m[1]
+  const suggestions = (m[1] || '')
     .split('\n')
     .map((line) => line.replace(/^[-*\d.\s]+/, '').trim())
     .filter(Boolean)

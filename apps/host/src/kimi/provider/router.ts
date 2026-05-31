@@ -15,6 +15,8 @@
 // first. Decoupled from concrete providers — the caller injects a per-provider
 // runner — so this stays pure, layer-clean (L1, no upward imports) and testable.
 
+import { omitUndefined } from '../../util/object.js';
+
 export type ProviderCandidate = string | Record<string, unknown>;
 type ProviderCircuitReader = (candidate: ProviderCandidate) => boolean;
 type ProviderAttemptReporter = (candidate: ProviderCandidate) => void;
@@ -93,13 +95,14 @@ export async function runWithFallback(
   if (typeof runner !== 'function') {
     throw new Error('runWithFallback: runner is required');
   }
-  const ordered = orderProviderChain(chain, { isOpen });
+  const ordered = orderProviderChain(chain, omitUndefined({ isOpen }));
   if (ordered.length === 0) {
     throw new Error('provider chain is empty');
   }
   const errors: ProviderAttemptError[] = [];
   for (let index = 0; index < ordered.length; index += 1) {
     const candidate = ordered[index];
+    if (candidate === undefined) continue;
     try {
       if (typeof onAttempt === 'function') {
         onAttempt(candidate);
@@ -115,7 +118,10 @@ export async function runWithFallback(
         break;
       }
       if (typeof onFallback === 'function') {
-        onFallback({ failed: candidate, next: ordered[index + 1] as ProviderCandidate, error: err });
+        const next = ordered[index + 1];
+        if (next !== undefined) {
+          onFallback({ failed: candidate, next, error: err });
+        }
       }
     }
   }
@@ -131,10 +137,10 @@ export async function runWithFallback(
 export function createProviderRouter({ chain = [], isOpen, onAttempt }: ProviderRouterOptions = {}): ProviderRouter {
   return {
     order() {
-      return orderProviderChain(chain, { isOpen });
+      return orderProviderChain(chain, omitUndefined({ isOpen }));
     },
     run(runner) {
-      return runWithFallback(chain, runner, { isOpen, onAttempt });
+      return runWithFallback(chain, runner, omitUndefined({ isOpen, onAttempt }));
     },
   };
 }

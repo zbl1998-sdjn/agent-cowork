@@ -77,8 +77,8 @@ describe('AppHeader', () => {
     const buttons = collectByType(tree, Button);
 
     expect(buttons).toHaveLength(13);
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();
     buttons.find((button) => button.props.children === '⚙️ 设置')?.props.onClick();
     buttons.find((button) => button.props.children === '退出')?.props.onClick();

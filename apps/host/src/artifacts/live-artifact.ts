@@ -8,6 +8,7 @@
 //       readLiveArtifactHtml / refreshLiveArtifactData / refreshLiveArtifactDataAsync
 import fs from 'node:fs';
 
+import { omitUndefined } from '../util/object.js';
 import { renderViz } from './viz.js';
 import {
   ART_PARTS,
@@ -64,7 +65,7 @@ type LiveArtifactManifest = {
 
 /** 构建一份实时制品:规格化 spec → 试渲染校验 → 写出活页 HTML 与 manifest,返回落盘路径与 dataUrl。 */
 export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource }: BuildLiveArtifactOptions): BuiltLiveArtifact {
-  const spec = normalizeLiveArtifactSpec({ id, title, viz, dataUrl, dataSource });
+  const spec = normalizeLiveArtifactSpec(omitUndefined({ id, title, viz, dataUrl, dataSource }));
   // Validate the viz spec by rendering it once (throws 400 on bad kind/data).
   renderViz(spec.viz);
   if (spec.dataSource?.type === 'file-json') {
@@ -75,7 +76,7 @@ export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSo
   fs.mkdirSync(dir, { recursive: true });
 
   const html = renderLivePage({ title: spec.title, viz: spec.viz, dataUrl: spec.dataUrl });
-  const manifest: LiveArtifactManifest = {
+  const manifest: LiveArtifactManifest = omitUndefined({
     id: spec.id,
     title: spec.title,
     kind: spec.kind,
@@ -83,7 +84,7 @@ export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSo
     dataUrl: spec.dataUrl,
     dataSource: spec.dataSource || undefined,
     createdAt: new Date().toISOString(),
-  };
+  });
   fs.writeFileSync(htmlPath, html, 'utf8');
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   return {

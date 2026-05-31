@@ -32,9 +32,9 @@ export interface UseComposerSuggestionsOptions {
   /** Slash-commands surfaced alongside templates. */
   slashCommands: Array<{ id: string; label: string; run: () => void }>;
   /** Notified when the user picks a template recipe. */
-  onPickTemplate?: (recipe: Recipe) => void;
+  onPickTemplate?: ((recipe: Recipe) => void) | undefined;
   /** Notified when the user picks a previous run. */
-  onPickHistory?: (run: HistoryRun) => void;
+  onPickHistory?: ((run: HistoryRun) => void) | undefined;
   /** From useComposerRefine — lets it reset its "the prompt changed" flag. */
   markChanged: (next: string) => void;
 }

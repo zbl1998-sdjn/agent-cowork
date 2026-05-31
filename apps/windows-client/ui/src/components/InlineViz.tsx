@@ -14,7 +14,7 @@ export function InlineVizLoadingState() {
 
 // Renders a viz spec inline in the conversation by asking the host to render it
 // (persist:false) and embedding the returned self-contained HTML in an iframe.
-export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: string }) {
+export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: string | undefined }) {
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');
   const key = JSON.stringify(spec);

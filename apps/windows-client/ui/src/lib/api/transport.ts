@@ -131,11 +131,12 @@ export async function sendJsonMethod<T>(method: string, route: string, body?: un
     const value = (body as { idempotencyKey?: unknown }).idempotencyKey;
     if (typeof value === 'string' && value) headers['idempotency-key'] = value;
   }
-  const response = await fetch(resolveUrl(route), {
+  const init: RequestInit = {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const response = await fetch(resolveUrl(route), init);
   return parse<T>(response, route);
 }
 

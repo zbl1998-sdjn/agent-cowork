@@ -5,6 +5,7 @@
 //       显式指定后端则直接采用。诚实优先:绝不谎报网络隔离能力(plan/01 健壮性原则)。
 // 依赖:node:child_process(spawnSync 可注入便于测试)。导出:resolveSandboxStartup。
 import childProcess from 'node:child_process';
+import { omitUndefined } from '../util/object.js';
 import type {
   BackendProbe,
   RuntimeEnv,
@@ -192,7 +193,7 @@ export function resolveSandboxStartup({
   const image = dockerImageFrom({ sandboxOptions, env });
   const normalizedOptions = { ...sandboxOptions, ...(image ? { image } : {}) };
   const docker = probeDocker({ spawnSync, timeoutMs, image });
-  const wsl = probeWsl({ spawnSync, timeoutMs, distro: normalizedOptions.distro });
+  const wsl = probeWsl(omitUndefined({ spawnSync, timeoutMs, distro: normalizedOptions.distro }));
   const requested = String(requestedBackend || 'auto').toLowerCase();
 
   if (requested && requested !== 'auto') {

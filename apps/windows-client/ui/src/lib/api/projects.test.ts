@@ -30,7 +30,7 @@ describe('project workspace api', () => {
 
   it('lists and mutates projects through the host routes with idempotency headers', async () => {
     setStorage();
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const calls: Array<{ url: string; init?: RequestInit | undefined }> = [];
     (globalThis as unknown as { fetch: typeof fetch }).fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       calls.push({ url, init });

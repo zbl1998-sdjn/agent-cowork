@@ -16,6 +16,7 @@ import {
   sendJson,
   withJsonBody,
 } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { Recipe } from '../recipes/registry.js';
 import type { RunEventsLike, RunsIndexLike } from '../recipes/run-recipe-types.js';
@@ -117,7 +118,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
       cachedWrite(options, body, () => {
         const input = parsed.data;
         const recipeInput = input.recipe || input;
-        const recipe = customRecipes.save(recipeInput, { tenantId: requestContext.tenantId, userId: requestContext.userId });
+        const recipe = customRecipes.save(recipeInput, omitUndefined({ tenantId: requestContext.tenantId, userId: requestContext.userId }));
         return {
           ok: true,
           recipe,
@@ -141,7 +142,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
       }
       const scopedRunsIndex = {
         get(id: string): RunIndexEntryLike | null | Promise<RunIndexEntryLike | null> {
-          return runsIndex.get?.(id, { tenantId: requestContext.tenantId }) || null;
+          return runsIndex.get?.(id, omitUndefined({ tenantId: requestContext.tenantId })) || null;
         },
       };
       const result = await captureRun({ runId: parsed.data.runId, runsIndex: scopedRunsIndex });
@@ -166,7 +167,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
         return;
       }
       const recipe = getRecipe(recipeId);
-      const customRecipe = recipe ? null : customRecipes.get(recipeId, { tenantId: requestContext.tenantId });
+      const customRecipe = recipe ? null : customRecipes.get(recipeId, omitUndefined({ tenantId: requestContext.tenantId }));
       const selectedRecipe: Recipe | null = recipe || customRecipe;
       if (!selectedRecipe) {
         sendJson(response, 404, { error: 'Recipe not found' });
@@ -175,7 +176,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
       cachedWrite(options, body, () => {
         const input = parsed.data;
         const safeRoot = safeTrustedRoot(input.trustedRoot);
-        const result = runRecipe({
+        const result = runRecipe(omitUndefined({
           recipeId,
           trustedRoot: safeRoot,
           prompt: input.prompt,
@@ -186,7 +187,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
           runEvents,
           runsIndex,
           recipe: selectedRecipe,
-        });
+        }));
         const preview = result.operations.length
           ? previewFileOperations(result.operations, { trustedRoot: safeRoot })
           : { operations: [] };

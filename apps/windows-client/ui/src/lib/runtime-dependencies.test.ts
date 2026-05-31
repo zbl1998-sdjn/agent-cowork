@@ -30,8 +30,8 @@ describe('runtime dependency view model', () => {
 
     expect(vm.summary.readyCount).toBe(1);
     expect(vm.requiredIssues.map((item) => item.id)).toEqual(['python-embedded']);
-    expect(vm.requiredIssues[0].severity).toBe('error');
-    expect(vm.sections[0].items[0]).toMatchObject({
+    expect(vm.requiredIssues[0]!.severity).toBe('error');
+    expect(vm.sections[0]!.items[0]).toMatchObject({
       label: 'Node.js 运行时',
       purposeLabel: '启动 host',
       detailLabel: 'host 进程正在使用该运行时',
@@ -54,7 +54,7 @@ describe('runtime dependency view model', () => {
     ]));
 
     expect(vm.sections.map((section) => section.id)).toEqual(['A4', 'B4', 'B5', 'B6']);
-    expect(vm.sections[1].items[0]).toMatchObject({
+    expect(vm.sections[1]!.items[0]).toMatchObject({
       id: 'pandoc',
       label: '文档转换组件',
       purposeLabel: '转换 Office 和 Markdown',
@@ -62,7 +62,7 @@ describe('runtime dependency view model', () => {
       installModeLabel: '按需下载',
       downloadLabel: '约 80MB',
     });
-    expect(vm.sections[2].items[0]).toMatchObject({
+    expect(vm.sections[2]!.items[0]).toMatchObject({
       id: 'ffmpeg',
       label: '音视频处理组件',
       downloadLabel: '约 100MB',

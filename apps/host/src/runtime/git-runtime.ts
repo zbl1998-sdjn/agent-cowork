@@ -44,11 +44,9 @@ export function detectGitRuntime({ env = {}, spawnSync = childProcess.spawnSync 
   if (result?.status === 0) {
     const text = String(result.stdout || result.stderr || '').trim();
     const version = text.match(/git version\s+([^\s]+)/i)?.[1];
-    return {
-      status: 'available',
-      version,
-      detail: version ? `系统 Git 可用:${version}` : '系统 Git 可用',
-    };
+    return version
+      ? { status: 'available', version, detail: `系统 Git 可用:${version}` }
+      : { status: 'available', detail: '系统 Git 可用' };
   }
   return { status: 'missing', detail: '未检测到 Git;可按需安装 MinGit' };
 }

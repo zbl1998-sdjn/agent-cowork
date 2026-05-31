@@ -103,7 +103,7 @@ export function rollbackEntryForMove(op: OperationPreview): RollbackEntry {
     type: 'rename-back',
     from: requiredPath(op.targetPath, 'targetPath'),
     to: op.path,
-    expectedHash: op.afterHash,
+    expectedHash: op.afterHash ?? null,
   };
 }
 

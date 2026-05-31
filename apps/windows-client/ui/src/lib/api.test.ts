@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 type FetchCall = {
   url: string;
-  init?: RequestInit;
+  init?: RequestInit | undefined;
 };
 
 const encoder = new TextEncoder();
@@ -143,8 +143,8 @@ describe('JSON requests', () => {
 
     const result = await api.getRuntimeDependencies();
 
-    expect(result.dependencies[0].id).toBe('node');
-    expect(result.dependencies[0].description).toContain('本地 Node');
+    expect(result.dependencies[0]!.id).toBe('node');
+    expect(result.dependencies[0]!.description).toContain('本地 Node');
     expect(result.summary.byStatus.available).toBe(1);
     expect(calls.some((call) => call.url.endsWith('/api/runtime/dependencies'))).toBe(true);
   });
@@ -179,7 +179,7 @@ describe('JSON requests', () => {
 
     const result = await api.getRuntimeDependencyInstallPlan({ selectedIds: ['data-science'] });
 
-    expect(result.components[0].id).toBe('data-science');
+    expect(result.components[0]!.id).toBe('data-science');
     const request = calls.find((call) => call.url.endsWith('/api/runtime/dependencies/install-plan'));
     expect(request?.init?.method).toBe('POST');
     expect(JSON.parse(String(request?.init?.body))).toEqual({ selectedIds: ['data-science'] });
@@ -216,7 +216,7 @@ describe('JSON requests', () => {
       keepUserData: false,
     });
 
-    expect(result.targets[0].requiresConfirmation).toBe(true);
+    expect(result.targets[0]!.requiresConfirmation).toBe(true);
     const request = calls.find((call) => call.url.endsWith('/api/runtime/dependencies/cleanup-plan'));
     expect(request?.init?.method).toBe('POST');
     expect(JSON.parse(String(request?.init?.body))).toEqual({
@@ -702,7 +702,7 @@ describe('SSE streams', () => {
     });
     const reasoning: string[] = [];
     const tokens: string[] = [];
-    let done: { text: string; runId?: string; model?: string } | null = null;
+    let done: { text: string; runId?: string | undefined; model?: string | undefined } | null = null;
 
     await api.chatStream('打个招呼', { trustedRoot: 'C:/work', model: 'moonshot' }, {
       onReasoning: (delta) => reasoning.push(delta),

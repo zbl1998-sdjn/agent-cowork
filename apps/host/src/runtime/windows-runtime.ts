@@ -60,11 +60,9 @@ export function detectVcRuntime({
       const output = `${result?.stdout || ''}\n${result?.stderr || ''}`;
       if (result?.status === 0 && registryHasInstalledFlag(output)) {
         const version = parseVcVersion(output);
-        return {
-          status: 'available',
-          version,
-          detail: version ? `VC++ 运行库可用:${arch} ${version}` : `VC++ 运行库可用:${arch}`,
-        };
+        return version
+          ? { status: 'available', version, detail: `VC++ 运行库可用:${arch} ${version}` }
+          : { status: 'available', detail: `VC++ 运行库可用:${arch}` };
       }
     }
   } catch {

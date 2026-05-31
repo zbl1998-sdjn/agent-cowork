@@ -30,14 +30,16 @@ function blocked(message: string, why?: string): BlockedError {
   return error;
 }
 
-function parseDottedV4(ip: string): number[] | null {
+type V4Octets = [number, number, number, number];
+
+function parseDottedV4(ip: string): V4Octets | null {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
   if (!match) return null;
-  const octets = match.slice(1, 5).map(Number);
+  const octets = match.slice(1, 5).map(Number) as V4Octets;
   return octets.some((n) => n > 255) ? null : octets;
 }
 
-function isBlockedV4(octets: number[]): boolean {
+function isBlockedV4(octets: V4Octets): boolean {
   const [a, b, c] = octets;
   if (a === 0) return true; // 0.0.0.0/8 "this host"
   if (a === 10) return true; // 10/8 private
@@ -57,7 +59,7 @@ function isBlockedV4(octets: number[]): boolean {
  * Normalize a hostname that is actually a numeric IPv4 (dotted, decimal, hex, or
  * octal) into octets. Returns null when the host is not a bare numeric IPv4.
  */
-export function numericHostToV4(host: string): number[] | null {
+export function numericHostToV4(host: string): V4Octets | null {
   const dotted = parseDottedV4(host);
   if (dotted) return dotted;
   if (!/^(0x[0-9a-f]+|\d+)$/i.test(host)) return null;
@@ -78,7 +80,9 @@ export function isBlockedIp(ip: string): boolean {
     if (lower === '::1' || lower === '::') return true;
     const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(lower);
     if (mapped) {
-      const octets = parseDottedV4(mapped[1]);
+      const mappedAddress = mapped[1];
+      if (!mappedAddress) return true;
+      const octets = parseDottedV4(mappedAddress);
       return octets ? isBlockedV4(octets) : true;
     }
     if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true; // fc00::/7 unique-local

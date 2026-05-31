@@ -7,6 +7,7 @@
 // 导出:streamChat —— 单一入口,被 routes 层装配。
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { omitUndefined } from '../util/object.js';
 import { buildEnvBlock } from './system-prompt.js';
 import { resolveAgentEnvFacts } from './agent-env.js';
 import type { RequestContext } from '../http/middleware/common.js';
@@ -141,7 +142,7 @@ export async function streamChat({
 
   let text = '';
   try {
-    const result = await streamRunner({
+    const result = await streamRunner(omitUndefined({
       systemMessage,
       prompt: body.prompt,
       summary: body.summary,
@@ -157,7 +158,7 @@ export async function streamChat({
       signal,
       onToken: (delta: string) => { text += String(delta); sse(response, 'token', { delta }); },
       onReasoning: (delta: string) => sse(response, 'reasoning', { delta }),
-    });
+    }));
     text = (result && result.text) || text;
     const model = (result && result.model) || kimiConfig.model;
     const usage = (result && result.usage) || null;

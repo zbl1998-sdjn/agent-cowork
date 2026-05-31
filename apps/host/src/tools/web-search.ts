@@ -21,6 +21,7 @@ import { assertPublicHost } from './ssrf-guard.js';
 import { parseDdgLiteResults } from './search-providers/ddg.js';
 import { parseBingResults } from './search-providers/bing.js';
 import { parseWebSearchOptions } from './web-tool-inputs.js';
+import { omitUndefined } from '../util/object.js';
 import type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchResponseLike } from './web-tool-inputs.js';
 
 export type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchResponseLike } from './web-tool-inputs.js';
@@ -74,14 +75,14 @@ export async function webSearch(options: WebSearchOptions = {}): Promise<WebSear
     throw fail('no fetch implementation available', 500);
   }
 
-  const baseArgs: ProviderArgs = {
+  const baseArgs: ProviderArgs = omitUndefined({
     query,
     maxResults,
     fetchImpl,
     lookupImpl: parsed.lookupImpl,
     allowInternal: parsed.allowInternal === true,
     timeoutMs: parsed.timeoutMs || DEFAULT_TIMEOUT_MS,
-  };
+  });
 
   if (providerName === 'ddg') return searchViaDdg(baseArgs);
   if (providerName === 'bing') return searchViaBing(baseArgs);
@@ -122,7 +123,7 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
     // Best-effort SSRF check on the search host itself (lite.duckduckgo.com).
     // The fetched RESULT urls are returned to the caller untouched — it's up
     // to whoever fetches them next to re-check.
-    await assertPublicHost(url.hostname, { lookupImpl });
+    await assertPublicHost(url.hostname, omitUndefined({ lookupImpl }));
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -173,7 +174,7 @@ async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowIn
   url.searchParams.set('q', query);
   url.searchParams.set('count', String(Math.min(maxResults * 2, 20)));
   if (!allowInternal) {
-    await assertPublicHost(url.hostname, { lookupImpl });
+    await assertPublicHost(url.hostname, omitUndefined({ lookupImpl }));
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

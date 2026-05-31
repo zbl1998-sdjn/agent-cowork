@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import { omitUndefined } from '../util/object.js';
 import { createRollbackBatchId, rollbackEntryForMove, rollbackEntryForWrite, rollbackFileOperations as rollbackEntries } from './file-rollback.js';
 import { fileExists, hashBuffer, hashFile, pathExists, requiredPath } from './file-operation-utils.js';
 import type { RollbackEntry } from './file-rollback.js';
@@ -164,6 +165,9 @@ function applyMove(op: OperationPreview): void {
 /** 执行批操作:先 preview,再逐条落盘——写入前后均记 journal,写后回读校验哈希,并生成可回滚条目。 */
 export function applyFileOperations(operations: unknown, options: FileOperationOptions = {}): { applied: FileOperationEvent[] } {
   const trustedRoot = options.trustedRoot;
+  if (!trustedRoot) {
+    throw new Error('trustedRoot is required');
+  }
   const journalWriter = options.journalWriter;
   const rollbackBatchId = options.rollbackBatchId || createRollbackBatchId();
   const requestedOperations = Array.isArray(operations) ? operations.map(normalizeOp) : operations;
@@ -179,7 +183,7 @@ export function applyFileOperations(operations: unknown, options: FileOperationO
     } else if (op.type === 'rename' || op.type === 'move') {
       rollback = rollbackEntryForMove(op);
     }
-    const event: FileOperationEvent = {
+    const event: FileOperationEvent = omitUndefined({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       at: new Date().toISOString(),
       action: op.type,
@@ -189,13 +193,13 @@ export function applyFileOperations(operations: unknown, options: FileOperationO
       afterHash: op.afterHash,
       rollback,
       status: 'pending',
-    };
+    });
     if (journalWriter?.append) {
       journalWriter.append(event);
     }
 
     if (op.type === 'write') {
-      applyWrite({ ...requested, path: op.path });
+      applyWrite({ ...requested, type: 'write', path: op.path });
       const afterStat = fs.statSync(op.path);
       event.status = 'applied';
       event.afterHash = hashFile(op.path);

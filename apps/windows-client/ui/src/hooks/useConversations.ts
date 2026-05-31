@@ -32,10 +32,14 @@ interface UseConversationsArgs {
 
 export function useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user }: UseConversationsArgs) {
   const initialConversationsRef = useRef<Conversation[] | null>(null);
-  if (!initialConversationsRef.current) initialConversationsRef.current = loadConversations();
+  if (!initialConversationsRef.current) {
+    const loaded = loadConversations();
+    initialConversationsRef.current = loaded.length ? loaded : [{ id: nextConvId(), title: '新对话', messages: [] }];
+  }
+  const initialConversations = initialConversationsRef.current;
 
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversationsRef.current);
-  const [activeConvId, setActiveConvId] = useState<string>(initialConversationsRef.current[0].id);
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
+  const [activeConvId, setActiveConvId] = useState<string>(initialConversations[0]?.id || nextConvId());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [convSearch, setConvSearch] = useState('');
@@ -87,8 +91,10 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
           branches: c.branches as Conversation['branches'],
         }));
         setConversations(convs);
-        setActiveConvId(convs[0].id);
-        setMessages(activeConversationMessages(convs[0]));
+        const first = convs[0];
+        if (!first) return;
+        setActiveConvId(first.id);
+        setMessages(activeConversationMessages(first));
       }
     })();
   }, [user, setMessages]);
@@ -171,8 +177,10 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
     }
     setConversations(remaining);
     if (id === activeConvId) {
-      setActiveConvId(remaining[0].id);
-      setMessages(activeConversationMessages(remaining[0]));
+      const nextActive = remaining[0];
+      if (!nextActive) return;
+      setActiveConvId(nextActive.id);
+      setMessages(activeConversationMessages(nextActive));
     }
   }, [conversations, activeConvId, streamingId, user, setMessages]);
   const togglePin = useCallback((id: string) => {

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type {
   ConversationInput,
@@ -117,7 +118,7 @@ export async function handleConversationRoutes({
     const limit = normalizeLimit(query.limit);
 
     if (full && typeof conversationStore.listFull === 'function') {
-      const conversations = await conversationStore.listFull(safeRoot, requestContext, { limit });
+      const conversations = await conversationStore.listFull(safeRoot, requestContext, omitUndefined({ limit }));
       sendJson(response, 200, { conversations, context: requestContext });
       return true;
     }

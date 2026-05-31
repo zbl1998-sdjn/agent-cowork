@@ -10,6 +10,7 @@ import { createHeuristicTokenEstimator } from './token-estimator.js';
 import { createHistoryCompactor } from './history-compactor.js';
 import { createToolResultSummarizer } from './tool-result-summarizer.js';
 import { createInjectionGuard } from '../safety/untrusted-content.js';
+import { omitUndefined } from '../../util/object.js';
 
 type ChatMessageLike = {
   role?: string;
@@ -118,18 +119,18 @@ export class ContextManager {
     this.estimator = estimator;
     this.maxToolResultTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens) || 0));
     this.injectionGuard = options.injectionGuard || createInjectionGuard();
-    this.historyCompactor = options.historyCompactor || createHistoryCompactor({
+    this.historyCompactor = options.historyCompactor || createHistoryCompactor(omitUndefined({
       estimator,
       maxContextTokens: options.maxContextTokens,
       keepRecentMessages: options.keepRecentMessages,
       maxFacts: options.maxFacts,
-    });
-    this.toolResultSummarizer = options.toolResultSummarizer || createToolResultSummarizer({
+    }));
+    this.toolResultSummarizer = options.toolResultSummarizer || createToolResultSummarizer(omitUndefined({
       estimator,
       maxTokens: options.maxToolResultTokens,
       maxSources: options.maxSources,
       maxKeyPoints: options.maxKeyPoints,
-    });
+    }));
   }
 
   /**
@@ -144,12 +145,12 @@ export class ContextManager {
    */
   formatToolResult(result: unknown, options: ToolResultOptions = {}): FormattedToolResult {
     const maxTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens || options.maxTokens || this.maxToolResultTokens) || 0));
-    const output = this.toolResultSummarizer.shrink(result, {
+    const output = this.toolResultSummarizer.shrink(result, omitUndefined({
       maxTokens: options.maxToolResultTokens || options.maxTokens,
       maxSources: options.maxSources,
       maxKeyPoints: options.maxKeyPoints,
-    });
-    const meta = { source: 'tool', toolName: options.toolName };
+    }));
+    const meta = omitUndefined({ source: 'tool', toolName: options.toolName });
     let guarded = this.injectionGuard.wrap(output.content, meta);
     let afterTokens = this.estimator.estimateText(guarded.content);
     if (maxTokens > 0 && afterTokens > maxTokens) {

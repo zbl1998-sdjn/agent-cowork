@@ -25,6 +25,7 @@ export { UserProfile, createUserProfile } from './profile.js';
 
 import { FileMemoryStore } from './file-memory-store.js';
 import { SqliteMemoryStore } from './sqlite-memory-store.js';
+import { omitUndefined } from '../util/object.js';
 
 type SqliteMemoryStoreOptions = NonNullable<ConstructorParameters<typeof SqliteMemoryStore>[0]>;
 
@@ -37,7 +38,7 @@ export type CreateMemoryStoreOptions = SqliteMemoryStoreOptions & {
  */
 export function createMemoryStore({ backend = 'file', dbPath, db, now }: CreateMemoryStoreOptions = {}): FileMemoryStore | SqliteMemoryStore {
   if (backend === 'sqlite') {
-    return new SqliteMemoryStore({ dbPath, db, now });
+    return new SqliteMemoryStore(omitUndefined({ dbPath, db, now }));
   }
   return new FileMemoryStore();
 }

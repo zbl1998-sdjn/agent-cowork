@@ -16,6 +16,7 @@ import {
 import { validateToolArguments } from './arg-validator.js';
 import { traceToolResult, type RunTraceLike } from './run-trace-events.js';
 import { parseToolCall } from './tool-loop-support.js';
+import { omitUndefined } from '../../util/object.js';
 import type { ApprovalRegistry, HookEngine, RequestContext } from './approval-gate.js';
 
 export type ToolArgs = Record<string, unknown>;
@@ -124,12 +125,12 @@ export async function executeToolCall({
 
   const isMutating = !!(tool && tool.mutating === true);
   const needsApproval = toolNeedsApproval(tool);
-  if (await runPreToolHook({ hooks, name: toolName, args, steps, audit, emit, messages, call })) {
+  if (await runPreToolHook(omitUndefined({ hooks, name: toolName, args, steps, audit, emit, messages, call }))) {
     callbacks.saveCheckpoint('tool_result', stepNumber);
     return {};
   }
 
-  const planResult = await handleExitPlanMode({
+  const planResult = await handleExitPlanMode(omitUndefined({
     name: toolName,
     args,
     hasApprovals,
@@ -142,18 +143,18 @@ export async function executeToolCall({
     messages,
     call,
     context,
-  });
+  }));
   if (planResult.handled) {
     callbacks.saveCheckpoint('plan_result', stepNumber);
     return { planApproved: !!planResult.planApproved };
   }
 
-  if (blockUntilPlanApproved({ planMode, planApproved, needsApproval, name: toolName, tool, steps, audit, emit, messages, call })) {
+  if (blockUntilPlanApproved(omitUndefined({ planMode, planApproved, needsApproval, name: toolName, tool, steps, audit, emit, messages, call }))) {
     callbacks.saveCheckpoint('tool_result', stepNumber);
     return {};
   }
 
-  if (tool && await requestToolApproval({
+  if (tool && await requestToolApproval(omitUndefined({
     needsApproval,
     hasApprovals,
     sessionApproved,
@@ -171,7 +172,7 @@ export async function executeToolCall({
     planApproved,
     steps,
     context,
-  })) {
+  }))) {
     callbacks.saveCheckpoint('approval_result', stepNumber);
     return {};
   }

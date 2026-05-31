@@ -84,8 +84,8 @@ export function parseDdgLiteResults(html: unknown, limit = 8): ParsedResult[] {
 
   const anchors: Array<{ url: string; title: string }> = [];
   for (const match of html.matchAll(ANCHOR_RE)) {
-    const rawHref = match[1];
-    const rawTitle = clean(match[2]);
+    const rawHref = match[1] ?? '';
+    const rawTitle = clean(match[2] ?? '');
     if (!rawHref || !rawTitle) continue;
     const url = unwrapDdgRedirect(rawHref);
     // Skip internal DDG navigation that survived (next page, ads, etc.).
@@ -96,7 +96,7 @@ export function parseDdgLiteResults(html: unknown, limit = 8): ParsedResult[] {
 
   const snippets: string[] = [];
   for (const match of html.matchAll(SNIPPET_RE)) {
-    snippets.push(clean(match[1]));
+    snippets.push(clean(match[1] ?? ''));
     if (snippets.length >= anchors.length) break;
   }
 

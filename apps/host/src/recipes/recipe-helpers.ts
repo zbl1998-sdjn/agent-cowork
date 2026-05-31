@@ -119,9 +119,16 @@ export function parseTableRows(text: string): ParsedTable {
       rows: [['1', '未发现可解析表格行', '需人工确认']],
     };
   }
+  const firstRow = rows[0];
+  if (!firstRow) {
+    return {
+      columns: ['行号', '内容', '清洗状态'],
+      rows: [['1', '未发现可解析表格行', '需人工确认']],
+    };
+  }
   const width = Math.max(...rows.map((row) => row.length));
-  const hasHeader = rows[0].length > 1;
-  const columns = hasHeader ? rows[0].slice(0, width) : Array.from({ length: width }, (_, index) => `列${index + 1}`);
+  const hasHeader = firstRow.length > 1;
+  const columns = hasHeader ? firstRow.slice(0, width) : Array.from({ length: width }, (_, index) => `列${index + 1}`);
   const seen = new Set<string>();
   const cleaned = rows.slice(hasHeader ? 1 : 0).map((row, index) => {
     const normalized = Array.from({ length: columns.length }, (_, col) => row[col] || '');
@@ -145,10 +152,10 @@ export function reimbursementRows(text: string): string[][] {
   const amountPattern = /(?:¥|￥)?\s*(\d+(?:\.\d{1,2})?)/;
   const rows = lines
     .map((line, index) => {
-      const amount = amountPattern.exec(line)?.[1] || '';
+      const amount = amountPattern.exec(line)?.[1] ?? '';
       const vendor = line.split(/[,\t，。]/)[0]?.slice(0, 40) || `材料 ${index + 1}`;
       return [String(index + 1), vendor, amount, amount ? '待核验发票' : '缺少金额', line.slice(0, 120)];
     })
-    .filter((row) => row[2] || /发票|报销|金额|费用|invoice|amount/i.test(row[4]));
+    .filter((row) => row[2] || /发票|报销|金额|费用|invoice|amount/i.test(row[4] ?? ''));
   return rows.length ? rows : [['1', '待确认供应商', '', '缺少金额', '未从来源中识别到明确报销条目']];
 }

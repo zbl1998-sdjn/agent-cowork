@@ -44,9 +44,9 @@ describe('ApiSettings', () => {
     expect(html).toContain('ui-btn--danger');
     expect(html).toContain('保存中…');
     expect(html).toContain('disabled=""');
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
-    buttons[2].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
+    buttons[2]!.props.onClick();
     expect(onClearKey).toHaveBeenCalledOnce();
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onSave).toHaveBeenCalledOnce();

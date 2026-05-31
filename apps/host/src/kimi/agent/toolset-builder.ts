@@ -6,6 +6,7 @@
 // 依赖:同层 agent-tools(基础工具)、recipes/run-recipe(Skill 运行)、parallel-agent-tool(并行子代理)。
 // 导出:buildAgentToolset
 import { runRecipe } from '../../recipes/run-recipe.js';
+import { omitUndefined } from '../../util/object.js';
 import { createAgentTools } from '../agent-tools.js';
 import type { AgentTool } from './approval-gate.js';
 import { createParallelSubAgentTool } from './parallel-agent-tool.js';
@@ -106,7 +107,7 @@ export function buildAgentToolset({
       handler: async (args = {}) => {
         const skill = skillRegistry.get(args.id);
         if (!skill || !skill.enabled) return { error: `skill not available: ${args.id}` };
-        const result = runRecipe({
+        const result = runRecipe(omitUndefined({
           recipeId: String(args.id || ''),
           trustedRoot: ctx.trustedRoot,
           prompt: args.prompt || '',
@@ -114,7 +115,7 @@ export function buildAgentToolset({
           runStoreRoot: runDeps.runStoreRoot || '',
           runEvents: runDeps.runEvents as Parameters<typeof runRecipe>[0]['runEvents'],
           runsIndex: runDeps.runsIndex as Parameters<typeof runRecipe>[0]['runsIndex'],
-        });
+        }));
         return { skill: args.id, operations: result.operations.length, runId: result.runId };
       },
     });

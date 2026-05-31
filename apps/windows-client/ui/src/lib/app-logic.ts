@@ -16,8 +16,8 @@ export interface AssistantRunState {
   status: string;
   progress: ProgressEntry[];
   sources: SourceRef[];
-  todos?: TodoItem[];
-  subtasks?: SubtaskGroupItem[];
+  todos?: TodoItem[] | undefined;
+  subtasks?: SubtaskGroupItem[] | undefined;
   approvalState: ApprovalState;
 }
 
@@ -138,14 +138,14 @@ export function reconcileChatEnabled(
 }
 
 export function buildAgentChatStreamOptions(input: {
-  trustedRoot?: string;
-  model?: string;
-  modelConfig?: ModelRunConfig;
-  thinking?: string;
-  autoApprove?: boolean;
-  planMode?: boolean;
-  images?: string[];
-  resumeRunId?: string;
+  trustedRoot?: string | undefined;
+  model?: string | undefined;
+  modelConfig?: ModelRunConfig | undefined;
+  thinking?: string | undefined;
+  autoApprove?: boolean | undefined;
+  planMode?: boolean | undefined;
+  images?: string[] | undefined;
+  resumeRunId?: string | undefined;
 }) {
   return {
     trustedRoot: input.trustedRoot,

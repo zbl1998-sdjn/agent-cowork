@@ -4,10 +4,10 @@ import type { MessageRole } from '../lib/types';
 
 export interface MessageBubbleProps {
   role: MessageRole;
-  runId?: string;
-  status?: string;
-  time?: string;
-  children?: ReactNode;
+  runId?: string | undefined;
+  status?: string | undefined;
+  time?: string | undefined;
+  children?: ReactNode | undefined;
 }
 
 const NAME: Record<MessageRole, string> = { user: 'Derrick', assistant: 'Kimi' };

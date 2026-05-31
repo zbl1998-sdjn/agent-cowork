@@ -1,18 +1,18 @@
 // 起步建议(UI · lib):为空会话/新用户生成「起步卡片」建议(基于配方/角色),引导用户快速上手。依赖:无。
 export interface StarterRecipe {
-  name?: string | null;
-  summary?: string | null;
+  name?: string | null | undefined;
+  summary?: string | null | undefined;
 }
 
 export interface StarterHistoryRun {
-  promptPreview?: string | null;
+  promptPreview?: string | null | undefined;
 }
 
 interface StarterOptions {
   base: string[];
-  recipes?: StarterRecipe[];
-  historyRuns?: StarterHistoryRun[];
-  max?: number;
+  recipes?: StarterRecipe[] | undefined;
+  historyRuns?: StarterHistoryRun[] | undefined;
+  max?: number | undefined;
 }
 
 const DEFAULT_MAX_STARTERS = 4;

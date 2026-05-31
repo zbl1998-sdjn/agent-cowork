@@ -6,11 +6,13 @@ import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.j
 import { renderViz } from '../artifacts/viz.js';
 import { buildLiveArtifact, readLiveArtifactHtml, refreshLiveArtifactDataAsync } from '../artifacts/live-artifact.js';
 import { artifactPaths, normalizeLiveArtifactSpec, resolveLiveArtifactDataSourcePath } from '../artifacts/live-spec.js';
+import { omitUndefined } from '../util/object.js';
 import { errorMessage, errorStatus } from './route-error-utils.js';
 import {
   parseArtifactIdPath,
   parseVizBody,
 } from './viz-route-schemas.js';
+import { sendHtml } from './viz-route-support.js';
 import type { z } from 'zod';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { RequestContext } from '../http/middleware/common.js';
@@ -63,24 +65,15 @@ type VizRouteOptions = {
   fileOperationApprovals: Pick<FileOperationApprovalStore, 'issue' | 'consume'>;
 };
 
-function sendHtml(response: HttpResponseLike, status: number, body: string): void {
-  response.writeHead(status, {
-    'content-type': 'text/html; charset=utf-8',
-    'content-length': Buffer.byteLength(body),
-    'cache-control': 'no-store',
-  });
-  response.end(body);
-}
-
 function vizFromBody(input: VizRouteBody): VizSpec {
-  return {
+  return omitUndefined({
     title: input.title,
     kind: input.kind,
     data: input.data,
     options: input.options,
     code: input.code,
     definition: input.definition,
-  };
+  });
 }
 
 function buildVizRenderApprovalPlan({ trustedRoot, body, viz }: {
@@ -88,12 +81,12 @@ function buildVizRenderApprovalPlan({ trustedRoot, body, viz }: {
   body: VizRouteBody;
   viz: VizSpec;
 }): VizApprovalPlan {
-  const spec = normalizeLiveArtifactSpec({
+  const spec = normalizeLiveArtifactSpec(omitUndefined({
     id: body.id,
     title: viz.title,
     viz,
     dataSource: body.dataSource,
-  });
+  }));
   renderViz(spec.viz);
   if (spec.dataSource?.type === 'file-json') {
     resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });
@@ -193,7 +186,7 @@ export async function handleVizRoutes({
         });
         let artifact;
         try {
-          artifact = buildLiveArtifact({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource });
+          artifact = buildLiveArtifact(omitUndefined({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource }));
         } catch (err) {
           sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
           return;
@@ -216,12 +209,12 @@ export async function handleVizRoutes({
     if (!id) return true;
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
-      const artifactData = await refreshLiveArtifactDataAsync({
+      const artifactData = await refreshLiveArtifactDataAsync(omitUndefined({
         trustedRoot,
         id,
         toolRegistry,
         context: requestContext,
-      });
+      }));
       sendJson(response, 200, {
         context: requestContext,
         ...artifactData,

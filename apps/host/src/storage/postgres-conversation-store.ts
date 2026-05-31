@@ -8,6 +8,7 @@
 // PostgreSQL adapter for per-user conversation history. Tests inject a mock pool.
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { omitUndefined } from '../util/object.js';
 import {
   cleanConversationId,
   MAX_CONVERSATION_TITLE,
@@ -66,7 +67,7 @@ function parseJsonArray(value: unknown): unknown[] {
 function parseBranches(row: ConversationRow): ConversationBranch[] { return parseJsonArray(row.branches) as ConversationBranch[]; }
 /** 把 DB 行映射为列表摘要(Date 列转 ISO 串)。 */
 function summariseRow(row: ConversationRow): ConversationSummary {
-  return {
+  return omitUndefined({
     id: String(row.id || ''),
     title: String(row.title || '新对话'),
     pinned: Boolean(row.pinned),
@@ -75,13 +76,13 @@ function summariseRow(row: ConversationRow): ConversationSummary {
     activeBranchId: row.active_branch_id ? String(row.active_branch_id) : undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
-  };
+  });
 }
 /** 从行解析消息数组。 */
 function parseMessages(row: ConversationRow): unknown[] { return parseJsonArray(row.messages); }
 /** 把 DB 行映射为完整对话记录(含消息/分支正文,Date 列转 ISO 串)。 */
 function fullRow(row: ConversationRow): ConversationRecord {
-  return {
+  return omitUndefined({
     id: String(row.id || ''),
     title: String(row.title || '新对话'),
     pinned: Boolean(row.pinned),
@@ -90,7 +91,7 @@ function fullRow(row: ConversationRow): ConversationRecord {
     branches: parseBranches(row),
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
-  };
+  });
 }
 
 /** 对话历史的 PG 后端,接口与 FileConversationStore 对齐,按 tenant/user/workspace 隔离。 */

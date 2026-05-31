@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { createPromptRefiner } from '../kimi/prompt/refiner.js';
 import { createUserProfile } from '../memory/profile.js';
+import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { PromptContext, PromptModelCall, PromptRefiner } from '../kimi/prompt/refiner.js';
 import type { MemoryStoreLike } from '../memory/profile.js';
@@ -61,13 +62,13 @@ const promptRefineBodySchema = z.preprocess(
 );
 
 function contextFromBody(body: PromptBody, requestContext: RequestContext, trustedRoot: string): PromptContext {
-  return {
+  return omitUndefined({
     ...body.context,
     trustedRoot,
     tenantId: requestContext.tenantId,
     userId: requestContext.userId,
     traceId: requestContext.traceId,
-  };
+  });
 }
 
 async function contextWithProfile(
@@ -124,10 +125,10 @@ export async function handlePromptRoutes({
     }
     const input = parsed.data;
     const trustedRoot = state.safeTrustedRoot(input.trustedRoot || state.trustedRootDefault);
-    const refiner = state.config.promptRefiner || createPromptRefiner({
+    const refiner = state.config.promptRefiner || createPromptRefiner(omitUndefined({
       modelCall: state.config.promptRefineModelCall,
       timeoutMs: state.config.promptRefineTimeoutMs,
-    });
+    }));
     const ctx = await contextWithProfile(input, requestContext, trustedRoot, state.memoryStore, input.prompt);
     const result = await refiner.refine(input.prompt, ctx);
     sendJson(response, 200, {

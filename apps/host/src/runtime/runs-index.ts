@@ -5,6 +5,7 @@
 // 依赖:同层 runs-index-file / runs-index-sqlite / runs-index-utils。导出:RunsIndex / SqliteRunsIndex / createUlid。
 import { RunsIndex } from './runs-index-file.js';
 import { SqliteRunsIndex } from './runs-index-sqlite.js';
+import { omitUndefined } from '../util/object.js';
 
 export { RunsIndex } from './runs-index-file.js';
 export { SqliteRunsIndex } from './runs-index-sqlite.js';
@@ -61,7 +62,9 @@ export type RunIndexSummary = {
 };
 
 export function createRunsIndex({ backend = 'file', indexRoot, dbPath, db, now }: CreateRunsIndexOptions = {}) {
-  return backend === 'sqlite' ? new SqliteRunsIndex({ dbPath, db, now }) : new RunsIndex({ indexRoot, now });
+  return backend === 'sqlite'
+    ? new SqliteRunsIndex(omitUndefined({ dbPath, db, now }))
+    : new RunsIndex(omitUndefined({ indexRoot, now }));
 }
 
 export function summariseRunForIndex(runRecord: unknown, context: RunIndexContext = {}): RunIndexSummary {

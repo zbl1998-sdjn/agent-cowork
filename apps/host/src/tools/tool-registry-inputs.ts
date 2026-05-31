@@ -3,6 +3,7 @@
 // 职责:集中校验工具 descriptor 与 MCP 工具清单。内置注册入口 strict;MCP 清单允许
 //       协议扩展字段,但只投影注册表需要的 name/description/inputSchema。
 import { z } from 'zod';
+import { omitUndefined } from '../util/object.js';
 
 type ToolHandler = (args?: unknown, ctx?: unknown) => unknown | Promise<unknown>;
 type ParsedToolEntry = {
@@ -55,7 +56,7 @@ export function parseToolEntry(entry: unknown): ParsedToolEntry {
   if (!result.success) {
     throw inputError('ToolRegistry.register', result.error.issues.map(zodIssueMessage).join('; '));
   }
-  return result.data;
+  return omitUndefined(result.data) as ParsedToolEntry;
 }
 
 export function parseMcpTools(tools: unknown): ParsedMcpTool[] {
@@ -63,9 +64,9 @@ export function parseMcpTools(tools: unknown): ParsedMcpTool[] {
   if (!result.success) {
     throw inputError('ToolRegistry.registerMcpClient', result.error.issues.map(zodIssueMessage).join('; '));
   }
-  return result.data.map((tool) => ({
+  return result.data.map((tool) => omitUndefined({
     name: tool.name,
     description: tool.description,
     inputSchema: tool.inputSchema,
-  }));
+  }) as ParsedMcpTool);
 }

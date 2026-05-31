@@ -104,6 +104,9 @@ export function createAesGcmProtector({ keyMaterial }: { keyMaterial?: unknown }
         throw new Error('Unsupported credential cipher text');
       }
       const [, , ivText, tagText, encryptedText] = parts;
+      if (!ivText || !tagText || !encryptedText) {
+        throw new Error('Unsupported credential cipher text');
+      }
       const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivText, 'base64'));
       decipher.setAuthTag(Buffer.from(tagText, 'base64'));
       return Buffer.concat([

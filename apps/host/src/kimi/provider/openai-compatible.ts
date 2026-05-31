@@ -7,6 +7,7 @@
 //       createLocalOpenAiCompatibleProvider(供注册表登记)。
 import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 import { parseOpenAiCompatibleStream } from './kimi.js';
+import { omitUndefined } from '../../util/object.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
@@ -92,18 +93,18 @@ export function createOpenAiCompatibleProvider({
         body.temperature = config.temperature;
       }
       const fetcher = fetchImpl as FetchLike;
-      const resp = await fetcher(`${baseUrl}/chat/completions`, {
+      const resp = await fetcher(`${baseUrl}/chat/completions`, omitUndefined({
         method: 'POST',
         headers,
         body: JSON.stringify(body),
         signal,
-      });
+      }));
       if (!resp.ok) {
         throw new Error(`${id} request failed with status ${resp.status}`);
       }
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
       const message = reader
-        ? await parseOpenAiCompatibleStream(reader, { onContent, onReasoning })
+        ? await parseOpenAiCompatibleStream(reader, omitUndefined({ onContent, onReasoning }))
         : jsonMessage(await resp.json());
       return {
         ...message,

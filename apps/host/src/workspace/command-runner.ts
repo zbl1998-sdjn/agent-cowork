@@ -34,7 +34,12 @@ function parseCommand(cmd: unknown): ParsedCommand {
   if (typeof cmd !== 'string' || !cmd.trim()) {
     throw new Error('command is required');
   }
-  const [command, ...args] = cmd.trim().split(/\s+/);
+  const parts = cmd.trim().split(/\s+/);
+  const command = parts[0];
+  if (!command) {
+    throw new Error('command is required');
+  }
+  const args = parts.slice(1);
   return { command, args };
 }
 

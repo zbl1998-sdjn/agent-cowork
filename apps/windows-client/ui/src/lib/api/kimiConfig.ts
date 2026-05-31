@@ -2,13 +2,13 @@
 import { getJson, postJson } from './transport';
 
 export interface KimiInfo {
-  provider?: string;
+  provider?: string | undefined;
   configured: boolean;
   chatEnabled: boolean;
   planEnabled: boolean;
   model: string;
-  baseUrl?: string;
-  hasKey?: boolean;
+  baseUrl?: string | undefined;
+  hasKey?: boolean | undefined;
 }
 
 export async function getKimiInfo(): Promise<KimiInfo> {
@@ -16,11 +16,11 @@ export async function getKimiInfo(): Promise<KimiInfo> {
 }
 
 export interface SaveKimiConfigInput {
-  provider?: string;
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-  clearKey?: boolean;
+  provider?: string | undefined;
+  apiKey?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+  clearKey?: boolean | undefined;
 }
 
 export async function saveKimiConfig(input: SaveKimiConfigInput): Promise<KimiInfo> {

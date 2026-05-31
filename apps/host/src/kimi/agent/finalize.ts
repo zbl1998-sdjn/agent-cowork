@@ -5,6 +5,7 @@
 // 依赖:同层 model-resilience.js(带韧性的模型调用)。
 // 导出:addUsage / summarizeAfterBudget / applyStaticBackstop / sse
 import { callModelResilient } from './model-resilience.js';
+import { omitUndefined } from '../../util/object.js';
 
 export type Usage = { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
 export type UsageTotals = { prompt_tokens: number; completion_tokens: number; total_tokens: number };
@@ -12,6 +13,7 @@ export type Message = { role: string; content: unknown };
 export type ModelResult = { usage?: Usage; content?: string };
 export type Emit = (type: string, payload: Record<string, unknown>) => void;
 type ModelCall = Parameters<typeof callModelResilient>[0];
+type ModelFallbackEvent = { failed: unknown; next: unknown; error: string };
 export type SummarizeOptions = {
   finalText?: string;
   signal?: AbortSignal | null;
@@ -57,11 +59,11 @@ export async function summarizeAfterBudget({
       fetchImpl,
       onContent: emitToken,
       onReasoning: () => undefined,
-    }, {
+    }, omitUndefined({
       kimiConfig,
       timeoutMs,
-      onFallback: (event) => emit('model_fallback', event),
-    });
+      onFallback: (event: ModelFallbackEvent) => emit('model_fallback', event),
+    }));
     const result = (wrap || {}) as ModelResult;
     addUsage(usageTotals, result.usage);
     return result.content || '';

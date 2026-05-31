@@ -8,6 +8,7 @@
 //       refreshLiveArtifactDataAsync(支持 connector-tool 的异步刷新)
 import fs from 'node:fs';
 
+import { omitUndefined } from '../util/object.js';
 import { renderViz } from './viz.js';
 import {
   artifactPaths,
@@ -172,10 +173,10 @@ async function refreshFromConnectorTool({
   if (!connectorDataSourceAllowed(descriptor)) {
     throw fail('artifact connector tool is not allowed as a live data source', 403);
   }
-  const payload = parseConnectorToolPayload(await toolRegistry.call(dataSource.tool, dataSource.args || {}, {
+  const payload = parseConnectorToolPayload(await toolRegistry.call(dataSource.tool, dataSource.args || {}, omitUndefined({
     trustedRoot,
     context,
-  }));
+  })));
   const viz = vizFromSourcePayload(payload);
   renderViz(viz);
   return {
@@ -223,7 +224,7 @@ export async function refreshLiveArtifactDataAsync({
   const manifest = readArtifactManifest({ trustedRoot, id });
   const dataSource = normalizeLiveArtifactDataSource(manifest.dataSource);
   const base = dataSource?.type === 'connector-tool'
-    ? await refreshFromConnectorTool({ trustedRoot, manifest, dataSource, toolRegistry, context })
+    ? await refreshFromConnectorTool(omitUndefined({ trustedRoot, manifest, dataSource, toolRegistry, context }))
     : dataSource
       ? refreshFromFileJson({ trustedRoot, manifest, dataSource })
       : {

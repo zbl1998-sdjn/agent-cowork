@@ -4,6 +4,7 @@
 //       (通常是跑配方),记录上次/下次触发与错误。多租户隔离,幂等键防重复触发。
 // 依赖:同层 cron(解析/算下次)、runs-index(ULID)、scheduler-store(持久化)。导出:Scheduler 及存储转出。
 import { nextFireAt, parseCron, describeCron } from './cron.js';
+import { omitUndefined } from '../util/object.js';
 import { createUlid } from './runs-index.js';
 import {
   FileScheduleStore,
@@ -75,7 +76,7 @@ export class Scheduler {
     if (typeof executor !== 'function') {
       throw new Error('Scheduler: executor must be a function');
     }
-    this.store = store || new FileScheduleStore({ storeDir });
+    this.store = store || new FileScheduleStore(omitUndefined({ storeDir }));
     this.storeDir = storeDir || this.store.storeDir || null;
     this.executor = executor;
     this.tickIntervalMs = Math.max(1000, Number(tickIntervalMs) || 30_000);
@@ -86,7 +87,7 @@ export class Scheduler {
   }
 
   list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
-    return this.store.list({ tenantId, userId });
+    return this.store.list(omitUndefined({ tenantId, userId }));
   }
 
   get(id: string): ScheduleRecord | null {

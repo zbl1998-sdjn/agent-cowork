@@ -4,9 +4,9 @@ import { getOAuthConnectorStatus, type ConnectorInfo } from '../../lib/api';
 export type OAuthStatusView = {
   connected: boolean;
   accounts: string[];
-  configured?: boolean;
-  configurationMessage?: string;
-  requiredEnv?: string[];
+  configured?: boolean | undefined;
+  configurationMessage?: string | undefined;
+  requiredEnv?: string[] | undefined;
 };
 
 export async function readConnectorOAuthStatus(items: ConnectorInfo[]) {

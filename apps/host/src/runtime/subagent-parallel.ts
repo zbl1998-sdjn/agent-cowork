@@ -138,6 +138,10 @@ export async function runSubagentsParallel({
         return;
       }
       const child = childPlans[index];
+      const limits = childLimits[index];
+      if (!child || !limits) {
+        return;
+      }
       emit('child_start', { index, goal: child.goal, stepCount: child.steps.length });
       try {
         const out = await runSubagent({
@@ -160,7 +164,7 @@ export async function runSubagentsParallel({
           status: out.ok ? 'succeeded' : 'failed',
           ok: out.ok,
           steps: out.steps,
-          limits: childLimits[index],
+          limits,
         };
         children[index] = childResult;
         emit('child_end', { index, runId: out.runId, status: childResult.status });
@@ -171,7 +175,7 @@ export async function runSubagentsParallel({
           status: 'failed',
           ok: false,
           error: err instanceof Error ? err.message : String(err),
-          limits: childLimits[index],
+          limits,
         };
         children[index] = childResult;
         emit('child_end', { index, status: 'failed', error: childResult.error });

@@ -7,6 +7,7 @@ import { createRunCheckpointer } from '../runtime/run-checkpoint.js';
 import { createRunResumer } from '../runtime/run-resume.js';
 import { createRunId } from '../runtime/run-store.js';
 import { createSeededIdSource } from '../util/ids.js';
+import { omitUndefined } from '../util/object.js';
 
 type RunCheckpointer = ReturnType<typeof createRunCheckpointer>;
 type RunResumer = ReturnType<typeof createRunResumer>;
@@ -42,7 +43,7 @@ const agentRunStartBodySchema = z.preprocess(
 );
 
 function normalizeAgentRunStartBody(body: unknown): AgentRunStartBody {
-  return agentRunStartBodySchema.parse(body);
+  return omitUndefined(agentRunStartBodySchema.parse(body));
 }
 
 function createAgentRunIdentity(body: AgentRunStartBody): AgentRunIdentity {

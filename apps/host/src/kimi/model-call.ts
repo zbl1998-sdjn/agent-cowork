@@ -5,10 +5,11 @@
 // 依赖:./provider(统一的多 provider chat completion 入口)。
 // 导出:defaultAgentModelCall。
 import { callProviderChatCompletion } from './provider/index.js';
+import { omitUndefined } from '../util/object.js';
 
 type ProviderChatArgs = Parameters<typeof callProviderChatCompletion>[0];
 
 /** 默认的 agent 模型调用:直接转发到 provider 层的 chat completion。 */
 export async function defaultAgentModelCall({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, onReasoning, signal }: ProviderChatArgs) {
-  return callProviderChatCompletion({ messages, tools, kimiConfig, fetchImpl, onContent, onReasoning, signal });
+  return callProviderChatCompletion(omitUndefined({ messages, tools, kimiConfig, fetchImpl, onContent, onReasoning, signal }));
 }

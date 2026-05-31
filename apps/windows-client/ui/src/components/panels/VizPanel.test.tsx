@@ -58,8 +58,8 @@ describe('VizPanel state views', () => {
     );
 
     expect(buttons).toHaveLength(2);
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
 
     expect(onRender).toHaveBeenCalledOnce();
     expect(onReopen).toHaveBeenCalledOnce();

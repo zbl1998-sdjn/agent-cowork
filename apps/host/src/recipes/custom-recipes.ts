@@ -5,6 +5,7 @@
 // 依赖:node:fs/path。导出:createCustomRecipeStore。
 import fs from 'node:fs';
 import path from 'node:path';
+import { omitUndefined } from '../util/object.js';
 
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
 
@@ -63,14 +64,14 @@ function slug(value: unknown): string {
 function cleanSteps(value: unknown): CapturedStep[] {
   return (Array.isArray(value) ? value : []).slice(0, 40).map((step, index) => {
     const record = step && typeof step === 'object' ? step as Record<string, unknown> : {};
-    return {
+    return omitUndefined({
       index,
       tool: cleanText(record.tool, 120),
       status: cleanText(record.status, 80) || undefined,
       args: record.args,
       result: record.result,
       summary: record.summary,
-    };
+    });
   });
 }
 

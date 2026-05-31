@@ -6,18 +6,20 @@
 // 导出:HistoryCompactor(类)、createHistoryCompactor(工厂)。
 
 import { createHeuristicTokenEstimator } from './token-estimator.js';
+import {
+  clipText,
+  cloneMessage,
+  contentText,
+  normalizeMessages,
+  stableText,
+  type ChatMessageLike,
+  type TokenEstimatorLike,
+} from './history-compactor-utils.js';
 
 const DEFAULT_MAX_CONTEXT_TOKENS = 12_000;
 const DEFAULT_KEEP_RECENT_MESSAGES = 16;
 const DEFAULT_MAX_FACTS = 24;
 const FACT_RE = /\b(?:fact|important|decision|constraint|preference)\s*:|(?:关键事实|重要|决定|约束|用户偏好|偏好)\s*[:：]/iu;
-
-type ChatMessageLike = { role?: string; content?: unknown; name?: string; tool_call_id?: string; tool_calls?: unknown[] };
-
-type TokenEstimatorLike = {
-  estimateText(value: unknown): number;
-  estimateMessages(messages: ChatMessageLike[]): { totalTokens: number };
-};
 
 type HistoryCompactorOptions = { estimator?: TokenEstimatorLike; maxContextTokens?: number; keepRecentMessages?: number; maxFacts?: number };
 
@@ -27,41 +29,6 @@ export type CompactResult = {
 };
 
 type EnforcedBudget = { messages: ChatMessageLike[]; tokens: number };
-
-function stableText(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
-  try {
-    return JSON.stringify(value) || '';
-  } catch {
-    return String(value);
-  }
-}
-
-function clipText(text: string, maxChars: number): string {
-  const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  if (clean.length <= maxChars) return clean;
-  return `${clean.slice(0, Math.max(0, maxChars - 18)).trim()} ...[truncated]`;
-}
-
-function cloneMessage(message: ChatMessageLike): ChatMessageLike {
-  return { ...message };
-}
-
-function contentText(message: ChatMessageLike): string {
-  const parts = [message.role, message.name, message.tool_call_id, stableText(message.content)];
-  if (Array.isArray(message.tool_calls)) {
-    parts.push(stableText(message.tool_calls));
-  }
-  return parts.filter(Boolean).join('\n');
-}
-
-function normalizeMessages(messages: unknown[]): ChatMessageLike[] {
-  return Array.isArray(messages)
-    ? messages.filter((message) => message && typeof message === 'object').map((message) => cloneMessage(message as ChatMessageLike))
-    : [];
-}
 
 function extractKeyFacts(messages: ChatMessageLike[], maxFacts: number): string[] {
   const seen = new Set<string>();
@@ -163,26 +130,37 @@ function enforceBudget(messages: ChatMessageLike[], maxContextTokens: number, es
   let compacted = messages.map(cloneMessage);
   let tokens = estimateMessages(estimator, compacted);
   for (let i = 1; i < compacted.length - 1 && tokens > maxContextTokens; i += 1) {
+    const message = compacted[i];
+    if (!message) continue;
     const overage = tokens - maxContextTokens;
-    const current = estimator.estimateText(contentText(compacted[i]));
-    compacted[i] = trimMessageContent(compacted[i], Math.max(1, current - overage - 16), estimator);
+    const current = estimator.estimateText(contentText(message));
+    compacted[i] = trimMessageContent(message, Math.max(1, current - overage - 16), estimator);
     tokens = estimateMessages(estimator, compacted);
   }
   if (tokens > maxContextTokens && compacted.length > 0) {
+    const first = compacted[0];
+    if (!first) return { messages: compacted, tokens };
     const otherTokens = estimateMessages(estimator, compacted.slice(1));
-    compacted[0] = trimWholeMessageToBudget(compacted[0], Math.max(1, maxContextTokens - otherTokens), estimator);
+    compacted[0] = trimWholeMessageToBudget(first, Math.max(1, maxContextTokens - otherTokens), estimator);
     tokens = estimateMessages(estimator, compacted);
   }
   while (tokens > maxContextTokens && compacted.length > 2) {
-    compacted = [compacted[0], ...compacted.slice(2)];
+    const first = compacted[0];
+    if (!first) break;
+    compacted = [first, ...compacted.slice(2)];
     tokens = estimateMessages(estimator, compacted);
   }
   if (tokens > maxContextTokens && compacted.length > 1) {
-    compacted[1] = trimWholeMessageToBudget(compacted[1], Math.max(1, maxContextTokens - estimateMessages(estimator, [compacted[0]])), estimator);
+    const first = compacted[0];
+    const second = compacted[1];
+    if (!first || !second) return { messages: compacted, tokens };
+    compacted[1] = trimWholeMessageToBudget(second, Math.max(1, maxContextTokens - estimateMessages(estimator, [first])), estimator);
     tokens = estimateMessages(estimator, compacted);
   }
   if (tokens > maxContextTokens && compacted.length === 1) {
-    compacted[0] = trimWholeMessageToBudget(compacted[0], maxContextTokens, estimator);
+    const first = compacted[0];
+    if (!first) return { messages: compacted, tokens };
+    compacted[0] = trimWholeMessageToBudget(first, maxContextTokens, estimator);
     tokens = estimateMessages(estimator, compacted);
   }
   return { messages: compacted, tokens };

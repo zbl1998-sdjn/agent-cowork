@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 
 import { assertTrustedPath } from '../security/path-policy.js';
+import { omitUndefined } from '../util/object.js';
 
 export type HttpError = Error & { statusCode?: number };
 export type LiveArtifactDataSource =
@@ -144,12 +145,12 @@ export function normalizeLiveArtifactSpec({ id, title, viz, dataUrl, dataSource 
   }
   const artifactId = id ? assertArtifactId(id) : createArtifactId();
   const resolvedDataUrl = dataUrl || `/api/artifacts/data/${artifactId}`;
-  return {
+  return omitUndefined({
     id: artifactId,
     title: title || '活页 Artifact',
     kind: viz.kind,
     viz,
     dataUrl: resolvedDataUrl,
     dataSource: normalizeLiveArtifactDataSource(dataSource),
-  };
+  });
 }

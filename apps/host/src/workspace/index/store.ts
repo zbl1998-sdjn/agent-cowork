@@ -5,6 +5,7 @@
 // 依赖:L0 path-policy + 同目录 chunk。导出:createWorkspaceIndex。
 import path from 'node:path';
 import { assertTrustedPath } from '../../security/path-policy.js';
+import { omitUndefined } from '../../util/object.js';
 import { chunkText, type WorkspaceChunk } from './chunk.js';
 
 export type UpsertInput = { path?: unknown; text?: unknown; chunks?: WorkspaceChunk[]; maxChunkLines?: number; maxChunkBytes?: number };
@@ -82,7 +83,7 @@ export function createWorkspaceIndex({ root }: { root?: unknown } = {}): Workspa
           id: chunk.id || `${sourcePath}:${chunk.startLine}-${chunk.endLine}:${index}`,
           sourcePath,
         }))
-        : chunkText({ sourcePath, text: String(text || ''), maxChunkLines, maxChunkBytes });
+        : chunkText(omitUndefined({ sourcePath, text: String(text || ''), maxChunkLines, maxChunkBytes }));
       byPath.set(sourcePath, nextChunks);
       return nextChunks;
     },

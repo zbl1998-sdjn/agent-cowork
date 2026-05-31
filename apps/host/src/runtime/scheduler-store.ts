@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createSqliteDatabase, type SqliteDatabase } from '../storage/sqlite.js';
+import { omitUndefined } from '../util/object.js';
 
 const SCHEDULE_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 
@@ -220,7 +221,7 @@ export function createScheduleStore({
   db,
 }: CreateScheduleStoreOptions = {}): FileScheduleStore | SqliteScheduleStore {
   if (backend === 'sqlite') {
-    return new SqliteScheduleStore({ dbPath, db });
+    return new SqliteScheduleStore(omitUndefined({ dbPath, db }));
   }
-  return new FileScheduleStore({ storeDir });
+  return new FileScheduleStore(omitUndefined({ storeDir }));
 }

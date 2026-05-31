@@ -19,7 +19,7 @@ import { connectorScopeKey, defaultConnectorScopes } from './connectorScopes';
 
 type OAuthApprovalView = { approvalId: string; scopes: string[] };
 
-interface UseConnectorsPanelStateOptions { trustedRoot: string; onConnected?: (servers: string[]) => void; }
+interface UseConnectorsPanelStateOptions { trustedRoot: string; onConnected?: ((servers: string[]) => void) | undefined; }
 
 function withoutRecordKey<T>(record: Record<string, T>, keyToRemove: string): Record<string, T> {
   const { [keyToRemove]: _removed, ...remaining } = record;

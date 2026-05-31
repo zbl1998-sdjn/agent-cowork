@@ -49,7 +49,7 @@ function clipUtf8(text: unknown, maxBytes: number): string {
   const buf = Buffer.from(String(text), 'utf8');
   if (buf.length <= maxBytes) return buf.toString('utf8');
   let end = maxBytes;
-  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && ((buf[end] ?? 0) & 0xc0) === 0x80) end -= 1;
   return buf.slice(0, end).toString('utf8');
 }
 /** 校验事实 key:非空、不超长、仅允许字母数字中文及少量符号。 */

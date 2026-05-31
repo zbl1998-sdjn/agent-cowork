@@ -193,7 +193,7 @@ export function createPostgresRunsIndex(options: PostgresRunsIndexOptions = {}):
 /** 包装异步索引,使 upsert/remove 的 fire-and-forget 写吞掉 rejection,读方法原样透传。 */
 export function withSafeWrites(index: AsyncRunsIndex): AsyncRunsIndex {
   const close = index.close;
-  return {
+  const wrapped: Omit<AsyncRunsIndex, 'close'> = {
     upsert(record, context) {
       const result = index.upsert(record, context);
       result.then(undefined, () => undefined);
@@ -208,6 +208,6 @@ export function withSafeWrites(index: AsyncRunsIndex): AsyncRunsIndex {
     list: (options) => index.list(options),
     size: () => index.size(),
     stats: (options) => index.stats(options),
-    close: close ? () => close.call(index) : undefined,
   };
+  return close ? { ...wrapped, close: () => close.call(index) } : wrapped;
 }

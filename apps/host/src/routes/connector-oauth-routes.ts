@@ -6,7 +6,9 @@
 import crypto from 'node:crypto';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { completeGitHubDeviceFlow, fetchGitHubViewer, startGitHubDeviceFlow } from '../connectors/oauth-github.js';
-import { normalizeOAuthScopes, oauthPermissions, selectedOAuthPermissions } from '../connectors/oauth-permissions.js';
+import { omitUndefined } from '../util/object.js';
+import { normalizeOAuthScopes, selectedOAuthPermissions } from '../connectors/oauth-permissions.js';
+import { createConnectorOAuthSession } from './connector-oauth-session.js';
 import {
   errorMessage,
   errorStatus,
@@ -17,26 +19,16 @@ import {
   oauthFilter,
   oauthIdentity,
 } from './connector-oauth-route-utils.js';
+import { sendConnectorOAuthStatus, unsupportedOAuthConnector } from './connector-oauth-status.js';
 import { parseConnectorOAuthBody } from './connector-oauth-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import type { OAuthPermission } from '../connectors/oauth-permissions.js';
 import type { CredentialStore } from '../security/credential-store.js';
 import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
+import type { ConnectorOAuthSession } from './connector-oauth-session.js';
 import type { RequestContext } from './connector-oauth-route-utils.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type GitHubOAuthConfig = { github?: { clientId?: unknown } };
-
-export type ConnectorOAuthSession = {
-  provider: 'github';
-  clientId: string;
-  deviceCode: string;
-  scopes: string[];
-  permissions?: OAuthPermission[];
-  tenantId?: string;
-  userId?: string;
-  expiresAtMs: number;
-};
 
 export type ConnectorOAuthRouteOptions = {
   request: RouteRequest;
@@ -51,10 +43,6 @@ export type ConnectorOAuthRouteOptions = {
   oauthConfig?: GitHubOAuthConfig;
 };
 
-function unsupportedOAuthConnector(response: HttpResponseLike): void {
-  sendJson(response, 400, { error: 'unsupported OAuth connector' });
-}
-
 export async function handleConnectorOAuthRoutes({
   request,
   response,
@@ -68,24 +56,7 @@ export async function handleConnectorOAuthRoutes({
   oauthConfig,
 }: ConnectorOAuthRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/connectors/oauth/status') {
-    const id = requestUrl.searchParams.get('id') || requestUrl.searchParams.get('provider') || '';
-    if (!isGitHub(id) || !credentialStore) {
-      unsupportedOAuthConnector(response);
-      return true;
-    }
-    const accounts = credentialStore.list(oauthFilter(requestContext, 'github'));
-    sendJson(response, 200, {
-      context: requestContext,
-      provider: 'github',
-      connected: accounts.length > 0,
-      accounts,
-      configured: Boolean(githubClientId(oauthConfig)),
-      requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
-      configurationMessage: githubClientId(oauthConfig)
-        ? 'GitHub OAuth client id 已配置。'
-        : 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。',
-      permissions: oauthPermissions(githubConnector()),
-    });
+    sendConnectorOAuthStatus(omitUndefined({ response, requestUrl, requestContext, credentialStore, oauthConfig }));
     return true;
   }
 
@@ -154,23 +125,21 @@ export async function handleConnectorOAuthRoutes({
           scopes,
           context: requestContext,
         });
-        const started = await startGitHubDeviceFlow({
+        const started = await startGitHubDeviceFlow(omitUndefined({
           clientId,
           scopes,
           fetchImpl: oauthFetch,
-        });
+        }));
         const sessionId = crypto.randomUUID();
         const expiresAtMs = Date.now() + Math.max(1, started.expiresIn) * 1000;
-        oauthSessions.set(sessionId, {
-          provider: 'github',
+        oauthSessions.set(sessionId, createConnectorOAuthSession({
           clientId,
           deviceCode: started.deviceCode,
           scopes: started.scopes,
           permissions: selectedOAuthPermissions(connector, started.scopes),
-          tenantId: requestContext.tenantId,
-          userId: requestContext.userId,
+          requestContext,
           expiresAtMs,
-        });
+        }));
         sendJson(response, 200, {
           context: requestContext,
           provider: 'github',
@@ -212,11 +181,11 @@ export async function handleConnectorOAuthRoutes({
         return;
       }
       try {
-        const completed = await completeGitHubDeviceFlow({
+        const completed = await completeGitHubDeviceFlow(omitUndefined({
           clientId: session.clientId,
           deviceCode: session.deviceCode,
           fetchImpl: oauthFetch,
-        });
+        }));
         if (completed.status === 'pending') {
           sendJson(response, 202, {
             context: requestContext,
@@ -226,7 +195,7 @@ export async function handleConnectorOAuthRoutes({
           });
           return;
         }
-        const account = await fetchGitHubViewer({ accessToken: completed.accessToken, fetchImpl: oauthFetch });
+        const account = await fetchGitHubViewer(omitUndefined({ accessToken: completed.accessToken, fetchImpl: oauthFetch }));
         const summary = credentialStore.put(oauthIdentity(requestContext, 'github', account.login), {
           accessToken: completed.accessToken,
           tokenType: completed.tokenType,

@@ -14,6 +14,7 @@ import { analyzeDataFile } from '../tools/data/report.js';
 import { createDataChartArtifact } from '../tools/data/artifact.js';
 import { createShellTool } from './agent-tools-shell.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
+import { omitUndefined } from '../util/object.js';
 import type { AgentTool, AgentToolsContext } from './agent-tools-types.js';
 
 export type { AgentTool, AgentToolsContext, SandboxLike, SandboxLimits, ToolArgs } from './agent-tools-types.js';
@@ -106,7 +107,8 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
           }
           const lines = text.split('\n');
           for (let i = 0; i < lines.length && hits.length < limit; i += 1) {
-            if (re.test(lines[i])) hits.push({ file: rel, line: i + 1, text: lines[i].slice(0, 200) });
+            const lineText = lines[i] ?? '';
+            if (re.test(lineText)) hits.push({ file: rel, line: i + 1, text: lineText.slice(0, 200) });
           }
         }
         return { pattern: args.pattern, hits };
@@ -160,7 +162,7 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
   ];
 
   if (sandbox) {
-    tools.push(createShellTool({ root, sandbox, sandboxLimits, context: ctx.context }));
+    tools.push(createShellTool(omitUndefined({ root, sandbox, sandboxLimits, context: ctx.context })));
   }
   return tools;
 }

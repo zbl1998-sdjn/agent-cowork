@@ -5,6 +5,7 @@
 // 依赖:仅标准库(fetch / TextDecoder)。
 // 导出:parseAnthropicStream(流解析)、createAnthropicProvider(工厂,产出
 //       带 id/chatCompletion 的 Provider,供注册表 index 登记)。
+import { omitUndefined } from '../../util/object.js';
 import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
@@ -102,7 +103,7 @@ function toAnthropicMessages(messages: unknown[] = []): { system?: string; messa
     }
     out.push({ role: 'user', content: [{ type: 'text', text: textContent(item.content) }] });
   }
-  return { system: system.join('\n\n') || undefined, messages: out };
+  return omitUndefined({ system: system.join('\n\n') || undefined, messages: out });
 }
 
 function mergeUsage(target: UsageTotals, usage: unknown = {}): void {
@@ -213,15 +214,15 @@ export function createAnthropicProvider(): Provider {
         'anthropic-version': ANTHROPIC_VERSION,
       };
       if (config.userAgent) headers['user-agent'] = String(config.userAgent);
-      const resp = await fetcher(`${baseUrl}/messages`, {
+      const resp = await fetcher(`${baseUrl}/messages`, omitUndefined({
         method: 'POST',
         headers,
         body: JSON.stringify(body),
         signal,
-      });
+      }));
       if (!resp.ok) throw new Error(`anthropic request failed with status ${resp.status}`);
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
-      const message = reader ? await parseAnthropicStream(reader, { onContent }) : fromAnthropicMessage(await resp.json());
+      const message = reader ? await parseAnthropicStream(reader, omitUndefined({ onContent })) : fromAnthropicMessage(await resp.json());
       return { ...message, provider: 'anthropic', model };
     },
   };

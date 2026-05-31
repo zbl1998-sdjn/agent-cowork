@@ -55,9 +55,9 @@ describe('ApprovalActions', () => {
     expect(buttons).toHaveLength(3);
     expect(buttons.every((button) => button.type === Button)).toBe(true);
 
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
-    buttons[2].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
+    buttons[2]!.props.onClick();
 
     expect(onApprove).toHaveBeenCalledTimes(1);
     expect(onViewDiff).toHaveBeenCalledTimes(1);

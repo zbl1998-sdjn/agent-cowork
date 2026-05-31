@@ -55,12 +55,12 @@ export function xmlToText(xml: unknown): string {
 export function decodePdfLiteral(input: string): string {
   let output = '';
   for (let i = 0; i < input.length; i += 1) {
-    const ch = input[i];
+    const ch = input[i] ?? '';
     if (ch !== '\\') {
       output += ch;
       continue;
     }
-    const next = input[i + 1];
+    const next = input[i + 1] ?? '';
     i += 1;
     if (next === 'n') output += '\n';
     else if (next === 'r') output += '\r';
@@ -69,8 +69,10 @@ export function decodePdfLiteral(input: string): string {
     else if (next === 'f') output += '\f';
     else if (/[0-7]/.test(next || '')) {
       let octal = next;
-      for (let j = 0; j < 2 && /[0-7]/.test(input[i + 1] || ''); j += 1) {
-        octal += input[i + 1];
+      for (let j = 0; j < 2; j += 1) {
+        const digit = input[i + 1];
+        if (!digit || !/[0-7]/.test(digit)) break;
+        octal += digit;
         i += 1;
       }
       output += String.fromCharCode(Number.parseInt(octal, 8));

@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { extractDocumentText } from '../workspace/document-extractor.js';
 import { assertTrustedPath } from '../security/path-policy.js';
+import { omitUndefined } from '../util/object.js';
 import { buildRecipeOperations, getRecipe } from './registry.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
@@ -182,7 +183,7 @@ export function runRecipe({
   emit('preview', { operations, count: operations.length });
   emit('awaiting_approval', { count: operations.length });
 
-  const sourceSummaries: RecipeSource[] = sources.map((source) => ({
+  const sourceSummaries: RecipeSource[] = sources.map((source) => omitUndefined({
     path: source.path,
     relativePath: source.relativePath,
     kind: source.kind,
