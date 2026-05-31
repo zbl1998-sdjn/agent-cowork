@@ -1,4 +1,3 @@
-// @ts-check
 // 实时制品·渲染阶段:把 viz 规格渲染成带「刷新」按钮的单页活页 HTML(host · L1 领域层 · artifacts)
 // ---------------------------------------------------------------------------
 // 职责:实时制品流水线「规格→渲染→刷新」的中间环——产出快照页面,内置共享的
@@ -7,16 +6,21 @@
 // 依赖:live-spec(CHART_KINDS);图表库走 cdnjs。
 // 导出:renderLivePage(生成活页 HTML 字符串)
 import { CHART_KINDS } from './live-spec.js';
+import type { VizSpec } from './viz.js';
 
 const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
 const MERMAID_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js';
 const U2028 = new RegExp(String.fromCharCode(0x2028), 'g');
 const U2029 = new RegExp(String.fromCharCode(0x2029), 'g');
 
-/** @typedef {{ kind?: string, [key: string]: unknown }} VizSpec */
+type RenderLivePageOptions = {
+  title?: unknown;
+  viz: VizSpec;
+  dataUrl?: string;
+};
 
-/** 序列化成可安全嵌入 <script> 的 JSON,转义 < > & 与行/段分隔符以防脚本逃逸。 @param {unknown} value @returns {string} */
-function safeJson(value) {
+/** 序列化成可安全嵌入 <script> 的 JSON,转义 < > & 与行/段分隔符以防脚本逃逸。 */
+function safeJson(value: unknown): string {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
@@ -25,8 +29,8 @@ function safeJson(value) {
     .replace(U2029, '\\u2029');
 }
 
-/** HTML 转义,用于标题等注入正文的文本。 @param {unknown} value @returns {string} */
-function escapeHtml(value) {
+/** HTML 转义,用于标题等注入正文的文本。 */
+function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -35,8 +39,8 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-/** 按 viz.kind 决定要插入哪个 cdnjs 脚本标签(图表用 Chart.js,流程图用 Mermaid)。 @param {unknown} kind @returns {string} */
-function libTag(kind) {
+/** 按 viz.kind 决定要插入哪个 cdnjs 脚本标签(图表用 Chart.js,流程图用 Mermaid)。 */
+function libTag(kind: unknown): string {
   const value = String(kind || '');
   if (CHART_KINDS.has(value)) {
     return `    <script src="${CHART_CDN}"></script>`;
@@ -95,8 +99,8 @@ const CLIENT_RENDERER = `
           else { renderChart(root, spec); }
         }`;
 
-/** 生成实时制品活页:首屏渲染 viz 快照,并支持按钮 fetch(dataUrl) 与 postMessage 两种刷新。 @param {{ title?: unknown, viz: VizSpec, dataUrl?: string }} options @returns {string} */
-export function renderLivePage({ title, viz, dataUrl }) {
+/** 生成实时制品活页:首屏渲染 viz 快照,并支持按钮 fetch(dataUrl) 与 postMessage 两种刷新。 */
+export function renderLivePage({ title, viz, dataUrl }: RenderLivePageOptions): string {
   const safeTitle = escapeHtml(title || '活页 Artifact');
   return `<!doctype html>
 <html lang="zh-CN">
