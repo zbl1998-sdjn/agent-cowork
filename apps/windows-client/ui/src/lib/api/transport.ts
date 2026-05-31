@@ -1,3 +1,8 @@
+// HTTP 传输层(UI · lib/api 传输层)
+// ---------------------------------------------------------------------------
+// 职责:前端与 Node host 通信的「唯一底层出口」——解析 host 基址(区分打包态 tauri.localhost / Vite :5173 /
+//       挂载在 host 后的同源)、统一 fetch 封装(注入鉴权头、超时、错误归一化)。各域 API 都建立在它之上。
+// 依赖:@tauri-apps/api(取外壳信息)。导出:defaultHostBase + 请求封装。
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 
 export function defaultHostBase(): string {

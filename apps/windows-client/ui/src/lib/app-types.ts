@@ -1,3 +1,4 @@
+// 应用态类型(UI · lib):App 编排层用到的视图模型/会话/UI 状态类型聚合,补充 lib/types 的领域类型。
 import type { ProgressLineProps } from '../components/ProgressLine';
 import type { ApprovalState, FileOperation, SourceRef, SubtaskGroupItem, TodoItem } from './types';
 

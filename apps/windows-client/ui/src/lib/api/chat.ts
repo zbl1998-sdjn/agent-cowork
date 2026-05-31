@@ -1,3 +1,4 @@
+// 聊天 API(UI · lib/api 传输层):封装 Agent 流式聊天(SSE)——发起对话请求、读取事件流、取消/续跑。
 import { authHeaders, hostReady, postJson, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse, type SsePayload } from './sse';
 import type { TodoItem, TodoStatus } from '../types';

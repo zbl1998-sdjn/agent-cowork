@@ -1,3 +1,4 @@
+// 运行历史 API(UI · lib/api 传输层):封装 /api/runs/* —— 拉取运行历史列表、单条记录与事件时间线。
 import type { RunEvent, RunRecord } from '../types';
 import { getJson } from './transport';
 import { authHeaders, hostReady, resolveUrl } from './transport';

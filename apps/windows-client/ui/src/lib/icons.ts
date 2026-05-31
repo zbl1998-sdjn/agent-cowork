@@ -1,3 +1,4 @@
+// 图标常量(UI · lib):应用外框 emoji 图标的单一事实来源(集中管理,供 check:icons 看护使用一致性)。
 // Single source of truth for emoji icons that appear in the chrome of the
 // app (header buttons, composer triggers, panel chips). Centralised so:
 //   - swapping to a real SVG icon set later is a one-file change;

@@ -1,3 +1,5 @@
+// 友好错误(UI · lib):把底层错误(网络/fetch/HTTP/JSON 解析)翻译成「非技术用户可读、可行动」的简短中文。
+// 呼应 host 的「永不空交代/错误可读」原则。依赖:无。
 // Pure helper: turn a low-level error (network / fetch / HTTP / JSON parse)
 // into a short Chinese sentence a non-technical user can act on.
 //

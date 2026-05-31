@@ -1,3 +1,4 @@
+// 提示词 API(UI · lib/api 传输层):封装 /api/prompt/* —— 把用户草稿交给精炼器做提示词优化。
 import { postJson } from './transport';
 
 export interface PromptRefineContext {

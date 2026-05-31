@@ -1,3 +1,5 @@
+// 聊天流回调(UI · lib):构建 Agent SSE 流的事件回调集——把后端事件(消息/工具/审批/进度/收尾)映射成
+// 对前端状态的更新与对审批的应答。是 App/hooks 与 api/chat 流之间的胶水。依赖:lib/api + api/chat 类型。
 import { respondApproval } from './api';
 import type { AgentStreamHandlers } from './api/chat';
 import { mergeTodoUpdate } from './app-logic';

@@ -1,3 +1,5 @@
+// 会话分支(UI · lib):支持「从某条消息分叉重答」的纯逻辑——创建/切换分支、按分支裁剪消息树。
+// 依赖:app-types + 同层 conversations。
 import type { Conversation, ConversationBranch, Message } from './app-types';
 import { convTitle } from './conversations';
 

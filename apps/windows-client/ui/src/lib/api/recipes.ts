@@ -1,3 +1,4 @@
+// 配方 API(UI · lib/api 传输层):封装 /api/recipes/* —— 列出配方、运行配方、保存自定义配方。
 import { getJson, newIdempotencyKey, postJson, type PostBody } from './transport';
 
 export async function listRecipes<TRecipe = unknown>(): Promise<TRecipe[]> {

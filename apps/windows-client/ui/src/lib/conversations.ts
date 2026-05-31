@@ -1,3 +1,5 @@
+// 会话工具(UI · lib):多会话历史栏的纯函数(标题推断、排序、增删改的不可变更新等),从 App.tsx 抽出以便
+// 脱离 DOM/React 单测。依赖:app-types。
 // Pure, testable helpers for the multi-conversation history rail. Kept out of
 // App.tsx so they can be unit-tested without a DOM/React harness.
 import { extractSuggestions } from './md';

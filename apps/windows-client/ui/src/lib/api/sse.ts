@@ -1,3 +1,4 @@
+// SSE 解析(UI · lib/api 传输层):把 host 的 Server-Sent Events 流解析成事件对象,供聊天/运行时间线消费。
 export type SsePayload = Record<string, unknown>;
 
 export async function streamSse(response: Response, onFrame: (type: string, data: SsePayload) => void): Promise<void> {

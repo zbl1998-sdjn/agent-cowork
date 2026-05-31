@@ -1,3 +1,5 @@
+// 可观测参数摘要(UI · lib):把工具调用的 args 对象浓缩成一句可读摘要,让可观测面板能显示「调用了什么」。
+// 依赖:无。
 // Pure helper: turn a tool-call `args` blob into a short human-friendly
 // summary so the Observability panel shows WHAT was invoked when the event
 // doesn't carry an explicit `reason` field.

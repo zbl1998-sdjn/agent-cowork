@@ -1,3 +1,4 @@
+// 搜索 API(UI · lib/api 传输层):封装 /api/search/* —— 在可信工作区内做文件名/内容或 RAG 检索。
 import { postJson } from './transport';
 import type { SourceRef } from '../types';
 

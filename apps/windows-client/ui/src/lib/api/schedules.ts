@@ -1,3 +1,4 @@
+// 计划任务 API(UI · lib/api 传输层):封装 /api/schedules/* —— 创建/列出/暂停/删除计划任务(cron/定时)。
 import { newIdempotencyKey, getJson, postJson } from './transport';
 
 export interface ScheduleItem {

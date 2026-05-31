@@ -1,3 +1,5 @@
+// 运行可观测整形(UI · lib):把运行的用量/耗时/工具调用整理成可展示的「可观测信息」(费用/时长/参数摘要),
+// 供时间线与运行详情面板。依赖:同层 usage-display / observability-args。
 import { formatDurationMs, formatEstimatedCost, formatTokenCount } from './usage-display';
 import { summariseArgs } from './observability-args';
 import type { RunRecord, SourceRef } from './types';

@@ -1,3 +1,4 @@
+// 起步建议(UI · lib):为空会话/新用户生成「起步卡片」建议(基于配方/角色),引导用户快速上手。依赖:无。
 export interface StarterRecipe {
   name?: string | null;
   summary?: string | null;

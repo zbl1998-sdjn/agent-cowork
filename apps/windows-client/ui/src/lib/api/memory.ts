@@ -1,3 +1,4 @@
+// 记忆 API(UI · lib/api 传输层):封装 /api/memory/* —— 记忆写入/查询/分层读取与用户画像。
 import { getJson, postJson } from './transport';
 
 export type MemoryProfileType = 'term' | 'project' | 'preference';

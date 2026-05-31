@@ -1,3 +1,5 @@
+// 运行时依赖逻辑(UI · lib):把后端返回的依赖探测结果整理成前端可展示的状态(就绪/缺失/可安装),
+// 并算出安装动作。配合 api/runtimeDependencies 与依赖面板。依赖:lib/types。
 import type {
   RuntimeDependency,
   RuntimeDependencyCleanupPlanResponse,

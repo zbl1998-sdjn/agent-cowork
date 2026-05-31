@@ -1,3 +1,5 @@
+// 输入框触发器(UI · lib):解析输入框里的触发语法——模板(/)、@提及、历史(↑)——并算出弹窗候选项与
+// 替换区间。是智能输入体验的纯逻辑核心。依赖:无。
 export type ComposerTriggerMode = 'template' | 'mention' | 'history';
 
 export interface ComposerTrigger {

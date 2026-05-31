@@ -1,3 +1,4 @@
+// 制品 API(UI · lib/api 传输层):封装 /api/artifacts/* —— 列出/重命名制品、取活页制品 HTML 与下载地址。
 import { authHeaders, getJson, hostReady, newIdempotencyKey, postJson, resolveUrl } from './transport';
 
 export async function fetchArtifactHtml(viewUrl: string): Promise<string> {

@@ -1,3 +1,4 @@
+// 文件 API(UI · lib/api 传输层):封装 /api/files|workspace/* —— 列文件树、读/预览、上传、批量文件操作与回滚。
 import { postJson } from './transport';
 
 export interface FilePreviewResult {

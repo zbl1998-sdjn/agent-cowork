@@ -1,3 +1,4 @@
+// 桌面更新 API(UI · lib/api 传输层):经 Tauri invoke 触发外壳的检查更新/安装更新命令。
 import { invokeDesktop } from './transport';
 
 export interface DesktopUpdateStatus {

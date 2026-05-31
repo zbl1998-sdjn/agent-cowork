@@ -1,3 +1,4 @@
+// 工具 API(UI · lib/api 传输层):封装 /api/tools/* —— 列出/检索工具、调用工具(写操作带幂等键)。
 import { getJson, newIdempotencyKey, postJson } from './transport';
 
 export interface ToolDescriptor {

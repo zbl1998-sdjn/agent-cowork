@@ -1,3 +1,4 @@
+// 引导逻辑(UI · lib):新用户引导的纯逻辑与本地状态键(是否已完成引导、所选角色等),配合 api/onboarding 推荐。依赖:无。
 export const ONBOARDING_DONE_KEY = 'kcw.onboardingDone';
 
 export type OnboardingRole = 'office' | 'developer' | 'research' | 'operations';

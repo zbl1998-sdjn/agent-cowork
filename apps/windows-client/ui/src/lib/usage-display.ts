@@ -1,3 +1,4 @@
+// 用量展示(UI · lib):把 token 数、费用、时长格式化成易读字符串(如 1.2k tokens、$0.003、1.4s),供可观测/计费展示。依赖:无。
 export interface UsageTransparency {
   schemaVersion?: number;
   model?: string;

@@ -1,3 +1,4 @@
+// 运行时依赖 API(UI · lib/api 传输层):封装依赖探测/安装端点 —— 查询外部运行时是否就绪、触发按需安装。
 import { getJson, postJson, type PostBody } from './transport';
 
 export type RuntimeDependencyStatus = 'available' | 'configured' | 'missing' | 'unknown' | 'not_applicable' | 'degraded' | string;

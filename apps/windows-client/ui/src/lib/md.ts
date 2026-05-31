@@ -1,3 +1,7 @@
+// Markdown 渲染(UI · lib)
+// ---------------------------------------------------------------------------
+// 职责:零依赖的轻量 Markdown 渲染器。先转义 HTML、再套用少量行内/块级变换,从源头保证 XSS 安全。
+// 依赖:无。导出:Markdown→安全 HTML 渲染函数。
 // Tiny, dependency-free Markdown renderer. HTML is escaped FIRST, then a small
 // set of inline/block transforms are applied, so the output is XSS-safe by
 // construction (no raw user HTML survives). Covers the common chat cases:

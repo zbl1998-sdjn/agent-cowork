@@ -1,3 +1,4 @@
+// 会话 API(UI · lib/api 传输层):封装 /api/conversations/* —— 会话列出/读取/创建/改名/删除。
 import { getJson, sendJsonMethod } from './transport';
 
 export interface StoredConversation {

@@ -1,3 +1,4 @@
+// 鉴权 API(UI · lib/api 传输层):封装 /api/auth/* —— 注册/登录/访客/登出/会话查询,并管理本地 token。
 import { getAuthToken, getJson, postJson, setAuthToken } from './transport';
 
 export interface AuthIdentity {

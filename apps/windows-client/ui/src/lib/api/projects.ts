@@ -1,3 +1,4 @@
+// 项目 API(UI · lib/api 传输层):封装 /api/projects/* —— 项目增删查与切换(写操作带幂等键)。
 import { getJson, newIdempotencyKey, postJson, sendJsonMethod } from './transport';
 
 export interface ProjectRecord {

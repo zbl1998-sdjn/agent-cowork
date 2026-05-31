@@ -1,3 +1,4 @@
+// 计划任务人话化(UI · lib):把调度器原始字段(cron/下次触发等)转成一眼能懂的简短中文短语。依赖:无。
 // Pure helpers: turn raw scheduler fields into one short Chinese phrase a
 // non-technical user can read at a glance.
 //

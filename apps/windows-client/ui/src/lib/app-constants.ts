@@ -1,3 +1,4 @@
+// 应用常量(UI · lib):集中存放界面默认值/限额/初始会话等常量(配置而非硬编码,plan/01 B.7)。
 import type { Conversation } from './app-types';
 
 export const GUEST_KEY = 'kcw.guest';
