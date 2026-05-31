@@ -311,6 +311,19 @@ test('GET /api/tools/search ranks matching tools', async () => {
   }
 });
 
+test('GET /api/tools/search rejects malformed limit', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/tools/search?q=sandbox&limit=zero');
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /number|limit/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('POST /api/tools/call invokes a read-only tool, is idempotent, and 404s unknown tools', async () => {
   const trustedRoot = tempRoot();
   fs.writeFileSync(path.join(trustedRoot, 'notes.txt'), 'tool-ok search target', 'utf8');
@@ -333,6 +346,23 @@ test('POST /api/tools/call invokes a read-only tool, is idempotent, and 404s unk
       body: { name: 'does.not.exist', args: {} },
     });
     assert.equal(unknown.status, 404);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/tools/call rejects malformed route body', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/tools/call', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'call-malformed' },
+      body: { name: 42, args: {} },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /string|name/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -496,6 +526,23 @@ test('POST /api/subagent/parallel runs child agents concurrently and records an 
     });
     assert.equal(replay.body.idempotentReplay, true);
     assert.equal(replay.body.runId, res.body.runId);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/subagent/parallel rejects malformed route body', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/subagent/parallel', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'agent-parallel-malformed' },
+      body: { goal: 'bad', agents: 'one' },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /agents|array/i);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
