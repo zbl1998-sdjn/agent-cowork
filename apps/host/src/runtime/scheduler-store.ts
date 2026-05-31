@@ -3,59 +3,77 @@
 // 职责:计划任务(日程)的持久化——文件后端 FileScheduleStore 与 SQLite 后端 SqliteScheduleStore 同接口
 //       (端口与适配器),按 tenant/user 隔离地增删查日程记录。依赖:storage/sqlite + node:fs/path。
 // 导出:FileScheduleStore / SqliteScheduleStore / createScheduleStore + tenant/user 归一化。
-// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import { createSqliteDatabase } from '../storage/sqlite.js';
+import { createSqliteDatabase, type SqliteDatabase } from '../storage/sqlite.js';
 
 const SCHEDULE_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 
-/**
- * @typedef {{ get(...params: unknown[]): unknown, run(...params: unknown[]): { changes?: number }, all(...params: unknown[]): unknown[] }} SqliteStatement
- * @typedef {{ prepare(sql: string): SqliteStatement }} SqliteDatabase
- * @typedef {{ id: string, tenantId: string, userId?: string, traceId?: string | null, name: string, kind: string, status: string, cron?: string | null, fireAt?: string | null, nextFireAt?: string | null, lastFiredAt?: string | null, lastRunId?: string | null, version?: number, runs?: number, createdAt?: string, updatedAt?: string, [key: string]: unknown }} ScheduleRecord
- * @typedef {{ storeDir?: string }} FileScheduleStoreOptions
- * @typedef {{ dbPath?: string, db?: SqliteDatabase | null }} SqliteScheduleStoreOptions
- * @typedef {{ backend?: string, storeDir?: string, dbPath?: string, db?: SqliteDatabase | null }} CreateScheduleStoreOptions
- * @typedef {{ tenantId?: unknown, userId?: unknown }} ScheduleListOptions
- * @typedef {{ schedule_json: string }} ScheduleRow
- */
+export type ScheduleRecord = {
+  id: string;
+  tenantId: string;
+  userId?: string;
+  traceId?: string | null;
+  name: string;
+  kind: string;
+  status: string;
+  cron?: string | null;
+  cronHuman?: string | null;
+  fireAt?: string | null;
+  nextFireAt?: string | null;
+  lastFiredAt?: string | null;
+  lastRunId?: string | null;
+  lastError?: string | null;
+  idempotencyKey?: string | null;
+  payload?: unknown;
+  version?: number;
+  runs?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+};
+export type FileScheduleStoreOptions = { storeDir?: string };
+export type SqliteScheduleStoreOptions = { dbPath?: string; db?: SqliteDatabase | null };
+export type CreateScheduleStoreOptions = {
+  backend?: string;
+  storeDir?: string;
+  dbPath?: string;
+  db?: SqliteDatabase | null;
+};
+export type ScheduleListOptions = { tenantId?: unknown; userId?: unknown };
+type ScheduleRow = { schedule_json: string };
 
-/** @param {string} dir @returns {string} */
-function ensureDirSync(dir) {
+function ensureDirSync(dir: string): string {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-/** @param {unknown} value @param {number} maxLength @returns {string} */
-function clampString(value, maxLength) {
+function clampString(value: unknown, maxLength: number): string {
   const text = String(value || '');
   return text.length > maxLength ? text.slice(0, maxLength) : text;
 }
 
-/** @param {unknown} value @returns {string} */
-export function normaliseTenantId(value) {
+export function normaliseTenantId(value: unknown): string {
   return clampString(value || 'tenant_local', 96).trim() || 'tenant_local';
 }
 
-/** @param {unknown} value @returns {string} */
-export function normaliseUserId(value) {
+export function normaliseUserId(value: unknown): string {
   return clampString(value || 'user_local', 96).trim() || 'user_local';
 }
 
-/** @param {string} file @returns {ScheduleRecord | null} */
-function readScheduleFile(file) {
+function readScheduleFile(file: string): ScheduleRecord | null {
   try {
     const raw = fs.readFileSync(file, 'utf8');
-    return /** @type {ScheduleRecord} */ (JSON.parse(raw));
+    return JSON.parse(raw) as ScheduleRecord;
   } catch {
     return null;
   }
 }
 
 export class FileScheduleStore {
-  /** @param {FileScheduleStoreOptions} [options] */
-  constructor({ storeDir } = {}) {
+  readonly storeDir: string;
+
+  constructor({ storeDir }: FileScheduleStoreOptions = {}) {
     if (!storeDir) {
       throw new Error('FileScheduleStore: storeDir required');
     }
@@ -63,22 +81,20 @@ export class FileScheduleStore {
     ensureDirSync(this.storeDir);
   }
 
-  /** @param {string} id @returns {string} */
-  _file(id) {
+  _file(id: string): string {
     if (!SCHEDULE_ID_RE.test(id)) {
       throw new Error('Scheduler: invalid schedule id');
     }
     return path.join(this.storeDir, `${id}.json`);
   }
 
-  /** @param {ScheduleListOptions} [options] @returns {ScheduleRecord[]} */
-  list({ tenantId, userId } = {}) {
+  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
     if (!fs.existsSync(this.storeDir)) {
       return [];
     }
     const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
     const wantUser = userId ? normaliseUserId(userId) : null;
-    const out = [];
+    const out: ScheduleRecord[] = [];
     for (const name of fs.readdirSync(this.storeDir)) {
       if (!name.endsWith('.json')) continue;
       const record = readScheduleFile(path.join(this.storeDir, name));
@@ -91,19 +107,16 @@ export class FileScheduleStore {
     return out;
   }
 
-  /** @param {string} id @returns {ScheduleRecord | null} */
-  get(id) {
+  get(id: string): ScheduleRecord | null {
     return readScheduleFile(this._file(id));
   }
 
-  /** @param {ScheduleRecord} record @returns {ScheduleRecord} */
-  save(record) {
+  save(record: ScheduleRecord): ScheduleRecord {
     fs.writeFileSync(this._file(record.id), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
     return record;
   }
 
-  /** @param {string} id @returns {boolean} */
-  remove(id) {
+  remove(id: string): boolean {
     const file = this._file(id);
     if (!fs.existsSync(file)) return false;
     fs.unlinkSync(file);
@@ -112,20 +125,18 @@ export class FileScheduleStore {
 }
 
 export class SqliteScheduleStore {
-  /** @param {SqliteScheduleStoreOptions} [options] */
-  constructor({ dbPath, db = null } = {}) {
+  readonly db: SqliteDatabase;
+
+  constructor({ dbPath, db = null }: SqliteScheduleStoreOptions = {}) {
     if (!db && (!dbPath || typeof dbPath !== 'string')) {
       throw new Error('SqliteScheduleStore: dbPath is required');
     }
-    this.db = db || createSqliteDatabase(/** @type {string} */ (dbPath));
+    this.db = db || createSqliteDatabase(dbPath as string);
   }
 
-  /** @param {ScheduleListOptions} [options] @returns {ScheduleRecord[]} */
-  list({ tenantId, userId } = {}) {
-    /** @type {string[]} */
-    const where = [];
-    /** @type {unknown[]} */
-    const params = [];
+  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
+    const where: string[] = [];
+    const params: unknown[] = [];
     if (tenantId) {
       where.push('tenant_id = ?');
       params.push(normaliseTenantId(tenantId));
@@ -140,19 +151,17 @@ export class SqliteScheduleStore {
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY COALESCE(next_fire_at, '')
     `).all(...params);
-    return rows.map((row) => /** @type {ScheduleRecord} */ (JSON.parse(/** @type {ScheduleRow} */ (row).schedule_json)));
+    return rows.map((row) => JSON.parse((row as ScheduleRow).schedule_json) as ScheduleRecord);
   }
 
-  /** @param {string} id @returns {ScheduleRecord | null} */
-  get(id) {
-    const row = /** @type {ScheduleRow | null | undefined} */ (this.db
+  get(id: string): ScheduleRecord | null {
+    const row = this.db
       .prepare('SELECT schedule_json FROM schedules WHERE id = ?')
-      .get(id));
-    return row ? /** @type {ScheduleRecord} */ (JSON.parse(row.schedule_json)) : null;
+      .get(id) as ScheduleRow | null | undefined;
+    return row ? JSON.parse(row.schedule_json) as ScheduleRecord : null;
   }
 
-  /** @param {ScheduleRecord} record @returns {ScheduleRecord} */
-  save(record) {
+  save(record: ScheduleRecord): ScheduleRecord {
     this.db.prepare(`
       INSERT INTO schedules (
         id, tenant_id, user_id, trace_id, name, kind, status, cron, fire_at,
@@ -198,15 +207,18 @@ export class SqliteScheduleStore {
     return record;
   }
 
-  /** @param {string} id @returns {boolean} */
-  remove(id) {
+  remove(id: string): boolean {
     const result = this.db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
     return Number(result.changes) > 0;
   }
 }
 
-/** @param {CreateScheduleStoreOptions} [options] */
-export function createScheduleStore({ backend = 'file', storeDir, dbPath, db } = {}) {
+export function createScheduleStore({
+  backend = 'file',
+  storeDir,
+  dbPath,
+  db,
+}: CreateScheduleStoreOptions = {}): FileScheduleStore | SqliteScheduleStore {
   if (backend === 'sqlite') {
     return new SqliteScheduleStore({ dbPath, db });
   }
