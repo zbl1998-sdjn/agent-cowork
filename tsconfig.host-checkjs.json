@@ -181,7 +181,7 @@
     "apps/host/src/routes/project-routes.js",
     "apps/host/src/routes/recipe-routes.js",
     "apps/host/src/routes/route-chain.js",
-    "apps/host/src/routes/route-error-utils.js",
+    "apps/host/src/routes/route-error-utils.ts",
     "apps/host/src/routes/run-routes.js",
     "apps/host/src/routes/sandbox-routes.js",
     "apps/host/src/routes/search-routes.js",
