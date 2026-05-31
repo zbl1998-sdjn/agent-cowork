@@ -1,3 +1,8 @@
+// MCP 客户端(host · L1 领域层 · mcp)
+// ---------------------------------------------------------------------------
+// 职责:基于注入式 transport 的小型 MCP 客户端。生命周期:connect()→initialize 握手→
+//       listTools()/callTool()→close()。transport 只需实现 start/send/onMessage/onClose/close,
+//       默认用 StdioTransport,测试可注入假实现。依赖:同层 json-rpc。导出:McpClient。
 import { JsonRpcClient } from './json-rpc.js';
 
 // A small MCP (Model Context Protocol) client over an injected transport.
@@ -14,6 +19,7 @@ const PROTOCOL_VERSION = '2024-11-05';
  * @typedef {{ transport?: McpTransport, clientInfo?: McpClientInfo, timeoutMs?: number }} McpClientOptions
  */
 
+/** MCP 客户端:对接单个 MCP 服务器,负责握手、列工具、调用工具与关闭。 */
 export class McpClient {
   /**
    * @param {McpClientOptions} [options]

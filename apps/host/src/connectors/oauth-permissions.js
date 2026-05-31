@@ -1,5 +1,11 @@
 // @ts-check
-
+//
+// OAuth 权限(host · L1 领域层 · connectors)
+// ---------------------------------------------------------------------------
+// 职责:校验并归一化连接器声明的 OAuth 权限项(id/label/风险/默认勾选),供前端展示与授权选择。
+//       最小权限原则:默认只勾必要项,高危项需用户显式选择。依赖:无。
+// 导出:权限解析/校验相关函数。
+//
 /**
  * @typedef {Error & { statusCode?: number }} HttpError
  * @typedef {{ id?: string, label?: string, description?: string, risk?: string, default?: boolean }} OAuthPermissionInput

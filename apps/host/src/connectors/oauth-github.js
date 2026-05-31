@@ -1,5 +1,11 @@
 // @ts-check
-
+//
+// GitHub OAuth(host · L1 领域层 · connectors)
+// ---------------------------------------------------------------------------
+// 职责:GitHub 设备码(device flow)OAuth——发起设备码、轮询换取 access token、拉取用户信息。
+//       适合桌面端无回调 URL 的场景;凭据最终经 credential-store 加密保存。
+// 依赖:无内部依赖(直连 GitHub API)。导出:device flow 各步骤函数。
+//
 const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';

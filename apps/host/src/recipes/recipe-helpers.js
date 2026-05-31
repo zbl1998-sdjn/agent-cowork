@@ -1,3 +1,9 @@
+// 配方助手(host · L1 领域层 · recipes)
+// ---------------------------------------------------------------------------
+// 职责:registry 各配方共用的纯函数——来源块/合并文本、表格解析、行动项/报销行抽取,以及把内容
+//       包装成 write 文件操作(md/csv/xlsx/二进制)的便捷构造器。无副作用、易测。
+// 依赖:node:path。导出:stamp/relSource/sourceBlock/combinedText/parseTableRows/actionRows/
+//       reimbursementRows/markdownOperation/csvOperation/xlsxOperation/binaryOperation 等。
 import path from 'node:path';
 
 /**

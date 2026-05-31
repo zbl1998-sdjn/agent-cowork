@@ -1,3 +1,9 @@
+// 用户存储与会话(host · L1 领域层 · auth)
+// ---------------------------------------------------------------------------
+// 职责:桌面登录的本地用户库 + 会话。密码用 scrypt 加盐哈希;会话是映射到用户/租户的不透明 bearer token。
+//       本模块含内存适配器(createUserStore,默认/测试用)与共享的凭据/身份助手;SQLite 持久化适配器在
+//       sqlite-user-store.js,两者暴露「同一接口」(端口与适配器),哈希/校验逻辑共用以保证一致。
+// 依赖:node:crypto。导出:createUserStore + newUserRecord/passwordMatches/newGuestIdentity/newSessionToken 等。
 import crypto from 'node:crypto';
 
 /**

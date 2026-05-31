@@ -1,3 +1,10 @@
+// 配方执行(host · L1 领域层 · recipes)
+// ---------------------------------------------------------------------------
+// 职责:执行配方的「唯一事实来源」——HTTP 路由(POST /api/recipes/:id/run)与调度器都走它,
+//       使「计划任务」产出与「手动运行」一致的可审批产物 + run 记录 + 事件时间线。
+//       读取来源材料 → 构建可审批操作 → 发出事件/落 run 记录;失败也落失败 run 记录。
+// 依赖:L0 path-policy + workspace/document-extractor + 同层 registry;按既有架构豁免向
+//       runtime/run-store、runs-index 记账。导出:runRecipe。
 import path from 'node:path';
 import { extractDocumentText } from '../workspace/document-extractor.js';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -33,7 +40,7 @@ function bytesOf(sources) {
   return sources.reduce((sum, s) => sum + (Number(s.size) || 0), 0);
 }
 
-/** @param {RunRecipeOptions} options @returns {RunRecipeResult} */
+/** 执行一个配方:读来源→构建可审批操作→发事件并写 run 记录,返回 { ok, runId, recipe, sources, operations, events }。 @param {RunRecipeOptions} options @returns {RunRecipeResult} */
 export function runRecipe({
   recipeId,
   trustedRoot,

@@ -1,3 +1,8 @@
+// JSON-RPC 2.0 客户端内核(host · L1 领域层 · mcp,与传输无关)
+// ---------------------------------------------------------------------------
+// 职责:持有请求 id 计数器与待决请求表,但不关心字节如何传输——调用方注入 send(message),并把入站
+//       消息喂回 handleMessage(message)。协议逻辑因此保持纯净、无需真实 MCP 服务器即可单测。
+// 依赖:无。导出:JsonRpcError / JsonRpcClient。
 // Minimal JSON-RPC 2.0 client core (transport-agnostic).
 //
 // The client owns the request-id counter and the pending-request map. It does

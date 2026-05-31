@@ -1,3 +1,8 @@
+// 技能注册表(host · L1 领域层 · skills)
+// ---------------------------------------------------------------------------
+// 职责:把配方目录包装成可安装/可开关的「技能」,带清单(触发词、权限、输出类型)与启用状态。
+//       这是通向真正技能/插件系统(技能 + 市场方向)的接缝,而不改变配方的执行方式。
+// 依赖:同层 recipes/registry。导出:createSkillRegistry。
 import { listRecipes } from '../recipes/registry.js';
 
 // Skill registry: turns the recipe catalog into installable/toggleable "skills"

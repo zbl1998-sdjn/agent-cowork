@@ -1,3 +1,8 @@
+// 自定义配方存储(host · L1 领域层 · recipes)
+// ---------------------------------------------------------------------------
+// 职责:把用户从一次运行「捕获」出来的自定义配方,按租户/用户隔离地持久化(增删查)。
+//       内容已脱敏(redacted)。供「把这次操作存成我的配方」能力使用。
+// 依赖:node:fs/path。导出:createCustomRecipeStore。
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -55,7 +60,7 @@ function httpError(error) {
   return /** @type {Error & { statusCode?: number }} */ (err);
 }
 
-/** @param {{ storePath: string }} options */
+/** 创建自定义配方存储(按 tenant/user 作用域增删查并持久化到 JSON)。 @param {{ storePath: string }} options */
 export function createCustomRecipeStore({ storePath }) {
   const filePath = path.resolve(storePath);
 

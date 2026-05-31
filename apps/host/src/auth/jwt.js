@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 无状态 JWT 校验(host · L1 领域层 · auth)
+// ---------------------------------------------------------------------------
+// 职责:零依赖(仅 node:crypto)的 HS256 JWT 验签与声明解析。签名 JWT 让任意 host 实例仅凭 token
+//       即可推出 tenant_id/user_id——多租户、可横向扩展的身份路径;声明覆盖请求头默认值。
+// 依赖:node:crypto。导出:resolveJwtIdentity(及相关)。
 // Stateless JWT (HS256) verification with zero dependencies (node:crypto).
 //
 // Opaque server-side sessions don't scale across instances; a signed JWT lets
@@ -48,6 +53,7 @@ function b64url(buf) {
 /**
  * @param {Record<string, unknown>} payload
  * @param {string} secret
+ * 用 HS256 签发 JWT(自动加 iat,可选 exp)。
  * @param {SignJwtOptions} [options]
  * @returns {string}
  */
@@ -62,6 +68,7 @@ export function signJwtHS256(payload, secret, { expiresInSec } = {}) {
 }
 
 /**
+ * 验签并校验有效期(含时钟容差)的 HS256 JWT;任何不合法/过期返回 null。
  * @param {unknown} token
  * @param {string} secret
  * @param {VerifyJwtOptions} [options]
@@ -93,6 +100,7 @@ export function verifyJwtHS256(token, secret, { now = Math.floor(Date.now() / 10
 // Map verified claims to an identity. Accepts common claim names so it works
 // with tokens minted by typical IdPs (tenant_id/tid/org, user_id/uid/sub).
 /**
+ * 验签后把声明映射为身份 { tenantId, userId };兼容常见 IdP 的声明名。失败返回 null。
  * @param {unknown} token
  * @param {string} secret
  * @param {VerifyJwtOptions} [opts]

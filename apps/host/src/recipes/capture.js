@@ -1,3 +1,8 @@
+// 运行捕获(host · L1 领域层 · recipes)
+// ---------------------------------------------------------------------------
+// 职责:读取一条 run 记录,提炼其步骤/产物/提示词并「脱敏」,组装成可保存的自定义配方草稿。
+//       是「把这次跑的流程存成配方」的取数侧;所有文本经 redaction 抹密。
+// 依赖:L0 security/redaction。导出:captureRun。
 import fs from 'node:fs';
 import path from 'node:path';
 import { redactText, redactValue } from '../security/redaction.js';
@@ -194,6 +199,7 @@ function titleFromRecord(record, runId) {
 }
 
 /** @param {{ runId?: unknown, runStoreRoot?: string | null, runsIndex?: RunsIndexLike | null, recordReader?: RecordReader | null }} [options] */
+/** 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。 */
 export async function captureRun({ runId, runStoreRoot = null, runsIndex = null, recordReader = null } = {}) {
   if (!runId || typeof runId !== 'string') {
     const err = /** @type {Error & { statusCode?: number }} */ (new Error('captureRun: runId is required'));

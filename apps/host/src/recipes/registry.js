@@ -1,3 +1,10 @@
+// 配方注册表(host · L1 领域层 · recipes)
+// ---------------------------------------------------------------------------
+// 职责:内置「一键配方」(会议纪要转行动项、表格清洗、报销整理、合同摘要、总结报告等)的清单与
+//       产物构建。每个配方把来源材料加工成「可审批的文件操作(write)」,经审批后落入工作区。
+//       配方各 description 是面向用户的运行时中文字符串(非注释)。
+// 依赖:artifacts/office-writers·xlsx-writer + 同层 recipe-helpers。
+// 导出:listRecipes / getRecipe / buildRecipeOperations。
 import { createDocxDocument, createPdfDocument, createPptxPresentation } from '../artifacts/office-writers.js';
 import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
 import {
@@ -186,17 +193,17 @@ function summaryReportRecipe(trustedRoot, recipe, prompt, sources) {
   ];
 }
 
-/** @returns {Recipe[]} */
+/** 列出全部内置配方(浅拷贝,不泄露内部引用)。 @returns {Recipe[]} */
 export function listRecipes() {
   return RECIPES.map((recipe) => ({ ...recipe }));
 }
 
-/** @param {string} recipeId @returns {Recipe | null} */
+/** 按 id 取配方,不存在返回 null。 @param {string} recipeId @returns {Recipe | null} */
 export function getRecipe(recipeId) {
   return RECIPES.find((recipe) => recipe.id === recipeId) || null;
 }
 
-/** @param {BuildRecipeOptions} [options] @returns {FileOperationInput[]} */
+/** 据配方 id 把来源材料构建成「可审批的文件操作」数组(各配方有专属构建器,其余走通用 Markdown)。 @param {BuildRecipeOptions} [options] @returns {FileOperationInput[]} */
 export function buildRecipeOperations({ recipeId, trustedRoot, prompt = '', sources = [], recipe: providedRecipe = null } = {}) {
   const id = typeof recipeId === 'string' ? recipeId : '';
   const root = typeof trustedRoot === 'string' ? trustedRoot : '';

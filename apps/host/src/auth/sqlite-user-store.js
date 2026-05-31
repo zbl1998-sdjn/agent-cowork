@@ -1,3 +1,8 @@
+// SQLite 用户存储(host · L1 领域层 · auth)
+// ---------------------------------------------------------------------------
+// 职责:与 createUserStore() 接口完全一致的「持久化」适配器——把注册用户、会话、访客租户存进 SQLite,
+//       使已登录用户(或带本地数据的访客)在 host 重启后仍在。表在自有 DB 句柄上幂等创建。
+// 依赖:storage/sqlite + 同层 user-store(复用哈希/身份助手)。导出:createSqliteUserStore。
 import { openSqliteDatabase } from '../storage/sqlite.js';
 import {
   createUserStore,

@@ -1,3 +1,8 @@
+// MCP stdio 传输(host · L1 领域层 · mcp)
+// ---------------------------------------------------------------------------
+// 职责:MCP-over-stdio 传输层。每条 JSON-RPC 消息以「单行 UTF-8 JSON + \n」成帧:拉起服务器子进程,
+//       把出站消息写入其 stdin,从 stdout 逐行解析入站消息回调给上层。spawn 可注入便于单测。
+// 依赖:node:child_process。导出:StdioTransport。
 import childProcess from 'node:child_process';
 
 // Stdio transport for an MCP server child process.

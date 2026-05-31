@@ -1,3 +1,8 @@
+// MCP 批量接入(host · L1 领域层 · mcp)
+// ---------------------------------------------------------------------------
+// 职责:按一组 MCP 服务器规格逐个以 stdio 拉起、握手、把其工具以 `mcp__<name>__<tool>` 导入注册表。
+//       单个服务器连接失败只记入 errors、不影响其余——一个坏连接器不能拖垮整个 host。
+// 依赖:node:child_process + 同层 stdio-transport/mcp-client。导出:connectMcpServers(及相关)。
 import childProcess from 'node:child_process';
 import { StdioTransport } from './stdio-transport.js';
 import { McpClient } from './mcp-client.js';
