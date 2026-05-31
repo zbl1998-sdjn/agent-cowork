@@ -9,43 +9,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { createRollbackBatchId, rollbackEntryForMove, rollbackEntryForWrite, rollbackFileOperations as rollbackEntries } from './file-rollback.js';
-import type { JournalWriter, RollbackEntry } from './file-rollback.js';
 import { fileExists, hashBuffer, hashFile, pathExists, requiredPath } from './file-operation-utils.js';
+import type { RollbackEntry } from './file-rollback.js';
+import type {
+  FileOperation,
+  FileOperationEvent,
+  FileOperationInput,
+  FileOperationOptions,
+  OperationPreview,
+} from './file-operation-types.js';
 
 export { rollbackEntries as rollbackFileOperations };
-
-export type FileOperationInput = {
-  type?: unknown;
-  path?: string;
-  from?: string;
-  to?: string;
-  newName?: string;
-  content?: unknown;
-  contentBase64?: string;
-  encoding?: string;
-  overwrite?: boolean;
-};
-export type FileOperation = FileOperationInput & { type: string };
-export type OperationPreview = {
-  type: 'write' | 'rename' | 'move';
-  path: string;
-  targetPath?: string;
-  beforeHash: string | null;
-  afterHash: string;
-};
-export type FileOperationOptions = { trustedRoot?: string; journalWriter?: JournalWriter; rollbackBatchId?: string };
-export type FileOperationEvent = {
-  id: string;
-  at: string;
-  action: string;
-  path: string;
-  targetPath?: string;
-  beforeHash: string | null;
-  afterHash: string;
-  rollback?: RollbackEntry | null;
-  status: string;
-  size?: number;
-};
+export type {
+  FileOperation,
+  FileOperationEvent,
+  FileOperationInput,
+  FileOperationOptions,
+  OperationPreview,
+} from './file-operation-types.js';
 
 function normalizeOp(op: unknown): FileOperation {
   if (!op || typeof op !== 'object') {

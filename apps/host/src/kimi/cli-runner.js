@@ -9,7 +9,7 @@ import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { TextDecoder } from 'node:util';
+import { decodeCliOutput } from './cli-output.js';
 // @ts-check
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_STEPS = 10;
@@ -23,25 +23,6 @@ const MAX_OUTPUT_LENGTH = 256 * 1024;
 /** 归一换行并去首尾空白。 @param {unknown} value */
 function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
-}
-/** 解码 CLI 字节输出:优先严格 UTF-8,Windows 下回退 GB18030,最后兜底替换解码。 @param {Buffer[]} chunks */
-function decodeCliOutput(chunks) {
-  const buffer = Buffer.concat(chunks);
-  if (buffer.length === 0) {
-    return '';
-  }
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
-  } catch {
-    if (process.platform === 'win32') {
-      try {
-        return new TextDecoder('gb18030').decode(buffer);
-      } catch {
-        // Fall through to Node's replacement decoder.
-      }
-    }
-    return buffer.toString('utf8');
-  }
 }
 /** 把工作区长期记忆裁剪成提示词里的「记忆块」(空则返回空串)。 @param {unknown} memory */
 function buildMemoryBlock(memory) {

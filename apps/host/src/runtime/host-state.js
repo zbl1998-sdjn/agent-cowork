@@ -37,6 +37,7 @@ import { getAppHome } from '../storage/app-home.js';
 import { sendJson } from '../http/request-utils.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
+import { resolveStoreBackendConfig } from './store-backend-config.js';
 import {
   defaultStaticRoot,
   defaultUiDistRoot,
@@ -93,13 +94,7 @@ export function createHostState(config = {}, { hostSrcDir }) {
   state.persistKimiConfig = () => persistKimiConfig(kimiConfigFile, kimiApiConfig);
 
   const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.AgentCowork', 'index'));
-  const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'file').toLowerCase();
-  state.storeBackend = storeRaw === 'sqlite' ? 'sqlite' : storeRaw === 'postgres' ? 'postgres' : 'file';
-  state.databaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
-  state.usePostgresState = state.storeBackend === 'postgres' && !!state.databaseUrl;
-  state.sqliteDbPath = path.resolve(
-    config.sqliteDbPath || process.env.KCW_SQLITE_PATH || path.join(trustedRootDefault, '.AgentCowork', 'state.sqlite'),
-  );
+  Object.assign(state, resolveStoreBackendConfig(config, trustedRootDefault));
   state.runsIndex = config.runsIndex || (state.storeBackend === 'postgres'
     ? withSafeWrites(createPostgresRunsIndex({ connectionString: state.databaseUrl }))
     : createRunsIndex({ backend: state.storeBackend, indexRoot: runsIndexRoot, dbPath: state.sqliteDbPath }));

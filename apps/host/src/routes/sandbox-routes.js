@@ -9,6 +9,7 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { errorMessage, errorPayload, errorStatus } from './route-error-utils.js';
 
 /**
  * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
@@ -20,28 +21,11 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
  * @typedef {SandboxLike & { networkIsolated?: unknown }} RouteSandboxLike
  * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
  * @typedef {{ upsert(summary: unknown, context?: RequestContext): unknown }} RunsIndexLike
- * @typedef {Error & { statusCode?: number, payload?: Record<string, unknown> }} RouteError
  * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, sandbox?: RouteSandboxLike | null, sandboxEnabled?: boolean, sandboxLimits?: SandboxLimits, sandboxStartup?: unknown, runStoreRoot: string, runsIndex: RunsIndexLike, runEvents: RunEventsLike, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string, allowUnsafeDirectSandboxRoutes?: boolean }} SandboxRouteOptions
  */
 
 /** @param {unknown} body @returns {Record<string, unknown>} */
 function objectBody(body) { return body && typeof body === 'object' && !Array.isArray(body) ? /** @type {Record<string, unknown>} */ (body) : {}; }
-/** @param {unknown} err @param {number} fallback @returns {number} */
-function errorStatus(err, fallback) {
-  const error = /** @type {Partial<RouteError>} */ (err);
-  return Number(error?.statusCode) || fallback;
-}
-
-/** @param {unknown} err @returns {string} */
-function errorMessage(err) {
-  return /** @type {Partial<RouteError>} */ (err)?.message || String(err || 'request failed');
-}
-
-/** @param {unknown} err @returns {Record<string, unknown>} */
-function errorPayload(err) {
-  const error = /** @type {Partial<RouteError>} */ (err);
-  return error?.payload && typeof error.payload === 'object' ? error.payload : {};
-}
 
 /** @param {SandboxSpec} spec @returns {string} */
 function promptPreview(spec) {

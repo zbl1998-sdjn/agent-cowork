@@ -7,6 +7,7 @@
 //       (提示词拼装);运行期用全局 fetch。
 // 导出:runKimiApiPlan、runKimiApiChat、runKimiApiChatStream,以及再导出配置/提示构造器。
 import { cleanProvider, cleanText, DEFAULT_BASE_URL, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TIMEOUT_MS, KIMI_API_NOT_CONFIGURED_MESSAGE } from './api-runner-config.js';
+import { extractMessageText } from './api-runner-payload.js';
 import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
 export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
@@ -18,32 +19,6 @@ export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-pro
  * @typedef {{ prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown, systemMessage?: string, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider?: unknown, timeoutMs?: unknown, maxTokens?: unknown, fetchImpl?: typeof fetch, userAgent?: unknown, temperature?: unknown, promptBuilder?: (options: { prompt?: unknown, summary?: unknown, mode?: unknown, memory?: unknown }) => string, resultMode?: string }} KimiTextOptions
  * @typedef {KimiTextOptions & { onToken?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} KimiStreamOptions
  */
-
-/** 从响应体里提取首条 message 文本(兼容字符串与多段 content 数组)。 @param {unknown} payload @returns {string} */
-function extractMessageText(payload) {
-  const data = /** @type {KimiPayload} */ (payload && typeof payload === 'object' ? payload : {});
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content === 'string') {
-    return cleanText(content);
-  }
-  if (Array.isArray(content)) {
-    return cleanText(
-      content
-        .map((part) => {
-          if (typeof part === 'string') {
-            return part;
-          }
-          if (part && typeof part.text === 'string') {
-            return part.text;
-          }
-          return '';
-        })
-        .filter(Boolean)
-        .join('\n'),
-    );
-  }
-  return '';
-}
 
 /** 非流式直答核心:校验 key/fetch、超时中止、发请求并返回规范化文本结果。 @param {KimiTextOptions} [options] @returns {Promise<KimiTextResult>} */
 async function runKimiApiText({

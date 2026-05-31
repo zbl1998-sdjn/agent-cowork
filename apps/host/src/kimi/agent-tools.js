@@ -19,12 +19,6 @@ import { analyzeDataFile } from '../tools/data/report.js';
 import { createDataChartArtifact } from '../tools/data/artifact.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
 
-// Agent tools aligned with the Kimi CLI / Claude Code native tool set:
-//   Read, Write, Edit, Glob, Grep, Shell, WebFetch, git helpers.
-// Mutating tools (Write/Edit/Shell) carry `mutating: true` so the agent loop
-// can gate them behind an approval prompt. All file paths are jailed to the
-// trusted workspace root.
-
 /**
  * @typedef {Record<string, unknown>} ToolArgs
  * @typedef {{ allowTools?: string[] }} SandboxLimits

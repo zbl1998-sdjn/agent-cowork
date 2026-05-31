@@ -11,11 +11,11 @@ import { readFilePreview } from '../workspace/file-preview.js';
 import { extractDocumentText } from '../workspace/document-extractor.js';
 import { searchWorkspace } from '../workspace/file-search.js';
 import { buildContextBundle } from '../workspace/context-bundle.js';
-import { previewFileOperations, applyFileOperations, rollbackFileOperations } from '../workspace/file-operations.js';
 import { importUploadedFiles } from '../workspace/uploads.js';
 import { buildAttachmentContext } from '../workspace/attachment-context.js';
 import { assertTrustedPath } from '../security/path-policy.js';
-import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
+import { sendJson, withJsonBody } from '../http/request-utils.js';
+import { handleWorkspaceFileOperationRoutes } from './workspace-file-operation-routes.js';
 
 /**
  * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
@@ -154,89 +154,18 @@ export async function handleWorkspaceFileRoutes({
     return true;
   }
 
-  if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
-    await withWorkspaceBody(request, response, async (body) => {
-      const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const preview = previewFileOperations(body.operations, { trustedRoot });
-      const fileOperationApprovalId = preview.operations.length
-        ? fileOperationApprovals.issue({
-          kind: 'file-ops:apply',
-          trustedRoot,
-          operations: preview.operations,
-          context: requestContext,
-        })
-        : null;
-      sendJson(response, 200, { ...preview, fileOperationApprovalId });
-    });
-    return true;
-  }
-
-  if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
-    await withWorkspaceBody(request, response, async (body) => {
-      if (!requireIdempotencyKey(response, requestContext)) {
-        return;
-      }
-      const fingerprint = bodyFingerprint(body);
-      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-        return;
-      }
-      const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const preview = previewFileOperations(body.operations, { trustedRoot });
-      fileOperationApprovals.consume(body.fileOperationApprovalId || body.approvalId, {
-        kind: 'file-ops:apply',
-        trustedRoot,
-        operations: preview.operations,
-        context: requestContext,
-      });
-      const applied = applyFileOperations(body.operations, {
-        trustedRoot,
-        journalWriter: config.journalWriter,
-      });
-      const rollbackApprovalId = applied.applied.length
-        ? fileOperationApprovals.issue({
-          kind: 'file-ops:rollback',
-          trustedRoot,
-          operations: applied.applied,
-          context: requestContext,
-        })
-        : null;
-      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
-        ...applied,
-        rollbackApprovalId,
-        context: requestContext,
-      });
-    });
-    return true;
-  }
-
-  if (request.method === 'POST' && pathname === '/api/file-ops/rollback') {
-    await withWorkspaceBody(request, response, async (body) => {
-      if (!requireIdempotencyKey(response, requestContext)) {
-        return;
-      }
-      const fingerprint = bodyFingerprint(body);
-      const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-        return;
-      }
-      const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const entries = body.rollback || body.applied || body.operations;
-      fileOperationApprovals.consume(body.rollbackApprovalId || body.fileOperationApprovalId || body.approvalId, {
-        kind: 'file-ops:rollback',
-        trustedRoot,
-        operations: entries,
-        context: requestContext,
-      });
-      const rollback = rollbackFileOperations(entries, {
-        trustedRoot,
-        journalWriter: config.journalWriter,
-      });
-      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
-        ...rollback,
-        context: requestContext,
-      });
-    });
+  if (await handleWorkspaceFileOperationRoutes({
+    request,
+    response,
+    pathname,
+    requestContext,
+    config,
+    cacheKeyFor,
+    requireIdempotencyKey,
+    sendCachedOrStore,
+    safeTrustedRoot,
+    fileOperationApprovals,
+  })) {
     return true;
   }
 

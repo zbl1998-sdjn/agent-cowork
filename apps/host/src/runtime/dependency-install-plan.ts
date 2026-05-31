@@ -12,25 +12,20 @@ import {
   retainedPath,
   safeChild,
 } from './dependency-plan-utils.js';
-import type { SupplyChainPrecheck } from './dependency-plan-utils.js';
+import type {
+  InstallPlanComponent,
+  PlanTarget,
+  RetainedPlanItem,
+  RuntimeDependencyCleanupPlanOptions,
+  RuntimeDependencyInstallPlanOptions,
+  RuntimeDependencyUpdatePlanOptions,
+} from './dependency-install-plan-types.js';
 
-export type RuntimeDependencyInstallPlanOptions = { selectedIds?: unknown[]; freeBytes?: unknown };
-export type RuntimeDependencyCleanupPlanOptions = { selectedIds?: unknown[]; appDataRoot?: string | null; keepUserData?: boolean };
-export type RuntimeDependencyUpdatePlanOptions = {
-  selectedIds?: unknown[];
-  appDataRoot?: string | null;
-  currentVersion?: unknown;
-  targetVersion?: unknown;
-};
-type InstallPlanComponent = Record<string, unknown> & {
-  id: string;
-  label: string;
-  needsDownload: boolean;
-  estimatedDownloadBytes: number;
-  supplyChain: SupplyChainPrecheck;
-};
-type PlanTarget = Record<string, unknown>;
-type RetainedPlanItem = Record<string, unknown> & { relativePath: string };
+export type {
+  RuntimeDependencyCleanupPlanOptions,
+  RuntimeDependencyInstallPlanOptions,
+  RuntimeDependencyUpdatePlanOptions,
+} from './dependency-install-plan-types.js';
 
 export function buildRuntimeDependencyInstallPlan(options: RuntimeDependencyInstallPlanOptions = {}) {
   const selectedIds = Array.isArray(options.selectedIds) ? options.selectedIds : [];

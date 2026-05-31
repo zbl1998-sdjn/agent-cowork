@@ -10,11 +10,7 @@
 // 导出:SqliteMemoryStore 类。
 
 import { createSqliteDatabase } from '../storage/sqlite.js';
-import {
-  MAX_MEMORY_BYTES,
-  MEMORY_HEADER,
-  NOTE_NAME_RE,
-} from './memory-constants.js';
+import { MAX_MEMORY_BYTES, MEMORY_HEADER, NOTE_NAME_RE } from './memory-constants.js';
 import { appendAuditEvent } from './memory-audit.js';
 import { buildMemorySystemBlockFromText, loadMemoryContextFromStore } from './memory-query.js';
 import {

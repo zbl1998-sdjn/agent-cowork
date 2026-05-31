@@ -9,6 +9,13 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
+export {
+  isAllowedHost,
+  isAllowedOrigin,
+  isLoopbackHostname,
+  requiresOriginCheck,
+} from './request-origin-policy.js';
+
 export type HttpResponseLike = {
   writeHead(statusCode: number, headers?: Record<string, string | number>): unknown;
   end(chunk?: string | Buffer): unknown;
@@ -54,69 +61,6 @@ export function stableHeader(value: unknown, fallback: string): string {
 export function isJsonContentType(request: HttpRequestLike): boolean {
   const value = String(headerValue(request, 'content-type') || '').toLowerCase();
   return value.split(';')[0].trim() === 'application/json';
-}
-
-/** 是否为回环主机名(localhost / 127.0.0.1 / ::1)。 */
-export function isLoopbackHostname(hostname: unknown): boolean {
-  const value = String(hostname || '').toLowerCase();
-  return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
-}
-
-/** CORS 来源白名单:无 Origin(同源/非浏览器)放行,回环与 Tauri webview 放行,其余拒绝。 */
-export function isAllowedOrigin(origin: unknown): boolean {
-  const value = String(origin || '').trim();
-  // No Origin header = same-origin navigation or a non-browser client (curl, the
-  // desktop host itself) — allowed. The literal opaque origin "null" (sandboxed
-  // iframe, file://, data:) is NOT allowed: it can't be attributed to a trusted
-  // loopback/tauri context, so we never reflect CORS for it.
-  if (!value) {
-    return true;
-  }
-  if (value === 'null') {
-    return false;
-  }
-  try {
-    const parsed = new URL(value);
-    // Tauri webview origins: `tauri://localhost` (macOS/Linux) and, on Windows,
-    // the custom-protocol origin surfaces as http(s)://tauri.localhost. Both are
-    // the desktop shell itself and must be allowed, otherwise the webview's
-    // cross-origin calls to the loopback host (incl. CORS preflight) are blocked
-    // and the app can't even log in.
-    if (parsed.protocol === 'tauri:') {
-      return true;
-    }
-    const host = String(parsed.hostname || '').toLowerCase();
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && (isLoopbackHostname(host) || host === 'tauri.localhost');
-  } catch {
-    return false;
-  }
-}
-
-/** Host 头白名单(防 DNS rebinding):仅回环与 tauri.localhost 视为合法寻址本服务。 */
-export function isAllowedHost(hostHeader: unknown): boolean {
-  const value = String(hostHeader || '').trim();
-  // No Host header = HTTP/1.0 or a non-browser client; not a DNS-rebinding vector,
-  // so we don't block it (the loopback bind already scopes who can reach us).
-  if (!value) {
-    return true;
-  }
-  let hostname: string;
-  try {
-    hostname = new URL(`http://${value}`).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  // Anti-DNS-rebinding: a malicious site that rebinds its name to 127.0.0.1 still
-  // sends its own name in the Host header. Only the loopback host / tauri webview
-  // are legitimate ways to address this server.
-  return isLoopbackHostname(hostname) || hostname === 'tauri.localhost';
-}
-
-/** 是否需要做来源校验:/api/ 下的写方法(POST/PUT/PATCH/DELETE)才需要。 */
-export function requiresOriginCheck(method: unknown, pathname: string): boolean {
-  return pathname.startsWith('/api/')
-    && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
 }
 
 /** 稳定序列化:对象键按字典序排序,使「相同内容」总得到相同字符串(用于指纹/幂等)。 */

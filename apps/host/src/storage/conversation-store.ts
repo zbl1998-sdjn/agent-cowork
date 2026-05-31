@@ -7,6 +7,23 @@
 // 导出:FileConversationStore(类) · createConversationStore(工厂)。
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  cleanConversationId,
+  MAX_CONVERSATION_TITLE,
+  safeOptionalConversationId,
+  sanitizeConversationBranches,
+  sanitizeConversationMessages,
+} from './conversation-sanitizers.js';
+import type {
+  ConversationContext,
+  ConversationInput,
+  ConversationListFullOptions,
+  ConversationQueryOptions,
+  ConversationQueryResult,
+  ConversationRecord,
+  ConversationStoreOptions,
+  ConversationSummary,
+} from './conversation-types.js';
 
 // Per-user conversation persistence. Each conversation is one JSON document under
 //   <trustedRoot>/.AgentCowork/conversations/<tenantId>/<userId>/<convId>.json
@@ -15,53 +32,19 @@ import path from 'node:path';
 // treatment, which keeps the desktop's offline experience intact.
 const ROOT_DIR = '.AgentCowork';
 const CONV_DIR = 'conversations';
-const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_BYTES = 1024 * 1024; // hard cap per conversation document
-const MAX_TITLE = 200;
 
-export type ConversationContext = { tenantId?: unknown; userId?: unknown };
-export type ConversationBranch = {
-  id: string;
-  title: string;
-  parentBranchId?: string;
-  baseMessageId?: string;
-  createdAt?: string;
-  messages: unknown[];
-};
-export type ConversationInput = {
-  id?: unknown;
-  title?: unknown;
-  pinned?: unknown;
-  messages?: unknown;
-  activeBranchId?: unknown;
-  branches?: unknown;
-  createdAt?: unknown;
-  updatedAt?: unknown;
-};
-export type ConversationRecord = {
-  id: string;
-  title: string;
-  pinned: boolean;
-  messages: unknown[];
-  activeBranchId?: string;
-  branches?: ConversationBranch[];
-  createdAt?: unknown;
-  updatedAt?: unknown;
-};
-export type ConversationSummary = {
-  id: string;
-  title: string;
-  pinned: boolean;
-  messageCount: number;
-  branchCount: number;
-  activeBranchId?: string;
-  createdAt?: unknown;
-  updatedAt?: unknown;
-};
-export type ConversationQueryOptions = { q?: unknown; limit?: unknown; offset?: unknown };
-export type ConversationQueryResult = { items: ConversationSummary[]; total: number };
-export type ConversationListFullOptions = { limit?: number };
-export type ConversationStoreOptions = { backend?: string; now?: () => Date };
+export type {
+  ConversationBranch,
+  ConversationContext,
+  ConversationInput,
+  ConversationListFullOptions,
+  ConversationQueryOptions,
+  ConversationQueryResult,
+  ConversationRecord,
+  ConversationStoreOptions,
+  ConversationSummary,
+} from './conversation-types.js';
 
 /** 把 tenant/user 段清洗为文件系统安全字符串(防目录穿越)。 */
 function normaliseSegment(value: unknown, fallback: string): string {
@@ -85,43 +68,6 @@ function userDir(trustedRoot: unknown, context: ConversationContext = {}): strin
   const tenant = normaliseSegment(context.tenantId, 'tenant_local');
   const user = normaliseSegment(context.userId, 'user_local');
   return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, CONV_DIR, tenant, user);
-}
-
-/** 校验对话 id 合法性(白名单正则),非法抛错。 */
-function cleanId(id: unknown): string {
-  const text = String(id || '').trim();
-  if (!ID_RE.test(text)) throw new Error('invalid conversation id');
-  return text;
-}
-
-/** 仅保留最近 200 条消息,防止单文档膨胀。 */
-function sanitizeMessages(messages: unknown): unknown[] {
-  if (!Array.isArray(messages)) return [];
-  // Cap the stored history so a runaway conversation can't blow the byte limit.
-  return messages.slice(-200);
-}
-
-/** 校验可选 id(分支/baseMessage),非法返回空串而非抛错。 */
-function safeOptionalId(value: unknown): string {
-  const text = String(value || '').trim();
-  return ID_RE.test(text) ? text : '';
-}
-
-/** 清洗分支列表:限 12 条,补默认 id/标题,逐分支裁剪消息。 */
-function sanitizeBranches(branches: unknown): ConversationBranch[] {
-  if (!Array.isArray(branches)) return [];
-  return branches.slice(-12).map((branch, index) => {
-    const source = (branch || {}) as Record<string, unknown>;
-    const id = safeOptionalId(source.id) || (index === 0 ? 'main' : `branch-${index}`);
-    return {
-      id,
-      title: String(source.title || (index === 0 ? '主线' : `分支 ${index}`)).slice(0, MAX_TITLE),
-      ...(safeOptionalId(source.parentBranchId) ? { parentBranchId: String(source.parentBranchId) } : {}),
-      ...(source.baseMessageId ? { baseMessageId: String(source.baseMessageId).slice(0, 96) } : {}),
-      ...(source.createdAt ? { createdAt: String(source.createdAt).slice(0, 64) } : {}),
-      messages: sanitizeMessages(source.messages),
-    };
-  });
 }
 
 /** 把完整对话记录压成列表用的摘要(含消息/分支计数)。 */
@@ -192,7 +138,7 @@ export class FileConversationStore {
 
   /** 读取单个对话完整记录,不存在或损坏返回 null。 */
   get(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): ConversationRecord | null {
-    const file = path.join(userDir(trustedRoot, context), `${cleanId(id)}.json`);
+    const file = path.join(userDir(trustedRoot, context), `${cleanConversationId(id)}.json`);
     if (!fs.existsSync(file)) return null;
     try {
       return JSON.parse(fs.readFileSync(file, 'utf8')) as ConversationRecord;
@@ -203,22 +149,22 @@ export class FileConversationStore {
 
   /** 落盘对话(清洗 + 选活跃分支 + 保留 createdAt);超字节上限则进一步裁剪消息而非拒绝。 */
   save(trustedRoot: unknown, conv: ConversationInput, context: ConversationContext = {}): ConversationSummary {
-    const id = cleanId(conv && conv.id);
+    const id = cleanConversationId(conv && conv.id);
     const dir = userDir(trustedRoot, context);
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${id}.json`);
     const existing = fs.existsSync(file) ? this.get(trustedRoot, id, context) : null;
     const now = this.now().toISOString();
-    const branches = sanitizeBranches(conv && conv.branches);
-    const requestedActive = safeOptionalId(conv && conv.activeBranchId);
+    const branches = sanitizeConversationBranches(conv && conv.branches);
+    const requestedActive = safeOptionalConversationId(conv && conv.activeBranchId);
     const activeBranchId = branches.some((branch) => branch.id === requestedActive)
       ? requestedActive
       : branches[0]?.id;
     const record: ConversationRecord = {
       id,
-      title: String((conv && conv.title) || '新对话').slice(0, MAX_TITLE),
+      title: String((conv && conv.title) || '新对话').slice(0, MAX_CONVERSATION_TITLE),
       pinned: Boolean(conv && conv.pinned),
-      messages: sanitizeMessages(conv && conv.messages),
+      messages: sanitizeConversationMessages(conv && conv.messages),
       ...(branches.length ? { activeBranchId, branches } : {}),
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -235,7 +181,7 @@ export class FileConversationStore {
 
   /** 删除单个对话文档,返回是否真的删除。 */
   remove(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): boolean {
-    const file = path.join(userDir(trustedRoot, context), `${cleanId(id)}.json`);
+    const file = path.join(userDir(trustedRoot, context), `${cleanConversationId(id)}.json`);
     if (!fs.existsSync(file)) return false;
     fs.unlinkSync(file);
     return true;

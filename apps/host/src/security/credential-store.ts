@@ -14,32 +14,28 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { summarizeCredential } from './credential-summary.js';
+import type {
+  CredentialEntry,
+  CredentialFile,
+  CredentialFilter,
+  CredentialIdentity,
+  CredentialProtector,
+  CredentialStore,
+  CredentialStoreOptions,
+  CredentialSummary,
+} from './credential-store-types.js';
 
-export type CredentialIdentity = { tenantId?: unknown; userId?: unknown; provider?: unknown; accountId?: unknown };
-export type CredentialSummary = {
-  provider: string;
-  accountId: string;
-  tenantId: string;
-  userId: string;
-  scopes: string[];
-  account: Record<string, unknown> | null;
-  updatedAt: string;
-};
-export type CredentialEntry = { summary: CredentialSummary; sealed: string };
-export type CredentialFile = { schemaVersion: number; entries: Record<string, CredentialEntry> };
-export type CredentialProtector = {
-  protect(plainText: unknown): string;
-  unprotect(sealedText: unknown): string;
-};
-export type CredentialStoreOptions = { filePath?: string; protector?: CredentialProtector };
-export type CredentialFilter = { tenantId?: unknown; userId?: unknown; provider?: unknown; accountId?: unknown };
-export type CredentialStore = {
-  put(identity: CredentialIdentity, secret: Record<string, unknown>): CredentialSummary;
-  get(identity: CredentialIdentity): Record<string, unknown> | null;
-  list(filter?: CredentialFilter): CredentialSummary[];
-  delete(identity: CredentialIdentity): boolean;
-  deleteMany(filter?: CredentialFilter): number;
-};
+export type {
+  CredentialEntry,
+  CredentialFile,
+  CredentialFilter,
+  CredentialIdentity,
+  CredentialProtector,
+  CredentialStore,
+  CredentialStoreOptions,
+  CredentialSummary,
+} from './credential-store-types.js';
 
 function ensureDir(filePath: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -80,38 +76,6 @@ function readStore(filePath: string): CredentialFile {
 function writeStore(filePath: string, data: CredentialFile): void {
   ensureDir(filePath);
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-}
-
-function scopesFrom(value: Record<string, unknown>): string[] {
-  if (Array.isArray(value.scopes)) {
-    return value.scopes.map(String).map((s) => s.trim()).filter(Boolean);
-  }
-  return String(value.scope || '').split(/\s+/).map((s) => s.trim()).filter(Boolean);
-}
-
-/** 从账户对象只摘取可安全展示的字段(login/id/name/email),丢弃其余敏感内容。 */
-function safeAccount(account: unknown): Record<string, unknown> | null {
-  if (!account || typeof account !== 'object') return null;
-  const source = account as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of ['login', 'id', 'name', 'email']) {
-    if (source[key] !== undefined && source[key] !== null) out[key] = source[key];
-  }
-  return Object.keys(out).length ? out : null;
-}
-
-/** 生成「可对外展示的脱敏摘要」:身份、scopes、账户安全字段、更新时间——不含任何密钥。 */
-function summarize(identity: CredentialIdentity, secret: Record<string, unknown>): CredentialSummary {
-  const account = safeAccount(secret.account);
-  return {
-    provider: String(identity.provider),
-    accountId: String(identity.accountId || account?.login || 'default'),
-    tenantId: String(identity.tenantId || 'tenant_local'),
-    userId: String(identity.userId || 'user_local'),
-    scopes: scopesFrom(secret),
-    account,
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 function aesKey(keyMaterial: unknown): Buffer {
@@ -204,7 +168,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
     put(identity: CredentialIdentity, secret: Record<string, unknown>): CredentialSummary {
       const key = credentialKey(identity);
       const data = readStore(filePath);
-      const summary = summarize(identity, secret || {});
+      const summary = summarizeCredential(identity, secret || {});
       data.entries[key] = {
         summary,
         sealed: protector.protect(JSON.stringify(secret || {})),

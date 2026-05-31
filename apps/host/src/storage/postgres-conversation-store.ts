@@ -8,6 +8,13 @@
 // PostgreSQL adapter for per-user conversation history. Tests inject a mock pool.
 import crypto from 'node:crypto';
 import path from 'node:path';
+import {
+  cleanConversationId,
+  MAX_CONVERSATION_TITLE,
+  safeOptionalConversationId,
+  sanitizeConversationBranches,
+  sanitizeConversationMessages,
+} from './conversation-sanitizers.js';
 import type {
   ConversationBranch,
   ConversationContext,
@@ -38,9 +45,6 @@ type ConversationRow = {
   total?: unknown;
 };
 
-const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
-const MAX_TITLE = 200;
-
 function clampId(v: unknown, fb: string): string { const t = String(v || '').trim(); return t ? t.slice(0, 96) : fb; }
 const normTenant = (v: unknown): string => clampId(v, 'tenant_local');
 const normUser = (v: unknown): string => clampId(v, 'user_local');
@@ -49,38 +53,6 @@ const normUser = (v: unknown): string => clampId(v, 'user_local');
 function workspaceKey(trustedRoot: unknown): string {
   const root = path.resolve(String(trustedRoot || ''));
   return crypto.createHash('sha256').update(root).digest('hex');
-}
-
-/** 校验对话 id 合法性,非法抛错。 */
-function cleanId(id: unknown): string {
-  const t = String(id || '').trim();
-  if (!ID_RE.test(t)) throw new Error('invalid conversation id');
-  return t;
-}
-/** 仅保留最近 200 条消息。 */
-function sanitizeMessages(messages: unknown): unknown[] {
-  return Array.isArray(messages) ? messages.slice(-200) : [];
-}
-/** 校验可选 id,非法返回空串。 */
-function safeOptionalId(value: unknown): string {
-  const t = String(value || '').trim();
-  return ID_RE.test(t) ? t : '';
-}
-/** 清洗分支列表(限 12 条、补默认 id/标题、逐分支裁剪消息)。 */
-function sanitizeBranches(branches: unknown): ConversationBranch[] {
-  if (!Array.isArray(branches)) return [];
-  return branches.slice(-12).map((branch, index) => {
-    const source = (branch || {}) as Record<string, unknown>;
-    const id = safeOptionalId(source.id) || (index === 0 ? 'main' : `branch-${index}`);
-    return {
-      id,
-      title: String(source.title || (index === 0 ? '主线' : `分支 ${index}`)).slice(0, MAX_TITLE),
-      ...(safeOptionalId(source.parentBranchId) ? { parentBranchId: String(source.parentBranchId) } : {}),
-      ...(source.baseMessageId ? { baseMessageId: String(source.baseMessageId).slice(0, 96) } : {}),
-      ...(source.createdAt ? { createdAt: String(source.createdAt).slice(0, 64) } : {}),
-      messages: sanitizeMessages(source.messages),
-    };
-  });
 }
 
 /** 把列值解析为数组:已是数组直接用,字符串则尝试 JSON.parse,失败返回空数组。 */
@@ -204,7 +176,7 @@ export class PostgresConversationStore {
     const r = await this._query(
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
-      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanId(id)],
+      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanConversationId(id)],
     );
     const row = (r.rows && r.rows[0]) as ConversationRow | undefined;
     return row ? fullRow(row) : null;
@@ -212,16 +184,16 @@ export class PostgresConversationStore {
 
   /** upsert 对话(按 tenant/user/workspace/id 冲突更新),清洗后写入并返回摘要。 */
   async save(trustedRoot: unknown, conv: ConversationInput, context: ConversationContext = {}): Promise<ConversationSummary> {
-    const id = cleanId(conv && conv.id);
+    const id = cleanConversationId(conv && conv.id);
     const tenantId = normTenant(context.tenantId);
     const userId = normUser(context.userId);
     const wsKey = workspaceKey(trustedRoot);
     const now = this._now().toISOString();
-    const title = String((conv && conv.title) || '新对话').slice(0, MAX_TITLE);
+    const title = String((conv && conv.title) || '新对话').slice(0, MAX_CONVERSATION_TITLE);
     const pinned = Boolean(conv && conv.pinned);
-    const messages = sanitizeMessages(conv && conv.messages);
-    const branches = sanitizeBranches(conv && conv.branches);
-    const requestedActive = safeOptionalId(conv && conv.activeBranchId);
+    const messages = sanitizeConversationMessages(conv && conv.messages);
+    const branches = sanitizeConversationBranches(conv && conv.branches);
+    const requestedActive = safeOptionalConversationId(conv && conv.activeBranchId);
     const activeBranchId = branches.some((branch) => branch.id === requestedActive)
       ? requestedActive
       : branches[0]?.id || null;
@@ -247,7 +219,7 @@ export class PostgresConversationStore {
   async remove(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): Promise<boolean> {
     const r = await this._query(
       `DELETE FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
-      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanId(id)],
+      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanConversationId(id)],
     );
     return (r.rowCount || 0) > 0;
   }

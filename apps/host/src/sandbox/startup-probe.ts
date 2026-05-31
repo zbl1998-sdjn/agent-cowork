@@ -5,36 +5,25 @@
 //       显式指定后端则直接采用。诚实优先:绝不谎报网络隔离能力(plan/01 健壮性原则)。
 // 依赖:node:child_process(spawnSync 可注入便于测试)。导出:resolveSandboxStartup。
 import childProcess from 'node:child_process';
+import type {
+  BackendProbe,
+  RuntimeEnv,
+  SandboxStartupOptions,
+  SandboxStartupResult,
+  SpawnSyncLike,
+  StartupBackends,
+} from './startup-probe-types.js';
 
-export type ProbeError = { code?: string; message?: string };
-export type ProbeResult = { status?: number | null; stdout?: unknown; stderr?: unknown; error?: ProbeError };
-export type SpawnSyncLike = (command: string, args: readonly string[], options: Record<string, unknown>) => ProbeResult;
-export type RuntimeEnv = Record<string, string | undefined>;
-export type SandboxStartupOptions = {
-  backend?: string;
-  image?: string | null;
-  distro?: string | null;
-  [key: string]: unknown;
-};
-export type BackendProbe = {
-  available: boolean;
-  usable: boolean;
-  networkIsolated: boolean;
-  image?: string | null;
-  imagePresent?: boolean;
-  distro?: string | null;
-  detail: string;
-  reason: string;
-};
-export type StartupBackends = {
-  docker: BackendProbe;
-  wsl: BackendProbe;
-  local: { available: boolean; usable: boolean; networkIsolated: boolean };
-};
-export type SandboxStartupResult = {
-  options: SandboxStartupOptions;
-  info: Record<string, unknown>;
-};
+export type {
+  BackendProbe,
+  ProbeError,
+  ProbeResult,
+  RuntimeEnv,
+  SandboxStartupOptions,
+  SandboxStartupResult,
+  SpawnSyncLike,
+  StartupBackends,
+} from './startup-probe-types.js';
 
 const DOCKER_INFO_ARGS = Object.freeze(['info', '--format', '{{.ServerVersion}}']);
 const WSL_STATUS_ARGS = Object.freeze(['--status']);

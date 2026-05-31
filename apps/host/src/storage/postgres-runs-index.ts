@@ -8,127 +8,44 @@
 // PostgreSQL adapter for the runs index. Async methods stay await-compatible
 // with sync file/sqlite adapters. `pg` is optional and lazily imported; tests
 // inject a mock pool.
-export type PgResult = { rows?: unknown[]; rowCount?: number | null };
-export type PgPool = { query(text: string, params?: unknown[]): Promise<PgResult>; end?: () => Promise<unknown> };
+import type {
+  AsyncRunsIndex,
+  PgPool,
+  PgResult,
+  PostgresRunsIndexOptions,
+  RunContext,
+  RunRecord,
+  RunRecordInput,
+  RunsGetOptions,
+  RunsListOptions,
+  RunsStats,
+  RunsStatsOptions,
+} from './postgres-runs-index-types.js';
+import {
+  normaliseRecord,
+  normaliseTenantId,
+  normaliseUserId,
+  parseRecord,
+  safePgIdentifier,
+} from './postgres-runs-index-records.js';
+
+export type {
+  AsyncRunsIndex,
+  PgPool,
+  PgResult,
+  PostgresRunsIndexOptions,
+  RunContext,
+  RunRecord,
+  RunRecordInput,
+  RunsGetOptions,
+  RunsListOptions,
+  RunsStats,
+  RunsStatsOptions,
+} from './postgres-runs-index-types.js';
+
 type PgPoolConstructor = new (options?: Record<string, unknown>) => PgPool;
 type PgModule = { default?: { Pool?: PgPoolConstructor }; Pool?: PgPoolConstructor };
-export type RunRecordInput = {
-  id?: unknown;
-  tenantId?: unknown;
-  userId?: unknown;
-  traceId?: unknown;
-  type?: unknown;
-  status?: unknown;
-  mode?: unknown;
-  provider?: unknown;
-  recipeId?: unknown;
-  startedAt?: unknown;
-  finishedAt?: unknown;
-  durationMs?: unknown;
-  promptPreview?: unknown;
-  error?: unknown;
-  runPath?: unknown;
-  version?: unknown;
-  updatedAt?: unknown;
-};
-export type RunRecord = {
-  id: string;
-  tenantId: string;
-  userId: string;
-  traceId: string;
-  type: string;
-  status: string;
-  mode: string | null;
-  provider: string | null;
-  recipeId: string | null;
-  startedAt: unknown;
-  finishedAt: unknown;
-  durationMs: number | null;
-  promptPreview: string | null;
-  error: string | null;
-  runPath: string | null;
-  version: number;
-  updatedAt: string;
-};
-export type RunContext = { traceId?: unknown };
-export type RunsGetOptions = { tenantId?: unknown };
-export type RunsListOptions = {
-  tenantId?: unknown;
-  userId?: unknown;
-  limit?: unknown;
-  status?: unknown;
-  type?: unknown;
-  recipeId?: unknown;
-};
-export type RunsStatsOptions = { tenantId?: unknown };
-export type RunsStats = { total: number; byStatus: Record<string, number>; byType: Record<string, number> };
-export type PostgresRunsIndexOptions = {
-  pool?: PgPool | null;
-  connectionString?: string | null;
-  table?: string;
-  now?: () => Date;
-};
 type RunsIndexRow = { record_json?: unknown; count?: unknown; status?: unknown; type?: unknown };
-export type AsyncRunsIndex = {
-  upsert(record: RunRecordInput, context?: RunContext): Promise<RunRecord>;
-  remove(id: string): Promise<boolean>;
-  get(id: string, options?: RunsGetOptions): Promise<RunRecord | null>;
-  list(options?: RunsListOptions): Promise<RunRecord[]>;
-  size(): Promise<number>;
-  stats(options?: RunsStatsOptions): Promise<RunsStats>;
-  close?: () => Promise<void>;
-};
-
-function clampId(value: unknown, fallback: string): string {
-  const text = String(value || '').trim();
-  if (!text) return fallback;
-  return text.length > 96 ? text.slice(0, 96) : text;
-}
-const normaliseTenantId = (v: unknown): string => clampId(v, 'tenant_local');
-const normaliseUserId = (v: unknown): string => clampId(v, 'user_local');
-
-/** 校验表名合法(表名拼进 SQL 不能参数化,需防注入)。 */
-function safePgIdentifier(value: unknown): string {
-  const text = String(value || '').trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
-    throw new Error('PostgresRunsIndex: invalid table name');
-  }
-  return text;
-}
-
-/** 归一一条 run 记录:必填 id 校验、租户/用户回落、字段截断与默认版本。 */
-function normaliseRecord(record: unknown): RunRecord {
-  if (!record || typeof record !== 'object') throw new Error('runs-index: record must be an object');
-  const input = record as RunRecordInput;
-  const id = String(input.id || '').trim();
-  if (!id) throw new Error('runs-index: record.id is required');
-  return {
-    id,
-    tenantId: normaliseTenantId(input.tenantId),
-    userId: normaliseUserId(input.userId),
-    traceId: String(input.traceId || ''),
-    type: String(input.type || ''),
-    status: String(input.status || ''),
-    mode: input.mode ? String(input.mode) : null,
-    provider: input.provider ? String(input.provider) : null,
-    recipeId: input.recipeId ? String(input.recipeId) : null,
-    startedAt: input.startedAt || null,
-    finishedAt: input.finishedAt || null,
-    durationMs: typeof input.durationMs === 'number' ? input.durationMs : null,
-    promptPreview: typeof input.promptPreview === 'string' ? input.promptPreview.slice(0, 240) : null,
-    error: input.error ? String(input.error).slice(0, 1024) : null,
-    runPath: input.runPath ? String(input.runPath) : null,
-    version: Number(input.version) || 1,
-    updatedAt: String(input.updatedAt || new Date().toISOString()),
-  };
-}
-
-/** 从行的 record_json 列还原 RunRecord(字符串则 parse,兼容 jsonb 直返)。 */
-function parseRecord(row: unknown): RunRecord | null {
-  if (!row) return null;
-  const raw = (row as RunsIndexRow).record_json;
-  return typeof raw === 'string' ? JSON.parse(raw) as RunRecord : raw as RunRecord | null;
-}
 
 /** 运行索引的 PG 后端:upsert 写入并提供 get/list/size/stats 查询。 */
 export class PostgresRunsIndex {

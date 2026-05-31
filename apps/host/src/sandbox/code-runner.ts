@@ -12,59 +12,19 @@ import { resolveLocalRuntimeTool, withLocalRuntimeToolLimits } from './local-run
 import { MAX_CODE_BYTES, SCRIPT_DIR_SEGMENTS, fail, pickExt, preview, toHttpError } from './code-runner-utils.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
-import type { SandboxLimits, SandboxSpec } from './sandbox-spec.js';
+import type { SandboxSpec } from './sandbox-spec.js';
+import type { RunCodeOptions, RunCodeResult, SandboxExecResult } from './code-runner-types.js';
 
-export type SandboxExecResult = {
-  backend?: unknown;
-  exitCode: number;
-  stdout?: string;
-  stderr?: string;
-  timedOut?: boolean;
-  truncated?: boolean;
-  durationMs?: number;
-};
-export type SandboxLike = {
-  backend?: unknown;
-  exec(
-    spec: SandboxSpec,
-    ctx?: { trustedRoot?: string; context?: Record<string, unknown> },
-  ): Promise<SandboxExecResult> | SandboxExecResult;
-};
-export type RunEventsLike = {
-  publish(runId: string, event: Record<string, unknown>): Record<string, unknown>;
-};
-export type RunsIndexLike = {
-  upsert(summary: unknown, context?: Record<string, unknown>): unknown;
-};
-export type RunCodeOptions = {
-  sandbox?: SandboxLike | null;
-  sandboxLimits?: SandboxLimits;
-  runtimeEnv?: Record<string, string | undefined>;
-  nodeExecPath?: unknown;
-  tool?: unknown;
-  code?: unknown;
-  prompt?: unknown;
-  ext?: unknown;
-  timeoutMs?: unknown;
-  network?: boolean;
-  trustedRoot: string;
-  runStoreRoot: string;
-  runEvents?: RunEventsLike | null;
-  runsIndex?: RunsIndexLike | null;
-  context?: Record<string, unknown>;
-};
+export type {
+  RunCodeOptions,
+  RunCodeResult,
+  RunEventsLike,
+  RunsIndexLike,
+  SandboxExecResult,
+  SandboxLike,
+} from './code-runner-types.js';
+
 type RunRecordLike = { id: string; [key: string]: unknown };
-export type RunCodeResult = {
-  ok: boolean;
-  runId: string;
-  runPath: string;
-  backend: unknown;
-  scriptPath: string;
-  scriptRelative: string;
-  spec: Pick<SandboxSpec, 'tool' | 'args' | 'timeoutMs' | 'network'>;
-  result: SandboxExecResult & { ok: boolean };
-  events: Record<string, unknown>[];
-};
 
 /**
  * 运行内联代码:校验代码/工具 → 选本地运行时(如内置 Python)→ 写脚本 → 沙箱执行 → 落 run 记录与事件。
