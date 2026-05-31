@@ -3,43 +3,60 @@
 // 职责:处理 /api/sandbox/* —— 运行内联代码(POST run-code,需幂等键、默认禁直接执行)、查询沙箱后端探测信息。
 //       执行委派 L1 code-runner,落 run 记录。依赖:L0 request-utils + L1 sandbox + L2 run-store/runs-index。
 // 导出:handleSandboxRoutes。
-// @ts-check
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { errorMessage, errorPayload, errorStatus } from './route-error-utils.js';
+import {
+  parseSandboxBody,
+  sandboxExecBodySchema,
+  sandboxRunCodeBodySchema,
+} from './sandbox-route-schemas.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { RawSandboxSpec, SandboxLimits, SandboxSpec } from '../sandbox/sandbox-spec.js';
+import type { RunEventsLike, RunsIndexLike, SandboxLike } from '../sandbox/code-runner.js';
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
- * @typedef {import('../sandbox/sandbox-spec.js').SandboxSpec} SandboxSpec
- * @typedef {import('../sandbox/sandbox-spec.js').SandboxLimits} SandboxLimits
- * @typedef {import('../sandbox/code-runner.js').SandboxLike} SandboxLike
- * @typedef {SandboxLike & { networkIsolated?: unknown }} RouteSandboxLike
- * @typedef {{ publish(runId: string, event: Record<string, unknown>): Record<string, unknown> }} RunEventsLike
- * @typedef {{ upsert(summary: unknown, context?: RequestContext): unknown }} RunsIndexLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext: RequestContext, sandbox?: RouteSandboxLike | null, sandboxEnabled?: boolean, sandboxLimits?: SandboxLimits, sandboxStartup?: unknown, runStoreRoot: string, runsIndex: RunsIndexLike, runEvents: RunEventsLike, cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string, requireIdempotencyKey(response: RouteResponse, context: RequestContext): boolean, sendCachedOrStore(response: RouteResponse, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | void, safeTrustedRoot(input?: unknown): string, allowUnsafeDirectSandboxRoutes?: boolean }} SandboxRouteOptions
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type RequestContext = { tenantId?: string; userId?: string; idempotencyKey?: string; [key: string]: unknown };
+type RouteSandboxLike = SandboxLike & { networkIsolated?: unknown };
+export type SandboxRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestContext: RequestContext;
+  sandbox?: RouteSandboxLike | null;
+  sandboxEnabled?: boolean;
+  sandboxLimits?: SandboxLimits;
+  sandboxStartup?: unknown;
+  runStoreRoot: string;
+  runsIndex: RunsIndexLike;
+  runEvents: RunEventsLike;
+  cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string;
+  requireIdempotencyKey(response: HttpResponseLike, context: RequestContext): boolean;
+  sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string | undefined, status: number, payload?: unknown): boolean | undefined;
+  safeTrustedRoot(input?: unknown): string;
+  allowUnsafeDirectSandboxRoutes?: boolean;
+};
 
-/** @param {unknown} body @returns {Record<string, unknown>} */
-function objectBody(body) { return body && typeof body === 'object' && !Array.isArray(body) ? /** @type {Record<string, unknown>} */ (body) : {}; }
-
-/** @param {SandboxSpec} spec @returns {string} */
-function promptPreview(spec) {
+function promptPreview(spec: SandboxSpec): string {
   return [spec.tool, ...spec.args].join(' ').slice(0, 240);
 }
 
-/** @param {RunsIndexLike} runsIndex @param {unknown} record @param {string} runPath @param {RequestContext} requestContext */
-function safeUpsertRunIndex(runsIndex, record, runPath, requestContext) {
+function safeUpsertRunIndex(
+  runsIndex: RunsIndexLike,
+  record: Record<string, unknown>,
+  runPath: string,
+  requestContext: RequestContext,
+): void {
   try {
-    runsIndex.upsert(summariseRunForIndex({ .../** @type {Record<string, unknown>} */ (record), runPath }, requestContext), requestContext);
-  } catch { /* index failures never break the request path */ }
+    runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
+  } catch {
+    // Index failures must never break the request path.
+  }
 }
 
-/** @param {SandboxRouteOptions} options @returns {Promise<boolean>} */
 export async function handleSandboxRoutes({
   request,
   response,
@@ -57,7 +74,7 @@ export async function handleSandboxRoutes({
   sendCachedOrStore,
   safeTrustedRoot,
   allowUnsafeDirectSandboxRoutes = false,
-}) {
+}: SandboxRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/sandbox/info') {
     sendJson(response, 200, {
       context: requestContext,
@@ -73,28 +90,24 @@ export async function handleSandboxRoutes({
 
   if (request.method === 'POST' && pathname === '/api/sandbox/exec') {
     await withJsonBody(request, response, async (body) => {
-      const input = objectBody(body);
       if (!sandboxEnabled || !sandbox) {
         sendJson(response, 503, { error: 'Sandbox execution is disabled in this host.' });
         return;
       }
-      if (!requireIdempotencyKey(response, requestContext)) {
-        return;
-      }
+      if (!requireIdempotencyKey(response, requestContext)) return;
       if (!allowUnsafeDirectSandboxRoutes) {
         sendJson(response, 428, {
           error: 'Direct sandbox execution requires agent approval; call the sandbox tool through the approved agent flow.',
         });
         return;
       }
+      const input = parseSandboxBody(response, sandboxExecBodySchema, body, 'invalid sandbox exec request');
+      if (!input) return;
       const fingerprint = bodyFingerprint(body);
       const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-        return;
-      }
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) return;
 
-      // Accept either { spec: {...} } or the spec fields at the top level.
-      const rawSpec = input.spec && typeof input.spec === 'object' && !Array.isArray(input.spec) ? input.spec : input;
+      const rawSpec = (input.spec || input) as RawSandboxSpec;
       let spec;
       try {
         spec = normalizeSandboxSpec(rawSpec, sandboxLimits);
@@ -159,40 +172,36 @@ export async function handleSandboxRoutes({
         timedOut: result.timedOut,
       });
 
-      const payload = {
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         runId,
         runPath,
         context: requestContext,
         backend: result.backend,
         spec: { tool: spec.tool, args: spec.args, timeoutMs: spec.timeoutMs, network: spec.network },
         result,
-      };
-      sendCachedOrStore(response, cacheKey, fingerprint, 200, payload);
+      });
     });
     return true;
   }
 
   if (request.method === 'POST' && pathname === '/api/sandbox/run-code') {
     await withJsonBody(request, response, async (body) => {
-      const input = objectBody(body);
       if (!sandboxEnabled || !sandbox) {
         sendJson(response, 503, { error: 'Sandbox execution is disabled in this host.' });
         return;
       }
-      if (!requireIdempotencyKey(response, requestContext)) {
-        return;
-      }
+      if (!requireIdempotencyKey(response, requestContext)) return;
       if (!allowUnsafeDirectSandboxRoutes) {
         sendJson(response, 428, {
           error: 'Direct sandbox execution requires agent approval; call the sandbox tool through the approved agent flow.',
         });
         return;
       }
+      const input = parseSandboxBody(response, sandboxRunCodeBodySchema, body, 'invalid sandbox run-code request');
+      if (!input) return;
       const fingerprint = bodyFingerprint(body);
       const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
-      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
-        return;
-      }
+      if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) return;
 
       const trustedRoot = safeTrustedRoot(input.trustedRoot);
       let outcome;
@@ -220,7 +229,7 @@ export async function handleSandboxRoutes({
         return;
       }
 
-      const payload = {
+      sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         runId: outcome.runId,
         runPath: outcome.runPath,
         context: requestContext,
@@ -228,8 +237,7 @@ export async function handleSandboxRoutes({
         script: outcome.scriptRelative,
         spec: outcome.spec,
         result: outcome.result,
-      };
-      sendCachedOrStore(response, cacheKey, fingerprint, 200, payload);
+      });
     });
     return true;
   }

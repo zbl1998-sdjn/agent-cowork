@@ -314,6 +314,23 @@ test('POST /api/sandbox/exec rejects a tool outside the allowlist with 400', asy
   }
 });
 
+test('POST /api/sandbox/exec rejects malformed route body before spec normalization', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/sandbox/exec', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'sbx-malformed' },
+      body: { spec: 'node' },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /object|spec/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('POST /api/sandbox/exec requires an Idempotency-Key', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
@@ -710,6 +727,25 @@ test('POST /api/sandbox/run-code rejects a tool outside the allowlist with 400 a
     const scriptsDir = path.join(trustedRoot, '.AgentCowork', 'scripts');
     const wrote = fs.existsSync(scriptsDir) ? fs.readdirSync(scriptsDir) : [];
     assert.equal(wrote.length, 0, 'an invalid tool must not leave a script behind');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('POST /api/sandbox/run-code rejects malformed route body before writing a script', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/sandbox/run-code', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'code-malformed' },
+      body: { tool: 42, code: 'process.stdout.write("x")' },
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /string|tool/i);
+    const scriptsDir = path.join(trustedRoot, '.AgentCowork', 'scripts');
+    assert.equal(fs.existsSync(scriptsDir), false);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
