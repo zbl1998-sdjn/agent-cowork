@@ -138,7 +138,7 @@
     "apps/host/src/runtime/run-checkpoint.ts",
     "apps/host/src/runtime/run-trace-sanitizers.ts",
     "apps/host/src/runtime/run-trace-normalizers.ts",
-    "apps/host/src/runtime/run-trace.js",
+    "apps/host/src/runtime/run-trace.ts",
     "apps/host/src/runtime/run-events.ts",
     "apps/host/src/runtime/run-metrics.ts",
     "apps/host/src/runtime/run-store.ts",
