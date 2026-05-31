@@ -1,28 +1,83 @@
 // 记忆路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/memory/* —— 记忆的写入/查询/分层读取与用户画像存取(多租户隔离)。
-// 依赖:L1 memory 存储(经参数注入)。导出:handleMemoryRoutes。
+// 依赖:L0 path-policy/request-utils + L1 memory 存储(经参数注入)。导出:handleMemoryRoutes。
 import path from 'node:path';
+import { z } from 'zod';
 import { MEMORY_LIMITS } from '../memory/memory-constants.js';
 import { createUserProfile } from '../memory/profile.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { MemoryStoreLike as ProfileMemoryStoreLike } from '../memory/profile.js';
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {Error & { statusCode?: number }} RouteError
- * @typedef {{ traceId?: string, tenantId?: string, userId?: string, idempotencyKey?: string, [key: string]: unknown }} RequestContext
- * @typedef {{ name: string, size: number, modifiedAt: string, path?: string }} MemoryNote
- * @typedef {{ key: string, value: string, scope: string }} MemoryFact
- * @typedef {{ file: string, fact: MemoryFact }} MemoryFactResult
- * @typedef {{ trustedRoot?: unknown, key?: unknown, value?: unknown, scope?: unknown, entry?: unknown, name?: unknown, body?: unknown, type?: unknown }} MemoryBody
- * @typedef {{ readMainMemory(trustedRoot: string, context?: RequestContext): string | Promise<string>, listMemoryNotes(trustedRoot: string, context?: RequestContext): MemoryNote[] | Promise<MemoryNote[]>, readMemoryNote(trustedRoot: string, noteName: string, context?: RequestContext): string | null | Promise<string | null>, writeMemoryNote(trustedRoot: string, noteName: string, body: string, context?: RequestContext): string | Promise<string>, appendMemoryFact(trustedRoot: string, fact: { key?: unknown, value?: unknown, scope?: unknown }, context?: RequestContext): MemoryFactResult | Promise<MemoryFactResult> }} MemoryStoreLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, trustedRootDefault: string, memoryStore: MemoryStoreLike }} MemoryRouteOptions
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type RouteError = Error & { statusCode?: number };
+type RequestContext = { traceId?: string; tenantId?: string; userId?: string; idempotencyKey?: string; [key: string]: unknown };
+type MemoryNote = { name: string; size: number; modifiedAt: string; path?: string };
+type MemoryFact = { key: string; value: string; scope: string };
+type MemoryFactResult = { file: string; fact: MemoryFact };
+type MemoryStoreLike = ProfileMemoryStoreLike & {
+  readMainMemory(trustedRoot: string, context?: RequestContext): string | Promise<string>;
+  listMemoryNotes(trustedRoot: string, context?: RequestContext): MemoryNote[] | Promise<MemoryNote[]>;
+  appendMemoryFact(
+    trustedRoot: string,
+    fact: { key?: unknown; value?: unknown; scope?: unknown },
+    context?: RequestContext,
+  ): MemoryFactResult | Promise<MemoryFactResult>;
+};
+type MemoryRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestUrl: URL;
+  requestContext: RequestContext;
+  trustedRootDefault: string;
+  memoryStore: MemoryStoreLike;
+};
 
-/** @param {unknown} value @param {string} trustedRootDefault @returns {string} */
-function safeMemoryRoot(value, trustedRootDefault) {
+const trustedRootSchema = z.preprocess(
+  (value) => (value === '' || value == null ? undefined : value),
+  z.string().optional(),
+);
+const profileQuerySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  query: z.string().optional(),
+  limit: z.coerce.number().int().finite().catch(8),
+}).passthrough();
+const factBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  key: z.string().trim().min(1, 'memory fact key is required'),
+  value: z.string().trim().min(1, 'memory fact value is required'),
+  scope: z.string().optional(),
+}).passthrough();
+const profileLearnBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  entry: z.unknown().optional(),
+}).passthrough();
+const profileForgetBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  type: z.unknown().optional(),
+  key: z.unknown().optional(),
+}).passthrough();
+const noteBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  name: z.string().trim().min(1, 'body.name is required'),
+  body: z.string(),
+}).passthrough();
+
+function errorStatus(err: unknown, fallback: number): number {
+  return err && typeof err === 'object' && 'statusCode' in err && typeof (err as RouteError).statusCode === 'number'
+    ? (err as RouteError).statusCode ?? fallback
+    : fallback;
+}
+
+function errorMessage(err: unknown, fallback = 'invalid memory request'): string {
+  if (err instanceof z.ZodError) return err.issues[0]?.message || fallback;
+  return err instanceof Error ? err.message : String(err);
+}
+
+function safeMemoryRoot(value: unknown, trustedRootDefault: string): string {
   if (value != null && value !== '' && typeof value !== 'string') {
     throw new Error('trustedRoot must be a string');
   }
@@ -30,18 +85,15 @@ function safeMemoryRoot(value, trustedRootDefault) {
   return assertTrustedPath(trustedRoot, trustedRootDefault);
 }
 
-/** @param {unknown} value @param {string} trustedRootDefault @param {RouteResponse} response @returns {string | null} */
-function safeMemoryRootOrSend(value, trustedRootDefault, response) {
+function safeMemoryRootOrSend(value: unknown, trustedRootDefault: string, response: HttpResponseLike): string | null {
   try {
     return safeMemoryRoot(value, trustedRootDefault);
   } catch (err) {
-    const error = /** @type {RouteError} */ (err);
-    sendJson(response, error.statusCode || 400, { error: error.message });
+    sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
     return null;
   }
 }
 
-/** @param {MemoryRouteOptions} options @returns {Promise<boolean>} */
 export async function handleMemoryRoutes({
   request,
   response,
@@ -50,7 +102,7 @@ export async function handleMemoryRoutes({
   requestContext,
   trustedRootDefault,
   memoryStore,
-}) {
+}: MemoryRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/memory') {
     const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
     if (!safeRoot) return true;
@@ -74,13 +126,20 @@ export async function handleMemoryRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/api/memory/profile') {
-    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    let query: z.infer<typeof profileQuerySchema>;
+    try {
+      query = profileQuerySchema.parse(Object.fromEntries(requestUrl.searchParams.entries()));
+    } catch (err) {
+      sendJson(response, 400, { error: errorMessage(err) });
+      return true;
+    }
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
     if (!safeRoot) return true;
     const profile = createUserProfile({ memoryStore });
     const loaded = await profile.load(safeRoot, requestContext);
     const recall = await profile.recall(safeRoot, {
-      query: requestUrl.searchParams.get('query') || '',
-      limit: Number(requestUrl.searchParams.get('limit') || 8),
+      query: query.query || '',
+      limit: query.limit,
       context: requestContext,
     });
     sendJson(response, 200, { trustedRoot: safeRoot, profile: loaded, recall, context: requestContext });
@@ -89,7 +148,12 @@ export async function handleMemoryRoutes({
 
   if (request.method === 'POST' && pathname === '/api/memory/facts') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {MemoryBody} */ (body || {});
+      const parsed = factBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
+      }
+      const input = parsed.data;
       const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
       const result = await memoryStore.appendMemoryFact(
         safeRoot,
@@ -108,7 +172,12 @@ export async function handleMemoryRoutes({
 
   if (request.method === 'POST' && pathname === '/api/memory/profile/learn') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {MemoryBody} */ (body || {});
+      const parsed = profileLearnBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
+      }
+      const input = parsed.data;
       const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
       const profile = createUserProfile({ memoryStore });
       const learned = await profile.learn(safeRoot, input.entry || input, requestContext);
@@ -119,10 +188,16 @@ export async function handleMemoryRoutes({
 
   if (request.method === 'POST' && pathname === '/api/memory/profile/forget') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {MemoryBody} */ (body || {});
+      const parsed = profileForgetBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
+      }
+      const input = parsed.data;
       const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
       const profile = createUserProfile({ memoryStore });
-      const result = await profile.forget(safeRoot, input, requestContext);
+      const forgetInput = input as { type?: unknown; key?: unknown };
+      const result = await profile.forget(safeRoot, { type: forgetInput.type, key: forgetInput.key }, requestContext);
       sendJson(response, 200, { trustedRoot: safeRoot, ...result, context: requestContext });
     });
     return true;
@@ -130,13 +205,12 @@ export async function handleMemoryRoutes({
 
   if (request.method === 'POST' && pathname === '/api/memory/notes') {
     await withJsonBody(request, response, async (body) => {
-      const input = /** @type {MemoryBody} */ (body || {});
-      if (typeof input.name !== 'string' || !input.name.trim()) {
-        throw new Error('body.name is required');
+      const parsed = noteBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
       }
-      if (typeof input.body !== 'string') {
-        throw new Error('body.body must be a string');
-      }
+      const input = parsed.data;
       const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
       const written = await memoryStore.writeMemoryNote(safeRoot, input.name, input.body, requestContext);
       sendJson(response, 200, {

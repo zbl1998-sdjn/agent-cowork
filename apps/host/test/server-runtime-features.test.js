@@ -90,12 +90,24 @@ test('memory routes reject invalid input', async () => {
     assert.equal(badFact.status, 400);
     assert.match(badFact.body.error, /key is required/);
 
+    const malformedFact = await jsonRequest(base, '/api/memory/facts', {
+      method: 'POST',
+      body: { key: ['not-valid'], value: 'x' },
+    });
+    assert.equal(malformedFact.status, 400);
+
     const badNote = await jsonRequest(base, '/api/memory/notes', {
       method: 'POST',
       body: { name: '../escape.md', body: 'x' },
     });
     assert.equal(badNote.status, 400);
     assert.match(badNote.body.error, /Invalid memory note name/);
+
+    const malformedNote = await jsonRequest(base, '/api/memory/notes', {
+      method: 'POST',
+      body: { name: 'projects.md', body: ['not-valid'] },
+    });
+    assert.equal(malformedNote.status, 400);
 
     const missing = await jsonRequest(base, '/api/memory/notes/missing.md');
     assert.equal(missing.status, 404);
