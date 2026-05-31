@@ -71,14 +71,14 @@ export class CachedPostgresScheduleStore {
   /** 写缓存并异步写穿 PG(失败靠下次 save 重试);同步返回入参记录。 */
   save(record: ScheduleRecord): ScheduleRecord {
     this._cache.set(record.id, record);
-    Promise.resolve(this._pg.save(record)).catch(() => { /* cache holds it; PG retried on next save */ });
+    Promise.resolve(this._pg.save(record)).catch(() => undefined); // cache holds it; PG retried on next save
     return record;
   }
 
   /** 从缓存删除并异步在 PG 删除;同步返回缓存中是否曾存在。 */
   remove(id: string): boolean {
     const had = this._cache.delete(id);
-    Promise.resolve(this._pg.remove(id)).catch(() => {});
+    Promise.resolve(this._pg.remove(id)).catch(() => undefined);
     return had;
   }
 }

@@ -114,7 +114,7 @@ export function createApprovalRegistry({
         if (entry) entry.resolve('reject');
       }
       const id = `apr_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-      let resolve: (value: unknown) => void = () => {};
+      let resolve: (value: unknown) => void = () => undefined;
       const promise = new Promise<unknown>((resolver) => { resolve = resolver; });
       pending.set(id, { resolve, meta, ts: Date.now() });
       return { id, promise };

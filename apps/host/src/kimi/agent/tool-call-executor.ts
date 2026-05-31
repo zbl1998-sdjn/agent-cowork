@@ -16,7 +16,7 @@ import {
 import { validateToolArguments } from './arg-validator.js';
 import { traceToolResult, type RunTraceLike } from './run-trace-events.js';
 import { parseToolCall } from './tool-loop-support.js';
-import type { ApprovalRegistry, AuditBus, HookEngine, RequestContext } from './approval-gate.js';
+import type { ApprovalRegistry, HookEngine, RequestContext } from './approval-gate.js';
 
 export type ToolArgs = Record<string, unknown>;
 export type ToolCall = { id?: unknown; function?: { name?: string; arguments?: string } };

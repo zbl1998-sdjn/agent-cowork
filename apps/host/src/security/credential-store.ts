@@ -78,6 +78,11 @@ function writeStore(filePath: string, data: CredentialFile): void {
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
+function entriesWithoutKey(entries: Record<string, CredentialEntry>, keyToRemove: string): Record<string, CredentialEntry> {
+  const { [keyToRemove]: _removed, ...remaining } = entries;
+  return remaining;
+}
+
 function aesKey(keyMaterial: unknown): Buffer {
   return crypto.createHash('sha256').update(String(keyMaterial || '')).digest();
 }
@@ -201,7 +206,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
       const key = credentialKey(identity);
       const data = readStore(filePath);
       const existed = Boolean(data.entries[key]);
-      delete data.entries[key];
+      data.entries = entriesWithoutKey(data.entries, key);
       if (existed) writeStore(filePath, data);
       return existed;
     },
@@ -209,14 +214,19 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
     deleteMany(filter: CredentialFilter = {}): number {
       const data = readStore(filePath);
       let removed = 0;
+      const nextEntries: Record<string, CredentialEntry> = {};
       for (const [key, entry] of Object.entries(data.entries)) {
         const s = entry.summary || {};
-        if (filter.tenantId && s.tenantId !== filter.tenantId) continue;
-        if (filter.userId && s.userId !== filter.userId) continue;
-        if (filter.provider && s.provider !== filter.provider) continue;
-        delete data.entries[key];
-        removed += 1;
+        const matches = !(filter.tenantId && s.tenantId !== filter.tenantId)
+          && !(filter.userId && s.userId !== filter.userId)
+          && !(filter.provider && s.provider !== filter.provider);
+        if (matches) {
+          removed += 1;
+        } else {
+          nextEntries[key] = entry;
+        }
       }
+      data.entries = nextEntries;
       if (removed) writeStore(filePath, data);
       return removed;
     },

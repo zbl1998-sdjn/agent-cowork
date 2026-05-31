@@ -124,8 +124,8 @@ export class PostgresEventBus {
     if (!event || !event.type) throw new Error('PostgresEventBus.publish: event.type required');
     return this._getClient()
       .then((client) => (this._pool || client).query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ runId, event })]))
-      .then(() => {})
-      .catch(() => {});
+      .then(() => undefined)
+      .catch(() => undefined);
   }
 
   /** 订阅某 run 的事件(透传本地总线)。 */

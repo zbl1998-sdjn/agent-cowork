@@ -60,7 +60,7 @@ export class JsonStore<T extends JsonValue = Record<string, JsonValue>> {
       return JSON.parse(raw);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`Invalid JSON store at ${this.filePath}: ${message}`);
+      throw new Error(`Invalid JSON store at ${this.filePath}: ${message}`, { cause: err });
     }
   }
 

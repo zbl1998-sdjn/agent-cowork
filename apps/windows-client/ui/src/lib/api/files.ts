@@ -32,8 +32,8 @@ export async function fileToUpload(file: File, dir = 'uploads'): Promise<UploadF
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
   return { relativePath: `${dir}/${file.name}`, contentBase64: btoa(binary), size: file.size };
 }

@@ -12,30 +12,15 @@
 // internal/loopback/private hosts — resolving names to real IPs and re-checking
 // every redirect hop so a 302 → internal address can't bypass the guard.
 import { assertPublicHost } from './ssrf-guard.js';
+import { parseWebFetchOptions } from './web-tool-inputs.js';
+import type { WebFetchError, WebFetchLike, WebFetchOptions, WebFetchResponse } from './web-tool-inputs.js';
+
+export type { WebFetchError, WebFetchLike, WebFetchOptions } from './web-tool-inputs.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_BYTES = 512 * 1024;
 const MAX_REDIRECTS = 5;
 
-export type WebFetchError = Error & { statusCode?: number };
-export type WebFetchResponse = {
-  ok?: boolean;
-  status?: number;
-  headers?: { get(name: string): string | null } | null;
-  arrayBuffer(): Promise<ArrayBuffer> | ArrayBuffer;
-};
-export type WebFetchLike = (
-  input: string,
-  init: { signal: AbortSignal; redirect: 'manual' },
-) => Promise<WebFetchResponse> | WebFetchResponse;
-export type WebFetchOptions = {
-  url?: unknown;
-  timeoutMs?: unknown;
-  maxBytes?: unknown;
-  allowInternal?: boolean;
-  fetchImpl?: WebFetchLike;
-  lookupImpl?: (host: string) => Promise<unknown> | unknown;
-};
 export type WebFetchResult = {
   ok: boolean;
   status: number;
@@ -68,14 +53,15 @@ function parseHttpUrl(value: unknown): URL {
 /**
  * 抓取一个 http(s) URL:SSRF 校验 → 手动跟随重定向(每跳复校验)→ 读回限长文本体。
  */
-export async function webFetch({
-  url,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-  maxBytes = DEFAULT_MAX_BYTES,
-  allowInternal = false,
-  fetchImpl = globalThis.fetch as unknown as WebFetchLike,
-  lookupImpl,
-}: WebFetchOptions = {}): Promise<WebFetchResult> {
+export async function webFetch(options: WebFetchOptions = {}): Promise<WebFetchResult> {
+  const {
+    url,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    maxBytes = DEFAULT_MAX_BYTES,
+    allowInternal = false,
+    fetchImpl = globalThis.fetch as unknown as WebFetchLike,
+    lookupImpl,
+  } = parseWebFetchOptions(options);
   if (typeof fetchImpl !== 'function') {
     throw fail('no fetch implementation available', 500);
   }

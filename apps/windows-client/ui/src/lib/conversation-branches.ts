@@ -53,8 +53,9 @@ export function normalizeConversationBranches(conversation: Conversation): Requi
       messages: Array.isArray(branch.messages) ? branch.messages : [],
     }))
     : [{ id: MAIN_BRANCH_ID, title: '主线', messages: conversation.messages || [] }];
-  const activeBranchId = branches.some((branch) => branch.id === conversation.activeBranchId)
-    ? conversation.activeBranchId!
+  const requestedBranchId = conversation.activeBranchId;
+  const activeBranchId = requestedBranchId && branches.some((branch) => branch.id === requestedBranchId)
+    ? requestedBranchId
     : branches[0].id;
   return { activeBranchId, branches };
 }

@@ -225,7 +225,7 @@ export class Scheduler {
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.tickOnce().catch(() => {});
+      this.tickOnce().catch(() => undefined);
     }, this.tickIntervalMs);
     const timer = this.timer as ReturnType<typeof setInterval> & { unref?: () => void };
     if (typeof timer.unref === 'function') {

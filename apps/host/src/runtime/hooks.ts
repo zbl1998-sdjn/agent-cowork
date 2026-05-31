@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
+import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 
 // Hook engine (Claude Code / Kimi CLI style). Hooks fire on agent events:
 //   - pre_tool  : before a tool runs; a hook may BLOCK it ({ block:true, reason })
@@ -34,7 +35,7 @@ type RawHook = { event?: unknown; tool?: unknown; command?: unknown };
 export type LoadHooksOptions = {
   trustedRoot?: string;
   sandbox?: SandboxLike | null;
-  sandboxLimits?: unknown;
+  sandboxLimits?: SandboxLimits;
   configPath?: string;
 };
 
@@ -93,7 +94,7 @@ export function loadHooksConfig({ trustedRoot, sandbox, sandboxLimits, configPat
         const parts = command.trim().split(/\s+/).filter(Boolean);
         if (!parts.length) return undefined;
         let spec;
-        try { spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits as any); } catch { return undefined; }
+        try { spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits); } catch { return undefined; }
         const res = await sandbox.exec(spec, { trustedRoot, context: { hook: h.event, tool: payload.name } });
         if (h.event === 'pre_tool' && res.exitCode !== 0) {
           return { block: true, reason: (res.stderr || res.stdout || `hook exit ${res.exitCode}`).slice(0, 300) };

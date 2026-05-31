@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type * as ApiModule from './api';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(async () => undefined),
@@ -45,7 +46,7 @@ function setStorage(initial: Record<string, string> = {}): void {
 
 async function importApi(
   handler?: (url: string, init?: RequestInit) => Response | Promise<Response>,
-): Promise<{ api: typeof import('./api'); calls: FetchCall[] }> {
+): Promise<{ api: typeof ApiModule; calls: FetchCall[] }> {
   vi.resetModules();
   setStorage();
   const calls: FetchCall[] = [];

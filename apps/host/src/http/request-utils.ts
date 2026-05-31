@@ -22,7 +22,10 @@ export type HttpResponseLike = {
 };
 export type HttpRequestLike = {
   headers: Record<string, string | string[] | undefined>;
-  on(event: string, listener: (...args: any[]) => void): unknown;
+  on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
+  on(event: 'end', listener: () => void): unknown;
+  on(event: 'error', listener: (error: Error) => void): unknown;
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
   resume?: () => unknown;
 };
 export type HttpError = Error & { statusCode?: number; payload?: Record<string, unknown> };

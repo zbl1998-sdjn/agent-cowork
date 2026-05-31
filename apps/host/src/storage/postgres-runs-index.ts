@@ -196,12 +196,12 @@ export function withSafeWrites(index: AsyncRunsIndex): AsyncRunsIndex {
   return {
     upsert(record, context) {
       const result = index.upsert(record, context);
-      result.then(undefined, () => {});
+      result.then(undefined, () => undefined);
       return result;
     },
     remove(id) {
       const result = index.remove(id);
-      result.then(undefined, () => {});
+      result.then(undefined, () => undefined);
       return result;
     },
     get: (id, options) => index.get(id, options),

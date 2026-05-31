@@ -49,6 +49,13 @@ test('webFetch rejects non-http schemes and internal hosts by default', async ()
   await assert.rejects(() => webFetch({ url: 'http://127.0.0.1:9/' }), /blocked/);
 });
 
+test('webFetch rejects unknown option keys before network access', async () => {
+  await assert.rejects(
+    () => webFetch({ url: 'http://example.com/', extra: true }),
+    /Unrecognized key|extra/,
+  );
+});
+
 test('web.fetch is exposed as a built-in tool', async () => {
   const { server, port } = await startServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"k":1}'); });
   try {

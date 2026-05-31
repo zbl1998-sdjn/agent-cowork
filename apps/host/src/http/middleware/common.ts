@@ -14,7 +14,10 @@ import {
 export type MiddlewareRequest = {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
-  on(event: string, listener: (...args: any[]) => void): unknown;
+  on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
+  on(event: 'end', listener: () => void): unknown;
+  on(event: 'error', listener: (error: Error) => void): unknown;
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
 };
 export type MiddlewareResponse = {
   setHeader(name: string, value: string): unknown;

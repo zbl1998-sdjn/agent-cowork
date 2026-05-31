@@ -124,7 +124,7 @@ async function runKimiApiText({
     };
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error(`Kimi API timed out after ${timeoutMs}ms`);
+      throw new Error(`Kimi API timed out after ${timeoutMs}ms`, { cause: error });
     }
     throw error;
   } finally {

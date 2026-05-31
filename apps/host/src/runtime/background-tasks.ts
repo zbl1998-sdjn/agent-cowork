@@ -42,7 +42,7 @@ export type BackgroundTaskStore = {
   list(options?: BackgroundTaskListOptions): BackgroundTask[];
   pendingCount(): number;
   remove(id: string): boolean;
-  onComplete(cb: BackgroundTaskSubscriber): () => boolean | void;
+  onComplete(cb: BackgroundTaskSubscriber): () => boolean | undefined;
 };
 
 const TERMINAL = new Set<BackgroundTaskStatus>(['done', 'failed', 'cancelled']);
@@ -162,7 +162,7 @@ export function createBackgroundTasks({
 
     onComplete(cb) {
       if (typeof cb !== 'function') {
-        return () => {};
+        return () => undefined;
       }
       completeSubscribers.add(cb);
       return () => completeSubscribers.delete(cb);

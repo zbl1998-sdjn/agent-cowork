@@ -93,7 +93,7 @@ export function createServer(config = {}) {
   server.shutdown = async ({ timeoutMs = 10000 } = {}) => {
     state.draining = true;
     try { state.cancellation.cancelAll('shutdown'); } catch { /* ignore */ }
-    try { state.approvalRegistry.cancelAll('reject'); } catch { /* ignore */ }
+    try { state.approvalRegistry.cancelAll?.('reject'); } catch { /* ignore */ }
     try { server.closeMcp(); } catch { /* ignore */ }
     try {
       if (state.activeScheduler && typeof state.activeScheduler.stop === 'function') state.activeScheduler.stop();

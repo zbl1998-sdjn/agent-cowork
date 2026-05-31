@@ -68,7 +68,7 @@ export function todoItemsFromPlan(planText: unknown, { maxItems = 8 }: TodoPlanO
 /**
  * 创建工具调用 todo 追踪器:start 时发 running 条目,返回 finish 句柄按成败更新状态。
  */
-export function createToolTodoTracker(emit: TodoEmitter = () => {}): ToolTodoTracker {
+export function createToolTodoTracker(emit: TodoEmitter = () => undefined): ToolTodoTracker {
   let sequence = 0;
   return {
     start(name) {

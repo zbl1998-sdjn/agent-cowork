@@ -144,7 +144,7 @@ export async function runKimiApiChatStream({
     return { ok: true, provider: cleanProvider(provider), model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error(`Kimi API timed out after ${timeoutMs}ms`);
+      throw new Error(`Kimi API timed out after ${timeoutMs}ms`, { cause: error });
     }
     throw error;
   } finally {

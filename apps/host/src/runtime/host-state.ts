@@ -31,7 +31,7 @@ import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
 import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
-import { sendJson } from '../http/request-utils.js';
+import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import { resolveStoreBackendConfig } from './store-backend-config.js';
@@ -42,27 +42,15 @@ import {
 } from '../http/static-assets.js';
 import { createProjectStoreResolver } from './project-stores.js';
 import { configureHostScheduler } from './host-scheduler.js';
-
-export type HostConfig = Record<string, any>;
-export type RequestContextLike = {
-  tenantId?: string;
-  userId?: string;
-  traceId?: string;
-  idempotencyKey?: string;
-};
-export type HostState = Record<string, any> & {
-  config: HostConfig;
-  hostSrcDir: string;
-  trustedRootDefault: string;
-  staticRoot: string | null;
-  uiDistRoot: string;
-  uiDistEnabled: boolean;
-  kimiConfigFile: string;
-  kimiApiConfig: any;
-  runStoreRoot: string;
-  idempotencyStore: Map<string, any>;
-  draining: boolean;
-};
+import type {
+  ApprovalRegistryLike,
+  CancellationRegistryLike,
+  HostConfig,
+  HostState,
+  IdempotencyEntry,
+  RequestContextLike,
+  RunEventsState,
+} from './host-state-types.js';
 
 export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
@@ -89,8 +77,20 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     kimiChatRunner: config.kimiChatRunner || runKimiApiChat,
     kimiChatStreamRunner: config.kimiChatStreamRunner || runKimiApiChatStream,
     runStoreRoot: path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.AgentCowork', 'runs')),
-    idempotencyStore: config.idempotencyStore || new Map(),
+    idempotencyStore: config.idempotencyStore instanceof Map
+      ? config.idempotencyStore as Map<string, IdempotencyEntry>
+      : new Map<string, IdempotencyEntry>(),
     draining: false,
+    approvalRegistry: config.approvalRegistry as ApprovalRegistryLike,
+    authStore: config.authStore as HostState['authStore'],
+    cancellation: config.cancellation as CancellationRegistryLike,
+    runEvents: config.runEventBus as RunEventsState,
+    runsIndex: config.runsIndex as HostState['runsIndex'],
+    sandboxStartup: config.sandboxStartup as HostState['sandboxStartup'],
+    safeTrustedRoot: (requestedRoot: unknown = trustedRootDefault) => (
+      assertTrustedPath(path.resolve(String(requestedRoot || trustedRootDefault)), trustedRootDefault)
+    ),
+    toolRegistry: config.toolRegistry as HostState['toolRegistry'],
   };
 
   state.recomputeKimiEnabled = () => {
@@ -113,9 +113,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     ? createPostgresConversationStore({ connectionString: state.databaseUrl })
     : createConversationStore({ backend: state.storeBackend }));
   Object.assign(state, createProjectStoreResolver(config));
-  state.runEvents = config.runEventBus || (state.usePostgresState
+  state.runEvents = (config.runEventBus || (state.usePostgresState
     ? createPostgresEventBus({ connectionString: state.databaseUrl })
-    : new RunEventBus());
+    : new RunEventBus())) as RunEventsState;
 
   state.sandboxEnabled = config.enableSandbox !== false;
   state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup({
@@ -127,23 +127,23 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   });
   state.sandbox = config.sandbox || createSandbox(state.sandboxStartup.options);
   state.sandboxLimits = {
-    allowTools: config.sandboxAllowTools || DEFAULT_ALLOW_TOOLS,
+    allowTools: config.sandboxAllowTools || [...DEFAULT_ALLOW_TOOLS],
     allowEnv: config.sandboxAllowEnv || [],
     maxTimeoutMs: config.sandboxMaxTimeoutMs,
     defaultMaxOutputBytes: config.sandboxMaxOutputBytes,
   };
-  state.toolRegistry = config.toolRegistry || createToolRegistry().registerMany(createBuiltinTools({
+  state.toolRegistry = (config.toolRegistry || createToolRegistry().registerMany(createBuiltinTools({
     sandbox: state.sandboxEnabled ? state.sandbox : null,
     sandboxLimits: state.sandboxLimits,
     runStoreRoot: state.runStoreRoot,
     runEvents: state.runEvents,
     runsIndex: state.runsIndex,
-  }));
+  }))) as unknown as HostState['toolRegistry'];
   state.skillRegistry = config.skillRegistry || createSkillRegistry();
   state.cancellation = config.cancellation || createCancellationRegistry();
-  state.approvalRegistry = config.approvalRegistry || (state.usePostgresState
+  state.approvalRegistry = (config.approvalRegistry || (state.usePostgresState
     ? createPostgresApprovalStore({ connectionString: state.databaseUrl })
-    : createApprovalRegistry());
+    : createApprovalRegistry())) as ApprovalRegistryLike;
   state.fileOperationApprovals = config.fileOperationApprovals || createFileOperationApprovalStore({
     ttlMs: config.fileOperationApprovalTtlMs,
   });
@@ -151,8 +151,8 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     ttlMs: config.oauthPermissionApprovalTtlMs,
   });
   if (state.usePostgresState) {
-    if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => {});
-    if (state.runEvents?.start) Promise.resolve(state.runEvents.start()).catch(() => {});
+    if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => undefined);
+    if (state.runEvents?.start) Promise.resolve(state.runEvents.start()).catch(() => undefined);
   }
   state.agentConcurrency = config.agentConcurrency || createConcurrencyLimiter({
     maxConcurrent: Number(process.env.KCW_MAX_CONCURRENT_RUNS || 64),
@@ -179,12 +179,13 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   // intentionally binding to a non-loopback address (KCW_VALIDATE_HOST=false).
   state.validateHost = config.validateHost ?? (process.env.KCW_VALIDATE_HOST !== 'false');
 
-  state.safeTrustedRoot = (requestedRoot = trustedRootDefault) => (
-    assertTrustedPath(path.resolve(requestedRoot || trustedRootDefault), trustedRootDefault)
+  state.safeTrustedRoot = (requestedRoot: unknown = trustedRootDefault) => (
+    assertTrustedPath(path.resolve(String(requestedRoot || trustedRootDefault)), trustedRootDefault)
   );
-  state.indexRun = (record: Record<string, any>, ctx?: Record<string, unknown>): void => {
+  state.indexRun = (record: Record<string, unknown>, ctx?: Record<string, unknown>): void => {
     try {
-      const context = ctx || record.context || {};
+      const rawContext = record.context;
+      const context = ctx || (rawContext && typeof rawContext === 'object' ? rawContext as Record<string, unknown> : {});
       state.runsIndex.upsert(summariseRunForIndex({ ...record, runPath: record.runPath }, context), context);
     } catch {
       // index failures must never break the request path
@@ -193,25 +194,28 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.cacheKeyFor = (context: RequestContextLike, method: string, pathname: string): string => (
     context.idempotencyKey ? `${context.tenantId}:${context.userId}:${method}:${pathname}:${context.idempotencyKey}` : ''
   );
-  state.requireIdempotencyKey = (response: any, context: RequestContextLike): boolean => {
+  state.requireIdempotencyKey = (response: HttpResponseLike, context: RequestContextLike): boolean => {
     if (context.idempotencyKey) return true;
     sendJson(response, 428, { error: 'Idempotency-Key header is required for this write operation' });
     return false;
   };
   state.sendCachedOrStore = (
-    response: any,
+    response: HttpResponseLike,
     cacheKey: string,
     fingerprint: string | undefined,
     status: number,
-    payload: any,
+    payload: unknown,
   ): boolean => {
     if (cacheKey && state.idempotencyStore.has(cacheKey)) {
       const cached = state.idempotencyStore.get(cacheKey);
-      if (fingerprint && cached.fingerprint && cached.fingerprint !== fingerprint) {
+      if (fingerprint && cached?.fingerprint && cached.fingerprint !== fingerprint) {
         sendJson(response, 409, { error: 'Idempotency-Key reused with different request body' });
         return true;
       }
-      sendJson(response, cached.status, { ...cached.payload, idempotentReplay: true });
+      const cachedPayload = cached?.payload && typeof cached.payload === 'object'
+        ? cached.payload as Record<string, unknown>
+        : { value: cached?.payload };
+      sendJson(response, cached?.status || 200, { ...cachedPayload, idempotentReplay: true });
       return true;
     }
     if (payload === undefined) return false;

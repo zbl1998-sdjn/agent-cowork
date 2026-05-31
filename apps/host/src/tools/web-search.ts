@@ -20,32 +20,17 @@
 import { assertPublicHost } from './ssrf-guard.js';
 import { parseDdgLiteResults } from './search-providers/ddg.js';
 import { parseBingResults } from './search-providers/bing.js';
+import { parseWebSearchOptions } from './web-tool-inputs.js';
+import type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchResponseLike } from './web-tool-inputs.js';
+
+export type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchResponseLike } from './web-tool-inputs.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const DDG_PROBE_TIMEOUT_MS = 5_000; // fail-fast on DDG so the auto-fallback to Bing doesn't make the user wait the full 12s
 const DEFAULT_MAX_RESULTS = 8;
 const RESULT_HARD_CAP = 20;
 
-export type WebSearchError = Error & { statusCode?: number };
 export type SearchResult = { title: string; url: string; snippet: string };
-export type WebSearchResponseLike = {
-  ok?: boolean;
-  status?: number;
-  text(): Promise<string> | string;
-};
-export type WebSearchFetchLike = (
-  input: string,
-  init: { headers: Record<string, string>; signal: AbortSignal },
-) => Promise<WebSearchResponseLike> | WebSearchResponseLike;
-export type WebSearchOptions = {
-  query?: unknown;
-  maxResults?: unknown;
-  provider?: unknown;
-  allowInternal?: boolean;
-  fetchImpl?: WebSearchFetchLike;
-  lookupImpl?: (host: string) => Promise<unknown> | unknown;
-  timeoutMs?: number;
-};
 export type WebSearchResponse = {
   ok: boolean;
   provider: string;
@@ -69,13 +54,6 @@ function fail(message: string, statusCode = 400): WebSearchError {
   return error;
 }
 
-function safeQuery(value: unknown): string {
-  const text = typeof value === 'string' ? value.trim() : '';
-  if (!text) throw fail('query is required');
-  if (text.length > 400) throw fail('query too long (max 400 chars)');
-  return text;
-}
-
 function safeMaxResults(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_RESULTS;
@@ -87,10 +65,11 @@ function safeMaxResults(value: unknown): number {
  * Run a search against the chosen provider. Returns a normalized result list.
  */
 export async function webSearch(options: WebSearchOptions = {}): Promise<WebSearchResponse> {
-  const query = safeQuery(options.query);
-  const maxResults = safeMaxResults(options.maxResults);
-  const providerName = typeof options.provider === 'string' && options.provider ? options.provider : 'ddg';
-  const fetchImpl = options.fetchImpl || globalThis.fetch as unknown as WebSearchFetchLike;
+  const parsed = parseWebSearchOptions(options);
+  const query = parsed.query;
+  const maxResults = safeMaxResults(parsed.maxResults);
+  const providerName = parsed.provider;
+  const fetchImpl = parsed.fetchImpl || globalThis.fetch as unknown as WebSearchFetchLike;
   if (typeof fetchImpl !== 'function') {
     throw fail('no fetch implementation available', 500);
   }
@@ -99,9 +78,9 @@ export async function webSearch(options: WebSearchOptions = {}): Promise<WebSear
     query,
     maxResults,
     fetchImpl,
-    lookupImpl: options.lookupImpl,
-    allowInternal: options.allowInternal === true,
-    timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
+    lookupImpl: parsed.lookupImpl,
+    allowInternal: parsed.allowInternal === true,
+    timeoutMs: parsed.timeoutMs || DEFAULT_TIMEOUT_MS,
   };
 
   if (providerName === 'ddg') return searchViaDdg(baseArgs);

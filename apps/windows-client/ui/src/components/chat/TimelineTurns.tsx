@@ -166,15 +166,17 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
 }, assistantTurnPropsEqual);
 
 function PlanCard({ message, trustedRoot, onPatchAssistant }: { message: AssistantMessage; trustedRoot: string; onPatchAssistant: PatchAssistant }) {
+  const plan = message.plan;
   const respondToPlan = (approve: boolean) => {
-    if (!message.plan) return;
-    void respondApproval(message.plan.id, approve ? 'once' : 'reject');
+    if (!plan) return;
+    void respondApproval(plan.id, approve ? 'once' : 'reject');
     onPatchAssistant(message.id, (m) => ({ ...m, plan: undefined, status: approve ? 'applying' : 'running' }));
   };
+  if (!plan) return null;
   return (
     <div className="plan-card">
       <div className="plan-card-head">计划待批准</div>
-      <MessageText text={message.plan!.text} trustedRoot={trustedRoot} />
+      <MessageText text={plan.text} trustedRoot={trustedRoot} />
       <div className="plan-card-actions">
         <Button variant="primary" onClick={() => respondToPlan(true)}>批准并执行</Button>
         <Button variant="secondary" onClick={() => respondToPlan(false)}>继续完善</Button>
@@ -184,16 +186,18 @@ function PlanCard({ message, trustedRoot, onPatchAssistant }: { message: Assista
 }
 
 function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
+  const question = message.question;
   const respondToQuestion = (answer: string) => {
-    if (!message.question) return;
-    void answerQuestion(message.question.id, answer);
+    if (!question) return;
+    void answerQuestion(question.id, answer);
     onPatchAssistant(message.id, (m) => ({ ...m, question: undefined, status: 'running' }));
   };
+  if (!question) return null;
   return (
     <div className="question-card">
-      <div className="question-q">{message.question!.question}</div>
+      <div className="question-q">{question.question}</div>
       <div className="question-options">
-        {message.question!.options.length > 0 ? message.question!.options.map((opt, i) => (
+        {question.options.length > 0 ? question.options.map((opt, i) => (
           <ChoiceButton key={i} tone="warm" label={opt.label} detail={opt.description} onClick={() => respondToQuestion(opt.label)} />
         )) : (
           <ChoiceButton tone="warm" label="继续" onClick={() => respondToQuestion('继续')} />
@@ -204,14 +208,16 @@ function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage
 }
 
 function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
+  const approval = message.approval;
   const respondToApproval = (decision: 'once' | 'session' | 'reject') => {
-    if (!message.approval) return;
-    void respondApproval(message.approval.id, decision);
+    if (!approval) return;
+    void respondApproval(approval.id, decision);
     onPatchAssistant(message.id, (m) => ({ ...m, approval: undefined }));
   };
+  if (!approval) return null;
   return (
     <div className="approval-bar">
-      <span className="approval-q">需要批准操作：<code>{message.approval!.name}</code></span>
+      <span className="approval-q">需要批准操作：<code>{approval.name}</code></span>
       <div className="approval-actions">
         <Button variant="primary" onClick={() => respondToApproval('once')}>本次批准</Button>
         <Button variant="secondary" onClick={() => respondToApproval('session')}>本会话批准</Button>

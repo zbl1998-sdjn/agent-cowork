@@ -4,7 +4,7 @@
 //       数值摘要,并给出图表建议。是数据分析闭环的「剖析」一环。纯函数、确定性。
 // 依赖:同目录 table(安全读表)。导出:profileDataFile,并转出 readDataTable。
 
-import { readDataTable, type DataFileOptions, type DataTable } from './table.js';
+import { readDataTable, type DataFileOptions } from './table.js';
 
 export type { DataFileOptions, DataTable } from './table.js';
 export type DataTopValue = { value: string; count: number };

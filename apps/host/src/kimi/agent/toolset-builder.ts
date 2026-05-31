@@ -132,7 +132,7 @@ export function buildAgentToolset({
 
 /** 构造 AskUserQuestion 工具:经审批注册表向用户提带选项的问题并等回答。 */
 function createAskUserQuestionTool(agentDeps: AgentDeps, ctx: ToolsetContext): AgentTool {
-  const emit = typeof agentDeps.emit === 'function' ? agentDeps.emit : () => {};
+  const emit = typeof agentDeps.emit === 'function' ? agentDeps.emit : () => undefined;
   const context = (ctx && ctx.context) || {};
   return {
     name: 'AskUserQuestion',

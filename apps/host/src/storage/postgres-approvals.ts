@@ -138,7 +138,7 @@ export class PostgresApprovalStore {
   /** 同步发起审批:本地生成 id 与 promise,持久化为 fire-and-forget INSERT。 */
   request(meta: ApprovalMeta = {}): { id: string; promise: Promise<unknown> } {
     const id = this._generateId();
-    let resolve: ApprovalResolve = () => {};
+    let resolve: ApprovalResolve = () => undefined;
     const promise = new Promise<unknown>((r) => { resolve = r; });
     this._local.set(id, { resolve, meta });
     // Persist so another instance can resolve it; fire-and-forget (id is already
@@ -147,7 +147,7 @@ export class PostgresApprovalStore {
       `INSERT INTO pending_approvals (id, run_id, tenant_id, kind, status, created_at)
        VALUES ($1, $2, $3, $4, 'pending', NOW())`,
       [id, meta.runId || null, meta.tenantId || null, meta.kind || null],
-    )).catch(() => {});
+    )).catch(() => undefined);
     return { id, promise };
   }
 

@@ -69,6 +69,13 @@ test('webSearch rejects empty / overlong queries', async () => {
   await assert.rejects(() => webSearch({ query: 'x'.repeat(401) }), /query too long/);
 });
 
+test('webSearch rejects unknown option keys before provider fetch', async () => {
+  await assert.rejects(
+    () => webSearch({ query: 'test', extra: true }),
+    /Unrecognized key|extra/,
+  );
+});
+
 test('webSearch via DDG returns normalized results using injected fetch', async () => {
   const fakeFetch = async () => ({
     ok: true,

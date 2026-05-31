@@ -122,7 +122,7 @@ export function cleanFactKey(value: unknown): string {
   if (text.length > MAX_FACT_KEY_LENGTH) {
     throw new Error(`memory fact key too long; max ${MAX_FACT_KEY_LENGTH}`);
   }
-  if (!/^[\w一-龥 .,:_/()\-]+$/u.test(text)) {
+  if (!/^[\w一-龥 .,:_/()-]+$/u.test(text)) {
     throw new Error('memory fact key contains invalid characters');
   }
   return text;

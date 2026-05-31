@@ -6,11 +6,29 @@ import path from 'node:path';
 import { runRecipe } from '../recipes/run-recipe.js';
 import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule-store.js';
 import { Scheduler, createScheduleStore } from './scheduler.js';
+import type { RunEventsLike, RunsIndexLike } from '../recipes/run-recipe-types.js';
+import type { ScheduleStore, SchedulerExecutor } from './scheduler.js';
+import type { StoreBackend } from './store-backend-config.js';
 
-type HostSchedulerConfig = Record<string, any>;
-type HostSchedulerState = Record<string, any> & {
+type HostSchedulerConfig = Record<string, unknown> & {
+  scheduler?: Scheduler | null;
+  enableScheduler?: boolean;
+  scheduleStoreDir?: string;
+  scheduleExecutor?: SchedulerExecutor;
+  scheduleStore?: ScheduleStore | null;
+  schedulerTickMs?: number;
+  startScheduler?: boolean;
+};
+type HostSchedulerState = Record<string, unknown> & {
   activeScheduler?: Scheduler | null;
+  databaseUrl?: string | null;
+  runEvents?: unknown;
+  runsIndex?: unknown;
   runStoreRoot: string;
+  safeTrustedRoot(requestedRoot?: unknown): string;
+  sqliteDbPath?: string;
+  storeBackend?: StoreBackend;
+  usePostgresState?: boolean;
 };
 type ScheduleRecordLike = {
   id: string;
@@ -19,6 +37,17 @@ type ScheduleRecordLike = {
   traceId?: string | null;
   payload?: unknown;
 };
+type RecipeSchedulePayload = {
+  recipeId?: unknown;
+  trustedRoot?: unknown;
+  prompt?: unknown;
+  files?: unknown;
+  maxSize?: unknown;
+};
+
+function schedulePayload(value: unknown): RecipeSchedulePayload {
+  return value && typeof value === 'object' ? value as RecipeSchedulePayload : {};
+}
 
 export function configureHostScheduler({
   config,
@@ -38,20 +67,18 @@ export function configureHostScheduler({
     config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules'),
   );
   const defaultScheduleExecutor = async (record: ScheduleRecordLike) => {
-    const payload = record.payload && typeof record.payload === 'object'
-      ? record.payload as Record<string, any>
-      : {};
+    const payload = schedulePayload(record.payload);
     if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
     const result = runRecipe({
-      recipeId: payload.recipeId,
+      recipeId: String(payload.recipeId),
       trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
       prompt: payload.prompt || '',
-      files: payload.files || [],
+      files: Array.isArray(payload.files) ? payload.files : [],
       maxSize: payload.maxSize,
       context: { tenantId: record.tenantId, userId: record.userId, traceId: record.traceId || '' },
       runStoreRoot: state.runStoreRoot,
-      runEvents: state.runEvents,
-      runsIndex: state.runsIndex,
+      runEvents: state.runEvents as RunEventsLike | null | undefined,
+      runsIndex: state.runsIndex as RunsIndexLike | null | undefined,
     });
     return { runId: result.runId, operations: result.operations.length };
   };
@@ -59,7 +86,7 @@ export function configureHostScheduler({
   state.activeScheduler = new Scheduler({
     storeDir: scheduleStoreDir,
     store: config.scheduleStore || (state.usePostgresState
-      ? createCachedPostgresScheduleStore({ connectionString: state.databaseUrl })
+      ? createCachedPostgresScheduleStore({ connectionString: state.databaseUrl }) as unknown as ScheduleStore
       : createScheduleStore({
         backend: state.storeBackend,
         storeDir: scheduleStoreDir,

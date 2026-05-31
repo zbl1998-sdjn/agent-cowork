@@ -71,8 +71,11 @@ export async function runCommand(input: CommandInput = {}): Promise<CommandResul
   // the heap past the cap before the timeout fires (see createCappedBuffer).
   const out = createCappedBuffer(maxOutputBytes);
   const err = createCappedBuffer(maxOutputBytes);
-  let timeout;
   let timedOut = false;
+  const timeout = setTimeout((): void => {
+    timedOut = true;
+    child.kill('SIGKILL');
+  }, timeoutMs);
   child.stdout.on('data', (chunk) => out.push(chunk));
   child.stderr.on('data', (chunk) => err.push(chunk));
 
@@ -89,11 +92,6 @@ export async function runCommand(input: CommandInput = {}): Promise<CommandResul
       });
     });
   });
-  timeout = setTimeout((): void => {
-    timedOut = true;
-    child.kill('SIGKILL');
-  }, timeoutMs);
-
   const commandResult = await result.finally(() => clearTimeout(timeout));
   if (timedOut) {
     commandResult.error = `Command timed out after ${timeoutMs}ms`;

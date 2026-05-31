@@ -1,6 +1,6 @@
 // ArtifactsPanel(UI · components/panels):制品面板——列出/打开/重命名生成的制品(文档/图表/活页)。纯展示+回调。
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -100,7 +100,7 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [renamingPath, setRenamingPath] = useState('');
   const [renameText, setRenameText] = useState('');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setBusy(true);
     setError('');
     try {
@@ -110,9 +110,9 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
     } finally {
       setBusy(false);
     }
-  };
+  }, [trustedRoot]);
 
-  useEffect(() => { void refresh(); }, [trustedRoot]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const beginRename = (item: ArtifactItem) => {
     setError('');

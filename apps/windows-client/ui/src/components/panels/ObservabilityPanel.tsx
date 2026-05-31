@@ -28,18 +28,21 @@ function Rows({ empty, rows }: { empty: string; rows: ObservabilityRow[] }) {
   if (!rows.length) return <ObservabilityEmptyState title={empty} />;
   return (
     <dl className="observe-rows">
-      {rows.map((item) => (
-        <div key={`${item.label}:${item.value}`} className="observe-row">
-          <dt>{item.label}</dt>
-          <dd>
-            {item.path ? (
-              <Button size="sm" onClick={() => void openPath(item.path!)} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>
-                {item.value}
-              </Button>
-            ) : item.value}
-          </dd>
-        </div>
-      ))}
+      {rows.map((item) => {
+        const itemPath = item.path;
+        return (
+          <div key={`${item.label}:${item.value}`} className="observe-row">
+            <dt>{item.label}</dt>
+            <dd>
+              {itemPath ? (
+                <Button size="sm" onClick={() => void openPath(itemPath)} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                  {item.value}
+                </Button>
+              ) : item.value}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }

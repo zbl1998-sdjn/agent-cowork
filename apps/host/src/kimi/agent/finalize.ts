@@ -56,7 +56,7 @@ export async function summarizeAfterBudget({
       kimiConfig,
       fetchImpl,
       onContent: emitToken,
-      onReasoning: () => {},
+      onReasoning: () => undefined,
     }, {
       kimiConfig,
       timeoutMs,

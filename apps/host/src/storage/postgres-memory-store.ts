@@ -57,7 +57,7 @@ function cleanFactKey(v: unknown): string {
   const t = String(v || '').trim();
   if (!t) throw new Error('memory fact key is required');
   if (t.length > MAX_FACT_KEY_LENGTH) throw new Error(`memory fact key too long; max ${MAX_FACT_KEY_LENGTH}`);
-  if (!/^[\w一-龥 .,:_/()\-]+$/u.test(t)) throw new Error('memory fact key contains invalid characters');
+  if (!/^[\w一-龥 .,:_/()-]+$/u.test(t)) throw new Error('memory fact key contains invalid characters');
   return t;
 }
 /** 校验事实 value:归一换行、去空白、非空且不超长。 */

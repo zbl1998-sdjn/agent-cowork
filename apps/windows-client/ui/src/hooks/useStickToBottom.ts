@@ -80,7 +80,7 @@ export function useStickToBottom(
     updateStickState();
     el.addEventListener('scroll', updateStickState, { passive: true });
     return () => el.removeEventListener('scroll', updateStickState);
-  });
+  }, [updateStickState]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -104,7 +104,7 @@ export function useStickToBottom(
     }
     setIsAtBottom(true);
     setHasNewContent(false);
-  });
+  }, [resetKey]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;

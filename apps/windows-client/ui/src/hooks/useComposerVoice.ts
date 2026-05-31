@@ -21,8 +21,8 @@ type SpeechRecognitionWindow = {
 
 export function collectSpeechTranscript(results: ArrayLike<ArrayLike<{ transcript: string }>>) {
   let transcript = '';
-  for (let i = 0; i < results.length; i += 1) {
-    transcript += results[i][0].transcript;
+  for (const result of Array.from(results)) {
+    transcript += result[0]?.transcript || '';
   }
   return transcript;
 }
