@@ -21,6 +21,7 @@ export default tseslint.config(
   {
     files: [
       'apps/host/src/**/*.ts',
+      'eval/**/*.ts',
       'apps/windows-client/ui/src/**/*.{ts,tsx}',
       'apps/windows-client/ui/vite.config.ts',
     ],
@@ -28,6 +29,7 @@ export default tseslint.config(
       parserOptions: {
         project: [
           './tsconfig.host-checkjs.json',
+          './tsconfig.eval.json',
           './apps/windows-client/ui/tsconfig.json',
           './apps/windows-client/ui/tsconfig.node.json',
         ],

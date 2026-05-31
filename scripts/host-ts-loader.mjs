@@ -5,15 +5,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hostSourceRoot = path.join(repoRoot, 'apps', 'host', 'src');
+const evalSourceRoot = path.join(repoRoot, 'eval');
+const runtimeTypescriptRoots = [hostSourceRoot, evalSourceRoot];
 const require = createRequire(import.meta.url);
 
-function isInsideHostSource(filePath) {
-  const relative = path.relative(hostSourceRoot, filePath);
-  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
+function isInsideRuntimeTypescriptRoot(filePath) {
+  return runtimeTypescriptRoots.some((root) => {
+    const relative = path.relative(root, filePath);
+    return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
+  });
 }
 
 // Migration rule: keep NodeNext-style `.js` specifiers in source, but when a
-// host file has already moved to `.ts`, resolve only that jailed sibling.
+// runtime file has already moved to `.ts`, resolve only that jailed sibling.
 function resolveSiblingTs(specifier, parentURL) {
   if (!specifier.endsWith('.js')) return null;
   if (specifier.startsWith('node:')) return null;
@@ -31,7 +35,7 @@ function resolveSiblingTs(specifier, parentURL) {
   }
 
   const tsPath = `${jsPath.slice(0, -'.js'.length)}.ts`;
-  return isInsideHostSource(tsPath) && fs.existsSync(tsPath) ? tsPath : null;
+  return isInsideRuntimeTypescriptRoot(tsPath) && fs.existsSync(tsPath) ? tsPath : null;
 }
 
 function loadTypescript() {
@@ -64,7 +68,7 @@ export async function load(url, context, nextLoad) {
   if (!url.startsWith('file:')) return nextLoad(url, context);
 
   const filePath = fileURLToPath(url);
-  if (path.extname(filePath) !== '.ts' || !isInsideHostSource(filePath)) {
+  if (path.extname(filePath) !== '.ts' || !isInsideRuntimeTypescriptRoot(filePath)) {
     return nextLoad(url, context);
   }
 

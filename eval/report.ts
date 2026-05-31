@@ -1,11 +1,57 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-function rate(value) {
-  return Number.isFinite(value) ? value : 0;
+export type EvalSummaryResult = {
+  taskId?: unknown;
+  score?: { passed?: unknown; score?: unknown };
+  [key: string]: unknown;
+};
+export type EvalSummary = {
+  totalTasks: number;
+  passedTasks: number;
+  failedTasks: number;
+  passRate: number;
+  results?: EvalSummaryResult[];
+};
+export type EvalBaseline = {
+  passRate?: unknown;
+  summary?: { passRate?: unknown };
+};
+export type EvalReportOptions = {
+  baseline?: EvalBaseline | null;
+  regressionTolerance?: number;
+  generatedAt?: string;
+};
+export type WriteEvalReportOptions = EvalReportOptions & { outDir?: string };
+export type EvalBaselineComparison = {
+  available: boolean;
+  passRate: number | null;
+  delta: number | null;
+  regressionTolerance: number;
+  regressed: boolean;
+};
+export type EvalReportJson = {
+  generatedAt: string;
+  summary: {
+    totalTasks: number;
+    passedTasks: number;
+    failedTasks: number;
+    passRate: number;
+  };
+  baseline: EvalBaselineComparison;
+  results: EvalSummaryResult[];
+};
+export type EvalReport = {
+  json: EvalReportJson;
+  html: string;
+};
+
+function rate(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
-function escapeHtml(value) {
+function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -13,13 +59,13 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-function baselinePassRate(baseline) {
+function baselinePassRate(baseline: EvalBaseline | null): number | null {
   if (!baseline) return null;
   const value = baseline.passRate ?? baseline.summary?.passRate;
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
-function compareBaseline(summary, baseline, regressionTolerance) {
+function compareBaseline(summary: EvalSummary, baseline: EvalBaseline | null, regressionTolerance: number): EvalBaselineComparison {
   const passRate = rate(summary.passRate);
   const baselineRate = baselinePassRate(baseline);
   if (baselineRate === null) {
@@ -41,14 +87,14 @@ function compareBaseline(summary, baseline, regressionTolerance) {
   };
 }
 
-function renderHtml(report) {
+function renderHtml(report: EvalReportJson): string {
   const rows = report.results.map((result) => {
     const passed = result.score?.passed ? 'pass' : 'fail';
     const score = Number(result.score?.score ?? 0).toFixed(3);
     return `<tr><td>${escapeHtml(result.taskId)}</td><td>${passed}</td><td>${score}</td></tr>`;
   }).join('\n');
   const passRate = (report.summary.passRate * 100).toFixed(1);
-  const baseline = report.baseline.available
+  const baseline = report.baseline.available && report.baseline.passRate !== null && report.baseline.delta !== null
     ? `${(report.baseline.passRate * 100).toFixed(1)}% (${report.baseline.delta >= 0 ? '+' : ''}${(report.baseline.delta * 100).toFixed(1)}%)`
     : 'none';
   return `<!doctype html>
@@ -76,12 +122,12 @@ function renderHtml(report) {
 </html>`;
 }
 
-export function generateEvalReport(summary, {
+export function generateEvalReport(summary: EvalSummary, {
   baseline = null,
   regressionTolerance = 0.05,
   generatedAt = new Date().toISOString(),
-} = {}) {
-  const json = {
+}: EvalReportOptions = {}): EvalReport {
+  const json: EvalReportJson = {
     generatedAt,
     summary: {
       totalTasks: summary.totalTasks,
@@ -90,7 +136,7 @@ export function generateEvalReport(summary, {
       passRate: rate(summary.passRate),
     },
     baseline: compareBaseline(summary, baseline, regressionTolerance),
-    results: summary.results || [],
+    results: Array.isArray(summary.results) ? summary.results : [],
   };
   return {
     json,
@@ -98,15 +144,17 @@ export function generateEvalReport(summary, {
   };
 }
 
-export function writeEvalReport(summary, {
+export function writeEvalReport(summary: EvalSummary, {
   outDir,
   baseline = null,
   regressionTolerance = 0.05,
   generatedAt,
-} = {}) {
+}: WriteEvalReportOptions = {}) {
   if (!outDir) throw new Error('writeEvalReport requires outDir');
   fs.mkdirSync(outDir, { recursive: true });
-  const report = generateEvalReport(summary, { baseline, regressionTolerance, generatedAt });
+  const options: EvalReportOptions = { baseline, regressionTolerance };
+  if (generatedAt !== undefined) options.generatedAt = generatedAt;
+  const report = generateEvalReport(summary, options);
   const jsonPath = path.join(outDir, 'latest.json');
   const htmlPath = path.join(outDir, 'latest.html');
   fs.writeFileSync(jsonPath, `${JSON.stringify(report.json, null, 2)}\n`, 'utf8');
