@@ -103,7 +103,7 @@
     "apps/host/src/security/redaction.ts",
     "apps/host/src/security/path-policy.ts",
     "apps/host/src/runtime/action-audit.ts",
-    "apps/host/src/runtime/approvals.js",
+    "apps/host/src/runtime/approvals.ts",
     "apps/host/src/runtime/audit-events.ts",
     "apps/host/src/runtime/background-tasks.js",
     "apps/host/src/runtime/budget-guard.ts",
