@@ -1,5 +1,3 @@
-// @ts-check
-//
 // 调度器(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
 // 职责:管理计划任务(cron 周期 / 定时 fireAt):创建/列出/删除日程,按 tick 到点触发注入的 executor
@@ -7,37 +5,70 @@
 // 依赖:同层 cron(解析/算下次)、runs-index(ULID)、scheduler-store(持久化)。导出:Scheduler 及存储转出。
 import { nextFireAt, parseCron, describeCron } from './cron.js';
 import { createUlid } from './runs-index.js';
-import { FileScheduleStore, normaliseTenantId, normaliseUserId } from './scheduler-store.js';
+import {
+  FileScheduleStore,
+  normaliseTenantId,
+  normaliseUserId,
+  type ScheduleListOptions,
+  type ScheduleRecord,
+} from './scheduler-store.js';
 
 export { FileScheduleStore, SqliteScheduleStore, createScheduleStore } from './scheduler-store.js';
+export type { ScheduleListOptions, ScheduleRecord } from './scheduler-store.js';
 
-/**
- * @typedef {{ tenantId?: unknown, userId?: unknown }} ScheduleListOptions
- * @typedef {{ id: string, tenantId: string, userId?: string, traceId?: string | null, name: string, kind: string, status: string, cron?: string | null, cronHuman?: string | null, fireAt?: string | null, nextFireAt?: string | null, lastFiredAt?: string | null, lastRunId?: string | null, lastError?: string | null, idempotencyKey?: string | null, payload?: unknown, version?: number, runs?: number, createdAt?: string, updatedAt?: string, [key: string]: unknown }} ScheduleRecord
- * @typedef {{ list(options?: ScheduleListOptions): ScheduleRecord[], get(id: string): ScheduleRecord | null, save(record: ScheduleRecord): ScheduleRecord, remove(id: string): boolean, storeDir?: string }} ScheduleStore
- * @typedef {{ runId?: string | null, id?: string | null, [key: string]: unknown } | null | undefined} SchedulerExecutorResult
- * @typedef {(record: ScheduleRecord) => SchedulerExecutorResult | Promise<SchedulerExecutorResult>} SchedulerExecutor
- * @typedef {(event: string, payload?: Record<string, unknown>) => void} SchedulerLogger
- * @typedef {{ storeDir?: string, store?: ScheduleStore | null, executor: SchedulerExecutor, tickIntervalMs?: number, logger?: SchedulerLogger | null, now?: () => Date }} SchedulerOptions
- * @typedef {{ name?: unknown, cron?: string | null, fireAt?: string | null, payload?: unknown, tenantId?: unknown, userId?: unknown, traceId?: unknown, idempotencyKey?: unknown }} ScheduleCreateInput
- * @typedef {{ ok: true, schedule: ScheduleRecord, result: SchedulerExecutorResult } | { ok: false, schedule: ScheduleRecord, error: unknown }} SchedulerFireResult
- */
+export type ScheduleStore = {
+  list(options?: ScheduleListOptions): ScheduleRecord[];
+  get(id: string): ScheduleRecord | null;
+  save(record: ScheduleRecord): ScheduleRecord;
+  remove(id: string): boolean;
+  storeDir?: string;
+};
+export type SchedulerExecutorResult = { runId?: string | null; id?: string | null; [key: string]: unknown } | null | undefined;
+export type SchedulerExecutor = (record: ScheduleRecord) => SchedulerExecutorResult | Promise<SchedulerExecutorResult>;
+export type SchedulerLogger = (event: string, payload?: Record<string, unknown>) => void;
+export type SchedulerOptions = {
+  storeDir?: string;
+  store?: ScheduleStore | null;
+  executor: SchedulerExecutor;
+  tickIntervalMs?: number;
+  logger?: SchedulerLogger | null;
+  now?: () => Date;
+};
+export type ScheduleCreateInput = {
+  name?: unknown;
+  cron?: string | null;
+  fireAt?: string | null;
+  payload?: unknown;
+  tenantId?: unknown;
+  userId?: unknown;
+  traceId?: unknown;
+  idempotencyKey?: unknown;
+};
+export type SchedulerFireResult =
+  | { ok: true; schedule: ScheduleRecord; result: SchedulerExecutorResult }
+  | { ok: false; schedule: ScheduleRecord; error: unknown };
 
-/** @param {string} value */
-function isPositiveFutureIso(value) {
+function isPositiveFutureIso(value: string): boolean {
   if (!value) return false;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && parsed > Date.now();
 }
 
-/** @returns {string} */
-function nowIso() {
+function nowIso(): string {
   return new Date().toISOString();
 }
 
 export class Scheduler {
-  /** @param {SchedulerOptions} options */
-  constructor({ storeDir, store = null, executor, tickIntervalMs = 30_000, logger = null, now = () => new Date() }) {
+  readonly store: ScheduleStore;
+  readonly storeDir: string | null;
+  readonly executor: SchedulerExecutor;
+  readonly tickIntervalMs: number;
+  readonly logger: SchedulerLogger | null;
+  readonly now: () => Date;
+  private timer: ReturnType<typeof setInterval> | null;
+  private tickInFlight: boolean;
+
+  constructor({ storeDir, store = null, executor, tickIntervalMs = 30_000, logger = null, now = () => new Date() }: SchedulerOptions) {
     if (!store && !storeDir) {
       throw new Error('Scheduler: storeDir or store required');
     }
@@ -50,22 +81,18 @@ export class Scheduler {
     this.tickIntervalMs = Math.max(1000, Number(tickIntervalMs) || 30_000);
     this.logger = logger;
     this.now = now;
-    /** @type {ReturnType<typeof setInterval> | null} */
     this.timer = null;
     this.tickInFlight = false;
   }
 
-  /** @param {ScheduleListOptions} [options] @returns {ScheduleRecord[]} */
-  list({ tenantId, userId } = {}) {
+  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
     return this.store.list({ tenantId, userId });
   }
 
-  /** @param {string} id @returns {ScheduleRecord | null} */
-  get(id) {
+  get(id: string): ScheduleRecord | null {
     return this.store.get(id);
   }
 
-  /** @param {ScheduleCreateInput} input @returns {ScheduleRecord} */
   create({
     name,
     cron,
@@ -75,7 +102,7 @@ export class Scheduler {
     userId,
     traceId,
     idempotencyKey,
-  }) {
+  }: ScheduleCreateInput): ScheduleRecord {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new Error('Scheduler: name is required');
     }
@@ -90,8 +117,8 @@ export class Scheduler {
     }
     const id = createUlid().replace(/^run_/, 'sched_');
     const now = this.now();
-    const next = fireAt ? new Date(fireAt) : nextFireAt(/** @type {string} */ (cron), now);
-    const record = {
+    const next = fireAt ? new Date(fireAt) : nextFireAt(cron as string, now);
+    const record: ScheduleRecord = {
       id,
       version: 1,
       name: name.trim().slice(0, 200),
@@ -117,8 +144,7 @@ export class Scheduler {
     return record;
   }
 
-  /** @param {string} id @returns {boolean} */
-  cancel(id) {
+  cancel(id: string): boolean {
     const record = this.get(id);
     if (!record) return false;
     record.status = 'cancelled';
@@ -128,13 +154,11 @@ export class Scheduler {
     return true;
   }
 
-  /** @param {string} id @returns {boolean} */
-  remove(id) {
+  remove(id: string): boolean {
     return this.store.remove(id);
   }
 
-  /** @param {ScheduleListOptions | Date} [filterOrAsOf] @param {Date} [maybeAsOf] @returns {ScheduleRecord[]} */
-  pickDue(filterOrAsOf = {}, maybeAsOf = this.now()) {
+  pickDue(filterOrAsOf: ScheduleListOptions | Date = {}, maybeAsOf: Date = this.now()): ScheduleRecord[] {
     const filter = filterOrAsOf instanceof Date ? {} : filterOrAsOf;
     const asOf = filterOrAsOf instanceof Date ? filterOrAsOf : maybeAsOf;
     return this.list(filter).filter((record) => {
@@ -144,14 +168,13 @@ export class Scheduler {
     });
   }
 
-  /** @param {ScheduleRecord} record @returns {Promise<SchedulerFireResult>} */
-  async _fireOne(record) {
+  async _fireOne(record: ScheduleRecord): Promise<SchedulerFireResult> {
     const startedAt = this.now();
     try {
       const result = await this.executor(record);
       const lastRunId = result?.runId || result?.id || null;
-      const next = record.kind === 'one-shot' ? null : nextFireAt(/** @type {string} */ (record.cron), startedAt);
-      const updated = {
+      const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron as string, startedAt);
+      const updated: ScheduleRecord = {
         ...record,
         status: record.kind === 'one-shot' ? 'completed' : 'pending',
         nextFireAt: next ? next.toISOString() : null,
@@ -165,8 +188,8 @@ export class Scheduler {
       this.store.save(updated);
       return { ok: true, schedule: updated, result };
     } catch (err) {
-      const next = record.kind === 'one-shot' ? null : nextFireAt(/** @type {string} */ (record.cron), startedAt);
-      const updated = {
+      const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron as string, startedAt);
+      const updated: ScheduleRecord = {
         ...record,
         status: record.kind === 'one-shot' ? 'failed' : 'pending',
         nextFireAt: next ? next.toISOString() : null,
@@ -184,13 +207,12 @@ export class Scheduler {
     }
   }
 
-  /** @param {ScheduleListOptions} [filter] @returns {Promise<SchedulerFireResult[]>} */
-  async tickOnce(filter = {}) {
+  async tickOnce(filter: ScheduleListOptions = {}): Promise<SchedulerFireResult[]> {
     if (this.tickInFlight) return [];
     this.tickInFlight = true;
     try {
       const due = this.pickDue(filter);
-      const results = [];
+      const results: SchedulerFireResult[] = [];
       for (const record of due) {
         results.push(await this._fireOne(record));
       }
@@ -200,18 +222,18 @@ export class Scheduler {
     }
   }
 
-  start() {
+  start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
       this.tickOnce().catch(() => {});
     }, this.tickIntervalMs);
-    const timer = /** @type {ReturnType<typeof setInterval> & { unref?: () => void }} */ (this.timer);
+    const timer = this.timer as ReturnType<typeof setInterval> & { unref?: () => void };
     if (typeof timer.unref === 'function') {
       timer.unref();
     }
   }
 
-  stop() {
+  stop(): void {
     if (!this.timer) return;
     clearInterval(this.timer);
     this.timer = null;
