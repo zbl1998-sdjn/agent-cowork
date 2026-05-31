@@ -19,6 +19,12 @@ test('connect rejects a client-supplied command (no arbitrary program execution)
     });
     assert.equal(res.status, 400);
     assert.match((await res.json()).error, /not allowed|unsupported/i);
+
+    const malformed = await fetch(`${base}/api/connectors/connect`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: ['filesystem'], command: 'calc.exe', args: [] }),
+    });
+    assert.equal(malformed.status, 400);
   });
 });
 

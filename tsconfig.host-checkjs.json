@@ -172,7 +172,7 @@
     "apps/host/src/routes/auth-routes.ts",
     "apps/host/src/routes/conversation-routes.ts",
     "apps/host/src/routes/connector-oauth-routes.js",
-    "apps/host/src/routes/connector-routes.js",
+    "apps/host/src/routes/connector-routes.ts",
     "apps/host/src/routes/kimi-routes.js",
     "apps/host/src/routes/memory-routes.js",
     "apps/host/src/routes/onboarding-routes.ts",
