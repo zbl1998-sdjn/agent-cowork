@@ -1,46 +1,36 @@
-// @ts-check
 // Agent 原生工具集定义:Read/Write/Edit/Glob/Grep/Shell/WebFetch/Git 等(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:构造与 Kimi CLI / Claude Code 对齐的工具清单;写类工具标 mutating:true 以便
 //       Agent 循环走审批门;所有文件路径都被 jail 到可信工作区根。
-// 依赖:标准库(node:fs / node:path)、L0 ../security/path-policy.js;同层 workspace /
-//       sandbox / tools / 本目录 agent-tools-support.js。
-// 导出:createAgentTools(按上下文构造工具数组)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { readTextFile } from '../workspace/file-reader.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
-import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { webFetch } from '../tools/web-fetch.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
 import { analyzeDataFile } from '../tools/data/report.js';
 import { createDataChartArtifact } from '../tools/data/artifact.js';
+import { createShellTool } from './agent-tools-shell.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
+import type { AgentTool, AgentToolsContext } from './agent-tools-types.js';
 
-/**
- * @typedef {Record<string, unknown>} ToolArgs
- * @typedef {{ allowTools?: string[] }} SandboxLimits
- * @typedef {{ backend?: string, exec(spec: unknown, options: { trustedRoot: string, context?: unknown }): Promise<{ exitCode?: unknown, stdout?: unknown, stderr?: unknown, timedOut?: unknown }> }} SandboxLike
- * @typedef {{ trustedRoot?: string, sandbox?: SandboxLike, sandboxLimits?: SandboxLimits, context?: unknown }} AgentToolsContext
- * @typedef {{ name: string, mutating?: boolean, risk?: string, requiresApproval?: boolean, description?: string, parameters?: unknown, inputSchema?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
- */
+export type { AgentTool, AgentToolsContext, SandboxLike, SandboxLimits, ToolArgs } from './agent-tools-types.js';
 
-/** 按给定上下文(可信根、沙箱、限额)构造该工作区的 Agent 工具数组。 @param {AgentToolsContext} [ctx] @returns {AgentTool[]} */
-export function createAgentTools(ctx = {}) {
+/** 按给定上下文(可信根、沙箱、限额)构造该工作区的 Agent 工具数组。 */
+export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
   const { trustedRoot, sandbox, sandboxLimits } = ctx;
   if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');
   const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
-  /** @param {unknown} rel */
-  const within = (rel) => assertTrustedPath(path.join(root, String(rel || '')), root);
-  // Create-aware variant for write targets that may not exist yet (defeats
-  // junction/symlink parent escape on brand-new files).
-  /** @param {unknown} rel */
-  const withinForCreate = (rel) => assertTrustedPathForCreate(path.join(root, String(rel || '')), root);
+  const within = (rel: unknown): string => assertTrustedPath(path.join(root, String(rel || '')), root);
+  // Create-aware variant for write targets that may not exist yet (defeats junction/symlink escapes).
+  const withinForCreate = (rel: unknown): string => assertTrustedPathForCreate(path.join(root, String(rel || '')), root);
 
-  /** @type {AgentTool[]} */
-  const tools = [
+  const gitStatusTool = createGitStatusTool();
+  const gitDiffTool = createGitDiffTool();
+  const gitLogTool = createGitLogTool();
+  const tools: AgentTool[] = [
     {
       name: 'Read', mutating: false, risk: 'safe',
       description: '读取工作区内一个文本文件的内容。',
@@ -87,8 +77,7 @@ export function createAgentTools(ctx = {}) {
       description: '按 glob 模式列出工作区内匹配的文件（如 **/*.md）。',
       parameters: { type: 'object', properties: { pattern: { type: 'string' } }, required: ['pattern'] },
       handler: async (args = {}) => {
-        /** @type {string[]} */
-        const all = [];
+        const all: string[] = [];
         walkFiles(root, root, all, 2000);
         const re = globToRegExp(args.pattern || '**/*');
         return { pattern: args.pattern, matches: all.filter((p) => re.test(p)).slice(0, 200) };
@@ -99,16 +88,13 @@ export function createAgentTools(ctx = {}) {
       description: '在工作区文件内容中搜索正则模式，返回命中的文件与行。',
       parameters: { type: 'object', properties: { pattern: { type: 'string' }, glob: { type: 'string' }, maxResults: { type: 'number' } }, required: ['pattern'] },
       handler: async (args = {}) => {
-        /** @type {string[]} */
-        const files = [];
+        const files: string[] = [];
         walkFiles(root, root, files, 2000);
         const fileRe = args.glob ? globToRegExp(args.glob) : null;
-        /** @type {RegExp} */
-        let re;
+        let re: RegExp;
         try { re = new RegExp(String(args.pattern || ''), 'i'); } catch { throw new Error('invalid regex pattern'); }
         const limit = Math.min(Number(args.maxResults) || 50, 200);
-        /** @type {Array<{ file: string, line: number, text: string }>} */
-        const hits = [];
+        const hits: Array<{ file: string; line: number; text: string }> = [];
         for (const rel of files) {
           if (hits.length >= limit) break;
           if (fileRe && !fileRe.test(rel)) continue;
@@ -137,12 +123,7 @@ export function createAgentTools(ctx = {}) {
       description: '为批量整理/改名/去重生成文件操作预览；不会直接移动文件，实际执行必须交给审批后的文件操作。mode: byExtension/rename/dedupe。',
       parameters: {
         type: 'object',
-        properties: {
-          files: { type: 'array', items: { type: 'string' } },
-          mode: { type: 'string' },
-          targetDir: { type: 'string' },
-          renamePrefix: { type: 'string' },
-        },
+        properties: { files: { type: 'array', items: { type: 'string' } }, mode: { type: 'string' }, targetDir: { type: 'string' }, renamePrefix: { type: 'string' } },
         required: ['files'],
       },
       handler: async (args = {}) => planFileOrganization({ trustedRoot: root, ...args }),
@@ -150,15 +131,7 @@ export function createAgentTools(ctx = {}) {
     {
       name: 'AnalyzeDataFile', mutating: false, risk: 'safe',
       description: '分析工作区内 CSV/TSV/XLSX 数据文件，返回列统计、图表数据和 Markdown 报告草稿；不会修改文件。',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          maxRows: { type: 'number' },
-          maxBytes: { type: 'number' },
-        },
-        required: ['path'],
-      },
+      parameters: { type: 'object', properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } }, required: ['path'] },
       handler: async (args = {}) => analyzeDataFile({ trustedRoot: root, ...args }),
     },
     {
@@ -180,66 +153,14 @@ export function createAgentTools(ctx = {}) {
         return { status: r.status, contentType: r.contentType, text: clip(r.text) };
       },
     },
-    {
-      ...createGitStatusTool(),
-      name: 'GitStatus',
-      mutating: false,
-      risk: 'safe',
-      parameters: createGitStatusTool().inputSchema,
-    },
-    {
-      ...createGitDiffTool(),
-      name: 'GitDiff',
-      mutating: false,
-      risk: 'safe',
-      parameters: createGitDiffTool().inputSchema,
-    },
-    {
-      ...createGitLogTool(),
-      name: 'GitLog',
-      mutating: false,
-      risk: 'safe',
-      parameters: createGitLogTool().inputSchema,
-    },
+    { ...gitStatusTool, name: 'GitStatus', mutating: false, risk: 'safe', parameters: gitStatusTool.inputSchema },
+    { ...gitDiffTool, name: 'GitDiff', mutating: false, risk: 'safe', parameters: gitDiffTool.inputSchema },
+    { ...gitLogTool, name: 'GitLog', mutating: false, risk: 'safe', parameters: gitLogTool.inputSchema },
     createGitCommitTool(),
   ];
 
   if (sandbox) {
-    // On the local desktop backend, run the (user-approved) command through the
-    // OS shell so ordinary commands work — Windows: PowerShell, POSIX: `sh -c`.
-    // `cmd /s /c` drops stdout for quoted inline scripts such as `node -e "..."`.
-    // The structured allowlist still guards VM/server backends. Shell stays
-    // risk:'high' — every command is approval-gated and the cwd is jailed to the
-    // workspace root.
-    const isLocalBackend = !sandbox.backend || sandbox.backend === 'local-subprocess';
-    const isWindows = process.platform === 'win32';
-    tools.push({
-      name: 'Shell', mutating: true, risk: 'high',
-      description: isWindows
-        ? '在工作区目录里运行一条命令(经系统 shell)。优先用 Windows/PowerShell 命令(如 Get-ChildItem、dir、type)或 node/python 脚本；返回 stdout/stderr/退出码。每条命令都需用户确认。'
-        : '在隔离沙箱里运行一个命令（如 `node script.js`、`python x.py`），返回 stdout/stderr/退出码。默认无网络、cwd 限定工作区。',
-      parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
-      handler: async (args = {}) => {
-        const command = String(args.command || '').trim();
-        if (!command) throw new Error('command is required');
-        let spec;
-        if (isLocalBackend) {
-          const shellSpec = isWindows
-            ? { tool: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', command] }
-            : { tool: 'sh', args: ['-c', command] };
-          // Permit the OS shell binary for this approval-gated wrapper; other
-          // backends keep their strict tool allowlist unchanged.
-          const limits = { ...sandboxLimits, allowTools: [...((sandboxLimits && sandboxLimits.allowTools) || []), shellSpec.tool] };
-          spec = normalizeSandboxSpec(shellSpec, limits);
-        } else {
-          const parts = command.split(/\s+/).filter(Boolean);
-          spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits);
-        }
-        const result = await sandbox.exec(spec, { trustedRoot: root, context: ctx.context });
-        return { exitCode: result.exitCode, stdout: clip(result.stdout, 4000), stderr: clip(result.stderr, 2000), timedOut: result.timedOut };
-      },
-    });
+    tools.push(createShellTool({ root, sandbox, sandboxLimits, context: ctx.context }));
   }
-
   return tools;
 }
