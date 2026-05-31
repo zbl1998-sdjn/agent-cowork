@@ -1,4 +1,3 @@
-// @ts-check
 // 数据可视化渲染器:把 viz 规格渲染成自包含的单页 HTML(host · L1 领域层 · artifacts)
 // ---------------------------------------------------------------------------
 // 职责:支持 chart(Chart.js)/ mermaid(流程图)/ table(纯内联 HTML)三类;
@@ -17,31 +16,32 @@
 // is encoded so it cannot break out of the script context (no `</script>`,
 // no `<!--`, no U+2028/2029). Only cdnjs is used for the two chart libs.
 
+type HttpError = Error & { statusCode?: number };
+export type VizSpec = {
+  kind?: string;
+  title?: string;
+  data?: unknown;
+  options?: unknown;
+  code?: string;
+  definition?: string;
+  [key: string]: unknown;
+};
+
 const CHART_KINDS = new Set(['bar', 'line', 'pie', 'doughnut']);
 const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
 const MERMAID_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js';
-const LINE_SEP = new RegExp(String.fromCharCode(0x2028), "g");
-const PARA_SEP = new RegExp(String.fromCharCode(0x2029), "g");
+const LINE_SEP = new RegExp(String.fromCharCode(0x2028), 'g');
+const PARA_SEP = new RegExp(String.fromCharCode(0x2029), 'g');
 
-/**
- * @typedef {Error & { statusCode?: number }} HttpError
- * @typedef {{ kind?: string, title?: string, data?: any, options?: any, code?: string, definition?: string, [key: string]: any }} VizSpec
- */
-
-/**
- * 构造带 statusCode 的可视化错误(消息统一加 "viz: " 前缀)。
- * @param {string} message
- * @param {number} [statusCode]
- * @returns {HttpError}
- */
-function fail(message, statusCode = 400) {
-  const error = /** @type {HttpError} */ (new Error(`viz: ${message}`));
+/** 构造带 statusCode 的可视化错误(消息统一加 "viz: " 前缀)。 */
+function fail(message: string, statusCode = 400): HttpError {
+  const error = new Error(`viz: ${message}`) as HttpError;
   error.statusCode = statusCode;
   return error;
 }
 
-/** HTML 转义,防止用户文本在页面里被当作标签注入。 @param {unknown} value */
-function escapeHtml(value) {
+/** HTML 转义,防止用户文本在页面里被当作标签注入。 */
+function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -50,9 +50,8 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-// JSON safe to embed inside a <script> tag.
-/** 序列化成可安全嵌入 <script> 的 JSON(转义 < > & 与行/段分隔符)。 @param {unknown} value */
-function safeJson(value) {
+/** 序列化成可安全嵌入 <script> 的 JSON(转义 < > & 与行/段分隔符)。 */
+function safeJson(value: unknown): string {
   return JSON.stringify(value ?? null)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
@@ -61,8 +60,8 @@ function safeJson(value) {
     .replace(PARA_SEP, '\\u2029');
 }
 
-/** 统一的页面外壳:套上 doctype/样式/标题,把 headExtra(脚本标签)与 body 填进去。 @param {{ title: string, headExtra?: string, body: string }} options */
-function htmlShell({ title, headExtra = '', body }) {
+/** 统一的页面外壳:套上 doctype/样式/标题,把 headExtra(脚本标签)与 body 填进去。 */
+function htmlShell({ title, headExtra = '', body }: { title: string; headExtra?: string; body: string }): string {
   return `<!doctype html>
 <html lang="zh-CN">
   <head>
@@ -93,23 +92,19 @@ ${body}
 </html>`;
 }
 
-/** 规范化图表数据:兼容 datasets 多系列写法与 labels/values 简写,统一成 Chart.js 结构。 @param {any} data */
-function normalizeChartData(data) {
-  if (data && Array.isArray(data.datasets)) {
-    return { labels: Array.isArray(data.labels) ? data.labels : [], datasets: data.datasets };
+/** 规范化图表数据:兼容 datasets 多系列写法与 labels/values 简写,统一成 Chart.js 结构。 */
+function normalizeChartData(data: unknown): { labels: unknown[]; datasets: unknown[] } {
+  const record = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+  if (Array.isArray(record.datasets)) {
+    return { labels: Array.isArray(record.labels) ? record.labels : [], datasets: record.datasets };
   }
-  const labels = data && Array.isArray(data.labels) ? data.labels : [];
-  const values = data && Array.isArray(data.values) ? data.values : [];
-  return { labels, datasets: [{ label: (data && data.label) || '值', data: values }] };
+  const labels = Array.isArray(record.labels) ? record.labels : [];
+  const values = Array.isArray(record.values) ? record.values : [];
+  return { labels, datasets: [{ label: record.label || '值', data: values }] };
 }
 
-/**
- * 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。
- * @param {string} kind
- * @param {string} title
- * @param {VizSpec} spec
- */
-function renderChart(kind, title, spec) {
+/** 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。 */
+function renderChart(kind: string, title: string, spec: VizSpec): string {
   const chartData = normalizeChartData(spec.data);
   const options = spec.options && typeof spec.options === 'object' ? spec.options : { responsive: true };
   const config = { type: kind, data: chartData, options };
@@ -125,15 +120,10 @@ function renderChart(kind, title, spec) {
   return htmlShell({ title, headExtra, body });
 }
 
-/**
- * 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。
- * @param {string} title
- * @param {VizSpec} spec
- */
-function renderMermaid(title, spec) {
-  const definition = String(
-    (spec.data && (spec.data.definition || spec.data.code)) || spec.code || spec.definition || '',
-  ).trim();
+/** 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。 */
+function renderMermaid(title: string, spec: VizSpec): string {
+  const data = spec.data && typeof spec.data === 'object' ? spec.data as Record<string, unknown> : {};
+  const definition = String((data.definition || data.code) || spec.code || spec.definition || '').trim();
   if (!definition) {
     throw fail('mermaid viz requires a diagram definition');
   }
@@ -145,20 +135,16 @@ function renderMermaid(title, spec) {
   return htmlShell({ title, headExtra, body });
 }
 
-/**
- * 渲染表格页:纯内联 HTML(无 JS),每个单元格都经 HTML 转义。
- * @param {string} title
- * @param {VizSpec} spec
- */
-function renderTable(title, spec) {
-  const data = spec.data || {};
-  const columns = /** @type {unknown[]} */ (Array.isArray(data.columns) ? data.columns : []);
-  const rows = /** @type {unknown[]} */ (Array.isArray(data.rows) ? data.rows : []);
+/** 渲染表格页:纯内联 HTML(无 JS),每个单元格都经 HTML 转义。 */
+function renderTable(title: string, spec: VizSpec): string {
+  const data = spec.data && typeof spec.data === 'object' ? spec.data as Record<string, unknown> : {};
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const rows = Array.isArray(data.rows) ? data.rows : [];
   if (columns.length === 0 && rows.length === 0) {
     throw fail('table viz requires columns or rows');
   }
   const head = columns.length
-    ? `          <thead><tr>${columns.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>\n`
+    ? `          <thead><tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead>\n`
     : '';
   const bodyRows = rows
     .map((row) => `<tr>${(Array.isArray(row) ? row : [row]).map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
@@ -171,8 +157,8 @@ ${head}          <tbody>
   return htmlShell({ title, body });
 }
 
-/** 可视化渲染入口:按 spec.kind 分发到 chart/mermaid/table,未知种类抛 400。 @param {VizSpec} [spec] */
-export function renderViz(spec = {}) {
+/** 可视化渲染入口:按 spec.kind 分发到 chart/mermaid/table,未知种类抛 400。 */
+export function renderViz(spec: VizSpec = {}): string {
   const title = spec.title ? String(spec.title) : '可视化';
   const kind = String(spec.kind || '').toLowerCase();
   if (CHART_KINDS.has(kind)) {
