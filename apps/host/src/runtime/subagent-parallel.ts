@@ -2,7 +2,6 @@
 // ---------------------------------------------------------------------------
 // 职责:并发执行多个子代理计划(受并发上限约束),各自独立产出 run 记录与事件;用于把可并行的子任务一次性铺开。
 //       与 subagent.js(单计划顺序执行)互补。依赖:L0 path-policy + 同层 run-store/runs-index。
-// @ts-check
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createRunId, writeRunRecord } from './run-store.js';
@@ -19,20 +18,56 @@ import {
 const DEFAULT_MAX_PARALLEL_AGENTS = 8;
 const DEFAULT_MAX_CONCURRENCY = 3;
 
-/**
- * @typedef {{ tool?: unknown, args?: unknown, note?: unknown, rationale?: unknown }} SubagentStep
- * @typedef {{ goal?: unknown, task?: unknown, steps?: unknown }} ParallelAgentInput
- * @typedef {{ index: number, goal: string, steps: SubagentStep[] }} ChildPlan
- * @typedef {{ contextBytes: number, contextBudgetBytes: number, maxSteps: number }} ContextLimits
- * @typedef {{ has(name: string): boolean, call(name: string, args: Record<string, unknown>, context: { trustedRoot: string, context: Record<string, unknown> }): unknown | Promise<unknown> }} ToolRegistryLike
- * @typedef {{ publish(runId: string, payload: Record<string, unknown>): ParallelEvent }} RunEventsLike
- * @typedef {{ upsert(record: unknown, context?: Record<string, unknown>): unknown }} RunsIndexLike
- * @typedef {{ seq?: number, ts?: string, type: string, [key: string]: unknown }} ParallelEvent
- * @typedef {{ index: number, goal: string, runId?: string, status: 'succeeded' | 'failed', ok: boolean, steps?: unknown, error?: string, limits: ContextLimits }} ChildResult
- * @typedef {{ goal?: unknown, agents?: ParallelAgentInput[], registry: ToolRegistryLike, trustedRoot: string, runStoreRoot: string, runEvents?: RunEventsLike | null, runsIndex?: RunsIndexLike | null, context?: Record<string, unknown>, stopOnError?: boolean, contextBudgetBytes?: number, maxSteps?: number, maxAgents?: number, maxConcurrency?: number }} RunSubagentsParallelOptions
- */
+export type SubagentStep = { tool?: unknown; args?: unknown; note?: unknown; rationale?: unknown };
+export type ParallelAgentInput = { goal?: unknown; task?: unknown; steps?: unknown };
+export type ChildPlan = { index: number; goal: string; steps: SubagentStep[] };
+export type ContextLimits = { contextBytes: number; contextBudgetBytes: number; maxSteps: number };
+export type ToolRegistryLike = {
+  has(name: string): boolean;
+  call(
+    name: string,
+    args: Record<string, unknown>,
+    context: { trustedRoot: string; context: Record<string, unknown> },
+  ): unknown | Promise<unknown>;
+};
+export type RunEventsLike = { publish(runId: string, payload: Record<string, unknown>): ParallelEvent };
+export type RunsIndexLike = { upsert(record: unknown, context?: Record<string, unknown>): unknown };
+export type ParallelEvent = { seq?: number; ts?: string; type: string; [key: string]: unknown };
+export type ChildResult = {
+  index: number;
+  goal: string;
+  runId?: string;
+  status: 'succeeded' | 'failed';
+  ok: boolean;
+  steps?: unknown;
+  error?: string;
+  limits: ContextLimits;
+};
+export type RunSubagentsParallelOptions = {
+  goal?: unknown;
+  agents?: ParallelAgentInput[];
+  registry: ToolRegistryLike;
+  trustedRoot: string;
+  runStoreRoot: string;
+  runEvents?: RunEventsLike | null;
+  runsIndex?: RunsIndexLike | null;
+  context?: Record<string, unknown>;
+  stopOnError?: boolean;
+  contextBudgetBytes?: number;
+  maxSteps?: number;
+  maxAgents?: number;
+  maxConcurrency?: number;
+};
+export type RunSubagentsParallelResult = {
+  ok: boolean;
+  runId: string;
+  runPath: string;
+  goal: string;
+  children: ChildResult[];
+  events: ParallelEvent[];
+};
+type RunSubagentResult = { ok: boolean; runId: string; steps?: unknown };
 
-/** @param {RunSubagentsParallelOptions} options */
 export async function runSubagentsParallel({
   goal = '',
   agents = [],
@@ -47,7 +82,7 @@ export async function runSubagentsParallel({
   maxSteps = DEFAULT_MAX_STEPS,
   maxAgents = DEFAULT_MAX_PARALLEL_AGENTS,
   maxConcurrency = DEFAULT_MAX_CONCURRENCY,
-}) {
+}: RunSubagentsParallelOptions): Promise<RunSubagentsParallelResult> {
   if (!registry) {
     throw new Error('runSubagentsParallel: registry is required');
   }
@@ -62,11 +97,10 @@ export async function runSubagentsParallel({
     throw makeHttpError(400, `runSubagentsParallel: too many agents; max ${agentLimit}`, { maxAgents: agentLimit });
   }
 
-  /** @type {ChildPlan[]} */
-  const childPlans = agents.map((agent, index) => ({
+  const childPlans: ChildPlan[] = agents.map((agent, index) => ({
     index,
     goal: String(agent?.goal || agent?.task || `子任务 ${index + 1}`),
-    steps: Array.isArray(agent?.steps) ? /** @type {SubagentStep[]} */ (agent.steps) : [],
+    steps: Array.isArray(agent?.steps) ? agent.steps as SubagentStep[] : [],
   }));
   const childLimits = childPlans.map((child) => {
     validateSubagentSteps({ steps: child.steps, registry });
@@ -81,10 +115,8 @@ export async function runSubagentsParallel({
   const safeRoot = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const runId = createRunId();
   const startedAt = new Date();
-  /** @type {ParallelEvent[]} */
-  const events = [];
-  /** @param {string} type @param {Record<string, unknown>} [payload] */
-  const emit = (type, payload = {}) => {
+  const events: ParallelEvent[] = [];
+  const emit = (type: string, payload: Record<string, unknown> = {}): ParallelEvent => {
     const enriched = runEvents
       ? runEvents.publish(runId, { type, ...payload })
       : { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
@@ -96,11 +128,9 @@ export async function runSubagentsParallel({
   emit('user_message', { text: String(goal || '').slice(0, 2000) || `并行子任务 (${childPlans.length} 个)` });
   emit('assistant_start', { status: 'running', childCount: childPlans.length, maxConcurrency: concurrency });
 
-  /** @type {(ChildResult | undefined)[]} */
-  const children = new Array(childPlans.length);
+  const children: (ChildResult | undefined)[] = new Array(childPlans.length);
   let next = 0;
-  /** @returns {Promise<void>} */
-  async function worker() {
+  async function worker(): Promise<void> {
     for (;;) {
       const index = next;
       next += 1;
@@ -122,8 +152,8 @@ export async function runSubagentsParallel({
           stopOnError,
           contextBudgetBytes,
           maxSteps,
-        });
-        children[index] = {
+        }) as RunSubagentResult;
+        const childResult: ChildResult = {
           index,
           goal: child.goal,
           runId: out.runId,
@@ -132,9 +162,10 @@ export async function runSubagentsParallel({
           steps: out.steps,
           limits: childLimits[index],
         };
-        emit('child_end', { index, runId: out.runId, status: children[index].status });
+        children[index] = childResult;
+        emit('child_end', { index, runId: out.runId, status: childResult.status });
       } catch (err) {
-        children[index] = {
+        const childResult: ChildResult = {
           index,
           goal: child.goal,
           status: 'failed',
@@ -142,13 +173,15 @@ export async function runSubagentsParallel({
           error: err instanceof Error ? err.message : String(err),
           limits: childLimits[index],
         };
-        emit('child_end', { index, status: 'failed', error: children[index].error });
+        children[index] = childResult;
+        emit('child_end', { index, status: 'failed', error: childResult.error });
       }
     }
   }
 
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  const ok = children.every((child) => child && child.ok);
+  const childResults = children as ChildResult[];
+  const ok = childResults.every((child) => child && child.ok);
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
   emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
@@ -172,7 +205,7 @@ export async function runSubagentsParallel({
         steps: child.steps.map((step) => ({ tool: String(step.tool || '') })),
       })),
     },
-    result: { ok, children },
+    result: { ok, children: childResults },
     events,
   };
   const runPath = writeRunRecord(runStoreRoot, record);
@@ -180,9 +213,9 @@ export async function runSubagentsParallel({
     try {
       runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, context), context);
     } catch {
-      // index failures never break the run
+      // 索引失败不应影响子代理主流程,历史记录已由 run-store 落盘。
     }
   }
 
-  return { ok, runId, runPath, goal: String(goal || ''), children, events };
+  return { ok, runId, runPath, goal: String(goal || ''), children: childResults, events };
 }
