@@ -105,7 +105,7 @@
     "apps/host/src/runtime/action-audit.ts",
     "apps/host/src/runtime/approvals.ts",
     "apps/host/src/runtime/audit-events.ts",
-    "apps/host/src/runtime/background-tasks.js",
+    "apps/host/src/runtime/background-tasks.ts",
     "apps/host/src/runtime/budget-guard.ts",
     "apps/host/src/runtime/circuit-breaker.ts",
     "apps/host/src/runtime/cancellation.ts",
