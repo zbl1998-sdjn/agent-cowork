@@ -6,40 +6,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { redactText, redactValue } from '../security/redaction.js';
-
-// @ts-check
+import type {
+  ArtifactLike,
+  CapturedArtifact,
+  CapturedStep,
+  CaptureRunOptions,
+  CaptureRunResult,
+  RunRecord,
+  RunsIndexLike,
+} from './capture-types.js';
 
 const MAX_TEXT = 4000;
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
-/**
- * @typedef {{ type?: unknown, path?: unknown, fullPath?: unknown, kind?: unknown, source?: unknown, encoding?: unknown, contentBase64?: unknown }} ArtifactLike
- * @typedef {{ index: number, tool: string, status?: unknown, args?: unknown, result?: unknown, summary?: unknown }} CapturedStep
- * @typedef {{ type?: unknown, name?: unknown, tool?: unknown, args?: unknown, status?: unknown, result?: ArtifactLike, path?: unknown, operations?: ArtifactLike[], items?: ArtifactLike[] }} RunEvent
- * @typedef {{ tool?: unknown, status?: unknown, ok?: unknown, summary?: unknown }} ResultStep
- * @typedef {{ prompt?: unknown, summary?: unknown }} RunInput
- * @typedef {{ text?: unknown, steps?: ResultStep[] }} RunResult
- * @typedef {{ message?: unknown }} RunError
- * @typedef {{ recipeId?: unknown, command?: unknown, events?: RunEvent[], result?: RunResult, input?: RunInput, error?: RunError, type?: unknown, status?: unknown, mode?: unknown, provider?: unknown, startedAt?: unknown, finishedAt?: unknown }} RunRecord
- * @typedef {{ runPath?: unknown }} RunIndexEntry
- * @typedef {{ get(runId: string): RunIndexEntry | null | Promise<RunIndexEntry | null> }} RunsIndexLike
- * @typedef {(runId: string) => RunRecord | null | Promise<RunRecord | null>} RecordReader
- */
-
-/** @param {unknown} value @param {number} [max] @returns {string} */
-function clipText(value, max = MAX_TEXT) {
-  const redacted = redactText(value == null ? '' : String(value));
-  const text = typeof redacted === 'string' ? redacted : '';
+function clipText(value: unknown, max = MAX_TEXT): string {
+  const text = redactText(value == null ? '' : String(value)) ?? '';
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
-/** @param {unknown} value @returns {unknown} */
-function cleanValue(value) {
+function cleanValue(value: unknown): unknown {
   return redactValue(value);
 }
 
-/** @param {string} runId @param {RunsIndexLike | null | undefined} runsIndex @returns {Promise<RunRecord | null>} */
-async function readRecordFromIndex(runId, runsIndex) {
+async function readRecordFromIndex(runId: string, runsIndex: RunsIndexLike | null | undefined): Promise<RunRecord | null> {
   if (!runsIndex || typeof runsIndex.get !== 'function') {
     return null;
   }
@@ -48,35 +37,37 @@ async function readRecordFromIndex(runId, runsIndex) {
   if (!runPath || !fs.existsSync(runPath)) {
     return null;
   }
-  return /** @type {RunRecord} */ (JSON.parse(fs.readFileSync(runPath, 'utf8')));
+  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
 }
 
-/** @param {string} runId @param {string | null} runStoreRoot @returns {RunRecord | null} */
-function readRecordFromStoreRoot(runId, runStoreRoot) {
-  if (!runStoreRoot) return null;
-  if (!RUN_ID_RE.test(runId || '')) throw new Error('Invalid run id');
+function readRecordFromStoreRoot(runId: string, runStoreRoot: string | null | undefined): RunRecord | null {
+  if (!runStoreRoot) {
+    return null;
+  }
+  if (!RUN_ID_RE.test(runId || '')) {
+    throw new Error('Invalid run id');
+  }
   const runPath = path.join(runStoreRoot, `${runId}.json`);
-  if (!fs.existsSync(runPath)) return null;
-  return /** @type {RunRecord} */ (JSON.parse(fs.readFileSync(runPath, 'utf8')));
+  if (!fs.existsSync(runPath)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
 }
 
-/** @param {{ runId: string, runStoreRoot?: string | null, runsIndex?: RunsIndexLike | null, recordReader?: RecordReader | null }} options */
-async function loadRunRecord({ runId, runStoreRoot, runsIndex, recordReader }) {
-  let record = null;
+async function loadRunRecord({ runId, runStoreRoot, runsIndex, recordReader }: Required<Pick<CaptureRunOptions, 'runId'>> & Omit<CaptureRunOptions, 'runId'>): Promise<RunRecord | null> {
+  let record: RunRecord | null = null;
   if (typeof recordReader === 'function') {
-    record = await recordReader(runId);
+    record = await recordReader(runId as string);
   }
   if (runStoreRoot) {
-    record ||= readRecordFromStoreRoot(runId, runStoreRoot);
+    record ||= readRecordFromStoreRoot(runId as string, runStoreRoot);
   }
-  return record || await readRecordFromIndex(runId, runsIndex);
+  return record || (await readRecordFromIndex(runId as string, runsIndex));
 }
 
-/** @param {RunRecord} record @returns {CapturedStep[]} */
-function eventSteps(record) {
+function eventSteps(record: RunRecord): CapturedStep[] {
   const events = Array.isArray(record.events) ? record.events : [];
-  /** @type {CapturedStep[]} */
-  const steps = [];
+  const steps: CapturedStep[] = [];
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
     if (!event || event.type !== 'tool_call') {
@@ -98,8 +89,7 @@ function eventSteps(record) {
   return steps;
 }
 
-/** @param {RunRecord} record @returns {CapturedStep[]} */
-function resultSteps(record) {
+function resultSteps(record: RunRecord): CapturedStep[] {
   const rawSteps = Array.isArray(record.result?.steps) ? record.result.steps : [];
   return rawSteps.map((step, index) => ({
     index,
@@ -109,8 +99,7 @@ function resultSteps(record) {
   }));
 }
 
-/** @param {RunRecord} record @returns {CapturedStep[]} */
-function recipeOperationSteps(record) {
+function recipeOperationSteps(record: RunRecord): CapturedStep[] {
   const events = Array.isArray(record.events) ? record.events : [];
   const preview = events.find((event) => event && event.type === 'preview' && Array.isArray(event.operations));
   if (!preview) {
@@ -129,8 +118,7 @@ function recipeOperationSteps(record) {
   }));
 }
 
-/** @param {RunRecord} record @returns {CapturedStep[]} */
-function extractSteps(record) {
+function extractSteps(record: RunRecord): CapturedStep[] {
   const fromEvents = eventSteps(record);
   if (fromEvents.length) {
     return fromEvents;
@@ -142,13 +130,10 @@ function extractSteps(record) {
   return resultSteps(record);
 }
 
-/** @param {RunRecord} record */
-function extractArtifacts(record) {
-  /** @type {ArtifactLike[]} */
-  const artifacts = [];
-  const seen = new Set();
-  /** @param {ArtifactLike} artifact */
-  const add = (artifact) => {
+function extractArtifacts(record: RunRecord): CapturedArtifact[] {
+  const artifacts: CapturedArtifact[] = [];
+  const seen = new Set<string>();
+  const add = (artifact: ArtifactLike): void => {
     const artifactPath = clipText(artifact.path || artifact.fullPath || '', 500);
     if (!artifactPath || seen.has(artifactPath)) {
       return;
@@ -187,8 +172,7 @@ function extractArtifacts(record) {
   return artifacts;
 }
 
-/** @param {RunRecord} record @param {string} runId @returns {string} */
-function titleFromRecord(record, runId) {
+function titleFromRecord(record: RunRecord, runId: string): string {
   if (record.recipeId) {
     return `Captured ${record.recipeId}`;
   }
@@ -198,19 +182,16 @@ function titleFromRecord(record, runId) {
   return `Captured run ${runId}`;
 }
 
-/**
- * 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。
- * @param {{ runId?: unknown, runStoreRoot?: string | null, runsIndex?: RunsIndexLike | null, recordReader?: RecordReader | null }} [options]
- */
-export async function captureRun({ runId, runStoreRoot = null, runsIndex = null, recordReader = null } = {}) {
+/** 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。 */
+export async function captureRun({ runId, runStoreRoot = null, runsIndex = null, recordReader = null }: CaptureRunOptions = {}): Promise<CaptureRunResult> {
   if (!runId || typeof runId !== 'string') {
-    const err = /** @type {Error & { statusCode?: number }} */ (new Error('captureRun: runId is required'));
+    const err: Error & { statusCode?: number } = new Error('captureRun: runId is required');
     err.statusCode = 400;
     throw err;
   }
   const record = await loadRunRecord({ runId, runStoreRoot, runsIndex, recordReader });
   if (!record) {
-    const err = /** @type {Error & { statusCode?: number }} */ (new Error('Run record not found'));
+    const err: Error & { statusCode?: number } = new Error('Run record not found');
     err.statusCode = 404;
     throw err;
   }
