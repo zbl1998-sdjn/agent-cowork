@@ -50,6 +50,19 @@ test('ToolRegistry.list returns descriptors without leaking handlers', () => {
   assert.equal('handler' in list[0], false);
 });
 
+test('ToolRegistry.register rejects malformed descriptors before storage', () => {
+  const registry = new ToolRegistry();
+  assert.throws(
+    () => registry.register({ name: 'bad.tool', handler: () => 1, raw: true }),
+    /ToolRegistry\.register: .*raw/i,
+  );
+  assert.equal(registry.has('bad.tool'), false);
+  assert.throws(
+    () => registry.register({ name: 'bad.tool' }),
+    /ToolRegistry\.register: .*handler/i,
+  );
+});
+
 test('ToolRegistry.search ranks name hits above description hits and respects empty query', () => {
   const registry = new ToolRegistry();
   registry.register({ name: 'sandbox.exec', description: 'run a command', handler: () => {} });
