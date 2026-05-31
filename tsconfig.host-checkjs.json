@@ -22,7 +22,7 @@
     "apps/host/src/artifacts/live-refresh.js",
     "apps/host/src/artifacts/office-writers.ts",
     "apps/host/src/artifacts/xlsx-writer.ts",
-    "apps/host/src/artifacts/live-spec.js",
+    "apps/host/src/artifacts/live-spec.ts",
     "apps/host/src/artifacts/viz.js",
     "apps/host/src/connectors/catalog.ts",
     "apps/host/src/connectors/oauth-github.ts",
