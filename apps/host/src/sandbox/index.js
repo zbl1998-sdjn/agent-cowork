@@ -1,4 +1,13 @@
 // @ts-check
+//
+// 沙箱工厂(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:按 backend 选择沙箱适配器(本地子进程 / VM:docker/wsl/hyperv)。各适配器实现
+//       同一 exec(spec, ctx) 契约,故调用方与路由后端无关——这是「端口与适配器」接缝,
+//       也是多沙箱后端可扩展的关键(新增后端=加一个适配器,不改调用方)。
+// 依赖:同目录 local-sandbox / vm-sandbox / wsl-docker-runner / sandbox-spec。
+// 导出:createSandbox + DEFAULT_ALLOW_TOOLS,并转出 normalizeSandboxSpec/SANDBOX_DEFAULTS/createWslDockerRunner。
+//
 // Sandbox factory + shared limits.
 //
 // createSandbox selects an adapter by backend. Both adapters implement the
@@ -29,7 +38,7 @@ const VM_BACKENDS = new Set(['vm', 'docker', 'wsl', 'hyperv']);
  * @typedef {{ backend?: string, vmBackend?: string, runner?: VmRunner | null, provisioned?: boolean, image?: string | null, distro?: string | null, spawn?: SpawnLike }} SandboxOptions
  */
 
-/** @param {SandboxOptions} [options] */
+/** 按 backend 创建沙箱:local→子进程;vm/docker/wsl/hyperv→VM(能真正运行才算 provisioned,否则快速失败)。 @param {SandboxOptions} [options] */
 export function createSandbox(options = {}) {
   const backend = String(options.backend || 'local').toLowerCase();
 

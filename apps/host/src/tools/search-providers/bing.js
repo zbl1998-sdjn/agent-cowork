@@ -1,3 +1,9 @@
+// Bing 结果页解析器(host · L1 领域层 · tools/search-providers)
+// ---------------------------------------------------------------------------
+// 职责:把 Bing SERP 的 HTML(li.b_algo 区块)解析成 { title, url, snippet }[]。
+//       Bing 是国内默认兜底(DDG 常连不通)。纯函数、确定性;布局不匹配返回 []。
+// 依赖:无。导出:parseBingResults。
+//
 // Parser for Bing's HTML search results (https://www.bing.com/search?q=...).
 //
 // Bing is the practical default for Chinese users — duckduckgo.com is
@@ -48,6 +54,7 @@ function clean(raw) {
  * if the layout doesn't match — callers should treat as "no results"
  * rather than crashing.
  *
+ * 从 Bing SERP 提取至多 limit 条结果(逐 b_algo 区块取首链 + b_caption 摘要)。
  * @param {string} html
  * @param {number} [limit]
  * @returns {ParsedResult[]}

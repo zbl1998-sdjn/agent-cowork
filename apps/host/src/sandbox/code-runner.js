@@ -1,3 +1,9 @@
+// 内联代码运行器(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:把一段内联代码(node/python)物化为可信根内的脚本文件,在沙箱里执行,并全程产出
+//       run 事件与 run 记录(可观测/可回放)。写盘前先校验 spec,失败也落 run 记录、不留残脚本。
+// 依赖:L0 path-policy + 同层 sandbox-spec/local-runtime-tools/code-runner-utils;按既有架构
+//       豁免直接向 runtime/run-store、runs-index 记账。导出:runCode。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -35,6 +41,8 @@ import { summariseRunForIndex } from '../runtime/runs-index.js';
  */
 
 /**
+ * 运行内联代码:校验代码/工具 → 选本地运行时(如内置 Python)→ 写脚本 → 沙箱执行 → 落 run 记录与事件。
+ * 返回 { ok, runId, runPath, result, events, … }。任一阶段失败均会发出失败事件并写入失败 run 记录。
  * @param {RunCodeOptions} options
  */
 export async function runCode({

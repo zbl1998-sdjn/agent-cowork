@@ -1,3 +1,8 @@
+// 文档抽取·纯工具(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:document-extractor 用到的无副作用工具——字节上限夹取、SHA-256、XML 实体解码、
+//       多行压实/截断、XML→纯文本、PDF 字面串解码(含八进制转义)。易单测。
+// 依赖:node:crypto。导出:cappedMaxBytes/sha256/decodeXmlEntities/compactLines/xmlToText/decodePdfLiteral。
 import crypto from 'node:crypto';
 
 export const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;

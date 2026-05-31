@@ -1,3 +1,9 @@
+// 数据文件剖析(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:读取 CSV/TSV/XLSX 表格,逐列推断类型(数值/日期/布尔/文本)、统计缺失/去重/Top 值与
+//       数值摘要,并给出图表建议。是数据分析闭环的「剖析」一环。纯函数、确定性。
+// 依赖:同目录 table(安全读表)。导出:profileDataFile,并转出 readDataTable。
+
 import { readDataTable } from './table.js';
 
 /**
@@ -149,6 +155,7 @@ function buildReport({ name, rowCount, columns, suggestions }) {
 }
 
 /**
+ * 剖析数据文件:读表后逐列生成画像 + 图表建议 + 文字小结,返回 data-profile 结果。
  * @param {DataFileOptions} [options]
  * @returns {DataProfile}
  */

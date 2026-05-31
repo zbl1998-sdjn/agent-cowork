@@ -1,3 +1,8 @@
+// 命令运行(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:在工作区内运行外部命令——默认「禁用」(allowCommands 显式开启才放行),cwd 限定可信根、
+//       无 shell、硬超时(SIGKILL)、输出限额。默认最小权限(plan/01 D.13)。
+// 依赖:L0 path-policy + sandbox/exec-child(限额缓冲)。导出:runCommand。
 import childProcess from 'node:child_process';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { createCappedBuffer } from '../sandbox/exec-child.js';
@@ -20,7 +25,7 @@ function parseCommand(cmd) {
   return { command, args };
 }
 
-/** @param {CommandInput} [input] @returns {Promise<CommandResult>} */
+/** 运行命令:未开 allowCommands 直接拒绝;cwd 校验在可信根内,无 shell 执行,超时 SIGKILL,输出限额。 @param {CommandInput} [input] @returns {Promise<CommandResult>} */
 export async function runCommand(input = {}) {
   const options = input || {};
   const allowCommands = options.allowCommands === true;

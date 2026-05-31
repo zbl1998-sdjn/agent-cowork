@@ -1,3 +1,9 @@
+// 联网抓取工具 web.fetch(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:受控地抓取一个 http(s) 网址,返回「限长」文本体(供联网研究)。校验协议、
+//       施加超时与字节上限,默认通过 ssrf-guard 拦截内网/回环/私网地址,并对每一跳
+//       重定向重新校验(防 302 跳转绕过)。依赖:同层 ssrf-guard。导出:webFetch。
+//
 // web.fetch — a deliberate outbound HTTP tool for "research" tasks.
 //
 // Unlike the sandbox (network off by default), this is an explicit networked
@@ -43,6 +49,7 @@ function parseHttpUrl(value) {
 }
 
 /**
+ * 抓取一个 http(s) URL:SSRF 校验 → 手动跟随重定向(每跳复校验)→ 读回限长文本体。
  * @param {WebFetchOptions} [options]
  * @returns {Promise<WebFetchResult>}
  */

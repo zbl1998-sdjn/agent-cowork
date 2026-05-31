@@ -1,3 +1,10 @@
+// 文件批操作(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:在可信根内安全地执行 write/rename/move 批量文件操作。先 preview(算前后哈希、查冲突)
+//       再 apply(写后回读校验哈希、记账到 journal、生成可回滚条目)。delete 一律禁止。
+// 安全:写目标用 create-aware 路径校验(防 junction/symlink 越界);每步写入 journal 便于审计/回滚。
+// 依赖:L0 path-policy + 同层 file-rollback / file-operation-utils。
+// 导出:previewFileOperations / applyFileOperations,并转出 rollbackFileOperations。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
@@ -103,7 +110,7 @@ function previewMove(op, trustedRoot) {
   };
 }
 
-/** @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ operations: OperationPreview[] }} */
+/** 预览批操作:逐条算前后哈希、查冲突(禁 delete、禁覆盖/重名),返回操作预案但不落盘。 @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ operations: OperationPreview[] }} */
 export function previewFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   if (!trustedRoot) {
@@ -157,7 +164,7 @@ function applyMove(op) {
   fs.renameSync(op.path, targetPath);
 }
 
-/** @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ applied: FileOperationEvent[] }} */
+/** 执行批操作:先 preview,再逐条落盘——写入前后均记 journal,写后回读校验哈希,并生成可回滚条目。 @param {unknown} operations @param {FileOperationOptions} [options] @returns {{ applied: FileOperationEvent[] }} */
 export function applyFileOperations(operations, options = {}) {
   const trustedRoot = options.trustedRoot;
   const journalWriter = options.journalWriter;

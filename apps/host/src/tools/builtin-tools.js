@@ -1,3 +1,11 @@
+// 内置工具清单(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:把 host 已有能力(沙箱执行/内联代码、联网抓取/搜索、工作区检索、Git 只读、
+//       数据剖析/分析/图表、文件整理预案、各 recipe)封装成「工具描述符 + handler」,
+//       供 ToolRegistry 登记。注册表因此与具体沙箱/recipe/web 机制解耦,测试可注入假实现。
+// 约定:handler 收到 (args, ctx),ctx = { trustedRoot, context };高危/写操作标 requiresApproval。
+// 注:各工具的 description 是面向模型的运行时中文字符串(非注释)。导出:createBuiltinTools。
+
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
 import { runRecipe } from '../recipes/run-recipe.js';
@@ -24,7 +32,7 @@ import { createDataChartArtifact } from './data/artifact.js';
  * @typedef {{ sandbox?: any, sandboxLimits?: Record<string, any>, runStoreRoot?: string, runEvents?: any, runsIndex?: any, enableWebTools?: boolean, fetchImpl?: any }} BuiltinToolsOptions
  */
 
-/** @param {BuiltinToolsOptions} [options] @returns {BuiltinTool[]} */
+/** 按运行环境(是否有沙箱、是否启用 web 工具等)组装并返回全部内置工具描述符。 @param {BuiltinToolsOptions} [options] @returns {BuiltinTool[]} */
 export function createBuiltinTools({
   sandbox,
   sandboxLimits = {},

@@ -1,7 +1,8 @@
-// Load workspace image files as OpenAI-compatible multipart `image_url` content
-// parts (base64 data URLs) so the agent can reason over uploaded screenshots/PDF
-// pages — the Claude Cowork "drop an image in chat" capability. All paths are
-// jailed to the trusted workspace root; non-images and oversized files are skipped.
+// 图片加载(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:把工作区图片读成 OpenAI 兼容的 image_url 多模态内容块(base64 data URL),让 Agent 能
+//       「在聊天里看图」。所有路径限定在可信根内;非图片与超大文件跳过(单图上限 8MB)。
+// 依赖:L0 path-policy。导出:isImagePath / loadImageContentParts。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -21,13 +22,12 @@ const MIME_BY_EXT = {
 };
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image
 
-/** @param {unknown} p @returns {boolean} */
+/** 路径扩展名是否为受支持图片类型。 @param {unknown} p @returns {boolean} */
 export function isImagePath(p) {
   return Object.prototype.hasOwnProperty.call(MIME_BY_EXT, path.extname(String(p || '')).toLowerCase());
 }
 
-// Returns an array of { type:'image_url', image_url:{ url } } for each readable
-// image among `paths` (relative to, or under, trustedRoot).
+// 为 paths 中每个可读图片返回一个 image_url 内容块(路径限定可信根内,跳过非图片/超大)。
 /** @param {{ trustedRoot?: string, paths?: unknown[], maxImages?: number }} options @returns {ImageContentPart[]} */
 export function loadImageContentParts({ trustedRoot, paths = [], maxImages = 6 }) {
   const root = path.resolve(trustedRoot || process.cwd());

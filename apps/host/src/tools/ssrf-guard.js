@@ -1,5 +1,12 @@
 // @ts-check
 //
+// SSRF 防护(host · L1 领域层,服务于 web.fetch)
+// ---------------------------------------------------------------------------
+// 职责:把「字符串前缀匹配」这种可被三类手法绕过(DNS 解析到内网 / 数字型 IPv4 /
+//       被遗漏的私网段)的朴素做法,升级为「真解析到 IP + 归一化数字形式 + 命中任一
+//       私网/保留/回环段即拒绝」。由 web.fetch 在每跳重定向上复用。
+// 依赖:node:dns / node:net。导出:numericHostToV4 / isBlockedIp / assertPublicHost。
+//
 // SSRF guard for the outbound web.fetch tool. The naive approach — string-match
 // the URL hostname against a few private prefixes — is bypassable three ways:
 //   1. a DNS name that *resolves* to an internal IP (the string isn't private);
@@ -48,6 +55,7 @@ function isBlockedV4(octets) {
 }
 
 /**
+ * 把「数字型 IPv4」主机名(点分/十进制/十六进制/八进制)归一化为四段八位组;非数字 IPv4 返回 null。
  * Normalize a hostname that is actually a numeric IPv4 (dotted, decimal, hex, or
  * octal) into octets. Returns null when the host is not a bare numeric IPv4.
  * @param {string} host @returns {number[] | null}
@@ -64,7 +72,7 @@ export function numericHostToV4(host) {
   return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
 }
 
-/** @param {string} ip @returns {boolean} true when the literal IP is private/reserved/loopback */
+/** 字面 IP(IPv4/IPv6,含 ::ffff 映射)是否落在私网/保留/回环段。 @param {string} ip @returns {boolean} true when the literal IP is private/reserved/loopback */
 export function isBlockedIp(ip) {
   const dotted = parseDottedV4(ip);
   if (dotted) return isBlockedV4(dotted);
@@ -85,6 +93,7 @@ export function isBlockedIp(ip) {
 }
 
 /**
+ * 断言主机名可安全抓取:数字/字面 IP 直接判定,域名则解析后要求「全部」地址均为公网;否则抛错(消息含 "blocked")。
  * Assert a URL hostname is safe to fetch — it must resolve only to public
  * addresses. Throws an Error whose message contains "blocked" otherwise.
  * @param {string} hostname

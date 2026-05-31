@@ -1,7 +1,12 @@
 // @ts-check
-import childProcess from 'node:child_process';
-import { runConstrainedChild } from './exec-child.js';
-
+//
+// WSL/Docker 运行器(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:VM 后端的真实 spawn 执行器。把归一化 SandboxSpec 翻译成具体隔离命令行,交给共享的
+//       受约束子进程执行。注入进 VmSandbox,使适配器保持纯净、本模块可用 fake spawn 单测。
+//       docker:--network=none 是真断网保证;wsl 默认共享宿主网络,故只报 networkIsolated:false 并告警。
+// 依赖:node:child_process + 同层 exec-child。导出:createWslDockerRunner。
+//
 // Real spawn-based runner for the VM sandbox backends.
 //
 // Turns a normalised SandboxSpec into a concrete, isolated command line and
@@ -17,6 +22,8 @@ import { runConstrainedChild } from './exec-child.js';
 // wsl shares the host network unless the distro is configured otherwise, so we
 // report `networkIsolated:false` and warn — never claim a guarantee we cannot
 // keep.
+import childProcess from 'node:child_process';
+import { runConstrainedChild } from './exec-child.js';
 
 /**
  * @typedef {import('./sandbox-spec.js').SandboxSpec} SandboxSpec
@@ -37,7 +44,7 @@ function dockerEnvFlags(env) {
   return flags;
 }
 
-/** @param {string} backend @param {SandboxSpec} spec @param {SandboxExecContext} ctx @param {{ image?: string | null, distro?: string | null }} options @returns {string[]} */
+/** 据后端拼出真实命令行 argv:docker(挂载/断网/env/镜像)或 wsl(可选 -d distro);缺镜像/未知后端抛 501。 @param {string} backend @param {SandboxSpec} spec @param {SandboxExecContext} ctx @param {{ image?: string | null, distro?: string | null }} options @returns {string[]} */
 function buildArgv(backend, spec, ctx, { image, distro }) {
   const mountRoot = ctx.trustedRoot;
   if (backend === 'docker') {
@@ -67,6 +74,7 @@ function buildArgv(backend, spec, ctx, { image, distro }) {
 }
 
 /**
+ * 创建可注入 VmSandbox({ runner }) 的执行器:按后端拼命令行并经受约束子进程运行,回传结果+网络隔离实情。
  * Create a runner suitable for `VmSandbox({ runner })`.
  *
  * @param {WslDockerRunnerOptions} options { backend, image, distro, spawn }

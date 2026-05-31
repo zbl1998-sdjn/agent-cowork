@@ -1,4 +1,12 @@
 // @ts-check
+//
+// 沙箱执行规格(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:沙箱「绝不」接受裸 shell 字符串。调用方以结构化数据描述要运行什么:工具名、argv
+//       数组、限定在可信根内的 cwd、必填时间预算、env 白名单、显式网络开关(默认关)。
+//       配合 spawn 层 shell:false,argv 无法注入 shell 语法,故校验聚焦工具名与资源上限。
+// 导出:normalizeSandboxSpec(校验+补默认) / SANDBOX_DEFAULTS(默认值常量)。
+//
 // Structured execution spec for the sandbox.
 //
 // The sandbox never accepts a raw shell string. Callers describe *what* to run
@@ -71,6 +79,7 @@ function cleanEnv(env, allowEnv) {
 }
 
 /**
+ * 校验并归一化原始 spec 为安全、补齐默认值的执行规格(工具白名单、参数上限、超时夹取、env 白名单)。
  * Validate + normalise a raw spec into a safe, fully-defaulted spec.
  *
  * @param {RawSandboxSpec} input raw caller spec

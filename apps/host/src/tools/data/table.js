@@ -1,4 +1,10 @@
 // @ts-check
+//
+// 安全读表(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:把工作区内的 CSV/TSV/XLSX 安全读取为统一的 DataTable(表头 + 行)。校验可信根、
+//       限制体积(默认 4MB)与行数(默认 5000),支持带引号转义的分隔符解析与分隔符自动嗅探。
+// 依赖:L0 security/path-policy + 同目录 xlsx-table。导出:readDataTable 及若干纯解析器。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../../security/path-policy.js';
@@ -13,6 +19,7 @@ const DEFAULT_MAX_ROWS = 5000;
  */
 
 /**
+ * 切分一行分隔文本为单元格,正确处理双引号包裹与 "" 转义。
  * @param {string} line
  * @param {string} delimiter
  * @returns {string[]}
@@ -40,6 +47,7 @@ export function splitDelimitedLine(line, delimiter) {
 }
 
 /**
+ * 校验数据文件:锚定可信根、确认存在且为普通文件、超 maxBytes 抛 413,返回安全路径与大小。
  * @param {string} root
  * @param {unknown} filePath
  * @param {number} maxBytes
@@ -64,6 +72,7 @@ export function safeDataFile(root, filePath, maxBytes) {
 }
 
 /**
+ * 决定分隔符:.tsv→制表符、.csv→逗号;其余按首行制表符与逗号谁多来嗅探。
  * @param {string} filePath
  * @param {string} text
  * @returns {string}
@@ -77,6 +86,7 @@ export function delimiterFor(filePath, text) {
 }
 
 /**
+ * 解析分隔文本为 { headers, rows },首行作表头,超 maxRows 截断并标记 truncated。
  * @param {string} text
  * @param {string} delimiter
  * @param {number} maxRows
@@ -95,6 +105,7 @@ export function parseTable(text, delimiter, maxRows) {
 }
 
 /**
+ * 安全读取数据文件为统一 DataTable:校验 → 按 .xlsx/分隔文本分流解析 → 归一化输出。
  * @param {DataFileOptions} [options]
  * @returns {DataTable}
  */

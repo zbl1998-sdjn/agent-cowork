@@ -1,3 +1,8 @@
+// 工作区检索(host · L1 领域层 · workspace/index)
+// ---------------------------------------------------------------------------
+// 职责:SearchWorkspace 工具的实现——遍历可信工作区内可提取的文档,抽取文本、切块入检索器,
+//       再按查询返回相关文本块与来源(路径/行号/摘要)。单个文件读取/解析失败不影响整体检索。
+// 依赖:同层 retriever/chunk + workspace file-tree/document-extractor。导出:searchWorkspaceIndex。
 import path from 'node:path';
 import { listWorkspaceTree } from '../file-tree.js';
 import { extractDocumentText, isExtractableDocument } from '../document-extractor.js';
@@ -30,7 +35,7 @@ function sourceFromChunk(root, chunk) {
   };
 }
 
-/** @param {SearchWorkspaceOptions} [options] */
+/** 在工作区内做关键词/RAG 检索:列文件→抽取文本→入检索器→查询,返回 { chunks, sources, indexedFiles }。 @param {SearchWorkspaceOptions} [options] */
 export function searchWorkspaceIndex({
   root,
   query,

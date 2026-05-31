@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 文本文件读取(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:安全读取工作区内的「文本」文件——路径经可读工作区校验、限制大小(默认/硬上限 256KB)、
+//       拒绝疑似二进制文件,返回 { path, size, sha256, content }。
+// 依赖:L0 path-policy。导出:readTextFile。
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
@@ -24,6 +29,7 @@ function cappedMaxBytes(value, fallback = DEFAULT_MAX_BYTES) {
 }
 
 /**
+ * 启发式判断是否疑似二进制:出现多个 NUL 或非常见控制字符即判定为二进制(拒读)。
  * @param {Buffer} buffer
  * @returns {boolean}
  */
@@ -47,6 +53,7 @@ function isLikelyBinary(buffer) {
 }
 
 /**
+ * 安全读取文本文件:校验路径与大小、拒绝二进制,返回内容与 sha256。
  * @param {string} filePath
  * @param {ReadTextFileOptions} [options]
  * @returns {ReadTextFileResult}

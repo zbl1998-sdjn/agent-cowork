@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// ZIP 读写(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:零三方依赖地读/写 ZIP。读取设多重上限(条目数、单条目/总解压字节、压缩比)防 zip-bomb;
+//       供 docx/xlsx/pptx 抽取与制品打包使用。
+// 依赖:node:zlib。导出:crc32 / readZipEntries / createZip。
 import zlib from 'node:zlib';
 
 /**
@@ -61,6 +66,7 @@ function normalizeZipName(name) {
 }
 
 /**
+ * 解析 ZIP 字节为条目数组(逐条解压并校验上限,抵御 zip-bomb)。
  * @param {Buffer} buffer
  * @param {ZipReadOptions} [options]
  * @returns {ZipReadEntry[]}
@@ -144,6 +150,7 @@ export function readZipEntries(buffer, options = {}) {
 }
 
 /**
+ * 把若干 { name, content } 条目打包成 ZIP 字节(deflate),用于生成 Office/制品文件。
  * @param {ZipCreateEntry[]} entries
  * @returns {Buffer}
  */

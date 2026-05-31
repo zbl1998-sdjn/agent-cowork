@@ -1,4 +1,12 @@
 // @ts-check
+//
+// 受约束子进程运行器(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:本地与 VM(WSL/Docker)后端共用的子进程启动方式——无 shell、argv 数组、硬超时(SIGKILL)、
+//       输出字节上限。集中在此,保证各后端的安全行为一致。
+// 亮点:CappedBuffer 在「写入时」即限内存(超额只计数不保留),避免高产出命令在超时前耗尽堆。
+// 依赖:无。导出:createCappedBuffer / runConstrainedChild。
+//
 // Shared constrained child-process runner.
 //
 // Both the local subprocess adapter and the VM (WSL/Docker) runner spawn a
@@ -32,7 +40,7 @@ const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
  * real exit code; an *unbounded* producer is bounded in time by the SIGKILL
  * timeout. Either way memory stays O(maxBytes).
  */
-/** @param {number} maxBytes @returns {CappedBuffer} */
+/** 造一个「写入即限内存」的输出缓冲:超过 maxBytes 的分块只计数不保留,内存恒为 O(maxBytes)。 @param {number} maxBytes @returns {CappedBuffer} */
 export function createCappedBuffer(maxBytes) {
   const cap = Math.max(1, Number(maxBytes) || DEFAULT_MAX_OUTPUT_BYTES);
   /** @type {Buffer[]} */
@@ -59,6 +67,7 @@ export function createCappedBuffer(maxBytes) {
 }
 
 /**
+ * 在资源限制下运行子进程:无 shell、限时(到点 SIGKILL)、stdout/stderr 各自限额,返回结构化结果。
  * Run a child process under resource limits.
  *
  * @param {object} opts

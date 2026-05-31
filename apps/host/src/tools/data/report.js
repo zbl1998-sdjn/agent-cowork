@@ -1,3 +1,9 @@
+// 数据分析报告(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:在 profile 的基础上,挑选最合适的图表(柱/折线)、提炼洞察、产出 Markdown 报告草稿。
+//       是数据分析闭环 profile → 图表 → 报告 的「报告」一环。纯函数、确定性。
+// 依赖:同目录 profile(剖析 + 读表)。导出:analyzeDataFile。
+
 import { profileDataFile, readDataTable } from './profile.js';
 
 const MAX_CHART_POINTS = 12;
@@ -119,6 +125,7 @@ function buildLineChart(profile, table) {
 }
 
 /**
+ * 按 profile 的首选建议选图:倾向折线则先折线后柱状,否则反之(任一不可行回退另一种)。
  * @param {DataProfile} profile
  * @param {DataTable} table
  * @returns {DataChart | null}
@@ -199,6 +206,7 @@ function buildReportMarkdown(profile, chart, insights) {
 }
 
 /**
+ * 分析数据文件:读表 + 剖析 → 选图 → 出洞察 → 拼 Markdown 报告,返回完整 data-analysis 结果。
  * @param {DataFileOptions} [options]
  * @returns {DataAnalysis}
  */

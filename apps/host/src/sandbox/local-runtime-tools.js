@@ -1,3 +1,9 @@
+// 本地运行时工具解析(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:仅在本地后端下,把 python/node 解析到「随应用打包/配置」的运行时(内置 Python、
+//       指定 Node),以便离线/免装即可跑代码;并据此收窄沙箱限额(把该运行时与 PATH 加进白名单)。
+// 依赖:node:path。导出:resolveLocalRuntimeTool / withLocalRuntimeToolLimits。
+
 import path from 'node:path';
 
 /**
@@ -52,6 +58,7 @@ function resolveNode(runtimeEnv, nodeExecPath) {
 }
 
 /**
+ * 解析本地运行时工具:本地后端下把 python/node 映射到内置/配置的可执行文件(返回 { tool, pathPrefix });否则 null。
  * @param {string} toolName
  * @param {SandboxLike | null | undefined} sandbox
  * @param {RuntimeEnv} [runtimeEnv]
@@ -65,7 +72,7 @@ export function resolveLocalRuntimeTool(toolName, sandbox, runtimeEnv = process.
   return null;
 }
 
-/** @param {SandboxLimits} sandboxLimits @param {string} runtimeTool @returns {SandboxLimits} */
+/** 在原限额基础上,把选中的本地运行时工具与 PATH 并入白名单(内置 Python 不得借机放宽调用方白名单)。 @param {SandboxLimits} sandboxLimits @param {string} runtimeTool @returns {SandboxLimits} */
 export function withLocalRuntimeToolLimits(sandboxLimits, runtimeTool) {
   const allowTools = sandboxLimits.allowTools
     ? Array.from(new Set([...sandboxLimits.allowTools, runtimeTool]))

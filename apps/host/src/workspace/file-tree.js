@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 工作区文件树(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:遍历可信工作区目录树,返回文件/目录条目。遍历有界(深度/条数硬上限)防止超大工作区耗内存或卡 UI;
+//       跳过被忽略路径(隐藏/依赖/产物/敏感)与符号链接;单个不可读文件跳过不致命。
+// 依赖:L0 path-policy。导出:listWorkspaceTree。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, isWorkspaceIgnoredPath } from '../security/path-policy.js';
@@ -13,6 +18,7 @@ import { assertTrustedPath, isWorkspaceIgnoredPath } from '../security/path-poli
  */
 
 /**
+ * 列出工作区文件树(深度优先,深度/条数有上限),返回按路径排序的文件/目录条目。
  * @param {string} trustedRoot
  * @param {WorkspaceTreeOptions} [options]
  * @returns {WorkspaceTreeEntry[]}

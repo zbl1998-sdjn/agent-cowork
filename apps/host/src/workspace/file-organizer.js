@@ -1,3 +1,9 @@
+// 文件整理预案(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:为批量整理生成「操作预案」(只读,不落盘):按扩展名归类(byExtension)、批量改名(rename)、
+//       按内容哈希去重(dedupe)。目标路径自动加后缀避免冲突,最终经 previewFileOperations 出预览。
+//       真正执行仍需走审批 apply(plan/01 C.11)。
+// 依赖:L0 path-policy + 同层 file-operations。导出:planFileOrganization。
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,7 +46,7 @@ function targetWithSuffix(target, used) {
   return current;
 }
 
-/** @param {OrganizeOptions} [options] @returns {{ operations: OrganizeOperation[], preview: { operations: unknown[] } }} */
+/** 生成文件整理预案(byExtension/rename/dedupe 三种模式)+ 操作预览;不实际改动文件。 @param {OrganizeOptions} [options] @returns {{ operations: OrganizeOperation[], preview: { operations: unknown[] } }} */
 export function planFileOrganization({
   trustedRoot,
   files,

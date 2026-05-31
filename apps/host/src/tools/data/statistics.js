@@ -1,4 +1,11 @@
 // @ts-check
+//
+// 列/数据集描述统计(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:把表格数据转成描述性统计(计数/缺失/去重/类型推断,数值列另算 min/max/mean/median/总体
+//       stddev,非数值列取 Top 值)。补充 profile.js,服务于数据分析闭环。纯函数、无上行依赖、可测。
+// 导出:computeColumnStats(单列) / describeRows(整表)。
+//
 // Column / dataset descriptive statistics (05-A4).
 //
 // Pure helpers that turn tabular data into descriptive stats for the data
@@ -67,6 +74,7 @@ function isBooleanish(value) {
 }
 
 /**
+ * 计算单列统计:推断类型;数值列出 min/max/sum/mean/median/stddev,其余出 Top5 高频值。
  * @param {unknown[] | undefined} values
  * @returns {ColumnStats}
  */
@@ -122,6 +130,7 @@ export function computeColumnStats(values = []) {
 }
 
 /**
+ * 描述整张「对象数组」表:汇总所有列名,逐列调用 computeColumnStats。
  * @param {unknown[] | undefined} rows
  * @returns {RowStats}
  */

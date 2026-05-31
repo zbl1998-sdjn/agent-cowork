@@ -1,4 +1,10 @@
 // @ts-check
+//
+// XLSX 表格解析(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:零依赖解析 .xlsx——把它当 zip 解开,读 sharedStrings 与首个 worksheet 的 XML,
+//       还原单元格(共享串/内联串/布尔/数值)并按列引用(A1)定位,产出表头 + 行。
+// 依赖:workspace/zip-utils(安全解压)。导出:parseXlsxTable。
 import { readZipEntries } from '../../workspace/zip-utils.js';
 
 /**
@@ -100,7 +106,7 @@ function readRow(rowXml, sharedStrings) {
   return Array.from({ length: values.length }, (_, index) => values[index] || '');
 }
 
-/** @param {Buffer} buffer @param {number} maxRows @returns {ParsedXlsxTable} */
+/** 解析 .xlsx 字节为 { headers, rows };首行作表头,超 maxRows 截断并标记 truncated。 @param {Buffer} buffer @param {number} maxRows @returns {ParsedXlsxTable} */
 export function parseXlsxTable(buffer, maxRows) {
   const limit = Math.max(1, Number(maxRows) || 1);
   const entries = readZipEntries(buffer, {

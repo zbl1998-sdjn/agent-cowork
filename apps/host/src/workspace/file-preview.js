@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 文件预览(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:为 UI 提供安全、限量的文件预览:图片/PDF 以 base64 返回(供 data: URL 渲染),
+//       文本/Markdown/diff 以 UTF-8 返回,CSV/TSV 额外解析成表格。路径限定可信根、字节封顶。
+// 依赖:L0 path-policy。导出:readFilePreview。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
@@ -127,6 +132,7 @@ function httpError(statusCode, message) {
 }
 
 /**
+ * 读取文件预览:按扩展名分流(图片/PDF→base64;文本/diff→文本;CSV/TSV→表格;其余→other),受可信根与字节上限约束。
  * @param {string} filePath
  * @param {{ trustedRoot?: string, maxBytes?: number }} [options]
  * @returns {FilePreview}

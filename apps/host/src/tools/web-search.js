@@ -1,3 +1,10 @@
+// 联网搜索工具 web.search(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:为模型提供「发现 URL」的能力(WebFetch 只能抓已知 URL)。默认零配置零密钥的
+//       DDG lite;auto 模式先短超时探 DDG、不可达再回退 Bing(照顾国内网络),也可切 Bing/Tavily。
+// 提供商契约:search(query,{maxResults,fetchImpl,lookupImpl}) → { title, url, snippet }[]。
+// 依赖:同层 ssrf-guard + search-providers/{ddg,bing} 解析器。导出:webSearch。
+//
 // web.search — a search-engine wrapper for "research" tasks.
 //
 // The model has WebFetch (give me a URL, I'll fetch it) but no way to discover
@@ -53,6 +60,7 @@ function safeMaxResults(value) {
 }
 
 /**
+ * 按所选提供商执行搜索(ddg/bing/auto/其他),返回归一化结果列表;query 与 maxResults 先做安全裁剪。
  * Run a search against the chosen provider. Returns a normalized result list.
  *
  * @param {WebSearchOptions} [options]
@@ -103,6 +111,7 @@ export async function webSearch(options = {}) {
 }
 
 /**
+ * 经 DuckDuckGo lite 端点搜索(精简 HTML,易解析);对搜索主机本身做 SSRF 校验。
  * @param {{ query: string, maxResults: number, fetchImpl: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown, allowInternal: boolean, timeoutMs: number }} args
  * @returns {Promise<WebSearchResponse>}
  */
@@ -155,6 +164,7 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
 }
 
 /**
+ * 经 Bing HTML 结果页搜索——给无法访问 DDG(如国内网络)的用户兜底;公开、免密钥。
  * Bing HTML SERP — practical fallback for users who can't reach DDG
  * (mainland China etc.). Public, key-free, mostly stable HTML.
  *

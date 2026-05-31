@@ -1,3 +1,9 @@
+// DuckDuckGo lite 结果页解析器(host · L1 领域层 · tools/search-providers)
+// ---------------------------------------------------------------------------
+// 职责:把 lite.duckduckgo.com 的表格式 HTML 解析成 { title, url, snippet }[]。
+//       纯函数、确定性、易用 fixture 测试;布局不匹配时返回 [](视作「无结果」而非崩溃)。
+// 依赖:无。导出:unwrapDdgRedirect(还原跳转真链)/ parseDdgLiteResults。
+//
 // Parser for https://lite.duckduckgo.com/lite/ HTML.
 //
 // The lite endpoint returns a table-based layout (a deliberate "text-mode"
@@ -48,6 +54,7 @@ function clean(raw) {
  * ) back into the underlying target URL. If the URL isn't a DDG redirect,
  * returns the input unchanged.
  *
+ * 把 DDG 的跟踪跳转(//duckduckgo.com/l/?uddg=…)还原成真实目标 URL;非跳转则原样返回。
  * @param {string} href
  * @returns {string}
  */
@@ -72,6 +79,7 @@ export function unwrapDdgRedirect(href) {
  * if the page layout doesn't match (callers should treat that as "no results"
  * not "crashed").
  *
+ * 从 DDG lite 页面提取至多 limit 条结果(锚点配对其后的 result-snippet)。
  * @param {string} html
  * @param {number} [limit]
  * @returns {ParsedResult[]}

@@ -1,3 +1,8 @@
+// 文件名/内容搜索(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:在工作区内按「文件名」或可选的「文件内容」做关键词命中,返回命中文件及内容摘录。
+//       与 index/ 的 RAG 检索不同,这里是即时线性扫描;单文件解析失败不影响整体。
+// 依赖:同层 file-tree / document-extractor。导出:searchWorkspace。
 import path from 'node:path';
 import { listWorkspaceTree } from './file-tree.js';
 import { extractDocumentText, isExtractableDocument } from './document-extractor.js';
@@ -16,7 +21,7 @@ function cap(value, fallback, min, max) {
   return Math.min(Math.max(Math.floor(n), min), max);
 }
 
-/** @param {SearchOptions} [options] @returns {{ query: string, results: SearchResult[] }} */
+/** 在工作区按文件名(及可选内容)搜索关键词,返回命中结果(含摘录、匹配类型)。 @param {SearchOptions} [options] @returns {{ query: string, results: SearchResult[] }} */
 export function searchWorkspace(options = {}) {
   const trustedRoot = options.trustedRoot ?? options.root;
   if (!trustedRoot) {

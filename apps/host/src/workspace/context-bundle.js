@@ -1,5 +1,8 @@
-// @ts-check
-
+// 上下文打包(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:把一组路径(文件或目录)收集成「文本文件包」供模型上下文使用。目录会展开为其下文件;
+//       受单文件大小、全局总字节、最大文件数三重预算约束,超额或读失败的路径记入 skipped。
+// 依赖:L0 path-policy + 同层 file-reader / file-tree。导出:buildContextBundle。
 import path from 'node:path';
 import { readTextFile } from './file-reader.js';
 import { listWorkspaceTree } from './file-tree.js';
@@ -36,6 +39,7 @@ function errorMessage(error) {
 }
 
 /**
+ * 把给定路径(文件/目录展开)打包成文本文件集合,受大小/总量/数量预算约束,返回 { files, skipped, … }。
  * @param {ContextBundleInput} input
  * @returns {ContextBundle}
  */

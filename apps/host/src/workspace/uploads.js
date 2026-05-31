@@ -1,3 +1,9 @@
+// 上传导入(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:把前端上传的 base64 文件安全落入工作区。相对路径净化(禁绝对路径/.. 等)、拒绝「活动内容」
+//       扩展名(exe/bat/js/html…,上传是数据不是程序)、限单文件/总量/数量,目标路径经 create 校验。
+// 安全:类型白名单 + 路径 jail(plan/01 D.12-13)。依赖:L0 path-policy。
+// 导出:sanitizeUploadRelativePath / importUploadedFiles。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPathForCreate } from '../security/path-policy.js';
@@ -38,7 +44,7 @@ const BLOCKED_UPLOAD_EXTENSIONS = new Set([
   '.html', '.htm', '.svg', '.xhtml', '.mht', '.mhtml',
 ]);
 
-/** @param {unknown} input @returns {string} */
+/** 净化上传相对路径:必须相对、逐段合法、拒绝活动内容扩展名;返回规范化后的系统相对路径。 @param {unknown} input @returns {string} */
 export function sanitizeUploadRelativePath(input) {
   const raw = String(input || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!raw || path.isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) {
@@ -71,7 +77,7 @@ function decodeBase64File(file) {
   return buffer;
 }
 
-/** @param {UploadOptions} [options] @returns {{ batchId: string, uploadRoot: string, imported: ImportedFile[], totalBytes: number }} */
+/** 批量导入上传文件:校验数量/大小/总量,逐个净化路径、解码 base64、写入工作区上传目录,返回导入清单。 @param {UploadOptions} [options] @returns {{ batchId: string, uploadRoot: string, imported: ImportedFile[], totalBytes: number }} */
 export function importUploadedFiles({
   trustedRoot,
   files,

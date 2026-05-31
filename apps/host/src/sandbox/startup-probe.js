@@ -1,3 +1,9 @@
+// 沙箱启动探测(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:启动时探测可用沙箱后端(docker 守护是否在、镜像是否就绪;wsl 是否可用),据此选定后端。
+//       auto 模式优先选可用且能真断网的 docker,否则回退 local 并明确告知「本地不隔离网络」的事实。
+//       显式指定后端则直接采用。诚实优先:绝不谎报网络隔离能力(plan/01 健壮性原则)。
+// 依赖:node:child_process(spawnSync 可注入便于测试)。导出:resolveSandboxStartup。
 import childProcess from 'node:child_process';
 
 /**
@@ -145,6 +151,7 @@ function explicitStartup({ requestedBackend, sandboxOptions, docker, wsl }) {
 }
 
 /**
+ * 探测并选定沙箱后端:返回 { options(含 backend), info(选中后端/是否隔离/回退原因/给用户的话) }。
  * @param {{ requestedBackend?: string, sandboxOptions?: SandboxStartupOptions, env?: RuntimeEnv, spawnSync?: SpawnSyncLike, timeoutMs?: number }} [options]
  * @returns {{ options: SandboxStartupOptions, info: Record<string, unknown> }}
  */

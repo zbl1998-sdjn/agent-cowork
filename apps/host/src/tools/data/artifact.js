@@ -1,4 +1,9 @@
 // @ts-check
+//
+// 数据图表制品(host · L1 领域层 · tools/data)
+// ---------------------------------------------------------------------------
+// 职责:分析数据文件并把推荐图表落成「活页 artifact」(写操作)。串起 data 分析与 artifacts 制品。
+// 依赖:artifacts/live-artifact(落盘) + 同目录 report(分析)。导出:createDataChartArtifact。
 
 import { buildLiveArtifact } from '../../artifacts/live-artifact.js';
 import { analyzeDataFile } from './report.js';
@@ -31,6 +36,7 @@ function cleanText(value) {
 }
 
 /**
+ * 分析数据文件 → 取推荐图表 → 构建活页 artifact 落盘,返回含源信息/图表/制品引用/报告的结果。
  * @param {DataChartArtifactOptions} [options]
  * @returns {DataChartArtifact}
  */

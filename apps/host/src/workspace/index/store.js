@@ -1,3 +1,8 @@
+// 工作区内存索引(host · L1 领域层 · workspace/index)
+// ---------------------------------------------------------------------------
+// 职责:按文件维护「分块 + 关键词打分检索」的内存索引。upsert 入块、remove 删文件、search 按词
+//       频打分排序返回相关块与来源。路径一律经可信根校验。纯内存、无持久化(随进程生命周期)。
+// 依赖:L0 path-policy + 同目录 chunk。导出:createWorkspaceIndex。
 import path from 'node:path';
 import { assertTrustedPath } from '../../security/path-policy.js';
 import { chunkText } from './chunk.js';
@@ -57,7 +62,7 @@ function sourcesFor(chunks) {
   return sources;
 }
 
-/** @param {{ root?: unknown }} [options] @returns {WorkspaceIndex} */
+/** 创建按文件分块的内存检索索引(root 经可信根校验),返回 { root, upsert, remove, search, chunks }。 @param {{ root?: unknown }} [options] @returns {WorkspaceIndex} */
 export function createWorkspaceIndex({ root } = {}) {
   if (typeof root !== 'string' || root.length === 0) {
     throw new Error('root is required');

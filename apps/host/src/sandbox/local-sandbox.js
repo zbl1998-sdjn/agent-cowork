@@ -1,4 +1,12 @@
 // @ts-check
+//
+// 本地子进程沙箱(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:把归一化 SandboxSpec 作为「受约束子进程」在宿主机上运行:无 shell(argv 数组不可注入)、
+//       cwd 限定可信根、env 白名单、硬超时(SIGKILL)+ 输出字节上限。
+// 诚实声明:普通宿主子进程「无法」做网络隔离,故始终 networkIsolated:false,要求关网时给出警告;
+//       真隔离交给 VM 适配器(WSL2/Docker),两者共享同一 exec(spec,ctx) 契约。
+// 依赖:L0 path-policy + 同层 exec-child。导出:LocalSubprocessSandbox。
 import childProcess from 'node:child_process';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
@@ -24,6 +32,7 @@ import { runConstrainedChild } from './exec-child.js';
  * @typedef {{ backend: string, exitCode: number, signal: string | null, stdout: string, stderr: string, timedOut: boolean, truncated: boolean, bytesStdout: number, bytesStderr: number, durationMs: number, networkIsolated: boolean, warnings: string[] }} SandboxExecResult
  */
 
+/** 本地子进程沙箱适配器:在宿主机上运行受约束子进程(无网络隔离)。 */
 export class LocalSubprocessSandbox {
   /** @param {{ spawn?: SpawnLike }} [options] */
   constructor({ spawn = childProcess.spawn } = {}) {
@@ -32,7 +41,7 @@ export class LocalSubprocessSandbox {
     this._spawn = spawn;
   }
 
-  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {Promise<SandboxExecResult>} */
+  /** 执行一条规格:校验 cwd 在可信根内,拼装 env(并入 PATH 等),交受约束子进程运行并回传结果+警告。 @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {Promise<SandboxExecResult>} */
   async exec(spec, ctx = {}) {
     const trustedRoot = ctx.trustedRoot;
     if (!trustedRoot) {

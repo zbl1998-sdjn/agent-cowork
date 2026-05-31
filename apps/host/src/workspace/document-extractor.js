@@ -1,3 +1,9 @@
+// 文档文本抽取(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:把多种文档抽成纯文本供检索/上下文用——纯文本类直读;docx/xlsx/pptx 当 zip 解开取 XML;
+//       pdf 解析文本字面串(失败回退可见字符)。路径限可信根、大小封顶。零三方依赖。
+// 依赖:L0 path-policy + 同层 file-reader/zip-utils/document-extractor-utils。
+// 导出:extractDocumentText / isExtractableDocument。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
@@ -121,7 +127,7 @@ function extractPdf(buffer) {
   return compactLines(latin1.replace(/[^\x09\x0a\x0d\x20-\x7e]+/g, ' '));
 }
 
-/** @param {string} filePath @param {ExtractOptions} [options] @returns {ExtractedDocument} */
+/** 抽取文档纯文本:校验路径/大小,按扩展名分流(text/docx/xlsx/pptx/pdf),返回 { kind, content, sha256, … }。 @param {string} filePath @param {ExtractOptions} [options] @returns {ExtractedDocument} */
 export function extractDocumentText(filePath, options = {}) {
   const trustedRoot = options.trustedRoot ?? options.root;
   if (!trustedRoot) {
@@ -179,7 +185,7 @@ export function extractDocumentText(filePath, options = {}) {
   };
 }
 
-/** @param {string} filePath @returns {boolean} */
+/** 该文件是否为可抽取文档(txt/md/csv/json/log 或 docx/xlsx/pptx/pdf)。 @param {string} filePath @returns {boolean} */
 export function isExtractableDocument(filePath) {
   return TEXT_EXTENSIONS.has(path.extname(filePath).toLowerCase()) || ['.docx', '.xlsx', '.pptx', '.pdf'].includes(path.extname(filePath).toLowerCase());
 }

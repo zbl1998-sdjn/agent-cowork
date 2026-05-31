@@ -1,5 +1,13 @@
 // @ts-check
 
+// 统一工具注册表(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:把「内置工具」(sandbox/run-code/recipes/web/data…)与「MCP 服务器工具」
+//       收拢到同一命名空间,提供 list/search/get/call,以及 MCP 客户端的接入/吊销。
+// 设计:MCP 工具按 `mcp__<server>__<tool>` 命名空间隔离,既不与内置工具撞名,也能
+//       从名字反推来源服务器;search 即「按需暴露」的 ToolSearch 模拟(详见下方英文)。
+// 依赖:无内部依赖(只持有调用方注入的 handler 与 MCP client)。导出:ToolRegistry / createToolRegistry。
+//
 // A unified tool registry.
 //
 // Built-in tools (sandbox exec / run-code / recipes) and tools exposed by
@@ -24,7 +32,7 @@
  * @typedef {{ connect(): void | Promise<void>, listTools(): McpTool[] | Promise<McpTool[]>, callTool(name: string, args?: any): any | Promise<any>, close?: () => void }} McpClient
  */
 
-/** @param {unknown} text */
+/** 把查询/描述切成小写词元(按非字母数字下划线点分隔),用于关键词打分。 @param {unknown} text */
 function tokenize(text) {
   return String(text || '')
     .toLowerCase()
@@ -33,6 +41,7 @@ function tokenize(text) {
 }
 
 /**
+ * 给工具描述符按命中词打分(名字命中 +3,描述命中 +1),用于 search 排序。
  * @param {ToolDescriptor} descriptor
  * @param {string[]} terms
  */
@@ -53,6 +62,7 @@ function scoreTool(descriptor, terms) {
   return score;
 }
 
+/** 工具注册表:内置工具与 MCP 工具的统一登记/检索/调用中枢。 */
 export class ToolRegistry {
   constructor() {
     /** @type {Map<string, ToolEntry>} */
@@ -61,7 +71,7 @@ export class ToolRegistry {
     this._mcpClients = new Map();
   }
 
-  /** @param {ToolEntry} entry */
+  /** 登记一个工具(校验 name/handler,补齐 risk/mutating/requiresApproval 默认值)。 @param {ToolEntry} entry */
   register(entry) {
     if (!entry || typeof entry.name !== 'string' || !entry.name.trim()) {
       throw new Error('ToolRegistry.register: name is required');
@@ -82,7 +92,7 @@ export class ToolRegistry {
     return this;
   }
 
-  /** @param {ToolEntry[]} [entries] */
+  /** 批量登记。 @param {ToolEntry[]} [entries] */
   registerMany(entries = []) {
     for (const entry of entries) {
       this.register(entry);
@@ -100,7 +110,7 @@ export class ToolRegistry {
     return this._tools.get(name) || null;
   }
 
-  /** @param {string} name */
+  /** 返回单个工具的「脱敏描述符」(不含 handler,可安全暴露给前端/模型)。 @param {string} name */
   descriptor(name) {
     const entry = this._tools.get(name);
     if (!entry) {
@@ -117,7 +127,7 @@ export class ToolRegistry {
     };
   }
 
-  /** @returns {ToolDescriptor[]} */
+  /** 列出全部工具描述符(不泄露 handler)。 @returns {ToolDescriptor[]} */
   list() {
     return [...this._tools.values()].map((entry) => ({
       name: entry.name,
@@ -131,6 +141,7 @@ export class ToolRegistry {
   }
 
   /**
+   * 按关键词检索并打分排序,返回最相关的若干工具(MCP 工具多时按需暴露,避免一次性塞满)。
    * @param {string} query
    * @param {{ limit?: number }} [options]
    */
@@ -149,6 +160,7 @@ export class ToolRegistry {
   }
 
   /**
+   * 按名调用工具的 handler;未知工具抛 404。
    * @param {string} name
    * @param {any} [args]
    * @param {any} [ctx]
@@ -164,6 +176,8 @@ export class ToolRegistry {
   }
 
   /**
+   * 接入一个 MCP 服务器:连接、拉取其工具清单,并以 `mcp__server__tool` 命名空间登记;
+   * MCP 工具默认高风险、需审批。返回导入的工具数。
    * @param {string} serverName
    * @param {McpClient} client
    */
@@ -191,7 +205,7 @@ export class ToolRegistry {
     return tools.length;
   }
 
-  /** @param {string} serverName */
+  /** 吊销某 MCP 服务器:关闭客户端并移除其全部工具,返回移除统计。 @param {string} serverName */
   unregisterMcpServer(serverName) {
     if (!serverName) {
       throw new Error('unregisterMcpServer: serverName is required');
@@ -219,11 +233,13 @@ export class ToolRegistry {
     return { name: serverName, removed, toolsRemoved };
   }
 
+  /** 当前已接入的 MCP 服务器名清单。 */
   mcpServers() {
     return [...this._mcpClients.keys()];
   }
 }
 
+/** 创建一个空的工具注册表。 */
 export function createToolRegistry() {
   return new ToolRegistry();
 }

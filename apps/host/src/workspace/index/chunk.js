@@ -1,5 +1,10 @@
 // @ts-check
-
+//
+// 文本分块(host · L1 领域层 · workspace/index)
+// ---------------------------------------------------------------------------
+// 职责:把文档文本切成带行号区间的检索块(chunk),受「最多行数 + 最多字节」双重约束;
+//       超长单行会按 UTF-8 字节边界再切,保证每块体积有界。纯函数、确定性、可测。
+// 依赖:无。导出:chunkText。
 const DEFAULT_MAX_CHUNK_LINES = 40;
 const DEFAULT_MAX_CHUNK_BYTES = 8 * 1024;
 
@@ -80,6 +85,7 @@ function makeChunk({ sourcePath, lines, startLine, endLine, ordinal }) {
 }
 
 /**
+ * 把文本切成 WorkspaceChunk[]:按行累积,超行数/字节即 flush;超长单行先按字节切分。
  * @param {Partial<ChunkTextInput>} [input]
  * @returns {WorkspaceChunk[]}
  */

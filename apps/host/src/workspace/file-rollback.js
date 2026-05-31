@@ -1,3 +1,10 @@
+// 文件操作回滚(host · L1 领域层 · workspace)
+// ---------------------------------------------------------------------------
+// 职责:为 apply 过的写/移操作生成「可回滚条目」,并按需逆序回滚:删掉新建文件、从备份还原被覆盖
+//       文件、把移动/改名移回去。回滚前校验哈希(目标自 apply 后被改动则拒绝),保证安全。
+// 安全:备份落在可信根内的 .AgentCowork/rollback/<batch>;全程经 path-policy 校验。
+// 依赖:L0 path-policy + 同层 file-operation-utils。
+// 导出:createRollbackBatchId / rollbackEntryForWrite / rollbackEntryForMove / rollbackFileOperations。
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -13,6 +20,7 @@ import { fileExists, hashFile, pathExists, requiredPath } from './file-operation
  * @typedef {{ type: string, path?: string, backupPath?: string, from?: string, to?: string, status: string }} RollbackResult
  */
 
+/** 生成一个回滚批次 ID(同批操作的备份归到同一目录)。 */
 export function createRollbackBatchId() {
   return `rb_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 }
@@ -42,7 +50,7 @@ function backupExistingFile(filePath, options) {
   return backup;
 }
 
-/** @param {OperationPreview} op @param {RollbackOptions} options @returns {RollbackEntry} */
+/** 为写操作造回滚条目:覆盖已有文件则先备份(restore-backup),新建文件则记 delete-created-file。 @param {OperationPreview} op @param {RollbackOptions} options @returns {RollbackEntry} */
 export function rollbackEntryForWrite(op, options) {
   if (op.beforeHash) {
     const backup = backupExistingFile(op.path, options);
@@ -62,7 +70,7 @@ export function rollbackEntryForWrite(op, options) {
   };
 }
 
-/** @param {OperationPreview} op @returns {RollbackEntry} */
+/** 为移动/改名造回滚条目(rename-back:把目标移回原路径)。 @param {OperationPreview} op @returns {RollbackEntry} */
 export function rollbackEntryForMove(op) {
   return {
     type: 'rename-back',
@@ -133,7 +141,7 @@ function rollbackRenameBack(entry, trustedRoot) {
   return { type: entry.type, from, to, status: 'rolled_back' };
 }
 
-/** @param {unknown} entries @param {RollbackOptions} [options] @returns {{ rolledBack: RollbackResult[] }} */
+/** 逆序回滚一批操作条目(删新建/还原备份/移回);逐条校验哈希并记 journal,返回回滚结果。 @param {unknown} entries @param {RollbackOptions} [options] @returns {{ rolledBack: RollbackResult[] }} */
 export function rollbackFileOperations(entries, options = {}) {
   const trustedRoot = options.trustedRoot;
   const journalWriter = options.journalWriter;

@@ -1,4 +1,13 @@
 // @ts-check
+//
+// VM 沙箱适配器(契约,host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:提供「真隔离」目标——在轻量 Linux VM/容器内运行工具,挂载可信根、默认断网。
+//       与 LocalSubprocessSandbox 共享 exec(spec,ctx) 契约,换后端不动路由与调用点。
+//       支持 wsl / docker / hyperv(在部署期 provision,不在此处);未就绪时 exec 快速失败(501)
+//       而非静默退回无隔离进程——隔离保证正是本适配器的全部意义。
+// 依赖:同层 sandbox-spec(类型)。导出:VmSandbox。
+//
 // VM sandbox adapter (contract).
 //
 // This is the extensible target that delivers Claude-Cowork-grade isolation:
@@ -25,7 +34,7 @@
  * @typedef {(plan: VmPlan, spec: SandboxSpec, ctx: SandboxExecContext) => unknown | Promise<unknown>} VmRunner
  */
 
-/** @param {string} backend @param {SandboxSpec} spec @param {string} mountRoot @returns {VmPlan} */
+/** 据后端拼出执行计划(argv + 是否网络隔离):docker --network=none、wsl、hyperv;未知返回 null。 @param {string} backend @param {SandboxSpec} spec @param {string} mountRoot @returns {VmPlan} */
 function buildPlan(backend, spec, mountRoot) {
   switch (backend) {
     case 'docker':
@@ -51,6 +60,7 @@ function buildPlan(backend, spec, mountRoot) {
   }
 }
 
+/** VM 沙箱:把执行计划交给注入的 runner 真正运行;runner 缺失即视为未 provision。 */
 export class VmSandbox {
   /** @param {{ backend?: string, image?: string | null, distro?: string | null, provisioned?: boolean, runner?: VmRunner | null }} [options] */
   constructor({ backend = 'docker', image = null, distro = null, provisioned = false, runner = null } = {}) {
@@ -66,13 +76,13 @@ export class VmSandbox {
     this._provisioned = provisioned && typeof runner === 'function';
   }
 
-  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {VmPlan} */
+  /** 生成执行计划(挂载根取自 ctx.trustedRoot),便于测试与审阅而不真正运行。 @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] @returns {VmPlan} */
   plan(spec, ctx = {}) {
     const mountRoot = ctx.trustedRoot || '<trusted-root>';
     return buildPlan(this.vmBackend, spec, mountRoot);
   }
 
-  /** @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] */
+  /** 执行:未 provision 抛 501(绝不退回无隔离进程);否则生成计划并交 runner 运行。 @param {SandboxSpec} spec @param {SandboxExecContext} [ctx] */
   async exec(spec, ctx = {}) {
     if (!this._provisioned || typeof this._runner !== 'function') {
       const error = /** @type {HttpError} */ (new Error(

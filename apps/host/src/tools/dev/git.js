@@ -1,3 +1,11 @@
+// Git 工具(host · L1 领域层 · tools/dev)
+// ---------------------------------------------------------------------------
+// 职责:把 git 暴露成受控工具。status/diff/log 为只读;GitCommit 为高危写操作(需审批)。
+//       所有命令限定在「可信工作区」内运行(经 path-policy 校验),参数白名单化、输出截断、
+//       带 15s 超时与 safe.directory,杜绝任意参数注入与越界。
+// 依赖:node:child_process/path/util + L0 security/path-policy。
+// 导出:createGitStatusTool/DiffTool/LogTool/CommitTool + createGitReadOnlyBuiltinTools(只读三件套)。
+
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -29,7 +37,7 @@ function intInRange(value, fallback, min, max) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
-/** @param {unknown} trustedRoot @param {unknown} [workspace] @returns {ResolvedWorkspace} */
+/** 把 workspace 锚定并校验进可信根,返回 { root, workspace } 绝对路径(越界即抛错)。 @param {unknown} trustedRoot @param {unknown} [workspace] @returns {ResolvedWorkspace} */
 function resolveWorkspace(trustedRoot, workspace = '.') {
   if (!trustedRoot) throw new Error('trustedRoot is required');
   const trustedRootText = String(trustedRoot);
@@ -46,7 +54,7 @@ function resolveGitPath(root, workspace, relPath) {
   return path.relative(workspace, full).replace(/\\/g, '/');
 }
 
-/** @param {RunGitOptions} options @returns {Promise<GitRunResult>} */
+/** 在校验过的工作区内执行一条 git 命令,统一截断 stdout/stderr 并归一化退出码。 @param {RunGitOptions} options @returns {Promise<GitRunResult>} */
 async function runGit({ trustedRoot, workspace = '.', args }) {
   const resolved = resolveWorkspace(trustedRoot, workspace);
   const argv = [
@@ -82,6 +90,7 @@ async function runGit({ trustedRoot, workspace = '.', args }) {
   }
 }
 
+/** git.status 只读工具:porcelain/short 状态,可选分支信息。 */
 export function createGitStatusTool() {
   return {
     name: 'git.status',
@@ -105,6 +114,7 @@ export function createGitStatusTool() {
   };
 }
 
+/** git.diff 只读工具:参数白名单仅 staged/stat/context/path。 */
 export function createGitDiffTool() {
   return {
     name: 'git.diff',
@@ -134,6 +144,7 @@ export function createGitDiffTool() {
   };
 }
 
+/** git.log 只读工具:oneline 最近提交,参数仅 maxCount/path。 */
 export function createGitLogTool() {
   return {
     name: 'git.log',
@@ -159,6 +170,7 @@ export function createGitLogTool() {
   };
 }
 
+/** GitCommit 高危写工具:add(all 或 paths 白名单)后提交;message 必填且限长,必经审批。 */
 export function createGitCommitTool() {
   return {
     name: 'GitCommit',
@@ -201,6 +213,7 @@ export function createGitCommitTool() {
   };
 }
 
+/** 只读 Git 工具三件套(status/diff/log),供 builtin-tools 默认挂载(写操作 GitCommit 另行按需启用)。 */
 export function createGitReadOnlyBuiltinTools() {
   return [createGitStatusTool(), createGitDiffTool(), createGitLogTool()];
 }
