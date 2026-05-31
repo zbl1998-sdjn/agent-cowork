@@ -141,7 +141,7 @@
     "apps/host/src/runtime/run-trace.js",
     "apps/host/src/runtime/run-events.ts",
     "apps/host/src/runtime/run-metrics.js",
-    "apps/host/src/runtime/run-store.js",
+    "apps/host/src/runtime/run-store.ts",
     "apps/host/src/runtime/run-resume.ts",
     "apps/host/src/runtime/runs-index.ts",
     "apps/host/src/runtime/runs-index-file.js",
