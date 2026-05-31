@@ -110,7 +110,7 @@
     "apps/host/src/runtime/circuit-breaker.ts",
     "apps/host/src/runtime/cancellation.ts",
     "apps/host/src/runtime/concurrency.ts",
-    "apps/host/src/runtime/cron.js",
+    "apps/host/src/runtime/cron.ts",
     "apps/host/src/runtime/dependencies-catalog.ts",
     "apps/host/src/runtime/dependency-install-plan-types.ts",
     "apps/host/src/runtime/dependency-install-plan.ts",

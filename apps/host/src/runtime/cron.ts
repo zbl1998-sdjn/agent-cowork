@@ -1,4 +1,3 @@
-// @ts-check
 //
 // Cron 解析(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
@@ -28,7 +27,22 @@
 // Time zone: matches the host process local time. Phase B should swap to
 // IANA-aware library if cross-region matters.
 
-const FIELD_LIMITS = [
+type FieldLimit = {
+  min: number;
+  max: number;
+};
+
+export type ParsedCron = {
+  minute: Set<number>;
+  hour: Set<number>;
+  dayOfMonth: Set<number>;
+  month: Set<number>;
+  dayOfWeek: Set<number>;
+  domStar: boolean;
+  dowStar: boolean;
+};
+
+const FIELD_LIMITS: FieldLimit[] = [
   { min: 0, max: 59 },
   { min: 0, max: 23 },
   { min: 1, max: 31 },
@@ -36,35 +50,15 @@ const FIELD_LIMITS = [
   { min: 0, max: 6 },
 ];
 
-/**
- * @typedef {object} FieldLimit
- * @property {number} min
- * @property {number} max
- *
- * @typedef {object} ParsedCron
- * @property {Set<number>} minute
- * @property {Set<number>} hour
- * @property {Set<number>} dayOfMonth
- * @property {Set<number>} month
- * @property {Set<number>} dayOfWeek
- * @property {boolean} domStar
- * @property {boolean} dowStar
- */
-
-/**
- * @param {string} token
- * @param {FieldLimit} limit
- * @returns {Set<number>}
- */
-function parseField(token, { min, max }) {
+function parseField(token: string, { min, max }: FieldLimit): Set<number> {
   if (token === '*') {
     return rangeSet(min, max, 1);
   }
-  const parts = token.split(',').map((p) => p.trim()).filter(Boolean);
+  const parts = token.split(',').map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) {
-    throw new Error(`cron: empty field`);
+    throw new Error('cron: empty field');
   }
-  const out = new Set();
+  const out = new Set<number>();
   for (const part of parts) {
     const stepSplit = part.split('/');
     if (stepSplit.length > 2) {
@@ -75,8 +69,8 @@ function parseField(token, { min, max }) {
       throw new Error(`cron: step must be positive integer in '${part}'`);
     }
     const rangePart = stepSplit[0];
-    let start;
-    let end;
+    let start: number;
+    let end: number;
     if (rangePart === '*') {
       start = min;
       end = max;
@@ -94,29 +88,22 @@ function parseField(token, { min, max }) {
     if (start < min || end > max || start > end) {
       throw new Error(`cron: out-of-range value in '${part}' (expected ${min}-${max})`);
     }
-    for (let v = start; v <= end; v += step) {
-      out.add(v);
+    for (let value = start; value <= end; value += step) {
+      out.add(value);
     }
   }
   return out;
 }
 
-/**
- * @param {number} min
- * @param {number} max
- * @param {number} step
- * @returns {Set<number>}
- */
-function rangeSet(min, max, step) {
-  const out = new Set();
-  for (let v = min; v <= max; v += step) {
-    out.add(v);
+function rangeSet(min: number, max: number, step: number): Set<number> {
+  const out = new Set<number>();
+  for (let value = min; value <= max; value += step) {
+    out.add(value);
   }
   return out;
 }
 
-/** @param {string} expression */
-export function parseCron(expression) {
+export function parseCron(expression: string): ParsedCron {
   if (typeof expression !== 'string') {
     throw new Error('cron: expression must be a string');
   }
@@ -136,11 +123,7 @@ export function parseCron(expression) {
   };
 }
 
-/**
- * @param {ParsedCron} parsed
- * @param {Date} candidate
- */
-function dateMatches(parsed, candidate) {
+function dateMatches(parsed: ParsedCron, candidate: Date): boolean {
   if (!parsed.minute.has(candidate.getMinutes())) return false;
   if (!parsed.hour.has(candidate.getHours())) return false;
   if (!parsed.month.has(candidate.getMonth() + 1)) return false;
@@ -155,12 +138,7 @@ function dateMatches(parsed, candidate) {
   return domMatch || dowMatch;
 }
 
-/**
- * @param {string} expression
- * @param {Date} [fromDate]
- * @returns {Date}
- */
-export function nextFireAt(expression, fromDate = new Date()) {
+export function nextFireAt(expression: string, fromDate: Date = new Date()): Date {
   const parsed = parseCron(expression);
   // Advance to the next whole minute > fromDate.
   const candidate = new Date(fromDate.getTime());
@@ -177,8 +155,7 @@ export function nextFireAt(expression, fromDate = new Date()) {
   throw new Error(`cron: no fire time within 4 years for '${expression}'`);
 }
 
-/** @param {string} expression */
-export function describeCron(expression) {
+export function describeCron(expression: string): string {
   // Friendly hint, not a translation. Best-effort heuristics for common shapes.
   try {
     parseCron(expression);
@@ -186,15 +163,15 @@ export function describeCron(expression) {
     return `invalid: ${err instanceof Error ? err.message : String(err)}`;
   }
   const tokens = expression.trim().split(/\s+/);
-  const [m, h, dom, mo, dow] = tokens;
-  if (m === '0' && h === '9' && dom === '*' && mo === '*' && dow === '1') {
+  const [minute, hour, dom, month, dow] = tokens;
+  if (minute === '0' && hour === '9' && dom === '*' && month === '*' && dow === '1') {
     return '每周一上午 9:00';
   }
-  if (m === '0' && h !== '*' && dom === '*' && mo === '*' && dow === '*') {
-    return `每天 ${h.padStart(2, '0')}:00`;
+  if (minute === '0' && hour !== '*' && dom === '*' && month === '*' && dow === '*') {
+    return `每天 ${hour.padStart(2, '0')}:00`;
   }
-  if (h === '*' && dom === '*' && mo === '*' && dow === '*') {
-    return `每小时第 ${m} 分钟`;
+  if (hour === '*' && dom === '*' && month === '*' && dow === '*') {
+    return `每小时第 ${minute} 分钟`;
   }
   return expression;
 }
