@@ -605,6 +605,24 @@ test('run detail invalid run id returns 400', async () => {
   }
 });
 
+test('run list endpoints reject malformed query filters', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const tasks = await jsonRequest(base, '/api/tasks?limit=0');
+    assert.equal(tasks.status, 400);
+
+    const runs = await jsonRequest(base, '/api/runs?limit=not-a-number');
+    assert.equal(runs.status, 400);
+
+    const index = await jsonRequest(base, '/api/runs/index?status=bad/status');
+    assert.equal(index.status, 400);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('scheduler default executor runs a recipe and records a run', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({

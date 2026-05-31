@@ -6,54 +6,78 @@ import { listRunRecords, readRunRecord } from '../runtime/run-store.js';
 import { formatSseFrame, parseLastEventId } from '../runtime/run-events.js';
 import { taskFromRun } from '../runtime/task-presenter.js';
 import { decodePathSegment, headerValue, sendJson, stableHeader } from '../http/request-utils.js';
+import {
+  parseRunQuery,
+  runIndexQuerySchema,
+  runListQuerySchema,
+  taskListQuerySchema,
+} from './run-route-schemas.js';
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { RunRecord, RunSummary } from '../runtime/run-store.js';
+import type { RunEvent } from '../runtime/run-events.js';
+import type { RunSummary as PresenterRunSummary, TaskSummary } from '../runtime/task-presenter.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike & { write(chunk?: string | Buffer): unknown, on(event: string, listener: (...args: any[]) => void): unknown }} RouteResponse
- * @typedef {import('../runtime/run-store.js').RunRecord} RunRecord
- * @typedef {import('../runtime/run-store.js').RunSummary} RunSummary
- * @typedef {import('../runtime/run-events.js').RunEvent} RunEvent
- * @typedef {import('../runtime/task-presenter.js').RunSummary} PresenterRunSummary
- * @typedef {import('../runtime/task-presenter.js').TaskSummary} TaskSummary
- * @typedef {{ tenantId: string, userId?: string, traceId: string, [key: string]: unknown }} RequestContext
- * @typedef {RunRecord | RunSummary} VisibleRunRecord
- * @typedef {{ list(options?: { tenantId?: string, userId?: string, limit?: number, status?: string, type?: string, recipeId?: string }): unknown[] | Promise<unknown[]>, stats(options?: { tenantId?: string }): unknown | Promise<unknown> }} RunsIndexLike
- * @typedef {{ seed(runId: string, events: RunEvent[]): unknown, replay(runId: string, afterSeq?: number): RunEvent[], subscribe(runId: string, listener: (event: RunEvent) => void): () => void }} RunEventsLike
- * @typedef {{ request: RouteRequest, response: RouteResponse, pathname: string, requestUrl: URL, requestContext: RequestContext, runStoreRoot: string, runsIndex: RunsIndexLike, runEvents: RunEventsLike }} RunRouteOptions
- */
+type RouteRequest = HttpRequestLike & { method?: string };
+type RouteResponse = HttpResponseLike & {
+  write(chunk?: string | Buffer): unknown;
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
+};
+type RequestContext = { tenantId: string; userId?: string; traceId: string; [key: string]: unknown };
+type VisibleRunRecord = RunRecord | RunSummary;
+type RunsIndexListOptions = {
+  tenantId?: string;
+  userId?: string;
+  limit?: number;
+  status?: string;
+  type?: string;
+  recipeId?: string;
+};
+type RunsIndexLike = {
+  list(options?: RunsIndexListOptions): unknown[] | Promise<unknown[]>;
+  stats(options?: { tenantId?: string }): unknown | Promise<unknown>;
+};
+type RunEventsLike = {
+  seed(runId: string, events: RunEvent[]): unknown;
+  replay(runId: string, afterSeq?: number): RunEvent[];
+  subscribe(runId: string, listener: (event: RunEvent) => void): () => void;
+};
+type RunRouteOptions = {
+  request: RouteRequest;
+  response: RouteResponse;
+  pathname: string;
+  requestUrl: URL;
+  requestContext: RequestContext;
+  runStoreRoot: string;
+  runsIndex: RunsIndexLike;
+  runEvents: RunEventsLike;
+};
 
-/** @param {VisibleRunRecord | null | undefined} record @returns {string} */
-function recordTenantId(record) {
+function recordTenantId(record: VisibleRunRecord | null | undefined): string {
   return stableHeader(record?.context?.tenantId || record?.tenantId, 'tenant_local');
 }
 
-/** @param {VisibleRunRecord | null | undefined} record @param {RequestContext} context @returns {boolean} */
-function recordVisibleToContext(record, context) {
+function recordVisibleToContext(record: VisibleRunRecord | null | undefined, context: RequestContext): boolean {
   return Boolean(record) && recordTenantId(record) === context.tenantId;
 }
 
-/** @param {string} runStoreRoot @param {RequestContext} context @param {number} limit @returns {RunSummary[]} */
-function visibleRunRecords(runStoreRoot, context, limit) {
+function visibleRunRecords(runStoreRoot: string, context: RequestContext, limit: number): RunSummary[] {
   return listRunRecords(runStoreRoot, { limit: Number.MAX_SAFE_INTEGER })
     .filter((record) => recordVisibleToContext(record, context))
     .slice(0, limit);
 }
 
-/** @param {string} pathname @param {string} prefix @param {string} [suffix] @returns {string | null} */
-function parseRunId(pathname, prefix, suffix = '') {
+function parseRunId(pathname: string, prefix: string, suffix = ''): string | null {
   const encoded = pathname.slice(prefix.length, suffix ? -suffix.length : undefined);
   const runId = decodePathSegment(encoded);
   return runId && RUN_ID_RE.test(runId) ? runId : null;
 }
 
-/** @param {RunSummary} run @returns {TaskSummary} */
-function presentRunTask(run) {
-  return taskFromRun(/** @type {PresenterRunSummary} */ (/** @type {unknown} */ (run)));
+function presentRunTask(run: RunSummary): TaskSummary {
+  return taskFromRun(run as unknown as PresenterRunSummary);
 }
 
-/** @param {RunRouteOptions} options @returns {Promise<boolean>} */
 export async function handleRunRoutes({
   request,
   response,
@@ -63,10 +87,13 @@ export async function handleRunRoutes({
   runStoreRoot,
   runsIndex,
   runEvents,
-}) {
+}: RunRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/tasks') {
-    const limit = Number(requestUrl.searchParams.get('limit')) || 20;
-    const runs = visibleRunRecords(runStoreRoot, requestContext, limit);
+    const query = parseRunQuery(response, taskListQuerySchema, {
+      limit: requestUrl.searchParams.get('limit'),
+    }, 'invalid task list query');
+    if (!query) return true;
+    const runs = visibleRunRecords(runStoreRoot, requestContext, query.limit);
     sendJson(response, 200, {
       runStoreRoot,
       tasks: runs.map(presentRunTask),
@@ -75,20 +102,23 @@ export async function handleRunRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/api/runs/index') {
-    const limit = Number(requestUrl.searchParams.get('limit')) || 50;
-    const status = requestUrl.searchParams.get('status') || undefined;
-    const type = requestUrl.searchParams.get('type') || undefined;
-    const recipeId = requestUrl.searchParams.get('recipeId') || undefined;
-    const userId = requestUrl.searchParams.get('userId') || undefined;
+    const query = parseRunQuery(response, runIndexQuerySchema, {
+      limit: requestUrl.searchParams.get('limit'),
+      status: requestUrl.searchParams.get('status'),
+      type: requestUrl.searchParams.get('type'),
+      recipeId: requestUrl.searchParams.get('recipeId'),
+      userId: requestUrl.searchParams.get('userId'),
+    }, 'invalid run index query');
+    if (!query) return true;
     // await: transparent for the sync file/sqlite adapters, required for the
     // async PostgreSQL adapter (multi-instance backend).
     const records = await runsIndex.list({
       tenantId: requestContext.tenantId,
-      userId,
-      limit,
-      status,
-      type,
-      recipeId,
+      userId: query.userId,
+      limit: query.limit,
+      status: query.status,
+      type: query.type,
+      recipeId: query.recipeId,
     });
     const stats = await runsIndex.stats({ tenantId: requestContext.tenantId });
     sendJson(response, 200, {
@@ -108,8 +138,7 @@ export async function handleRunRoutes({
     const lastEventId = parseLastEventId(
       headerValue(request, 'last-event-id') || requestUrl.searchParams.get('lastEventId'),
     );
-    /** @type {RunEvent[]} */
-    let persisted = [];
+    let persisted: RunEvent[] = [];
     try {
       const record = readRunRecord(runStoreRoot, runId);
       if (!record || !recordVisibleToContext(record, requestContext)) {
@@ -117,7 +146,7 @@ export async function handleRunRoutes({
         return true;
       }
       if (Array.isArray(record.events)) {
-        persisted = /** @type {RunEvent[]} */ (record.events);
+        persisted = record.events as RunEvent[];
       }
     } catch {
       sendJson(response, 404, { error: 'Run record not found' });
@@ -134,10 +163,8 @@ export async function handleRunRoutes({
     });
     response.write('retry: 3000\n\n');
 
-    /** @type {Set<unknown>} */
-    const sentSeqs = new Set();
-    /** @param {RunEvent} event */
-    const writeEvent = (event) => {
+    const sentSeqs = new Set<unknown>();
+    const writeEvent = (event: RunEvent): void => {
       if (event.seq != null) {
         if (sentSeqs.has(event.seq)) {
           return;
@@ -162,11 +189,11 @@ export async function handleRunRoutes({
     const heartbeat = setInterval(() => {
       response.write(': ping\n\n');
     }, 15000);
-    const maybeUnref = /** @type {{ unref?: () => void }} */ (/** @type {unknown} */ (heartbeat));
+    const maybeUnref = heartbeat as { unref?: () => void };
     if (typeof maybeUnref.unref === 'function') {
       maybeUnref.unref();
     }
-    const cleanup = () => {
+    const cleanup = (): void => {
       clearInterval(heartbeat);
       unsubscribe();
     };
@@ -176,10 +203,13 @@ export async function handleRunRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/api/runs') {
-    const limit = Number(requestUrl.searchParams.get('limit')) || 20;
+    const query = parseRunQuery(response, runListQuerySchema, {
+      limit: requestUrl.searchParams.get('limit'),
+    }, 'invalid run list query');
+    if (!query) return true;
     sendJson(response, 200, {
       runStoreRoot,
-      runs: visibleRunRecords(runStoreRoot, requestContext, limit),
+      runs: visibleRunRecords(runStoreRoot, requestContext, query.limit),
     });
     return true;
   }
