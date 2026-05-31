@@ -1,4 +1,9 @@
-//! Agent Cowork desktop shell (Tauri 2).
+//! Agent Cowork 桌面外壳(Tauri 2)— 组装根 / crate 入口。
+//!
+//! 中文说明:本 crate 刻意「保持薄」(plan/00 桌面外壳准则)——只负责开窗、守护打包的 Node host
+//! sidecar、向 webview 暴露一小撮带类型的 IPC 命令;真正的业务逻辑都在 host(Node)里。各模块职责单一:
+//! error(IPC 错误)/ config(绑定与可信根)/ security(路径围栏)/ sidecar(host 生命周期)/
+//! commands(薄命令层)/ updater(自动更新)。绝不把业务塞进外壳。
 //!
 //! This crate is intentionally thin: it owns the application window, manages
 //! the bundled Node host sidecar lifecycle, and exposes a small, typed IPC
@@ -21,6 +26,7 @@ use tauri::Manager;
 
 use sidecar::HostSidecar;
 
+/// 构建并运行桌面应用:注册插件与 IPC 命令、在 setup 钩子里原生拉起 Node host、退出时停止 sidecar(避免遗留孤儿进程)。
 /// Build and run the desktop application.
 ///
 /// The Node host is started natively in the `setup` hook so a packaged build

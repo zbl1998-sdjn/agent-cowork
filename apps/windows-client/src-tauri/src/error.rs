@@ -1,3 +1,4 @@
+//! 桌面外壳错误处理(error)——所有可失败操作返回 DesktopResult;错误类型小而可序列化,以便跨 Tauri IPC 边界传给 webview。
 //! Error handling for the Agent Cowork desktop shell.
 //!
 //! Every fallible operation in the shell returns [`DesktopResult`]. The error

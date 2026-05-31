@@ -1,3 +1,5 @@
+//! 薄命令层(commands)——#[tauri::command] 包装:解析共享状态/配置后委派给 sidecar/security/updater 等领域模块。
+//! 命令故意保持极薄,新增原生能力 = 新模块 + 一个薄 command,不往这里堆逻辑(plan/00 外壳准则)。
 //! Thin Tauri command layer.
 //!
 //! Commands are deliberately tiny: they resolve shared state / config and

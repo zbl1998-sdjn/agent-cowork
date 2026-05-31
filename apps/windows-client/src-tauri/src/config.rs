@@ -1,3 +1,4 @@
+//! 桌面外壳配置(config)——绑定地址、dev URL、可信根解析的单一事实来源。配置集中而非散落(plan/01 B.7)。
 //! Static and environment-derived configuration for the desktop shell.
 //!
 //! Keeping configuration in one place means the host binding, dev URL, and
