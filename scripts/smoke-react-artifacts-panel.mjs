@@ -236,7 +236,7 @@ async function main() {
         const deadline = Date.now() + 8000;
         function tick() {
           const headerReady = [...document.querySelectorAll('button')].some((button) => button.innerText.trim() === '产物');
-          const workspaceReady = document.body.innerText.includes(${JSON.stringify(workspace)});
+          const workspaceReady = document.querySelector('.workspace-chip')?.getAttribute('title')?.includes(${JSON.stringify(workspace)});
           if (headerReady && workspaceReady) resolve(true);
           else if (Date.now() > deadline) reject(new Error('React shell did not become ready for artifact smoke'));
           else setTimeout(tick, 50);

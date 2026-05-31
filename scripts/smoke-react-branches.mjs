@@ -253,9 +253,10 @@ async function main() {
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
         function tick() {
+          const workspaceReady = document.querySelector('.workspace-chip')?.getAttribute('title')?.includes(${JSON.stringify(workspace)});
           const ready = document.querySelector('.conv-branch-select') &&
             document.body.innerText.includes('MAIN_ONLY_MARKER') &&
-            document.body.innerText.includes(${JSON.stringify(workspace)});
+            workspaceReady;
           if (ready) resolve(true);
           else if (Date.now() > deadline) reject(new Error('React branch smoke shell did not become ready'));
           else setTimeout(tick, 50);
