@@ -6,31 +6,63 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// @ts-check
-
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
 
-/**
- * @typedef {{ index?: unknown, tool?: unknown, status?: unknown, args?: unknown, result?: unknown, summary?: unknown }} CapturedStep
- * @typedef {{ path?: unknown, kind?: unknown, source?: unknown }} CapturedArtifact
- * @typedef {{ id: string, name: string, description: string, output: string, riskLevel: string, custom: true, tenantId: string, userId: string, sourceRunId: string | null, prompt: string, steps: CapturedStep[], artifacts: CapturedArtifact[], redacted: true, createdAt: string, updatedAt: string }} CustomRecipe
- * @typedef {{ tenantId?: unknown, userId?: unknown }} RecipeScope
- */
+type CapturedStep = {
+  index: number;
+  tool: string;
+  status?: string;
+  args?: unknown;
+  result?: unknown;
+  summary?: unknown;
+};
 
-/** @param {unknown} value @param {number} max @returns {string} */
-function cleanText(value, max) {
+type CapturedArtifact = {
+  path: string;
+  kind: string;
+  source?: unknown;
+};
+
+export type CustomRecipe = {
+  id: string;
+  name: string;
+  description: string;
+  output: string;
+  riskLevel: string;
+  custom: true;
+  tenantId: string;
+  userId: string;
+  sourceRunId: string | null;
+  prompt: string;
+  steps: CapturedStep[];
+  artifacts: CapturedArtifact[];
+  redacted: true;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecipeScope = {
+  tenantId?: unknown;
+  userId?: unknown;
+};
+
+export type CustomRecipeStore = {
+  list(scope?: RecipeScope): CustomRecipe[];
+  get(id: string, scope?: RecipeScope): CustomRecipe | null;
+  save(input: Record<string, unknown>, scope?: RecipeScope): CustomRecipe;
+};
+
+function cleanText(value: unknown, max: number): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
 
-/** @param {unknown} value @returns {string} */
-function slug(value) {
+function slug(value: unknown): string {
   return cleanText(value, 80).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'captured';
 }
 
-/** @param {unknown} value @returns {CapturedStep[]} */
-function cleanSteps(value) {
+function cleanSteps(value: unknown): CapturedStep[] {
   return (Array.isArray(value) ? value : []).slice(0, 40).map((step, index) => {
-    const record = /** @type {Record<string, unknown>} */ (step && typeof step === 'object' ? step : {});
+    const record = step && typeof step === 'object' ? step as Record<string, unknown> : {};
     return {
       index,
       tool: cleanText(record.tool, 120),
@@ -42,62 +74,58 @@ function cleanSteps(value) {
   });
 }
 
-/** @param {unknown} value @returns {CapturedArtifact[]} */
-function cleanArtifacts(value) {
+function cleanArtifacts(value: unknown): CapturedArtifact[] {
   return (Array.isArray(value) ? value : []).slice(0, 80).map((artifact) => {
-    const record = /** @type {Record<string, unknown>} */ (artifact && typeof artifact === 'object' ? artifact : {});
+    const record = artifact && typeof artifact === 'object' ? artifact as Record<string, unknown> : {};
     return {
       path: cleanText(record.path, 500),
       kind: cleanText(record.kind, 80) || 'file',
       source: record.source,
     };
-  }).filter((artifact) => artifact.path);
+  }).filter((artifact) => Boolean(artifact.path));
 }
 
-/** @param {unknown} error @returns {Error & { statusCode?: number }} */
-function httpError(error) {
-  const err = error instanceof Error ? error : new Error(String(error));
-  return /** @type {Error & { statusCode?: number }} */ (err);
+function httpError(error: unknown): Error & { statusCode?: number } {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
-/** 创建自定义配方存储(按 tenant/user 作用域增删查并持久化到 JSON)。 @param {{ storePath: string }} options */
-export function createCustomRecipeStore({ storePath }) {
+/** 创建自定义配方存储(按 tenant/user 作用域增删查并持久化到 JSON)。 */
+export function createCustomRecipeStore({ storePath }: { storePath: string }): CustomRecipeStore {
   const filePath = path.resolve(storePath);
 
-  /** @returns {CustomRecipe[]} */
-  function readAll() {
+  function readAll(): CustomRecipe[] {
     try {
-      if (!fs.existsSync(filePath)) return [];
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      return Array.isArray(parsed?.recipes) ? parsed.recipes : [];
+      if (!fs.existsSync(filePath)) {
+        return [];
+      }
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { recipes?: unknown };
+      return Array.isArray(parsed.recipes) ? parsed.recipes as CustomRecipe[] : [];
     } catch {
       return [];
     }
   }
 
-  /** @param {CustomRecipe[]} recipes */
-  function writeAll(recipes) {
+  function writeAll(recipes: CustomRecipe[]): void {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, `${JSON.stringify({ recipes }, null, 2)}\n`, 'utf8');
     fs.renameSync(tmp, filePath);
   }
 
-  /** @param {RecipeScope} [scope] @returns {CustomRecipe[]} */
-  function list({ tenantId } = {}) {
+  function list({ tenantId }: RecipeScope = {}): CustomRecipe[] {
     const tenant = cleanText(tenantId || 'tenant_local', 96);
     return readAll().filter((recipe) => recipe.tenantId === tenant).map((recipe) => ({ ...recipe }));
   }
 
   return {
     list,
-    /** @param {string} id @param {RecipeScope} [scope] @returns {CustomRecipe | null} */
-    get(id, scope = {}) {
-      if (!RECIPE_ID_RE.test(id || '')) return null;
+    get(id: string, scope: RecipeScope = {}): CustomRecipe | null {
+      if (!RECIPE_ID_RE.test(id || '')) {
+        return null;
+      }
       return list(scope).find((recipe) => recipe.id === id) || null;
     },
-    /** @param {Record<string, unknown>} input @param {RecipeScope} [scope] @returns {CustomRecipe} */
-    save(input, { tenantId, userId } = {}) {
+    save(input: Record<string, unknown>, { tenantId, userId }: RecipeScope = {}): CustomRecipe {
       if (input.redacted !== true) {
         const err = httpError(new Error('Recipe draft must be redacted before saving'));
         err.statusCode = 400;
@@ -111,22 +139,21 @@ export function createCustomRecipeStore({ storePath }) {
       const requestedId = cleanText(input.id, 120);
       const baseId = requestedId && RECIPE_ID_RE.test(requestedId) ? requestedId : `custom-${slug(name)}-${Date.now().toString(36)}`;
       const previous = existing.find((recipe) => recipe.id === baseId && recipe.tenantId === tenant);
-      /** @type {CustomRecipe} */
-      const recipe = {
+      const recipe: CustomRecipe = {
         ...(previous || {}),
         id: baseId,
         name,
         description: cleanText(input.description || input.prompt, 500),
         output: 'Markdown',
         riskLevel: 'safe-write',
-        custom: /** @type {true} */ (true),
+        custom: true,
         tenantId: tenant,
         userId: user,
         sourceRunId: cleanText(input.sourceRunId, 120) || null,
         prompt: cleanText(input.prompt, 4000),
         steps: cleanSteps(input.steps),
         artifacts: cleanArtifacts(input.artifacts),
-        redacted: /** @type {true} */ (true),
+        redacted: true,
         createdAt: previous?.createdAt || now,
         updatedAt: now,
       };

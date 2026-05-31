@@ -95,7 +95,7 @@
     "apps/host/src/mcp/mcp-client.ts",
     "apps/host/src/mcp/stdio-transport.ts",
     "apps/host/src/onboarding/recommendations.ts",
-    "apps/host/src/recipes/custom-recipes.js",
+    "apps/host/src/recipes/custom-recipes.ts",
     "apps/host/src/recipes/recipe-helpers.ts",
     "apps/host/src/recipes/capture.js",
     "apps/host/src/recipes/registry.js",
