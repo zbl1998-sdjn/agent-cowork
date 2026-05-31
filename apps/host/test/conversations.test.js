@@ -91,6 +91,13 @@ test('upsert preserves createdAt and updates title/messages', async () => {
     assert.equal(full.pinned, true);
     assert.equal(full.createdAt, created.createdAt);
     assert.ok(full.updatedAt >= created.updatedAt);
+
+    res = await fetch(`${baseUrl}/api/conversations/bad-body`, {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({ title: ['not-valid'], pinned: 'true' }),
+    });
+    assert.equal(res.status, 400);
   });
 });
 

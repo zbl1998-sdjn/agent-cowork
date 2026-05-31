@@ -170,7 +170,7 @@
     "apps/host/src/routes/clarify-routes.ts",
     "apps/host/src/routes/connector-oauth-route-utils.ts",
     "apps/host/src/routes/auth-routes.ts",
-    "apps/host/src/routes/conversation-routes.js",
+    "apps/host/src/routes/conversation-routes.ts",
     "apps/host/src/routes/connector-oauth-routes.js",
     "apps/host/src/routes/connector-routes.js",
     "apps/host/src/routes/kimi-routes.js",
