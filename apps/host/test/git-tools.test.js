@@ -7,7 +7,7 @@ import test from 'node:test';
 import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createApprovalRegistry } from '../src/runtime/approvals.js';
-import { createGitDiffTool, createGitLogTool, createGitStatusTool } from '../src/tools/dev/git.js';
+import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../src/tools/dev/git.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 
 function tmp() {
@@ -48,6 +48,20 @@ test('git read-only tools are jailed and expose status/diff/log output', async (
   await assert.rejects(
     () => createGitDiffTool().handler({ path: '../outside.txt' }, { trustedRoot: root }),
     /escaped|outside|Sensitive/i,
+  );
+});
+
+test('git tools reject unknown input keys before command execution', async () => {
+  const root = repo();
+
+  await assert.rejects(
+    () => createGitStatusTool().handler({ raw: ['status'] }, { trustedRoot: root }),
+    /git\.status: .*raw/i,
+  );
+
+  await assert.rejects(
+    () => createGitCommitTool().handler({ message: 'noop', raw: ['add', '.'] }, { trustedRoot: root }),
+    /GitCommit: .*raw/i,
   );
 });
 

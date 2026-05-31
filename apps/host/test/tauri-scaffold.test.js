@@ -10,9 +10,15 @@ const tauriRoot = path.join(appsRoot, 'windows-client', 'src-tauri');
 const resourcesRoot = path.join(appsRoot, 'windows-client', 'resources');
 const packageJson = JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf8'));
 
-test('Tauri scaffold keeps npm zero-deps and points at the Node host/static resources', () => {
-  assert.equal(Object.keys(packageJson.dependencies || {}).length, 0);
-  assert.equal(Object.keys(packageJson.devDependencies || {}).length, 0);
+test('Tauri scaffold keeps host npm dependencies allowlisted and points at the Node host/static resources', () => {
+  assert.deepEqual(Object.keys(packageJson.dependencies || {}).sort(), ['zod']);
+  assert.deepEqual(Object.keys(packageJson.devDependencies || {}).sort(), [
+    '@eslint/js',
+    'eslint',
+    'eslint-plugin-react-hooks',
+    'typescript',
+    'typescript-eslint',
+  ]);
 
   const config = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8'));
   assert.equal(config.productName, 'Agent Cowork');

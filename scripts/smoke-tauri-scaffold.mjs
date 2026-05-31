@@ -22,8 +22,16 @@ function commandAvailable(command, args = ['--version']) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-assert(!packageJson.dependencies || Object.keys(packageJson.dependencies).length === 0, 'package.json must stay zero runtime dependencies');
-assert(!packageJson.devDependencies || Object.keys(packageJson.devDependencies).length === 0, 'package.json must stay zero dev dependencies');
+const runtimeDependencies = Object.keys(packageJson.dependencies || {}).sort();
+const devDependencies = Object.keys(packageJson.devDependencies || {}).sort();
+assert(JSON.stringify(runtimeDependencies) === JSON.stringify(['zod']), 'package.json runtime dependencies must stay allowlisted');
+assert(JSON.stringify(devDependencies) === JSON.stringify([
+  '@eslint/js',
+  'eslint',
+  'eslint-plugin-react-hooks',
+  'typescript',
+  'typescript-eslint',
+]), 'package.json dev dependencies must stay allowlisted');
 
 const configPath = path.join(tauriRoot, 'tauri.conf.json');
 const cargoPath = path.join(tauriRoot, 'Cargo.toml');
@@ -133,7 +141,7 @@ const tauri = commandAvailable('cargo', ['tauri', '--version']);
 console.log(JSON.stringify({
   ok: true,
   tauriRoot,
-  packageDependencies: 0,
+  packageDependencies: runtimeDependencies.length,
   requiredComponents: requiredComponents.length,
   toolchain: {
     cargo,
