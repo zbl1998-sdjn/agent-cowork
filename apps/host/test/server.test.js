@@ -330,6 +330,21 @@ test('file-ops apply requires a server-issued approval receipt', async () => {
     assert.match((await rejected.json()).error, /approval/i);
     assert.equal(fs.existsSync(target), false);
 
+    const malformedPreview = await fetch(`${baseUrl}/api/file-ops/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, operations: { type: 'write', path: target } }),
+    });
+    assert.equal(malformedPreview.status, 400);
+
+    const malformedApproval = await fetch(`${baseUrl}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'malformed-approval' },
+      body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: ['not-valid'] }),
+    });
+    assert.equal(malformedApproval.status, 400);
+    assert.equal(fs.existsSync(target), false);
+
     const preview = await fetch(`${baseUrl}/api/file-ops/preview`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

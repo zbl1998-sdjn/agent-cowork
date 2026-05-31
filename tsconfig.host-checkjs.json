@@ -191,7 +191,7 @@
     "apps/host/src/routes/system-routes.js",
     "apps/host/src/routes/tool-routes.js",
     "apps/host/src/routes/viz-routes.js",
-    "apps/host/src/routes/workspace-file-operation-routes.js",
+    "apps/host/src/routes/workspace-file-operation-routes.ts",
     "apps/host/src/routes/workspace-file-routes.js",
     "apps/host/src/sandbox/exec-child.ts",
     "apps/host/src/sandbox/code-runner-types.ts",
