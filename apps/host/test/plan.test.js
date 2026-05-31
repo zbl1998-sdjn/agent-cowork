@@ -65,3 +65,19 @@ test('POST /api/plan proposes steps, then they execute via /api/subagent/run', a
     await new Promise((r) => server.close(r));
   }
 });
+
+test('POST /api/plan validates goal at the route boundary', async () => {
+  const trustedRoot = tmp();
+  const server = createServer({ trustedRoot, enableScheduler: false, requireAuth: false, trustIdentityHeaders: true });
+  const base = await bind(server);
+  try {
+    const missing = await J(base, '/api/plan', { method: 'POST', body: {} });
+    assert.equal(missing.status, 400);
+    assert.match(missing.body.error, /goal/i);
+
+    const invalid = await J(base, '/api/plan', { method: 'POST', body: { goal: ['SearchWorkspace'] } });
+    assert.equal(invalid.status, 400);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
