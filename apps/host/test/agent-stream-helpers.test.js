@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from '../src/routes/agent-stream-budget.js';
+import { buildAgentConfigSnapshot } from '../src/routes/agent-config-snapshot.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
 import { readRunRecord } from '../src/runtime/run-store.js';
 
@@ -36,6 +37,28 @@ test('agent stream budget helpers reject malformed budget fields', () => {
     () => resolveAgentRunTimeoutMs({ budget: { maxWallClockMs: ['bad'] } }, {}),
     /agent stream budget: budget\.maxWallClockMs:/,
   );
+});
+
+test('agent config snapshot normalizes diagnostics without leaking fallback keys', () => {
+  const snapshot = buildAgentConfigSnapshot(
+    { mode: 'developer', thinking: 'deep', maxSteps: '99' },
+    {
+      provider: 'openai',
+      temperature: '0.25',
+      fallbacks: [
+        { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local', apiKey: 'test-local-key' },
+        'malformed-fallback',
+      ],
+    },
+  );
+
+  assert.equal(snapshot.developerMode, true);
+  assert.equal(snapshot.verify, true);
+  assert.equal(snapshot.maxSteps, 16);
+  assert.equal(snapshot.temperature, 0.25);
+  assert.equal(snapshot.fallbacks[0].hasKey, true);
+  assert.equal(Object.hasOwn(snapshot.fallbacks[0], 'apiKey'), false);
+  assert.equal(snapshot.fallbacks[1].hasKey, false);
 });
 
 test('recordAgentRun normalizes provider, writes index summary, and swallows record failures', () => {
