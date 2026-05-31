@@ -1,5 +1,3 @@
-// @ts-check
-
 // 对话上下文统一编排门面(host · L1 领域层 · kimi/context)
 // ---------------------------------------------------------------------------
 // 职责:对外暴露 ContextManager,把历史压缩、工具结果摘要与不可信内容防护
@@ -13,22 +11,89 @@ import { createHistoryCompactor } from './history-compactor.js';
 import { createToolResultSummarizer } from './tool-result-summarizer.js';
 import { createInjectionGuard } from '../safety/untrusted-content.js';
 
-/**
- * @typedef {{ role?: string, content?: unknown, name?: string, tool_call_id?: string, tool_calls?: unknown[] }} ChatMessageLike
- * @typedef {{ estimateText(value: unknown): number, estimateMessages(messages: ChatMessageLike[]): { totalTokens: number } }} TokenEstimatorLike
- * @typedef {{ compact(messages: unknown[], options?: Record<string, unknown>): { compacted: boolean, beforeTokens: number, afterTokens: number, messages: ChatMessageLike[], keyFacts?: string[], summary?: string } }} HistoryCompactorLike
- * @typedef {{ shrink(result: unknown, options?: Record<string, unknown>): { summarized: boolean, beforeTokens: number, afterTokens: number, content: string, sources?: string[], keyPoints?: string[] } }} ToolResultSummarizerLike
- * @typedef {{ wrap(value: unknown, meta?: { source?: string, toolName?: string }): { content: string, wrapped: boolean, alreadyWrapped?: boolean, flagged: boolean, reasons: string[] } }} InjectionGuardLike
- */
+type ChatMessageLike = {
+  role?: string;
+  content?: unknown;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: unknown[];
+};
+
+type ContextBudgetOptions = {
+  maxContextTokens?: number;
+  keepRecentMessages?: number;
+  maxFacts?: number;
+};
+
+type ToolResultOptions = {
+  maxToolResultTokens?: number;
+  maxTokens?: number;
+  maxSources?: number;
+  maxKeyPoints?: number;
+  toolName?: string;
+};
+
+type TokenEstimatorLike = {
+  estimateText(value: unknown): number;
+  estimateMessages(messages: ChatMessageLike[]): { totalTokens: number };
+};
+
+type HistoryCompactionResult = {
+  compacted: boolean;
+  beforeTokens: number;
+  afterTokens: number;
+  messages: ChatMessageLike[];
+  keyFacts?: string[];
+  summary?: string;
+};
+
+type HistoryCompactorLike = {
+  compact(messages: unknown[], options?: ContextBudgetOptions): HistoryCompactionResult;
+};
+
+type ToolShrinkResult = {
+  summarized: boolean;
+  beforeTokens: number;
+  afterTokens: number;
+  content: string;
+  sources?: string[];
+  keyPoints?: string[];
+};
+
+type ToolResultSummarizerLike = {
+  shrink(result: unknown, options?: Pick<ToolResultOptions, 'maxTokens' | 'maxSources' | 'maxKeyPoints'>): ToolShrinkResult;
+};
+
+type InjectionGuardLike = {
+  wrap(value: unknown, meta?: { source?: string; toolName?: string }): {
+    content: string;
+    wrapped: boolean;
+    alreadyWrapped?: boolean;
+    flagged: boolean;
+    reasons: string[];
+  };
+};
+
+type ContextManagerOptions = ContextBudgetOptions & {
+  estimator?: TokenEstimatorLike;
+  historyCompactor?: HistoryCompactorLike;
+  toolResultSummarizer?: ToolResultSummarizerLike;
+  injectionGuard?: InjectionGuardLike;
+  maxToolResultTokens?: number;
+  maxSources?: number;
+  maxKeyPoints?: number;
+};
+
+type FormattedToolResult = ToolShrinkResult & {
+  untrusted: boolean;
+  injectionFlagged: boolean;
+  injectionReasons: string[];
+};
 
 /**
  * 用二分查找把文本裁到不超过 token 预算(尾部加截断标记)。
- * @param {string} text
- * @param {number} maxTokens
- * @param {TokenEstimatorLike} estimator
- * @returns {string}
  */
-function clipToTokenBudget(text, maxTokens, estimator) {
+function clipToTokenBudget(text: string, maxTokens: number, estimator: TokenEstimatorLike): string {
   if (maxTokens <= 0 || estimator.estimateText(text) <= maxTokens) return text;
   let low = 0;
   let high = text.length;
@@ -42,21 +107,13 @@ function clipToTokenBudget(text, maxTokens, estimator) {
 }
 
 export class ContextManager {
-  /**
-   * @param {{
-   *   estimator?: TokenEstimatorLike,
-   *   historyCompactor?: HistoryCompactorLike,
-   *   toolResultSummarizer?: ToolResultSummarizerLike,
-   *   injectionGuard?: InjectionGuardLike,
-   *   maxContextTokens?: number,
-   *   keepRecentMessages?: number,
-   *   maxFacts?: number,
-   *   maxToolResultTokens?: number,
-   *   maxSources?: number,
-   *   maxKeyPoints?: number,
-   * }} [options]
-   */
-  constructor(options = {}) {
+  estimator: TokenEstimatorLike;
+  maxToolResultTokens: number;
+  injectionGuard: InjectionGuardLike;
+  historyCompactor: HistoryCompactorLike;
+  toolResultSummarizer: ToolResultSummarizerLike;
+
+  constructor(options: ContextManagerOptions = {}) {
     const estimator = options.estimator || createHeuristicTokenEstimator();
     this.estimator = estimator;
     this.maxToolResultTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens) || 0));
@@ -77,19 +134,15 @@ export class ContextManager {
 
   /**
    * 压缩历史消息以适配上下文 token 预算,返回压缩结果。
-   * @param {unknown[]} messages
-   * @param {{ maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
    */
-  prepareMessages(messages, options = {}) {
+  prepareMessages(messages: unknown[], options: ContextBudgetOptions = {}): HistoryCompactionResult {
     return this.historyCompactor.compact(messages, options);
   }
 
   /**
    * 摘要工具结果、套上不可信内容防护壳,并按 token 预算二次裁剪。
-   * @param {unknown} result
-   * @param {{ maxToolResultTokens?: number, maxTokens?: number, maxSources?: number, maxKeyPoints?: number, toolName?: string }} [options]
    */
-  formatToolResult(result, options = {}) {
+  formatToolResult(result: unknown, options: ToolResultOptions = {}): FormattedToolResult {
     const maxTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens || options.maxTokens || this.maxToolResultTokens) || 0));
     const output = this.toolResultSummarizer.shrink(result, {
       maxTokens: options.maxToolResultTokens || options.maxTokens,
@@ -119,9 +172,7 @@ export class ContextManager {
 
 /**
  * 创建 ContextManager 实例的工厂(便于注入依赖与测试)。
- * @param {ConstructorParameters<typeof ContextManager>[0]} [options]
- * @returns {ContextManager}
  */
-export function createContextManager(options = {}) {
+export function createContextManager(options: ContextManagerOptions = {}): ContextManager {
   return new ContextManager(options);
 }
