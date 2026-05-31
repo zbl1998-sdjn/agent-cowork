@@ -1,5 +1,12 @@
 // @ts-check
 
+// 启发式 token 估算器(host · L1 领域层 · kimi/context)
+// ---------------------------------------------------------------------------
+// 职责:无需远程分词器,按「CJK 字符约 1 token + 其余字符按比例折算」估算
+//       文本与整组消息的 token 数,供压缩/摘要的预算决策使用。
+// 依赖:仅标准库。
+// 导出:HeuristicTokenEstimator(类)、createHeuristicTokenEstimator(工厂)。
+
 const DEFAULT_CHARS_PER_TOKEN = 4;
 const DEFAULT_MESSAGE_OVERHEAD_TOKENS = 3;
 const DEFAULT_REPLY_PRIMER_TOKENS = 3;
@@ -76,7 +83,7 @@ export class HeuristicTokenEstimator {
     this.replyPrimerTokens = Math.max(0, Math.round(Number(options.replyPrimerTokens) || DEFAULT_REPLY_PRIMER_TOKENS));
   }
 
-  /** @param {unknown} value @returns {number} */
+  /** 估算单段文本的 token 数(CJK 逐字计、其余按字符数折算)。 @param {unknown} value @returns {number} */
   estimateText(value) {
     const text = stableText(value);
     if (!text) return 0;
@@ -86,6 +93,7 @@ export class HeuristicTokenEstimator {
   }
 
   /**
+   * 估算整组消息的 token 数:逐条文本 token + 每条固定开销 + 回复引导开销。
    * @param {Array<ChatMessageLike | string | null | undefined>} messages
    * @returns {MessagesTokenEstimate}
    */
@@ -117,6 +125,7 @@ export class HeuristicTokenEstimator {
 }
 
 /**
+ * 创建启发式 token 估算器实例的工厂。
  * @param {{ charsPerToken?: number, messageOverheadTokens?: number, replyPrimerTokens?: number }} [options]
  * @returns {HeuristicTokenEstimator}
  */

@@ -1,4 +1,12 @@
 // @ts-check
+// 工具调用的审批门禁与计划模式守卫(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:在工具真正执行前拦一道闸——跑 pre_tool hook、处理 ExitPlanMode 计划批准、
+//      计划模式下拦住未批准的写操作、按风险/变更性向用户申请逐次或会话级审批。
+//      统一把"被阻止/拒绝"的结果写回 steps/messages 并广播事件。
+// 依赖:同层 todo-state.js(从计划文本生成 todo 快照);其余靠注入的回调/注册表。
+// 导出:ensureExitPlanModeTool / makeAudit / toolNeedsApproval /
+//      runPreToolHook / handleExitPlanMode / blockUntilPlanApproved / requestToolApproval
 import { todoItemsFromPlan } from './todo-state.js';
 
 /**
@@ -20,7 +28,7 @@ import { todoItemsFromPlan } from './todo-state.js';
  * @typedef {{ needsApproval: boolean, hasApprovals: boolean, approvals?: ApprovalRegistry | null, sessionApproved: Set<string>, name: string, args: ToolArgs, tool: AgentTool, runId?: unknown, emit: EmitFn, audit: AuditFn, steps: StepList, messages: MessageList, call: ToolCall, autoApprove: boolean, planMode: boolean, planApproved: boolean, context?: RequestContext }} ToolApprovalOptions
  */
 
-/** @param {AgentTool[]} agentTools @param {boolean} planMode */
+/** 计划模式下确保工具集里存在 ExitPlanMode 工具(只读,供模型提交计划草案)。 @param {AgentTool[]} agentTools @param {boolean} planMode */
 export function ensureExitPlanModeTool(agentTools, planMode) {
   if (!planMode || agentTools.some((t) => t.name === 'ExitPlanMode')) return;
   agentTools.push({
@@ -33,7 +41,7 @@ export function ensureExitPlanModeTool(agentTools, planMode) {
   });
 }
 
-/** @param {AuditBus | null | undefined} auditBus @param {RequestContext} [context] @returns {AuditFn} */
+/** 生成审计函数:把每次事件连同请求上下文发往审计总线,失败静默吞掉不打断主循环。 @param {AuditBus | null | undefined} auditBus @param {RequestContext} [context] @returns {AuditFn} */
 export function makeAudit(auditBus, context) {
   return (kind, extra = {}) => {
     if (!auditBus) return;
@@ -41,7 +49,7 @@ export function makeAudit(auditBus, context) {
   };
 }
 
-/** @param {AgentTool | null | undefined} tool */
+/** 判断某工具是否需要审批:显式 requiresApproval、会变更状态(mutating)、或风险 high/critical。 @param {AgentTool | null | undefined} tool */
 export function toolNeedsApproval(tool) {
   const risk = String(tool?.risk || '').toLowerCase();
   return !!(tool && (tool.requiresApproval === true || tool.mutating === true || risk === 'high' || risk === 'critical'));
@@ -55,7 +63,7 @@ function approvalScope(context = {}) {
   };
 }
 
-/** @param {PreToolHookOptions} options */
+/** 运行 pre_tool 钩子:若钩子判定阻止则写回阻止结果并返回 true(调用方据此跳过执行)。 @param {PreToolHookOptions} options */
 export async function runPreToolHook({ hooks, name, args, steps, audit, emit, messages, call }) {
   if (!hooks) return false;
   const blockedByHook = hooks.blocked(await hooks.run('pre_tool', { name, args }));
@@ -68,7 +76,7 @@ export async function runPreToolHook({ hooks, name, args, steps, audit, emit, me
   return true;
 }
 
-/** @param {ExitPlanOptions} options */
+/** 处理 ExitPlanMode 调用:征求计划批准、记录审计、批准后据计划文本生成 todo 快照。 @param {ExitPlanOptions} options */
 export async function handleExitPlanMode({
   name,
   args,
@@ -106,7 +114,7 @@ export async function handleExitPlanMode({
   return { handled: true, planApproved: approved };
 }
 
-/** @param {PlanBlockOptions} options */
+/** 计划模式且计划未批准时,拦住需审批的写操作并提示先用只读工具研究再提交计划。 @param {PlanBlockOptions} options */
 export function blockUntilPlanApproved({
   planMode,
   planApproved,
@@ -128,7 +136,7 @@ export function blockUntilPlanApproved({
   return true;
 }
 
-/** @param {ToolApprovalOptions} options */
+/** 向用户申请单次工具审批:命中自动批准/计划授权则放行,否则等待用户决定(可记会话级)。 @param {ToolApprovalOptions} options */
 export async function requestToolApproval({
   needsApproval,
   hasApprovals,

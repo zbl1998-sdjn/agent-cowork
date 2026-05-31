@@ -1,4 +1,11 @@
 // @ts-check
+// Agent 原生工具集定义:Read/Write/Edit/Glob/Grep/Shell/WebFetch/Git 等(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:构造与 Kimi CLI / Claude Code 对齐的工具清单;写类工具标 mutating:true 以便
+//       Agent 循环走审批门;所有文件路径都被 jail 到可信工作区根。
+// 依赖:标准库(node:fs / node:path)、L0 ../security/path-policy.js;同层 workspace /
+//       sandbox / tools / 本目录 agent-tools-support.js。
+// 导出:createAgentTools(按上下文构造工具数组)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
@@ -26,7 +33,7 @@ import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
  * @typedef {{ name: string, mutating?: boolean, risk?: string, requiresApproval?: boolean, description?: string, parameters?: unknown, inputSchema?: unknown, handler?: (args?: ToolArgs) => unknown | Promise<unknown> }} AgentTool
  */
 
-/** @param {AgentToolsContext} [ctx] @returns {AgentTool[]} */
+/** 按给定上下文(可信根、沙箱、限额)构造该工作区的 Agent 工具数组。 @param {AgentToolsContext} [ctx] @returns {AgentTool[]} */
 export function createAgentTools(ctx = {}) {
   const { trustedRoot, sandbox, sandboxLimits } = ctx;
   if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');

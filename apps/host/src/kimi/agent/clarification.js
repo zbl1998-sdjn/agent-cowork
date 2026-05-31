@@ -1,4 +1,11 @@
 // @ts-check
+// 进模型前的提示澄清层(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:在调用模型前判断用户 prompt 是否信息不足(缺动作/对象/期望/目标);
+//      若需澄清且存在 AskUserQuestion 工具,则向用户提一个带选项的问题,
+//      把回答拼回 prompt 后再继续;否则返回规整后的 prompt。
+// 依赖:同层 prompt/refine-policy.js(分析提示完整度);AskUserQuestion 工具(可选)。
+// 导出:buildPromptClarification / clarifyPromptBeforeModel
 import { analyzePromptForRefine } from '../prompt/refine-policy.js';
 
 /**
@@ -21,7 +28,7 @@ function describeMissing(missing) {
   return (missing || []).map((item) => MISSING_TEXT[/** @type {MissingKey} */ (item)] || String(item)).join('、');
 }
 
-/** @param {ClarificationPolicy} policy */
+/** 据缺失项构造给用户的澄清问题与候选选项(补充目标 / 先做只读梳理)。 @param {ClarificationPolicy} policy */
 export function buildPromptClarification(policy) {
   const missing = describeMissing(policy.missing);
   return {
@@ -35,7 +42,7 @@ export function buildPromptClarification(policy) {
   };
 }
 
-/** @param {ClarifyOptions} options */
+/** 进模型前的澄清主流程:多模态输入或无需澄清则直接放行,否则提问并把答案并入 prompt。 @param {ClarifyOptions} options */
 export async function clarifyPromptBeforeModel({ prompt, userContent, toolMap }) {
   if (Array.isArray(userContent) && userContent.length) {
     return { prompt, clarified: false };

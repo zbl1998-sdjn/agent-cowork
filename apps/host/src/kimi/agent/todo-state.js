@@ -1,5 +1,10 @@
 // @ts-check
-
+// Todo 状态模型与生成(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:规范化 todo 条目(id/text/状态),从计划文本切出 todo 列表(去标记/去重/截断),
+//      并提供"工具调用 todo 追踪器"——每次工具调用 start→finish 自动发 todo_update 事件。
+// 依赖:仅标准库;事件经注入的 emit 广播。
+// 导出:createTodoItem / todoItemsFromPlan / createToolTodoTracker
 /**
  * @typedef {'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected'} TodoStatus
  * @typedef {{ id: string, text: string, status: TodoStatus, detail?: string, kind?: string }} TodoItem
@@ -35,6 +40,7 @@ function normalizeText(text, fallback) {
 }
 
 /**
+ * 规范化生成一个 todo 条目(缺省值兜底、状态校验、detail 截断 240 字)。
  * @param {TodoItemInput} [input]
  * @returns {TodoItem}
  */
@@ -60,6 +66,7 @@ function stripPlanMarker(line) {
 }
 
 /**
+ * 从计划文本逐行解析出 todo 列表:剥离列表/标题标记、去引号、去重并截断到 maxItems。
  * @param {unknown} planText
  * @param {TodoPlanOptions} [options]
  * @returns {TodoItem[]}
@@ -82,6 +89,7 @@ export function todoItemsFromPlan(planText, { maxItems = 8 } = {}) {
 }
 
 /**
+ * 创建工具调用 todo 追踪器:start 时发 running 条目,返回 finish 句柄按成败更新状态。
  * @param {TodoEmitter} [emit]
  * @returns {ToolTodoTracker}
  */

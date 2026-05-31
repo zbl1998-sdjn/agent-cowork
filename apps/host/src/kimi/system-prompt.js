@@ -1,4 +1,10 @@
 // @ts-check
+// Agent 系统提示词构建(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:拼装 agent 的系统提示词——环境事实(env 块) + 能力说明 + 计划/开发者
+//       模式规则 + skills/记忆注入 + 内联图表/建议提示;纯函数无 I/O,易单测。
+// 依赖:仅标准库(Date 等)。
+// 导出:SYSTEM_PROMPT_VERSION、buildEnvBlock、buildSystemPrompt。
 // Builds the agent's system prompt: capability framing + plan-mode rules +
 // skills/memory injection + inline-viz/suggestions hints. Pure (no I/O), so it
 // is trivially unit-testable and kept out of the agent loop module.
@@ -20,6 +26,8 @@ const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '
  * Designed to live at the very TOP of the system prompt so it survives any
  * context-window compaction.
  *
+ * 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,
+ * 放在系统提示词最顶部,避免模型凭训练截止时间猜测「今天/最近」。
  * @param {EnvFacts} facts
  * @returns {string[]} lines (caller joins with '\n')
  */
@@ -41,6 +49,8 @@ export function buildEnvBlock({ now = new Date(), trustedRoot = '', osName = '',
 }
 
 /**
+ * 组装完整系统提示词:env 块 + 能力说明,按需追加计划模式/开发者模式规则、
+ * 已启用 skills 清单与工作区记忆,末尾附内联建议/定时任务提示。
  * @param {{ memoryText?: string, skills?: SkillDescriptor[], planMode?: boolean, developerMode?: boolean, env?: EnvFacts }} [options]
  * @returns {string}
  */

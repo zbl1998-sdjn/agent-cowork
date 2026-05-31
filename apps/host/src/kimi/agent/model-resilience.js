@@ -1,4 +1,11 @@
 // @ts-check
+// 模型调用韧性层:熔断 + 超时 + 多模型回退(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:把一次模型调用包上熔断器与超时控制,并在主模型不可用时按 fallbacks 顺序
+//      回退到备用模型;区分"可回退"(超时/熔断/5xx)与"不可回退"(鉴权/4xx)错误;
+//      对外暴露脱敏后的友好错误文案。
+// 依赖:L0 security/redaction(脱敏)、L2 runtime/model-breakers(熔断器),同层 provider/router(回退编排)。
+// 导出:callModelResilient / friendlyAgentError / modelBreakerStats(再导出)
 import { redactText } from '../../security/redaction.js';
 import { modelBreaker, modelBreakerStats, modelProvider } from '../../runtime/model-breakers.js';
 import { runWithFallback } from '../provider/router.js';
@@ -102,7 +109,7 @@ async function callOneModel(modelCall, callArgs, kimiConfig, timeoutMs) {
   });
 }
 
-/** @param {ModelCall} modelCall @param {ModelCallArgs} callArgs @param {ResilienceOptions} [options] */
+/** 带韧性地调用模型:单候选直连,多候选则按回退链逐个尝试,全失败时抛聚合错误。 @param {ModelCall} modelCall @param {ModelCallArgs} callArgs @param {ResilienceOptions} [options] */
 export async function callModelResilient(modelCall, callArgs, { kimiConfig, timeoutMs = 60000, onFallback } = {}) {
   const candidates = modelCandidates(kimiConfig);
   if (candidates.length <= 1) return callOneModel(modelCall, callArgs, candidates[0], timeoutMs);
@@ -131,7 +138,7 @@ export async function callModelResilient(modelCall, callArgs, { kimiConfig, time
   }
 }
 
-/** @param {unknown} err @param {{ traceId?: unknown }} context */
+/** 把底层模型错误转成面向用户的中文友好文案(熔断/超时各有专属提示,均附追踪号)。 @param {unknown} err @param {{ traceId?: unknown }} context */
 export function friendlyAgentError(err, context) {
   const trace = context && context.traceId ? `（追踪号 ${context.traceId}）` : '';
   const error = /** @type {Partial<ModelError>} */ (err);

@@ -1,4 +1,11 @@
 // @ts-check
+// Kimi API 直答运行器:OpenAI 兼容的 chat/completions 调用(同步与流式)(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:发起 OpenAI 兼容的 /chat/completions 请求,处理超时中止、提取回复文本;
+//       提供计划/聊天两种非流式入口与一个 SSE 流式聊天入口。
+// 依赖:同层 ./api-runner-config.js(常量/provider 归一)、./api-runner-prompts.js
+//       (提示词拼装);运行期用全局 fetch。
+// 导出:runKimiApiPlan、runKimiApiChat、runKimiApiChatStream,以及再导出配置/提示构造器。
 import { cleanProvider, cleanText, DEFAULT_BASE_URL, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TIMEOUT_MS, KIMI_API_NOT_CONFIGURED_MESSAGE } from './api-runner-config.js';
 import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 
@@ -12,7 +19,7 @@ export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-pro
  * @typedef {KimiTextOptions & { onToken?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} KimiStreamOptions
  */
 
-/** @param {unknown} payload @returns {string} */
+/** 从响应体里提取首条 message 文本(兼容字符串与多段 content 数组)。 @param {unknown} payload @returns {string} */
 function extractMessageText(payload) {
   const data = /** @type {KimiPayload} */ (payload && typeof payload === 'object' ? payload : {});
   const content = data.choices?.[0]?.message?.content;
@@ -38,7 +45,7 @@ function extractMessageText(payload) {
   return '';
 }
 
-/** @param {KimiTextOptions} [options] @returns {Promise<KimiTextResult>} */
+/** 非流式直答核心:校验 key/fetch、超时中止、发请求并返回规范化文本结果。 @param {KimiTextOptions} [options] @returns {Promise<KimiTextResult>} */
 async function runKimiApiText({
   prompt,
   summary,
@@ -126,7 +133,7 @@ async function runKimiApiText({
   }
 }
 
-/** @param {KimiTextOptions} [options] */
+/** 计划模式直答:用 plan 提示构造器走非流式调用。 @param {KimiTextOptions} [options] */
 export function runKimiApiPlan(options = {}) {
   return runKimiApiText({
     ...options,
@@ -135,7 +142,7 @@ export function runKimiApiPlan(options = {}) {
   });
 }
 
-/** @param {KimiTextOptions} [options] */
+/** 聊天模式直答:用 chat 提示构造器走非流式调用。 @param {KimiTextOptions} [options] */
 export function runKimiApiChat(options = {}) {
   return runKimiApiText({
     ...options,
@@ -147,7 +154,7 @@ export function runKimiApiChat(options = {}) {
 // Streaming chat: same OpenAI-compatible request with stream:true, parsing the
 // upstream SSE and invoking onToken(delta) per content chunk. Returns the full
 // accumulated text. Used by POST /api/kimi/chat/stream.
-/** @param {KimiStreamOptions} [options] @returns {Promise<KimiTextResult>} */
+/** 流式聊天:stream:true 调用并逐块解析 SSE,通过 onToken/onReasoning 回调增量推送,返回累计文本。 @param {KimiStreamOptions} [options] @returns {Promise<KimiTextResult>} */
 export async function runKimiApiChatStream({
   prompt,
   summary = '',

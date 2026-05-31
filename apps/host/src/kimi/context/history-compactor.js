@@ -1,5 +1,12 @@
 // @ts-check
 
+// 历史消息压缩器(host · L1 领域层 · kimi/context)
+// ---------------------------------------------------------------------------
+// 职责:超出上下文预算时,保留最近若干条、把更早的历史折叠为一条 system 摘要
+//       (含关键事实抽取与角色统计),再按 token 预算逐级强制收敛。
+// 依赖:同层 token-estimator(估算 token);其余仅标准库。
+// 导出:HistoryCompactor(类)、createHistoryCompactor(工厂)。
+
 import { createHeuristicTokenEstimator } from './token-estimator.js';
 
 const DEFAULT_MAX_CONTEXT_TOKENS = 12_000;
@@ -150,6 +157,7 @@ function trimWholeMessageToBudget(message, maxMessageTokens, estimator) {
 }
 
 /**
+ * 多级强制收敛:依次裁中间消息正文、裁首条、丢弃中段、裁次条,直至落入预算。
  * @param {ChatMessageLike[]} messages
  * @param {number} maxContextTokens
  * @param {TokenEstimatorLike} estimator
@@ -196,6 +204,7 @@ export class HistoryCompactor {
   }
 
   /**
+   * 压缩历史:未超预算则原样返回;否则折叠旧消息为摘要并强制收敛到预算内。
    * @param {unknown[]} messages
    * @param {{ maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
    * @returns {CompactResult}
@@ -239,6 +248,7 @@ export class HistoryCompactor {
 }
 
 /**
+ * 创建 HistoryCompactor 实例的工厂(便于注入估算器与阈值)。
  * @param {{ estimator?: TokenEstimatorLike, maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
  * @returns {HistoryCompactor}
  */

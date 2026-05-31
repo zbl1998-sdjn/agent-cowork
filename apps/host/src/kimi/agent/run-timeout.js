@@ -1,5 +1,10 @@
 // @ts-check
-
+// 单次运行的超时与中止控制(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:派生一个 AbortController,把上游 signal 与本地超时定时器合并成一个统一信号;
+//      到点自动 abort 并标记 timedOut,提供中文停止文案与 dispose 清理。
+// 依赖:仅标准库(AbortController / setTimeout,定时器可注入便于测试)。
+// 导出:isAbortLikeError(判断错误是否由中止引发)/ createRunTimeout
 /**
  * @typedef {{
  *   signal?: AbortSignal | null,
@@ -15,7 +20,7 @@ function positiveMs(value) {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
-/** @param {unknown} err @returns {boolean} */
+/** 判断错误是否属于"中止/取消"类(AbortError 或消息含 abort/cancel)。 @param {unknown} err @returns {boolean} */
 export function isAbortLikeError(err) {
   if (!err) return false;
   if (err instanceof Error) return err.name === 'AbortError' || /abort|aborted|cancel/i.test(err.message);
@@ -23,6 +28,7 @@ export function isAbortLikeError(err) {
 }
 
 /**
+ * 创建运行超时控制器:合并上游中止信号与本地超时,返回统一 signal 及状态查询/清理方法。
  * @param {RunTimeoutOptions} [options]
  */
 export function createRunTimeout(options = {}) {

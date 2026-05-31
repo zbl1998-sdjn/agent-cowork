@@ -1,4 +1,13 @@
 // @ts-check
+// Agent 主循环编排(runAgentChat)(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:本子目录的总装入口——拼系统提示与工具集、按步预算循环调用模型,把每个工具调用
+//      交给 executeToolCall,期间穿插上下文压缩、检查点、超时/预算/循环看护与收尾兜底;
+//      无工具调用即收尾(可选 verify 复核),返回 { text, steps, usage, ... }。
+// 依赖:聚合本子目录各模块(approval-gate/finalize/clarification/model-resilience/
+//      todo-state/loop-guard/tool-retry/run-timeout/checkpoint-state/run-trace-events/
+//      tool-loop-support/tool-call-executor)及同层 agent-tools/system-prompt/context 等。
+// 导出:runAgentChat
 import { createAgentTools } from '../agent-tools.js';
 import { buildSystemPrompt } from '../system-prompt.js';
 import { resolveAgentEnvFacts } from '../agent-env.js';
@@ -36,7 +45,7 @@ import { executeToolCall } from './tool-call-executor.js';
  * @typedef {{ prompt?: unknown, kimiConfig?: ModelConfig, trustedRoot: string, tools?: AgentTool[], modelCall?: import('./model-resilience.js').ModelCall, maxSteps?: number, approvals?: import('./approval-gate.js').ApprovalRegistry | null, autoApprove?: boolean, planMode?: boolean, developerMode?: boolean, auditBus?: import('./approval-gate.js').AuditBus | null, hooks?: import('./approval-gate.js').HookEngine | null, memoryText?: string, skills?: import('../system-prompt.js').SkillDescriptor[], emit?: EmitFn, sandbox?: import('../agent-tools.js').SandboxLike, sandboxLimits?: import('../agent-tools.js').SandboxLimits, runStoreRoot?: unknown, runEvents?: unknown, runsIndex?: unknown, context?: import('./approval-gate.js').RequestContext, fetchImpl?: unknown, lazyTools?: AgentTool[], verify?: boolean, maxVerifySteps?: number, signal?: AbortSignal | null, runId?: string | null, userContent?: unknown, clarifyBeforeModel?: boolean, contextManager?: ContextManagerLike | null, contextOptions?: unknown, loopGuard?: import('./tool-call-executor.js').LoopGuard | null, loopGuardOptions?: unknown, retryPolicy?: import('./tool-call-executor.js').RetryPolicy | null, retryOptions?: unknown, budgetGuard?: BudgetGuardLike | null, runTimeoutMs?: number, checkpointer?: import('./checkpoint-state.js').Checkpointer | null, resumeState?: ResumeState | null, runTrace?: import('./run-trace-events.js').RunTraceLike | null }} RunAgentChatOptions
  */
 
-/** @param {RunAgentChatOptions} options */
+/** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 @param {RunAgentChatOptions} options */
 export async function runAgentChat(options) {
   const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => {}, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
   /** @type {AgentTool[]} */
@@ -90,6 +99,7 @@ export async function runAgentChat(options) {
   });
   const toolTodos = createToolTodoTracker(checkpointRecorder.emitTodo);
 
+  // 开启 verify 时额外预留若干步给"读回改动核对"阶段,避免复核挤占正常任务步数。
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
   const runTimeout = createRunTimeout({ signal, timeoutMs: runTimeoutMs });
   let stopForLoopGuard = false;
@@ -180,6 +190,7 @@ export async function runAgentChat(options) {
     if (calls.length === 0) {
       finalText = message.content || '';
       const finalMessage = { role: 'assistant', content: finalText };
+      // 发生过真实写改且尚未复核时,先不收尾:塞一条只读核对指令再跑一轮,确认改动无误。
       if (verify && didMutate && !verified) {
         verified = true;
         emit('verify_start', {});

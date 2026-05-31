@@ -1,5 +1,12 @@
 // @ts-check
 
+// 工具结果摘要器(host · L1 领域层 · kimi/context)
+// ---------------------------------------------------------------------------
+// 职责:超过 token 预算时,把冗长工具结果递归抽取为「关键点 + 来源(路径/URL)
+//       + 预览」的精简摘要,并按预算逐级降级;未超预算则原样返回。
+// 依赖:同层 token-estimator;其余仅标准库。
+// 导出:ToolResultSummarizer(类)、createToolResultSummarizer(工厂)。
+
 import { createHeuristicTokenEstimator } from './token-estimator.js';
 
 const DEFAULT_MAX_TOKENS = 2_000;
@@ -89,6 +96,7 @@ function collectSourcesFromText(text, sources, limit) {
 }
 
 /**
+ * 递归遍历任意结构,沿途收集来源与关键点(限深 8 层防爆栈/循环)。
  * @param {unknown} value
  * @param {{ sources: string[], keyPoints: string[], maxSources: number, maxKeyPoints: number, pathHint?: string, depth: number }} state
  */
@@ -186,6 +194,7 @@ export class ToolResultSummarizer {
   }
 
   /**
+   * 把工具结果收缩到 token 预算内:未超则原样返回,超则生成并逐级降级摘要。
    * @param {unknown} result
    * @param {{ maxTokens?: number, maxSources?: number, maxKeyPoints?: number }} [options]
    * @returns {ShrinkResult}
@@ -230,6 +239,7 @@ export class ToolResultSummarizer {
 }
 
 /**
+ * 创建 ToolResultSummarizer 实例的工厂。
  * @param {{ estimator?: TokenEstimatorLike, maxTokens?: number, maxSources?: number, maxKeyPoints?: number, previewLines?: number }} [options]
  * @returns {ToolResultSummarizer}
  */

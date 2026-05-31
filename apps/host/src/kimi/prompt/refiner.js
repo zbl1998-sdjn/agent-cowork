@@ -1,3 +1,10 @@
+// 提示词精炼器(host · L1 领域层 · kimi/prompt)
+// ---------------------------------------------------------------------------
+// 职责:依精炼策略决定是否精炼;可调模型(带超时)改写 prompt,失败或无模型
+//       时退回基于上下文(项目/术语)的本地兜底改写;追问场景则原样返回。
+// 依赖:同层 refine-policy(策略判定);其余仅标准库。
+// 导出:refinePrompt(异步函数)、createPromptRefiner(工厂)。
+
 import { analyzePromptForRefine } from './refine-policy.js';
 
 /**
@@ -88,7 +95,7 @@ async function withTimeout(value, timeoutMs) {
   }
 }
 
-/** @param {unknown} raw @param {PromptContext} [ctx] @param {PromptRefinerOptions} [options] @returns {Promise<PromptRefineResult>} */
+/** 精炼一条 prompt:能精炼则调模型/兜底改写,需追问或已明确则原样返回。 @param {unknown} raw @param {PromptContext} [ctx] @param {PromptRefinerOptions} [options] @returns {Promise<PromptRefineResult>} */
 export async function refinePrompt(raw, ctx = {}, options = {}) {
   const policy = analyzePromptForRefine(raw, options);
   if (policy.needsClarification || !policy.shouldRefine) {
@@ -122,7 +129,7 @@ export async function refinePrompt(raw, ctx = {}, options = {}) {
   };
 }
 
-/** @param {PromptRefinerOptions} [options] @returns {PromptRefiner} */
+/** 创建绑定好选项的精炼器对象(暴露 refine 方法)。 @param {PromptRefinerOptions} [options] @returns {PromptRefiner} */
 export function createPromptRefiner(options = {}) {
   return {
     /** @param {unknown} raw @param {PromptContext} [ctx] */

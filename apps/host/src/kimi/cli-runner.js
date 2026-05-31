@@ -1,3 +1,10 @@
+// Kimi CLI 调用(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:在隔离临时目录中以子进程方式调用本地 Kimi CLI,拼装 plan/chat 模式的
+//       提示词与命令行参数,做超时/输出上限/编码(UTF-8↔GB18030)处理后返回纯文本。
+// 依赖:node:child_process/fs/os/path/util(均标准库);不依赖网络。
+// 导出:buildKimiPlanPrompt / buildKimiChatPrompt / buildKimiCliPlanArgs /
+//       buildKimiCliChatArgs / runKimiCliPlan / runKimiCliChat。
 import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,11 +20,11 @@ const MAX_OUTPUT_LENGTH = 256 * 1024;
  * @typedef {PromptOptions & { trustedRoot?: unknown, maxSteps?: unknown, model?: unknown }} CliArgsOptions
  * @typedef {{ command?: string, argsBuilder?: (options: CliArgsOptions) => string[], timeoutMs?: unknown, maxSteps?: unknown, model?: unknown, resultMode?: string } & PromptOptions} RunTextOptions
  */
-/** @param {unknown} value */
+/** 归一换行并去首尾空白。 @param {unknown} value */
 function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
 }
-/** @param {Buffer[]} chunks */
+/** 解码 CLI 字节输出:优先严格 UTF-8,Windows 下回退 GB18030,最后兜底替换解码。 @param {Buffer[]} chunks */
 function decodeCliOutput(chunks) {
   const buffer = Buffer.concat(chunks);
   if (buffer.length === 0) {
@@ -36,7 +43,7 @@ function decodeCliOutput(chunks) {
     return buffer.toString('utf8');
   }
 }
-/** @param {unknown} memory */
+/** 把工作区长期记忆裁剪成提示词里的「记忆块」(空则返回空串)。 @param {unknown} memory */
 function buildMemoryBlock(memory) {
   const text = cleanText(memory).slice(0, 4096);
   if (!text) {
@@ -48,7 +55,7 @@ function buildMemoryBlock(memory) {
     '工作区记忆结束。',
   ].join('\n');
 }
-/** @param {PromptOptions} options */
+/** 拼装「计划模式」提示词:基于摘要给出目标理解 + 整理建议 + 审批前动作清单。 @param {PromptOptions} options */
 export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
@@ -73,7 +80,7 @@ export function buildKimiPlanPrompt({ prompt, summary = '', mode = 'cowork', mem
   );
   return lines.join('\n');
 }
-/** @param {PromptOptions} options */
+/** 拼装「对话模式」提示词:仅基于消息与摘要回答,需文件操作时提示切到协作模式。 @param {PromptOptions} options */
 export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
@@ -98,7 +105,7 @@ export function buildKimiChatPrompt({ prompt, summary = '', memory = '' }) {
   );
   return lines.join('\n');
 }
-/** @param {CliArgsOptions} options */
+/** 构造计划模式的 Kimi CLI 命令行参数(工作目录、单次输出、步数上限、提示词)。 @param {CliArgsOptions} options */
 export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
@@ -117,7 +124,7 @@ export function buildKimiCliPlanArgs({ trustedRoot, prompt, summary, mode, maxSt
   args.push('--prompt', buildKimiPlanPrompt({ prompt, summary, mode, memory }));
   return args;
 }
-/** @param {CliArgsOptions} options */
+/** 构造对话模式的 Kimi CLI 命令行参数。 @param {CliArgsOptions} options */
 export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = DEFAULT_MAX_STEPS, model, memory = '' }) {
   if (!trustedRoot || typeof trustedRoot !== 'string') {
     throw new Error('trustedRoot is required');
@@ -136,7 +143,7 @@ export function buildKimiCliChatArgs({ trustedRoot, prompt, summary, maxSteps = 
   args.push('--prompt', buildKimiChatPrompt({ prompt, summary, memory }));
   return args;
 }
-/** @param {RunTextOptions} [options] */
+/** 通用执行器:在临时工作目录里 spawn Kimi CLI,带超时与输出上限,返回标准化结果。 @param {RunTextOptions} [options] */
 function runKimiCliText({
   command = 'kimi',
   argsBuilder,
@@ -229,7 +236,7 @@ function runKimiCliText({
     });
   });
 }
-/** @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
+/** 以计划模式调用 Kimi CLI。 @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
 export function runKimiCliPlan(options = {}) {
   return runKimiCliText({
     ...options,
@@ -237,7 +244,7 @@ export function runKimiCliPlan(options = {}) {
     resultMode: options.mode === 'code' ? 'code' : 'cowork',
   });
 }
-/** @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
+/** 以对话模式调用 Kimi CLI。 @param {Omit<RunTextOptions, 'argsBuilder' | 'resultMode'>} [options] */
 export function runKimiCliChat(options = {}) {
   return runKimiCliText({
     ...options,

@@ -1,5 +1,10 @@
 // @ts-check
-
+// 运行检查点记录器:可恢复地保存 Agent 运行进度(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:在 Agent 循环各阶段把当前 messages/usage/已批准工具/todos/步骤等快照交给
+//      checkpointer 持久化,供中断后续跑;同时维护一份内存 todos 镜像(按 id 去重更新)。
+// 依赖:仅标准库;持久化由注入的 checkpointer 完成,事件由注入的 emit 广播。
+// 导出:createCheckpointRecorder(返回 { emitTodo, save })
 /**
  * @typedef {{ id?: unknown }} TodoPayload
  * @typedef {{ save(input: Record<string, unknown>): string }} Checkpointer
@@ -41,6 +46,7 @@ function errorMessage(err) {
 }
 
 /**
+ * 创建检查点记录器:emitTodo 在广播 todo 的同时同步内存镜像,save 把当前进度落盘。
  * @param {CheckpointRecorderOptions} options
  */
 export function createCheckpointRecorder({

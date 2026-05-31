@@ -1,5 +1,10 @@
 // @ts-check
-
+// 工具循环的零散支撑件(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:为工具循环提供三件小工具——按需激活的 search_tools(懒加载扩展工具/MCP)、
+//      解析模型返回的工具调用(JSON 参数容错)、以及无预算限制时的空预算守卫占位。
+// 依赖:仅标准库。
+// 导出:addLazySearchTool / parseToolCall / createNoopBudgetGuard
 /**
  * @typedef {Record<string, unknown>} ToolArgs
  * @typedef {{ name: string, description?: string, parameters?: unknown, risk?: string, mutating?: boolean, handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> }} AgentTool
@@ -7,6 +12,7 @@
  */
 
 /**
+ * 注入 search_tools 工具:模型按关键词检索懒加载工具,命中后将其追加进活动工具集并即可调用。
  * @param {AgentTool[]} agentTools
  * @param {AgentTool[]} lazyTools
  * @returns {Map<string, AgentTool>}
@@ -45,7 +51,7 @@ export function addLazySearchTool(agentTools, lazyTools) {
   return toolMap;
 }
 
-/** @param {ToolCall} call */
+/** 解析模型返回的工具调用,JSON 参数解析失败时降级为空参数 {}。 @param {ToolCall} call */
 export function parseToolCall(call) {
   const name = call.function && call.function.name;
   try {
@@ -55,6 +61,7 @@ export function parseToolCall(call) {
   }
 }
 
+/** 创建空预算守卫:check/recordUsage 永不叫停,作为未配置预算时的默认占位。 */
 export function createNoopBudgetGuard() {
   const snapshot = {
     runUsage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },

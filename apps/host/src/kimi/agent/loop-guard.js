@@ -1,5 +1,10 @@
 // @ts-check
-
+// 循环看护:检测工具调用打转/连续失败并叫停(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:为每次工具调用计算稳定指纹(工具名 + 规范化参数),累计同指纹的重复次数与
+//      连续失败次数;超过阈值即返回 shouldBreak,让主循环跳出无效死循环。
+// 依赖:仅标准库。
+// 导出:LoopGuard(类)/ createLoopGuard(工厂)
 const DEFAULT_MAX_REPEATS = 4;
 const DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 
@@ -51,8 +56,10 @@ function decision(partial = {}) {
   };
 }
 
+/** 循环看护器:按指纹追踪工具调用的重复与连续失败,超阈值即建议中断。 */
 export class LoopGuard {
   /**
+   * 构造看护器,设定重复次数与连续失败次数的上限(均至少为 1)。
    * @param {{ maxRepeats?: number, maxConsecutiveFailures?: number }} [options]
    */
   constructor(options = {}) {
@@ -64,6 +71,7 @@ export class LoopGuard {
   }
 
   /**
+   * 观察一次工具调用及其成败,更新计数并产出本次决策(是否应中断)。
    * @param {ToolCallLike} call
    * @param {boolean | { ok?: boolean }} [okOrResult]
    * @returns {LoopDecision}
@@ -102,13 +110,14 @@ export class LoopGuard {
     return this.lastDecision;
   }
 
-  /** @returns {LoopDecision} */
+  /** 返回最近一次 observe 的决策。 @returns {LoopDecision} */
   shouldBreak() {
     return this.lastDecision;
   }
 }
 
 /**
+ * 工厂:创建一个 LoopGuard 实例。
  * @param {{ maxRepeats?: number, maxConsecutiveFailures?: number }} [options]
  * @returns {LoopGuard}
  */

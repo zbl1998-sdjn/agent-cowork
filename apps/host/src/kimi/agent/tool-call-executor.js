@@ -1,4 +1,12 @@
 // @ts-check
+// 单次工具调用的执行管线(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:把一次工具调用从头跑到尾——解析参数→schema 校验→pre_tool hook→计划/审批门禁
+//      →带重试执行→记录用量/审计/trace/todo→格式化结果写回 messages→post_tool hook
+//      →预算与循环看护检查;并通过返回值告知主循环是否需要中断/已发生变更。
+// 依赖:同层 approval-gate / arg-validator / tool-loop-support / run-trace-events;
+//      其余能力(重试、上下文、预算、看护、checkpoint)由调用方注入。
+// 导出:executeToolCall(返回 { planApproved?, didMutate?, stop*?, breakToolLoop? })
 import {
   blockUntilPlanApproved,
   handleExitPlanMode,
@@ -37,7 +45,7 @@ function resultPath(result) {
   return String(/** @type {{ path?: unknown }} */ (result).path || '');
 }
 
-/** @param {ExecuteToolCallOptions} options @returns {Promise<ExecuteToolCallResult>} */
+/** 执行一次工具调用的完整管线:校验→门禁→重试执行→记账/写回结果→预算与循环看护。 @param {ExecuteToolCallOptions} options @returns {Promise<ExecuteToolCallResult>} */
 export async function executeToolCall({
   call,
   stepNumber,
@@ -145,6 +153,7 @@ export async function executeToolCall({
     });
   }
   const ok = !hasError(result);
+  // 仅当"需审批的工具成功执行"才算发生真实变更——据此决定收尾是否触发 verify 复核。
   const didMutate = !!(ok && needsApproval);
   const path = resultPath(result);
   if (ok && isMutating && path) emit('file_written', { path });

@@ -1,13 +1,19 @@
 // @ts-check
+// Kimi 配置持久化(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:读写磁盘上的 kimiApi 配置(provider/apiKey/baseUrl/model/fallbacks),
+//       做字段清洗与归一,损坏文件时静默回退到环境变量派生的配置。
+// 依赖:node:fs / node:path(均标准库)。
+// 导出:applyPersistedKimiConfig(读入并写进目标对象)、persistKimiConfig(写盘)。
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** @param {unknown} value */
+/** 把 provider 归一为去空白的小写串。 @param {unknown} value */
 function cleanProvider(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-/** @param {unknown} value @returns {Array<Record<string, unknown>>} */
+/** 清洗 fallback 列表:仅保留有效字段,丢弃完全为空的项。 @param {unknown} value @returns {Array<Record<string, unknown>>} */
 function cleanFallbacks(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => {
@@ -23,7 +29,7 @@ function cleanFallbacks(value) {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
-/** @param {string} file @param {Record<string, unknown>} target */
+/** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);文件不存在或损坏则不动。 @param {string} file @param {Record<string, unknown>} target */
 export function applyPersistedKimiConfig(file, target) {
   try {
     if (!fs.existsSync(file)) return;
@@ -45,7 +51,7 @@ export function applyPersistedKimiConfig(file, target) {
   }
 }
 
-/** @param {string} file @param {Record<string, unknown>} source */
+/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录)。 @param {string} file @param {Record<string, unknown>} source */
 export function persistKimiConfig(file, source) {
   const payload = {
     kimiApi: {

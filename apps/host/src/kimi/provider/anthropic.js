@@ -1,4 +1,12 @@
 // @ts-check
+
+// Anthropic/Claude 提供商适配(host · L1 领域层 · kimi/provider)
+// ---------------------------------------------------------------------------
+// 职责:把统一的 OpenAI 风格消息/工具转成 Anthropic Messages API 格式,发起
+//       SSE 流式请求并解析回 { content, tool_calls, usage } 的统一结构。
+// 依赖:仅标准库(fetch / TextDecoder)。
+// 导出:parseAnthropicStream(流解析)、createAnthropicProvider(工厂,产出
+//       带 id/chatCompletion 的 Provider,供注册表 index 登记)。
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -54,7 +62,7 @@ function toAnthropicTool(tool) {
   };
 }
 
-/** @param {unknown[]} [messages] */
+/** 把统一消息列表转为 Anthropic 格式:system 抽出合并,tool 角色映射为 user 侧 tool_result。 @param {unknown[]} [messages] */
 function toAnthropicMessages(messages = []) {
   /** @type {string[]} */
   const system = [];
@@ -126,7 +134,7 @@ function fromAnthropicMessage(payload) {
   return { content, tool_calls: toolCalls.length ? toolCalls : undefined, usage };
 }
 
-/** @param {StreamReader} reader @param {StreamHandlers} [handlers] */
+/** 解析 Anthropic SSE 流,累积正文/工具调用/用量,聚合为统一消息结构。 @param {StreamReader} reader @param {StreamHandlers} [handlers] */
 export async function parseAnthropicStream(reader, { onContent } = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
@@ -173,6 +181,7 @@ export async function parseAnthropicStream(reader, { onContent } = {}) {
   return finish();
 }
 
+/** 创建 Anthropic Provider:暴露 id 与 chatCompletion,供注册表登记与路由调用。 */
 export function createAnthropicProvider() {
   return {
     id: 'anthropic',

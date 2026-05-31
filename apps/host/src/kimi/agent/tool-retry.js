@@ -1,5 +1,10 @@
 // @ts-check
-
+// 工具调用的重试策略(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:对工具执行做指数退避重试,只重试瞬时类错误(超时/网络/繁忙/限流等),
+//      对永久类错误(权限/校验/路径越界/不存在等)立即放弃;兼容"抛异常"与"返回 {error}"两种失败形态。
+// 依赖:仅标准库(sleep 可注入便于测试)。
+// 导出:isRetryableToolError / RetryPolicy(类)/ createRetryPolicy(工厂)
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_BASE_DELAY_MS = 100;
 const DEFAULT_MAX_DELAY_MS = 2_000;
@@ -36,7 +41,7 @@ function isToolErrorResult(value) {
   return !!(value && typeof value === 'object' && 'error' in value && /** @type {{ error?: unknown }} */ (value).error);
 }
 
-/** @param {unknown} err @returns {boolean} */
+/** 判断错误是否可重试:永久类错误码/文案直接否决,瞬时类错误码或文案命中则放行。 @param {unknown} err @returns {boolean} */
 export function isRetryableToolError(err) {
   const code = errorCode(err);
   const message = errorMessage(err);
@@ -52,8 +57,9 @@ function retryDelay(attempt, baseDelayMs, maxDelayMs) {
   return Math.min(maxDelayMs, delay);
 }
 
+/** 重试策略:按最大尝试次数与指数退避封装一次可重试的操作执行。 */
 export class RetryPolicy {
-  /** @param {RetryPolicyOptions} [options] */
+  /** 构造重试策略,设定尝试次数、退避基/上限延迟、sleep 实现与可重试判定。 @param {RetryPolicyOptions} [options] */
   constructor(options = {}) {
     this.maxAttempts = Math.max(1, Math.round(Number(options.maxAttempts) || DEFAULT_MAX_ATTEMPTS));
     this.baseDelayMs = Math.max(0, Math.round(Number(options.baseDelayMs) || DEFAULT_BASE_DELAY_MS));
@@ -65,6 +71,7 @@ export class RetryPolicy {
   }
 
   /**
+   * 执行操作并按策略重试,把本次尝试摘要(次数/是否重试过/错误)记入 lastRun。
    * @template T
    * @param {(ctx: { attempt: number }) => Promise<T> | T} operation
    * @returns {Promise<T>}
@@ -100,6 +107,7 @@ export class RetryPolicy {
 }
 
 /**
+ * 工厂:创建一个 RetryPolicy 实例。
  * @param {RetryPolicyOptions} [options]
  * @returns {RetryPolicy}
  */

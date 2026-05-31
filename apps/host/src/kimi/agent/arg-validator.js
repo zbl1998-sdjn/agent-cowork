@@ -1,5 +1,11 @@
 // @ts-check
-
+// 工具参数的轻量 JSON Schema 校验器(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:在执行工具前,用工具自带的 parameters schema 校验模型给出的参数,
+//      支持 type/required/properties/items/enum/additionalProperties 子集;
+//      不合法即返回错误清单,挡住格式错误的调用。
+// 依赖:仅标准库(无外部依赖)。
+// 导出:validateToolArguments(顶层入口,返回 { valid, errors })
 /**
  * @typedef {{ valid: boolean, errors: string[] }} ValidationResult
  * @typedef {{
@@ -104,6 +110,7 @@ function validateObject(schema, value, path, errors) {
 }
 
 /**
+ * 校验工具参数是否符合给定 schema;无有效 schema 时一律放行。
  * @param {unknown} schema
  * @param {unknown} args
  * @returns {ValidationResult}

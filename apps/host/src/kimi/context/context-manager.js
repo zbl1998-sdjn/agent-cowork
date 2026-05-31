@@ -1,5 +1,13 @@
 // @ts-check
 
+// 对话上下文统一编排门面(host · L1 领域层 · kimi/context)
+// ---------------------------------------------------------------------------
+// 职责:对外暴露 ContextManager,把历史压缩、工具结果摘要与不可信内容防护
+//       串成一条管线;按 token 预算裁剪工具结果并标注其可信度。
+// 依赖:同层 token-estimator / history-compactor / tool-result-summarizer +
+//       safety/untrusted-content(同属 L1,无向上依赖)。
+// 导出:ContextManager(类)、createContextManager(工厂)。
+
 import { createHeuristicTokenEstimator } from './token-estimator.js';
 import { createHistoryCompactor } from './history-compactor.js';
 import { createToolResultSummarizer } from './tool-result-summarizer.js';
@@ -14,6 +22,7 @@ import { createInjectionGuard } from '../safety/untrusted-content.js';
  */
 
 /**
+ * 用二分查找把文本裁到不超过 token 预算(尾部加截断标记)。
  * @param {string} text
  * @param {number} maxTokens
  * @param {TokenEstimatorLike} estimator
@@ -67,6 +76,7 @@ export class ContextManager {
   }
 
   /**
+   * 压缩历史消息以适配上下文 token 预算,返回压缩结果。
    * @param {unknown[]} messages
    * @param {{ maxContextTokens?: number, keepRecentMessages?: number, maxFacts?: number }} [options]
    */
@@ -75,6 +85,7 @@ export class ContextManager {
   }
 
   /**
+   * 摘要工具结果、套上不可信内容防护壳,并按 token 预算二次裁剪。
    * @param {unknown} result
    * @param {{ maxToolResultTokens?: number, maxTokens?: number, maxSources?: number, maxKeyPoints?: number, toolName?: string }} [options]
    */
@@ -89,6 +100,7 @@ export class ContextManager {
     let guarded = this.injectionGuard.wrap(output.content, meta);
     let afterTokens = this.estimator.estimateText(guarded.content);
     if (maxTokens > 0 && afterTokens > maxTokens) {
+      // 防护壳本身有固定开销;先量空壳开销,再把正文裁到剩余预算内。
       const overhead = this.estimator.estimateText(this.injectionGuard.wrap('', meta).content);
       const bodyBudget = Math.max(1, maxTokens - overhead);
       guarded = this.injectionGuard.wrap(clipToTokenBudget(output.content, bodyBudget, this.estimator), meta);
@@ -106,6 +118,7 @@ export class ContextManager {
 }
 
 /**
+ * 创建 ContextManager 实例的工厂(便于注入依赖与测试)。
  * @param {ConstructorParameters<typeof ContextManager>[0]} [options]
  * @returns {ContextManager}
  */

@@ -1,3 +1,10 @@
+// 提示词精炼策略(host · L1 领域层 · kimi/prompt)
+// ---------------------------------------------------------------------------
+// 职责:纯启发式分析用户原始 prompt——归一化、识别意图、判断缺失要素
+//       (动作/目标/期望产出),据此决定该精炼、该追问还是已足够明确。
+// 依赖:仅标准库(无副作用、无 I/O)。
+// 导出:normalizePrompt、detectPromptIntent、analyzePromptForRefine。
+
 const VAGUE_ONLY_PATTERNS = [
   /^(帮我|请)?(看看|看一下|处理|处理一下|弄一下|搞一下|优化一下|改一下|整理一下)$/iu,
   /^(help me )?(check|handle|fix|improve|optimi[sz]e)( it)?$/iu,
@@ -32,7 +39,7 @@ function textIncludes(patterns, text) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-/** @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {string} */
+/** 归一化原始输入:统一换行、压空白、裁到最大长度。 @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {string} */
 export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
   return String(raw ?? '')
     .replace(/\r\n/g, '\n')
@@ -41,7 +48,7 @@ export function normalizePrompt(raw, { maxLength = 8000 } = {}) {
     .slice(0, maxLength);
 }
 
-/** @param {string} text @returns {PromptIntent} */
+/** 按关键词判定任务意图(修复/创建/审查/总结/翻译/通用)。 @param {string} text @returns {PromptIntent} */
 export function detectPromptIntent(text) {
   if (/修复|报错|失败|fix|error|fail/iu.test(text)) return 'fix';
   if (/实现|新增|创建|生成|导出|保存|转换|build|implement|create|generate|export|save|convert/iu.test(text)) return 'create';
@@ -51,7 +58,7 @@ export function detectPromptIntent(text) {
   return 'general';
 }
 
-/** @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {PromptPolicy} */
+/** 综合分析 prompt,产出意图、缺失要素与「精炼/追问/已明确」决策。 @param {unknown} raw @param {PromptAnalyzeOptions} [options] @returns {PromptPolicy} */
 export function analyzePromptForRefine(raw, options = {}) {
   const normalized = normalizePrompt(raw, options);
   /** @type {PromptMissing[]} */

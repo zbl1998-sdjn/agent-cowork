@@ -1,4 +1,10 @@
 // @ts-check
+// 并行子代理工具(AgentParallel)(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:把若干互相独立的子任务并行派给子 Agent 执行(带并发上限与上下文字节预算),
+//      逐个 emit child_start/child_end 事件,最后汇总每个子任务的成功文本或失败原因。
+// 依赖:注入的 runAgentChat(递归跑子 Agent)、共享上下文/沙箱/审批/审计等依赖。
+// 导出:createParallelSubAgentTool(返回一个 AgentTool 定义)
 const DEFAULT_PARALLEL_AGENT_BUDGET_BYTES = 32 * 1024;
 const DEFAULT_PARALLEL_AGENT_MAX_TASKS = 8;
 const DEFAULT_PARALLEL_AGENT_CONCURRENCY = 3;
@@ -45,7 +51,7 @@ function enforceParallelAgentBudget(tasks, args = {}) {
   return { contextBytes, contextBudgetBytes: budget, maxTasks };
 }
 
-/** @param {ParallelToolOptions} options */
+/** 构造并行子代理工具:校验任务数与上下文预算,按并发上限派多个子 Agent 并汇总结果。 @param {ParallelToolOptions} options */
 export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools }) {
   return {
     name: 'AgentParallel',

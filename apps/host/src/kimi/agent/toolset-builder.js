@@ -1,4 +1,11 @@
 // @ts-check
+// Agent 工具集构建(host · L1 领域层 · kimi/agent)
+// ---------------------------------------------------------------------------
+// 职责:在基础文件/命令工具之上,按需挂载外部连接器(MCP)工具、Skill 运行工具,
+//      以及依赖回调的交互/编排工具(AskUserQuestion、ScheduleTask、Agent 子代理、AgentParallel);
+//      据传入的注册表/依赖是否存在决定挂载哪些,组装成最终交给主循环的工具数组。
+// 依赖:同层 agent-tools(基础工具)、recipes/run-recipe(Skill 运行)、parallel-agent-tool(并行子代理)。
+// 导出:buildAgentToolset
 import { createAgentTools } from '../agent-tools.js';
 import { runRecipe } from '../../recipes/run-recipe.js';
 import { createParallelSubAgentTool } from './parallel-agent-tool.js';
@@ -20,7 +27,7 @@ import { createParallelSubAgentTool } from './parallel-agent-tool.js';
  * @typedef {{ ctx: ToolsetContext, runDeps: RunDeps, agentDeps: AgentDeps, baseTools: AgentTool[] }} SubAgentToolOptions
  */
 
-/** @param {BuildToolsetOptions} options @returns {AgentTool[]} */
+/** 构建完整工具集:基础工具 + MCP 连接器 + Skill + 交互/编排工具(按可用依赖条件挂载)。 @param {BuildToolsetOptions} options @returns {AgentTool[]} */
 export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = {}, agentDeps = null }) {
   const tools = createAgentTools(/** @type {Parameters<typeof createAgentTools>[0]} */ (ctx));
   if (toolRegistry && typeof toolRegistry.list === 'function') {
@@ -63,6 +70,7 @@ export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = 
   }
   if (!agentDeps) return tools;
 
+  // baseTools 是挂载交互/子代理工具之前的快照:派生子 Agent 时只给这套,避免子代理再递归派生子代理。
   const baseTools = tools.slice();
   if (agentDeps.approvals) tools.push(createAskUserQuestionTool(agentDeps, ctx));
   if (agentDeps.scheduler) tools.push(createScheduleTaskTool(ctx, agentDeps));
@@ -71,7 +79,7 @@ export function buildAgentToolset({ ctx, toolRegistry, skillRegistry, runDeps = 
   return tools;
 }
 
-/** @param {AgentDeps} agentDeps @param {ToolsetContext} ctx @returns {AgentTool} */
+/** 构造 AskUserQuestion 工具:经审批注册表向用户提带选项的问题并等回答。 @param {AgentDeps} agentDeps @param {ToolsetContext} ctx @returns {AgentTool} */
 function createAskUserQuestionTool(agentDeps, ctx) {
   const emit = typeof agentDeps.emit === 'function' ? agentDeps.emit : () => {};
   const context = (ctx && ctx.context) || {};
@@ -107,7 +115,7 @@ function createAskUserQuestionTool(agentDeps, ctx) {
   };
 }
 
-/** @param {ToolsetContext} ctx @param {AgentDeps} agentDeps @returns {AgentTool} */
+/** 构造 ScheduleTask 工具:经调度器创建 cron 周期或一次性定时任务。 @param {ToolsetContext} ctx @param {AgentDeps} agentDeps @returns {AgentTool} */
 function createScheduleTaskTool(ctx, agentDeps) {
   return {
     name: 'ScheduleTask',
@@ -135,7 +143,7 @@ function createScheduleTaskTool(ctx, agentDeps) {
   };
 }
 
-/** @param {SubAgentToolOptions} options @returns {AgentTool} */
+/** 构造 Agent 工具:派生单个子 Agent(仅持 baseTools)自主完成一个子任务并返回结果摘要。 @param {SubAgentToolOptions} options @returns {AgentTool} */
 function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }) {
   return {
     name: 'Agent',

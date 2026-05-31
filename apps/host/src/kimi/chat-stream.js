@@ -1,4 +1,11 @@
 // @ts-check
+// SSE 流式聊天端点(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:把一次非 agent 的简单对话以 text/event-stream 推给前端,逐 token 下发,
+//       并把整次对话落盘成一条 kimi-chat run 记录(成功/取消/失败三态)。
+// 依赖:runtime/run-store(落盘)、runtime/runs-index(索引)、
+//       ./system-prompt(env 块)、./agent-env(环境事实);模型调用由外部注入的 streamRunner 提供。
+// 导出:streamChat —— 单一入口,被 routes 层装配。
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { buildEnvBlock } from './system-prompt.js';
@@ -23,22 +30,22 @@ import { resolveAgentEnvFacts } from './agent-env.js';
  * @typedef {Error & { name?: string }} RouteError
  */
 
-/** @param {unknown} err @returns {string} */
+/** 把任意抛出物归一成可展示的错误字符串。 @param {unknown} err @returns {string} */
 function errorMessage(err) {
   return /** @type {Partial<RouteError>} */ (err)?.message || String(err || 'stream failed');
 }
 
-/** @param {StreamResponse} response @param {string} event @param {unknown} data */
+/** 按 SSE 帧格式写出一个 event + JSON data。 @param {StreamResponse} response @param {string} event @param {unknown} data */
 function sse(response, event, data) {
   response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-/** @param {KimiConfig} kimiConfig */
+/** 取出归一化后的 provider 名(缺省 kimi-api)。 @param {KimiConfig} kimiConfig */
 function modelProvider(kimiConfig) {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
-/** @param {StreamChatOptions} options */
+/** 入口:开启 SSE 流、逐 token 转发模型输出,并把整次对话记录为一条 run。 @param {StreamChatOptions} options */
 export async function streamChat({
   response,
   requestContext,
@@ -61,7 +68,7 @@ export async function streamChat({
   const signal = controller ? controller.signal : undefined;
   sse(response, 'start', { runId });
 
-  /** @param {string} status @param {Record<string, unknown>} extra */
+  /** 落盘一条 run 记录并更新索引;索引失败不应中断流。 @param {string} status @param {Record<string, unknown>} extra */
   const record = (status, extra) => {
     const finishedAt = new Date();
     const base = {

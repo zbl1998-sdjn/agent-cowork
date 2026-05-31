@@ -1,4 +1,12 @@
 // @ts-check
+
+// OpenAI 兼容提供商工厂(host · L1 领域层 · kimi/provider)
+// ---------------------------------------------------------------------------
+// 职责:用一份可参数化的工厂(baseUrl/是否需要 key/未配置文案)派生出多家
+//       OpenAI 兼容提供商——官方 OpenAI 与本地推理服务皆复用同一实现。
+// 依赖:同层 kimi.js 的 parseOpenAiCompatibleStream;其余仅标准库。
+// 导出:createOpenAiCompatibleProvider(通用工厂)、createOpenAiProvider、
+//       createLocalOpenAiCompatibleProvider(供注册表登记)。
 import { parseOpenAiCompatibleStream } from './kimi.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
@@ -29,7 +37,7 @@ function jsonMessage(payload) {
   };
 }
 
-/** @param {ProviderOptions} [options] */
+/** 派生一个 OpenAI 兼容 Provider(参数化 id/baseUrl/是否需要 key/未配置文案)。 @param {ProviderOptions} [options] */
 export function createOpenAiCompatibleProvider({
   id = 'openai-compatible',
   defaultBaseUrl = '',
@@ -98,6 +106,7 @@ export function createOpenAiCompatibleProvider({
   };
 }
 
+/** 派生官方 OpenAI 提供商(默认官方 baseUrl,必须配置 API key)。 */
 export function createOpenAiProvider() {
   return createOpenAiCompatibleProvider({
     id: 'openai',
@@ -107,6 +116,7 @@ export function createOpenAiProvider() {
   });
 }
 
+/** 派生本地 OpenAI 兼容提供商(自定义 baseUrl,免 API key)。 */
 export function createLocalOpenAiCompatibleProvider() {
   return createOpenAiCompatibleProvider({
     id: 'openai/local',

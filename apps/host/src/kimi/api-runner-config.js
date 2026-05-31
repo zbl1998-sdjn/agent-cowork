@@ -1,4 +1,11 @@
 // @ts-check
+// Kimi/模型 API 的配置常量与解析:默认值、provider 归一、回退链(host · L1 领域层)
+// ---------------------------------------------------------------------------
+// 职责:集中放置默认 baseUrl/model/超时/maxTokens 等常量,并把 config+env 解析成
+//       一份规范化的 KimiApiConfig(含 Anthropic/Kimi 不同的 key/url/model 取值规则)。
+// 依赖:仅标准库(读 process.env)。
+// 导出:常量(DEFAULT_*、MAX_PROMPT_LENGTH、KIMI_API_NOT_CONFIGURED_MESSAGE)、
+//       cleanText、cleanProvider、resolveKimiApiConfig。
 export const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
 export const DEFAULT_MODEL = 'kimi-k2.6';
 export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
@@ -12,23 +19,23 @@ export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置 Kimi/Moonshot API Key�
  * @typedef {{ provider: string, configured: boolean, apiKey: string, baseUrl: string, model: string, timeoutMs: number, maxTokens: number, temperature?: number, userAgent: string, fallbacks: ModelFallback[] }} KimiApiConfig
  */
 
-/** @param {unknown} value */
+/** 规范化文本:统一换行、去首尾空白;非字符串安全转空串。 @param {unknown} value */
 export function cleanText(value) {
   return String(value || '').replace(/\r\n/g, '\n').trim();
 }
 
-/** @param {unknown} value @param {string} [fallback] */
+/** 归一化 provider 名(小写去空白),空值用 fallback 兜底。 @param {unknown} value @param {string} [fallback] */
 export function cleanProvider(value, fallback = 'kimi-api') {
   const provider = String(value || '').trim().toLowerCase();
   return provider || fallback;
 }
 
-/** @param {string} provider */
+/** 判断 provider 是否走 Anthropic/Claude 系(决定 key/url/model 的取值来源)。 @param {string} provider */
 function isAnthropicProvider(provider) {
   return provider === 'anthropic' || provider === 'claude';
 }
 
-/** @param {unknown} value @returns {ModelFallback[]} */
+/** 解析模型回退链:接受 JSON 字符串或数组,逐项规范化并丢弃空条目。 @param {unknown} value @returns {ModelFallback[]} */
 function cleanModelFallbacks(value) {
   let input = value;
   if (typeof input === 'string' && input.trim()) {
@@ -51,7 +58,7 @@ function cleanModelFallbacks(value) {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
-/** @param {Record<string, unknown>} [config] @param {Record<string, string | undefined>} [env] @returns {KimiApiConfig} */
+/** 把 config 与环境变量合并解析成规范化的 KimiApiConfig(含 provider/key/url/model/回退链)。 @param {Record<string, unknown>} [config] @param {Record<string, string | undefined>} [env] @returns {KimiApiConfig} */
 export function resolveKimiApiConfig(config = {}, env = process.env) {
   const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
   const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;

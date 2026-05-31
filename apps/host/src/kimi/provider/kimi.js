@@ -1,4 +1,11 @@
 // @ts-check
+
+// Kimi 提供商适配 + OpenAI 兼容流解析(host · L1 领域层 · kimi/provider)
+// ---------------------------------------------------------------------------
+// 职责:对 Kimi(OpenAI 兼容)发起流式 chat/completions,并提供被本目录其它
+//       OpenAI 兼容提供商共用的 SSE 解析器(含流中断时部分工具调用的拆分)。
+// 依赖:上层常量 ../api-runner.js(未配置文案);其余仅标准库。
+// 导出:createKimiProvider(工厂,供注册表登记)、parseOpenAiCompatibleStream(共用流解析)。
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
 
 /**
@@ -11,6 +18,7 @@ import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
  * @typedef {{ onContent?: (delta: string) => void, onReasoning?: (delta: string) => void }} StreamHandlers
  */
 
+/** 创建 Kimi Provider:暴露 id 与 chatCompletion,供注册表登记与路由调用。 */
 export function createKimiProvider() {
   return {
     id: 'kimi',
@@ -93,7 +101,7 @@ function splitInterruptedToolCalls(calls, interrupted) {
   return { executable, partial };
 }
 
-/** @param {StreamReader} reader @param {StreamHandlers} [handlers] */
+/** 解析 OpenAI 兼容 SSE 流,累积正文/思考/工具调用/用量;读流出错且已有内容时标记中断而非丢弃。 @param {StreamReader} reader @param {StreamHandlers} [handlers] */
 export async function parseOpenAiCompatibleStream(reader, { onContent, onReasoning } = {}) {
   const decoder = new TextDecoder();
   let buffer = '';

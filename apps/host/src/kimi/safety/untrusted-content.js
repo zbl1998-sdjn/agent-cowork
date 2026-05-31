@@ -1,5 +1,13 @@
 // @ts-check
 
+// 不可信内容防护(host · L1 领域层 · kimi/safety)
+// ---------------------------------------------------------------------------
+// 职责:把工具/外部来源的输出用显式边界包成「仅作数据」的不可信块,并扫描
+//       提示注入/工具劫持/数据外泄/审批绕过等可疑模式予以标记。
+// 依赖:仅标准库。
+// 导出:UNTRUSTED_DATA_START/END(边界标记常量)、InjectionGuard(类)、
+//       createInjectionGuard(工厂);被 context-manager 用于包裹工具结果。
+
 export const UNTRUSTED_DATA_START = 'BEGIN_UNTRUSTED_DATA';
 export const UNTRUSTED_DATA_END = 'END_UNTRUSTED_DATA';
 
@@ -74,6 +82,7 @@ function sourceLabel(meta) {
 
 export class InjectionGuard {
   /**
+   * 包裹不可信内容:已带边界则仅复检,否则加上来源标注、安全提示与数据边界。
    * @param {unknown} value
    * @param {InjectionGuardMeta} [meta]
    * @returns {GuardedContent}
@@ -98,7 +107,7 @@ export class InjectionGuard {
   }
 }
 
-/** @returns {InjectionGuard} */
+/** 创建 InjectionGuard 实例的工厂。 @returns {InjectionGuard} */
 export function createInjectionGuard() {
   return new InjectionGuard();
 }
