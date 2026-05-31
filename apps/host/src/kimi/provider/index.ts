@@ -1,5 +1,3 @@
-// @ts-check
-
 // 提供商注册表与解析入口(host · L1 领域层 · kimi/provider)
 // ---------------------------------------------------------------------------
 // 职责:维护「provider id → Provider 实例」的内置注册表(BUILTIN_PROVIDERS),
@@ -11,20 +9,16 @@
 import { createAnthropicProvider } from './anthropic.js';
 import { createKimiProvider } from './kimi.js';
 import { createLocalOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
+import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 
-/**
- * @typedef {Record<string, unknown> & { provider?: unknown, chatCompletion?: Provider['chatCompletion'] }} ModelConfig
- * @typedef {{ messages?: unknown[], tools?: unknown[], kimiConfig?: ModelConfig, fetchImpl?: unknown, onContent?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} ProviderChatArgs
- * @typedef {{ id: string, chatCompletion(args: ProviderChatArgs): unknown | Promise<unknown> }} Provider
- */
+export type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 
 const anthropicProvider = createAnthropicProvider();
 const kimiProvider = createKimiProvider();
 const openAiProvider = createOpenAiProvider();
 const localOpenAiProvider = createLocalOpenAiCompatibleProvider();
 
-/** @type {Map<string, Provider>} */
-const BUILTIN_PROVIDERS = new Map([
+const BUILTIN_PROVIDERS = new Map<string, Provider>([
   ['kimi', kimiProvider],
   ['kimi-api', kimiProvider],
   ['openai', openAiProvider],
@@ -36,19 +30,24 @@ const BUILTIN_PROVIDERS = new Map([
   ['local', localOpenAiProvider],
 ]);
 
-/** 解析目标 Provider:优先用配置中注入的自定义实现,否则按 id 查注册表,兜底回 kimi。 @param {ModelConfig} [kimiConfig] @returns {Provider} */
-export function resolveModelProvider(kimiConfig = {}) {
+// 解析目标 Provider:优先使用注入实现,否则按别名表查找,未知 id 兜底到 kimi。
+export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
   const injected = kimiConfig.provider;
-  const provider = /** @type {Partial<Provider>} */ (injected && typeof injected === 'object' ? injected : {});
+  const provider = injected && typeof injected === 'object' ? injected as Partial<Provider> : {};
   if (typeof provider.chatCompletion === 'function') {
-    return /** @type {Provider} */ (injected);
+    return injected as Provider;
   }
+
   const id = String(kimiConfig.provider || 'kimi').trim().toLowerCase() || 'kimi';
-  return /** @type {Provider} */ (BUILTIN_PROVIDERS.get(id) || BUILTIN_PROVIDERS.get('kimi'));
+  const fallback = BUILTIN_PROVIDERS.get('kimi');
+  if (!fallback) {
+    throw new Error('Built-in kimi provider is not registered');
+  }
+  return BUILTIN_PROVIDERS.get(id) || fallback;
 }
 
-/** 解析出 Provider 后统一发起一次对话补全(注册表对调用方屏蔽具体实现)。 @param {ProviderChatArgs} args */
-export async function callProviderChatCompletion(args) {
+// 统一发起一次对话补全,让调用方无需感知具体 provider 实现。
+export async function callProviderChatCompletion(args: ProviderChatArgs): Promise<unknown> {
   const provider = resolveModelProvider(args?.kimiConfig);
   return provider.chatCompletion(args);
 }

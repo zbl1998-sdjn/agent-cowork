@@ -1,5 +1,3 @@
-// @ts-check
-
 // OpenAI 兼容提供商工厂(host · L1 领域层 · kimi/provider)
 // ---------------------------------------------------------------------------
 // 职责:用一份可参数化的工厂(baseUrl/是否需要 key/未配置文案)派生出多家
@@ -7,29 +5,40 @@
 // 依赖:同层 kimi.js 的 parseOpenAiCompatibleStream;其余仅标准库。
 // 导出:createOpenAiCompatibleProvider(通用工厂)、createOpenAiProvider、
 //       createLocalOpenAiCompatibleProvider(供注册表登记)。
+import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 import { parseOpenAiCompatibleStream } from './kimi.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
-/**
- * @typedef {Record<string, unknown> & { apiKey?: unknown, baseUrl?: unknown, model?: unknown, maxTokens?: unknown, temperature?: unknown, userAgent?: unknown }} ModelConfig
- * @typedef {{ id?: string, defaultBaseUrl?: string, requiresApiKey?: boolean, notConfiguredMessage?: string }} ProviderOptions
- * @typedef {{ messages?: unknown[], tools?: unknown[], kimiConfig?: ModelConfig, fetchImpl?: unknown, onContent?: (delta: string) => void, onReasoning?: (delta: string) => void, signal?: AbortSignal }} ProviderChatArgs
- */
+type ProviderOptions = {
+  id?: string;
+  defaultBaseUrl?: string;
+  requiresApiKey?: boolean;
+  notConfiguredMessage?: string;
+};
+type StreamReader = { read(): Promise<{ value?: BufferSource; done?: boolean }> };
+type FetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  body?: { getReader?: () => StreamReader } | null;
+  json(): Promise<unknown>;
+}>;
 
-/** @param {unknown} baseUrl */
-function trimBaseUrl(baseUrl) {
+function trimBaseUrl(baseUrl: unknown): string {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
 
-/** @param {string} id @param {string} message */
-function providerMessage(id, message) {
+function providerMessage(id: string, message: string): string {
   return message || `未配置 ${id} 模型提供商。请配置 baseUrl、model 和 API key 后重试。`;
 }
 
-/** @param {unknown} payload */
-function jsonMessage(payload) {
-  const body = /** @type {{ choices?: Array<{ message?: Record<string, unknown> }>, usage?: unknown }} */ (payload && typeof payload === 'object' ? payload : {});
+function jsonMessage(payload: unknown): Record<string, unknown> {
+  const body = payload && typeof payload === 'object'
+    ? payload as { choices?: Array<{ message?: Record<string, unknown> & { usage?: unknown } }>; usage?: unknown }
+    : {};
   const message = body.choices?.[0]?.message || { content: '' };
   return {
     ...message,
@@ -37,16 +46,15 @@ function jsonMessage(payload) {
   };
 }
 
-/** 派生一个 OpenAI 兼容 Provider(参数化 id/baseUrl/是否需要 key/未配置文案)。 @param {ProviderOptions} [options] */
+/** 派生一个 OpenAI 兼容 Provider(参数化 id/baseUrl/是否需要 key/未配置文案)。 */
 export function createOpenAiCompatibleProvider({
   id = 'openai-compatible',
   defaultBaseUrl = '',
   requiresApiKey = true,
   notConfiguredMessage = '',
-} = {}) {
+}: ProviderOptions = {}): Provider {
   return {
     id,
-    /** @param {ProviderChatArgs} args */
     async chatCompletion({
       messages,
       tools,
@@ -55,8 +63,8 @@ export function createOpenAiCompatibleProvider({
       onContent,
       onReasoning,
       signal,
-    }) {
-      const config = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
+    }: ProviderChatArgs): Promise<Record<string, unknown>> {
+      const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const baseUrl = trimBaseUrl(config.baseUrl || defaultBaseUrl);
       const model = String(config.model || '').trim();
@@ -66,15 +74,13 @@ export function createOpenAiCompatibleProvider({
       if (typeof fetchImpl !== 'function') {
         throw new Error('fetch is not available for model provider calls');
       }
-      /** @type {Record<string, string>} */
-      const headers = {
+      const headers: Record<string, string> = {
         'content-type': 'application/json',
         accept: 'text/event-stream',
       };
       if (apiKey) headers.authorization = `Bearer ${apiKey}`;
       if (config.userAgent) headers['user-agent'] = String(config.userAgent);
-      /** @type {Record<string, unknown>} */
-      const body = {
+      const body: Record<string, unknown> = {
         model,
         messages,
         tools,
@@ -82,8 +88,10 @@ export function createOpenAiCompatibleProvider({
         max_tokens: config.maxTokens || 2048,
         stream: true,
       };
-      if (Number.isFinite(config.temperature)) body.temperature = /** @type {number} */ (config.temperature);
-      const fetcher = /** @type {typeof fetch} */ (fetchImpl);
+      if (typeof config.temperature === 'number' && Number.isFinite(config.temperature)) {
+        body.temperature = config.temperature;
+      }
+      const fetcher = fetchImpl as FetchLike;
       const resp = await fetcher(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
@@ -107,7 +115,7 @@ export function createOpenAiCompatibleProvider({
 }
 
 /** 派生官方 OpenAI 提供商(默认官方 baseUrl,必须配置 API key)。 */
-export function createOpenAiProvider() {
+export function createOpenAiProvider(): Provider {
   return createOpenAiCompatibleProvider({
     id: 'openai',
     defaultBaseUrl: DEFAULT_OPENAI_BASE_URL,
@@ -117,7 +125,7 @@ export function createOpenAiProvider() {
 }
 
 /** 派生本地 OpenAI 兼容提供商(自定义 baseUrl,免 API key)。 */
-export function createLocalOpenAiCompatibleProvider() {
+export function createLocalOpenAiCompatibleProvider(): Provider {
   return createOpenAiCompatibleProvider({
     id: 'openai/local',
     requiresApiKey: false,

@@ -1,5 +1,3 @@
-// @ts-check
-
 // Anthropic/Claude 提供商适配(host · L1 领域层 · kimi/provider)
 // ---------------------------------------------------------------------------
 // 职责:把统一的 OpenAI 风格消息/工具转成 Anthropic Messages API 格式,发起
@@ -7,53 +5,62 @@
 // 依赖:仅标准库(fetch / TextDecoder)。
 // 导出:parseAnthropicStream(流解析)、createAnthropicProvider(工厂,产出
 //       带 id/chatCompletion 的 Provider,供注册表 index 登记)。
+import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 
-/**
- * @typedef {Record<string, unknown> & { apiKey?: unknown, baseUrl?: unknown, model?: unknown, maxTokens?: unknown, temperature?: unknown, userAgent?: unknown }} ModelConfig
- * @typedef {Record<string, unknown> & { role?: string, content?: unknown, tool_call_id?: unknown, tool_calls?: unknown[] }} ChatMessage
- * @typedef {{ function?: { name?: unknown, description?: unknown, parameters?: unknown } }} ChatTool
- * @typedef {{ id?: unknown, function?: { name?: unknown, arguments?: unknown } }} ToolCallLike
- * @typedef {{ read(): Promise<{ value?: BufferSource, done?: boolean }> }} StreamReader
- * @typedef {{ onContent?: (delta: string) => void }} StreamHandlers
- * @typedef {{ index: number, id: string, type: string, function: { name: string, arguments: string } }} AnthropicToolBlock
- * @typedef {Record<string, number>} UsageTotals
- * @typedef {{ messages?: unknown[], tools?: unknown[], kimiConfig?: ModelConfig, fetchImpl?: unknown, onContent?: (delta: string) => void, signal?: AbortSignal }} ProviderChatArgs
- */
+type ChatMessage = Record<string, unknown> & {
+  role?: string;
+  content?: unknown;
+  tool_call_id?: unknown;
+  tool_calls?: unknown[];
+};
+type ChatTool = { function?: { name?: unknown; description?: unknown; parameters?: unknown } };
+type ToolCallLike = { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
+type AnthropicMessage = { role: string; content: unknown[] };
+type AnthropicTool = { name: string; description: unknown; input_schema: unknown };
+type AnthropicToolBlock = { index: number; id: string; type: string; function: { name: string; arguments: string } };
+type UsageTotals = Record<string, number>;
+type StreamReader = { read(): Promise<{ value?: BufferSource; done?: boolean }> };
+type StreamHandlers = { onContent?: (delta: string) => void };
+type FetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  body?: { getReader?: () => StreamReader } | null;
+  json(): Promise<unknown>;
+}>;
 
-/** @param {unknown} baseUrl */
-function trimBaseUrl(baseUrl) {
+function trimBaseUrl(baseUrl: unknown): string {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
 
-/** @param {unknown} content */
-function textContent(content) {
+function textContent(content: unknown): string {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return String(content || '');
   return content.map((part) => {
     if (typeof part === 'string') return part;
-    const value = /** @type {{ text?: unknown, content?: unknown }} */ (part && typeof part === 'object' ? part : {});
+    const value = part && typeof part === 'object' ? part as { text?: unknown; content?: unknown } : {};
     if (typeof value.text === 'string') return value.text;
     if (typeof value.content === 'string') return value.content;
     return '';
   }).filter(Boolean).join('\n');
 }
 
-/** @param {unknown} raw */
-function parseArgs(raw) {
+function parseArgs(raw: unknown): unknown {
   if (!raw) return {};
   try { return JSON.parse(String(raw)); } catch { return {}; }
 }
 
-/** @param {unknown} input */
-function toolArguments(input) {
+function toolArguments(input: unknown): string {
   return input && typeof input === 'object' && Object.keys(input).length > 0 ? JSON.stringify(input) : '';
 }
 
-/** @param {unknown} tool */
-function toAnthropicTool(tool) {
-  const value = /** @type {ChatTool} */ (tool && typeof tool === 'object' ? tool : {});
+function toAnthropicTool(tool: unknown): AnthropicTool {
+  const value = tool && typeof tool === 'object' ? tool as ChatTool : {};
   const fn = value.function || {};
   return {
     name: String(fn.name || '').trim(),
@@ -62,15 +69,13 @@ function toAnthropicTool(tool) {
   };
 }
 
-/** 把统一消息列表转为 Anthropic 格式:system 抽出合并,tool 角色映射为 user 侧 tool_result。 @param {unknown[]} [messages] */
-function toAnthropicMessages(messages = []) {
-  /** @type {string[]} */
-  const system = [];
-  /** @type {Array<{ role: string, content: unknown[] }>} */
-  const out = [];
+/** 把统一消息列表转为 Anthropic 格式:system 抽出合并,tool 角色映射为 user 侧 tool_result。 */
+function toAnthropicMessages(messages: unknown[] = []): { system?: string; messages: AnthropicMessage[] } {
+  const system: string[] = [];
+  const out: AnthropicMessage[] = [];
   for (const msg of messages) {
     if (!msg || typeof msg !== 'object') continue;
-    const item = /** @type {ChatMessage} */ (msg);
+    const item = msg as ChatMessage;
     if (item.role === 'system') {
       const text = textContent(item.content);
       if (text) system.push(text);
@@ -84,12 +89,11 @@ function toAnthropicMessages(messages = []) {
       continue;
     }
     if (item.role === 'assistant') {
-      /** @type {unknown[]} */
-      const content = [];
+      const content: unknown[] = [];
       const text = textContent(item.content);
       if (text) content.push({ type: 'text', text });
       for (const call of Array.isArray(item.tool_calls) ? item.tool_calls : []) {
-        const toolCall = /** @type {ToolCallLike} */ (call && typeof call === 'object' ? call : {});
+        const toolCall = call && typeof call === 'object' ? call as ToolCallLike : {};
         const fn = toolCall.function || {};
         content.push({ type: 'tool_use', id: toolCall.id || `call_${content.length}`, name: fn.name || '', input: parseArgs(fn.arguments) });
       }
@@ -101,9 +105,8 @@ function toAnthropicMessages(messages = []) {
   return { system: system.join('\n\n') || undefined, messages: out };
 }
 
-/** @param {UsageTotals} target @param {unknown} [usage] */
-function mergeUsage(target, usage = {}) {
-  const body = /** @type {{ input_tokens?: unknown, output_tokens?: unknown }} */ (usage && typeof usage === 'object' ? usage : {});
+function mergeUsage(target: UsageTotals, usage: unknown = {}): void {
+  const body = usage && typeof usage === 'object' ? usage as { input_tokens?: unknown; output_tokens?: unknown } : {};
   const input = Number(body.input_tokens || 0);
   const output = Number(body.output_tokens || 0);
   if (input) target.prompt_tokens = Math.max(target.prompt_tokens || 0, input);
@@ -111,15 +114,13 @@ function mergeUsage(target, usage = {}) {
   target.total_tokens = (target.prompt_tokens || 0) + (target.completion_tokens || 0);
 }
 
-/** @param {unknown} payload */
-function fromAnthropicMessage(payload) {
+function fromAnthropicMessage(payload: unknown): Record<string, unknown> {
   let content = '';
-  /** @type {unknown[]} */
-  const toolCalls = [];
-  const body = /** @type {{ content?: unknown[], usage?: unknown }} */ (payload && typeof payload === 'object' ? payload : {});
+  const toolCalls: unknown[] = [];
+  const body = payload && typeof payload === 'object' ? payload as { content?: unknown[]; usage?: unknown } : {};
   for (const rawPart of Array.isArray(body.content) ? body.content : []) {
-    const part = /** @type {Record<string, unknown>} */ (rawPart && typeof rawPart === 'object' ? rawPart : {});
-    if (part.type === 'text') content += part.text || '';
+    const part = rawPart && typeof rawPart === 'object' ? rawPart as Record<string, unknown> : {};
+    if (part.type === 'text') content += String(part.text || '');
     if (part.type === 'tool_use') {
       toolCalls.push({
         id: part.id,
@@ -128,21 +129,21 @@ function fromAnthropicMessage(payload) {
       });
     }
   }
-  /** @type {UsageTotals} */
-  const usage = {};
+  const usage: UsageTotals = {};
   mergeUsage(usage, body.usage);
   return { content, tool_calls: toolCalls.length ? toolCalls : undefined, usage };
 }
 
-/** 解析 Anthropic SSE 流,累积正文/工具调用/用量,聚合为统一消息结构。 @param {StreamReader} reader @param {StreamHandlers} [handlers] */
-export async function parseAnthropicStream(reader, { onContent } = {}) {
+/** 解析 Anthropic SSE 流,累积正文/工具调用/用量,聚合为统一消息结构。 */
+export async function parseAnthropicStream(
+  reader: StreamReader,
+  { onContent }: StreamHandlers = {},
+): Promise<Record<string, unknown>> {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
-  /** @type {UsageTotals} */
-  const usage = {};
-  /** @type {Map<number, AnthropicToolBlock>} */
-  const toolBlocks = new Map();
+  const usage: UsageTotals = {};
+  const toolBlocks = new Map<number, AnthropicToolBlock>();
   const finish = () => ({
     content,
     tool_calls: toolBlocks.size ? [...toolBlocks.values()].sort((a, b) => a.index - b.index).map(({ index: _index, ...call }) => call) : undefined,
@@ -157,14 +158,14 @@ export async function parseAnthropicStream(reader, { onContent } = {}) {
       const line = buffer.slice(0, nl).trim();
       buffer = buffer.slice(nl + 1);
       if (!line.startsWith('data:')) continue;
-      let json;
-      try { json = JSON.parse(line.slice(5).trim()); } catch { continue; }
-      json = /** @type {Record<string, unknown>} */ (json && typeof json === 'object' ? json : {});
-      const message = /** @type {{ usage?: unknown }} */ (json.message && typeof json.message === 'object' ? json.message : {});
+      let json: Record<string, unknown>;
+      try { json = JSON.parse(line.slice(5).trim()) as Record<string, unknown>; } catch { continue; }
+      json = json && typeof json === 'object' ? json : {};
+      const message = json.message && typeof json.message === 'object' ? json.message as { usage?: unknown } : {};
       mergeUsage(usage, json.usage || message.usage);
       const idx = Number(json.index || 0);
-      const contentBlock = /** @type {Record<string, unknown>} */ (json.content_block && typeof json.content_block === 'object' ? json.content_block : {});
-      const delta = /** @type {Record<string, unknown>} */ (json.delta && typeof json.delta === 'object' ? json.delta : {});
+      const contentBlock = json.content_block && typeof json.content_block === 'object' ? json.content_block as Record<string, unknown> : {};
+      const delta = json.delta && typeof json.delta === 'object' ? json.delta as Record<string, unknown> : {};
       if (json.type === 'content_block_start' && contentBlock.type === 'tool_use') {
         toolBlocks.set(idx, { index: idx, id: String(contentBlock.id || `toolu_${idx}`), type: 'function', function: { name: String(contentBlock.name || ''), arguments: toolArguments(contentBlock.input) } });
       } else if (json.type === 'content_block_delta' && delta.type === 'text_delta') {
@@ -181,20 +182,18 @@ export async function parseAnthropicStream(reader, { onContent } = {}) {
   return finish();
 }
 
-/** 创建 Anthropic Provider:暴露 id 与 chatCompletion,供注册表登记与路由调用。 */
-export function createAnthropicProvider() {
+/** 创建 Anthropic Provider:暴露 id 与 chatCompletion,供注册表 index 登记。 */
+export function createAnthropicProvider(): Provider {
   return {
     id: 'anthropic',
-    /** @param {ProviderChatArgs} args */
-    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal }) {
-      const config = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
+    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal }: ProviderChatArgs): Promise<Record<string, unknown>> {
+      const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const model = String(config.model || '').trim();
       const baseUrl = trimBaseUrl(config.baseUrl || DEFAULT_ANTHROPIC_BASE_URL);
       if (!apiKey || !model) throw new Error('未配置 Anthropic/Claude 模型。请配置 API key 与 model 后重试。');
       const converted = toAnthropicMessages(messages);
-      /** @type {Record<string, unknown>} */
-      const body = {
+      const body: Record<string, unknown> = {
         model,
         messages: converted.messages,
         max_tokens: config.maxTokens || 2048,
@@ -203,10 +202,11 @@ export function createAnthropicProvider() {
       };
       const anthropicTools = (Array.isArray(tools) ? tools : []).map(toAnthropicTool).filter((tool) => tool.name);
       if (anthropicTools.length) body.tools = anthropicTools;
-      if (Number.isFinite(config.temperature)) body.temperature = /** @type {number} */ (config.temperature);
-      const fetcher = /** @type {typeof fetch} */ (fetchImpl);
-      /** @type {Record<string, string>} */
-      const headers = {
+      if (typeof config.temperature === 'number' && Number.isFinite(config.temperature)) {
+        body.temperature = config.temperature;
+      }
+      const fetcher = fetchImpl as FetchLike;
+      const headers: Record<string, string> = {
         'content-type': 'application/json',
         accept: 'text/event-stream',
         'x-api-key': apiKey,
