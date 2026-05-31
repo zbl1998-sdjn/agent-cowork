@@ -1,4 +1,3 @@
-// @ts-check
 // Agent 系统提示词构建(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:拼装 agent 的系统提示词——环境事实(env 块) + 能力说明 + 计划/开发者
@@ -14,10 +13,15 @@ export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v2';
 const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
-/**
- * @typedef {{ id: string, name: string, description?: string }} SkillDescriptor
- * @typedef {{ now?: Date, trustedRoot?: string, osName?: string, appVersion?: string, provider?: string, model?: string }} EnvFacts
- */
+export type SkillDescriptor = { id: string; name: string; description?: string };
+export type EnvFacts = { now?: Date; trustedRoot?: string; osName?: string; appVersion?: string; provider?: string; model?: string };
+type SystemPromptOptions = {
+  memoryText?: string;
+  skills?: SkillDescriptor[];
+  planMode?: boolean;
+  developerMode?: boolean;
+  env?: EnvFacts;
+};
 
 /**
  * Render the env block that pins the model to real-world facts: today's date,
@@ -28,10 +32,15 @@ const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '
  *
  * 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,
  * 放在系统提示词最顶部,避免模型凭训练截止时间猜测「今天/最近」。
- * @param {EnvFacts} facts
- * @returns {string[]} lines (caller joins with '\n')
  */
-export function buildEnvBlock({ now = new Date(), trustedRoot = '', osName = '', appVersion = '', provider = '', model = '' } = {}) {
+export function buildEnvBlock({
+  now = new Date(),
+  trustedRoot = '',
+  osName = '',
+  appVersion = '',
+  provider = '',
+  model = '',
+}: EnvFacts = {}): string[] {
   const yyyy = now.getFullYear();
   const m = now.getMonth() + 1;
   const d = now.getDate();
@@ -51,10 +60,14 @@ export function buildEnvBlock({ now = new Date(), trustedRoot = '', osName = '',
 /**
  * 组装完整系统提示词:env 块 + 能力说明,按需追加计划模式/开发者模式规则、
  * 已启用 skills 清单与工作区记忆,末尾附内联建议/定时任务提示。
- * @param {{ memoryText?: string, skills?: SkillDescriptor[], planMode?: boolean, developerMode?: boolean, env?: EnvFacts }} [options]
- * @returns {string}
  */
-export function buildSystemPrompt({ memoryText = '', skills = [], planMode = false, developerMode = false, env } = {}) {
+export function buildSystemPrompt({
+  memoryText = '',
+  skills = [],
+  planMode = false,
+  developerMode = false,
+  env,
+}: SystemPromptOptions = {}): string {
   const lines = [
     ...buildEnvBlock(env || {}),
     '',
