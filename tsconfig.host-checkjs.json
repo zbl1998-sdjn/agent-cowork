@@ -55,7 +55,7 @@
     "apps/host/src/kimi/agent-tools.js",
     "apps/host/src/kimi/agent-env.ts",
     "apps/host/src/kimi/agent-runner.ts",
-    "apps/host/src/kimi/chat-stream.js",
+    "apps/host/src/kimi/chat-stream.ts",
     "apps/host/src/kimi/cli-output.ts",
     "apps/host/src/kimi/cli-detect.ts",
     "apps/host/src/kimi/cli-runner.js",

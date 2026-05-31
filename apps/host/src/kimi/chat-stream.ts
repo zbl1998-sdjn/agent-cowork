@@ -1,4 +1,3 @@
-// @ts-check
 // SSE 流式聊天端点(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:把一次非 agent 的简单对话以 text/event-stream 推给前端,逐 token 下发,
@@ -10,42 +9,81 @@ import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { buildEnvBlock } from './system-prompt.js';
 import { resolveAgentEnvFacts } from './agent-env.js';
+import type { RequestContext } from '../http/middleware/common.js';
 
 // SSE streaming chat with cancellation support: opens text/event-stream, emits
 // `start`, a `token` frame per delta, then `done` (or `cancelled`/`error`), and
 // records a kimi-chat run. The model call is an injectable streamRunner; an
 // optional cancellation registry lets POST /api/runs/:id/cancel interrupt it.
 
-/**
- * @typedef {import('../http/request-utils.js').HttpResponseLike & { write(chunk?: string | Buffer): unknown, writeHead(statusCode: number, headers?: Record<string, string>): unknown }} StreamResponse
- * @typedef {import('../http/middleware/common.js').RequestContext} RequestContext
- * @typedef {{ prompt?: unknown, summary?: unknown, thinking?: unknown, model?: unknown }} StreamBody
- * @typedef {{ provider?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown }} KimiConfig
- * @typedef {{ text?: string, model?: unknown, usage?: unknown }} StreamResult
- * @typedef {{ systemMessage?: string, prompt?: unknown, summary?: unknown, thinking?: unknown, apiKey?: unknown, baseUrl?: unknown, model?: unknown, provider: string, timeoutMs?: unknown, maxTokens?: unknown, userAgent?: unknown, temperature?: unknown, signal?: AbortSignal, onToken(delta: string): void, onReasoning(delta: string): void }} StreamRunnerInput
- * @typedef {(input: StreamRunnerInput) => Promise<StreamResult> | StreamResult} StreamRunner
- * @typedef {{ upsert(summary: unknown, context?: RequestContext): unknown }} RunsIndexLike
- * @typedef {{ register(runId: string): AbortController, done(runId: string): unknown }} CancellationLike
- * @typedef {{ response: StreamResponse, requestContext: RequestContext, body: StreamBody, streamRunner: StreamRunner, kimiConfig: KimiConfig, trustedRoot: string, runStoreRoot: string, runsIndex: RunsIndexLike, cancellation?: CancellationLike | null }} StreamChatOptions
- * @typedef {Error & { name?: string }} RouteError
- */
+type StreamResponse = {
+  write(chunk?: string | Buffer): unknown;
+  writeHead(statusCode: number, headers?: Record<string, string>): unknown;
+  end(chunk?: string | Buffer): unknown;
+};
+type StreamBody = { prompt?: unknown; summary?: unknown; thinking?: unknown; model?: unknown };
+type KimiConfig = {
+  provider?: unknown;
+  apiKey?: unknown;
+  baseUrl?: unknown;
+  model?: unknown;
+  timeoutMs?: unknown;
+  maxTokens?: unknown;
+  userAgent?: unknown;
+  temperature?: unknown;
+};
+type StreamResult = { text?: string; model?: unknown; usage?: unknown };
+type StreamRunnerInput = {
+  systemMessage?: string;
+  prompt?: unknown;
+  summary?: unknown;
+  thinking?: unknown;
+  apiKey?: unknown;
+  baseUrl?: unknown;
+  model?: unknown;
+  provider: string;
+  timeoutMs?: unknown;
+  maxTokens?: unknown;
+  userAgent?: unknown;
+  temperature?: unknown;
+  signal?: AbortSignal;
+  onToken(delta: string): void;
+  onReasoning(delta: string): void;
+};
+type StreamRunner = (input: StreamRunnerInput) => Promise<StreamResult> | StreamResult;
+type RunsIndexLike = { upsert(summary: unknown, context?: RequestContext): unknown };
+type CancellationLike = { register(runId: string): AbortController; done(runId: string): unknown };
+type StreamChatOptions = {
+  response: StreamResponse;
+  requestContext: RequestContext;
+  body: StreamBody;
+  streamRunner: StreamRunner;
+  kimiConfig: KimiConfig;
+  trustedRoot: string;
+  runStoreRoot: string;
+  runsIndex: RunsIndexLike;
+  cancellation?: CancellationLike | null;
+};
 
-/** 把任意抛出物归一成可展示的错误字符串。 @param {unknown} err @returns {string} */
-function errorMessage(err) {
-  return /** @type {Partial<RouteError>} */ (err)?.message || String(err || 'stream failed');
+/** 把任意抛出物归一成可展示的错误字符串。 */
+function errorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as { message?: unknown }).message || 'stream failed');
+  }
+  return String(err || 'stream failed');
 }
 
-/** 按 SSE 帧格式写出一个 event + JSON data。 @param {StreamResponse} response @param {string} event @param {unknown} data */
-function sse(response, event, data) {
+/** 按 SSE 帧格式写出一个 event + JSON data。 */
+function sse(response: StreamResponse, event: string, data: unknown): void {
   response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-/** 取出归一化后的 provider 名(缺省 kimi-api)。 @param {KimiConfig} kimiConfig */
-function modelProvider(kimiConfig) {
+/** 取出归一化后的 provider 名(缺省 kimi-api)。 */
+function modelProvider(kimiConfig: KimiConfig): string {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
-/** 入口:开启 SSE 流、逐 token 转发模型输出,并把整次对话记录为一条 run。 @param {StreamChatOptions} options */
+/** 入口:开启 SSE 流、逐 token 转发模型输出,并把整次对话记录为一条 run。 */
 export async function streamChat({
   response,
   requestContext,
@@ -56,7 +94,7 @@ export async function streamChat({
   runStoreRoot,
   runsIndex,
   cancellation = null,
-}) {
+}: StreamChatOptions): Promise<void> {
   response.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
     'cache-control': 'no-store',
@@ -69,7 +107,7 @@ export async function streamChat({
   sse(response, 'start', { runId });
 
   /** 落盘一条 run 记录并更新索引;索引失败不应中断流。 @param {string} status @param {Record<string, unknown>} extra */
-  const record = (status, extra) => {
+  const record = (status: string, extra: Record<string, unknown>): string => {
     const finishedAt = new Date();
     const base = {
       id: runId,
@@ -91,7 +129,7 @@ export async function streamChat({
     } catch {
       // index failure must not break the stream
     }
-    return runPath;
+    return String(runPath);
   };
 
   // Stamp a system message with today's real-world date / cwd / OS / model so
@@ -117,8 +155,8 @@ export async function streamChat({
       userAgent: kimiConfig.userAgent,
       temperature: kimiConfig.temperature,
       signal,
-      onToken: (delta) => { text += String(delta); sse(response, 'token', { delta }); },
-      onReasoning: (delta) => sse(response, 'reasoning', { delta }),
+      onToken: (delta: string) => { text += String(delta); sse(response, 'token', { delta }); },
+      onReasoning: (delta: string) => sse(response, 'reasoning', { delta }),
     });
     text = (result && result.text) || text;
     const model = (result && result.model) || kimiConfig.model;
