@@ -1,5 +1,3 @@
-// @ts-check
-
 // 工具结果摘要器(host · L1 领域层 · kimi/context)
 // ---------------------------------------------------------------------------
 // 职责:超过 token 预算时,把冗长工具结果递归抽取为「关键点 + 来源(路径/URL)
@@ -18,13 +16,41 @@ const SOURCE_KEY_RE = /(?:^|_)(?:path|file|source|url|href|uri|relativePath)$/iu
 const URL_RE = /\bhttps?:\/\/[^\s"'<>),]+/giu;
 const PATH_RE = /(?:[A-Za-z]:[\\/][^\s"'<>|]+|(?:\.{0,2}[\\/])?[\w.-]+(?:[\\/][\w .()[\]-]+)+)/gu;
 
-/**
- * @typedef {{ estimateText(value: unknown): number }} TokenEstimatorLike
- * @typedef {{ summarized: boolean, beforeTokens: number, afterTokens: number, content: string, sources: string[], keyPoints: string[] }} ShrinkResult
- */
+type TokenEstimatorLike = { estimateText(value: unknown): number };
 
-/** @param {unknown} value @returns {string} */
-function stableText(value) {
+export type ShrinkResult = {
+  summarized: boolean;
+  beforeTokens: number;
+  afterTokens: number;
+  content: string;
+  sources: string[];
+  keyPoints: string[];
+};
+
+type ToolResultSummarizerOptions = {
+  estimator?: TokenEstimatorLike;
+  maxTokens?: number;
+  maxSources?: number;
+  maxKeyPoints?: number;
+  previewLines?: number;
+};
+
+type ShrinkOptions = Pick<ToolResultSummarizerOptions, 'maxTokens' | 'maxSources' | 'maxKeyPoints'>;
+
+type InspectState = {
+  sources: string[];
+  keyPoints: string[];
+  maxSources: number;
+  maxKeyPoints: number;
+  pathHint?: string;
+  depth: number;
+};
+
+type RenderSummaryParts = Pick<ShrinkResult, 'beforeTokens' | 'sources' | 'keyPoints'> & {
+  preview: string[];
+};
+
+function stableText(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
@@ -35,20 +61,13 @@ function stableText(value) {
   }
 }
 
-/** @param {string} text @param {number} maxChars @returns {string} */
-function clipText(text, maxChars) {
+function clipText(text: string, maxChars: number): string {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, Math.max(0, maxChars - 18)).trim()} ...[truncated]`;
 }
 
-/**
- * @param {string[]} list
- * @param {string} value
- * @param {number} limit
- * @param {boolean} [priority]
- */
-function pushUnique(list, value, limit, priority = false) {
+function pushUnique(list: string[], value: string, limit: number, priority = false): void {
   const clean = clipText(value, 240);
   if (!clean) return;
   const key = clean.toLowerCase();
@@ -62,8 +81,7 @@ function pushUnique(list, value, limit, priority = false) {
   list.push(clean);
 }
 
-/** @param {string} text @param {number} maxTokens @param {TokenEstimatorLike} estimator @returns {string} */
-function clipToTokenBudget(text, maxTokens, estimator) {
+function clipToTokenBudget(text: string, maxTokens: number, estimator: TokenEstimatorLike): string {
   if (maxTokens <= 0) return '';
   if (estimator.estimateText(text) <= maxTokens) return text;
   let low = 0;
@@ -77,12 +95,7 @@ function clipToTokenBudget(text, maxTokens, estimator) {
   return `${text.slice(0, low).trim()} ...[truncated]`;
 }
 
-/**
- * @param {string} text
- * @param {string[]} sources
- * @param {number} limit
- */
-function collectSourcesFromText(text, sources, limit) {
+function collectSourcesFromText(text: string, sources: string[], limit: number): void {
   for (const match of text.matchAll(URL_RE)) {
     pushUnique(sources, match[0], limit);
   }
@@ -90,17 +103,15 @@ function collectSourcesFromText(text, sources, limit) {
     pushUnique(sources, match[0].replace(/\\/g, '/'), limit);
   }
   const sourceLabel = text.match(/\b(?:file|source|path|url)\s*[:=]\s*([^\s,;]+)/iu);
-  if (sourceLabel) {
+  if (sourceLabel?.[1]) {
     pushUnique(sources, sourceLabel[1].replace(/\\/g, '/'), limit);
   }
 }
 
 /**
  * 递归遍历任意结构,沿途收集来源与关键点(限深 8 层防爆栈/循环)。
- * @param {unknown} value
- * @param {{ sources: string[], keyPoints: string[], maxSources: number, maxKeyPoints: number, pathHint?: string, depth: number }} state
  */
-function inspectValue(value, state) {
+function inspectValue(value: unknown, state: InspectState): void {
   if (value === undefined || value === null || state.depth > 8) return;
   if (typeof value === 'string') {
     collectSourcesFromText(value, state.sources, state.maxSources);
@@ -114,10 +125,12 @@ function inspectValue(value, state) {
   }
   if (typeof value !== 'object') return;
   if (Array.isArray(value)) {
-    for (const item of value) inspectValue(item, { ...state, depth: state.depth + 1 });
+    for (const item of value) {
+      inspectValue(item, { ...state, depth: state.depth + 1 });
+    }
     return;
   }
-  const record = /** @type {Record<string, unknown>} */ (value);
+  const record = value as Record<string, unknown>;
   const sourceValue = Object.entries(record).find(([key]) => SOURCE_KEY_RE.test(key))?.[1];
   const pathHint = typeof sourceValue === 'string'
     ? sourceValue.replace(/\\/g, '/')
@@ -148,12 +161,7 @@ function inspectValue(value, state) {
   }
 }
 
-/**
- * @param {string} text
- * @param {number} maxLines
- * @returns {string[]}
- */
-function previewLines(text, maxLines) {
+function previewLines(text: string, maxLines: number): string[] {
   return text
     .split(/\r?\n/u)
     .map((line) => clipText(line, 180))
@@ -161,11 +169,7 @@ function previewLines(text, maxLines) {
     .slice(0, maxLines);
 }
 
-/**
- * @param {{ beforeTokens: number, sources: string[], keyPoints: string[], preview: string[] }} parts
- * @returns {string}
- */
-function renderSummary(parts) {
+function renderSummary(parts: RenderSummaryParts): string {
   const keyPoints = parts.keyPoints.length ? parts.keyPoints.map((point) => `- ${point}`) : ['- none detected'];
   const sources = parts.sources.length ? parts.sources.map((source) => `- ${source}`) : ['- none detected'];
   const preview = parts.preview.length ? parts.preview.map((line) => `- ${line}`) : ['- omitted'];
@@ -182,10 +186,13 @@ function renderSummary(parts) {
 }
 
 export class ToolResultSummarizer {
-  /**
-   * @param {{ estimator?: TokenEstimatorLike, maxTokens?: number, maxSources?: number, maxKeyPoints?: number, previewLines?: number }} [options]
-   */
-  constructor(options = {}) {
+  estimator: TokenEstimatorLike;
+  maxTokens: number;
+  maxSources: number;
+  maxKeyPoints: number;
+  previewLines: number;
+
+  constructor(options: ToolResultSummarizerOptions = {}) {
     this.estimator = options.estimator || createHeuristicTokenEstimator();
     this.maxTokens = Math.max(1, Math.round(Number(options.maxTokens) || DEFAULT_MAX_TOKENS));
     this.maxSources = Math.max(1, Math.round(Number(options.maxSources) || DEFAULT_MAX_SOURCES));
@@ -195,20 +202,15 @@ export class ToolResultSummarizer {
 
   /**
    * 把工具结果收缩到 token 预算内:未超则原样返回,超则生成并逐级降级摘要。
-   * @param {unknown} result
-   * @param {{ maxTokens?: number, maxSources?: number, maxKeyPoints?: number }} [options]
-   * @returns {ShrinkResult}
    */
-  shrink(result, options = {}) {
+  shrink(result: unknown, options: ShrinkOptions = {}): ShrinkResult {
     const maxTokens = Math.max(1, Math.round(Number(options.maxTokens) || this.maxTokens));
     const maxSources = Math.max(1, Math.round(Number(options.maxSources) || this.maxSources));
     const maxKeyPoints = Math.max(1, Math.round(Number(options.maxKeyPoints) || this.maxKeyPoints));
     const content = stableText(result);
     const beforeTokens = this.estimator.estimateText(content);
-    /** @type {string[]} */
-    const sources = [];
-    /** @type {string[]} */
-    const keyPoints = [];
+    const sources: string[] = [];
+    const keyPoints: string[] = [];
     inspectValue(result, { sources, keyPoints, maxSources, maxKeyPoints, depth: 0 });
 
     if (beforeTokens <= maxTokens) {
@@ -238,11 +240,7 @@ export class ToolResultSummarizer {
   }
 }
 
-/**
- * 创建 ToolResultSummarizer 实例的工厂。
- * @param {{ estimator?: TokenEstimatorLike, maxTokens?: number, maxSources?: number, maxKeyPoints?: number, previewLines?: number }} [options]
- * @returns {ToolResultSummarizer}
- */
-export function createToolResultSummarizer(options = {}) {
+/** 创建 ToolResultSummarizer 实例的工厂。 */
+export function createToolResultSummarizer(options: ToolResultSummarizerOptions = {}): ToolResultSummarizer {
   return new ToolResultSummarizer(options);
 }
