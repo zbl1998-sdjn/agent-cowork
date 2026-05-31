@@ -1,4 +1,3 @@
-// @ts-check
 // 单次工具调用的执行管线(host · L1 领域层 · kimi/agent)
 // ---------------------------------------------------------------------------
 // 职责:把一次工具调用从头跑到尾——解析参数→schema 校验→pre_tool hook→计划/审批门禁
@@ -15,37 +14,70 @@ import {
   toolNeedsApproval,
 } from './approval-gate.js';
 import { validateToolArguments } from './arg-validator.js';
+import { traceToolResult, type RunTraceLike } from './run-trace-events.js';
 import { parseToolCall } from './tool-loop-support.js';
-import { traceToolResult } from './run-trace-events.js';
+import type { ApprovalRegistry, AuditBus, HookEngine, RequestContext } from './approval-gate.js';
 
-/**
- * @typedef {Record<string, unknown>} ToolArgs
- * @typedef {{ id?: unknown, function?: { name?: string, arguments?: string } }} ToolCall
- * @typedef {{ name: string, description?: string, mutating?: boolean, risk?: string, parameters?: unknown, handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> }} AgentTool
- * @typedef {{ formatToolResult(result: unknown, context: { toolName: string }): { content: string, summarized?: boolean, beforeTokens?: unknown, afterTokens?: unknown, sources?: unknown[], injectionFlagged?: boolean, injectionReasons?: unknown[] } }} ContextManager
- * @typedef {{ run(operation: () => unknown | Promise<unknown>): Promise<unknown>, lastRun: { retried?: boolean, attempts?: unknown, errors?: unknown } }} RetryPolicy
- * @typedef {{ check(): { shouldAbort?: boolean } & Record<string, unknown> }} BudgetGuard
- * @typedef {{ observe(call: { name: string, args: ToolArgs }, ok: boolean): { shouldBreak?: boolean, reason?: unknown, repeatCount?: unknown, consecutiveFailures?: unknown } }} LoopGuard
- * @typedef {{ start(name: string): { finish(status: string): void } }} TodoTracker
- * @typedef {(kind: string, extra?: Record<string, unknown>) => void} AuditFn
- * @typedef {(type: string, payload: Record<string, unknown>) => void} EmitFn
- * @typedef {{ saveCheckpoint(phase: string, step: number): void, stopOnBudget(decision: Record<string, unknown>): void }} ExecutorCallbacks
- * @typedef {{ call: ToolCall, stepNumber: number, toolMap: Map<string, AgentTool>, activeContextManager: ContextManager, activeRetryPolicy: RetryPolicy, activeBudgetGuard: BudgetGuard, activeLoopGuard: LoopGuard, toolCtx: Record<string, unknown>, toolTodos: TodoTracker, hasApprovals: boolean, autoApprove: boolean, approvals?: import('./approval-gate.js').ApprovalRegistry | null, sessionApproved: Set<string>, runId?: unknown, planMode: boolean, planApproved: boolean, hooks?: import('./approval-gate.js').HookEngine | null, audit: AuditFn, emit: EmitFn, messages: Array<Record<string, unknown>>, steps: Array<Record<string, unknown>>, context?: import('./approval-gate.js').RequestContext, runTrace?: import('./run-trace-events.js').RunTraceLike | null, callbacks: ExecutorCallbacks }} ExecuteToolCallOptions
- * @typedef {{ planApproved?: boolean, didMutate?: boolean, stopForBudget?: boolean, stopForLoopGuard?: boolean, breakToolLoop?: boolean }} ExecuteToolCallResult
- */
+export type ToolArgs = Record<string, unknown>;
+export type ToolCall = { id?: unknown; function?: { name?: string; arguments?: string } };
+export type AgentTool = { name: string; description?: string; mutating?: boolean; risk?: string; requiresApproval?: boolean; parameters?: unknown; handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> };
+export type FormattedToolResult = { content: string; summarized?: boolean; beforeTokens?: unknown; afterTokens?: unknown; sources?: unknown[]; injectionFlagged?: boolean; injectionReasons?: unknown[] };
+export type ContextManager = { formatToolResult(result: unknown, context: { toolName: string }): FormattedToolResult };
+export type RetryPolicy = {
+  run<T>(operation: () => Promise<T> | T): Promise<T>;
+  lastRun: { retried?: boolean; attempts?: unknown; errors?: unknown };
+};
+export type BudgetGuard = { check(): { shouldAbort?: boolean } & Record<string, unknown> };
+export type LoopGuard = {
+  observe(call: { name: string; args: ToolArgs }, ok: boolean): {
+    shouldBreak?: boolean;
+    reason?: unknown;
+    repeatCount?: unknown;
+    consecutiveFailures?: unknown;
+  };
+};
+export type TodoTracker = { start(name: string): { finish(status: string): void } };
+export type AuditFn = (kind: string, extra?: Record<string, unknown>) => void;
+export type EmitFn = (type: string, payload: Record<string, unknown>) => void;
+export type ExecutorCallbacks = { saveCheckpoint(phase: string, step: number): void; stopOnBudget(decision: Record<string, unknown>): void };
+export type ExecuteToolCallOptions = {
+  call: ToolCall;
+  stepNumber: number;
+  toolMap: Map<string, AgentTool>;
+  activeContextManager: ContextManager;
+  activeRetryPolicy: RetryPolicy;
+  activeBudgetGuard: BudgetGuard;
+  activeLoopGuard: LoopGuard;
+  toolCtx: Record<string, unknown>;
+  toolTodos: TodoTracker;
+  hasApprovals: boolean;
+  autoApprove: boolean;
+  approvals?: ApprovalRegistry | null;
+  sessionApproved: Set<string>;
+  runId?: unknown;
+  planMode: boolean;
+  planApproved: boolean;
+  hooks?: HookEngine | null;
+  audit: AuditFn;
+  emit: EmitFn;
+  messages: Array<Record<string, unknown>>;
+  steps: Array<Record<string, unknown>>;
+  context?: RequestContext;
+  runTrace?: RunTraceLike | null;
+  callbacks: ExecutorCallbacks;
+};
+export type ExecuteToolCallResult = { planApproved?: boolean; didMutate?: boolean; stopForBudget?: boolean; stopForLoopGuard?: boolean; breakToolLoop?: boolean };
 
-/** @param {unknown} result */
-function hasError(result) {
-  return !!(result && typeof result === 'object' && 'error' in result && /** @type {{ error?: unknown }} */ (result).error);
+function hasError(result: unknown): boolean {
+  return !!(result && typeof result === 'object' && 'error' in result && (result as { error?: unknown }).error);
 }
 
-/** @param {unknown} result */
-function resultPath(result) {
+function resultPath(result: unknown): string {
   if (!result || typeof result !== 'object' || !('path' in result)) return '';
-  return String(/** @type {{ path?: unknown }} */ (result).path || '');
+  return String((result as { path?: unknown }).path || '');
 }
 
-/** 执行一次工具调用的完整管线:校验→门禁→重试执行→记账/写回结果→预算与循环看护。 @param {ExecuteToolCallOptions} options @returns {Promise<ExecuteToolCallResult>} */
+/** 执行一次工具调用的完整管线:校验→门禁→重试执行→记账/写回结果→预算与循环看护。 */
 export async function executeToolCall({
   call,
   stepNumber,
@@ -71,7 +103,7 @@ export async function executeToolCall({
   context,
   runTrace,
   callbacks,
-}) {
+}: ExecuteToolCallOptions): Promise<ExecuteToolCallResult> {
   const { name, args } = parseToolCall(call);
   const toolName = String(name || '');
   emit('tool_call', { name: toolName, args });
@@ -98,7 +130,18 @@ export async function executeToolCall({
   }
 
   const planResult = await handleExitPlanMode({
-    name: toolName, args, hasApprovals, autoApprove, approvals, runId, emit, audit, steps, messages, call, context,
+    name: toolName,
+    args,
+    hasApprovals,
+    autoApprove,
+    approvals,
+    runId,
+    emit,
+    audit,
+    steps,
+    messages,
+    call,
+    context,
   });
   if (planResult.handled) {
     callbacks.saveCheckpoint('plan_result', stepNumber);
@@ -135,13 +178,13 @@ export async function executeToolCall({
 
   const todo = toolTodos.start(toolName);
   const toolStartedAt = Date.now();
-  let result;
+  let result: unknown;
   try {
     result = await activeRetryPolicy.run(async () => (
       tool && typeof tool.handler === 'function' ? tool.handler(args, toolCtx) : { error: `unknown tool: ${toolName}` }
     ));
   } catch (err) {
-    const error = /** @type {{ message?: unknown }} */ (err && typeof err === 'object' ? err : {});
+    const error = err && typeof err === 'object' ? err as { message?: unknown } : {};
     result = { error: error.message };
   }
   const durationMs = Math.max(0, Date.now() - toolStartedAt);
