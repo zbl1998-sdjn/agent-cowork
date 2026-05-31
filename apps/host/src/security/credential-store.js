@@ -1,3 +1,14 @@
+// 凭据加密存储(host · L0 基础层,无内部依赖)
+// ---------------------------------------------------------------------------
+// 职责:把第三方连接器(如 GitHub)OAuth 等机密「加密落盘」,只在内存中按需解密,
+//       并对外只暴露脱敏摘要(summary)。绝不把明文写日志或入库(plan/01 D.12)。
+// 加密器(Protector,可注入):
+//   · Windows → DPAPI(CurrentUser 作用域,密钥随用户/机器绑定);
+//   · 其他平台 → AES-256-GCM(密钥取自环境或 主机名:用户名:home 派生)。
+// 文件权限:0o600(仅属主可读写)。键 = tenant/user/provider/account 四元组。
+// 导出:createAesGcmProtector / createDpapiProtector / createDefaultCredentialProtector
+//       / createCredentialStore。
+
 import childProcess from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -26,7 +37,7 @@ function safePart(value, fallback) {
   return encodeURIComponent(text);
 }
 
-/** @param {CredentialIdentity} identity */
+/** 由身份四元组拼出存储键 `tenant/user/provider/account`(各段 URL 编码,空段报错)。 @param {CredentialIdentity} identity */
 function credentialKey(identity) {
   return [
     safePart(identity.tenantId, 'tenant_local'),
@@ -36,7 +47,7 @@ function credentialKey(identity) {
   ].join('/');
 }
 
-/** @param {string} filePath @returns {CredentialFile} */
+/** 读取存储文件;不存在则返回空库(容错:损坏的 entries 字段退化为空)。 @param {string} filePath @returns {CredentialFile} */
 function readStore(filePath) {
   if (!fs.existsSync(filePath)) {
     return { schemaVersion: 1, entries: {} };
@@ -51,7 +62,7 @@ function readStore(filePath) {
   };
 }
 
-/** @param {string} filePath @param {CredentialFile} data */
+/** 写回存储文件,权限收紧到 0o600(仅属主可读写)。 @param {string} filePath @param {CredentialFile} data */
 function writeStore(filePath, data) {
   ensureDir(filePath);
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
@@ -65,7 +76,7 @@ function scopesFrom(value) {
   return String(value.scope || '').split(/\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
-/** @param {unknown} account @returns {Record<string, unknown> | null} */
+/** 从账户对象只摘取可安全展示的字段(login/id/name/email),丢弃其余敏感内容。 @param {unknown} account @returns {Record<string, unknown> | null} */
 function safeAccount(account) {
   if (!account || typeof account !== 'object') return null;
   const source = /** @type {Record<string, unknown>} */ (account);
@@ -77,7 +88,7 @@ function safeAccount(account) {
   return Object.keys(out).length ? out : null;
 }
 
-/** @param {CredentialIdentity} identity @param {Record<string, unknown>} secret @returns {CredentialSummary} */
+/** 生成「可对外展示的脱敏摘要」:身份、scopes、账户安全字段、更新时间——不含任何密钥。 @param {CredentialIdentity} identity @param {Record<string, unknown>} secret @returns {CredentialSummary} */
 function summarize(identity, secret) {
   const account = safeAccount(secret.account);
   return {
@@ -96,7 +107,7 @@ function aesKey(keyMaterial) {
   return crypto.createHash('sha256').update(String(keyMaterial || '')).digest();
 }
 
-/** @param {{ keyMaterial?: unknown }} [options] @returns {CredentialProtector} */
+/** 造 AES-256-GCM 加密器(跨平台兜底):密文形如 `aesgcm:v1:iv:tag:data`,自带完整性校验。 @param {{ keyMaterial?: unknown }} [options] @returns {CredentialProtector} */
 export function createAesGcmProtector({ keyMaterial } = {}) {
   const key = aesKey(keyMaterial || process.env.KCW_CREDENTIAL_KEY || `${os.hostname()}:${os.userInfo().username}:${os.homedir()}`);
   return {
@@ -129,7 +140,7 @@ function powershellPath() {
   return fs.existsSync(windowsPowerShell) ? windowsPowerShell : 'powershell.exe';
 }
 
-/** @param {string} script @param {string} base64Input */
+/** 调 PowerShell 执行 DPAPI 加解密脚本,经 stdin 传 base64 输入(5s 超时、隐藏窗口)。 @param {string} script @param {string} base64Input */
 function runDpapi(script, base64Input) {
   const output = childProcess.execFileSync(powershellPath(), [
     '-NoProfile',
@@ -146,7 +157,7 @@ function runDpapi(script, base64Input) {
   return String(output).trim();
 }
 
-/** @returns {CredentialProtector} */
+/** 造 Windows DPAPI 加密器:密钥由当前用户账户保管,密文形如 `dpapi:v1:...`。 @returns {CredentialProtector} */
 export function createDpapiProtector() {
   const scope = '[System.Security.Cryptography.DataProtectionScope]::CurrentUser';
   return {
@@ -165,17 +176,21 @@ export function createDpapiProtector() {
   };
 }
 
-/** @returns {CredentialProtector} */
+/** 按平台选默认加密器:Windows 用 DPAPI,其余用 AES-GCM。 @returns {CredentialProtector} */
 export function createDefaultCredentialProtector() {
   if (process.platform === 'win32') return createDpapiProtector();
   return createAesGcmProtector();
 }
 
-/** @param {CredentialStoreOptions} [options] */
+/**
+ * 造凭据存储:提供 put/get/list/delete/deleteMany。
+ * 写入时密钥经 protector 加密成 sealed 落盘;list 只返回脱敏 summary,get 才解密还原明文。
+ * @param {CredentialStoreOptions} [options]
+ */
 export function createCredentialStore({ filePath, protector = createDefaultCredentialProtector() } = {}) {
   if (!filePath) throw new Error('createCredentialStore: filePath is required');
   return {
-    /** @param {CredentialIdentity} identity @param {Record<string, unknown>} secret */
+    /** 存入/覆盖一条凭据:明文加密为 sealed,同时保存脱敏 summary。 @param {CredentialIdentity} identity @param {Record<string, unknown>} secret */
     put(identity, secret) {
       const key = credentialKey(identity);
       const data = readStore(filePath);
@@ -187,14 +202,14 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
       writeStore(filePath, data);
       return { ...summary };
     },
-    /** @param {CredentialIdentity} identity */
+    /** 取出并解密一条凭据明文;不存在返回 null。 @param {CredentialIdentity} identity */
     get(identity) {
       const data = readStore(filePath);
       const entry = data.entries[credentialKey(identity)];
       if (!entry) return null;
       return JSON.parse(protector.unprotect(entry.sealed));
     },
-    /** @param {CredentialFilter} [filter] */
+    /** 列出匹配过滤条件的脱敏摘要(不解密、不含密钥)。 @param {CredentialFilter} [filter] */
     list(filter = {}) {
       const data = readStore(filePath);
       return Object.entries(data.entries)
@@ -207,7 +222,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
         })
         .map(([, entry]) => ({ ...(entry.summary || {}) }));
     },
-    /** @param {CredentialIdentity} identity */
+    /** 删除单条凭据;返回是否确有删除。 @param {CredentialIdentity} identity */
     delete(identity) {
       const key = credentialKey(identity);
       const data = readStore(filePath);
@@ -216,7 +231,7 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
       if (existed) writeStore(filePath, data);
       return existed;
     },
-    /** @param {CredentialFilter} [filter] */
+    /** 批量删除匹配过滤条件的凭据;返回删除条数(如撤销某租户某 provider 的全部授权)。 @param {CredentialFilter} [filter] */
     deleteMany(filter = {}) {
       const data = readStore(filePath);
       let removed = 0;

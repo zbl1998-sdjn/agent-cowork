@@ -1,8 +1,19 @@
 // @ts-check
+//
+// 路径安全策略(host · L0 基础层,无内部依赖)
+// ---------------------------------------------------------------------------
+// 职责:把外部传入的任意路径收敛进「可信根 trustedRoot」之内,并拦截对敏感文件/
+//       目录(.ssh、凭据、.env、私钥等)的访问。是所有文件读写工具的安全闸门——
+//       「路径 jail」就落在这里(参见 plan/01 D.12)。
+// 依赖:仅 node:fs / node:path(L0 不依赖任何内部模块)。
+// 导出:canonicalizePath / resolveWithinRoot / isSensitivePath /
+//       isWorkspaceIgnoredPath / assertTrustedPath / assertTrustedPathForCreate /
+//       assertReadableWorkspacePath / isTrustedPath。
 
 import fs from 'node:fs';
 import path from 'node:path';
 
+// 敏感「目录名」黑名单:路径中任意一段命中即视为敏感(凭据库、密钥目录等)。
 const SENSITIVE_SEGMENTS = new Set([
   '.aws',
   '.azure',
@@ -17,6 +28,7 @@ const SENSITIVE_SEGMENTS = new Set([
   '.kimi',
 ]);
 
+// 敏感「文件名」黑名单:即便落在可信根内,这些文件也不允许被工具读写。
 const SENSITIVE_FILENAMES = new Set([
   '.env',
   '.netrc',
@@ -29,7 +41,9 @@ const SENSITIVE_FILENAMES = new Set([
   'id_ed25519',
 ]);
 
+// 敏感「扩展名」黑名单:证书/私钥文件。
 const SENSITIVE_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx']);
+// 工作区检索时应忽略的目录(体积大且无业务价值),用于「可读工作区」收窄。
 const WORKSPACE_IGNORED_SEGMENTS = new Set(['node_modules', 'dist', 'build', 'coverage']);
 
 /** @returns {boolean} */
@@ -37,7 +51,7 @@ function isWindows() {
   return process.platform === 'win32';
 }
 
-/** @param {string} p @returns {string} */
+/** 归一化用于「比较」的路径:转正斜杠;Windows 上大小写不敏感故转小写。 @param {string} p @returns {string} */
 function normalizeForCompare(p) {
   const replaced = path.resolve(p).replace(/[\\]/g, '/');
   return isWindows() ? replaced.toLowerCase() : replaced;
@@ -48,7 +62,11 @@ function realpath(p) {
   return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
 }
 
-/** @param {string} input @returns {string} */
+/**
+ * 规范化为「真实绝对路径」:解析符号链接/junction/Windows 8.3 短名。
+ * 若路径尚未创建,回退到最近的已存在祖先目录再拼回缺失段(供写入前校验)。
+ * @param {string} input @returns {string}
+ */
 export function canonicalizePath(input) {
   const resolved = path.resolve(input);
   try {
@@ -76,7 +94,7 @@ export function canonicalizePath(input) {
   }
 }
 
-/** @param {string} inputPath @param {string | null} [relativeTo] @returns {string[]} */
+/** 取「可信根之下」的路径段序列;给定 relativeTo 时只检查根以内,否则取全路径段。 @param {string} inputPath @param {string | null} [relativeTo] @returns {string[]} */
 function segmentsBelowRoot(inputPath, relativeTo = null) {
   const normalized = normalizeForCompare(inputPath);
   if (!relativeTo) return normalized.split('/').filter(Boolean);
@@ -89,13 +107,14 @@ function segmentsBelowRoot(inputPath, relativeTo = null) {
   return normalized.split('/').filter(Boolean);
 }
 
-/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
+/** 把相对路径锚定到可信根、绝对路径原样解析(尚不做安全断言)。 @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function resolveWithinRoot(candidatePath, trustedRoot) {
   return path.isAbsolute(candidatePath)
     ? path.resolve(candidatePath)
     : path.resolve(trustedRoot, candidatePath);
 }
 
+// 判断路径是否「敏感」:文件名/扩展名命中黑名单,或路径段命中敏感目录。
 // `relativeTo` scopes directory-segment checks below the trusted root, while
 // filename/extension checks still apply to the target itself.
 /** @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
@@ -133,7 +152,7 @@ export function isSensitivePath(inputPath, relativeTo = null) {
   return false;
 }
 
-/** @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
+/** 工作区检索时是否应忽略该路径:隐藏目录、依赖/产物目录,或敏感路径。 @param {string} inputPath @param {string | null} [relativeTo] @returns {boolean} */
 export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
   const segments = segmentsBelowRoot(inputPath, relativeTo);
   for (const segment of segments) {
@@ -148,7 +167,7 @@ export function isWorkspaceIgnoredPath(inputPath, relativeTo = null) {
   return isSensitivePath(inputPath, relativeTo);
 }
 
-/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
+/** 断言为「可读工作区路径」:先过可信根校验,再排除被忽略/敏感路径;违反即抛错。 @param {string} candidatePath @param {string} trustedRoot @returns {string} */
 export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
   const safe = assertTrustedPath(candidatePath, trustedRoot);
   // `safe` is already realpath-canonicalized; canonicalize the root too so the
@@ -164,7 +183,11 @@ export function assertReadableWorkspacePath(candidatePath, trustedRoot) {
   return safe;
 }
 
-/** @param {string} candidatePath @param {string} trustedRoot @returns {string} */
+/**
+ * 断言路径在可信根「之内」且非敏感,返回规范化后的安全绝对路径;越界/敏感即抛错。
+ * 这是读取类工具的核心闸门(写入新文件用 assertTrustedPathForCreate)。
+ * @param {string} candidatePath @param {string} trustedRoot @returns {string}
+ */
 export function assertTrustedPath(candidatePath, trustedRoot) {
   const candidate = resolveWithinRoot(candidatePath, trustedRoot);
   const root = canonicalizePath(trustedRoot);
@@ -188,6 +211,9 @@ export function assertTrustedPath(candidatePath, trustedRoot) {
   return absoluteCandidate;
 }
 
+// 写入专用变体:目标文件「可能尚不存在」。普通 assertTrustedPath 对不存在路径
+// 调 realpath 不会解析 junction,会让 `根/<指向外部的junction>/新文件` 漏过;这里
+// 改为向上找到最近的「已存在祖先」并对其规范化,再要求真实父目录落在真实根内。
 // Create-aware variant for WRITE targets that may not exist yet. The plain
 // assertTrustedPath() canonicalizes the candidate, but realpath() of a
 // non-existent path returns the path unresolved — so `root/<junction-to-outside>/
@@ -227,7 +253,7 @@ export function assertTrustedPathForCreate(candidatePath, trustedRoot) {
   return finalPath;
 }
 
-/** @param {string} candidatePath @param {string} trustedRoot @returns {boolean} */
+/** assertTrustedPath 的「布尔版」:可信且非敏感返回 true,否则 false(不抛错)。 @param {string} candidatePath @param {string} trustedRoot @returns {boolean} */
 export function isTrustedPath(candidatePath, trustedRoot) {
   try {
     assertTrustedPath(candidatePath, trustedRoot);

@@ -1,4 +1,13 @@
 // @ts-check
+//
+// HTTP 请求/响应工具箱(host · L0 基础层,无内部依赖)
+// ---------------------------------------------------------------------------
+// 职责:为路由层提供与具体框架解耦的底层原语——JSON 响应、请求体读取(含 DoS 限额)、
+//       CORS/Host 同源校验(防 DNS rebinding)、请求上下文构造、幂等指纹等。
+// 安全:tenant/user 身份「绝不」信任客户端请求头(见 createRequestContext);
+//       写操作走 requiresOriginCheck + isAllowedOrigin 双闸门。
+// 导出:sendJson / withJsonBody / readJsonBody / createRequestContext / isAllowedOrigin
+//       / isAllowedHost / bodyFingerprint / sendFile 等。
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
@@ -7,7 +16,7 @@ import fs from 'node:fs';
 /** @typedef {Error & { statusCode?: number, payload?: Record<string, unknown> }} HttpError */
 /** @typedef {{ requireJsonContentType?: boolean, maxBytes?: number }} JsonBodyOptions */
 
-/** @param {HttpResponseLike} response @param {number} status @param {unknown} payload */
+/** 以 JSON 响应:序列化 payload 并写好 content-type 与 content-length。 @param {HttpResponseLike} response @param {number} status @param {unknown} payload */
 export function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
   response.writeHead(status, {
@@ -17,31 +26,31 @@ export function sendJson(response, status, payload) {
   response.end(body);
 }
 
-/** @param {HttpRequestLike} request @param {string} name @returns {string | undefined} */
+/** 取请求头(大小写不敏感);多值时取第一个。 @param {HttpRequestLike} request @param {string} name @returns {string | undefined} */
 export function headerValue(request, name) {
   const value = request.headers[name.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** @param {unknown} value @param {string} fallback @returns {string} */
+/** 校验并清洗头部值:仅允许有限字符集与长度,非法则回退 fallback(防注入)。 @param {unknown} value @param {string} fallback @returns {string} */
 export function stableHeader(value, fallback) {
   const text = String(value || '').trim();
   return /^[a-zA-Z0-9_.:-]{1,96}$/.test(text) ? text : fallback;
 }
 
-/** @param {HttpRequestLike} request @returns {boolean} */
+/** 请求体是否声明为 application/json。 @param {HttpRequestLike} request @returns {boolean} */
 export function isJsonContentType(request) {
   const value = String(headerValue(request, 'content-type') || '').toLowerCase();
   return value.split(';')[0].trim() === 'application/json';
 }
 
-/** @param {unknown} hostname @returns {boolean} */
+/** 是否为回环主机名(localhost / 127.0.0.1 / ::1)。 @param {unknown} hostname @returns {boolean} */
 export function isLoopbackHostname(hostname) {
   const value = String(hostname || '').toLowerCase();
   return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
 }
 
-/** @param {unknown} origin @returns {boolean} */
+/** CORS 来源白名单:无 Origin(同源/非浏览器)放行,回环与 Tauri webview 放行,其余拒绝。 @param {unknown} origin @returns {boolean} */
 export function isAllowedOrigin(origin) {
   const value = String(origin || '').trim();
   // No Origin header = same-origin navigation or a non-browser client (curl, the
@@ -72,7 +81,7 @@ export function isAllowedOrigin(origin) {
   }
 }
 
-/** @param {unknown} hostHeader @returns {boolean} */
+/** Host 头白名单(防 DNS rebinding):仅回环与 tauri.localhost 视为合法寻址本服务。 @param {unknown} hostHeader @returns {boolean} */
 export function isAllowedHost(hostHeader) {
   const value = String(hostHeader || '').trim();
   // No Host header = HTTP/1.0 or a non-browser client; not a DNS-rebinding vector,
@@ -92,13 +101,13 @@ export function isAllowedHost(hostHeader) {
   return isLoopbackHostname(hostname) || hostname === 'tauri.localhost';
 }
 
-/** @param {unknown} method @param {string} pathname @returns {boolean} */
+/** 是否需要做来源校验:/api/ 下的写方法(POST/PUT/PATCH/DELETE)才需要。 @param {unknown} method @param {string} pathname @returns {boolean} */
 export function requiresOriginCheck(method, pathname) {
   return pathname.startsWith('/api/')
     && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
 }
 
-/** @param {unknown} value @returns {string | undefined} */
+/** 稳定序列化:对象键按字典序排序,使「相同内容」总得到相同字符串(用于指纹/幂等)。 @param {unknown} value @returns {string | undefined} */
 export function stableJsonStringify(value) {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableJsonStringify(item) ?? 'null').join(',')}]`;
@@ -117,7 +126,7 @@ export function stableJsonStringify(value) {
   return JSON.stringify(value);
 }
 
-/** @param {unknown} body @returns {string} */
+/** 请求体的 SHA-256 指纹(基于稳定序列化),用于幂等键去重。 @param {unknown} body @returns {string} */
 export function bodyFingerprint(body) {
   return crypto
     .createHash('sha256')
@@ -125,7 +134,11 @@ export function bodyFingerprint(body) {
     .digest('hex');
 }
 
-/** @param {HttpRequestLike} request @returns {{ traceId: string, tenantId: string, userId: string, authenticated: boolean, idempotencyKey: string }} */
+/**
+ * 构造请求上下文:traceId、租户/用户身份、是否已认证、幂等键。
+ * 安全要点:tenant/user 一律从本地身份起步,「只」由后续验证过的会话/JWT 覆写,绝不取自请求头。
+ * @param {HttpRequestLike} request @returns {{ traceId: string, tenantId: string, userId: string, authenticated: boolean, idempotencyKey: string }}
+ */
 export function createRequestContext(request) {
   const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
   return {
@@ -141,7 +154,7 @@ export function createRequestContext(request) {
   };
 }
 
-/** @param {unknown} value @returns {string | null} */
+/** 安全地 decodeURIComponent 路径段;非法编码返回 null 而非抛错。 @param {unknown} value @returns {string | null} */
 export function decodePathSegment(value) {
   try {
     return decodeURIComponent(String(value));
@@ -150,7 +163,7 @@ export function decodePathSegment(value) {
   }
 }
 
-/** @param {HttpResponseLike} response @param {string} filePath @param {string} contentType */
+/** 同步读取并直出文件(no-store);读失败返回 404 JSON。 @param {HttpResponseLike} response @param {string} filePath @param {string} contentType */
 export function sendFile(response, filePath, contentType) {
   try {
     const body = fs.readFileSync(filePath);
@@ -166,7 +179,10 @@ export function sendFile(response, filePath, contentType) {
   }
 }
 
-/** @param {HttpRequestLike} request @param {{ maxBytes?: number }} [options] @returns {Promise<unknown>} */
+/**
+ * 读取并解析 JSON 请求体;超过 maxBytes 抛 413(DoS 防护:暂停并丢弃后续分块,内存有界)。
+ * @param {HttpRequestLike} request @param {{ maxBytes?: number }} [options] @returns {Promise<unknown>}
+ */
 export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
   return new Promise((resolve, reject) => {
     /** @type {Buffer[]} */
@@ -216,7 +232,11 @@ export function readJsonBody(request, { maxBytes = 1024 * 1024 } = {}) {
   });
 }
 
-/** @param {HttpRequestLike} request @param {HttpResponseLike} response @param {(body: unknown) => void | Promise<void>} handler @param {JsonBodyOptions} [options] @returns {Promise<void>} */
+/**
+ * 路由处理的便捷包装:校验 content-type、读 JSON 体并交给 handler;统一把错误转成
+ * 415/413/400 等 JSON 响应(handler 内抛的带 statusCode 的错误也会被规范化)。
+ * @param {HttpRequestLike} request @param {HttpResponseLike} response @param {(body: unknown) => void | Promise<void>} handler @param {JsonBodyOptions} [options] @returns {Promise<void>}
+ */
 export async function withJsonBody(request, response, handler, options = {}) {
   if (options.requireJsonContentType !== false && !isJsonContentType(request)) {
     sendJson(response, 415, { error: 'content-type must be application/json' });

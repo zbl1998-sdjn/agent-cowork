@@ -1,3 +1,10 @@
+// 脱敏(host · L0 基础层,无内部依赖)
+// ---------------------------------------------------------------------------
+// 职责:在「写日志 / 返回错误体 / 落审计证据」之前,把密钥与敏感文件路径从文本中
+//       抹掉。这是纵深防御的「最后一道网」——调用方仍应首先避免打印密钥。
+// 依赖:无(纯正则)。导出:redactText(单值) / redactValue(递归对象/数组)。
+// 设计要点见下方英文注释(为什么用全局正则、为什么保留 label 只抹 value)。
+//
 // Secret/PII redaction — a defense-in-depth net that scrubs secrets and
 // sensitive filesystem paths out of any text before it is logged, returned in an
 // error body, or written to audit/evidence files.
@@ -44,6 +51,7 @@ const SENSITIVE_PATHS = [
 ];
 
 /**
+ * 抹掉「label=value / label:value」形式的密钥值,以及 Authorization/Bearer 令牌;保留 label 便于排错。
  * @param {string} text
  * @returns {string}
  */
@@ -55,6 +63,7 @@ function maskAssignments(text) {
 }
 
 /**
+ * 抹掉敏感文件系统路径(凭据库、.ssh、Windows AppData),避免日志泄露目录布局。
  * @param {string} text
  * @returns {string}
  */
@@ -63,6 +72,7 @@ function maskPaths(text) {
 }
 
 /**
+ * 兜底:抹掉无 label 的裸令牌形态(sk- 开头的 API Key、JWT、长 opaque 段)。
  * @param {string} text
  * @returns {string}
  */
@@ -71,6 +81,7 @@ function maskTokens(text) {
 }
 
 /**
+ * 对单个值脱敏:依次抹赋值式密钥、敏感路径、裸令牌。null/undefined 原样返回,其余转字符串。
  * Redact a single value. Null/undefined pass through; other values are stringified.
  * @param {unknown} value
  * @returns {string | null | undefined}
@@ -85,6 +96,7 @@ export function redactText(value) {
 }
 
 /**
+ * 递归脱敏:对对象/数组里的每个字符串都做 redactText,常用于整体脱敏日志载荷。
  * Recursively redact every string inside an object/array.
  * @param {unknown} value
  * @returns {unknown}
