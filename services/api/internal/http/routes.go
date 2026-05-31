@@ -1,3 +1,6 @@
+// Package httpapi 是 api 服务的 HTTP 路由与中间件层(services/api · Go)。
+// 职责:声明 /health 与 /v1/* 路由;中间件统一注入请求上下文(trace/租户/用户/幂等键),并强制 POST /v1/* 必须带
+//       Idempotency-Key。身份从请求头清洗而来(与 Node host 的 request-utils 思路一致)。依赖:标准库。
 package httpapi
 
 import (
@@ -13,6 +16,7 @@ type contextKey string
 
 const requestContextKey contextKey = "agent-cowork-request-context"
 
+// RequestContext 是每个请求的归因上下文(trace/租户/用户/幂等键),随请求贯穿处理链。
 type RequestContext struct {
 	TraceID        string `json:"trace_id"`
 	TenantID       string `json:"tenant_id"`
@@ -20,6 +24,7 @@ type RequestContext struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 }
 
+// NewHandler 构建并返回挂好全部路由与请求上下文中间件的 http.Handler。
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +52,7 @@ func requestContext(r *http.Request) RequestContext {
 	return RequestContext{}
 }
 
+// requestContextMiddleware 注入请求上下文、回写 trace/租户/用户响应头,并对 POST /v1/* 强制校验幂等键。
 func requestContextMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := RequestContext{

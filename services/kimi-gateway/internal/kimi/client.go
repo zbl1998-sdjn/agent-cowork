@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// NewClient 用单个 baseURL/apiKey 构造带默认超时与默认重试策略的 Client。
 func NewClient(baseURL string, apiKey string, timeout time.Duration) Client {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
@@ -30,6 +31,7 @@ func NewClient(baseURL string, apiKey string, timeout time.Duration) Client {
 	}
 }
 
+// Chat 发起一次非流式对话:校验请求/策略,经重试 + 熔断 + 多端点轮换调用上游,返回聚合后的 ChatResponse。
 func (c Client) Chat(ctx context.Context, request ChatRequest) (ChatResponse, error) {
 	if err := c.validateChatRequest(request); err != nil {
 		return ChatResponse{}, err
@@ -76,6 +78,7 @@ func (c Client) Chat(ctx context.Context, request ChatRequest) (ChatResponse, er
 	return ChatResponse{}, lastErr
 }
 
+// ChatStream 发起流式对话:逐条把上游 SSE 解析成 StreamEvent 并通过 emit 回调输出(delta/tool_call/usage/done)。
 func (c Client) ChatStream(ctx context.Context, request ChatRequest, emit func(StreamEvent) error) error {
 	if emit == nil {
 		return errors.New("stream emitter is required")

@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// RetryPolicy 是重试策略(最多 MaxAttempts 次、间隔 Backoff);Validate 限定次数 1..5、退避非负,避免无界重试放大故障。
 type RetryPolicy struct {
 	MaxAttempts int
 	Backoff     time.Duration
