@@ -5,24 +5,32 @@
 // 依赖:node:path。导出:stamp/relSource/sourceBlock/combinedText/parseTableRows/actionRows/
 //       reimbursementRows/markdownOperation/csvOperation/xlsxOperation/binaryOperation 等。
 import path from 'node:path';
+import type { FileOperationInput } from '../workspace/file-operations.js';
 
-/**
- * @typedef {{ path?: string, relativePath?: string, kind?: string, content?: string, error?: string, size?: unknown, sha256?: string }} SourceLike
- * @typedef {import('../workspace/file-operations.js').FileOperationInput} FileOperationInput
- * @typedef {{ columns: string[], rows: string[][] }} ParsedTable
- */
+export type SourceLike = {
+  path?: string;
+  relativePath?: string;
+  kind?: string;
+  content?: string;
+  error?: string;
+  size?: unknown;
+  sha256?: string;
+};
 
-export function stamp() {
+export type ParsedTable = {
+  columns: string[];
+  rows: string[][];
+};
+
+export function stamp(): string {
   return `${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${Math.random().toString(16).slice(2, 6)}`;
 }
 
-/** @param {SourceLike} source @returns {string} */
-export function relSource(source) {
+export function relSource(source: SourceLike): string {
   return source.relativePath || source.path || 'unknown';
 }
 
-/** @param {SourceLike[]} sources @returns {string} */
-export function sourceBlock(sources) {
+export function sourceBlock(sources: SourceLike[]): string {
   if (!sources.length) {
     return '- 未提供可读取来源文件';
   }
@@ -31,8 +39,7 @@ export function sourceBlock(sources) {
     .join('\n');
 }
 
-/** @param {SourceLike[]} sources @returns {string} */
-export function combinedText(sources) {
+export function combinedText(sources: SourceLike[]): string {
   return sources
     .filter((source) => source.content)
     .map((source) => `## ${relSource(source)}\n${source.content}`)
@@ -40,13 +47,11 @@ export function combinedText(sources) {
     .slice(0, 20000);
 }
 
-/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @returns {string} */
-export function artifactPath(trustedRoot, recipeId, filename) {
+export function artifactPath(trustedRoot: string, recipeId: string, filename: string): string {
   return path.join(trustedRoot, '.AgentCowork', 'artifacts', `${recipeId}-${stamp()}-${filename}`);
 }
 
-/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {string} content @returns {FileOperationInput} */
-export function markdownOperation(trustedRoot, recipeId, filename, content) {
+export function markdownOperation(trustedRoot: string, recipeId: string, filename: string, content: string): FileOperationInput {
   return {
     type: 'write',
     path: artifactPath(trustedRoot, recipeId, filename),
@@ -54,8 +59,7 @@ export function markdownOperation(trustedRoot, recipeId, filename, content) {
   };
 }
 
-/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {Buffer} buffer @returns {FileOperationInput} */
-export function binaryOperation(trustedRoot, recipeId, filename, buffer) {
+export function binaryOperation(trustedRoot: string, recipeId: string, filename: string, buffer: Buffer): FileOperationInput {
   return {
     type: 'write',
     path: artifactPath(trustedRoot, recipeId, filename),
@@ -64,19 +68,16 @@ export function binaryOperation(trustedRoot, recipeId, filename, buffer) {
   };
 }
 
-/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {Buffer} workbook @returns {FileOperationInput} */
-export function xlsxOperation(trustedRoot, recipeId, filename, workbook) {
+export function xlsxOperation(trustedRoot: string, recipeId: string, filename: string, workbook: Buffer): FileOperationInput {
   return binaryOperation(trustedRoot, recipeId, filename, workbook);
 }
 
-/** @param {unknown} value @returns {string} */
-function csvEscape(value) {
+function csvEscape(value: unknown): string {
   const text = String(value ?? '');
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** @param {string} trustedRoot @param {string} recipeId @param {string} filename @param {unknown[][]} rows @returns {FileOperationInput} */
-export function csvOperation(trustedRoot, recipeId, filename, rows) {
+export function csvOperation(trustedRoot: string, recipeId: string, filename: string, rows: unknown[][]): FileOperationInput {
   const content = rows.map((row) => row.map(csvEscape).join(',')).join('\n') + '\n';
   return {
     type: 'write',
@@ -85,8 +86,7 @@ export function csvOperation(trustedRoot, recipeId, filename, rows) {
   };
 }
 
-/** @param {string} text @param {unknown} prompt @returns {string[][]} */
-export function actionRows(text, prompt) {
+export function actionRows(text: string, prompt: unknown): string[][] {
   const candidates = text
     .split(/\r?\n/)
     .map((line) => line.replace(/^[-*#\d.\s]+/, '').trim())
@@ -103,8 +103,7 @@ export function actionRows(text, prompt) {
   ]);
 }
 
-/** @param {string} text @returns {ParsedTable} */
-export function parseTableRows(text) {
+export function parseTableRows(text: string): ParsedTable {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -123,7 +122,7 @@ export function parseTableRows(text) {
   const width = Math.max(...rows.map((row) => row.length));
   const hasHeader = rows[0].length > 1;
   const columns = hasHeader ? rows[0].slice(0, width) : Array.from({ length: width }, (_, index) => `列${index + 1}`);
-  const seen = new Set();
+  const seen = new Set<string>();
   const cleaned = rows.slice(hasHeader ? 1 : 0).map((row, index) => {
     const normalized = Array.from({ length: columns.length }, (_, col) => row[col] || '');
     const key = normalized.join('\u0001');
@@ -137,8 +136,7 @@ export function parseTableRows(text) {
   };
 }
 
-/** @param {string} text @returns {string[][]} */
-export function reimbursementRows(text) {
+export function reimbursementRows(text: string): string[][] {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
