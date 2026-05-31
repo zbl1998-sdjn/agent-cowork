@@ -49,6 +49,11 @@ test('auth routes: register -> login -> me, and token sets request identity', as
     assert.equal(noAuth.status, 401);
     const badLogin = await J(base, '/api/auth/login', { method: 'POST', body: { username: 'alice', password: 'nope' } });
     assert.equal(badLogin.status, 401);
+
+    const malformedRegister = await J(base, '/api/auth/register', { method: 'POST', body: { username: ['alice'], password: 'hunter2x' } });
+    assert.equal(malformedRegister.status, 400);
+    const malformedLogin = await J(base, '/api/auth/login', { method: 'POST', body: { username: 'alice', password: ['hunter2x'] } });
+    assert.equal(malformedLogin.status, 400);
   } finally {
     await new Promise((r) => server.close(r));
   }

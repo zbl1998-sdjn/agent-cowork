@@ -2,22 +2,10 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/auth/* —— 注册/登录/访客/登出/会话查询,签发会话 token。
 // 依赖:L0 request-utils + L1 auth 用户存储(经参数注入)。导出:handleAuthRoutes。
+import { z } from 'zod';
 import { sendJson, withJsonBody, headerValue } from '../http/request-utils.js';
-
-/**
- * @typedef {import('../http/request-utils.js').HttpRequestLike & { method?: string }} RouteRequest
- * @typedef {import('../http/request-utils.js').HttpResponseLike} RouteResponse
- * @typedef {Error & { statusCode?: number }} RouteError
- * @typedef {{ username?: string, userId: string, tenantId: string, guest?: boolean, token?: string }} Identity
- * @typedef {{
- *   register(username: unknown, password: unknown): Identity,
- *   createSession(identity: Identity): string,
- *   createGuest(): Identity,
- *   login(username: unknown, password: unknown): Identity,
- *   resolveToken(token: string): Identity | null,
- *   logout(token: string): boolean,
- * }} AuthStoreLike
- */
+import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { Identity, SessionIdentity } from '../auth/user-store.js';
 
 // Local auth routes.
 //   POST /api/auth/register { username, password } -> { userId, token }
@@ -25,14 +13,49 @@ import { sendJson, withJsonBody, headerValue } from '../http/request-utils.js';
 //   GET  /api/auth/me       (Bearer token)         -> { userId, tenantId } or 401
 //   POST /api/auth/logout   (Bearer token)         -> { ok }
 
-/** @param {RouteRequest} request @returns {string} */
-function bearer(request) {
+type RouteRequest = HttpRequestLike & { method?: string };
+type RouteError = Error & { statusCode?: number };
+type AuthStoreLike = {
+  register(username: string, password: string): Identity;
+  createSession(identity: Identity): string;
+  createGuest(): SessionIdentity;
+  login(username: string, password: string): SessionIdentity;
+  resolveToken(token: string): Identity | null;
+  logout(token: string): boolean;
+};
+type AuthRouteOptions = {
+  request: RouteRequest;
+  response: HttpResponseLike;
+  pathname: string;
+  requestContext?: Record<string, unknown>;
+  authStore?: AuthStoreLike | null;
+};
+
+const credentialsBodySchema = z.preprocess(
+  (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {}),
+  z.object({
+    username: z.string().trim().min(1, 'username is required'),
+    password: z.string().min(1, 'password is required'),
+  }),
+);
+
+function bearer(request: RouteRequest): string {
   const value = headerValue(request, 'authorization') || '';
   return value.startsWith('Bearer ') ? value.slice(7) : '';
 }
 
-/** @param {{ request: RouteRequest, response: RouteResponse, pathname: string, requestContext?: Record<string, unknown>, authStore?: AuthStoreLike | null }} options */
-export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore }) {
+function errorPayload(err: unknown, fallbackStatus: number): { status: number; body: { error: string } } {
+  if (err instanceof z.ZodError) {
+    return { status: 400, body: { error: err.issues[0]?.message || 'invalid auth request' } };
+  }
+  if (err instanceof Error) {
+    const error = err as RouteError;
+    return { status: error.statusCode || fallbackStatus, body: { error: error.message } };
+  }
+  return { status: fallbackStatus, body: { error: 'auth request failed' } };
+}
+
+export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore }: AuthRouteOptions): Promise<boolean> {
   if (!authStore) {
     return false;
   }
@@ -40,13 +63,13 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/auth/register') {
     await withJsonBody(request, response, async (body) => {
       try {
-        const input = /** @type {{ username?: unknown, password?: unknown }} */ (body || {});
+        const input = credentialsBodySchema.parse(body);
         const identity = authStore.register(input.username, input.password);
         const token = authStore.createSession(identity);
         sendJson(response, 200, { ...identity, token });
       } catch (err) {
-        const error = /** @type {RouteError} */ (err);
-        sendJson(response, error.statusCode || 400, { error: error.message });
+        const error = errorPayload(err, 400);
+        sendJson(response, error.status, error.body);
       }
     });
     return true;
@@ -58,8 +81,8 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
     try {
       sendJson(response, 200, authStore.createGuest());
     } catch (err) {
-      const error = /** @type {RouteError} */ (err);
-      sendJson(response, error.statusCode || 500, { error: error.message });
+      const error = errorPayload(err, 500);
+      sendJson(response, error.status, error.body);
     }
     return true;
   }
@@ -67,11 +90,11 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/auth/login') {
     await withJsonBody(request, response, async (body) => {
       try {
-        const input = /** @type {{ username?: unknown, password?: unknown }} */ (body || {});
+        const input = credentialsBodySchema.parse(body);
         sendJson(response, 200, authStore.login(input.username, input.password));
       } catch (err) {
-        const error = /** @type {RouteError} */ (err);
-        sendJson(response, error.statusCode || 401, { error: error.message });
+        const error = errorPayload(err, 401);
+        sendJson(response, error.status, error.body);
       }
     });
     return true;
