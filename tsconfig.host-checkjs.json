@@ -67,7 +67,7 @@
     "apps/host/src/kimi/provider/index.js",
     "apps/host/src/kimi/provider/kimi.js",
     "apps/host/src/kimi/provider/openai-compatible.js",
-    "apps/host/src/kimi/provider/router.js",
+    "apps/host/src/kimi/provider/router.ts",
     "apps/host/src/kimi/prompt/refine-policy.ts",
     "apps/host/src/kimi/prompt/refiner.ts",
     "apps/host/src/kimi/safety/untrusted-content.ts",
