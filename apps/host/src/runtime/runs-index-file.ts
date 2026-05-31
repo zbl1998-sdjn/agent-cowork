@@ -3,33 +3,47 @@
 // 职责:基于「事件日志(jsonl)」的运行索引文件后端——以 upsert 事件追加方式维护可查询索引,
 //       按 tenant/user/trace 归一化记录。与 SQLite 后端同接口(端口与适配器)。
 // 依赖:node:fs/path + 同层 runs-index-utils。导出:RunsIndex。
-// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import { normaliseRecord, normaliseTenantId, normaliseUserId } from './runs-index-utils.js';
+import {
+  normaliseRecord,
+  normaliseTenantId,
+  normaliseUserId,
+  type NormalisedRunRecord,
+} from './runs-index-utils.js';
 
-/**
- * @typedef {{ id: string, tenantId: string, userId: string, traceId: string, type: string, status: string, startedAt?: unknown, updatedAt?: unknown, version?: number, [key: string]: unknown }} RunIndexRecord
- * @typedef {{ id?: unknown, op?: string, record?: RunIndexRecord, tenantId?: string, userId?: string, traceId?: unknown, ts?: unknown }} RunIndexEvent
- * @typedef {{ indexRoot?: string, now?: () => Date }} RunsIndexOptions
- * @typedef {{ traceId?: unknown }} RunsIndexContext
- * @typedef {{ tenantId?: unknown, userId?: unknown, limit?: unknown, status?: unknown, type?: unknown, recipeId?: unknown }} RunsIndexListOptions
- */
+export type RunIndexRecord = NormalisedRunRecord & Record<string, unknown>;
+export type RunIndexEvent = {
+  id?: unknown;
+  op?: string;
+  record?: RunIndexRecord;
+  tenantId?: string;
+  userId?: string;
+  traceId?: unknown;
+  ts?: unknown;
+};
+export type RunsIndexOptions = { indexRoot?: string; now?: () => Date };
+export type RunsIndexContext = { traceId?: unknown };
+export type RunsIndexListOptions = {
+  tenantId?: unknown;
+  userId?: unknown;
+  limit?: unknown;
+  status?: unknown;
+  type?: unknown;
+  recipeId?: unknown;
+};
 
-/** @param {string} dir @returns {string} */
-function ensureDirSync(dir) {
+function ensureDirSync(dir: string): string {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-/** @param {string} file @param {RunIndexEvent} event */
-function appendJsonl(file, event) {
+function appendJsonl(file: string, event: RunIndexEvent): void {
   ensureDirSync(path.dirname(file));
   fs.appendFileSync(file, `${JSON.stringify(event)}\n`, 'utf8');
 }
 
-/** @param {string} file @returns {RunIndexEvent[]} */
-function readJsonl(file) {
+function readJsonl(file: string): RunIndexEvent[] {
   if (!fs.existsSync(file)) {
     return [];
   }
@@ -39,50 +53,49 @@ function readJsonl(file) {
     .filter((line) => line.trim().length > 0)
     .map((line) => {
       try {
-        return JSON.parse(line);
+        return JSON.parse(line) as RunIndexEvent;
       } catch {
         return null;
       }
     })
-    .filter((event) => Boolean(event));
+    .filter((event): event is RunIndexEvent => Boolean(event));
 }
 
 export class RunsIndex {
-  /** @param {RunsIndexOptions} [options] */
-  constructor({ indexRoot, now = () => new Date() } = {}) {
+  readonly indexRoot: string;
+  readonly eventFile: string;
+  readonly now: () => Date;
+  readonly records: Map<string, RunIndexRecord>;
+
+  constructor({ indexRoot, now = () => new Date() }: RunsIndexOptions = {}) {
     if (!indexRoot || typeof indexRoot !== 'string') {
       throw new Error('RunsIndex: indexRoot is required');
     }
     this.indexRoot = indexRoot;
     this.eventFile = path.join(indexRoot, 'index.jsonl');
     this.now = now;
-    /** @type {Map<unknown, RunIndexRecord>} */
-    this.records = new Map();
+    this.records = new Map<string, RunIndexRecord>();
     this._replay();
   }
 
-  _replay() {
+  _replay(): void {
     const events = readJsonl(this.eventFile);
     for (const event of events) {
       if (!event || !event.id) {
         continue;
       }
+      const id = String(event.id);
       if (event.op === 'delete') {
-        this.records.delete(event.id);
+        this.records.delete(id);
         continue;
       }
-      const previous = this.records.get(event.id) || {};
-      this.records.set(event.id, /** @type {RunIndexRecord} */ ({ ...previous, ...event.record }));
+      const previous = this.records.get(id) || {};
+      this.records.set(id, { ...previous, ...event.record } as RunIndexRecord);
     }
   }
 
-  /**
-   * @param {unknown} record
-   * @param {RunsIndexContext} [context]
-   * @returns {RunIndexRecord}
-   */
-  upsert(record, context = {}) {
-    const normalised = normaliseRecord(record);
+  upsert(record: unknown, context: RunsIndexContext = {}): RunIndexRecord {
+    const normalised = normaliseRecord(record) as RunIndexRecord;
     const existing = this.records.get(normalised.id);
     if (existing) {
       normalised.version = (Number(existing.version) || 0) + 1;
@@ -101,17 +114,12 @@ export class RunsIndex {
     return normalised;
   }
 
-  /**
-   * @param {unknown} id
-   * @param {RunsIndexContext} [context]
-   * @returns {boolean}
-   */
-  remove(id, context = {}) {
-    const existing = this.records.get(id);
+  remove(id: unknown, context: RunsIndexContext = {}): boolean {
+    const existing = typeof id === 'string' ? this.records.get(id) : undefined;
     if (!existing) {
       return false;
     }
-    this.records.delete(id);
+    this.records.delete(id as string);
     appendJsonl(this.eventFile, {
       ts: this.now().toISOString(),
       op: 'delete',
@@ -123,13 +131,8 @@ export class RunsIndex {
     return true;
   }
 
-  /**
-   * @param {unknown} id
-   * @param {{ tenantId?: unknown }} [options]
-   * @returns {RunIndexRecord | null}
-   */
-  get(id, { tenantId } = {}) {
-    const record = this.records.get(id);
+  get(id: unknown, { tenantId }: { tenantId?: unknown } = {}): RunIndexRecord | null {
+    const record = typeof id === 'string' ? this.records.get(id) : undefined;
     if (!record) {
       return null;
     }
@@ -139,14 +142,17 @@ export class RunsIndex {
     return record;
   }
 
-  /**
-   * @param {RunsIndexListOptions} [options]
-   * @returns {RunIndexRecord[]}
-   */
-  list({ tenantId, userId, limit = 50, status, type, recipeId } = {}) {
+  list({
+    tenantId,
+    userId,
+    limit = 50,
+    status,
+    type,
+    recipeId,
+  }: RunsIndexListOptions = {}): RunIndexRecord[] {
     const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
     const wantUser = userId ? normaliseUserId(userId) : null;
-    const out = [];
+    const out: RunIndexRecord[] = [];
     for (const record of this.records.values()) {
       if (wantTenant && record.tenantId !== wantTenant) continue;
       if (wantUser && record.userId !== wantUser) continue;
@@ -160,22 +166,19 @@ export class RunsIndex {
     return out.slice(0, cap);
   }
 
-  /** @returns {number} */
-  size() {
+  size(): number {
     return this.records.size;
   }
 
-  /**
-   * @param {{ tenantId?: unknown }} [options]
-   * @returns {{ total: number, byStatus: Record<string, number>, byType: Record<string, number> }}
-   */
-  stats({ tenantId } = {}) {
+  stats({ tenantId }: { tenantId?: unknown } = {}): {
+    total: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+  } {
     const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
     let total = 0;
-    /** @type {Record<string, number>} */
-    const byStatus = Object.create(null);
-    /** @type {Record<string, number>} */
-    const byType = Object.create(null);
+    const byStatus: Record<string, number> = Object.create(null);
+    const byType: Record<string, number> = Object.create(null);
     for (const record of this.records.values()) {
       if (wantTenant && record.tenantId !== wantTenant) continue;
       total += 1;

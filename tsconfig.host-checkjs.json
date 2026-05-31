@@ -144,7 +144,7 @@
     "apps/host/src/runtime/run-store.ts",
     "apps/host/src/runtime/run-resume.ts",
     "apps/host/src/runtime/runs-index.ts",
-    "apps/host/src/runtime/runs-index-file.js",
+    "apps/host/src/runtime/runs-index-file.ts",
     "apps/host/src/runtime/runs-index-sqlite.js",
     "apps/host/src/runtime/runs-index-utils.ts",
     "apps/host/src/runtime/scheduler.js",
