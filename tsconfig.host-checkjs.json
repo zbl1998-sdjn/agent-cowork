@@ -188,7 +188,7 @@
     "apps/host/src/sandbox/wsl-docker-runner.ts",
     "apps/host/src/security/credential-store.ts",
     "apps/host/src/server.js",
-    "apps/host/src/skills/skill-registry.js",
+    "apps/host/src/skills/skill-registry.ts",
     "apps/host/src/storage/app-home.ts",
     "apps/host/src/storage/audit-events.ts",
     "apps/host/src/storage/cached-pg-schedule-store.ts",

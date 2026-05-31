@@ -10,18 +10,46 @@ import { listRecipes } from '../recipes/registry.js';
 // enabled/disabled state. This is the seam toward a real skill/plugin system
 // (the Claude Cowork skills + marketplace direction) without changing how
 // recipes execute.
-// @ts-check
 
-/**
- * @typedef {{ id: string, name: string, description?: string }} RecipeDescriptor
- * @typedef {{ trigger: string[], permissions: string[], outputs: string[] }} SkillManifest
- * @typedef {{ id: string, name: string, description: string, kind: 'recipe', trigger: string[], permissions: string[], outputs: string[], enabled: boolean }} SkillDescriptor
- * @typedef {{ recipes?: RecipeDescriptor[], initialDisabled?: Iterable<string> }} SkillRegistryOptions
- * @typedef {{ list(): SkillDescriptor[], get(id: string): SkillDescriptor | null, isEnabled(id: string): boolean, setEnabled(id: string, enabled: boolean): SkillDescriptor, enabledSkills(): SkillDescriptor[] }} SkillRegistry
- */
+type HttpError = Error & { statusCode?: number };
 
-/** @type {Record<string, SkillManifest>} */
-const MANIFEST = {
+export type RecipeDescriptor = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+export type SkillManifest = {
+  trigger: string[];
+  permissions: string[];
+  outputs: string[];
+};
+
+export type SkillDescriptor = {
+  id: string;
+  name: string;
+  description: string;
+  kind: 'recipe';
+  trigger: string[];
+  permissions: string[];
+  outputs: string[];
+  enabled: boolean;
+};
+
+export type SkillRegistryOptions = {
+  recipes?: RecipeDescriptor[];
+  initialDisabled?: Iterable<string>;
+};
+
+export type SkillRegistry = {
+  list(): SkillDescriptor[];
+  get(id: string): SkillDescriptor | null;
+  isEnabled(id: string): boolean;
+  setEnabled(id: string, enabled: boolean): SkillDescriptor;
+  enabledSkills(): SkillDescriptor[];
+};
+
+const MANIFEST: Record<string, SkillManifest> = {
   'meeting-actions': { trigger: ['会议', '纪要', '行动项', 'meeting'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'plan'] },
   'excel-cleaning': { trigger: ['表格', '清洗', 'excel', 'csv'], permissions: ['read-files', 'write-files'], outputs: ['xlsx'] },
   'reimbursement': { trigger: ['报销', '发票', '供应商'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'plan'] },
@@ -32,8 +60,7 @@ const MANIFEST = {
   'email-draft': { trigger: ['邮件', '草稿', 'email'], permissions: ['read-files'], outputs: ['md'] },
 };
 
-/** @param {RecipeDescriptor} recipe @returns {SkillManifest} */
-function manifestFor(recipe) {
+function manifestFor(recipe: RecipeDescriptor): SkillManifest {
   return MANIFEST[recipe.id] || {
     trigger: String(recipe.id || '').split('-').filter(Boolean),
     permissions: ['read-files', 'write-files'],
@@ -41,12 +68,13 @@ function manifestFor(recipe) {
   };
 }
 
-/** @param {SkillRegistryOptions} [options] @returns {SkillRegistry} */
-export function createSkillRegistry({ recipes = listRecipes(), initialDisabled = [] } = {}) {
+export function createSkillRegistry({
+  recipes = listRecipes(),
+  initialDisabled = [],
+}: SkillRegistryOptions = {}): SkillRegistry {
   const disabled = new Set(initialDisabled);
 
-  /** @param {RecipeDescriptor} recipe @returns {SkillDescriptor} */
-  function toSkill(recipe) {
+  function toSkill(recipe: RecipeDescriptor): SkillDescriptor {
     const manifest = manifestFor(recipe);
     return {
       id: recipe.id,
@@ -60,8 +88,7 @@ export function createSkillRegistry({ recipes = listRecipes(), initialDisabled =
     };
   }
 
-  /** @param {string} id @returns {RecipeDescriptor | null} */
-  function find(id) {
+  function find(id: string): RecipeDescriptor | null {
     return recipes.find((r) => r.id === id) || null;
   }
 
@@ -79,8 +106,7 @@ export function createSkillRegistry({ recipes = listRecipes(), initialDisabled =
     setEnabled(id, enabled) {
       const recipe = find(id);
       if (!recipe) {
-        /** @type {Error & { statusCode?: number }} */
-        const err = new Error(`skill not found: ${id}`);
+        const err = new Error(`skill not found: ${id}`) as HttpError;
         err.statusCode = 404;
         throw err;
       }
