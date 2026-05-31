@@ -26,34 +26,57 @@ const DDG_PROBE_TIMEOUT_MS = 5_000; // fail-fast on DDG so the auto-fallback to 
 const DEFAULT_MAX_RESULTS = 8;
 const RESULT_HARD_CAP = 20;
 
-/**
- * @typedef {Error & { statusCode?: number }} WebSearchError
- * @typedef {{ title: string, url: string, snippet: string }} SearchResult
- * @typedef {{ query?: unknown, maxResults?: unknown, provider?: unknown, allowInternal?: boolean, fetchImpl?: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown, timeoutMs?: number }} WebSearchOptions
- * @typedef {{ ok: boolean, provider: string, query: string, results: SearchResult[], note?: string }} WebSearchResponse
- */
+export type WebSearchError = Error & { statusCode?: number };
+export type SearchResult = { title: string; url: string; snippet: string };
+export type WebSearchResponseLike = {
+  ok?: boolean;
+  status?: number;
+  text(): Promise<string> | string;
+};
+export type WebSearchFetchLike = (
+  input: string,
+  init: { headers: Record<string, string>; signal: AbortSignal },
+) => Promise<WebSearchResponseLike> | WebSearchResponseLike;
+export type WebSearchOptions = {
+  query?: unknown;
+  maxResults?: unknown;
+  provider?: unknown;
+  allowInternal?: boolean;
+  fetchImpl?: WebSearchFetchLike;
+  lookupImpl?: (host: string) => Promise<unknown> | unknown;
+  timeoutMs?: number;
+};
+export type WebSearchResponse = {
+  ok: boolean;
+  provider: string;
+  query: string;
+  results: SearchResult[];
+  note?: string;
+};
 
-/**
- * @param {string} message
- * @param {number} [statusCode]
- * @returns {WebSearchError}
- */
-function fail(message, statusCode = 400) {
-  const error = /** @type {WebSearchError} */ (new Error(`web.search: ${message}`));
+type ProviderArgs = {
+  query: string;
+  maxResults: number;
+  fetchImpl: WebSearchFetchLike;
+  lookupImpl?: (host: string) => Promise<unknown> | unknown;
+  allowInternal: boolean;
+  timeoutMs: number;
+};
+
+function fail(message: string, statusCode = 400): WebSearchError {
+  const error = new Error(`web.search: ${message}`) as WebSearchError;
   error.statusCode = statusCode;
   return error;
 }
 
-/** @param {unknown} value */
-function safeQuery(value) {
+function safeQuery(value: unknown): string {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) throw fail('query is required');
   if (text.length > 400) throw fail('query too long (max 400 chars)');
   return text;
 }
 
-/** @param {unknown} value */
-function safeMaxResults(value) {
+function safeMaxResults(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_RESULTS;
   return Math.min(Math.max(1, Math.floor(n)), RESULT_HARD_CAP);
@@ -62,20 +85,17 @@ function safeMaxResults(value) {
 /**
  * 按所选提供商执行搜索(ddg/bing/auto/其他),返回归一化结果列表;query 与 maxResults 先做安全裁剪。
  * Run a search against the chosen provider. Returns a normalized result list.
- *
- * @param {WebSearchOptions} [options]
- * @returns {Promise<WebSearchResponse>}
  */
-export async function webSearch(options = {}) {
+export async function webSearch(options: WebSearchOptions = {}): Promise<WebSearchResponse> {
   const query = safeQuery(options.query);
   const maxResults = safeMaxResults(options.maxResults);
   const providerName = typeof options.provider === 'string' && options.provider ? options.provider : 'ddg';
-  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const fetchImpl = options.fetchImpl || globalThis.fetch as unknown as WebSearchFetchLike;
   if (typeof fetchImpl !== 'function') {
     throw fail('no fetch implementation available', 500);
   }
 
-  const baseArgs = {
+  const baseArgs: ProviderArgs = {
     query,
     maxResults,
     fetchImpl,
@@ -112,10 +132,8 @@ export async function webSearch(options = {}) {
 
 /**
  * 经 DuckDuckGo lite 端点搜索(精简 HTML,易解析);对搜索主机本身做 SSRF 校验。
- * @param {{ query: string, maxResults: number, fetchImpl: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown, allowInternal: boolean, timeoutMs: number }} args
- * @returns {Promise<WebSearchResponse>}
  */
-async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }) {
+async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }: ProviderArgs): Promise<WebSearchResponse> {
   // lite endpoint returns a strip-down HTML that's far easier to parse than the
   // standard SERP page. Stable enough for MVP; if it ever changes we'll get a
   // visible "0 results" instead of a silent crash.
@@ -129,7 +147,7 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response;
+  let response: WebSearchResponseLike | undefined;
   try {
     response = await fetchImpl(url.toString(), {
       headers: {
@@ -142,13 +160,16 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
       signal: controller.signal,
     });
   } catch (err) {
-    clearTimeout(timeout);
-    if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') {
+    if (err && (err as { name?: string }).name === 'AbortError') {
       throw fail(`search request timed out after ${timeoutMs}ms`, 504);
     }
-    throw fail(`search request failed: ${String(/** @type {Error} */ (err).message || err)}`, 502);
+    throw fail(`search request failed: ${String((err as Error).message || err)}`, 502);
+  } finally {
+    clearTimeout(timeout);
   }
-  clearTimeout(timeout);
+  if (!response) {
+    throw fail('search request failed: empty response', 502);
+  }
   if (!response.ok) {
     throw fail(`search returned HTTP ${response.status}`, 502);
   }
@@ -167,11 +188,8 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
  * 经 Bing HTML 结果页搜索——给无法访问 DDG(如国内网络)的用户兜底;公开、免密钥。
  * Bing HTML SERP — practical fallback for users who can't reach DDG
  * (mainland China etc.). Public, key-free, mostly stable HTML.
- *
- * @param {{ query: string, maxResults: number, fetchImpl: typeof globalThis.fetch, lookupImpl?: (host: string) => Promise<unknown> | unknown, allowInternal: boolean, timeoutMs: number }} args
- * @returns {Promise<WebSearchResponse>}
  */
-async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }) {
+async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }: ProviderArgs): Promise<WebSearchResponse> {
   const url = new URL('https://www.bing.com/search');
   url.searchParams.set('q', query);
   url.searchParams.set('count', String(Math.min(maxResults * 2, 20)));
@@ -180,7 +198,7 @@ async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowIn
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response;
+  let response: WebSearchResponseLike | undefined;
   try {
     response = await fetchImpl(url.toString(), {
       headers: {
@@ -191,13 +209,16 @@ async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowIn
       signal: controller.signal,
     });
   } catch (err) {
-    clearTimeout(timeout);
-    if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') {
+    if (err && (err as { name?: string }).name === 'AbortError') {
       throw fail(`bing search timed out after ${timeoutMs}ms`, 504);
     }
-    throw fail(`bing search request failed: ${String(/** @type {Error} */ (err).message || err)}`, 502);
+    throw fail(`bing search request failed: ${String((err as Error).message || err)}`, 502);
+  } finally {
+    clearTimeout(timeout);
   }
-  clearTimeout(timeout);
+  if (!response) {
+    throw fail('bing search request failed: empty response', 502);
+  }
   if (!response.ok) {
     throw fail(`bing returned HTTP ${response.status}`, 502);
   }
