@@ -2,121 +2,84 @@
 // ---------------------------------------------------------------------------
 // 职责:为每条运行记录补充指标——成功/失败判定、用量与费用透明化、耗时分阶段汇总,供 run-store 写入。
 // 依赖:同层 usage。导出:withRunMetrics(给 run 记录附加指标)。
-// @ts-check
-import { buildUsageTransparency } from './usage.js';
+import { buildUsageTransparency, type TimingInput } from './usage.js';
+
+type StepStats = { total: number; succeeded: number; failed: number };
+type ToolStats = { calls: number; succeeded: number; failed: number; unique: string[] };
+type StepCount = StepStats & { stepRecords: Record<string, unknown>[] };
+type UsageInput = { usage: unknown; provider: string; model: string; timing: TimingInput };
+
+export type RunMetrics = {
+  schemaVersion: 1;
+  provider: string;
+  model: string;
+  status: string;
+  tokens: ReturnType<typeof buildUsageTransparency>['tokens'];
+  cost: ReturnType<typeof buildUsageTransparency>['cost'];
+  duration: ReturnType<typeof buildUsageTransparency>['duration'];
+  steps: StepStats;
+  tools: ToolStats;
+  failures: { count: number; rate: number; runFailed: boolean };
+};
 
 const FAILURE_STATUSES = new Set(['failed', 'error', 'rejected', 'blocked', 'cancelled', 'timeout']);
 const SUCCESS_STATUSES = new Set(['succeeded', 'success', 'ok', 'completed', 'done']);
 
-/**
- * @param {unknown} value
- * @returns {value is Record<string, unknown>}
- */
-function isRecord(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/**
- * @param {Record<string, unknown>} source
- * @param {string} key
- * @returns {Record<string, unknown>}
- */
-function objectAt(source, key) {
+function objectAt(source: Record<string, unknown>, key: string): Record<string, unknown> {
   const value = source[key];
   return isRecord(value) ? value : {};
 }
 
-/**
- * @param {Record<string, unknown>} source
- * @param {string} key
- * @returns {unknown[]}
- */
-function arrayAt(source, key) {
+function arrayAt(source: Record<string, unknown>, key: string): unknown[] {
   const value = source[key];
   return Array.isArray(value) ? value : [];
 }
 
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function text(value) {
+function text(value: unknown): string {
   return value == null ? '' : String(value);
 }
 
-/**
- * @param {unknown} value
- * @returns {string | number | null | undefined}
- */
-function timingStamp(value) {
+function timingStamp(value: unknown): string | number | null | undefined {
   return typeof value === 'string' || typeof value === 'number' || value === null ? value : undefined;
 }
 
-/**
- * @param {unknown} value
- * @returns {number | null | undefined}
- */
-function timingDuration(value) {
+function timingDuration(value: unknown): number | null | undefined {
   if (value === undefined || value === null) return value;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 }
 
-/**
- * @param {Record<string, unknown>} step
- * @returns {string}
- */
-function stepTool(step) {
+function stepTool(step: Record<string, unknown>): string {
   return text(step.tool || step.name).trim();
 }
 
-/**
- * @param {Record<string, unknown>} event
- * @returns {string}
- */
-function eventTool(event) {
+function eventTool(event: Record<string, unknown>): string {
   return text(event.name || event.tool).trim();
 }
 
-/**
- * @param {Record<string, unknown>} item
- * @returns {boolean}
- */
-function failed(item) {
+function failed(item: Record<string, unknown>): boolean {
   if (item.ok === false) return true;
   return FAILURE_STATUSES.has(text(item.status).toLowerCase());
 }
 
-/**
- * @param {Record<string, unknown>} item
- * @returns {boolean}
- */
-function succeeded(item) {
+function succeeded(item: Record<string, unknown>): boolean {
   if (item.ok === true) return true;
   return SUCCESS_STATUSES.has(text(item.status).toLowerCase());
 }
 
-/**
- * @param {string[]} names
- * @returns {string[]}
- */
-function uniqueSorted(names) {
+function uniqueSorted(names: string[]): string[] {
   return Array.from(new Set(names.filter(Boolean))).sort();
 }
 
-/**
- * @param {number} value
- * @returns {number}
- */
-function roundRate(value) {
+function roundRate(value: number): number {
   return Number(value.toFixed(4));
 }
 
-/**
- * @param {Record<string, unknown>} record
- * @returns {{ usage: unknown, provider: string, model: string, timing: { startedAt?: string | number | null, finishedAt?: string | number | null, durationMs?: number | null } }}
- */
-function usageInput(record) {
+function usageInput(record: Record<string, unknown>): UsageInput {
   const result = objectAt(record, 'result');
   const existingMetrics = objectAt(record, 'metrics');
   const attributionModel = objectAt(objectAt(record, 'attribution'), 'model');
@@ -132,11 +95,7 @@ function usageInput(record) {
   };
 }
 
-/**
- * @param {Record<string, unknown>} record
- * @returns {{ total: number, succeeded: number, failed: number, stepRecords: Record<string, unknown>[] }}
- */
-function countSteps(record) {
+function countSteps(record: Record<string, unknown>): StepCount {
   const result = objectAt(record, 'result');
   const stepRecords = (arrayAt(result, 'steps').length ? arrayAt(result, 'steps') : arrayAt(record, 'steps'))
     .filter(isRecord);
@@ -159,12 +118,7 @@ function countSteps(record) {
   };
 }
 
-/**
- * @param {Record<string, unknown>} record
- * @param {Record<string, unknown>[]} stepRecords
- * @returns {{ calls: number, succeeded: number, failed: number, unique: string[] }}
- */
-function countTools(record, stepRecords) {
+function countTools(record: Record<string, unknown>, stepRecords: Record<string, unknown>[]): ToolStats {
   const stepTools = stepRecords.map(stepTool).filter(Boolean);
   if (stepTools.length) {
     const toolSteps = stepRecords.filter((step) => stepTool(step));
@@ -188,11 +142,7 @@ function countTools(record, stepRecords) {
   };
 }
 
-/**
- * @param {unknown} record
- * @returns {{ schemaVersion: 1, provider: string, model: string, status: string, tokens: { prompt_tokens: number, completion_tokens: number, total_tokens: number }, cost: ReturnType<typeof buildUsageTransparency>['cost'], duration: ReturnType<typeof buildUsageTransparency>['duration'], steps: { total: number, succeeded: number, failed: number }, tools: { calls: number, succeeded: number, failed: number, unique: string[] }, failures: { count: number, rate: number, runFailed: boolean } }}
- */
-export function buildRunMetrics(record) {
+export function buildRunMetrics(record: unknown): RunMetrics {
   const source = isRecord(record) ? record : {};
   const { usage, provider, model, timing } = usageInput(source);
   const usageSummary = buildUsageTransparency({ usage, provider, model, timing });
@@ -219,11 +169,7 @@ export function buildRunMetrics(record) {
   };
 }
 
-/**
- * @param {Record<string, unknown>} record
- * @returns {Record<string, unknown>}
- */
-export function withRunMetrics(record) {
+export function withRunMetrics<T extends Record<string, unknown>>(record: T): T & { metrics: RunMetrics } {
   return {
     ...record,
     metrics: buildRunMetrics(record),

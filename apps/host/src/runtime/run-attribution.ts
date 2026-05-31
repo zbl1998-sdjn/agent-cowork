@@ -112,7 +112,7 @@ export function buildRunAttribution(record: unknown): RunAttribution {
 
 /**
  */
-export function withRunAttribution(record: Record<string, unknown>): Record<string, unknown> {
+export function withRunAttribution<T extends Record<string, unknown>>(record: T): T & { attribution: RunAttribution } {
   return {
     ...record,
     attribution: buildRunAttribution(record),
