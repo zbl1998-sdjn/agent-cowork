@@ -1,4 +1,3 @@
-// @ts-check
 // 实时制品·刷新阶段:读 manifest/html,并按数据源拉取最新 viz 数据(host · L1 领域层 · artifacts)
 // ---------------------------------------------------------------------------
 // 职责:实时制品流水线「规格→渲染→刷新」的末环——读取已落盘的 manifest/html,
@@ -16,27 +15,45 @@ import {
   normalizeLiveArtifactDataSource,
   resolveLiveArtifactDataSourcePath,
 } from './live-spec.js';
+import type { LiveArtifactDataSource } from './live-spec.js';
+import type { VizSpec } from './viz.js';
 
-/**
- * @typedef {import('./live-spec.js').LiveArtifactDataSource} LiveArtifactDataSource
- * @typedef {import('./viz.js').VizSpec} VizSpec
- * @typedef {{ id: string, title: string, viz: VizSpec, dataSource?: unknown }} ArtifactManifest
- * @typedef {{ id: string, title: string, viz: VizSpec, dataSource?: unknown, refreshedAt?: string }} ArtifactData
- * @typedef {{ source?: string, name?: string, risk?: unknown, mutating?: boolean, requiresApproval?: boolean }} ToolDescriptor
- * @typedef {{ descriptor(name: string): ToolDescriptor | null | undefined, call(name: string, args: Record<string, unknown>, ctx: { trustedRoot: string, context?: unknown }): unknown | Promise<unknown> }} ToolRegistryLike
- */
+export type ArtifactManifest = {
+  id: string;
+  title: string;
+  viz: VizSpec;
+  dataSource?: unknown;
+};
+export type ArtifactData = {
+  id: string;
+  title: string;
+  viz: VizSpec;
+  dataSource?: unknown;
+  refreshedAt?: string;
+};
+export type ToolDescriptor = {
+  source?: string;
+  name?: string;
+  risk?: unknown;
+  mutating?: boolean;
+  requiresApproval?: boolean;
+};
+export type ToolRegistryLike = {
+  descriptor(name: string): ToolDescriptor | null | undefined;
+  call(name: string, args: Record<string, unknown>, ctx: { trustedRoot: string; context?: unknown }): unknown | Promise<unknown>;
+};
 
-/** 读取并解析制品 manifest(JSON);文件不存在抛 404。 @param {{ trustedRoot: string, id: string }} options @returns {ArtifactManifest} */
-export function readArtifactManifest({ trustedRoot, id }) {
+/** 读取并解析制品 manifest(JSON);文件不存在抛 404。 */
+export function readArtifactManifest({ trustedRoot, id }: { trustedRoot: string; id: string }): ArtifactManifest {
   const { manifestPath } = artifactPaths({ trustedRoot, id });
   if (!fs.existsSync(manifestPath)) {
     throw fail('artifact not found', 404);
   }
-  return /** @type {ArtifactManifest} */ (JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+  return JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as ArtifactManifest;
 }
 
-/** 读取制品已落盘的活页 HTML 快照;文件不存在抛 404。 @param {{ trustedRoot: string, id: string }} options @returns {string} */
-export function readLiveArtifactHtml({ trustedRoot, id }) {
+/** 读取制品已落盘的活页 HTML 快照;文件不存在抛 404。 */
+export function readLiveArtifactHtml({ trustedRoot, id }: { trustedRoot: string; id: string }): string {
   const { htmlPath } = artifactPaths({ trustedRoot, id });
   if (!fs.existsSync(htmlPath)) {
     throw fail('artifact not found', 404);
@@ -44,12 +61,12 @@ export function readLiveArtifactHtml({ trustedRoot, id }) {
   return fs.readFileSync(htmlPath, 'utf8');
 }
 
-/** 读取并解析 JSON 文件;区分「文件缺失(404)」与「内容非法 JSON(400)」两类错误。 @param {string} filePath @returns {unknown} */
-function readJsonFile(filePath) {
+/** 读取并解析 JSON 文件;区分「文件缺失(404)」与「内容非法 JSON(400)」两类错误。 */
+function readJsonFile(filePath: string): unknown {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (err) {
-    const error = /** @type {{ code?: unknown }} */ (err);
+    const error = err as { code?: unknown };
     if (error && error.code === 'ENOENT') {
       throw fail('artifact data source not found', 404);
     }
@@ -57,20 +74,28 @@ function readJsonFile(filePath) {
   }
 }
 
-/** 从数据源载荷里取出 viz:优先取 payload.viz,否则把整个对象当作 viz。 @param {unknown} payload @returns {VizSpec} */
-function vizFromSourcePayload(payload) {
+/** 从数据源载荷里取出 viz:优先取 payload.viz,否则把整个对象当作 viz。 */
+function vizFromSourcePayload(payload: unknown): VizSpec {
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    const record = /** @type {Record<string, unknown>} */ (payload);
+    const record = payload as Record<string, unknown>;
     if (record.viz && typeof record.viz === 'object' && !Array.isArray(record.viz)) {
-      return /** @type {VizSpec} */ (record.viz);
+      return record.viz as VizSpec;
     }
-    return /** @type {VizSpec} */ (record);
+    return record as VizSpec;
   }
   throw fail('artifact data source must contain a viz object');
 }
 
-/** file-json 数据源刷新:读本地 JSON 文件取 viz 并用 renderViz 验一遍后返回。 @param {{ trustedRoot: string, manifest: ArtifactManifest, dataSource: LiveArtifactDataSource }} options @returns {ArtifactData} */
-function refreshFromFileJson({ trustedRoot, manifest, dataSource }) {
+/** file-json 数据源刷新:读本地 JSON 文件取 viz 并用 renderViz 验一遍后返回。 */
+function refreshFromFileJson({
+  trustedRoot,
+  manifest,
+  dataSource,
+}: {
+  trustedRoot: string;
+  manifest: ArtifactManifest;
+  dataSource: Extract<LiveArtifactDataSource, { type: 'file-json' }>;
+}): ArtifactData {
   const filePath = resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource });
   if (!filePath || !fs.existsSync(filePath)) {
     throw fail('artifact data source not found', 404);
@@ -86,8 +111,8 @@ function refreshFromFileJson({ trustedRoot, manifest, dataSource }) {
   };
 }
 
-/** 判定某 MCP 工具能否当实时数据源:放行只读 fs 读取,否则要求非变更、免审批、风险不高。 @param {ToolDescriptor | null | undefined} descriptor @returns {boolean} */
-function connectorDataSourceAllowed(descriptor) {
+/** 判定某 MCP 工具能否当实时数据源:放行只读 fs 读取,否则要求非变更、免审批、风险不高。 */
+function connectorDataSourceAllowed(descriptor: ToolDescriptor | null | undefined): boolean {
   if (!descriptor) {
     return false;
   }
@@ -100,31 +125,43 @@ function connectorDataSourceAllowed(descriptor) {
     && !['high', 'critical'].includes(risk);
 }
 
-/** 解析 MCP 工具返回:若是 content 数组则取其中的 text 片段当 JSON 解析,否则直接当对象。 @param {unknown} result @returns {Record<string, unknown>} */
-function parseConnectorToolPayload(result) {
+/** 解析 MCP 工具返回:若是 content 数组则取其中的 text 片段当 JSON 解析,否则直接当对象。 */
+function parseConnectorToolPayload(result: unknown): Record<string, unknown> {
   if (result && typeof result === 'object' && !Array.isArray(result)) {
-    const record = /** @type {{ content?: unknown }} */ (result);
+    const record = result as { content?: unknown };
     if (Array.isArray(record.content)) {
       const textPart = record.content.find((part) => {
-        const item = /** @type {{ type?: unknown, text?: unknown }} */ (part || {});
+        const item = part && typeof part === 'object' ? part as { type?: unknown; text?: unknown } : {};
         return item.type === 'text' && typeof item.text === 'string';
-      });
+      }) as { text: string } | undefined;
       if (!textPart) {
         throw fail('artifact connector data source must return text JSON');
       }
       try {
-        return /** @type {Record<string, unknown>} */ (JSON.parse(/** @type {{ text: string }} */ (textPart).text));
+        return JSON.parse(textPart.text) as Record<string, unknown>;
       } catch {
         throw fail('artifact connector data source text is not valid JSON');
       }
     }
-    return /** @type {Record<string, unknown>} */ (result);
+    return result as Record<string, unknown>;
   }
   throw fail('artifact connector data source must return a JSON object');
 }
 
-/** connector-tool 数据源刷新:校验工具已连接且被允许后调用它,解析返回里的 viz 并验证。 @param {{ trustedRoot: string, manifest: ArtifactManifest, dataSource: Extract<LiveArtifactDataSource, { type: 'connector-tool' }>, toolRegistry?: ToolRegistryLike | null, context?: unknown }} options @returns {Promise<ArtifactData>} */
-async function refreshFromConnectorTool({ trustedRoot, manifest, dataSource, toolRegistry, context }) {
+/** connector-tool 数据源刷新:校验工具已连接且被允许后调用它,解析返回里的 viz 并验证。 */
+async function refreshFromConnectorTool({
+  trustedRoot,
+  manifest,
+  dataSource,
+  toolRegistry,
+  context,
+}: {
+  trustedRoot: string;
+  manifest: ArtifactManifest;
+  dataSource: Extract<LiveArtifactDataSource, { type: 'connector-tool' }>;
+  toolRegistry?: ToolRegistryLike | null;
+  context?: unknown;
+}): Promise<ArtifactData> {
   if (!toolRegistry) {
     throw fail('artifact connector data source is unavailable', 503);
   }
@@ -149,8 +186,8 @@ async function refreshFromConnectorTool({ trustedRoot, manifest, dataSource, too
   };
 }
 
-/** 同步刷新制品数据:connector-tool 需异步刷新故在此拒绝(503),file-json 读文件,无数据源回退 manifest 自带 viz。 @param {{ trustedRoot: string, id: string, now?: Date }} options @returns {ArtifactData} */
-export function refreshLiveArtifactData({ trustedRoot, id, now = new Date() }) {
+/** 同步刷新制品数据:connector-tool 需异步刷新故在此拒绝(503),file-json 读文件,无数据源回退 manifest 自带 viz。 */
+export function refreshLiveArtifactData({ trustedRoot, id, now = new Date() }: { trustedRoot: string; id: string; now?: Date }): ArtifactData {
   const manifest = readArtifactManifest({ trustedRoot, id });
   const dataSource = normalizeLiveArtifactDataSource(manifest.dataSource);
   if (dataSource?.type === 'connector-tool') {
@@ -169,8 +206,20 @@ export function refreshLiveArtifactData({ trustedRoot, id, now = new Date() }) {
   };
 }
 
-/** 异步刷新制品数据:三路分发——connector-tool 调工具、file-json 读文件、无数据源回退 manifest viz。 @param {{ trustedRoot: string, id: string, now?: Date, toolRegistry?: ToolRegistryLike | null, context?: unknown }} options @returns {Promise<ArtifactData>} */
-export async function refreshLiveArtifactDataAsync({ trustedRoot, id, now = new Date(), toolRegistry, context }) {
+/** 异步刷新制品数据:三路分发——connector-tool 调工具、file-json 读文件、无数据源回退 manifest viz。 */
+export async function refreshLiveArtifactDataAsync({
+  trustedRoot,
+  id,
+  now = new Date(),
+  toolRegistry,
+  context,
+}: {
+  trustedRoot: string;
+  id: string;
+  now?: Date;
+  toolRegistry?: ToolRegistryLike | null;
+  context?: unknown;
+}): Promise<ArtifactData> {
   const manifest = readArtifactManifest({ trustedRoot, id });
   const dataSource = normalizeLiveArtifactDataSource(manifest.dataSource);
   const base = dataSource?.type === 'connector-tool'

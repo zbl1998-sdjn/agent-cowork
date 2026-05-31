@@ -19,7 +19,7 @@
     "apps/host/src/artifacts/artifact-catalog.ts",
     "apps/host/src/artifacts/live-artifact.js",
     "apps/host/src/artifacts/live-render.ts",
-    "apps/host/src/artifacts/live-refresh.js",
+    "apps/host/src/artifacts/live-refresh.ts",
     "apps/host/src/artifacts/office-writers.ts",
     "apps/host/src/artifacts/xlsx-writer.ts",
     "apps/host/src/artifacts/live-spec.ts",
