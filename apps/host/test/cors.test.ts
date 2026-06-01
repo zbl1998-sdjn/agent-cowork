@@ -4,13 +4,20 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import type { HostServer } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 
-function tempRoot() {
+function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-cors-'));
 }
-async function bind(server) {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return `http://127.0.0.1:${server.address().port}`;
+
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  return `http://127.0.0.1:${address.port}`;
 }
 
 test('host reflects CORS headers for a loopback origin (browser preview at :5173)', async () => {
@@ -23,7 +30,7 @@ test('host reflects CORS headers for a loopback origin (browser preview at :5173
     assert.equal(res.headers.get('access-control-allow-origin'), origin);
     assert.equal(res.headers.get('vary'), 'Origin');
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });
 
@@ -42,7 +49,7 @@ test('OPTIONS preflight from a loopback origin returns 204 with allow headers', 
     // previously surfaced as a misleading "configure API" hint in chat.
     assert.match(res.headers.get('access-control-allow-headers') || '', /authorization/i);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });
 
@@ -60,7 +67,7 @@ test('reflects CORS for the Tauri webview origin (Windows: http://tauri.localhos
     // the preflight for it must be allowed or the app logs in but can't chat.
     assert.match(pre.headers.get('access-control-allow-headers') || '', /authorization/i);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });
 
@@ -74,6 +81,6 @@ test('a non-loopback origin is not reflected and its preflight is rejected', asy
     const pre = await fetch(`${base}/api/tools/call`, { method: 'OPTIONS', headers: { origin } });
     assert.equal(pre.status, 403);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });

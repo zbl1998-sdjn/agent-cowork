@@ -1,13 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
+import type { ServerConfig } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+async function withServer(config: ServerConfig, fn: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = createServer({ requireAuth: false, ...config });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  const { port } = server.address();
-  try { await fn(`http://127.0.0.1:${port}`); } finally { await new Promise((r) => server.close(r)); }
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', (error) => reject(error));
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    await fn(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await closeTestServer(server);
+  }
 }
 
 const EXPECTED = {

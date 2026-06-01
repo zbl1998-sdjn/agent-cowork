@@ -1,20 +1,50 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyRequestMiddleware } from '../src/http/middleware/common.js';
+import type {
+  MiddlewareRequest,
+  MiddlewareResponse,
+  RequestContext,
+} from '../src/http/middleware/common.js';
 
-function makeResponse() {
-  const res = { statusCode: 0, headers: {}, ended: false, body: '' };
-  res.setHeader = (k, v) => { res.headers[String(k).toLowerCase()] = v; };
-  res.writeHead = (status, headers) => { res.statusCode = status; Object.assign(res.headers, headers || {}); };
-  res.end = (chunk) => { res.ended = true; if (chunk) res.body += String(chunk); };
+type CapturedResponse = MiddlewareResponse & {
+  statusCode: number;
+  headers: Record<string, string | number>;
+  ended: boolean;
+  body: string;
+};
+
+function makeResponse(): CapturedResponse {
+  const res: CapturedResponse = {
+    statusCode: 0,
+    headers: {},
+    ended: false,
+    body: '',
+    setHeader(name, value) {
+      res.headers[name.toLowerCase()] = value;
+    },
+    writeHead(statusCode, headers) {
+      res.statusCode = statusCode;
+      Object.assign(res.headers, headers ?? {});
+    },
+    end(chunk) {
+      res.ended = true;
+      if (chunk !== undefined) res.body += String(chunk);
+    },
+  };
   return res;
 }
 
-function makeRequest(host, method = 'GET') {
-  return { method, headers: host == null ? {} : { host }, on() {} };
+function makeRequest(host: string | null, method = 'GET'): MiddlewareRequest {
+  return { method, headers: host == null ? {} : { host }, on() { return undefined; } };
 }
 
-const ctx = () => ({ traceId: 't', tenantId: 'tenant_local', userId: 'user_local', authenticated: true });
+const ctx = (): RequestContext => ({
+  traceId: 't',
+  tenantId: 'tenant_local',
+  userId: 'user_local',
+  authenticated: true,
+});
 
 test('rejects a non-loopback Host header (DNS rebinding)', () => {
   const response = makeResponse();
