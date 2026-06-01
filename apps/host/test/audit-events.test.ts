@@ -5,8 +5,17 @@ import path from 'node:path';
 import test from 'node:test';
 import { AuditEventBus, createJsonlAuditSubscriber } from '../src/runtime/audit-events.js';
 
-function tempRoot() {
+type JsonRecord = Record<string, unknown>;
+
+function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-audit-'));
+}
+
+function requireJsonRecord(value: unknown, label: string): JsonRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a JSON object`);
+  }
+  return value as JsonRecord;
 }
 
 test('AuditEventBus writes structured JSONL asynchronously with trace_id', async () => {
@@ -27,7 +36,7 @@ test('AuditEventBus writes structured JSONL asynchronously with trace_id', async
   assert.equal(fs.existsSync(auditPath), false, 'subscriber should not run inline');
 
   await bus.flush();
-  const line = JSON.parse(fs.readFileSync(auditPath, 'utf8').trim());
+  const line = requireJsonRecord(JSON.parse(fs.readFileSync(auditPath, 'utf8').trim()), 'audit line');
   assert.equal(line.ts, '2026-05-21T00:00:00.000Z');
   assert.equal(line.trace_id, 'trace_test');
   assert.equal(line.tenant_id, 'tenant_test');
@@ -45,10 +54,13 @@ test('AuditEventBus flush reports subscriber failures', async () => {
   await assert.rejects(
     () => bus.flush(),
     (error) => {
+      assert.ok(error instanceof AggregateError);
       assert.equal(error.name, 'AggregateError');
       assert.match(error.message, /AuditEventBus subscriber failed/);
       assert.equal(error.errors.length, 1);
-      assert.match(error.errors[0].message, /audit sink failed/);
+      const [firstError] = error.errors as unknown[];
+      assert.ok(firstError instanceof Error);
+      assert.match(firstError.message, /audit sink failed/);
       return true;
     },
   );

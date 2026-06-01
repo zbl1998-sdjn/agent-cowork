@@ -3,18 +3,29 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import type { KimiTextResult } from '../src/kimi/api-runner.js';
+import type { HostServer } from '../src/server.js';
 import { createServer } from '../src/server.js';
 import { createRunId } from '../src/runtime/run-store.js';
 import { createUlid } from '../src/runtime/runs-index.js';
 import { createSeededIdSource } from '../src/util/ids.js';
+import { closeTestServer } from './helpers/close-server.js';
 
-function tempRoot() {
+function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-seeded-ids-'));
 }
 
-async function bind(server) {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return `http://127.0.0.1:${server.address().port}`;
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function fakeKimiChatRunner(): Promise<KimiTextResult> {
+  return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'ok', durationMs: 0 };
 }
 
 test('seeded id source makes run ids and ULIDs reproducible', () => {
@@ -42,7 +53,7 @@ test('agent stream runSeed emits a deterministic start runId', async () => {
   const server = createServer({
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: async () => ({}),
+    kimiChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: 'seeded done' }),
   });
   const base = await bind(server);
@@ -57,6 +68,6 @@ test('agent stream runSeed emits a deterministic start runId', async () => {
     assert.match(text, new RegExp(`"runId":"${expectedRunId}"`));
     assert.match(text, /seeded done/);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });
