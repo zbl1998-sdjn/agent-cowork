@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { Readable } from 'node:stream';
 import test from 'node:test';
 import { readJsonBody } from '../src/http/request-utils.js';
+import { ManualHttpRequest } from './helpers/manual-http-request.js';
 
-function requestFromText(text) {
-  const request = Readable.from([Buffer.from(text, 'utf8')]);
-  request.headers = { 'content-type': 'application/json' };
-  return request;
+async function readTextBody(text: string, maxBytes: number): Promise<unknown> {
+  const request = new ManualHttpRequest();
+  const body = readJsonBody(request, { maxBytes });
+  request.emit('data', Buffer.from(text, 'utf8'));
+  request.emit('end');
+  return body;
 }
 
 test('readJsonBody enforces maxBytes by UTF-8 byte length', async () => {
@@ -15,15 +17,13 @@ test('readJsonBody enforces maxBytes by UTF-8 byte length', async () => {
   assert.ok(Buffer.byteLength(payload, 'utf8') > maxBytes);
 
   await assert.rejects(
-    readJsonBody(requestFromText(payload), { maxBytes }),
+    () => readTextBody(payload, maxBytes),
     /Request body too large/,
   );
 });
 
 test('readJsonBody parses JSON within byte limit', async () => {
   const payload = JSON.stringify({ text: 'ok' });
-  const parsed = await readJsonBody(requestFromText(payload), {
-    maxBytes: Buffer.byteLength(payload, 'utf8'),
-  });
+  const parsed = await readTextBody(payload, Buffer.byteLength(payload, 'utf8'));
   assert.deepEqual(parsed, { text: 'ok' });
 });
