@@ -33,6 +33,7 @@
     "scripts/eval.ts",
     "scripts/host-ts-support.ts",
     "scripts/release.ts",
+    "scripts/run-host-node.ts",
     "scripts/smoke-kimi-api.ts",
     "scripts/smoke-local-operations.ts",
     "scripts/smoke-live-mvp.ts",
