@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRateLimiter } from '../src/runtime/rate-limit.js';
 
 test('token bucket allows a burst then rejects with Retry-After', () => {
-  let clock = 0;
+  const clock = 0;
   const rl = createRateLimiter({ ratePerSec: 2, burst: 3, now: () => clock });
   assert.equal(rl.take('t1').allowed, true);
   assert.equal(rl.take('t1').allowed, true);
@@ -24,7 +24,7 @@ test('bucket refills over time', () => {
 });
 
 test('limits are isolated per tenant', () => {
-  let clock = 0;
+  const clock = 0;
   const rl = createRateLimiter({ ratePerSec: 1, burst: 1, now: () => clock });
   assert.equal(rl.take('a').allowed, true);
   assert.equal(rl.take('a').allowed, false);
