@@ -61,14 +61,24 @@ function stdoutText(stdout: string | Buffer | undefined): string {
   return Buffer.isBuffer(stdout) ? stdout.toString('utf8') : String(stdout || '');
 }
 
-function trackedJsFiles(): string[] {
-  const git = spawnSync('git', ['-c', `safe.directory=${ROOT}`, 'ls-files', '-z', '--', '*.js', '*.jsx', '*.mjs', '*.cjs'], {
+function gitFiles(args: string[]): string[] | null {
+  const git = spawnSync('git', ['-c', `safe.directory=${ROOT}`, ...args, '-z', '--', '*.js', '*.jsx', '*.mjs', '*.cjs'], {
     cwd: ROOT,
     encoding: 'buffer',
     windowsHide: true,
   });
   if (git.status === 0 && git.stdout && stdoutText(git.stdout).length > 0) {
-    return stdoutText(git.stdout).split('\0').filter((file) => file && !isSkipped(file)).sort();
+    return stdoutText(git.stdout).split('\0').filter((file) => file && !isSkipped(file));
+  }
+  return git.status === 0 ? [] : null;
+}
+
+function repositoryJsFiles(): string[] {
+  // Catch local, untracked JS sources before they quietly become part of a later commit.
+  const tracked = gitFiles(['ls-files']);
+  const untracked = gitFiles(['ls-files', '--others', '--exclude-standard']);
+  if (tracked && untracked) {
+    return [...new Set([...tracked, ...untracked])].sort();
   }
   return walk(ROOT).sort();
 }
@@ -85,7 +95,7 @@ function isGeneratedBootstrapScript(relativePath: string): boolean {
   return Boolean(source && fs.existsSync(path.join(ROOT, source)));
 }
 
-const files = trackedJsFiles();
+const files = repositoryJsFiles();
 const unexpected = files.filter((file) => {
   return !isGeneratedBootstrapScript(file) && !isGeneratedResourceScript(file);
 });
