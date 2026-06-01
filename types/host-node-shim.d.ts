@@ -269,9 +269,9 @@ declare module 'node:dns' {
 }
 
 declare module 'node:test' {
-  export type TestContext = { skip(message?: string): void };
-  export type TestFunction = (context: TestContext) => unknown | Promise<unknown>;
-  export type TestOptions = { only?: boolean; skip?: boolean | string; todo?: boolean | string; timeout?: number };
+  export interface TestContext { skip(message?: string): void }
+  export interface TestFunction { (context: TestContext): unknown | Promise<unknown> }
+  export interface TestOptions { only?: boolean; skip?: boolean | string; todo?: boolean | string; timeout?: number }
   export default function test(name: string, fn: TestFunction): unknown;
   export default function test(name: string, options: TestOptions, fn: TestFunction): unknown;
 }
