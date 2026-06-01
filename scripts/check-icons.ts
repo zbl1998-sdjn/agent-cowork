@@ -15,7 +15,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stripComments } from './check-arch.mjs';
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT = path.resolve(process.env.KCW_ARCH_CHECK_ROOT || DEFAULT_ROOT);
@@ -33,7 +32,7 @@ const ICON_EMOJI = [
   ['📝', 'TEMPLATE'],
   ['📎', 'PAPERCLIP'],
   ['🕘', 'HISTORY'],
-];
+] satisfies readonly [string, string][];
 
 // Files that legitimately mention the emoji as documentation strings (panel
 // intros explaining "look for the 📥 button"). Keep this list small — most
@@ -44,15 +43,97 @@ const WAIVERS = new Set([
   'apps/windows-client/ui/src/components/panels/RuntimeDependenciesPanelView.tsx',
 ]);
 
-function toPosix(p) {
-  return p.split(path.sep).join('/');
+function stripComments(text: string): string {
+  const out: string[] = [];
+  let i = 0;
+  let inLine = false;
+  let inBlock = false;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inLine) {
+      if (ch === '\n') {
+        inLine = false;
+        out.push(ch);
+      }
+      i += 1;
+      continue;
+    }
+    if (inBlock) {
+      if (ch === '*' && next === '/') {
+        inBlock = false;
+        i += 2;
+        continue;
+      }
+      if (ch === '\n') out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (inSingle) {
+      if (ch === '\\') {
+        out.push(ch, next ?? '');
+        i += 2;
+        continue;
+      }
+      if (ch === "'") inSingle = false;
+      if (ch) out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '\\') {
+        out.push(ch, next ?? '');
+        i += 2;
+        continue;
+      }
+      if (ch === '"') inDouble = false;
+      if (ch) out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (inTemplate) {
+      if (ch === '\\') {
+        out.push(ch, next ?? '');
+        i += 2;
+        continue;
+      }
+      if (ch === '`') inTemplate = false;
+      if (ch) out.push(ch);
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      inLine = true;
+      i += 2;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      inBlock = true;
+      i += 2;
+      continue;
+    }
+    if (ch === "'") inSingle = true;
+    if (ch === '"') inDouble = true;
+    if (ch === '`') inTemplate = true;
+    if (ch) out.push(ch);
+    i += 1;
+  }
+  return out.join('');
 }
 
-function relFromRoot(p) {
-  return toPosix(path.relative(ROOT, p));
+function toPosix(filePath: string): string {
+  return filePath.split(path.sep).join('/');
 }
 
-function walk(dir, out = []) {
+function relFromRoot(filePath: string): string {
+  return toPosix(path.relative(ROOT, filePath));
+}
+
+function walk(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules') continue;
     const full = path.join(dir, entry.name);
@@ -65,8 +146,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-const files = walk(UI_SRC).filter((f) => !f.endsWith(path.join('lib', 'icons.ts')));
-const violations = [];
+const files = walk(UI_SRC).filter((file) => !file.endsWith(path.join('lib', 'icons.ts')));
+const violations: string[] = [];
 
 for (const file of files) {
   const rel = relFromRoot(file);
@@ -75,9 +156,9 @@ for (const file of files) {
   const stripped = stripComments(raw);
   for (const [emoji, name] of ICON_EMOJI) {
     if (stripped.includes(emoji)) {
-      // Locate first occurrence line number in the ORIGINAL text for the report.
-      const idx = raw.indexOf(emoji);
-      const line = idx >= 0 ? raw.slice(0, idx).split('\n').length : 0;
+      // Locate first occurrence line number in the original text for the report.
+      const index = raw.indexOf(emoji);
+      const line = index >= 0 ? raw.slice(0, index).split('\n').length : 0;
       violations.push(`${rel}:${line}: naked ${emoji} — use ICONS.${name} from lib/icons.ts`);
     }
   }
@@ -85,7 +166,7 @@ for (const file of files) {
 
 if (violations.length) {
   console.error('Icon-usage check failed:');
-  for (const v of violations) console.error(`- ${v}`);
+  for (const violation of violations) console.error(`- ${violation}`);
   process.exit(1);
 }
 

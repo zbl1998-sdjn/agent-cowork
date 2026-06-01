@@ -313,7 +313,7 @@ function runMain() {
 }
 
 // Only run the architecture scan when invoked as the main entrypoint.
-// `check-icons.mjs` imports `stripComments` from this file; without the guard
+// `check-icons.ts` uses the same strip-comments rule; without the guard
 // loading that import would run the scan a second time as a side-effect.
 const invokedAsMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedAsMain) runMain();
