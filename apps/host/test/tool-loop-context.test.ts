@@ -6,9 +6,29 @@ import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createContextManager } from '../src/kimi/context/context-manager.js';
 import { HeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
+import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ChatMessage, ContextManagerLike } from '../src/kimi/agent/tool-loop-types.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-context-'));
+}
+
+type EmittedEvent = { type: string; payload: Record<string, unknown> };
+
+function messageArray(value: unknown): ChatMessage[] {
+  assert.ok(Array.isArray(value), 'model call should receive messages');
+  return value as ChatMessage[];
+}
+
+function messageText(message: Record<string, unknown>): string {
+  const content = message.content;
+  assert.equal(typeof content, 'string', 'tool message content should be text');
+  return content as string;
+}
+
+function payloadRecord(value: unknown): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), 'event payload should be an object');
+  return value as Record<string, unknown>;
 }
 
 test('runAgentChat summarizes oversized tool results before the next model turn', async () => {
@@ -37,13 +57,13 @@ test('runAgentChat summarizes oversized tool results before the next model turn'
     }),
   }];
   let calls = 0;
-  let capturedToolMessage = null;
-  const modelCall = async ({ messages }) => {
+  let capturedToolMessage: ChatMessage | null = null;
+  const modelCall: ModelCall = async ({ messages }) => {
     calls += 1;
     if (calls === 1) {
       return { content: '', tool_calls: [{ id: 'call_search', function: { name: 'Search', arguments: '{}' } }] };
     }
-    capturedToolMessage = messages.at(-1);
+    capturedToolMessage = messageArray(messages).at(-1) || null;
     return { content: 'done' };
   };
 
@@ -53,17 +73,19 @@ test('runAgentChat summarizes oversized tool results before the next model turn'
     trustedRoot: root,
     tools,
     modelCall,
-    contextManager,
+    contextManager: contextManager as unknown as ContextManagerLike,
     runStoreRoot: path.join(root, 'runs'),
   });
 
   assert.equal(out.text, 'done');
-  assert.equal(capturedToolMessage?.role, 'tool');
-  assert.ok(estimator.estimateText(capturedToolMessage.content) <= 170);
-  assert.match(capturedToolMessage.content, /tool result summarized/i);
-  assert.match(capturedToolMessage.content, /OAuth callback state/i);
-  assert.match(capturedToolMessage.content, /src\/module-42\.js/);
-  assert.doesNotMatch(capturedToolMessage.content, /module-89.*alpha beta gamma.*alpha beta gamma/s);
+  const toolMessage = payloadRecord(capturedToolMessage);
+  const toolContent = messageText(toolMessage);
+  assert.equal(toolMessage.role, 'tool');
+  assert.ok(estimator.estimateText(toolContent) <= 170);
+  assert.match(toolContent, /tool result summarized/i);
+  assert.match(toolContent, /OAuth callback state/i);
+  assert.match(toolContent, /src\/module-42\.js/);
+  assert.equal(/module-89.*alpha beta gamma.*alpha beta gamma/s.test(toolContent), false);
 });
 
 test('runAgentChat marks tool output as untrusted data before the next model turn', async () => {
@@ -87,17 +109,17 @@ test('runAgentChat marks tool output as untrusted data before the next model tur
       return { ok: true };
     },
   }];
-  const events = [];
+  const events: EmittedEvent[] = [];
   let calls = 0;
-  let capturedToolMessage = null;
-  const modelCall = async ({ messages }) => {
+  let capturedToolMessage: ChatMessage | null = null;
+  const modelCall: ModelCall = async ({ messages }) => {
     calls += 1;
     if (calls === 1) {
       return { content: '', tool_calls: [{ id: 'call_search', function: { name: 'SearchWorkspace', arguments: '{}' } }] };
     }
     if (calls === 2) {
-      capturedToolMessage = messages.at(-1);
-      if (!/untrusted tool output/i.test(String(capturedToolMessage.content))) {
+      capturedToolMessage = messageArray(messages).at(-1) || null;
+      if (!/untrusted tool output/i.test(String(capturedToolMessage?.content || ''))) {
         return { content: '', tool_calls: [{ id: 'call_shell', function: { name: 'Shell', arguments: '{}' } }] };
       }
       return { content: 'treated as untrusted' };
@@ -111,15 +133,18 @@ test('runAgentChat marks tool output as untrusted data before the next model tur
     trustedRoot: root,
     tools,
     modelCall,
-    emit: (type, payload) => events.push({ type, payload }),
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
     runStoreRoot: path.join(root, 'runs'),
   });
 
   assert.equal(out.text, 'treated as untrusted');
   assert.equal(shellRuns, 0);
-  assert.match(capturedToolMessage.content, /BEGIN_UNTRUSTED_DATA/);
-  assert.match(capturedToolMessage.content, /SYSTEM OVERRIDE/);
+  const toolMessage = payloadRecord(capturedToolMessage);
+  const toolContent = messageText(toolMessage);
+  assert.match(toolContent, /BEGIN_UNTRUSTED_DATA/);
+  assert.match(toolContent, /SYSTEM OVERRIDE/);
   assert.ok(events.some((event) => event.type === 'untrusted_content_flagged'
     && event.payload.name === 'SearchWorkspace'
+    && Array.isArray(event.payload.reasons)
     && event.payload.reasons.includes('prompt_injection')));
 });

@@ -6,14 +6,43 @@ import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createLoopGuard } from '../src/kimi/agent/loop-guard.js';
 import { createRetryPolicy } from '../src/kimi/agent/tool-retry.js';
+import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-resilience-'));
 }
 
+type EmittedEvent = { type: string; payload: Record<string, unknown> };
+
+function messageArray(value: unknown): ChatMessage[] {
+  assert.ok(Array.isArray(value), 'model call should receive messages');
+  return value as ChatMessage[];
+}
+
+function assertMessage(value: ChatMessage | null): asserts value is ChatMessage {
+  assert.ok(value, 'expected captured tool message');
+}
+
+function messageText(message: ChatMessage): string {
+  const content = message.content;
+  assert.equal(typeof content, 'string', 'tool message content should be text');
+  return content as string;
+}
+
+function payloadRecord(value: unknown): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), 'event payload should be an object');
+  return value as Record<string, unknown>;
+}
+
+function eventRecord(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
 test('runAgentChat retries retryable tool failures before sending the tool result back to the model', async () => {
   const root = tmp();
-  const delays = [];
+  const delays: number[] = [];
   let toolAttempts = 0;
   const tools = [{
     name: 'FetchReport',
@@ -33,13 +62,13 @@ test('runAgentChat retries retryable tool failures before sending the tool resul
     sleep: async (delay) => { delays.push(delay); },
   });
   let calls = 0;
-  let capturedToolMessage = null;
-  const modelCall = async ({ messages }) => {
+  let capturedToolMessage: ChatMessage | null = null;
+  const modelCall: ModelCall = async ({ messages }) => {
     calls += 1;
     if (calls === 1) {
       return { content: '', tool_calls: [{ id: 'fetch_1', function: { name: 'FetchReport', arguments: '{}' } }] };
     }
-    capturedToolMessage = messages.at(-1);
+    capturedToolMessage = messageArray(messages).at(-1) || null;
     return { content: 'done' };
   };
 
@@ -56,13 +85,15 @@ test('runAgentChat retries retryable tool failures before sending the tool resul
   assert.equal(out.text, 'done');
   assert.equal(toolAttempts, 2);
   assert.deepEqual(delays, [5]);
-  assert.match(capturedToolMessage.content, /"ok": true/);
-  assert.doesNotMatch(capturedToolMessage.content, /ETIMEDOUT/);
+  assertMessage(capturedToolMessage);
+  const toolContent = messageText(capturedToolMessage);
+  assert.match(toolContent, /"ok": true/);
+  assert.equal(/ETIMEDOUT/.test(toolContent), false);
 });
 
 test('runAgentChat stops repeated identical tool calls through LoopGuard before exhausting maxSteps', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let toolExecutions = 0;
   const tools = [{
     name: 'Ping',
@@ -76,8 +107,8 @@ test('runAgentChat stops repeated identical tool calls through LoopGuard before 
     },
   }];
   const loopGuard = createLoopGuard({ maxRepeats: 2, maxConsecutiveFailures: 3 });
-  const modelCall = async ({ tools: modelTools }) => {
-    if (modelTools && modelTools.length > 0) {
+  const modelCall: ModelCall = async ({ tools: modelTools }) => {
+    if (Array.isArray(modelTools) && modelTools.length > 0) {
       return { content: '', tool_calls: [{ id: `ping_${Math.random()}`, function: { name: 'Ping', arguments: JSON.stringify({ target: 'same' }) } }] };
     }
     return { content: 'stopped by guard' };
@@ -91,18 +122,18 @@ test('runAgentChat stops repeated identical tool calls through LoopGuard before 
     modelCall,
     loopGuard,
     maxSteps: 6,
-    emit: (type, payload) => events.push({ type, payload }),
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
     runStoreRoot: path.join(root, 'runs'),
   });
 
   assert.equal(out.text, 'stopped by guard');
   assert.equal(toolExecutions, 2);
-  assert.ok(events.some((event) => event.type === 'loop_guard_break' && /repeated/i.test(event.payload.reason)));
+  assert.ok(events.some((event) => event.type === 'loop_guard_break' && /repeated/i.test(String(event.payload.reason || ''))));
 });
 
 test('runAgentChat stops consecutive identical tool failures through LoopGuard before exhausting maxSteps', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let toolExecutions = 0;
   const tools = [{
     name: 'ReadLockedFile',
@@ -116,8 +147,8 @@ test('runAgentChat stops consecutive identical tool failures through LoopGuard b
     },
   }];
   const loopGuard = createLoopGuard({ maxRepeats: 10, maxConsecutiveFailures: 2 });
-  const modelCall = async ({ tools: modelTools }) => {
-    if (modelTools && modelTools.length > 0) {
+  const modelCall: ModelCall = async ({ tools: modelTools }) => {
+    if (Array.isArray(modelTools) && modelTools.length > 0) {
       return { content: '', tool_calls: [{ id: `read_${toolExecutions + 1}`, function: { name: 'ReadLockedFile', arguments: JSON.stringify({ path: 'same.txt' }) } }] };
     }
     return { content: 'stopped after failures' };
@@ -131,7 +162,7 @@ test('runAgentChat stops consecutive identical tool failures through LoopGuard b
     modelCall,
     loopGuard,
     maxSteps: 6,
-    emit: (type, payload) => events.push({ type, payload }),
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
     runStoreRoot: path.join(root, 'runs'),
   });
 
@@ -139,16 +170,16 @@ test('runAgentChat stops consecutive identical tool failures through LoopGuard b
   assert.equal(toolExecutions, 2);
   assert.ok(events.some((event) => (
     event.type === 'loop_guard_break'
-    && /failed 2 consecutive times/i.test(event.payload.reason)
+    && /failed 2 consecutive times/i.test(String(event.payload.reason || ''))
   )));
 });
 
 test('runAgentChat does not retry permanent tool errors', async () => {
   const root = tmp();
-  const delays = [];
-  const events = [];
+  const delays: number[] = [];
+  const events: EmittedEvent[] = [];
   let toolAttempts = 0;
-  let capturedToolMessage = null;
+  let capturedToolMessage: ChatMessage | null = null;
   const tools = [{
     name: 'ReadSecret',
     risk: 'safe',
@@ -166,12 +197,12 @@ test('runAgentChat does not retry permanent tool errors', async () => {
     sleep: async (delay) => { delays.push(delay); },
   });
   let calls = 0;
-  const modelCall = async ({ messages }) => {
+  const modelCall: ModelCall = async ({ messages }) => {
     calls += 1;
     if (calls === 1) {
       return { content: '', tool_calls: [{ id: 'read_1', function: { name: 'ReadSecret', arguments: '{}' } }] };
     }
-    capturedToolMessage = messages.at(-1);
+    capturedToolMessage = messageArray(messages).at(-1) || null;
     return { content: 'done' };
   };
 
@@ -183,22 +214,23 @@ test('runAgentChat does not retry permanent tool errors', async () => {
     modelCall,
     retryPolicy,
     maxSteps: 4,
-    emit: (type, payload) => events.push({ type, payload }),
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
     runStoreRoot: path.join(root, 'runs'),
   });
 
   assert.equal(out.text, 'done');
   assert.equal(toolAttempts, 1);
   assert.deepEqual(delays, []);
-  assert.match(capturedToolMessage.content, /outside trusted root/);
+  assertMessage(capturedToolMessage);
+  assert.match(messageText(capturedToolMessage), /outside trusted root/);
   assert.ok(!events.some((event) => event.type === 'tool_retry'));
 });
 
 test('runAgentChat emits model_fallback when the primary provider fails and fallback succeeds', async () => {
   const root = tmp();
-  const events = [];
-  const seenProviders = [];
-  const modelCall = async ({ kimiConfig }) => {
+  const events: EmittedEvent[] = [];
+  const seenProviders: unknown[] = [];
+  const modelCall: ModelCall = async ({ kimiConfig }) => {
     seenProviders.push(kimiConfig.provider);
     if (kimiConfig.provider === 'openai') {
       throw new Error('primary temporary outage');
@@ -218,14 +250,15 @@ test('runAgentChat emits model_fallback when the primary provider fails and fall
     trustedRoot: root,
     tools: [],
     modelCall,
-    emit: (type, payload) => events.push({ type, payload }),
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
     runStoreRoot: path.join(root, 'runs'),
   });
 
   assert.equal(out.text, 'fallback done');
   assert.deepEqual(seenProviders, ['openai', 'openai/local']);
   const fallbackEvent = events.find((event) => event.type === 'model_fallback');
-  assert.equal(fallbackEvent.payload.failed.provider, 'openai');
-  assert.equal(fallbackEvent.payload.next.provider, 'openai/local');
+  assert.ok(fallbackEvent, 'model_fallback event should be emitted');
+  assert.equal(eventRecord(fallbackEvent.payload.failed, 'failed provider').provider, 'openai');
+  assert.equal(eventRecord(fallbackEvent.payload.next, 'next provider').provider, 'openai/local');
   assert.ok(!JSON.stringify(fallbackEvent).includes('sk-primary-secret'), 'fallback event leaked primary key');
 });
