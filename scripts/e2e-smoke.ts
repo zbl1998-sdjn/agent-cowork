@@ -2,6 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { HostServer } from '../apps/host/src/server.js';
+import type { ModelCall } from '../apps/host/src/kimi/agent/model-resilience.js';
+import type { KimiTextResult } from '../apps/host/src/kimi/api-runner.js';
+
+type StreamEvent = { event: string; data: unknown };
+type JsonRecord = Record<string, unknown>;
+type SmokeSummary = {
+  start: boolean;
+  toolCallCount: number;
+  toolResultCount: number;
+  shellResultCount: number;
+  shellOk: boolean;
+  approvals: number;
+  fileWritten: boolean;
+  done: boolean;
+  errors: unknown[];
+};
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const reportRoot = path.resolve(process.env.E2E_SMOKE_REPORT_DIR || path.join(repoRoot, 'reports', 'e2e-smoke'));
@@ -10,15 +27,19 @@ const liveRequested = process.env.E2E_SMOKE_REAL === '1' || process.env.E2E_SMOK
 const apiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY;
 const mode = liveRequested && apiKey ? 'live' : 'dry-run';
 
-function assert(condition, message) {
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function nowStamp() {
+function nowStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-function writeFixtureWorkspace() {
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' ? value as JsonRecord : null;
+}
+
+function writeFixtureWorkspace(): void {
   fs.mkdirSync(workspaceRoot, { recursive: true });
   fs.writeFileSync(
     path.join(workspaceRoot, 'input.txt'),
@@ -27,15 +48,16 @@ function writeFixtureWorkspace() {
   );
 }
 
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  return `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  assert(address && typeof address === 'object', 'server did not expose a TCP address');
+  return `http://127.0.0.1:${address.port}`;
 }
 
-async function postJson(baseUrl, route, body) {
+async function postJson(baseUrl: string, route: string, body: JsonRecord): Promise<unknown> {
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -46,7 +68,10 @@ async function postJson(baseUrl, route, body) {
   return payload;
 }
 
-async function parseSseChunk(buffer, onEvent) {
+async function parseSseChunk(
+  buffer: string,
+  onEvent: (event: string, data: unknown) => void | Promise<void>,
+): Promise<string> {
   let rest = buffer;
   for (;;) {
     const match = /\r?\n\r?\n/.exec(rest);
@@ -60,9 +85,9 @@ async function parseSseChunk(buffer, onEvent) {
       if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
     }
     if (!dataLines.length) continue;
-    let data = dataLines.join('\n');
+    let data: unknown = dataLines.join('\n');
     try {
-      data = JSON.parse(data);
+      data = JSON.parse(String(data)) as unknown;
     } catch {
       /* keep text data */
     }
@@ -70,8 +95,8 @@ async function parseSseChunk(buffer, onEvent) {
   }
 }
 
-async function runAgentStream(baseUrl) {
-  const events = [];
+async function runAgentStream(baseUrl: string): Promise<StreamEvent[]> {
+  const events: StreamEvent[] = [];
   const response = await fetch(`${baseUrl}/api/agent/chat/stream`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -84,6 +109,7 @@ async function runAgentStream(baseUrl) {
     }),
   });
   assert(response.ok, `/api/agent/chat/stream returned ${response.status}`);
+  assert(response.body, 'agent stream response did not include a readable body');
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -94,18 +120,24 @@ async function runAgentStream(baseUrl) {
     buffer += decoder.decode(value, { stream: true });
     buffer = await parseSseChunk(buffer, async (event, data) => {
       events.push({ event, data });
-      if (event === 'approval_request' && data && data.id) {
-        await postJson(baseUrl, `/api/approvals/${data.id}`, { decision: 'once' });
+      const payload = asRecord(data);
+      if (event === 'approval_request' && typeof payload?.id === 'string') {
+        await postJson(baseUrl, `/api/approvals/${payload.id}`, { decision: 'once' });
       }
     });
   }
-  await parseSseChunk(buffer, (event, data) => events.push({ event, data }));
+  await parseSseChunk(buffer, (event, data) => {
+    events.push({ event, data });
+  });
   return events;
 }
 
-function makeDryRunModelCall() {
+function makeDryRunModelCall(): ModelCall {
   let step = 0;
-  return async ({ onContent }) => {
+  return async (args) => {
+    const onContent = typeof args.onContent === 'function'
+      ? args.onContent as (content: string) => unknown
+      : undefined;
     step += 1;
     if (step === 1) {
       return {
@@ -159,11 +191,22 @@ function makeDryRunModelCall() {
   };
 }
 
-function summarize(events) {
+async function dryRunKimiChatRunner(): Promise<KimiTextResult> {
+  return {
+    ok: true,
+    provider: 'test',
+    model: 'dry-run',
+    mode: 'chat',
+    text: 'dry-run',
+    durationMs: 0,
+  };
+}
+
+function summarize(events: readonly StreamEvent[]): SmokeSummary {
   const eventNames = events.map((item) => item.event);
   const shellResults = events
-    .filter((item) => item.event === 'tool_result' && item.data?.name === 'Shell')
-    .map((item) => item.data?.result || {});
+    .filter((item) => item.event === 'tool_result' && asRecord(item.data)?.name === 'Shell')
+    .map((item) => asRecord(asRecord(item.data)?.result) || {});
   const shellOk = shellResults.some((result) => result.exitCode === 0 && String(result.stdout || '').includes('shell-ok'));
   return {
     start: eventNames.includes('start'),
@@ -178,7 +221,7 @@ function summarize(events) {
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   fs.mkdirSync(reportRoot, { recursive: true });
   writeFixtureWorkspace();
 
@@ -187,17 +230,21 @@ async function main() {
     staticRoot: false,
     requireAuth: false,
     enableScheduler: false,
-    agentModelCall: mode === 'dry-run' ? makeDryRunModelCall() : undefined,
-    kimiChatRunner: mode === 'dry-run' ? async () => ({ ok: true, text: 'dry-run' }) : undefined,
-    kimiApiKey: apiKey,
-    kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
-    kimiModel: process.env.KIMI_MODEL,
+    ...(mode === 'dry-run' ? {
+      agentModelCall: makeDryRunModelCall(),
+      kimiChatRunner: dryRunKimiChatRunner,
+    } : {}),
+    ...(apiKey ? { kimiApiKey: apiKey } : {}),
+    ...(process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL
+      ? { kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL }
+      : {}),
+    ...(process.env.KIMI_MODEL ? { kimiModel: process.env.KIMI_MODEL } : {}),
     kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
   });
 
   const startedAt = Date.now();
   const reportPath = path.join(reportRoot, `e2e-smoke-${nowStamp()}.json`);
-  let baseUrl = null;
+  let baseUrl: string | null = null;
   try {
     baseUrl = await bind(server);
     const events = await runAgentStream(baseUrl);
@@ -229,7 +276,7 @@ async function main() {
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify({ ok: true, mode, reportPath, summary }, null, 2));
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
@@ -241,9 +288,9 @@ main().catch((error) => {
     mode,
     generatedAt: new Date().toISOString(),
     workspace: workspaceRoot,
-    error: error.stack || error.message,
+    error: error instanceof Error ? (error.stack || error.message) : String(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(error instanceof Error ? (error.stack || error.message) : String(error));
   process.exit(1);
 });
