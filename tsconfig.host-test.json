@@ -105,6 +105,7 @@
     "apps/host/test/metrics.test.ts",
     "apps/host/test/mcp-client.test.ts",
     "apps/host/test/mcp-connect.test.ts",
+    "apps/host/test/mcp-fs-server.test.ts",
     "apps/host/test/mcp-json-rpc.test.ts",
     "apps/host/test/mcp-stdio-transport.test.ts",
     "apps/host/test/model-provider.test.ts",

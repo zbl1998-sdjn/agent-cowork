@@ -4,12 +4,23 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import { connectMcpServers, closeMcpClients } from '../src/mcp/connect.js';
 import { createToolRegistry } from '../src/tools/tool-registry.js';
+import { itemAt, toolCallResultSchema } from './helpers/mcp.js';
 
-const FS_SERVER = fileURLToPath(new URL('../mcp-servers/fs-server.mjs', import.meta.url));
+const FS_SERVER = fileURLToPath(new URL('../mcp-servers/fs-server.mjs', import.meta.url).href);
 
-function seedRoot() {
+const fsEntrySchema = z.object({
+  name: z.string(),
+  type: z.enum(['dir', 'file', 'other']),
+});
+
+const fsStatSchema = z.object({
+  type: z.enum(['dir', 'file']),
+}).passthrough();
+
+function seedRoot(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-fsmcp-'));
   fs.writeFileSync(path.join(root, 'a.txt'), 'hello world', 'utf8');
   fs.writeFileSync(path.join(root, '.npmrc'), 'token=secret', 'utf8');
@@ -17,28 +28,37 @@ function seedRoot() {
   return root;
 }
 
+function nodeExecPath(): string {
+  const execPath = process.execPath;
+  assert.ok(execPath, 'process.execPath should be available for MCP subprocess tests');
+  return execPath;
+}
+
+function textContent(value: unknown, label: string): string {
+  const result = toolCallResultSchema.parse(value);
+  return itemAt(result.content, 0, label).text;
+}
+
 test('fs-server exposes jailed filesystem tools over a real subprocess', async () => {
   const root = seedRoot();
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
   });
   try {
     assert.equal(out.toolCount, 3);
     assert.equal(registry.has('mcp__fs__list_dir'), true);
     assert.equal(registry.has('mcp__fs__read_text'), true);
 
-    const listed = await registry.call('mcp__fs__list_dir', {});
-    const entries = JSON.parse(listed.content[0].text);
-    const names = entries.map((e) => e.name).sort();
+    const entries = z.array(fsEntrySchema).parse(JSON.parse(textContent(await registry.call('mcp__fs__list_dir', {}), 'list_dir content')));
+    const names = entries.map((entry) => entry.name).sort();
     assert.deepEqual(names, ['a.txt', 'sub']);
 
-    const read = await registry.call('mcp__fs__read_text', { path: 'a.txt' });
-    assert.equal(read.content[0].text, 'hello world');
+    assert.equal(textContent(await registry.call('mcp__fs__read_text', { path: 'a.txt' }), 'read_text content'), 'hello world');
 
-    const stat = await registry.call('mcp__fs__stat', { path: 'sub' });
-    assert.equal(JSON.parse(stat.content[0].text).type, 'dir');
+    const stat = fsStatSchema.parse(JSON.parse(textContent(await registry.call('mcp__fs__stat', { path: 'sub' }), 'stat content')));
+    assert.equal(stat.type, 'dir');
   } finally {
     closeMcpClients(out.clients);
   }
@@ -49,7 +69,7 @@ test('fs-server blocks hidden and credential-like files inside the root', async 
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
   });
   try {
     await assert.rejects(
@@ -70,7 +90,7 @@ test('fs-server rejects path traversal outside the root', async () => {
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
   });
   try {
     await assert.rejects(
@@ -97,7 +117,7 @@ test('fs-server rejects symlink or junction escapes outside the root', async (t)
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: process.execPath, args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
   });
   try {
     await assert.rejects(

@@ -163,6 +163,7 @@ declare module 'node:fs' {
   export function renameSync(oldPath: string, newPath: string): void;
   export function rmSync(path: string, options?: { recursive?: boolean, force?: boolean }): void;
   export function statSync(path: string): Stats;
+  export function symlinkSync(target: string, path: string, type?: string): void;
   export function unlinkSync(path: string): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function writeFileSync(path: string, data: Buffer | string, options?: Record<string, unknown>): void;
@@ -268,7 +269,8 @@ declare module 'node:dns' {
 }
 
 declare module 'node:test' {
-  export type TestFunction = (context?: unknown) => unknown | Promise<unknown>;
+  export type TestContext = { skip(message?: string): void };
+  export type TestFunction = (context: TestContext) => unknown | Promise<unknown>;
   export type TestOptions = { only?: boolean; skip?: boolean | string; todo?: boolean | string; timeout?: number };
   export default function test(name: string, fn: TestFunction): unknown;
   export default function test(name: string, options: TestOptions, fn: TestFunction): unknown;
