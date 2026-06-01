@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { HostServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -13,16 +14,41 @@ const reportPath = archiveRequested
   ? path.join(reportRoot, `windows-paths-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
   : defaultReportPath;
 
-function assert(condition, message) {
+type JsonRecord = Record<string, unknown>;
+type RequestBody = JsonRecord & { idempotencyKey?: string };
+type ErrorResponse = { error?: unknown };
+type PathEntry = { path?: unknown };
+type FileTreeResponse = { files: PathEntry[] };
+type FileReadResponse = { content?: unknown; sha256?: unknown };
+type FilePreviewResponse = { kind?: unknown; text?: unknown };
+type SearchResponse = { results: PathEntry[] };
+type ContextBundleResponse = { files: unknown[] };
+type UploadResponse = { imported: Array<{ path?: unknown }> };
+type ArtifactCatalogResponse = { artifacts: Array<{ path?: unknown }> };
+type ArtifactRenameResponse = { artifact?: { path?: unknown } };
+type FileOpsPreviewResponse = { operations: unknown[]; fileOperationApprovalId?: unknown };
+type FileOpsApplyResponse = { applied: JsonRecord[]; rollbackApprovalId?: unknown };
+type FileOpsRollbackResponse = { rolledBack: unknown[] };
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function assertInside(child, parent, label) {
+function isErrorWithCode(error: unknown): error is Error & { code?: string } {
+  return error instanceof Error;
+}
+
+function errorDetails(error: unknown): string {
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+
+function assertInside(child: string, parent: string, label: string): void {
   const relative = path.relative(parent, child);
   assert(relative && !relative.startsWith('..') && !path.isAbsolute(relative), `${label} escaped expected parent: ${child}`);
 }
 
-function buildLongDirectory(root) {
+function buildLongDirectory(root: string): string {
   let current = path.join(root, '长路径');
   for (let index = 1; index <= 10; index += 1) {
     current = path.join(current, `第${index}层-中文目录-用于验证长路径处理`);
@@ -30,36 +56,49 @@ function buildLongDirectory(root) {
   return current;
 }
 
-async function postJson(baseUrl, route, body, expectedStatus = 200) {
-  const headers = { 'content-type': 'application/json' };
-  if (body?.idempotencyKey) headers['idempotency-key'] = body.idempotencyKey;
+async function postJson<T = JsonRecord>(
+  baseUrl: string,
+  route: string,
+  body: RequestBody,
+  expectedStatus = 200,
+): Promise<T> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (typeof body.idempotencyKey === 'string' && body.idempotencyKey) {
+    headers['idempotency-key'] = body.idempotencyKey;
+  }
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+  const payload = (text ? JSON.parse(text) : {}) as T;
   assert(response.status === expectedStatus, `${route} returned ${response.status}: ${text}`);
   return payload;
 }
 
-async function getJson(baseUrl, route, expectedStatus = 200) {
+async function getJson<T = JsonRecord>(baseUrl: string, route: string, expectedStatus = 200): Promise<T> {
   const response = await fetch(`${baseUrl}${route}`);
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+  const payload = (text ? JSON.parse(text) : {}) as T;
   assert(response.status === expectedStatus, `${route} returned ${response.status}: ${text}`);
   return payload;
 }
 
-async function getText(baseUrl, route, expectedStatus = 200) {
+async function getText(baseUrl: string, route: string, expectedStatus = 200): Promise<string> {
   const response = await fetch(`${baseUrl}${route}`);
   const text = await response.text();
   assert(response.status === expectedStatus, `${route} returned ${response.status}: ${text}`);
   return text;
 }
 
-async function main() {
+async function closeServer(server: HostServer): Promise<void> {
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+}
+
+async function main(): Promise<void> {
   const startedAt = Date.now();
   fs.mkdirSync(buildDir, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
@@ -101,58 +140,65 @@ async function main() {
     requireAuth: false,
   });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', (error: Error) => reject(error));
+    server.listen(0, '127.0.0.1', () => resolve());
   });
 
   const address = server.address();
+  assert(address && typeof address === 'object', 'windows paths smoke server did not bind to a TCP port');
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
-    const health = await (await fetch(`${baseUrl}/health`)).json();
+    const health = await (await fetch(`${baseUrl}/health`)).json() as { ok?: unknown; service?: unknown };
     assert(health.ok === true && health.service === 'agent-cowork-host', 'health check failed');
 
-    const workspaceInfo = await (await fetch(`${baseUrl}/api/workspace`)).json();
+    const workspaceInfo = await (await fetch(`${baseUrl}/api/workspace`)).json() as { trustedRoot?: unknown };
     assert(workspaceInfo.trustedRoot === workspace, 'workspace endpoint lost unicode trustedRoot');
 
-    const tree = await postJson(baseUrl, '/api/files/tree', { root: workspace });
+    const tree = await postJson<FileTreeResponse>(baseUrl, '/api/files/tree', { root: workspace });
+    assert(Array.isArray(tree.files), 'tree response missing files array');
     assert(tree.files.some((entry) => entry.path === '会议纪要/周报-含中文.md'), 'tree missing unicode file');
 
-    const read = await postJson(baseUrl, '/api/files/read', { trustedRoot: workspace, path: sourcePath });
-    assert(read.content.includes('中文路径 smoke'), 'read endpoint lost unicode content');
+    const read = await postJson<FileReadResponse>(baseUrl, '/api/files/read', { trustedRoot: workspace, path: sourcePath });
+    assert(typeof read.content === 'string' && read.content.includes('中文路径 smoke'), 'read endpoint lost unicode content');
     assert(typeof read.sha256 === 'string' && read.sha256.length === 64, 'read endpoint missing sha256');
 
-    const previewFile = await postJson(baseUrl, '/api/files/preview', { trustedRoot: workspace, path: sourcePath });
-    assert(previewFile.kind === 'markdown' && previewFile.text.includes('中文路径 smoke'), 'preview endpoint lost unicode markdown');
+    const previewFile = await postJson<FilePreviewResponse>(baseUrl, '/api/files/preview', { trustedRoot: workspace, path: sourcePath });
+    assert(
+      previewFile.kind === 'markdown' && typeof previewFile.text === 'string' && previewFile.text.includes('中文路径 smoke'),
+      'preview endpoint lost unicode markdown',
+    );
 
-    const longRead = await postJson(baseUrl, '/api/files/read', { trustedRoot: workspace, path: longFilePath });
-    assert(longRead.content.includes('长路径内容'), 'read endpoint failed long path file');
+    const longRead = await postJson<FileReadResponse>(baseUrl, '/api/files/read', { trustedRoot: workspace, path: longFilePath });
+    assert(typeof longRead.content === 'string' && longRead.content.includes('长路径内容'), 'read endpoint failed long path file');
 
-    const search = await postJson(baseUrl, '/api/files/search', {
+    const search = await postJson<SearchResponse>(baseUrl, '/api/files/search', {
       trustedRoot: workspace,
       query: 'trustedRoot jail',
       maxResults: 5,
       includeContent: true,
     });
+    assert(Array.isArray(search.results), 'search response missing results array');
     assert(search.results.some((entry) => entry.path === '会议纪要/周报-含中文.md'), 'search endpoint missing unicode file');
 
-    const bundle = await postJson(baseUrl, '/api/context/bundle', {
+    const bundle = await postJson<ContextBundleResponse>(baseUrl, '/api/context/bundle', {
       trustedRoot: workspace,
       paths: [sourcePath, longFilePath],
       maxTextSize: 4096,
     });
+    assert(Array.isArray(bundle.files), 'context bundle response missing files array');
     assert(bundle.files.length === 2, `context bundle expected 2 files, got ${bundle.files.length}`);
 
-    const escaped = await postJson(
+    const escaped = await postJson<ErrorResponse>(
       baseUrl,
       '/api/files/read',
       { trustedRoot: workspace, path: outsidePath },
       400,
     );
-    assert(/trusted root|escaped/i.test(escaped.error), `escaped read returned unexpected error: ${escaped.error}`);
+    assert(/trusted root|escaped/i.test(String(escaped.error)), `escaped read returned unexpected error: ${escaped.error}`);
 
-    const sensitive = await postJson(
+    const sensitive = await postJson<ErrorResponse>(
       baseUrl,
       '/api/file-ops/preview',
       {
@@ -161,13 +207,13 @@ async function main() {
       },
       400,
     );
-    assert(/sensitive|blocked/i.test(sensitive.error), `sensitive path returned unexpected error: ${sensitive.error}`);
+    assert(/sensitive|blocked/i.test(String(sensitive.error)), `sensitive path returned unexpected error: ${sensitive.error}`);
     assert(!fs.existsSync(path.join(workspace, '.ssh', 'id_rsa')), 'sensitive preview wrote a file');
 
     let junctionEscape = 'not-created';
     try {
       fs.symlinkSync(outsideDir, junctionPath, process.platform === 'win32' ? 'junction' : 'dir');
-      const blockedJunction = await postJson(
+      const blockedJunction = await postJson<ErrorResponse>(
         baseUrl,
         '/api/file-ops/preview',
         {
@@ -176,17 +222,21 @@ async function main() {
         },
         400,
       );
-      assert(/trusted root|escaped|sensitive/i.test(blockedJunction.error), `junction escape returned unexpected error: ${blockedJunction.error}`);
+      assert(
+        /trusted root|escaped|sensitive/i.test(String(blockedJunction.error)),
+        `junction escape returned unexpected error: ${blockedJunction.error}`,
+      );
       assert(!fs.existsSync(path.join(outsideDir, '不应写入.md')), 'junction escape wrote outside trustedRoot');
       junctionEscape = 'blocked';
-    } catch (err) {
-      if (err?.code !== 'EPERM' && err?.code !== 'EACCES') {
+    } catch (err: unknown) {
+      const code = isErrorWithCode(err) ? err.code : undefined;
+      if (code !== 'EPERM' && code !== 'EACCES') {
         throw err;
       }
-      junctionEscape = `skipped:${err.code}`;
+      junctionEscape = `skipped:${code}`;
     }
 
-    const uploaded = await postJson(baseUrl, '/api/uploads/import', {
+    const uploaded = await postJson<UploadResponse>(baseUrl, '/api/uploads/import', {
       trustedRoot: workspace,
       files: [{
         relativePath: '上传资料/客户-张三.md',
@@ -194,21 +244,25 @@ async function main() {
         size: Buffer.byteLength('上传中文内容\n', 'utf8'),
       }],
     });
+    assert(Array.isArray(uploaded.imported), 'upload import response missing imported array');
+    const uploadedFile = uploaded.imported[0];
+    assert(uploadedFile && typeof uploadedFile.path === 'string', 'upload import did not return a file path');
     assert(uploaded.imported.length === 1, 'upload import did not return one file');
-    assert(uploaded.imported[0].path.includes('Agent_Cowork上传'), 'upload path did not use workspace upload root');
-    assert(fs.readFileSync(uploaded.imported[0].path, 'utf8').includes('上传中文内容'), 'upload import lost unicode content');
+    assert(uploadedFile.path.includes('Agent_Cowork上传'), 'upload path did not use workspace upload root');
+    assert(fs.readFileSync(uploadedFile.path, 'utf8').includes('上传中文内容'), 'upload import lost unicode content');
 
-    const artifactsBefore = await getJson(baseUrl, `/api/artifacts?trustedRoot=${encodeURIComponent(workspace)}&limit=10`);
+    const artifactsBefore = await getJson<ArtifactCatalogResponse>(baseUrl, `/api/artifacts?trustedRoot=${encodeURIComponent(workspace)}&limit=10`);
+    assert(Array.isArray(artifactsBefore.artifacts), 'artifact catalog response missing artifacts array');
     assert(artifactsBefore.artifacts.some((item) => item.path === seededArtifactPath), 'artifact catalog missing unicode artifact');
     const artifactHtml = await getText(baseUrl, `/api/artifacts/view?trustedRoot=${encodeURIComponent(workspace)}&path=${encodeURIComponent(seededArtifactPath)}`);
     assert(artifactHtml.includes('初始产物') && artifactHtml.includes('中文 artifact 预览'), 'artifact view lost unicode content');
-    const renamedArtifact = await postJson(baseUrl, '/api/artifacts/rename', {
+    const renamedArtifact = await postJson<ArtifactRenameResponse>(baseUrl, '/api/artifacts/rename', {
       trustedRoot: workspace,
       path: seededArtifactPath,
       newName: '初始产物-已改名.md',
       idempotencyKey: 'windows-paths-artifact-rename',
     });
-    assert(renamedArtifact.artifact.path === renamedArtifactPath, 'artifact rename returned unexpected path');
+    assert(renamedArtifact.artifact?.path === renamedArtifactPath, 'artifact rename returned unexpected path');
     assert(fs.existsSync(renamedArtifactPath), 'artifact rename did not update disk');
 
     const operations = [
@@ -216,16 +270,20 @@ async function main() {
       { type: 'rename', path: sourcePath, newName: '周报-已改名.md' },
       { type: 'move', from: longFilePath, to: movedPath },
     ];
-    const preview = await postJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
+    const preview = await postJson<FileOpsPreviewResponse>(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
+    assert(Array.isArray(preview.operations), 'file operation preview response missing operations array');
     assert(preview.operations.length === 3, `preview expected 3 operations, got ${preview.operations.length}`);
-    assert(/^fop_/.test(preview.fileOperationApprovalId || ''), 'preview did not issue approval');
+    assert(typeof preview.fileOperationApprovalId === 'string', 'preview did not return string approval id');
+    const fileOperationApprovalId = preview.fileOperationApprovalId;
+    assert(/^fop_/.test(fileOperationApprovalId), 'preview did not issue approval');
 
-    const applied = await postJson(baseUrl, '/api/file-ops/apply', {
+    const applied = await postJson<FileOpsApplyResponse>(baseUrl, '/api/file-ops/apply', {
       trustedRoot: workspace,
       operations,
-      fileOperationApprovalId: preview.fileOperationApprovalId,
+      fileOperationApprovalId,
       idempotencyKey: 'windows-paths-apply',
     });
+    assert(Array.isArray(applied.applied), 'file operation apply response missing applied array');
     assert(applied.applied.length === 3, `apply expected 3 operations, got ${applied.applied.length}`);
     assert(fs.existsSync(artifactPath), 'unicode artifact was not written');
     assert(!fs.existsSync(sourcePath), 'source path still exists after rename');
@@ -233,12 +291,13 @@ async function main() {
     assert(!fs.existsSync(longFilePath), 'long path source still exists after move');
     assert(fs.existsSync(movedPath), 'long path file was not moved');
 
-    const rollback = await postJson(baseUrl, '/api/file-ops/rollback', {
+    const rollback = await postJson<FileOpsRollbackResponse>(baseUrl, '/api/file-ops/rollback', {
       trustedRoot: workspace,
       applied: applied.applied,
       rollbackApprovalId: applied.rollbackApprovalId,
       idempotencyKey: 'windows-paths-rollback',
     });
+    assert(Array.isArray(rollback.rolledBack), 'file operation rollback response missing rolledBack array');
     assert(rollback.rolledBack.length === 3, `rollback expected 3 entries, got ${rollback.rolledBack.length}`);
     assert(fs.existsSync(sourcePath), 'rollback did not restore original unicode file');
     assert(fs.existsSync(longFilePath), 'rollback did not restore original long path file');
@@ -262,7 +321,7 @@ async function main() {
       reportPath,
       escapedError: escaped.error,
       junctionEscape,
-      uploadPath: uploaded.imported[0].path,
+      uploadPath: uploadedFile.path,
       renamedArtifactPath,
       bundledFiles: bundle.files.length,
       applied: applied.applied.length,
@@ -270,7 +329,7 @@ async function main() {
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify(report, null, 2));
-  } catch (error) {
+  } catch (error: unknown) {
     const report = {
       ok: false,
       generatedAt: new Date().toISOString(),
@@ -280,25 +339,25 @@ async function main() {
       longFilePath,
       longPathLength: path.resolve(longFilePath).length,
       reportPath,
-      error: error.stack || error.message,
+      error: errorDetails(error),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
-    process.exitCode = 1;
+    console.error(errorDetails(error));
+    Reflect.set(process, 'exitCode', 1);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeServer(server);
   }
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   const report = {
     ok: false,
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: errorDetails(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });

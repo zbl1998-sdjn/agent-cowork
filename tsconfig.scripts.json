@@ -38,6 +38,7 @@
     "scripts/smoke-runtime-update-preservation.ts",
     "scripts/smoke-offline-local.ts",
     "scripts/smoke-ui-contract.ts",
+    "scripts/smoke-windows-paths.ts",
     "scripts/start-mvp.ts",
     "scripts/start-tauri-dev.ts",
     "scripts/start-tauri-host.ts",
