@@ -4,10 +4,23 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { signJwtHS256, verifyJwtHS256, resolveJwtIdentity } from '../src/auth/jwt.js';
+import type { HostServer } from '../src/server.js';
 import { createServer } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 
-function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-jwt-')); }
-async function bind(s) { await new Promise((r) => s.listen(0, '127.0.0.1', r)); return `http://127.0.0.1:${s.address().port}`; }
+function tmp(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-jwt-'));
+}
+
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  return `http://127.0.0.1:${address.port}`;
+}
+
 const SECRET = 'test-secret-123';
 
 test('sign + verify round-trips and exposes claims', () => {
@@ -33,9 +46,9 @@ test('expired tokens are rejected', () => {
 });
 
 test('resolveJwtIdentity maps common claim names', () => {
-  assert.deepEqual(resolveJwtIdentity(signJwtHS256({ tenant_id: 'acme', user_id: 'u1' }, SECRET), SECRET).tenantId, 'acme');
-  assert.equal(resolveJwtIdentity(signJwtHS256({ tid: 'org9', sub: 'u2' }, SECRET), SECRET).tenantId, 'org9');
-  assert.equal(resolveJwtIdentity(signJwtHS256({ sub: 'u3' }, SECRET), SECRET).userId, 'u3');
+  assert.equal(resolveJwtIdentity(signJwtHS256({ tenant_id: 'acme', user_id: 'u1' }, SECRET), SECRET)?.tenantId, 'acme');
+  assert.equal(resolveJwtIdentity(signJwtHS256({ tid: 'org9', sub: 'u2' }, SECRET), SECRET)?.tenantId, 'org9');
+  assert.equal(resolveJwtIdentity(signJwtHS256({ sub: 'u3' }, SECRET), SECRET)?.userId, 'u3');
   assert.equal(resolveJwtIdentity('garbage', SECRET), null);
 });
 
@@ -51,5 +64,7 @@ test('E2E: a valid JWT sets the request context tenant/user (echoed in response 
     // a request without a token keeps the local defaults
     const res2 = await fetch(`${base}/api/workspace`);
     assert.equal(res2.headers.get('x-tenant-id'), 'tenant_local');
-  } finally { await new Promise((r) => server.close(r)); }
+  } finally {
+    await closeTestServer(server);
+  }
 });

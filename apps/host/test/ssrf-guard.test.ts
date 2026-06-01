@@ -53,7 +53,7 @@ test('assertPublicHost rejects when ANY resolved address is internal', async () 
 
 test('assertPublicHost allows a name that resolves only to public IPs', async () => {
   const lookupImpl = async () => [{ address: '93.184.216.34' }];
-  await assert.doesNotReject(() => assertPublicHost('example.com', { lookupImpl }));
+  await assertPublicHost('example.com', { lookupImpl });
 });
 
 test('assertPublicHost blocks a literal IPv6 ULA host', async () => {
