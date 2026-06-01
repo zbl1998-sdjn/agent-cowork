@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "identifier": "com.agent.cowork",
   "build": {
-    "beforeDevCommand": "node ../../../scripts/start-tauri-dev.mjs",
+    "beforeDevCommand": "node ../../../scripts/run-host-node.mjs scripts/start-tauri-dev.ts",
     "beforeBuildCommand": "pwsh -NoProfile -ExecutionPolicy Bypass -File ../../scripts/prepare-embedded-python.ps1",
     "devUrl": "http://127.0.0.1:5173",
     "frontendDist": "../ui-dist"
