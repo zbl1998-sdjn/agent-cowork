@@ -32,19 +32,19 @@ const optionalStringField = z.preprocess(
 const requestContextSchema = z.object({
   tenantId: optionalStringField,
   userId: optionalStringField,
-}).passthrough();
+}).loose();
 
 const oauthConfigSchema = z.object({
   github: z.object({
     clientId: optionalStringField,
-  }).passthrough().optional(),
-}).passthrough();
+  }).loose().optional(),
+}).loose();
 
 const providerSchema = z.string().trim().min(1, 'provider is required');
 const accountIdSchema = z.string().trim().min(1, 'accountId is required');
 const routeErrorSchema = z.object({
   statusCode: z.number().int().min(100).max(599).optional(),
-}).passthrough();
+}).loose();
 
 function objectOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)

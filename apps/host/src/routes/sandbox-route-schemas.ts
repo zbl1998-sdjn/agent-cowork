@@ -8,7 +8,7 @@ import type { HttpResponseLike } from '../http/request-utils.js';
 const objectBody = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 );
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const sandboxSpecShape = z.object({
   tool: z.unknown().optional(),
   args: z.unknown().optional(),
@@ -16,12 +16,12 @@ const sandboxSpecShape = z.object({
   timeoutMs: z.unknown().optional(),
   network: z.unknown().optional(),
   env: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 export const sandboxExecBodySchema = objectBodySchema.pipe(z.object({
   spec: sandboxSpecShape.optional(),
   trustedRoot: z.unknown().optional(),
-}).passthrough());
+}).loose());
 
 export const sandboxRunCodeBodySchema = objectBodySchema.pipe(z.object({
   tool: z.string().trim().min(1, 'tool is required').max(64),
@@ -31,7 +31,7 @@ export const sandboxRunCodeBodySchema = objectBodySchema.pipe(z.object({
   timeoutMs: z.unknown().optional(),
   network: z.boolean().optional(),
   trustedRoot: z.unknown().optional(),
-}).passthrough());
+}).loose());
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;

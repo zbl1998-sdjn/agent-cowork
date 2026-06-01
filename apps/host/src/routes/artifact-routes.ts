@@ -37,7 +37,7 @@ const renameBodySchema = z.preprocess(
     trustedRoot: z.unknown().optional(),
     path: z.string().min(1, 'artifact path is required'),
     newName: z.string().trim().min(1, 'artifact newName is required'),
-  }).passthrough(),
+  }).loose(),
 );
 
 function normalizeLimit(value: string | null): number {

@@ -10,8 +10,8 @@ export const chatCompletionRequestSchema = z.object({
   messages: z.array(z.object({
     role: z.string(),
     content: z.string(),
-  }).passthrough()).min(1),
-}).passthrough();
+  }).loose()).min(1),
+}).loose();
 
 export const kimiTextResultSchema = z.object({
   provider: z.string(),
@@ -19,25 +19,25 @@ export const kimiTextResultSchema = z.object({
   text: z.string(),
   usage: z.object({
     total_tokens: z.number(),
-  }).passthrough().nullable().optional(),
-}).passthrough();
+  }).loose().nullable().optional(),
+}).loose();
 
 const headersSchema = z.object({
   authorization: z.string(),
-}).passthrough();
+}).loose();
 
 const openAiResponseSchema = z.object({
   choices: z.array(z.object({
     message: z.object({
       content: z.string(),
-    }).passthrough(),
-  }).passthrough()),
+    }).loose(),
+  }).loose()),
   usage: z.object({
     prompt_tokens: z.number(),
     completion_tokens: z.number(),
     total_tokens: z.number(),
-  }).passthrough(),
-}).passthrough();
+  }).loose(),
+}).loose();
 
 export type CapturedKimiRequest = {
   url: string;

@@ -8,7 +8,7 @@ import type { HttpResponseLike } from '../http/request-utils.js';
 const objectBody = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 );
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const limitSchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
   z.number().int().min(1).max(50).default(10),
@@ -24,7 +24,7 @@ const stepSchema = z.object({
   args: z.unknown().optional(),
   note: z.unknown().optional(),
   rationale: z.unknown().optional(),
-}).passthrough();
+}).loose();
 const maxConcurrencySchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
   z.number().int().min(1).max(16).optional(),
@@ -39,27 +39,27 @@ export const toolCallBodySchema = objectBodySchema.pipe(z.object({
   name: toolNameSchema,
   args: z.unknown().optional(),
   trustedRoot: optionalTrustedRootSchema,
-}).passthrough());
+}).loose());
 
 export const subagentRunBodySchema = objectBodySchema.pipe(z.object({
   goal: z.unknown().optional(),
   steps: z.array(stepSchema, 'body.steps must be an array').optional(),
   trustedRoot: optionalTrustedRootSchema,
   stopOnError: z.boolean().optional(),
-}).passthrough());
+}).loose());
 
 const childAgentSchema = z.object({
   goal: z.unknown().optional(),
   task: z.unknown().optional(),
   steps: z.array(stepSchema, 'agent.steps must be an array').optional(),
-}).passthrough();
+}).loose();
 export const subagentParallelBodySchema = objectBodySchema.pipe(z.object({
   goal: z.unknown().optional(),
   agents: z.array(childAgentSchema, 'body.agents must be an array').optional(),
   trustedRoot: optionalTrustedRootSchema,
   stopOnError: z.boolean().optional(),
   maxConcurrency: maxConcurrencySchema,
-}).passthrough());
+}).loose());
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;

@@ -31,18 +31,18 @@ const requestContextSchema = z.object({
   tenantId: z.unknown().optional(),
   userId: z.unknown().optional(),
   traceId: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 const modelConfigSchema = z.object({
   model: z.unknown().optional(),
   provider: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 const outcomeSchema = z.object({
   text: z.unknown().optional(),
   steps: z.unknown().optional(),
   usage: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 const recordOptionsSchema = z.object({
   runStoreRoot: z.string(),

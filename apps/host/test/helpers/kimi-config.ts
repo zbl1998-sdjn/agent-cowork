@@ -13,7 +13,7 @@ const fallbackStatusSchema = z.object({
   apiKey: z.unknown().optional(),
   baseUrl: z.string().optional(),
   model: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export const kimiConfigResponseSchema = z.object({
   provider: z.string().optional(),
@@ -25,11 +25,11 @@ export const kimiConfigResponseSchema = z.object({
   model: z.string().optional(),
   apiKey: z.unknown().optional(),
   fallbacks: z.array(fallbackStatusSchema).optional(),
-}).passthrough();
+}).loose();
 
 export const kimiErrorResponseSchema = z.object({
   error: z.string(),
-}).passthrough();
+}).loose();
 
 const persistedConfigSchema = z.object({
   kimiApi: z.object({
@@ -42,9 +42,9 @@ const persistedConfigSchema = z.object({
       apiKey: z.string().optional(),
       baseUrl: z.string().optional(),
       model: z.string().optional(),
-    }).passthrough()).optional(),
-  }).passthrough(),
-}).passthrough();
+    }).loose()).optional(),
+  }).loose(),
+}).loose();
 
 export type KimiConfigResponse = z.infer<typeof kimiConfigResponseSchema>;
 export type PersistedKimiConfig = z.infer<typeof persistedConfigSchema>;

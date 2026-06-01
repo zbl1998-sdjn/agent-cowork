@@ -20,22 +20,22 @@ const gitRunResultSchema = z.object({
   workspace: z.string(),
   stdout: z.string(),
   stderr: z.string(),
-}).passthrough();
+}).loose();
 
 const modelToolsArgsSchema = z.object({
   tools: z.array(z.unknown()).optional(),
-}).passthrough();
+}).loose();
 
 const approvalRequestPayloadSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   risk: z.string(),
-}).passthrough();
+}).loose();
 
 const rejectedGitCommitStepSchema = z.object({
   tool: z.literal('GitCommit'),
   rejected: z.literal(true),
-}).passthrough();
+}).loose();
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-git-'));

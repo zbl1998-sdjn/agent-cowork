@@ -36,27 +36,27 @@ const objectBody = (value: unknown): Record<string, unknown> => (
 
 const baseWriteBodySchema = z.preprocess(
   objectBody,
-  z.object({ trustedRoot: z.unknown().optional() }).passthrough(),
+  z.object({ trustedRoot: z.unknown().optional() }).loose(),
 );
 const createProjectBodySchema = baseWriteBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   name: z.unknown().optional(),
   color: z.unknown().optional(),
-}).passthrough());
+}).loose());
 const updateProjectBodySchema = baseWriteBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   name: z.unknown().optional(),
   color: z.unknown().optional(),
   archived: z.boolean().optional(),
-}).passthrough());
+}).loose());
 const conversationMembershipBodySchema = baseWriteBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   conversationId: z.string().min(1, 'conversationId is required'),
-}).passthrough());
+}).loose());
 const artifactMembershipBodySchema = baseWriteBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   artifactId: z.string().min(1, 'artifactId is required'),
-}).passthrough());
+}).loose());
 
 function withProjectStats(store: ProjectStore, project: ProjectRecord): ProjectWithStats {
   return {

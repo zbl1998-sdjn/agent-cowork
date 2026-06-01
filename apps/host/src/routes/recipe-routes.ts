@@ -49,19 +49,19 @@ const trustedRootSchema = z.preprocess(
   (value) => (value === '' || value == null ? undefined : value),
   z.string().optional(),
 );
-const objectBodySchema = z.object({}).passthrough();
+const objectBodySchema = z.object({}).loose();
 const customRecipeBodySchema = z.object({
   recipe: objectBodySchema.optional(),
-}).passthrough();
+}).loose();
 const captureBodySchema = z.object({
   runId: z.string().trim().regex(RECIPE_ID_RE, 'Invalid run id'),
-}).passthrough();
+}).loose();
 const recipeRunBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   prompt: z.unknown().optional(),
   files: z.array(z.unknown(), 'files must be an array').optional(),
   maxSize: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 function customRecipeStoreFor(runStoreRoot: string): ReturnType<typeof createCustomRecipeStore> {
   const agentRoot = path.dirname(path.resolve(runStoreRoot));

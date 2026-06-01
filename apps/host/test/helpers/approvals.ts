@@ -8,26 +8,26 @@ import type { AgentTool } from '../../src/kimi/agent/tool-call-executor.js';
 
 const approvalEventSchema = z.object({
   id: z.string().min(1),
-}).passthrough();
+}).loose();
 
 const approvalPayloadSchema = z.object({
   id: z.string().min(1),
   name: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export const approvalOkResponseSchema = z.object({
   ok: z.boolean(),
-}).passthrough();
+}).loose();
 
 export const approvalErrorResponseSchema = z.object({
   error: z.string(),
-}).passthrough();
+}).loose();
 
 export const approvalBatchResponseSchema = z.object({
   context: z.object({
     tenantId: z.string().optional(),
     userId: z.string().optional(),
-  }).passthrough(),
+  }).loose(),
   ids: z.array(z.string()),
   ok: z.boolean(),
   resolved: z.number(),
@@ -36,7 +36,7 @@ export const approvalBatchResponseSchema = z.object({
     ok: z.boolean(),
   })),
   decision: z.string(),
-}).passthrough();
+}).loose();
 
 export function callThenAnswer(toolName: string, args: Record<string, unknown> = {}): ModelCall {
   let calls = 0;

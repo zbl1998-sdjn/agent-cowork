@@ -46,7 +46,7 @@ const listQuerySchema = z.object({
   q: z.string().optional(),
   limit: z.coerce.number().int().finite().optional(),
   offset: z.coerce.number().int().finite().optional(),
-}).passthrough();
+}).loose();
 const conversationBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   title: z.string().optional(),
@@ -54,7 +54,7 @@ const conversationBodySchema = z.object({
   messages: z.unknown().optional(),
   activeBranchId: z.unknown().optional(),
   branches: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 function errorStatus(err: unknown, fallback: number): number {
   return err && typeof err === 'object' && 'statusCode' in err && typeof (err as RouteError).statusCode === 'number'

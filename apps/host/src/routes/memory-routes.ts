@@ -44,27 +44,27 @@ const profileQuerySchema = z.object({
   trustedRoot: trustedRootSchema,
   query: z.string().optional(),
   limit: z.coerce.number().int().finite().catch(8),
-}).passthrough();
+}).loose();
 const factBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   key: z.string().trim().min(1, 'memory fact key is required'),
   value: z.string().trim().min(1, 'memory fact value is required'),
   scope: z.string().optional(),
-}).passthrough();
+}).loose();
 const profileLearnBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   entry: z.unknown().optional(),
-}).passthrough();
+}).loose();
 const profileForgetBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   type: z.unknown().optional(),
   key: z.unknown().optional(),
-}).passthrough();
+}).loose();
 const noteBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   name: z.string().trim().min(1, 'body.name is required'),
   body: z.string(),
-}).passthrough();
+}).loose();
 
 function errorStatus(err: unknown, fallback: number): number {
   return err && typeof err === 'object' && 'statusCode' in err && typeof (err as RouteError).statusCode === 'number'

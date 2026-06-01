@@ -34,7 +34,7 @@ export const kimiFallbackSchema = z.object({
   timeoutMs: optionalNumber(1000),
   maxTokens: optionalNumber(1),
   temperature: optionalNumber(),
-}).passthrough();
+}).loose();
 
 export const kimiConfigBodySchema = objectBody('invalid kimi config request').pipe(z.object({
   clearKey: z.boolean().optional(),
@@ -43,20 +43,20 @@ export const kimiConfigBodySchema = objectBody('invalid kimi config request').pi
   fallbacks: z.array(kimiFallbackSchema, 'fallbacks must be an array').optional(),
   baseUrl: optionalText(2048),
   model: optionalText(200),
-}).passthrough());
+}).loose());
 
 export const kimiPlanChatBodySchema = objectBody('invalid kimi request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
   mode: optionalText(32),
   trustedRoot: trustedRootSchema,
-}).passthrough());
+}).loose());
 
 export const kimiAgentStreamBodySchema = objectBody('invalid agent stream request').pipe(z.object({
   prompt: z.string().optional(),
   resumeRunId: optionalNonEmptyText(96),
   trustedRoot: trustedRootSchema,
-}).passthrough());
+}).loose());
 
 export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request').pipe(z.object({
   prompt: promptSchema,
@@ -64,7 +64,7 @@ export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request'
   thinking: z.unknown().optional(),
   model: z.unknown().optional(),
   trustedRoot: trustedRootSchema,
-}).passthrough());
+}).loose());
 
 export type KimiConfigBody = z.output<typeof kimiConfigBodySchema>;
 export type KimiPlanChatBody = z.output<typeof kimiPlanChatBodySchema>;

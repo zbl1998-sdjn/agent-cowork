@@ -16,7 +16,7 @@ type BatchResolution = { ids: string[]; decision: unknown };
 
 const approvalOkSchema = z.object({
   ok: z.boolean(),
-}).passthrough();
+}).loose();
 
 const batchApprovalSchema = z.object({
   ids: z.array(z.string()),
@@ -27,7 +27,7 @@ const batchApprovalSchema = z.object({
     ok: z.boolean(),
   })),
   decision: z.unknown(),
-}).passthrough();
+}).loose();
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-pgw-')); }
 

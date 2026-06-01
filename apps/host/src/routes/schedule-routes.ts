@@ -54,14 +54,14 @@ const stringOrNullSchema = z.preprocess(
 );
 const payloadSchema = z.preprocess(
   (value) => (value == null ? {} : value),
-  z.object({}).passthrough(),
+  z.object({}).loose(),
 );
 const scheduleCreateBodySchema = z.preprocess(objectBody, z.object({
   name: z.string().trim().min(1, 'name is required'),
   cron: stringOrNullSchema,
   fireAt: stringOrNullSchema,
   payload: payloadSchema,
-}).passthrough());
+}).loose());
 
 function scheduleVisibleToContext(record: ScheduleRecord | null | undefined, context: RequestContext): boolean {
   return Boolean(record) && stableHeader(record?.tenantId, 'tenant_local') === context.tenantId;

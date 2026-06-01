@@ -30,14 +30,14 @@ const approvalIdSchema = z.string().regex(APPROVAL_ID_RE, 'approval id contains 
 const approvalBodySchema = z.object({
   decision: z.unknown().optional(),
   answer: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 const batchApprovalBodySchema = approvalBodySchema.extend({
   ids: z.array(approvalIdSchema)
     .min(1, 'ids must be a non-empty array of approval IDs')
     .max(MAX_BATCH_APPROVALS, `ids must contain at most ${MAX_BATCH_APPROVALS} approval IDs`)
     .transform((ids) => [...new Set(ids)]),
-}).passthrough();
+}).loose();
 
 function parseBody(body: unknown): z.infer<typeof approvalBodySchema> {
   const result = approvalBodySchema.safeParse(body && typeof body === 'object' && !Array.isArray(body) ? body : {});

@@ -9,7 +9,7 @@ const vizArtifactIdSchema = z.string().regex(/^viz[-_a-zA-Z0-9]+$/);
 const previewResponseSchema = z.object({
   id: vizArtifactIdSchema,
   fileOperationApprovalId: z.string().regex(/^fop_/),
-}).passthrough();
+}).loose();
 
 const persistedRenderResponseSchema = z.object({
   persisted: z.literal(true),
@@ -18,23 +18,23 @@ const persistedRenderResponseSchema = z.object({
   dataUrl: z.string(),
   viewUrl: z.string(),
   idempotentReplay: z.boolean().optional(),
-}).passthrough();
+}).loose();
 
 const inlineRenderResponseSchema = z.object({
   persisted: z.literal(false),
   html: z.string(),
-}).passthrough();
+}).loose();
 
 export const artifactDataResponseSchema = z.object({
   dataSource: z.object({
     type: z.string(),
     tool: z.string().optional(),
-  }).passthrough().optional(),
+  }).loose().optional(),
   viz: z.object({
     kind: z.string(),
     data: z.unknown(),
-  }).passthrough(),
-}).passthrough();
+  }).loose(),
+}).loose();
 
 export async function approveVizRender(base: string, body: VizRenderBody): Promise<VizRenderBody> {
   const preview = await jsonRequest(base, '/api/viz/render/preview', {

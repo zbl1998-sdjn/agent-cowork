@@ -48,7 +48,7 @@ const fileOperationSchema = z.object({
   contentBase64: z.unknown().optional(),
   encoding: z.unknown().optional(),
   overwrite: z.unknown().optional(),
-}).passthrough().superRefine((operation, ctx) => {
+}).loose().superRefine((operation, ctx) => {
   const type = typeof operation.type === 'string' ? operation.type.toLowerCase() : '';
   if (!['write', 'rename', 'move', 'delete'].includes(type)) {
     ctx.addIssue({ code: 'custom', path: ['type'], message: 'operation type must be write, rename, move, or delete' });
@@ -78,21 +78,21 @@ const fileOperationSchema = z.object({
     }
   }
 });
-const rollbackEntrySchema = z.object({}).passthrough();
+const rollbackEntrySchema = z.object({}).loose();
 const baseBodySchema = z.preprocess(
   objectBody,
-  z.object({ trustedRoot: z.unknown().optional() }).passthrough(),
+  z.object({ trustedRoot: z.unknown().optional() }).loose(),
 );
 const operationsBodySchema = baseBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   operations: z.array(fileOperationSchema, 'operations must be an array'),
-}).passthrough());
+}).loose());
 const applyBodySchema = operationsBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   operations: z.array(fileOperationSchema, 'operations must be an array'),
   fileOperationApprovalId: approvalIdSchema,
   approvalId: approvalIdSchema,
-}).passthrough());
+}).loose());
 const rollbackBodySchema = baseBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   operations: z.array(rollbackEntrySchema, 'operations must be an array').optional(),
@@ -101,7 +101,7 @@ const rollbackBodySchema = baseBodySchema.pipe(z.object({
   rollbackApprovalId: approvalIdSchema,
   fileOperationApprovalId: approvalIdSchema,
   approvalId: approvalIdSchema,
-}).passthrough().superRefine((input, ctx) => {
+}).loose().superRefine((input, ctx) => {
   if (!input.rollback && !input.applied && !input.operations) {
     ctx.addIssue({
       code: 'custom',

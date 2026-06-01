@@ -38,7 +38,7 @@ const mcpToolSchema = z.object({
   name: z.string().trim().min(1, 'name is required'),
   description: z.string().optional(),
   inputSchema: z.unknown().optional(),
-}).passthrough();
+}).loose();
 
 function inputError(prefix: string, message: string): Error & { statusCode?: number } {
   const error = new Error(`${prefix}: ${message}`) as Error & { statusCode?: number };

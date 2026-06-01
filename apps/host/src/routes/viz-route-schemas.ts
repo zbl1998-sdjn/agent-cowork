@@ -11,7 +11,7 @@ const APPROVAL_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
 const objectBody = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 );
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const artifactIdSchema = z.string()
   .trim()
   .min(1, 'artifact id is required')
@@ -36,7 +36,7 @@ export const vizRenderBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: z.unknown().optional(),
   approvalId: approvalIdSchema.optional(),
   fileOperationApprovalId: approvalIdSchema.optional(),
-}).passthrough());
+}).loose());
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;

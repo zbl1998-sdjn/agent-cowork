@@ -44,14 +44,14 @@ const suggestQuerySchema = z.object({
   q: z.string().optional(),
   query: z.string().optional(),
   limit: z.coerce.number().int().finite().catch(5),
-}).passthrough();
+}).loose();
 const connectBodySchema = z.object({
   id: connectorIdSchema.optional(),
   trustedRoot: z.unknown().optional(),
-}).passthrough();
+}).loose();
 const disconnectBodySchema = z.object({
   id: connectorIdSchema,
-}).passthrough();
+}).loose();
 
 function errorStatus(err: unknown, fallback: number): number {
   return err && typeof err === 'object' && 'statusCode' in err && typeof (err as RouteError).statusCode === 'number'

@@ -38,7 +38,7 @@ const fallbackConfigSchema = z.preprocess(
     baseUrl: z.unknown().optional(),
     model: z.unknown().optional(),
     apiKey: z.unknown().optional(),
-  }).passthrough(),
+  }).loose(),
 );
 
 const modelConfigSnapshotSchema = z.preprocess(
@@ -54,7 +54,7 @@ const modelConfigSnapshotSchema = z.preprocess(
       (value) => (Array.isArray(value) ? value : []),
       z.array(fallbackConfigSchema),
     ).optional(),
-  }).passthrough(),
+  }).loose(),
 );
 
 const requestSnapshotSchema = z.preprocess(
@@ -66,7 +66,7 @@ const requestSnapshotSchema = z.preprocess(
     verify: z.unknown().optional(),
     thinking: z.unknown().optional(),
     maxSteps: z.unknown().optional(),
-  }).passthrough(),
+  }).loose(),
 );
 
 function finiteNumber(value: unknown): number | undefined {

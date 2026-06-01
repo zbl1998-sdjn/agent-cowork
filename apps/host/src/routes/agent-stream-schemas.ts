@@ -12,7 +12,7 @@ const requestBudgetSchema = z.object({
   maxRunCostUsd: numericLimitSchema.optional(),
   maxSessionCostUsd: numericLimitSchema.optional(),
   maxWallClockMs: numericLimitSchema.optional(),
-}).passthrough();
+}).loose();
 
 export const agentStreamBodySchema = z.object({
   prompt: z.string().optional(),
@@ -38,7 +38,7 @@ export const agentStreamBodySchema = z.object({
   maxRunCostUsd: numericLimitSchema.optional(),
   maxSessionCostUsd: numericLimitSchema.optional(),
   maxWallClockMs: numericLimitSchema.optional(),
-}).passthrough();
+}).loose();
 
 export type AgentStreamBody = z.output<typeof agentStreamBodySchema>;
 

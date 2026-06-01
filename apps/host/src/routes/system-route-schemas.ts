@@ -28,7 +28,7 @@ export type RuntimeDependencyPlanOptions =
 const objectBody = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 );
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const optionalText = (max: number) => z.preprocess(
   (value) => (value == null || value === '' ? undefined : value),
   z.string().trim().min(1).max(max).optional(),
@@ -54,7 +54,7 @@ export const dependencyPlanBodySchema = objectBodySchema.pipe(z.object({
   currentVersion: optionalText(80),
   targetVersion: optionalText(80),
   appDataRoot: optionalText(1000),
-}).passthrough());
+}).loose());
 
 const desktopUpdateParamsSchema = z.object({
   target: safePathSegmentSchema,

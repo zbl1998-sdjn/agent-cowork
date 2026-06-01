@@ -14,33 +14,33 @@ const approvalResponseSchema = z.object({
   permissions: z.array(z.object({
     id: z.string(),
     risk: z.string().optional(),
-  }).passthrough()).optional(),
-}).passthrough();
+  }).loose()).optional(),
+}).loose();
 
 const startResponseSchema = z.object({
   provider: z.string().optional(),
   sessionId: z.string(),
   userCode: z.string(),
   scopes: z.array(z.string()).optional(),
-}).passthrough();
+}).loose();
 
 const completeResponseSchema = z.object({
   connected: z.boolean().optional(),
   status: z.string().optional(),
   account: z.object({
     login: z.string().optional(),
-  }).passthrough().optional(),
-}).passthrough();
+  }).loose().optional(),
+}).loose();
 
 const oauthStatusSchema = z.object({
   connected: z.boolean().optional(),
   configured: z.boolean().optional(),
   accounts: z.array(z.object({
     accountId: z.string(),
-  }).passthrough()).optional(),
+  }).loose()).optional(),
   requiredEnv: z.array(z.string()).optional(),
   configurationMessage: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export function testProtector(): { protect(text: unknown): string; unprotect(text: unknown): string } {
   return {

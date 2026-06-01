@@ -15,29 +15,29 @@ const jsonRpcMessageSchema = z.object({
     message: z.string().optional(),
     code: z.unknown().optional(),
     data: z.unknown().optional(),
-  }).passthrough().optional(),
-}).passthrough();
+  }).loose().optional(),
+}).loose();
 
 export const serverInfoSchema = z.object({
   name: z.string(),
   version: z.string(),
-}).passthrough();
+}).loose();
 
 export const mcpToolSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export const toolCallResultSchema = z.object({
   content: z.array(z.object({
     type: z.string(),
     text: z.string(),
-  }).passthrough()),
-}).passthrough();
+  }).loose()),
+}).loose();
 
 const toolCallParamsSchema = z.object({
   name: z.string(),
-}).passthrough();
+}).loose();
 
 type Listener = (...args: unknown[]) => void;
 class SimpleEmitter {

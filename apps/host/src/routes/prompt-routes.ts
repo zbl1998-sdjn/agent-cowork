@@ -58,7 +58,7 @@ const promptRefineBodySchema = z.preprocess(
     // Context is optional user metadata. Keep it tolerant while preventing
     // arrays/scalars from leaking numeric keys into the refiner context.
     context: z.preprocess(objectOrEmpty, recordSchema),
-  }).passthrough(),
+  }).loose(),
 );
 
 function contextFromBody(body: PromptBody, requestContext: RequestContext, trustedRoot: string): PromptContext {

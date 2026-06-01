@@ -30,7 +30,7 @@ export async function noopKimiChatRunner(): Promise<KimiTextResult> {
 
 const startEventSchema = z.object({
   runId: z.string().min(1),
-}).passthrough();
+}).loose();
 
 const runRecordSchema = z.object({
   provider: z.string().optional(),
@@ -42,14 +42,14 @@ const runRecordSchema = z.object({
     fallbacks: z.array(z.object({
       hasKey: z.boolean().optional(),
       apiKey: z.unknown().optional(),
-    }).passthrough()).optional(),
-  }).passthrough(),
-}).passthrough();
+    }).loose()).optional(),
+  }).loose(),
+}).loose();
 
 const kimiInfoSchema = z.object({
   provider: z.string().optional(),
   model: z.string().optional(),
-}).passthrough();
+}).loose();
 
 export async function readAgentStream(response: Response): Promise<string> {
   const reader = readableBody(response, 'agent stream response').getReader();

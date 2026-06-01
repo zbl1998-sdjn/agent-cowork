@@ -20,7 +20,7 @@ type PgCall =
 const notifyParamsSchema = z.tuple([z.string(), z.string()]);
 const fakeClientOptionsSchema = z.object({
   connectionString: z.string(),
-}).passthrough();
+}).loose();
 
 function eventAt(events: readonly RunEvent[], index: number, label: string): RunEvent {
   const event = events[index];

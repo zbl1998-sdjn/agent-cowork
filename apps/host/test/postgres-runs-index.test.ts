@@ -19,7 +19,7 @@ const storedRecordSchema = z.object({
   startedAt: z.unknown().optional(),
   updatedAt: z.string(),
   version: z.number(),
-}).passthrough();
+}).loose();
 
 function stringParam(params: readonly unknown[], index: number): string {
   return z.string().parse(params[index]);

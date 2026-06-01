@@ -18,7 +18,7 @@ const fsEntrySchema = z.object({
 
 const fsStatSchema = z.object({
   type: z.enum(['dir', 'file']),
-}).passthrough();
+}).loose();
 
 function seedRoot(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-fsmcp-'));

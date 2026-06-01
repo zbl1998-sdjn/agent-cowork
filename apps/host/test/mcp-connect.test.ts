@@ -15,17 +15,17 @@ import { closeTestServer } from './helpers/close-server.js';
 const FIXTURE = fileURLToPath(new URL('./fixtures/mock-mcp-server.mjs', import.meta.url).href);
 
 const toolListResponseSchema = z.object({
-  tools: z.array(z.object({ name: z.string() }).passthrough()),
+  tools: z.array(z.object({ name: z.string() }).loose()),
   mcpServers: z.array(z.string()),
-}).passthrough();
+}).loose();
 
 const toolSearchResponseSchema = z.object({
-  tools: z.array(z.object({ name: z.string() }).passthrough()),
-}).passthrough();
+  tools: z.array(z.object({ name: z.string() }).loose()),
+}).loose();
 
 const errorResponseSchema = z.object({
   error: z.string(),
-}).passthrough();
+}).loose();
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-mcpc-'));

@@ -23,12 +23,12 @@ const sessionModelSourceSchema = z.object({
   apiKey: z.string().optional(),
   modelApiKey: z.string().optional(),
   kimiApiKey: z.string().optional(),
-}).passthrough();
+}).loose();
 
 const sessionModelRequestSchema = sessionModelSourceSchema.extend({
   modelConfig: sessionModelSourceSchema.optional(),
   kimiConfig: sessionModelSourceSchema.optional(),
-}).passthrough();
+}).loose();
 
 type SessionModelSource = z.infer<typeof sessionModelSourceSchema>;
 

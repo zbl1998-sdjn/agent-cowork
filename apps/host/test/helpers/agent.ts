@@ -11,55 +11,55 @@ export type EmittedEvent = {
 
 const globResultSchema = z.object({
   matches: z.array(z.string()),
-}).passthrough();
+}).loose();
 
 const grepResultSchema = z.object({
   hits: z.array(z.unknown()),
-}).passthrough();
+}).loose();
 
 const readResultSchema = z.object({
   content: z.string(),
-}).passthrough();
+}).loose();
 
 const writeResultSchema = z.object({
   ok: z.boolean(),
-}).passthrough();
+}).loose();
 
 const editResultSchema = z.object({
   replacements: z.number(),
-}).passthrough();
+}).loose();
 
 const shellResultSchema = z.object({
   exitCode: z.number(),
   stdout: z.string(),
   stderr: z.string(),
-}).passthrough();
+}).loose();
 
 const todoEventSchema = z.object({
   status: z.string(),
   text: z.string(),
-}).passthrough();
+}).loose();
 
 const toolResultEventSchema = z.object({
   name: z.string(),
   durationMs: z.number(),
-}).passthrough();
+}).loose();
 
 const planProposalSchema = z.object({
   id: z.string().min(1),
-}).passthrough();
+}).loose();
 
 const todoSnapshotSchema = z.object({
   todos: z.array(z.object({
     text: z.string(),
-  }).passthrough()),
-}).passthrough();
+  }).loose()),
+}).loose();
 
 export const runsIndexSchema = z.object({
   runs: z.array(z.object({
     type: z.string().optional(),
-  }).passthrough()).optional(),
-}).passthrough();
+  }).loose()).optional(),
+}).loose();
 
 export function agentTool(tools: AgentTool[], name: string): CallableAgentTool {
   const tool = tools.find((candidate) => candidate.name === name);

@@ -16,7 +16,7 @@ const optionalString = (value: unknown): unknown => (
   value == null || value === '' ? undefined : value
 );
 
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const connectorIdSchema = z.preprocess(
   optionalString,
   z.string()
@@ -43,7 +43,7 @@ export const connectorOAuthBodySchema = objectBodySchema.pipe(z.object({
   oauthApprovalId: routeTokenSchema,
   clientSecret: z.unknown().optional(),
   sessionId: routeTokenSchema,
-}).passthrough());
+}).loose());
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;

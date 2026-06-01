@@ -7,7 +7,7 @@ import type { JsonRpcMessage } from '../src/mcp/json-rpc.js';
 
 const toolsResultSchema = z.object({
   tools: z.array(z.unknown()),
-}).passthrough();
+}).loose();
 
 test('JsonRpcClient resolves a request when a matching response arrives', async () => {
   const sent: JsonRpcMessage[] = [];

@@ -41,11 +41,11 @@ const requestBudgetSchema = z.object({
   maxRunCostUsd: numericLimitSchema.optional(),
   maxSessionCostUsd: numericLimitSchema.optional(),
   maxWallClockMs: numericLimitSchema.optional(),
-}).passthrough();
+}).loose();
 
 const requestBodySchema = requestBudgetSchema.extend({
   budget: requestBudgetSchema.optional(),
-}).passthrough();
+}).loose();
 
 const modelConfigSchema = z.object({
   model: z.string().optional(),
@@ -54,7 +54,7 @@ const modelConfigSchema = z.object({
   maxRunCostUsd: numericLimitSchema.optional(),
   maxSessionCostUsd: numericLimitSchema.optional(),
   maxAgentWallClockMs: numericLimitSchema.optional(),
-}).passthrough();
+}).loose();
 
 function objectOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)

@@ -21,7 +21,7 @@ const positiveIntegerSchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
   z.number().int().positive().optional(),
 );
-const objectBodySchema = z.preprocess(objectBody, z.object({}).passthrough());
+const objectBodySchema = z.preprocess(objectBody, z.object({}).loose());
 const pathField = (message: string): z.ZodString => z.string().trim().min(1, message);
 const attachmentFileSchema: z.ZodType<string | AttachmentInput> = z.union([
   z.string(),
@@ -29,43 +29,43 @@ const attachmentFileSchema: z.ZodType<string | AttachmentInput> = z.union([
     path: z.string().optional(),
     fullPath: z.string().optional(),
     relativePath: z.string().optional(),
-  }).passthrough(),
+  }).loose(),
 ]);
 
 export const treeBodySchema = objectBodySchema.pipe(z.object({
   root: pathField('body.root is required'),
   includeFiles: z.boolean().optional(),
   includeDirectories: z.boolean().optional(),
-}).passthrough());
+}).loose());
 
 const uploadFileSchema: z.ZodType<UploadFile> = z.object({
   relativePath: z.string().optional(),
   name: z.string().optional(),
   contentBase64: z.string(),
   size: z.number().int().nonnegative(),
-}).passthrough();
+}).loose();
 export const uploadBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   files: z.array(uploadFileSchema, 'files must be an array').nonempty('files must be a non-empty array'),
-}).passthrough());
+}).loose());
 
 export const readBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   path: pathField('body.path is required'),
   maxSize: positiveIntegerSchema,
-}).passthrough());
+}).loose());
 
 export const previewBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   path: pathField('body.path is required'),
   maxBytes: positiveIntegerSchema,
-}).passthrough());
+}).loose());
 
 export const extractBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   path: pathField('body.path is required'),
   maxSize: z.unknown().optional(),
-}).passthrough());
+}).loose());
 
 export const searchBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
@@ -73,19 +73,19 @@ export const searchBodySchema = objectBodySchema.pipe(z.object({
   maxResults: positiveIntegerSchema,
   includeContent: z.boolean().optional(),
   maxContentBytes: positiveIntegerSchema,
-}).passthrough());
+}).loose());
 
 export const contextBundleBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   paths: z.array(z.string(), 'body.paths must be an array'),
   maxTextSize: positiveIntegerSchema,
-}).passthrough());
+}).loose());
 
 export const attachmentContextBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
   files: z.array(attachmentFileSchema, 'files must be an array').optional(),
   maxSize: z.unknown().optional(),
-}).passthrough());
+}).loose());
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;

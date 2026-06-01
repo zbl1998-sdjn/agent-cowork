@@ -22,7 +22,7 @@ const envSchema = z.object({
   KIMI_API_MAX_TOKENS: z.coerce.number().int().positive().catch(2048),
   KIMI_MODEL: z.string().optional(),
   KCW_TRUST_IDENTITY_HEADERS: z.string().optional(),
-}).passthrough();
+}).loose();
 
 const env = envSchema.parse(process.env);
 const host = env.HOST;
