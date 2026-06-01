@@ -120,6 +120,7 @@
     "apps/host/test/plan.test.ts",
     "apps/host/test/pg-fulllayer.test.ts",
     "apps/host/test/postgres-approvals.test.ts",
+    "apps/host/test/postgres-event-bus.test.ts",
     "apps/host/test/project-routes.test.ts",
     "apps/host/test/prompt-routes.test.ts",
     "apps/host/test/prompt-refiner.test.ts",

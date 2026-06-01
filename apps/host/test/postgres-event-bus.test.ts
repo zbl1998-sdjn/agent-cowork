@@ -1,17 +1,49 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { z } from 'zod';
+import type { RunEvent } from '../src/runtime/run-events.js';
 import { PostgresEventBus } from '../src/storage/postgres-event-bus.js';
 
-function mockCluster() {
-  const listeners = new Set();
-  function makeClient() {
+type PgNotification = { channel?: string; payload?: string | null };
+type PgNotificationHandler = (message: PgNotification) => void;
+type PgQueryResult = { rows: unknown[] };
+type MockPgClient = {
+  query(text: string, params?: unknown[]): Promise<PgQueryResult>;
+  on(evt: 'notification', handler: PgNotificationHandler): void;
+};
+type PgCall =
+  | ['constructor', string]
+  | ['connect']
+  | ['on', string]
+  | ['query', string, unknown[]];
+
+const notifyParamsSchema = z.tuple([z.string(), z.string()]);
+const fakeClientOptionsSchema = z.object({
+  connectionString: z.string(),
+}).passthrough();
+
+function eventAt(events: readonly RunEvent[], index: number, label: string): RunEvent {
+  const event = events[index];
+  assert.ok(event, `${label} should exist`);
+  return event;
+}
+
+function mockCluster(): { makeClient(): MockPgClient } {
+  const listeners = new Set<PgNotificationHandler>();
+  function makeClient(): MockPgClient {
     return {
-      async query(text, params = []) {
+      async query(text: string, params: unknown[] = []): Promise<PgQueryResult> {
         const t = text.replace(/\s+/g, ' ').trim();
-        if (t.startsWith('SELECT pg_notify')) { for (const h of listeners) h({ channel: params[0], payload: params[1] }); return { rows: [] }; }
+        if (t.startsWith('SELECT pg_notify')) {
+          const [channel, payload] = notifyParamsSchema.parse(params);
+          for (const handler of listeners) handler({ channel, payload });
+          return { rows: [] };
+        }
         return { rows: [] };
       },
-      on(evt, h) { if (evt === 'notification') listeners.add(h); },
+      on(evt: 'notification', handler: PgNotificationHandler) {
+        if (evt === 'notification') listeners.add(handler);
+      },
     };
   }
   return { makeClient };
@@ -23,20 +55,21 @@ test('cross-instance SSE: an event published on B reaches a subscriber on A', as
   const B = new PostgresEventBus({ client: cluster.makeClient() });
   await A.start();
   await B.start();
-  const received = [];
+  const received: RunEvent[] = [];
   A.subscribe('run-1', (e) => received.push(e));
   await B.publish('run-1', { type: 'token', delta: '你好' });
   await new Promise((r) => setTimeout(r, 5));
   assert.equal(received.length, 1, 'A received the event B published');
-  assert.equal(received[0].type, 'token');
-  assert.equal(received[0].delta, '你好');
+  const event = eventAt(received, 0, 'received event');
+  assert.equal(event.type, 'token');
+  assert.equal(event.delta, '你好');
 });
 
 test('published event is delivered exactly once to a same-instance subscriber', async () => {
   const cluster = mockCluster();
   const A = new PostgresEventBus({ client: cluster.makeClient() });
   await A.start();
-  const got = [];
+  const got: RunEvent[] = [];
   A.subscribe('run-2', (e) => got.push(e));
   await A.publish('run-2', { type: 'done', text: 'ok' });
   await new Promise((r) => setTimeout(r, 5));
@@ -55,26 +88,28 @@ test('replay returns events the instance has observed', async () => {
 });
 
 test('connectionString creates a PG client for LISTEN and NOTIFY', async () => {
-  const calls = [];
-  const listeners = new Set();
+  const calls: PgCall[] = [];
+  const listeners = new Set<PgNotificationHandler>();
   class FakeClient {
-    constructor(options) {
-      calls.push(['constructor', options.connectionString]);
+    constructor(options: Record<string, unknown> = {}) {
+      const parsed = fakeClientOptionsSchema.parse(options);
+      calls.push(['constructor', parsed.connectionString]);
     }
 
-    async connect() {
+    async connect(): Promise<void> {
       calls.push(['connect']);
     }
 
-    on(evt, handler) {
+    on(evt: 'notification', handler: PgNotificationHandler): void {
       calls.push(['on', evt]);
       if (evt === 'notification') listeners.add(handler);
     }
 
-    async query(text, params = []) {
+    async query(text: string, params: unknown[] = []): Promise<PgQueryResult> {
       calls.push(['query', text, params]);
       if (text.startsWith('SELECT pg_notify')) {
-        for (const handler of listeners) handler({ channel: params[0], payload: params[1] });
+        const [channel, payload] = notifyParamsSchema.parse(params);
+        for (const handler of listeners) handler({ channel, payload });
       }
       return { rows: [] };
     }
@@ -84,7 +119,7 @@ test('connectionString creates a PG client for LISTEN and NOTIFY', async () => {
     connectionString: 'postgres://example/db',
     pg: { Client: FakeClient },
   });
-  const received = [];
+  const received: RunEvent[] = [];
   bus.subscribe('run-cs', (event) => received.push(event));
   await bus.start();
   await bus.publish('run-cs', { type: 'done', text: 'ok' });
@@ -93,7 +128,7 @@ test('connectionString creates a PG client for LISTEN and NOTIFY', async () => {
   assert.deepEqual(calls[1], ['connect']);
   assert.equal(calls.some((call) => call[0] === 'query' && call[1] === 'LISTEN kcw_run_events'), true);
   assert.equal(received.length, 1);
-  assert.equal(received[0].type, 'done');
+  assert.equal(eventAt(received, 0, 'received event').type, 'done');
 });
 
 test('PostgresEventBus rejects unsafe channel names', () => {
