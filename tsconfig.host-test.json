@@ -6,6 +6,7 @@
   "files": [
     "types/host-node-shim.d.ts",
     "apps/host/test/helpers/close-server.ts",
+    "apps/host/test/helpers/host-http.ts",
     "apps/host/test/test-fixtures.ts",
     "apps/host/test/agent-env.test.ts",
     "apps/host/test/agent-stream-input.test.ts",
@@ -99,6 +100,10 @@
     "apps/host/test/security-headers.test.ts",
     "apps/host/test/selfcheck.test.ts",
     "apps/host/test/server-security.test.ts",
+    "apps/host/test/server-runtime-memory.test.ts",
+    "apps/host/test/server-runtime-recipes.test.ts",
+    "apps/host/test/server-runtime-run-events.test.ts",
+    "apps/host/test/server-runtime-schedules.test.ts",
     "apps/host/test/server.test.ts",
     "apps/host/test/seeded-ids.test.ts",
     "apps/host/test/shutdown.test.ts",
