@@ -30,6 +30,7 @@
     "scripts/smoke-tauri-scaffold.ts",
     "apps/host/scripts/load-sse.ts",
     "scripts/smoke-runtime-update-preservation.ts",
+    "scripts/smoke-offline-local.ts",
     "scripts/start-mvp.ts",
     "scripts/start-tauri-dev.ts",
     "scripts/start-tauri-host.ts",

@@ -31,7 +31,7 @@
     "smoke:windows-paths": "node scripts/run-host-node.mjs scripts/smoke-windows-paths.mjs",
     "smoke:sqlite-runtime": "node scripts/run-host-node.mjs scripts/smoke-sqlite-runtime.mjs",
     "smoke:runtime-update": "node scripts/run-host-node.mjs scripts/smoke-runtime-update-preservation.ts",
-    "smoke:offline-local": "node scripts/run-host-node.mjs scripts/smoke-offline-local.mjs",
+    "smoke:offline-local": "node scripts/run-host-node.mjs scripts/smoke-offline-local.ts",
     "smoke:e2e": "node scripts/run-host-node.mjs scripts/e2e-smoke.mjs",
     "bench": "node scripts/run-host-node.mjs scripts/bench.ts",
     "eval": "node scripts/run-host-node.mjs scripts/eval.ts",

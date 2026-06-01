@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
+import type { AddressInfo } from 'node:http';
+import type { HostServer } from '../apps/host/src/server.js';
 
 const NETWORK_ENV = [
   'KIMI_API_KEY',
@@ -16,32 +18,68 @@ const NETWORK_ENV = [
   'http_proxy',
   'https_proxy',
   'all_proxy',
-];
-for (const key of NETWORK_ENV) delete process.env[key];
+] as const;
+for (const key of NETWORK_ENV) Reflect.deleteProperty(process.env, key);
 
-const originalFetch = globalThis.fetch;
-globalThis.fetch = async (input, init) => {
-  const url = new URL(typeof input === 'string' ? input : input.url);
+type JsonRecord = Record<string, unknown>;
+type RequestBody = JsonRecord & { idempotencyKey?: string };
+type SmokeReport = {
+  ok: boolean;
+  mode: 'offline-local';
+  generatedAt: string;
+  workspace: string;
+  checks: Record<string, string>;
+};
+
+const originalFetch: typeof fetch = globalThis.fetch.bind(globalThis);
+
+function fetchInputUrl(input: RequestInfo | URL): URL {
+  if (typeof input === 'string' || input instanceof URL) return new URL(input);
+  return new URL(input.url);
+}
+
+globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const url = fetchInputUrl(input);
   assert.ok(['127.0.0.1', 'localhost'].includes(url.hostname), `offline smoke blocked non-local fetch: ${url.href}`);
   return originalFetch(input, init);
 };
 
-function assertInside(child, parent, label) {
+function assertInside(child: string, parent: string, label: string): void {
   const relative = path.relative(parent, child);
   assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), `${label} escaped expected parent: ${child}`);
 }
 
-async function postJson(baseUrl, route, body, expectedStatus = 200) {
-  const headers = { 'content-type': 'application/json' };
+async function fetchJson<T = JsonRecord>(url: string): Promise<T> {
+  const response = await fetch(url);
+  return await response.json() as T;
+}
+
+async function postJson<T = JsonRecord>(
+  baseUrl: string,
+  route: string,
+  body: RequestBody,
+  expectedStatus = 200,
+): Promise<T> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (body?.idempotencyKey) headers['idempotency-key'] = body.idempotencyKey;
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
-  const payload = await response.json();
+  const payload = await response.json() as T;
   assert.equal(response.status, expectedStatus, `${route} returned ${response.status}: ${JSON.stringify(payload)}`);
   return payload;
+}
+
+async function listenLocal(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'offline smoke server did not bind to a TCP port');
+  return `http://127.0.0.1:${(address as AddressInfo).port}`;
 }
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -62,13 +100,8 @@ const server = createServer({
   requireAuth: false,
 });
 
-await new Promise((resolve, reject) => {
-  server.once('error', reject);
-  server.listen(0, '127.0.0.1', resolve);
-});
-
-const baseUrl = `http://127.0.0.1:${server.address().port}`;
-const report = {
+const baseUrl = await listenLocal(server);
+const report: SmokeReport = {
   ok: false,
   mode: 'offline-local',
   generatedAt: new Date().toISOString(),
@@ -77,44 +110,53 @@ const report = {
 };
 
 try {
-  const health = await (await fetch(`${baseUrl}/health`)).json();
+  const health = await fetchJson<{ ok?: unknown }>(`${baseUrl}/health`);
   assert.equal(health.ok, true);
   report.checks.health = 'passed';
 
-  const workspaceInfo = await (await fetch(`${baseUrl}/api/workspace`)).json();
+  const workspaceInfo = await fetchJson<{ trustedRoot?: unknown }>(`${baseUrl}/api/workspace`);
   assert.equal(workspaceInfo.trustedRoot, workspace);
   report.checks.workspace = 'passed';
 
-  const tree = await postJson(baseUrl, '/api/files/tree', { root: workspace });
+  const tree = await postJson<{ files: Array<{ path?: unknown }> }>(baseUrl, '/api/files/tree', { root: workspace });
   assert.ok(tree.files.some((item) => item.path === 'docs/offline-note.md'));
-  const read = await postJson(baseUrl, '/api/files/read', { trustedRoot: workspace, path: sourcePath });
-  assert.match(read.content, /本地文件仍可读写/);
+  const read = await postJson<{ content?: string }>(baseUrl, '/api/files/read', { trustedRoot: workspace, path: sourcePath });
+  assert.match(String(read.content), /本地文件仍可读写/);
   report.checks.localFiles = 'passed';
 
   const artifactPath = path.join(workspace, '.AgentCowork', 'artifacts', 'offline-result.md');
-  const preview = await postJson(baseUrl, '/api/file-ops/preview', {
+  const preview = await postJson<{ fileOperationApprovalId?: string }>(baseUrl, '/api/file-ops/preview', {
     trustedRoot: workspace,
     operations: [{ type: 'write', path: artifactPath, content: '# 离线结果\n\n本地写入成功。\n' }],
   });
-  assert.match(preview.fileOperationApprovalId, /^fop_/);
-  const applied = await postJson(baseUrl, '/api/file-ops/apply', {
+  assert.match(String(preview.fileOperationApprovalId), /^fop_/);
+  const applied = await postJson<{ applied: Array<{ status?: unknown }> }>(baseUrl, '/api/file-ops/apply', {
     trustedRoot: workspace,
     operations: [{ type: 'write', path: artifactPath, content: '# 离线结果\n\n本地写入成功。\n' }],
     fileOperationApprovalId: preview.fileOperationApprovalId,
     idempotencyKey: 'offline-local-write',
   });
-  assert.equal(applied.applied[0].status, 'applied');
+  const firstApplied = applied.applied.at(0);
+  assert.ok(firstApplied);
+  assert.equal(firstApplied.status, 'applied');
   assert.equal(fs.existsSync(artifactPath), true);
   report.checks.localWrite = 'passed';
 
-  const runtime = await (await fetch(`${baseUrl}/api/runtime/dependencies`)).json();
+  const runtime = await fetchJson<{ ok?: unknown; dependencies: Array<{ installMode?: unknown }> }>(
+    `${baseUrl}/api/runtime/dependencies`,
+  );
   assert.equal(runtime.ok, true);
   assert.ok(runtime.dependencies.some((item) => item.installMode === 'on-demand'));
   report.checks.runtimeDependencies = 'passed';
 
-  const kimi = await postJson(baseUrl, '/api/kimi/plan', { trustedRoot: workspace, prompt: '总结离线文件' }, 503);
-  assert.match(kimi.error, /本地文件功能仍可离线使用/);
-  assert.match(kimi.error, /需要模型回复时请联网/);
+  const kimi = await postJson<{ error?: unknown }>(
+    baseUrl,
+    '/api/kimi/plan',
+    { trustedRoot: workspace, prompt: '总结离线文件' },
+    503,
+  );
+  assert.match(String(kimi.error), /本地文件功能仍可离线使用/);
+  assert.match(String(kimi.error), /需要模型回复时请联网/);
   report.checks.modelNetworkBoundary = 'passed';
 
   const audit = fs.readFileSync(auditPath, 'utf8');
