@@ -6,6 +6,7 @@ import test from 'node:test';
 import { z } from 'zod';
 import { createServer } from '../src/server.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { scopedJsonHeaders } from './helpers/approvals.js';
 import type { HostServer } from '../src/server.js';
 
 type ApprovalRequest = { id: string; promise: Promise<unknown> };
@@ -96,10 +97,16 @@ test('POST /api/approvals/:id awaits an async resolve (PG-style store)', async (
     resolve: async (id: string, decision: unknown) => { resolvedWith = { id, decision }; return true; },
     respond: async () => true, cancelByRun: async () => 0, pendingCount: async () => 0,
   };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, approvalRegistry });
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    requireAuth: true,
+    trustIdentityHeaders: true,
+    approvalRegistry,
+  });
   const base = await bind(server);
   try {
-    const res = await fetch(`${base}/api/approvals/apr_123`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'once' }) });
+    const res = await fetch(`${base}/api/approvals/apr_123`, { method: 'POST', headers: scopedJsonHeaders('tenant_a', 'user_a'), body: JSON.stringify({ decision: 'once' }) });
     assert.equal(res.status, 200);
     const body = await responseJson(res, approvalOkSchema);
     assert.equal(body.ok, true, 'awaited async resolve returned true');
@@ -124,12 +131,18 @@ test('POST /api/approvals/batch awaits async resolveMany', async () => {
     cancelByRun: async () => 0,
     pendingCount: async () => 0,
   };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, approvalRegistry });
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    requireAuth: true,
+    trustIdentityHeaders: true,
+    approvalRegistry,
+  });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/approvals/batch`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: scopedJsonHeaders('tenant_a', 'user_a'),
       body: JSON.stringify({ ids: ['apr_a', 'missing', 'apr_a'], decision: 'session' }),
     });
     assert.equal(res.status, 200);
