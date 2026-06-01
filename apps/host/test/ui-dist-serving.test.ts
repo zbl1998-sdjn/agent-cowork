@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo, Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-uidist-'));
@@ -15,11 +17,13 @@ function seedUiDist() {
   fs.writeFileSync(path.join(dir, 'assets', 'app.js'), 'console.log("hi");', 'utf8');
   return dir;
 }
-async function bind(server) {
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  return `http://127.0.0.1:${server.address().port}`;
+async function bind(server: Server): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'test server should bind to a TCP port');
+  return `http://127.0.0.1:${(address as AddressInfo).port}`;
 }
-async function get(base, route) {
+async function get(base: string, route: string): Promise<{ status: number; type: string; body: string }> {
   const res = await fetch(`${base}${route}`);
   return { status: res.status, type: res.headers.get('content-type') || '', body: await res.text() };
 }
@@ -46,7 +50,7 @@ test('host serves the React SPA from ui-dist when it exists', async () => {
     const missing = await get(base, '/assets/missing.js');
     assert.equal(missing.status, 404);
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeTestServer(server);
   }
 });
 
@@ -64,7 +68,7 @@ test('SPA serving never hijacks /api or /health', async () => {
     assert.equal(health.status, 200);
     assert.match(health.body, /"ok":true/);
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeTestServer(server);
   }
 });
 
@@ -77,6 +81,6 @@ test('falls back to the legacy static UI when ui-dist is disabled', async () => 
     assert.ok(root.type.includes('text/html'));
     assert.match(root.body, /Agent Cowork/);
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeTestServer(server);
   }
 });

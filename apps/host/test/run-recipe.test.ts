@@ -10,9 +10,44 @@ import { RunsIndex } from '../src/runtime/runs-index.js';
 import { writeRunRecord } from '../src/runtime/run-store.js';
 import { listRecipes } from '../src/recipes/registry.js';
 import { readZipEntries } from '../src/workspace/zip-utils.js';
+import type { FileOperationInput } from '../src/workspace/file-operations.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-recipe-'));
+}
+
+function firstRecipeId(): string {
+  const recipe = listRecipes()[0];
+  assert.ok(recipe, 'expected at least one recipe fixture');
+  return recipe.id;
+}
+
+function eventAt(events: readonly Record<string, unknown>[], index: number): Record<string, unknown> {
+  const event = events[index];
+  assert.ok(event, `expected event at index ${index}`);
+  return event;
+}
+
+function firstItem<T>(items: readonly T[], label: string): T {
+  const item = items[0];
+  assert.ok(item, `expected ${label}`);
+  return item;
+}
+
+function operationPath(operation: FileOperationInput): string {
+  assert.ok(operation.path, 'operation should include a path');
+  return operation.path;
+}
+
+function operationWithExt(operations: readonly FileOperationInput[], ext: string): FileOperationInput {
+  const operation = operations.find((item) => operationPath(item).endsWith(ext));
+  assert.ok(operation, `${ext} operation should exist`);
+  return operation;
+}
+
+function stringField(value: unknown, label: string): string {
+  assert.ok(typeof value === 'string', `${label} should be a string`);
+  return value;
 }
 
 test('runRecipe produces operations, run record, events, and indexes the run', () => {
@@ -21,7 +56,7 @@ test('runRecipe produces operations, run record, events, and indexes the run', (
   const runEvents = new RunEventBus();
   const runsIndex = new RunsIndex({ indexRoot: path.join(trustedRoot, '.AgentCowork', 'index') });
 
-  const recipeId = listRecipes()[0].id;
+  const recipeId = firstRecipeId();
   const result = runRecipe({
     recipeId,
     trustedRoot,
@@ -48,18 +83,19 @@ test('runRecipe produces operations, run record, events, and indexes the run', (
   assert.equal(types[types.length - 1], 'assistant_end');
   // Events carry monotonic seq.
   for (let i = 1; i < result.events.length; i += 1) {
-    assert.ok(result.events[i].seq > result.events[i - 1].seq);
+    assert.ok(Number(eventAt(result.events, i).seq) > Number(eventAt(result.events, i - 1).seq));
   }
 
   // Run record embeds events for replay across restart.
-  const record = JSON.parse(fs.readFileSync(result.runPath, 'utf8'));
+  const record = JSON.parse(fs.readFileSync(result.runPath, 'utf8')) as { events?: unknown[] };
   assert.ok(Array.isArray(record.events));
   assert.equal(record.events.length, result.events.length);
 
   // Indexed and tenant scoped.
   const listed = runsIndex.list({ tenantId: 'tenant_alice' });
+  const firstListed = firstItem(listed, 'indexed run');
   assert.equal(listed.length, 1);
-  assert.equal(listed[0].id, result.runId);
+  assert.equal(firstListed.id, result.runId);
   assert.equal(runsIndex.list({ tenantId: 'tenant_bob' }).length, 0);
 });
 
@@ -77,7 +113,7 @@ test('runRecipe throws 404 for unknown recipe', () => {
 
 test('runRecipe works without runEvents/runsIndex (events still numbered locally)', () => {
   const trustedRoot = tempRoot();
-  const recipeId = listRecipes()[0].id;
+  const recipeId = firstRecipeId();
   const result = runRecipe({
     recipeId,
     trustedRoot,
@@ -86,7 +122,7 @@ test('runRecipe works without runEvents/runsIndex (events still numbered locally
   });
   assert.equal(result.ok, true);
   assert.ok(result.events.length >= 5);
-  assert.equal(result.events[0].seq, 1);
+  assert.equal(eventAt(result.events, 0).seq, 1);
 });
 
 test('summary-report recipe produces Office document artifacts', () => {
@@ -101,18 +137,19 @@ test('summary-report recipe produces Office document artifacts', () => {
     files: [source],
     runStoreRoot: path.join(trustedRoot, '.AgentCowork', 'runs'),
   });
-  const paths = result.operations.map((op) => op.path);
+  const paths = result.operations.map(operationPath);
 
   assert.ok(paths.some((item) => item.endsWith('.md')));
   assert.ok(paths.some((item) => item.endsWith('.docx')));
   assert.ok(paths.some((item) => item.endsWith('.pptx')));
   assert.ok(paths.some((item) => item.endsWith('.pdf')));
   for (const ext of ['.docx', '.pptx', '.pdf']) {
-    const op = result.operations.find((item) => item.path.endsWith(ext));
+    const op = operationWithExt(result.operations, ext);
     assert.ok(op?.contentBase64, `${ext} operation carries base64 content`);
   }
 
-  const docx = Buffer.from(result.operations.find((op) => op.path.endsWith('.docx')).contentBase64, 'base64');
+  const docxOperation = operationWithExt(result.operations, '.docx');
+  const docx = Buffer.from(stringField(docxOperation.contentBase64, 'docx contentBase64'), 'base64');
   const documentXml = readZipEntries(docx).find((entry) => entry.name === 'word/document.xml')?.content.toString('utf8') || '';
   assert.match(documentXml, /项目状态/);
 });
@@ -146,10 +183,11 @@ test('captureRun extracts a redacted reusable recipe draft from an agent run', a
   assert.equal(draft.prompt.includes(secret), false);
   assert.equal(JSON.stringify(draft).includes(secret), false);
   assert.equal(draft.steps.length, 1);
-  assert.equal(draft.steps[0].tool, 'Write');
-  assert.equal(draft.steps[0].status, 'succeeded');
+  const firstStep = firstItem(draft.steps, 'captured step');
+  assert.equal(firstStep.tool, 'Write');
+  assert.equal(firstStep.status, 'succeeded');
   assert.equal(draft.artifacts.length, 1);
-  assert.match(draft.artifacts[0].path, /report\.md$/);
+  assert.match(firstItem(draft.artifacts, 'captured artifact').path, /report\.md$/);
   assert.equal(draft.redacted, true);
 });
 
@@ -180,6 +218,6 @@ test('captureRun falls back to runsIndex runPath when runStoreRoot has no record
   const draft = (await captureRun({ runId, runStoreRoot: primaryRunStore, runsIndex })).recipe;
 
   assert.equal(draft.name, 'Captured summary-report');
-  assert.equal(draft.steps[0].tool, 'recipe.operation');
-  assert.equal(draft.artifacts[0].source, 'preview');
+  assert.equal(firstItem(draft.steps, 'captured recipe step').tool, 'recipe.operation');
+  assert.equal(firstItem(draft.artifacts, 'captured recipe artifact').source, 'preview');
 });

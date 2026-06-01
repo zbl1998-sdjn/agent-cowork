@@ -4,21 +4,29 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import type { AgentTool } from '../src/kimi/agent/tool-call-executor.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-verify-')); }
 
-function mut(name, onRun) {
+type EmittedEvent = { t: string; d: unknown };
+
+function noop() {
+  return undefined;
+}
+
+function mut(name: string, onRun: () => void): AgentTool {
   return { name, risk: 'low', mutating: true, description: name, parameters: { type: 'object', properties: {} }, handler: async () => { onRun(); return { ok: true }; } };
 }
-function ro(name, onRun) {
+
+function ro(name: string, onRun: () => void): AgentTool {
   return { name, risk: 'low', mutating: false, description: name, parameters: { type: 'object', properties: {} }, handler: async () => { onRun(); return { ok: true, read: true }; } };
 }
 
 test('verify=true: after a mutation, agent runs a read-only self-check round then finalizes', async () => {
   const root = tmp();
   let readBack = false;
-  const tools = [mut('Write', () => {}), ro('Read', () => { readBack = true; })];
-  const events = [];
+  const tools = [mut('Write', noop), ro('Read', () => { readBack = true; })];
+  const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
     n += 1;
@@ -36,10 +44,10 @@ test('verify=true: after a mutation, agent runs a read-only self-check round the
 
 test('verify=true with plan mode runs self-check after approved plan execution', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let readBack = false;
   const approvals = {
-    request(meta) {
+    request(meta: unknown) {
       events.push({ t: 'approval_requested', d: meta });
       return { id: 'plan_1', promise: Promise.resolve('once') };
     },
@@ -53,7 +61,7 @@ test('verify=true with plan mode runs self-check after approved plan execution',
       parameters: { type: 'object', properties: {} },
       handler: async () => ({ ok: true }),
     },
-    mut('Write', () => {}),
+    mut('Write', noop),
     ro('Read', () => { readBack = true; }),
   ];
   let n = 0;
@@ -91,8 +99,8 @@ test('verify=true with plan mode runs self-check after approved plan execution',
 
 test('verify=true but nothing mutated: no verification round', async () => {
   const root = tmp();
-  const tools = [ro('Read', () => {})];
-  const events = [];
+  const tools = [ro('Read', noop)];
+  const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
     n += 1;
@@ -106,8 +114,8 @@ test('verify=true but nothing mutated: no verification round', async () => {
 
 test('verify=false (default): no self-check even after a mutation', async () => {
   const root = tmp();
-  const tools = [mut('Write', () => {})];
-  const events = [];
+  const tools = [mut('Write', noop)];
+  const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
     n += 1;
