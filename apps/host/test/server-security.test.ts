@@ -1,45 +1,76 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import type { HostServer, ServerConfig } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 
-function tempRoot(prefix = 'kcw-security-') {
+type JsonRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+type JsonResponse = {
+  status: number;
+  body: Record<string, unknown>;
+  headers: Headers;
+};
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function tempRoot(prefix = 'kcw-security-'): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-async function bind(server) {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { address, port } = server.address();
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const addressInfo = server.address();
+  assert.ok(addressInfo && typeof addressInfo === 'object', 'test server should bind to a TCP port');
+  const { address, port } = addressInfo as AddressInfo;
   return `http://${address}:${port}`;
 }
 
-async function close(server) {
-  await new Promise((resolve) => server.close(resolve));
+async function close(server: HostServer): Promise<void> {
+  await closeTestServer(server);
 }
 
-function createSecurityServer(config = {}) {
+function createSecurityServer(config: Partial<ServerConfig> = {}): HostServer {
   return createServer({ requireAuth: false, trustIdentityHeaders: true, ...config });
 }
 
-async function jsonRequest(base, route, { method = 'GET', body, headers = {} } = {}) {
-  const response = await fetch(`${base}${route}`, {
+async function jsonRequest(
+  base: string,
+  route: string,
+  { method = 'GET', body, headers = {} }: JsonRequestOptions = {},
+): Promise<JsonResponse> {
+  const init: RequestInit = {
     method,
     headers: {
       'content-type': 'application/json',
       ...headers,
     },
-    body: body == null ? undefined : JSON.stringify(body),
-  });
+  };
+  if (body != null) {
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(`${base}${route}`, init);
   const text = await response.text();
-  let parsed = null;
+  let parsed: unknown = {};
   try {
-    parsed = text ? JSON.parse(text) : null;
+    parsed = text ? JSON.parse(text) : {};
   } catch {
     parsed = { raw: text };
   }
-  return { status: response.status, body: parsed, headers: response.headers };
+  return { status: response.status, body: recordValue(parsed, `${method} ${route} response`), headers: response.headers };
 }
 
 test('API rejects cross-origin mutating requests and text/plain JSON bodies', async () => {
@@ -222,7 +253,7 @@ test('run detail, task list, run list, and SSE history are tenant scoped', async
       body: { prompt: 'secret a', files: [] },
     });
     assert.equal(run.status, 200);
-    const runId = run.body.runId;
+    const runId = String(run.body.runId);
 
     const otherDetail = await jsonRequest(base, `/api/runs/${encodeURIComponent(runId)}`, {
       headers: { 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
@@ -288,7 +319,8 @@ test('critical writes require Idempotency-Key and reject same key with different
       body: { name: 'cancel target', fireAt: new Date(Date.now() + 60_000).toISOString(), payload: {} },
     });
     assert.equal(scheduled.status, 200);
-    const scheduleId = scheduled.body.schedule.id;
+    const scheduledRecord = recordValue(scheduled.body.schedule, 'scheduled record');
+    const scheduleId = String(scheduledRecord.id);
 
     const tickMissing = await jsonRequest(base, '/api/schedules/_tick', { method: 'POST' });
     assert.equal(tickMissing.status, 428);
@@ -321,7 +353,7 @@ test('critical writes require Idempotency-Key and reject same key with different
       body: { prompt: 'different body', files: [] },
     });
     assert.equal(mismatch.status, 409);
-    assert.match(mismatch.body.error, /reused/i);
+    assert.match(String(mismatch.body.error), /reused/i);
   } finally {
     await close(server);
   }
@@ -329,7 +361,7 @@ test('critical writes require Idempotency-Key and reject same key with different
 
 test('schedule mutation routes are tenant scoped', async () => {
   const trustedRoot = tempRoot();
-  const fired = [];
+  const fired: string[] = [];
   const server = createSecurityServer({
     trustedRoot,
     enableScheduler: true,
@@ -355,7 +387,8 @@ test('schedule mutation routes are tenant scoped', async () => {
       },
     });
     assert.equal(created.status, 200);
-    const scheduleId = created.body.schedule.id;
+    const createdRecord = recordValue(created.body.schedule, 'created schedule record');
+    const scheduleId = String(createdRecord.id);
 
     const bobCancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
       method: 'POST',
