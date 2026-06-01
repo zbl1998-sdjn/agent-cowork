@@ -1,6 +1,7 @@
 // Bundle the Node host (ESM, multi-file) into a single CJS file suitable for a
-// Node SEA (single executable). Run from this ui dir so esbuild resolves from
-// node_modules. The `import.meta.url` define fixes esbuild's CJS interop shim
+// Node SEA (single executable). Keep this script next to the UI package so the
+// esbuild dependency resolves from apps/windows-client/ui/node_modules. The
+// `import.meta.url` define fixes esbuild's CJS interop shim
 // (createRequire(import.meta.url)) which is undefined inside a SEA.
 import * as esbuild from 'esbuild';
 import { spawnSync } from 'node:child_process';
@@ -18,7 +19,9 @@ const compile = spawnSync(process.execPath, [
   cwd: repoRoot,
   stdio: 'inherit',
 });
-if (compile.status !== 0) process.exit(compile.status ?? 1);
+if (compile.status !== 0) {
+  process.exit(compile.status ?? 1);
+}
 
 await esbuild.build({
   entryPoints: [path.join(repoRoot, 'build', 'host-src', 'main.js')],

@@ -2,6 +2,7 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "target": "ES2022",
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
@@ -12,5 +13,6 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["vite.config.ts", "vite.config.build.ts"]
+  "files": ["../../../types/host-node-shim.d.ts"],
+  "include": ["vite.config.ts", "vite.config.build.ts", "build-host-sea.ts"]
 }

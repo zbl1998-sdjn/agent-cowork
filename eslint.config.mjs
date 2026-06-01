@@ -22,7 +22,7 @@ const typedSourceFiles = [
   'scripts/**/*.ts',
   'apps/windows-client/resources-src/**/*.ts',
   'apps/windows-client/ui/src/**/*.{ts,tsx}',
-  'apps/windows-client/ui/vite.config*.ts',
+  'apps/windows-client/ui/*.ts',
 ];
 
 const typedStrictConfigs = [
