@@ -447,12 +447,12 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - 覆盖 `MessageBubble` / `ProgressLine` / `PreviewCard` / `ApprovalActions` / `ArtifactCard` / `SourcesFooter` / `Composer` / `ClarificationCard` / `TaskStatusBadge`。
 - **测试覆盖**:
   - `apps/host/test/tauri-scaffold.test.js` 断言 npm zero-deps、Tauri config、externalBin、CSP、Rust sidecar/opener command/plugin 入口、capability 和组件清单。
-  - `scripts/smoke-tauri-scaffold.mjs` 输出当前工具链可运行性; 本机报告 `runnable:false`。
+  - `scripts/smoke-tauri-scaffold.ts` 输出当前工具链可运行性; 本机报告 `runnable:false`。
 
 验收:
 
 - `node --check scripts/start-tauri-host.mjs` 通过。
-- `node --check scripts/smoke-tauri-scaffold.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-tauri-scaffold.ts` 通过。
 - `npm run smoke:tauri-scaffold` 通过, 但报告 `cargo` / `rustc` / `cargo tauri` 不可用。
 - `node --test` 全量 **99 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
@@ -490,7 +490,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/server-security.test.js` 覆盖 Origin/JSON、trustedRoot escape、tenant run 泄漏、idempotency mismatch。
 - `apps/host/test/sqlite-adapters.test.js` 覆盖 SQLite memory audit 与 migration rollback。
 - `apps/host/test/audit-events.test.js` 覆盖 subscriber failure 可见性。
-- `apps/host/test/tauri-scaffold.test.js` 与 `scripts/smoke-tauri-scaffold.mjs` 覆盖 sidecar/opener/CSP/capability 契约。
+- `apps/host/test/tauri-scaffold.test.js` 与 `scripts/smoke-tauri-scaffold.ts` 覆盖 sidecar/opener/CSP/capability 契约。
 
 验收:
 

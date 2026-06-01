@@ -26,6 +26,7 @@
     "scripts/check-secrets.ts",
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
+    "scripts/smoke-tauri-scaffold.ts",
     "apps/host/scripts/load-sse.ts",
     "scripts/smoke-runtime-update-preservation.ts",
     "scripts/start-mvp.ts",

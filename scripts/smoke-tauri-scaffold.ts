@@ -6,18 +6,34 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const tauriRoot = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri');
 
-function assert(condition, message) {
+interface TauriPermissionGrant {
+  identifier?: string;
+  allow?: Array<{
+    name?: string;
+    sidecar?: boolean;
+  }>;
+}
+
+type TauriPermission = string | TauriPermissionGrant;
+
+interface ComponentManifest {
+  components?: Array<{
+    name?: string;
+  }>;
+}
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-function commandAvailable(command, args = ['--version']) {
+function commandAvailable(command: string, args: readonly string[] = ['--version']) {
   const result = spawnSync(command, args, { encoding: 'utf8', windowsHide: true });
   return {
     ok: result.status === 0,
-    stdout: (result.stdout || '').trim(),
-    stderr: (result.stderr || '').trim(),
+    stdout: String(result.stdout || '').trim(),
+    stderr: String(result.stderr || '').trim(),
   };
 }
 
@@ -110,15 +126,17 @@ for (const symbol of [
 }
 assert(!lib.includes('Command::new("node")'), 'Tauri Rust entry must use packaged sidecar instead of PATH node');
 
-const capability = JSON.parse(fs.readFileSync(capabilityPath, 'utf8'));
+const capability = JSON.parse(fs.readFileSync(capabilityPath, 'utf8')) as { permissions?: TauriPermission[] };
 assert(!(capability.permissions || []).includes('opener:default'), 'Tauri capability must not include broad opener:default');
 assert(!(capability.permissions || []).includes('shell:allow-open'), 'Tauri capability must not grant broad shell open');
 assert((capability.permissions || []).some((permission) => (
-  permission?.identifier === 'shell:allow-execute'
+  typeof permission === 'object'
+  && permission !== null
+  && permission.identifier === 'shell:allow-execute'
   && (permission.allow || []).some((item) => item.name === 'binaries/agent-cowork-host' && item.sidecar === true)
 )), 'Tauri capability must allow only the packaged host sidecar');
 
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as ComponentManifest;
 const requiredComponents = [
   'MessageBubble',
   'ClarificationCard',

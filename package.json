@@ -19,7 +19,7 @@
     "smoke:plan-loop": "node scripts/run-host-node.mjs scripts/smoke-plan-closed-loop.mjs",
     "smoke:mvp-runtime": "node scripts/smoke-mvp-runtime.mjs",
     "smoke:kimi-api": "node scripts/run-host-node.mjs scripts/smoke-kimi-api.mjs",
-    "smoke:tauri-scaffold": "node scripts/smoke-tauri-scaffold.mjs",
+    "smoke:tauri-scaffold": "node scripts/run-host-node.mjs scripts/smoke-tauri-scaffold.ts",
     "smoke:rendered-ui": "node scripts/run-host-node.mjs scripts/smoke-rendered-ui.mjs",
     "smoke:react-scroll": "node scripts/run-host-node.mjs scripts/smoke-react-scroll.mjs",
     "smoke:react-artifacts": "node scripts/run-host-node.mjs scripts/smoke-react-artifacts-panel.mjs",
