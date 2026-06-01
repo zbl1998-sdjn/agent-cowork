@@ -170,7 +170,7 @@ const checks = [
   {
     name: 'host operation smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-local-operations.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-local-operations.ts')],
   },
   {
     name: 'ci static and unit gates',
@@ -181,7 +181,7 @@ const checks = [
   {
     name: 'host local operation smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-local-operations.mjs'),
+    commandArgs: hostScriptArgs('smoke-local-operations.ts'),
   },
   {
     name: 'mvp runtime lifecycle smoke',

@@ -3,20 +3,41 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
+import type { AddressInfo } from 'node:http';
+import type { HostServer } from '../apps/host/src/server.js';
 
-function assert(condition, message) {
+type JsonRecord = Record<string, unknown>;
+type RequestBody = JsonRecord & { idempotencyKey?: string };
+type FileTreeResponse = { files: Array<{ path?: unknown }> };
+type FileReadResponse = { content?: string; sha256?: unknown };
+type ContextBundleResponse = { files: unknown[] };
+type FileOperationPreviewResponse = {
+  operations: Array<{ type?: unknown }>;
+  fileOperationApprovalId?: string;
+};
+type FileOperationApplyResponse = {
+  applied: Array<{ status?: unknown }>;
+};
+type ErrorResponse = { error?: unknown };
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-function assertInside(child, parent, label) {
+function assertInside(child: string, parent: string, label: string): void {
   const relative = path.relative(parent, child);
   assert(relative && !relative.startsWith('..') && !path.isAbsolute(relative), `${label} escaped expected parent: ${child}`);
 }
 
-async function requestJson(baseUrl, route, body, expectedStatus = 200) {
-  const headers = { 'content-type': 'application/json' };
+async function requestJson<T = JsonRecord>(
+  baseUrl: string,
+  route: string,
+  body: RequestBody,
+  expectedStatus = 200,
+): Promise<T> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (body?.idempotencyKey) {
     headers['idempotency-key'] = body.idempotencyKey;
   }
@@ -25,12 +46,27 @@ async function requestJson(baseUrl, route, body, expectedStatus = 200) {
     headers,
     body: JSON.stringify(body),
   });
-  const payload = await response.json();
+  const payload = await response.json() as T;
   assert(response.status === expectedStatus, `${route} returned ${response.status}: ${JSON.stringify(payload)}`);
   return payload;
 }
 
-async function main() {
+async function fetchJson<T = JsonRecord>(url: string): Promise<T> {
+  const response = await fetch(url);
+  return await response.json() as T;
+}
+
+async function listenLocal(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert(address && typeof address === 'object', 'local operations smoke server did not bind to a TCP port');
+  return `http://127.0.0.1:${(address as AddressInfo).port}`;
+}
+
+async function main(): Promise<void> {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.dirname(scriptDir);
   const buildRoot = path.join(repoRoot, 'build');
@@ -54,32 +90,26 @@ async function main() {
     requireAuth: false,
   });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-
-  const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const baseUrl = await listenLocal(server);
   try {
-    const health = await (await fetch(`${baseUrl}/health`)).json();
+    const health = await fetchJson<{ ok?: unknown; service?: unknown }>(`${baseUrl}/health`);
     assert(health.ok === true && health.service === 'agent-cowork-host', 'health check failed');
 
     const shell = await fetch(`${baseUrl}/`);
     assert(shell.status === 200, `preview shell returned ${shell.status}`);
     assert((await shell.text()).includes('Agent Cowork'), 'preview shell missing Agent Cowork UI');
 
-    const defaultWorkspace = await (await fetch(`${baseUrl}/api/workspace`)).json();
+    const defaultWorkspace = await fetchJson<{ trustedRoot?: unknown }>(`${baseUrl}/api/workspace`);
     assert(defaultWorkspace.trustedRoot === workspace, 'workspace endpoint returned unexpected trusted root');
 
-    const tree = await requestJson(baseUrl, '/api/files/tree', { root: workspace });
+    const tree = await requestJson<FileTreeResponse>(baseUrl, '/api/files/tree', { root: workspace });
     assert(tree.files.some((entry) => entry.path === 'contracts/sample-contract.txt'), 'tree missing contract file');
 
-    const read = await requestJson(baseUrl, '/api/files/read', { path: contractPath, trustedRoot: workspace });
-    assert(read.content.includes('renewal date'), 'read endpoint did not return contract content');
+    const read = await requestJson<FileReadResponse>(baseUrl, '/api/files/read', { path: contractPath, trustedRoot: workspace });
+    assert(String(read.content).includes('renewal date'), 'read endpoint did not return contract content');
     assert(typeof read.sha256 === 'string' && read.sha256.length === 64, 'read endpoint missing sha256');
 
-    const bundle = await requestJson(baseUrl, '/api/context/bundle', {
+    const bundle = await requestJson<ContextBundleResponse>(baseUrl, '/api/context/bundle', {
       trustedRoot: workspace,
       paths: [contractPath, notePath],
       maxTextSize: 2048,
@@ -95,12 +125,12 @@ async function main() {
       { type: 'move', from: contractPath, to: movedContractPath },
     ];
 
-    const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
+    const preview = await requestJson<FileOperationPreviewResponse>(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
     assert(preview.operations.length === 3, `preview expected 3 operations, got ${preview.operations.length}`);
     assert(preview.operations.map((op) => op.type).join(',') === 'write,rename,move', 'preview operation order changed');
     assert(/^fop_/.test(preview.fileOperationApprovalId || ''), 'preview did not issue a file operation approval id');
 
-    const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
+    const applied = await requestJson<FileOperationApplyResponse>(baseUrl, '/api/file-ops/apply', {
       trustedRoot: workspace,
       operations,
       fileOperationApprovalId: preview.fileOperationApprovalId,
@@ -117,7 +147,7 @@ async function main() {
 
     const blockedTarget = path.join(workspace, '.AgentCowork', 'artifacts', 'blocked.md');
     fs.writeFileSync(blockedTarget, 'existing target', 'utf8');
-    const blocked = await requestJson(
+    const blocked = await requestJson<ErrorResponse>(
       baseUrl,
       '/api/file-ops/preview',
       {
@@ -126,7 +156,7 @@ async function main() {
       },
       400,
     );
-    assert(/target already exists/i.test(blocked.error), `expected target-exists failure, got ${blocked.error}`);
+    assert(/target already exists/i.test(String(blocked.error)), `expected target-exists failure, got ${String(blocked.error)}`);
     assert(fs.existsSync(renamedNotePath), 'blocked move changed the source file');
 
     const audit = fs.readFileSync(auditPath, 'utf8');
@@ -156,6 +186,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.stack || error.message);
+  const message = error instanceof Error ? error.stack || error.message : String(error);
+  console.error(message);
   process.exit(1);
 });
