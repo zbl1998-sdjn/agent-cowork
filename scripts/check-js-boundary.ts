@@ -10,7 +10,7 @@ const BOOTSTRAP_SOURCE_BY_SCRIPT = new Map([
   ['scripts/host-ts-loader.mjs', 'scripts/bootstrap-src/host-ts-loader.ts'],
   ['scripts/run-host-node.mjs', 'scripts/bootstrap-src/run-host-node.ts'],
 ]);
-const SKIP_DIRS = new Set([
+const SKIP_DIR_NAMES = new Set([
   '.git',
   '.AgentCowork',
   '.KimiCowork',
@@ -20,11 +20,13 @@ const SKIP_DIRS = new Set([
   'coverage',
   'reports',
   'releases',
+]);
+const SKIP_PATH_PREFIXES = [
   'apps/windows-client/resources/python-embedded',
   'apps/windows-client/ui-dist',
   'apps/windows-client/ui/node_modules',
   'apps/windows-client/src-tauri/target',
-]);
+];
 
 function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
@@ -36,9 +38,9 @@ function rel(filePath: string): string {
 
 function isSkipped(relativePath: string): boolean {
   const normalized = relativePath.split('\\').join('/');
-  return normalized.split('/').some((_, index, parts) => {
-    return SKIP_DIRS.has(parts.slice(0, index + 1).join('/'));
-  });
+  const parts = normalized.split('/');
+  if (parts.some((part) => SKIP_DIR_NAMES.has(part))) return true;
+  return SKIP_PATH_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -48,7 +50,7 @@ function walk(dir: string, out: string[] = []): string[] {
     if (isSkipped(relative)) continue;
     if (entry.isDirectory()) {
       walk(full, out);
-    } else if (entry.isFile() && ['.js', '.mjs'].includes(path.extname(entry.name))) {
+    } else if (entry.isFile() && ['.js', '.jsx', '.mjs', '.cjs'].includes(path.extname(entry.name))) {
       out.push(relative);
     }
   }
@@ -60,7 +62,7 @@ function stdoutText(stdout: string | Buffer | undefined): string {
 }
 
 function trackedJsFiles(): string[] {
-  const git = spawnSync('git', ['-c', `safe.directory=${ROOT}`, 'ls-files', '-z', '--', '*.js', '*.mjs'], {
+  const git = spawnSync('git', ['-c', `safe.directory=${ROOT}`, 'ls-files', '-z', '--', '*.js', '*.jsx', '*.mjs', '*.cjs'], {
     cwd: ROOT,
     encoding: 'buffer',
     windowsHide: true,
@@ -89,7 +91,7 @@ const unexpected = files.filter((file) => {
 });
 
 if (unexpected.length > 0) {
-  console.error('JS/TS boundary check failed: unexpected JavaScript source files remain.');
+  console.error('JS/TS boundary check failed: unexpected JavaScript-like source files remain.');
   for (const file of unexpected) {
     console.error(`- ${file}`);
   }
