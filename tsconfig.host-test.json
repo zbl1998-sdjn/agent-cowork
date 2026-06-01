@@ -89,6 +89,7 @@
     "apps/host/test/file-preview.test.ts",
     "apps/host/test/file-reader.test.ts",
     "apps/host/test/file-written.test.ts",
+    "apps/host/test/git-tools.test.ts",
     "apps/host/test/host-header.test.ts",
     "apps/host/test/host-type-check.test.ts",
     "apps/host/test/history-compactor.test.ts",
