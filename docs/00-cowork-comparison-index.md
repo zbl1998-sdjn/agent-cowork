@@ -417,13 +417,13 @@ P2-B 完成 — Composer 新增 `#` 历史任务 picker, 从 runs-index 列最�
   - 数据源走 `/api/runs/index?limit=20`, 不扫描文件系统。
   - 选中后读取 `/api/runs/:id`, 高亮最近任务卡, 回放 progress / preview / sources / assistant_end 事件。
   - 若历史 run 带 `recipeId`, 自动恢复 selected recipe; 若带 prompt, 自动回填 Composer 便于复跑。
-- **契约 smoke** (`scripts/smoke-ui-contract.mjs`):
+- **契约 smoke** (`scripts/smoke-ui-contract.ts`):
   - 新增 `historyRunItems`、`/api/runs/index`、`mode: "history"`、`replayRunEvents` 断言。
 
 验收:
 
 - `node --check apps/windows-client/resources/app.js` 通过。
-- `node --check scripts/smoke-ui-contract.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-ui-contract.ts` 通过。
 - `node --test` 全量 **96 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
 
@@ -531,7 +531,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/request-utils.test.js` 覆盖多字节 JSON body 超限。
 - `apps/host/test/server-security.test.js` 覆盖 schedule mutation 缺 idempotency key 与跨租户 cancel/delete/tick。
 - `apps/host/test/server-runtime-features.test.js` 覆盖 schedule mutation 正常路径 idempotency header、run detail 非法 id。
-- `apps/host/test/server.test.js` 和 `scripts/smoke-ui-contract.mjs` 覆盖新增前端静态脚本。
+- `apps/host/test/server.test.js` 和 `scripts/smoke-ui-contract.ts` 覆盖新增前端静态脚本。
 
 验收:
 
@@ -555,7 +555,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `/api/recipes/:id/run` 对非法 route id 返回 400, 避免 encoded slash 等异常 id 落到 registry lookup。
 - **前端 composer controller 拆分**:
   - 新增 `apps/windows-client/resources/app-composer-popover.js`, 承接 `/` 模板、`@` 文件 mention、`#` 历史 run picker 的 state、渲染、键盘处理。
-  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.mjs`、`verify-mvp.mjs`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
+  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.ts`、`verify-mvp.mjs`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
   - `apps/windows-client/resources/app.js` 降到约 1739 行; `node --check` 已验证未截断。
 - **测试入口对齐**:
   - `package.json` 的 `test` script 对齐为默认 `node --test`, 与 handoff 要求一致; 受 Windows 沙箱限制时仍可用 `node --test --test-isolation=none` 做本地补充验证。
@@ -577,7 +577,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/server-runtime-features.test.js`: recipe route 非法 id 返回 400。
 - `apps/host/test/server.test.js`: 新增 composer popover 静态资源。
 - `services/kimi-gateway/internal/kimi/client_test.go`: 覆盖 missing `[DONE]`、错误 body 不泄漏、breaker fallback、空 content parts、非法 multipart、超大 multipart。
-- `scripts/smoke-ui-contract.mjs` / `scripts/verify-mvp.mjs` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
+- `scripts/smoke-ui-contract.ts` / `scripts/verify-mvp.mjs` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
 
 验收:
 
@@ -615,7 +615,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `apps/windows-client/resources/app.js` 增加 catalog 加载、空态、打开 live page、计划应用后刷新等流程。
   - `apps/windows-client/resources/app.css` 补齐 artifact list 的溢出与空态样式。
 - **契约 smoke**:
-  - `scripts/smoke-ui-contract.mjs` 覆盖 artifact catalog DOM contract、`/api/artifacts`、`/api/artifacts/view` 和 apply 后 catalog 刷新路径。
+  - `scripts/smoke-ui-contract.ts` 覆盖 artifact catalog DOM contract、`/api/artifacts`、`/api/artifacts/view` 和 apply 后 catalog 刷新路径。
   - `apps/host/test/server.test.js` 增加 endpoint 回归, 覆盖恶意 `<script>` 内容不会原样执行。
 
 验收:
@@ -624,7 +624,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `node --check apps/host/src/routes/artifact-routes.js` 通过。
 - `node --check apps/host/src/server.js` 通过。
 - `node --check apps/windows-client/resources/app.js` 通过。
-- `node --check scripts/smoke-ui-contract.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-ui-contract.ts` 通过。
 - `node --test apps/host/test/server.test.js` **15/15 通过**。
 - `npm test` 全量 **111 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。

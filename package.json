@@ -37,7 +37,7 @@
     "eval": "node scripts/run-host-node.mjs scripts/eval.ts",
     "smoke:windows-client": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-windows-client.ps1",
     "smoke:installed-tauri": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installed-tauri.ps1",
-    "smoke:ui": "node scripts/run-host-node.mjs scripts/smoke-ui-contract.mjs",
+    "smoke:ui": "node scripts/run-host-node.mjs scripts/smoke-ui-contract.ts",
     "prepare:embedded-python": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-embedded-python.ps1",
     "check:arch": "node scripts/run-host-node.mjs scripts/check-arch.ts",
     "check:filesize": "node scripts/run-host-node.mjs scripts/check-filesize.ts",

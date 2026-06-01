@@ -48,7 +48,7 @@ Expected after implementation: PASS.
 - Modify: `apps/windows-client/resources/index.html`
 - Modify: `apps/windows-client/resources/app.js`
 - Modify: `apps/windows-client/resources/app.css`
-- Modify: `scripts/smoke-ui-contract.mjs`
+- Modify: `scripts/smoke-ui-contract.ts`
 
 - [ ] **Step 1: Add static DOM anchors**
 
@@ -64,7 +64,7 @@ Extend the existing `.artifact-list` rules only. Avoid changing global layout, m
 
 - [ ] **Step 4: Update smoke contract**
 
-Update `scripts/smoke-ui-contract.mjs` to assert the index includes the artifact catalog anchors, scripts include `/api/artifacts`, and a backend smoke can list and view an applied artifact.
+Update `scripts/smoke-ui-contract.ts` to assert the index includes the artifact catalog anchors, scripts include `/api/artifacts`, and a backend smoke can list and view an applied artifact.
 
 - [ ] **Step 5: Verify frontend syntax and smoke**
 
@@ -72,7 +72,7 @@ Run:
 
 ```powershell
 node --check apps/windows-client/resources/app.js
-node --check scripts/smoke-ui-contract.mjs
+node scripts/run-host-node.mjs -- --check scripts/smoke-ui-contract.ts
 npm run smoke:ui
 ```
 

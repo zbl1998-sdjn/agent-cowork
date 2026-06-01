@@ -140,7 +140,7 @@ const checks = [
   {
     name: 'ui contract smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-ui-contract.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-ui-contract.ts')],
   },
   {
     name: 'rendered ui smoke script syntax',
@@ -196,7 +196,7 @@ const checks = [
   {
     name: 'ui to host api contract smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-ui-contract.mjs'),
+    commandArgs: hostScriptArgs('smoke-ui-contract.ts'),
   },
   {
     name: 'rendered browser ui smoke',

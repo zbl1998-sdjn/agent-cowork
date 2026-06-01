@@ -2,45 +2,99 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { HostServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
 
-function assert(condition, message) {
+type JsonRecord = Record<string, unknown>;
+type TextResponse = { body: string; contentType: string };
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-async function requestJson(baseUrl, route, body, expectedStatus = 200) {
-  const headers = { 'content-type': 'application/json' };
-  if (body?.idempotencyKey) {
-    headers['idempotency-key'] = body.idempotencyKey;
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function recordValue(value: unknown, label: string): JsonRecord {
+  assert(isRecord(value), `${label} must be a JSON object`);
+  return value;
+}
+
+function recordArray(value: unknown, label: string): JsonRecord[] {
+  assert(Array.isArray(value), `${label} must be an array`);
+  return value.map((item, index) => recordValue(item, `${label}[${index}]`));
+}
+
+function stringField(source: JsonRecord, key: string, label = key): string {
+  const value = source[key];
+  assert(typeof value === 'string', `${label} must be a string`);
+  return value;
+}
+
+async function fetchJson(baseUrl: string, route: string): Promise<JsonRecord> {
+  const response = await fetch(`${baseUrl}${route}`);
+  const payload = await response.json() as unknown;
+  assert(response.status === 200, `${route} returned ${response.status}: ${JSON.stringify(payload)}`);
+  return recordValue(payload, `${route} response`);
+}
+
+async function requestJson(baseUrl: string, route: string, body: JsonRecord, expectedStatus = 200): Promise<JsonRecord> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  const idempotencyKey = body.idempotencyKey;
+  if (typeof idempotencyKey === 'string' && idempotencyKey) {
+    headers['idempotency-key'] = idempotencyKey;
   }
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
-  const payload = await response.json();
+  const payload = await response.json() as unknown;
   assert(response.status === expectedStatus, `${route} returned ${response.status}: ${JSON.stringify(payload)}`);
-  return payload;
+  return recordValue(payload, `${route} response`);
 }
 
-async function getText(baseUrl, route) {
+async function getText(baseUrl: string, route: string): Promise<TextResponse> {
   const response = await fetch(`${baseUrl}${route}`);
   const body = await response.text();
   assert(response.status === 200, `${route} returned ${response.status}: ${body}`);
   return { body, contentType: response.headers.get('content-type') || '' };
 }
 
-function scriptRoutesFromHtml(html) {
+function scriptRoutesFromHtml(html: string): string[] {
   return [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/gi)]
-    .map((match) => `/${match[1].replace(/^\.\//, '')}`);
+    .map((match) => {
+      const source = match[1];
+      assert(source, 'script tag src capture should be present');
+      return `/${source.replace(/^\.\//, '')}`;
+    });
 }
 
-async function main() {
+function baseUrlFor(server: HostServer): string {
+  const address = server.address();
+  assert(address && typeof address === 'object', 'server did not expose a listening address');
+  return `http://127.0.0.1:${address.port}`;
+}
+
+function closeServer(server: HostServer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function main(): Promise<void> {
   fs.mkdirSync(buildDir, { recursive: true });
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-ui-smoke-'));
   fs.mkdirSync(path.join(workspace, 'contracts'), { recursive: true });
@@ -56,13 +110,12 @@ async function main() {
     uiDist: false,
   });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', (error: Error) => reject(error));
+    server.listen(0, '127.0.0.1', () => resolve());
   });
 
-  const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const baseUrl = baseUrlFor(server);
   try {
     const index = await getText(baseUrl, '/');
     assert(index.contentType.includes('text/html'), 'index did not return HTML');
@@ -182,53 +235,59 @@ async function main() {
     assert(index.body.includes('任务模板'), 'index missing recipe panel');
     assert(index.body.includes('澄清问题'), 'index missing clarification primitive');
 
-    const workspaceInfo = await (await fetch(`${baseUrl}/api/workspace`)).json();
+    const workspaceInfo = await fetchJson(baseUrl, '/api/workspace');
     assert(workspaceInfo.trustedRoot === workspace, 'workspace endpoint returned unexpected root');
 
     const tree = await requestJson(baseUrl, '/api/files/tree', { root: workspace });
-    assert(tree.files.some((entry) => entry.path === 'contracts/sample-contract.txt'), 'UI tree flow cannot see contract file');
+    const treeFiles = recordArray(tree.files, 'tree.files');
+    assert(treeFiles.some((entry) => entry.path === 'contracts/sample-contract.txt'), 'UI tree flow cannot see contract file');
 
     const read = await requestJson(baseUrl, '/api/files/read', {
       trustedRoot: workspace,
       path: contractPath,
       maxSize: 1600,
     });
-    assert(read.content.includes('renewal date'), 'UI read flow cannot read trusted file content');
+    const readContent = stringField(read, 'content', 'read.content');
+    assert(readContent.includes('renewal date'), 'UI read flow cannot read trusted file content');
 
     const extracted = await requestJson(baseUrl, '/api/files/extract', {
       trustedRoot: workspace,
       path: contractPath,
       maxSize: 1600,
     });
-    assert(extracted.content.includes('renewal date'), 'UI extract flow cannot extract trusted file content');
+    assert(stringField(extracted, 'content', 'extracted.content').includes('renewal date'), 'UI extract flow cannot extract trusted file content');
 
-    const recipes = await (await fetch(`${baseUrl}/api/recipes`)).json();
-    assert(recipes.recipes.length >= 8, 'UI recipe flow did not expose MVP templates');
+    const recipes = await fetchJson(baseUrl, '/api/recipes');
+    assert(recordArray(recipes.recipes, 'recipes.recipes').length >= 8, 'UI recipe flow did not expose MVP templates');
 
     const artifactPath = path.join(workspace, '.AgentCowork', 'artifacts', 'ui-smoke-plan.md');
     const operations = [
       {
         type: 'write',
         path: artifactPath,
-        content: `# UI Smoke 计划\n\n来源摘要: ${read.content}\n`,
+        content: `# UI Smoke 计划\n\n来源摘要: ${readContent}\n`,
       },
     ];
     const preview = await requestJson(baseUrl, '/api/file-ops/preview', { trustedRoot: workspace, operations });
-    assert(preview.operations.length === 1 && preview.operations[0].type === 'write', 'UI preview flow did not produce write preview');
-    assert(/^fop_/.test(preview.fileOperationApprovalId || ''), 'UI preview flow did not issue an approval id');
+    const previewOperations = recordArray(preview.operations, 'preview.operations');
+    assert(previewOperations.length === 1 && previewOperations[0]?.type === 'write', 'UI preview flow did not produce write preview');
+    const fileOperationApprovalId = stringField(preview, 'fileOperationApprovalId', 'preview.fileOperationApprovalId');
+    assert(/^fop_/.test(fileOperationApprovalId), 'UI preview flow did not issue an approval id');
 
     const applied = await requestJson(baseUrl, '/api/file-ops/apply', {
       trustedRoot: workspace,
       operations,
-      fileOperationApprovalId: preview.fileOperationApprovalId,
+      fileOperationApprovalId,
       idempotencyKey: 'ui-smoke-apply',
     });
-    assert(applied.applied.length === 1 && applied.applied[0].status === 'applied', 'UI apply flow did not apply write operation');
+    const appliedOperations = recordArray(applied.applied, 'applied.applied');
+    assert(appliedOperations.length === 1 && appliedOperations[0]?.status === 'applied', 'UI apply flow did not apply write operation');
     assert(fs.readFileSync(artifactPath, 'utf8').includes('UI Smoke 计划'), 'UI apply flow did not write artifact');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'UI apply flow did not write audit event');
 
-    const artifactCatalog = await (await fetch(`${baseUrl}/api/artifacts?limit=5`)).json();
-    assert(artifactCatalog.artifacts.some((item) => item.path === artifactPath), 'artifact catalog did not expose applied artifact');
+    const artifactCatalog = await fetchJson(baseUrl, '/api/artifacts?limit=5');
+    const artifacts = recordArray(artifactCatalog.artifacts, 'artifactCatalog.artifacts');
+    assert(artifacts.some((item) => item.path === artifactPath), 'artifact catalog did not expose applied artifact');
     const artifactView = await getText(baseUrl, `/api/artifacts/view?path=${encodeURIComponent(artifactPath)}`);
     assert(artifactView.contentType.includes('text/html'), 'artifact live page did not return HTML');
     assert(artifactView.body.includes('Artifact Live Page'), 'artifact live page missing title');
@@ -248,11 +307,12 @@ async function main() {
       ),
     );
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeServer(server);
   }
 }
 
-main().catch((error) => {
-  console.error(error.stack || error.message);
+main().catch((error: unknown) => {
+  const err = error as { stack?: unknown; message?: unknown };
+  console.error(err.stack || err.message || error);
   process.exit(1);
 });
