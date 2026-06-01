@@ -5,36 +5,48 @@ import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { AuditEventBus } from '../src/runtime/audit-events.js';
+import type { AgentTool } from '../src/kimi/agent-tools-types.js';
+import type { AuditEvent } from '../src/storage/audit-events.js';
+
+type ScriptedResponse = {
+  content: string;
+  tool_calls?: Array<{
+    id: string;
+    function: { name: string; arguments: string };
+  }>;
+};
+type ApprovalRequestMeta = Record<string, unknown> & { kind?: unknown; name?: unknown };
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-plan-')); }
 
 // A scripted model: yields a preset list of assistant messages in order, then
 // repeats the last one (a plain final answer) to end the loop.
-function scriptedModel(script) {
+function scriptedModel(script: ScriptedResponse[]) {
   let i = 0;
-  return async () => script[Math.min(i++, script.length - 1)];
+  const fallback = script.at(-1) || { content: '' };
+  return async () => script[Math.min(i++, script.length - 1)] || fallback;
 }
-function toolCall(name, args) {
+function toolCall(name: string, args: Record<string, unknown> = {}): ScriptedResponse {
   return { content: '', tool_calls: [{ id: `c_${Math.random().toString(16).slice(2, 8)}`, function: { name, arguments: JSON.stringify(args || {}) } }] };
 }
 
 // Approvals stub that resolves each request with a queued decision and records
 // what was asked, so tests can assert which tools actually hit the gate.
-function queuedApprovals(decisions) {
+function queuedApprovals(decisions: string[]) {
   const q = [...decisions];
-  const requested = [];
+  const requested: ApprovalRequestMeta[] = [];
   return {
     requested,
-    request(meta) {
+    request(meta: ApprovalRequestMeta) {
       requested.push(meta);
-      const decision = q.length ? q.shift() : 'once';
+      const decision = q.shift() ?? 'once';
       return { id: `apr_${requested.length}`, promise: Promise.resolve(decision) };
     },
   };
 }
 
 function collectAudit() {
-  const events = [];
+  const events: AuditEvent[] = [];
   const bus = new AuditEventBus();
   bus.subscribe((e) => { events.push(e); });
   return { bus, events };
@@ -65,7 +77,9 @@ test('plan mode blocks mutating tools until ExitPlanMode is approved', async () 
   assert.ok(kinds.includes('tool.auto_approved'), 'post-plan write authorized by the approved plan');
   // The plan went through the approval registry exactly once.
   assert.equal(approvals.requested.length, 1);
-  assert.equal(approvals.requested[0].kind, 'plan');
+  const [planApproval] = approvals.requested;
+  assert.ok(planApproval);
+  assert.equal(planApproval.kind, 'plan');
 });
 
 test('rejecting the plan keeps mutating tools blocked', async () => {
@@ -97,14 +111,16 @@ test('approval gate closes the leak: a plain Write requires approval (not just h
   });
   assert.equal(fs.existsSync(path.join(root, 'c.txt')), false, 'a rejected Write must not happen');
   assert.equal(approvals.requested.length, 1);
-  assert.equal(approvals.requested[0].name, 'Write');
+  const [writeApproval] = approvals.requested;
+  assert.ok(writeApproval);
+  assert.equal(writeApproval.name, 'Write');
 });
 
 test('autoApprove covers non-high mutations but high-risk stays explicit', async () => {
   const root = tmp();
   let dangerRan = 0;
   const approvals = queuedApprovals(['reject']); // reject the high-risk call
-  const customTools = [
+  const customTools: AgentTool[] = [
     { name: 'Write', risk: 'write', mutating: true, description: 'w', parameters: { type: 'object', properties: {} }, handler: async () => { fs.writeFileSync(path.join(root, 'd.txt'), 'y'); return { ok: true }; } },
     { name: 'Danger', risk: 'high', mutating: true, description: 'd', parameters: { type: 'object', properties: {} }, handler: async () => { dangerRan += 1; return { ok: true }; } },
   ];
@@ -120,5 +136,7 @@ test('autoApprove covers non-high mutations but high-risk stays explicit', async
   assert.equal(fs.existsSync(path.join(root, 'd.txt')), true, 'non-high write auto-approved under autoApprove');
   assert.equal(dangerRan, 0, 'high-risk must NOT auto-run under autoApprove');
   assert.equal(approvals.requested.length, 1);
-  assert.equal(approvals.requested[0].name, 'Danger');
+  const [dangerApproval] = approvals.requested;
+  assert.ok(dangerApproval);
+  assert.equal(dangerApproval.name, 'Danger');
 });

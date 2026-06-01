@@ -120,6 +120,7 @@
     "apps/host/test/path-policy.test.ts",
     "apps/host/test/path-policy-create.test.ts",
     "apps/host/test/plan.test.ts",
+    "apps/host/test/plan-mode.test.ts",
     "apps/host/test/pg-fulllayer.test.ts",
     "apps/host/test/postgres-approvals.test.ts",
     "apps/host/test/postgres-event-bus.test.ts",
