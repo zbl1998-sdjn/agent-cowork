@@ -2,19 +2,33 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PostgresScheduleStore } from '../src/storage/postgres-schedule-store.js';
 import { PostgresMemoryStore } from '../src/storage/postgres-memory-store.js';
+import type { PgPool as MemoryPgPool } from '../src/storage/postgres-memory-store.js';
+import type { PgPool as SchedulePgPool, ScheduleRecord } from '../src/storage/postgres-schedule-store.js';
 
-function schedPool() {
-  const rows = new Map();
+type ScheduleRow = { tenant_id: unknown; user_id: unknown; schedule_json: string };
+type MemoryFactRow = { id: unknown; tenant_id: unknown; created_at: unknown; fact_json: string };
+type MemoryNoteRow = {
+  id: unknown;
+  tenant_id: unknown;
+  name: string;
+  body: string;
+  size: number;
+  created_at: unknown;
+  updated_at: unknown;
+};
+
+function schedPool(): SchedulePgPool {
+  const rows = new Map<string, ScheduleRow>();
   return {
-    async query(text, params = []) {
+    async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
       if (t.startsWith('INSERT INTO schedules')) {
-        const rec = JSON.parse(params[16]);
-        rows.set(rec.id, { tenant_id: params[1], user_id: params[2], schedule_json: params[16] });
+        const rec = JSON.parse(String(params[16] ?? '{}')) as ScheduleRecord;
+        rows.set(rec.id, { tenant_id: params[1], user_id: params[2], schedule_json: String(params[16] ?? '') });
         return { rowCount: 1 };
       }
       if (t.startsWith('SELECT schedule_json FROM schedules WHERE id=')) {
-        const r = rows.get(params[0]);
+        const r = rows.get(String(params[0] ?? ''));
         return { rows: r ? [{ schedule_json: r.schedule_json }] : [] };
       }
       if (t.startsWith('SELECT schedule_json FROM schedules')) {
@@ -23,26 +37,41 @@ function schedPool() {
         return { rows: list.map((r) => ({ schedule_json: r.schedule_json })) };
       }
       if (t.startsWith('DELETE FROM schedules WHERE id=')) {
-        const had = rows.has(params[0]); rows.delete(params[0]); return { rowCount: had ? 1 : 0 };
+        const id = String(params[0] ?? '');
+        const had = rows.has(id); rows.delete(id); return { rowCount: had ? 1 : 0 };
       }
       return { rows: [] };
     },
   };
 }
 
-function memPool() {
-  const facts = [];
-  const notes = new Map();
+function memPool(): MemoryPgPool {
+  const facts: MemoryFactRow[] = [];
+  const notes = new Map<string, MemoryNoteRow>();
   return {
-    async query(text, params = []) {
+    async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
-      if (t.startsWith('INSERT INTO memory_facts')) { facts.push({ id: params[0], tenant_id: params[1], created_at: params[7], fact_json: params[9] }); return { rowCount: 1 }; }
+      if (t.startsWith('INSERT INTO memory_facts')) {
+        facts.push({ id: params[0], tenant_id: params[1], created_at: params[7], fact_json: String(params[9] ?? '') });
+        return { rowCount: 1 };
+      }
       if (t.startsWith('SELECT fact_json FROM memory_facts WHERE tenant_id=')) {
         const list = facts.filter((f) => f.tenant_id === params[0]).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)));
         return { rows: list.map((f) => ({ fact_json: f.fact_json })) };
       }
       if (t.startsWith('SELECT id, created_at FROM memory_notes WHERE tenant_id=')) { const n = notes.get(`${params[0]}|${params[1]}`); return { rows: n ? [{ id: n.id, created_at: n.created_at }] : [] }; }
-      if (t.startsWith('INSERT INTO memory_notes')) { notes.set(`${params[1]}|${params[4]}`, { id: params[0], tenant_id: params[1], name: params[4], body: params[5], size: params[6], created_at: params[7], updated_at: params[8] }); return { rowCount: 1 }; }
+      if (t.startsWith('INSERT INTO memory_notes')) {
+        notes.set(`${params[1]}|${params[4]}`, {
+          id: params[0],
+          tenant_id: params[1],
+          name: String(params[4] ?? ''),
+          body: String(params[5] ?? ''),
+          size: Number(params[6] ?? 0),
+          created_at: params[7],
+          updated_at: params[8],
+        });
+        return { rowCount: 1 };
+      }
       if (t.startsWith('SELECT body FROM memory_notes WHERE tenant_id=')) { const n = notes.get(`${params[0]}|${params[1]}`); return { rows: n ? [{ body: n.body }] : [] }; }
       if (t.startsWith('SELECT id, name, size, created_at, updated_at FROM memory_notes WHERE tenant_id=')) {
         const list = [...notes.values()].filter((n) => n.tenant_id === params[0]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -58,10 +87,13 @@ test('PostgresScheduleStore save/get/list/remove with tenant filter', async () =
   await store.save({ id: 's1', tenantId: 't1', name: '每日简报', kind: 'cron', cron: '0 6 * * *', nextFireAt: '2026-05-24T06:00:00Z', version: 1, runs: 0 });
   await store.save({ id: 's2', tenantId: 't2', name: 'other', kind: 'once' });
   const got = await store.get('s1');
+  assert.ok(got);
   assert.equal(got.name, '每日简报');
   const t1 = await store.list({ tenantId: 't1' });
   assert.equal(t1.length, 1);
-  assert.equal(t1[0].id, 's1');
+  const [first] = t1;
+  assert.ok(first);
+  assert.equal(first.id, 's1');
   assert.equal(await store.remove('s1'), true);
   assert.equal(await store.get('s1'), null);
 });
@@ -82,8 +114,10 @@ test('PostgresMemoryStore note write/read/list round-trip', async () => {
   assert.equal(await store.readMemoryNote('x', 'guide.md', { tenantId: 't1' }), '# 指南\n内容');
   const notes = await store.listMemoryNotes('x', { tenantId: 't1' });
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].name, 'guide.md');
-  assert.ok(notes[0].size > 0);
+  const [note] = notes;
+  assert.ok(note);
+  assert.equal(note.name, 'guide.md');
+  assert.ok(note.size > 0);
   await assert.rejects(() => store.readMemoryNote('x', '../evil', { tenantId: 't1' }), /Invalid memory note name/);
 });
 
