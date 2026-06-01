@@ -34,8 +34,8 @@ export type ToolDescriptor = {
 export type ToolSearchResult = ToolDescriptor & { score?: number };
 export type McpTool = { name: string; description?: string; inputSchema?: unknown };
 export type McpClient = {
-  connect(): void | Promise<void>;
-  listTools(): McpTool[] | Promise<McpTool[]>;
+  connect(): unknown | Promise<unknown>;
+  listTools(): unknown[] | Promise<unknown[]>;
   callTool(name: string, args?: unknown): unknown | Promise<unknown>;
   close?: () => void;
 };
