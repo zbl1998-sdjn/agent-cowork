@@ -1,26 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo } from 'node:http';
 import path from 'node:path';
 import { createServer } from '../src/server.js';
 import { readDesktopUpdateManifest } from '../src/runtime/desktop-update-source.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import { closeTestServer } from './helpers/close-server.js';
+import type { ServerConfig } from '../src/server.js';
 
-async function withServer(config, fn) {
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+async function withServer(config: Partial<ServerConfig>, fn: (base: string) => Promise<void>) {
   const server = createServer({ requireAuth: false, enableScheduler: false, ...config });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  const { port } = server.address();
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'test server should bind to a TCP port');
+  const { port } = address as AddressInfo;
   try {
     await fn(`http://127.0.0.1:${port}`);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 }
 
-function writeManifest(root, body) {
+function writeManifest(root: string, body: Record<string, unknown>) {
   const file = path.join(root, 'latest.json');
   fs.writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`, 'utf8');
   return file;
@@ -90,7 +99,7 @@ test('desktop update source route returns no-update or dynamic updater JSON', as
   }, async (base) => {
     const response = await fetch(`${base}/desktop-update/windows/x86_64/0.2.0`);
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = recordValue(await response.json(), 'desktop update response');
     assert.equal(body.version, '0.3.0');
     assert.equal(body.url, 'http://127.0.0.1:3017/downloads/update.zip');
     assert.equal(body.signature, 'loopback-signature');

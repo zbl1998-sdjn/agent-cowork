@@ -9,6 +9,11 @@ function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-runs-'));
 }
 
+function present<T>(value: T | null | undefined, label: string): T {
+  assert.ok(value, `${label} should exist`);
+  return value;
+}
+
 test('createUlid emits monotonic, prefixed, base32 ids', () => {
   const ids = Array.from({ length: 50 }, () => createUlid());
   for (const id of ids) {
@@ -17,7 +22,7 @@ test('createUlid emits monotonic, prefixed, base32 ids', () => {
   const sorted = [...ids].sort();
   // Same length deterministic prefix sort works because timestamps dominate.
   assert.deepEqual(new Set(ids).size, ids.length, 'ids should be unique');
-  assert.equal(sorted[0].length, ids[0].length);
+  assert.equal(present(sorted[0], 'first sorted id').length, present(ids[0], 'first id').length);
 });
 
 test('RunsIndex upsert + get + list', () => {
@@ -37,7 +42,7 @@ test('RunsIndex upsert + get + list', () => {
     durationMs: 5000,
     promptPreview: '把这些会议纪要整理成行动项',
   });
-  const got = index.get(id, { tenantId: 'tenant_alice' });
+  const got = present(index.get(id, { tenantId: 'tenant_alice' }), 'indexed run');
   assert.equal(got.id, id);
   assert.equal(got.tenantId, 'tenant_alice');
   assert.equal(got.status, 'succeeded');
@@ -54,12 +59,12 @@ test('RunsIndex upsert bumps version + persists state via JSONL replay', () => {
   const id = createUlid();
   index1.upsert({ id, tenantId: 't', userId: 'u', type: 'recipe-run', status: 'running' });
   index1.upsert({ id, tenantId: 't', userId: 'u', type: 'recipe-run', status: 'succeeded' });
-  const first = index1.get(id);
+  const first = present(index1.get(id), 'first indexed run');
   assert.equal(first.version, 2);
   assert.equal(first.status, 'succeeded');
 
   const index2 = new RunsIndex({ indexRoot: root });
-  const replayed = index2.get(id);
+  const replayed = present(index2.get(id), 'replayed indexed run');
   assert.equal(replayed.status, 'succeeded');
   assert.equal(replayed.version, 2);
 });

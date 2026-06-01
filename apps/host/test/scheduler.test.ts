@@ -10,6 +10,11 @@ function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-sched-'));
 }
 
+function present<T>(value: T | null | undefined, label: string): T {
+  assert.ok(value, `${label} should exist`);
+  return value;
+}
+
 test('parseCron accepts standard 5-field expressions', () => {
   const parsed = parseCron('0 9 * * 1');
   assert.ok(parsed.minute.has(0));
@@ -72,7 +77,7 @@ test('Scheduler.create persists a cron schedule with computed nextFireAt', () =>
   assert.equal(record.cronHuman, '每周一上午 9:00');
   assert.ok(record.nextFireAt);
   assert.equal(calls, 0);
-  const reloaded = scheduler.get(record.id);
+  const reloaded = present(scheduler.get(record.id), 'reloaded schedule');
   assert.equal(reloaded.id, record.id);
 });
 
@@ -117,18 +122,18 @@ test('Scheduler.pickDue + tickOnce fires due cron jobs and advances nextFireAt',
     userId: 'u',
   });
   // Initial nextFireAt is Monday 09:00 of the surrounding week.
-  const firstNext = record.nextFireAt;
+  const firstNext = present(record.nextFireAt, 'initial nextFireAt');
   // Advance "now" past nextFireAt.
   nowMs = Date.parse(firstNext) + 30 * 1000;
   const due = scheduler.pickDue();
   assert.equal(due.length, 1);
   const results = await scheduler.tickOnce();
   assert.equal(results.length, 1);
-  assert.equal(results[0].ok, true);
+  assert.equal(present(results[0], 'first tick result').ok, true);
   assert.equal(fired.length, 1);
-  const after = scheduler.get(record.id);
+  const after = present(scheduler.get(record.id), 'schedule after tick');
   assert.equal(after.status, 'pending');
-  assert.ok(Date.parse(after.nextFireAt) > Date.parse(firstNext));
+  assert.ok(Date.parse(present(after.nextFireAt, 'next fire after tick')) > Date.parse(firstNext));
   assert.equal(after.runs, 1);
   assert.equal(after.lastRunId, `run_${record.id}`);
 });
@@ -149,7 +154,7 @@ test('Scheduler one-shot completes after firing', async () => {
     now: () => new Date(Date.parse(fireAt) + 1000),
   });
   await sched2.tickOnce();
-  const after = sched2.get(record.id);
+  const after = present(sched2.get(record.id), 'one-shot schedule after tick');
   assert.equal(after.status, 'completed');
   assert.equal(after.nextFireAt, null);
 });
@@ -164,7 +169,7 @@ test('Scheduler.cancel marks the schedule cancelled and stops it firing', async 
   const fireAt = new Date(Date.now() + 60_000).toISOString();
   const record = scheduler.create({ name: 'once', fireAt, tenantId: 't', userId: 'u' });
   assert.equal(scheduler.cancel(record.id), true);
-  const after = scheduler.get(record.id);
+  const after = present(scheduler.get(record.id), 'cancelled schedule');
   assert.equal(after.status, 'cancelled');
   // Advance "now" past fireAt; pickDue should return nothing because cancelled.
   const sched2 = new Scheduler({
@@ -192,12 +197,12 @@ test('Scheduler executor errors land in lastError but record stays pending for c
     tenantId: 't',
     userId: 'u',
   });
-  nowMs = Date.parse(record.nextFireAt) + 1000;
+  nowMs = Date.parse(present(record.nextFireAt, 'error schedule nextFireAt')) + 1000;
   const results = await scheduler.tickOnce();
   assert.equal(results.length, 1);
-  assert.equal(results[0].ok, false);
-  const after = scheduler.get(record.id);
+  assert.equal(present(results[0], 'error tick result').ok, false);
+  const after = present(scheduler.get(record.id), 'schedule after error');
   assert.equal(after.status, 'pending');
-  assert.match(after.lastError, /synthetic failure/);
+  assert.match(present(after.lastError, 'last error'), /synthetic failure/);
   assert.equal(after.runs, 1);
 });
