@@ -61,7 +61,7 @@
     "test:isolated": "node scripts/run-host-node.mjs --cwd apps/host -- --test",
     "build:ui": "node scripts/build-ui.mjs",
     "build:ui:fresh": "node scripts/build-ui.mjs --install",
-    "build:host-source": "node scripts/build-host-source.mjs",
+    "build:host-source": "node scripts/run-host-node.mjs scripts/build-host-source.ts",
     "build:host": "node scripts/build-host.mjs",
     "test:host": "npm run check && node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-timeout=60000 --import ../../scripts/test-setup.ts \"test/*.test.js\" \"test/*.test.ts\"",
     "test:ui": "npm --prefix apps/windows-client/ui run test",

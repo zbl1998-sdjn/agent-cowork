@@ -11,7 +11,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // ui is apps/windows-client/ui; host is apps/host -> go up 2 then into host
 const realHostRoot = path.resolve(here, '..', '..', 'host');
 const repoRoot = path.resolve(here, '..', '..', '..');
-const compile = spawnSync(process.execPath, [path.join(repoRoot, 'scripts', 'build-host-source.mjs')], {
+const compile = spawnSync(process.execPath, [
+  path.join(repoRoot, 'scripts', 'run-host-node.mjs'),
+  path.join(repoRoot, 'scripts', 'build-host-source.ts'),
+], {
   cwd: repoRoot,
   stdio: 'inherit',
 });

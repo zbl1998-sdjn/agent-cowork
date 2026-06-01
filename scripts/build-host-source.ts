@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -10,7 +9,7 @@ import {
 
 const outDir = path.join(repoRoot, 'build', 'host-src');
 
-function assertBuildOutputPath(dir) {
+function assertBuildOutputPath(dir: string): void {
   const relative = path.relative(path.join(repoRoot, 'build'), dir);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error(`[build-host-source] refusing to clean outside build/: ${dir}`);
