@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const checkArchScript = path.join(repoRoot, 'scripts', 'check-arch.mjs');
+const nodeExecutable = process.execPath ?? 'node';
 
-function writeFile(filePath, text) {
+function writeFile(filePath: string, text: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, text);
 }
@@ -24,16 +25,17 @@ test('architecture check includes host .ts sources and resolves .js specifiers t
   );
   writeFile(path.join(root, 'apps', 'host', 'src', 'routes', 'later.ts'), 'export const later = 1;\n');
 
-  const result = spawnSync(process.execPath, [checkArchScript], {
+  const result = spawnSync(nodeExecutable, [checkArchScript], {
     cwd: repoRoot,
     env: { ...process.env, KCW_ARCH_CHECK_ROOT: root },
     encoding: 'utf8',
   });
+  const output = String(result.stdout ?? '') + String(result.stderr ?? '');
 
-  assert.notEqual(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stderr, /Architecture check failed:/);
+  assert.ok(result.status !== 0, output);
+  assert.match(output, /Architecture check failed:/);
   assert.match(
-    result.stderr,
+    output,
     /apps\/host\/src\/tools\/bad\.ts \(L1\) imports apps\/host\/src\/routes\/later\.ts \(L3\)/,
   );
 });
@@ -51,11 +53,12 @@ test('architecture waivers survive js-to-ts target migration', () => {
     'export function modelBreaker() { return null; }\n',
   );
 
-  const result = spawnSync(process.execPath, [checkArchScript], {
+  const result = spawnSync(nodeExecutable, [checkArchScript], {
     cwd: repoRoot,
     env: { ...process.env, KCW_ARCH_CHECK_ROOT: root },
     encoding: 'utf8',
   });
+  const output = String(result.stdout ?? '') + String(result.stderr ?? '');
 
-  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(result.status, 0, output);
 });

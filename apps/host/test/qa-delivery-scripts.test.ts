@@ -5,17 +5,26 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const hostNode = (scriptPath) => `node scripts/run-host-node.mjs ${scriptPath}`;
+const hostNode = (scriptPath: string): string => `node scripts/run-host-node.mjs ${scriptPath}`;
+type PackageJson = { scripts: Record<string, string> };
 
 test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+  const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as PackageJson;
   assert.equal(packageJson.scripts['smoke:e2e'], hostNode('scripts/e2e-smoke.mjs'));
   assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.mjs'));
   assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.mjs'));
   assert.equal(packageJson.scripts['check:secrets'], 'node scripts/check-secrets.mjs');
-  assert.match(packageJson.scripts['smoke:windows-client'], /smoke-windows-client\.ps1/);
+  const windowsClientSmokeScript = packageJson.scripts['smoke:windows-client'];
+  assert.ok(windowsClientSmokeScript);
+  assert.match(windowsClientSmokeScript, /smoke-windows-client\.ps1/);
 
-  for (const script of ['scripts/e2e-smoke.mjs', 'scripts/bench.mjs', 'scripts/check-secrets.mjs', 'scripts/smoke-kimi-api.mjs']) {
+  const deliveryScripts = [
+    'scripts/e2e-smoke.mjs',
+    'scripts/bench.mjs',
+    'scripts/check-secrets.mjs',
+    'scripts/smoke-kimi-api.mjs',
+  ] as const;
+  for (const script of deliveryScripts) {
     assert.ok(fs.existsSync(path.join(repoRoot, script)), `${script} is missing`);
   }
 
