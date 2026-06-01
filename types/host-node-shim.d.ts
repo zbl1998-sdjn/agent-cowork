@@ -2,13 +2,14 @@ interface Buffer extends Iterable<number> {
   readonly length: number;
   readonly [index: number]: number;
   readUInt16LE(offset: number): number;
+  readUInt32BE(offset: number): number;
   readUInt32LE(offset: number): number;
   slice(start?: number, end?: number): Buffer;
   subarray(start?: number, end?: number): Buffer;
   writeUInt16LE(value: number, offset: number): number;
   writeUInt32LE(value: number, offset: number): number;
   values(): IterableIterator<number>;
-  toString(encoding?: string): string;
+  toString(encoding?: string, start?: number, end?: number): string;
 }
 
 declare const Buffer: {
@@ -235,11 +236,19 @@ declare module 'node:module' {
 }
 
 declare module 'node:http' {
+  export interface ClientRequest {
+    on(event: 'error', listener: (error: Error) => void): ClientRequest;
+    setTimeout(timeout: number, callback?: () => void): ClientRequest;
+    destroy(error?: Error): void;
+  }
+
   export interface IncomingMessage {
     url?: string;
     method?: string;
     headers: Record<string, string | string[] | undefined>;
     socket?: { remoteAddress?: string };
+    statusCode?: number;
+    setEncoding(encoding: string): void;
     on(event: string, listener: (...args: any[]) => void): unknown;
   }
 
@@ -270,6 +279,7 @@ declare module 'node:http' {
   export function createServer(
     listener?: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
   ): Server;
+  export function get(url: string, callback?: (response: IncomingMessage) => void): ClientRequest;
 }
 
 declare module 'node:url' {

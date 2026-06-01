@@ -145,7 +145,7 @@ const checks: CheckConfig[] = [
   {
     name: 'audit-mvp script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'audit-mvp.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'audit-mvp.ts')],
   },
   {
     name: 'demo-mvp script syntax',

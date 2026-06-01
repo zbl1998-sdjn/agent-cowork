@@ -8,15 +8,132 @@ const buildDir = path.join(repoRoot, 'build');
 const reportPath = path.join(buildDir, 'mvp-acceptance-audit.json');
 const strict = process.argv.includes('--strict');
 
-function readJson(filePath) {
+type JsonRecord = Record<string, unknown>;
+type ReadJsonResult<T extends JsonRecord> =
+  | { ok: true; value: T; error?: undefined }
+  | { ok: false; value?: undefined; error: string };
+type FileEvidence = { path: string; exists: boolean; bytes: number; lastWriteTime: string | null };
+type PngSize = { width: number; height: number };
+type HealthResult = { statusCode?: number; body?: JsonRecord | string; error?: string };
+type RequirementStatus = 'passed' | 'failed' | 'blocked';
+type Requirement = { id: string; label: string; status: RequirementStatus; evidence: unknown };
+type LayoutScroll = { width?: number; clientWidth?: number; height?: number; clientHeight?: number };
+type SmokeLayout = {
+  activeMode?: unknown;
+  hasGreeting?: unknown;
+  hasCowork?: unknown;
+  hasModeTabs?: unknown;
+  hasSidebarActions?: unknown;
+  hasQuickActions?: unknown;
+  hasKimi?: unknown;
+  hasLocalFolder?: unknown;
+  hasApprove?: unknown;
+  title?: unknown;
+  hasShell?: unknown;
+  hasTimeline?: unknown;
+  hasComposer?: unknown;
+  hasConversationRail?: unknown;
+  hasHeaderActions?: unknown;
+  hasFrameworkOverlay?: unknown;
+  workspace?: unknown;
+  protocol?: unknown;
+  hostApi?: unknown;
+  scroll?: LayoutScroll;
+  issues?: unknown[];
+};
+type SmokeInteraction = {
+  afterPlan?: { status?: unknown; opCount?: number; preview?: string; approveText?: unknown };
+  afterApprove?: { status?: unknown; doneClass?: unknown; approval?: string; artifactCards?: number };
+};
+type ReportMetadata = { generatedAt?: string; repoRoot?: string };
+type RuntimeReport = ReportMetadata & {
+  host?: unknown;
+  port?: unknown;
+  pid?: unknown;
+  url?: unknown;
+  workspace?: unknown;
+};
+type VerificationReport = ReportMetadata & {
+  ok?: unknown;
+  summary?: { failed?: unknown };
+  notes?: unknown;
+  checks?: NativeCheck[];
+};
+type RenderedSmokeReport = ReportMetadata & {
+  ok?: unknown;
+  screenshotPath?: string;
+  artifacts?: unknown;
+  auditPath?: string;
+  desktopLayout?: SmokeLayout;
+  compactLayout?: SmokeLayout;
+  interaction?: SmokeInteraction;
+};
+type LiveMvpSmokeReport = RenderedSmokeReport & {
+  runtime?: RuntimeReport;
+  auditSizeBefore?: unknown;
+  auditSizeAfter?: unknown;
+};
+type WindowsResourceSmokeReport = RenderedSmokeReport & {
+  resourcesDir?: unknown;
+};
+type ReadinessReport = ReportMetadata & {
+  executable?: unknown;
+  executableExists?: unknown;
+  readyToRunNativeSmoke?: unknown;
+  blockedByAsr?: unknown;
+  exactExclusionRequired?: unknown;
+  diagnosis?: unknown;
+  defender?: unknown;
+  latestMatchingAsrEvent?: { timeCreated?: unknown; id?: unknown; providerName?: unknown };
+  explicitApprovalText?: unknown;
+  proposedUnblockCommand?: unknown;
+  rerunCommand?: unknown;
+  fullVerificationCommand?: unknown;
+  strictAuditCommand?: unknown;
+  requiredUserAction?: unknown;
+};
+type NativeCheck = { name?: unknown; status?: unknown; blockedByAsr?: unknown };
+type EvidenceIssue = { label: string; reason: 'stale'; generatedAt: string } | { label: string; reason: 'wrong-repo'; repoRoot: string };
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function atLeast(value: unknown, minimum: number): boolean {
+  return typeof value === 'number' && value >= minimum;
+}
+
+function greaterThan(left: unknown, right: unknown): boolean {
+  return typeof left === 'number' && typeof right === 'number' && left > right;
+}
+
+function fitsWidth(layout: SmokeLayout | undefined): boolean {
+  const scroll = layout?.scroll;
+  return typeof scroll?.width === 'number' && typeof scroll.clientWidth === 'number' && scroll.width <= scroll.clientWidth + 1;
+}
+
+function fitsHeight(layout: SmokeLayout | undefined): boolean {
+  const scroll = layout?.scroll;
+  return typeof scroll?.height === 'number' && typeof scroll.clientHeight === 'number' && scroll.height <= scroll.clientHeight + 1;
+}
+
+function readJson<T extends JsonRecord>(filePath: string): ReadJsonResult<T> {
   try {
-    return { ok: true, value: JSON.parse(fs.readFileSync(filePath, 'utf8')) };
+    const value = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
+    if (!isRecord(value)) {
+      return { ok: false, error: 'JSON root is not an object' };
+    }
+    return { ok: true, value: value as T };
   } catch (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: errorMessage(error) };
   }
 }
 
-function fileEvidence(filePath) {
+function fileEvidence(filePath: string): FileEvidence {
   try {
     const stat = fs.statSync(filePath);
     return {
@@ -30,7 +147,7 @@ function fileEvidence(filePath) {
   }
 }
 
-function readPngSize(filePath) {
+function readPngSize(filePath: string): PngSize | null {
   try {
     const buffer = fs.readFileSync(filePath);
     if (buffer.length < 24 || buffer.toString('ascii', 1, 4) !== 'PNG') {
@@ -45,8 +162,8 @@ function readPngSize(filePath) {
   }
 }
 
-function isPidAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) {
+function isPidAlive(pid: unknown): boolean {
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
     return false;
   }
   try {
@@ -57,36 +174,38 @@ function isPidAlive(pid) {
   }
 }
 
-async function getHealth(url) {
+async function getHealth(url: string): Promise<HealthResult> {
   return await new Promise((resolve) => {
     const request = http.get(url, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => {
-        body += chunk;
-      });
-      response.on('end', () => {
-        try {
-          resolve({ statusCode: response.statusCode, body: JSON.parse(body) });
-        } catch {
-          resolve({ statusCode: response.statusCode, body });
-        }
-      });
+            body += String(chunk);
+          });
+          response.on('end', () => {
+            const statusCode = response.statusCode ?? 0;
+            try {
+              const parsedBody = JSON.parse(body) as unknown;
+              resolve({ statusCode, body: isRecord(parsedBody) ? parsedBody : body });
+            } catch {
+              resolve({ statusCode, body });
+            }
+          });
     });
-    request.on('error', (error) => resolve({ error: error.message }));
+    request.on('error', (error) => resolve({ error: errorMessage(error) }));
     request.setTimeout(1500, () => request.destroy(new Error('health request timed out')));
   });
 }
 
-function requirement(id, label, status, evidence) {
+function requirement(id: string, label: string, status: RequirementStatus, evidence: unknown): Requirement {
   return { id, label, status, evidence };
 }
 
-function passed(requirements, ids) {
+function passed(requirements: Requirement[], ids: string[]): boolean {
   return ids.every((id) => requirements.find((item) => item.id === id)?.status === 'passed');
 }
 
-function hasReferenceFunctionalShell(layout) {
+function hasReferenceFunctionalShell(layout: SmokeLayout | undefined): boolean {
   if (!layout) {
     return false;
   }
@@ -108,7 +227,7 @@ function hasReferenceFunctionalShell(layout) {
   return newShell || legacyShell;
 }
 
-function hasReactLiveShell(layout) {
+function hasReactLiveShell(layout: SmokeLayout | undefined): boolean {
   if (!layout) {
     return false;
   }
@@ -120,27 +239,27 @@ function hasReactLiveShell(layout) {
     layout.hasConversationRail === true &&
     layout.hasHeaderActions === true &&
     layout.hasQuickActions === true &&
-    layout.scroll?.width <= layout.scroll?.clientWidth + 1
+    fitsWidth(layout)
   );
 }
 
-function liveInteractionPassed(interaction) {
+function liveInteractionPassed(interaction: SmokeInteraction | undefined): boolean {
   if (!interaction) {
     return false;
   }
 
   const legacyPassed =
     interaction.afterPlan?.status === '计划就绪' &&
-    interaction.afterPlan?.opCount >= 1 &&
+    atLeast(interaction.afterPlan?.opCount, 1) &&
     interaction.afterApprove?.status === '已在本机执行' &&
     interaction.afterApprove?.doneClass === true;
 
   const reactPassed =
     interaction.afterPlan?.preview?.includes('操作预览') === true &&
-    interaction.afterPlan?.opCount >= 1 &&
+    atLeast(interaction.afterPlan?.opCount, 1) &&
     interaction.afterPlan?.approveText === '审批执行' &&
     interaction.afterApprove?.approval?.includes('已审批') === true &&
-    interaction.afterApprove?.artifactCards >= 1;
+    atLeast(interaction.afterApprove?.artifactCards, 1);
 
   return legacyPassed || reactPassed;
 }
@@ -157,47 +276,53 @@ async function main() {
   const readinessFile = path.join(buildDir, 'windows-client-readiness.json');
   const windowsVerificationFile = path.join(buildDir, 'mvp-verification-report-windows.json');
 
-  const runtime = readJson(runtimeFile);
+  const runtime = readJson<RuntimeReport>(runtimeFile);
   const healthUrl = runtime.ok ? `http://${runtime.value.host}:${runtime.value.port}/health` : null;
   const health = healthUrl ? await getHealth(healthUrl) : null;
   const pidAlive = runtime.ok && isPidAlive(runtime.value.pid);
-  const healthOk = health?.statusCode === 200 && health?.body?.ok === true && health?.body?.service === 'agent-cowork-host';
+  const healthBody = isRecord(health?.body) ? health.body : null;
+  const healthOk = health?.statusCode === 200 && healthBody?.ok === true && healthBody?.service === 'agent-cowork-host';
 
-  const verification = readJson(verificationFile);
-  const rendered = readJson(renderedFile);
-  const liveMvpSmoke = readJson(liveMvpSmokeFile);
-  const runtimeSmoke = readJson(runtimeSmokeFile);
-  const windowsResourceSmoke = readJson(windowsResourceSmokeFile);
-  const readiness = readJson(readinessFile);
-  const windowsVerification = readJson(windowsVerificationFile);
+  const verification = readJson<VerificationReport>(verificationFile);
+  const rendered = readJson<RenderedSmokeReport>(renderedFile);
+  const liveMvpSmoke = readJson<LiveMvpSmokeReport>(liveMvpSmokeFile);
+  const runtimeSmoke = readJson<JsonRecord & { ok?: unknown; generatedAt?: string; port?: unknown; stop?: { stopped?: unknown } }>(runtimeSmokeFile);
+  const windowsResourceSmoke = readJson<WindowsResourceSmokeReport>(windowsResourceSmokeFile);
+  const readiness = readJson<ReadinessReport>(readinessFile);
+  const windowsVerification = readJson<VerificationReport>(windowsVerificationFile);
 
-  const screenshotPath = rendered.ok ? rendered.value.screenshotPath : path.join(buildDir, 'rendered-ui-smoke-1536x900.png');
+  const screenshotPath =
+    rendered.ok && rendered.value.screenshotPath
+      ? rendered.value.screenshotPath
+      : path.join(buildDir, 'rendered-ui-smoke-1536x900.png');
   const screenshot = fileEvidence(screenshotPath);
   const screenshotSize = readPngSize(screenshotPath);
   const artifactEvidence =
     rendered.ok && Array.isArray(rendered.value.artifacts)
-      ? rendered.value.artifacts.map((artifactPath) => fileEvidence(artifactPath))
+      ? rendered.value.artifacts.filter((artifactPath): artifactPath is string => typeof artifactPath === 'string').map((artifactPath) => fileEvidence(artifactPath))
       : [];
-  const auditEvidence = rendered.ok ? fileEvidence(rendered.value.auditPath) : null;
+  const auditEvidence = rendered.ok && rendered.value.auditPath ? fileEvidence(rendered.value.auditPath) : null;
 
   const desktopLayout = rendered.value?.desktopLayout;
   const compactLayout = rendered.value?.compactLayout;
   const interaction = rendered.value?.interaction;
-  const liveMvpScreenshotPath = liveMvpSmoke.ok
-    ? liveMvpSmoke.value.screenshotPath
-    : path.join(buildDir, 'live-mvp-smoke-1536x900.png');
+  const liveMvpScreenshotPath =
+    liveMvpSmoke.ok && liveMvpSmoke.value.screenshotPath
+      ? liveMvpSmoke.value.screenshotPath
+      : path.join(buildDir, 'live-mvp-smoke-1536x900.png');
   const liveMvpScreenshot = fileEvidence(liveMvpScreenshotPath);
   const liveMvpScreenshotSize = readPngSize(liveMvpScreenshotPath);
   const liveMvpDesktopLayout = liveMvpSmoke.value?.desktopLayout;
   const liveMvpInteraction = liveMvpSmoke.value?.interaction;
   const liveMvpArtifactEvidence =
     liveMvpSmoke.ok && Array.isArray(liveMvpSmoke.value.artifacts)
-      ? liveMvpSmoke.value.artifacts.map((artifactPath) => fileEvidence(artifactPath))
+      ? liveMvpSmoke.value.artifacts.filter((artifactPath): artifactPath is string => typeof artifactPath === 'string').map((artifactPath) => fileEvidence(artifactPath))
       : [];
-  const liveMvpAuditEvidence = liveMvpSmoke.ok ? fileEvidence(liveMvpSmoke.value.auditPath) : null;
-  const windowsResourceScreenshotPath = windowsResourceSmoke.ok
-    ? windowsResourceSmoke.value.screenshotPath
-    : path.join(buildDir, 'windows-client-resource-smoke-1536x900.png');
+  const liveMvpAuditEvidence = liveMvpSmoke.ok && liveMvpSmoke.value.auditPath ? fileEvidence(liveMvpSmoke.value.auditPath) : null;
+  const windowsResourceScreenshotPath =
+    windowsResourceSmoke.ok && windowsResourceSmoke.value.screenshotPath
+      ? windowsResourceSmoke.value.screenshotPath
+      : path.join(buildDir, 'windows-client-resource-smoke-1536x900.png');
   const windowsResourceScreenshot = fileEvidence(windowsResourceScreenshotPath);
   const windowsResourceScreenshotSize = readPngSize(windowsResourceScreenshotPath);
   const windowsResourceDesktopLayout = windowsResourceSmoke.value?.desktopLayout;
@@ -212,15 +337,15 @@ async function main() {
     desktopLayout?.title === 'Agent Cowork' &&
     hasReferenceFunctionalShell(desktopLayout) &&
     desktopLayout?.hasFrameworkOverlay === false &&
-    desktopLayout?.scroll?.width <= desktopLayout?.scroll?.clientWidth + 1 &&
+    fitsWidth(desktopLayout) &&
     compactLayout?.issues?.length === 0 &&
-    compactLayout?.scroll?.width <= compactLayout?.scroll?.clientWidth + 1 &&
-    compactLayout?.scroll?.height <= compactLayout?.scroll?.clientHeight + 1;
+    fitsWidth(compactLayout) &&
+    fitsHeight(compactLayout);
 
   const operationPassed =
     rendered.value?.ok === true &&
     interaction?.afterPlan?.status === '计划就绪' &&
-    interaction?.afterPlan?.opCount >= 1 &&
+    atLeast(interaction?.afterPlan?.opCount, 1) &&
     interaction?.afterApprove?.status === '已在本机执行' &&
     interaction?.afterApprove?.doneClass === true &&
     artifactEvidence.length > 0 &&
@@ -250,16 +375,16 @@ async function main() {
     { label: 'windows-client-readiness', value: readiness.value },
     { label: 'windows-verification', value: windowsVerification.value },
   ];
-  const evidenceIssues = [];
+  const evidenceIssues: EvidenceIssue[] = [];
   for (const { label, value } of evidenceReports) {
     if (!value || typeof value !== 'object') continue;
-    if (value.generatedAt) {
+    if (typeof value.generatedAt === 'string') {
       const ts = Date.parse(value.generatedAt);
       if (Number.isFinite(ts) && Date.now() - ts > STALE_MS) {
         evidenceIssues.push({ label, reason: 'stale', generatedAt: value.generatedAt });
       }
     }
-    if (value.repoRoot && path.resolve(value.repoRoot) !== path.resolve(repoRoot)) {
+    if (typeof value.repoRoot === 'string' && path.resolve(value.repoRoot) !== path.resolve(repoRoot)) {
       evidenceIssues.push({ label, reason: 'wrong-repo', repoRoot: value.repoRoot });
     }
   }
@@ -310,7 +435,7 @@ async function main() {
         liveMvpArtifactEvidence.length > 0 &&
         liveMvpArtifactEvidence.every((artifact) => artifact.exists && artifact.bytes > 0) &&
         liveMvpAuditEvidence?.exists === true &&
-        liveMvpSmoke.value?.auditSizeAfter > liveMvpSmoke.value?.auditSizeBefore
+        greaterThan(liveMvpSmoke.value?.auditSizeAfter, liveMvpSmoke.value?.auditSizeBefore)
         ? 'passed'
         : 'failed',
       {

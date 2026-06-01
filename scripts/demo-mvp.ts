@@ -233,7 +233,7 @@ async function main(): Promise<void> {
     );
   }
 
-  steps.push(runStep('MVP acceptance audit', nodeBin, [path.join(repoRoot, 'scripts', 'audit-mvp.mjs')]));
+  steps.push(runStep('MVP acceptance audit', nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'audit-mvp.ts')]));
 
   const finalStatus = await waitForRuntime(3000);
   const audit = readJsonIfExists(path.join(buildDir, 'mvp-acceptance-audit.json'));
