@@ -12,7 +12,10 @@ import type { HostServer } from '../src/server.js';
 import { itemAt, toolCallResultSchema } from './helpers/mcp.js';
 import { closeTestServer } from './helpers/close-server.js';
 
-const FIXTURE = fileURLToPath(new URL('./fixtures/mock-mcp-server.mjs', import.meta.url).href);
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(TEST_DIR, '..', '..', '..');
+const RUN_HOST_NODE = path.join(REPO_ROOT, 'scripts', 'run-host-node.mjs');
+const FIXTURE = fileURLToPath(new URL('./fixtures/mock-mcp-server.ts', import.meta.url).href);
 
 const toolListResponseSchema = z.object({
   tools: z.array(z.object({ name: z.string() }).loose()),
@@ -35,6 +38,10 @@ function nodeExecPath(): string {
   const execPath = process.execPath;
   assert.ok(execPath, 'process.execPath should be available for MCP subprocess tests');
   return execPath;
+}
+
+function mockMcpServerSpec(): { command: string; args: string[] } {
+  return { command: nodeExecPath(), args: [RUN_HOST_NODE, FIXTURE] };
 }
 
 async function bind(server: HostServer): Promise<string> {
@@ -68,7 +75,7 @@ test('connectMcpServers spawns a real MCP server and imports its tools', async (
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'mock', command: nodeExecPath(), args: [FIXTURE] }],
+    servers: [{ name: 'mock', ...mockMcpServerSpec() }],
   });
   try {
     assert.equal(out.toolCount, 2);
@@ -97,7 +104,7 @@ test('server.connectMcpServers exposes MCP tools through the HTTP routes', async
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
-    const outcome = await server.connectMcpServers([{ name: 'mock', command: nodeExecPath(), args: [FIXTURE] }]);
+    const outcome = await server.connectMcpServers([{ name: 'mock', ...mockMcpServerSpec() }]);
     assert.equal(outcome.toolCount, 2);
 
     const tools = toolListResponseSchema.parse((await jsonRequest(base, '/api/tools')).body);

@@ -13,6 +13,7 @@
     "apps/host/test/helpers/mcp.ts",
     "apps/host/test/helpers/runtime-dependency.ts",
     "apps/host/test/helpers/sandbox.ts",
+    "apps/host/test/fixtures/mock-mcp-server.ts",
     "apps/host/test/test-fixtures.ts",
     "apps/host/test/helpers/agent-stream.ts",
     "apps/host/test/helpers/agent.ts",
