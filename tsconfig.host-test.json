@@ -6,6 +6,7 @@
   "files": [
     "types/host-node-shim.d.ts",
     "apps/host/test/helpers/close-server.ts",
+    "apps/host/test/helpers/artifacts.ts",
     "apps/host/test/helpers/host-http.ts",
     "apps/host/test/helpers/runtime-dependency.ts",
     "apps/host/test/helpers/sandbox.ts",
@@ -14,6 +15,10 @@
     "apps/host/test/agent-stream-input.test.ts",
     "apps/host/test/approvals-hardening.test.ts",
     "apps/host/test/architecture-check.test.ts",
+    "apps/host/test/artifacts-live.test.ts",
+    "apps/host/test/artifacts-render.test.ts",
+    "apps/host/test/artifacts-routes-data.test.ts",
+    "apps/host/test/artifacts-routes-render.test.ts",
     "apps/host/test/arg-validator.test.ts",
     "apps/host/test/audit-events.test.ts",
     "apps/host/test/auth-env.test.ts",
