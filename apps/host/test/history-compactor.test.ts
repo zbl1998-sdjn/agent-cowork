@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HistoryCompactor, createHistoryCompactor } from '../src/kimi/context/history-compactor.js';
 import { HeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
+import type { ChatMessageLike } from '../src/kimi/context/history-compactor-utils.js';
 
-function makeLongHistory(rounds = 220) {
-  const messages = [
+function makeLongHistory(rounds = 220): ChatMessageLike[] {
+  const messages: ChatMessageLike[] = [
     { role: 'system', content: '你是本地 agent。' },
     { role: 'user', content: 'FACT: project=Orion-42\nIMPORTANT: preferred_language=zh-CN' },
   ];
@@ -19,6 +20,12 @@ function makeLongHistory(rounds = 220) {
     });
   }
   return messages;
+}
+
+function messageAt(messages: ChatMessageLike[], index: number): ChatMessageLike {
+  const message = messages[index];
+  assert.ok(message);
+  return message;
 }
 
 test('history compactor leaves messages unchanged when already under budget', () => {
@@ -51,10 +58,11 @@ test('history compactor summarizes 200+ old rounds, keeps recent messages, and p
   assert.ok(result.beforeTokens > maxContextTokens);
   assert.ok(result.afterTokens <= maxContextTokens, `${result.afterTokens} should fit ${maxContextTokens}`);
   assert.deepEqual(result.messages.slice(-keepRecentMessages), expectedTail);
-  assert.equal(result.messages[0].role, 'system');
-  assert.match(result.messages[0].content, /history compacted/i);
-  assert.match(result.messages[0].content, /project=Orion-42/);
-  assert.match(result.messages[0].content, /preferred_language=zh-CN/);
+  const summary = messageAt(result.messages, 0);
+  assert.equal(summary.role, 'system');
+  assert.match(String(summary.content), /history compacted/i);
+  assert.match(String(summary.content), /project=Orion-42/);
+  assert.match(String(summary.content), /preferred_language=zh-CN/);
   assert.ok(result.keyFacts.some((fact) => fact.includes('project=Orion-42')));
 });
 
@@ -72,7 +80,10 @@ test('history compactor trims retained message content rather than overflowing t
 
   assert.equal(result.compacted, true);
   assert.ok(result.afterTokens <= 160, `${result.afterTokens} should fit 160`);
-  assert.match(result.messages[0].content, /run_id=budget-tight/);
-  assert.match(result.messages.at(-2).content, /truncated|compacted/i);
-  assert.match(result.messages.at(-1).content, /final answer/);
+  const summary = messageAt(result.messages, 0);
+  const penultimate = messageAt(result.messages, result.messages.length - 2);
+  const last = messageAt(result.messages, result.messages.length - 1);
+  assert.match(String(summary.content), /run_id=budget-tight/);
+  assert.match(String(penultimate.content), /truncated|compacted/i);
+  assert.match(String(last.content), /final answer/);
 });

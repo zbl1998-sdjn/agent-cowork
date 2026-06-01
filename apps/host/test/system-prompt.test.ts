@@ -29,10 +29,10 @@ test('buildEnvBlock omits optional fields when blank', () => {
   const block = buildEnvBlock({ now: fixedNow }).join('\n');
   assert.match(block, /<env>/);
   assert.match(block, /今天:/);
-  assert.doesNotMatch(block, /工作目录:/);
-  assert.doesNotMatch(block, /操作系统:/);
-  assert.doesNotMatch(block, /应用版本:/);
-  assert.doesNotMatch(block, /当前模型:/);
+  assert.ok(!/工作目录:/.test(block));
+  assert.ok(!/操作系统:/.test(block));
+  assert.ok(!/应用版本:/.test(block));
+  assert.ok(!/当前模型:/.test(block));
 });
 
 test('buildSystemPrompt puts the env block at the very TOP', () => {

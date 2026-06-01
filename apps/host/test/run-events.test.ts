@@ -22,7 +22,7 @@ test('RunEventBus validates inputs', () => {
 
 test('RunEventBus subscribe receives live events and unsubscribe stops them', () => {
   const bus = new RunEventBus();
-  const received = [];
+  const received: string[] = [];
   const unsub = bus.subscribe('run_x', (e) => received.push(e.type));
   bus.publish('run_x', { type: 'a' });
   bus.publish('run_x', { type: 'b' });
@@ -51,8 +51,12 @@ test('RunEventBus buffer is bounded', () => {
   const buffered = bus.replay('r', 0);
   assert.equal(buffered.length, 10);
   // Newest preserved, oldest dropped.
-  assert.equal(buffered[buffered.length - 1].i, 24);
-  assert.equal(buffered[0].i, 15);
+  const first = buffered[0];
+  const last = buffered[buffered.length - 1];
+  assert.ok(first);
+  assert.ok(last);
+  assert.equal(last.i, 24);
+  assert.equal(first.i, 15);
 });
 
 test('RunEventBus.seed lifts seq above persisted max', () => {

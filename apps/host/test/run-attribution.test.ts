@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo, Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -13,14 +14,25 @@ function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-run-attr-'));
 }
 
-async function bind(server) {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function expectRecord(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(isRecord(value), `${label} should be an object`);
+  return value;
+}
+
+async function bind(server: Server): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'test server should bind to a TCP port');
+  const { port } = address as AddressInfo;
   return `http://127.0.0.1:${port}`;
 }
 
 test('buildRunAttribution records prompt, model, and config versions without secrets', () => {
-  const secret = 'sk-ATTRSECRET1234567890';
+  const secret = 'sk-test-attr-secret-1234567890';
   const attribution = buildRunAttribution({
     type: 'agent-chat',
     provider: 'kimi-api',
@@ -42,6 +54,7 @@ test('buildRunAttribution records prompt, model, and config versions without sec
   assert.equal(attribution.prompt.systemPromptVersion, SYSTEM_PROMPT_VERSION);
   assert.equal(attribution.prompt.builder, 'agent-system-prompt');
   assert.equal(attribution.prompt.inputChars, 6);
+  assert.ok(attribution.prompt.inputSha256);
   assert.match(attribution.prompt.inputSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(attribution.model, {
     provider: 'kimi-api',
@@ -50,12 +63,13 @@ test('buildRunAttribution records prompt, model, and config versions without sec
     baseUrl: 'https://api.moonshot.cn/v1',
   });
   assert.equal(attribution.config.apiKey, '[REDACTED]');
-  assert.equal(attribution.config.nested.accessToken, '[REDACTED]');
+  const nestedConfig = expectRecord(attribution.config.nested, 'nested config');
+  assert.equal(nestedConfig.accessToken, '[REDACTED]');
   assert.equal(JSON.stringify(attribution).includes(secret), false);
 });
 
 test('writeRunRecord attaches attribution to every persisted run record', () => {
-  const secret = 'sk-WRITEATTRSECRET1234567890';
+  const secret = 'sk-test-write-attr-secret-1234567890';
   const runStoreRoot = path.join(tempRoot(), 'runs');
   writeRunRecord(runStoreRoot, {
     id: 'run_attr_persisted',
@@ -73,10 +87,15 @@ test('writeRunRecord attaches attribution to every persisted run record', () => 
   });
 
   const record = readRunRecord(runStoreRoot, 'run_attr_persisted');
-  assert.equal(record.attribution.prompt.systemPromptVersion, SYSTEM_PROMPT_VERSION);
-  assert.equal(record.attribution.model.model, 'kimi-k2-test');
-  assert.equal(record.attribution.config.apiKey, '[REDACTED]');
-  assert.equal(JSON.stringify(record.attribution).includes(secret), false);
+  assert.ok(record, 'run record should be persisted');
+  const attribution = expectRecord(record.attribution, 'run attribution');
+  const prompt = expectRecord(attribution.prompt, 'run attribution prompt');
+  const model = expectRecord(attribution.model, 'run attribution model');
+  const config = expectRecord(attribution.config, 'run attribution config');
+  assert.equal(prompt.systemPromptVersion, SYSTEM_PROMPT_VERSION);
+  assert.equal(model.model, 'kimi-k2-test');
+  assert.equal(config.apiKey, '[REDACTED]');
+  assert.equal(JSON.stringify(attribution).includes(secret), false);
 });
 
 test('agent stream persists system-prompt version and safe config attribution', async () => {
@@ -85,13 +104,20 @@ test('agent stream persists system-prompt version and safe config attribution', 
   const server = createServer({
     trustedRoot: root,
     enableScheduler: false,
-    kimiApiKey: 'sk-SERVERATTRSECRET1234567890',
+    kimiApiKey: 'sk-test-server-attr-secret-1234567890',
     kimiBaseUrl: 'https://api.example.test/v1',
     kimiModel: 'agent-attr-model',
     kimiApiTimeoutMs: 7000,
     kimiApiMaxTokens: 1234,
     kimiTemperature: 0.4,
-    kimiChatRunner: async () => ({}),
+    kimiChatRunner: async () => ({
+      ok: true,
+      provider: 'kimi-api',
+      model: 'agent-attr-model',
+      mode: 'chat',
+      text: '',
+      durationMs: 0,
+    }),
     agentModelCall,
   });
   const base = await bind(server);
@@ -110,16 +136,20 @@ test('agent stream persists system-prompt version and safe config attribution', 
     const records = fs
       .readdirSync(runStoreRoot)
       .filter((name) => name.endsWith('.json'))
-      .map((name) => JSON.parse(fs.readFileSync(path.join(runStoreRoot, name), 'utf8')));
-    const record = records.find((item) => item.type === 'agent-chat');
+      .map((name): unknown => JSON.parse(fs.readFileSync(path.join(runStoreRoot, name), 'utf8')));
+    const record = records.find((item): item is Record<string, unknown> => isRecord(item) && item.type === 'agent-chat');
     assert.ok(record, 'agent-chat run record persisted');
-    assert.equal(record.attribution.prompt.systemPromptVersion, SYSTEM_PROMPT_VERSION);
-    assert.equal(record.attribution.prompt.builder, 'agent-system-prompt');
-    assert.equal(record.attribution.model.model, 'agent-attr-model');
-    assert.equal(record.attribution.config.maxTokens, 1234);
-    assert.equal(record.attribution.config.developerMode, true);
-    assert.equal(record.attribution.config.maxSteps, 3);
-    assert.equal(JSON.stringify(record.attribution).includes('SERVERATTRSECRET'), false);
+    const attribution = expectRecord(record.attribution, 'agent run attribution');
+    const prompt = expectRecord(attribution.prompt, 'agent run attribution prompt');
+    const model = expectRecord(attribution.model, 'agent run attribution model');
+    const config = expectRecord(attribution.config, 'agent run attribution config');
+    assert.equal(prompt.systemPromptVersion, SYSTEM_PROMPT_VERSION);
+    assert.equal(prompt.builder, 'agent-system-prompt');
+    assert.equal(model.model, 'agent-attr-model');
+    assert.equal(config.maxTokens, 1234);
+    assert.equal(config.developerMode, true);
+    assert.equal(config.maxSteps, 3);
+    assert.equal(JSON.stringify(attribution).includes('sk-test-server-attr-secret'), false);
   } finally {
     await closeTestServer(server);
   }

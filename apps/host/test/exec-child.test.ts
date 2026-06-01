@@ -2,6 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import childProcess from 'node:child_process';
 import { createCappedBuffer, runConstrainedChild } from '../src/sandbox/exec-child.js';
+import type { SpawnLike } from '../src/sandbox/exec-child.js';
+
+const spawn = childProcess.spawn as unknown as SpawnLike;
+
+function currentNodeCommand(): string {
+  assert.ok(process.execPath);
+  return process.execPath;
+}
+
+function stringEnv(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
+}
 
 test('createCappedBuffer: retains at most maxBytes, counts the rest, flags truncation', () => {
   const sink = createCappedBuffer(10);
@@ -25,7 +39,7 @@ test('createCappedBuffer: bounds memory for a huge stream (retained << produced)
   const cap = 4096;
   const sink = createCappedBuffer(cap);
   // Feed 5 MB in 1 KB chunks; retained bytes must never exceed the cap.
-  const chunk = Buffer.alloc(1024, 0x61);
+  const chunk = Buffer.from('a'.repeat(1024));
   for (let i = 0; i < 5 * 1024; i += 1) sink.push(chunk);
   assert.equal(Buffer.byteLength(sink.text), cap);
   assert.equal(sink.bytes, 5 * 1024 * 1024);
@@ -35,11 +49,11 @@ test('createCappedBuffer: bounds memory for a huge stream (retained << produced)
 test('runConstrainedChild: high-output command is truncated to the cap, exit code preserved', async () => {
   const cap = 1000;
   const res = await runConstrainedChild({
-    spawn: childProcess.spawn,
-    command: process.execPath, // node
+    spawn,
+    command: currentNodeCommand(), // node
     args: ['-e', "process.stdout.write('x'.repeat(1000000), () => process.exit(0))"],
     cwd: process.cwd(),
-    env: process.env,
+    env: stringEnv(),
     timeoutMs: 10000,
     maxOutputBytes: cap,
   });
@@ -52,11 +66,11 @@ test('runConstrainedChild: high-output command is truncated to the cap, exit cod
 
 test('runConstrainedChild: normal small command is not truncated', async () => {
   const res = await runConstrainedChild({
-    spawn: childProcess.spawn,
-    command: process.execPath,
+    spawn,
+    command: currentNodeCommand(),
     args: ['-e', "process.stdout.write('ok')"],
     cwd: process.cwd(),
-    env: process.env,
+    env: stringEnv(),
     timeoutMs: 10000,
     maxOutputBytes: 1024,
   });
