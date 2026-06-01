@@ -28,6 +28,7 @@
     "scripts/check-js-boundary.ts",
     "scripts/check-resource-js.ts",
     "scripts/check-secrets.ts",
+    "scripts/check-ts-project-coverage.ts",
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
     "scripts/demo-mvp.ts",
