@@ -123,6 +123,7 @@
     "apps/host/test/postgres-approvals.test.ts",
     "apps/host/test/postgres-event-bus.test.ts",
     "apps/host/test/postgres-runs-index.test.ts",
+    "apps/host/test/postgres-wiring.test.ts",
     "apps/host/test/project-routes.test.ts",
     "apps/host/test/prompt-routes.test.ts",
     "apps/host/test/prompt-refiner.test.ts",
