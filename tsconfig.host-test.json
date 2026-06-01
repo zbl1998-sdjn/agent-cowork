@@ -71,6 +71,8 @@
     "apps/host/test/token-estimator.test.ts",
     "apps/host/test/tool-loop-budget.test.ts",
     "apps/host/test/tool-loop-timeout.test.ts",
+    "apps/host/test/tool-result-summarizer.test.ts",
+    "apps/host/test/tool-retry.test.ts",
     "apps/host/test/tree-budget.test.ts",
     "apps/host/test/untrusted-content.test.ts",
     "apps/host/test/web-fetch-ssrf.test.ts",

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { RetryPolicy, createRetryPolicy, isRetryableToolError } from '../src/kimi/agent/tool-retry.js';
 
 test('retry policy retries transient thrown errors with bounded exponential backoff', async () => {
-  const delays = [];
+  const delays: number[] = [];
   let attempts = 0;
   const policy = createRetryPolicy({
     maxAttempts: 4,
@@ -15,7 +15,7 @@ test('retry policy retries transient thrown errors with bounded exponential back
   const result = await policy.run(async () => {
     attempts += 1;
     if (attempts < 3) {
-      const err = new Error('ETIMEDOUT: network timeout');
+      const err = new Error('ETIMEDOUT: network timeout') as Error & { code?: string };
       err.code = 'ETIMEDOUT';
       throw err;
     }
@@ -38,7 +38,7 @@ test('retry policy does not retry permanent permission or validation failures', 
   await assert.rejects(
     () => policy.run(async () => {
       attempts += 1;
-      const err = new Error('permission denied: path escaped trusted root');
+      const err = new Error('permission denied: path escaped trusted root') as Error & { code?: string };
       err.code = 'EACCES';
       throw err;
     }),
@@ -49,7 +49,7 @@ test('retry policy does not retry permanent permission or validation failures', 
 });
 
 test('retry policy can retry returned tool error objects and exposes attempt metadata', async () => {
-  const delays = [];
+  const delays: number[] = [];
   let attempts = 0;
   const policy = createRetryPolicy({
     maxAttempts: 3,

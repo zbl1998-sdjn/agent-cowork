@@ -47,7 +47,7 @@ test('tool result summarizer shrinks large structured results while preserving k
   assert.match(output.content, /src\/module-42\.js/);
   assert.ok(output.sources.includes('src/module-42.js'));
   assert.ok(output.keyPoints.some((point) => /OAuth callback state/i.test(point)));
-  assert.doesNotMatch(output.content, /module-79.*alpha beta gamma.*alpha beta gamma/s);
+  assert.equal(/module-79.*alpha beta gamma.*alpha beta gamma/s.test(output.content), false);
 });
 
 test('tool result summarizer handles huge text results without dropping source-like lines', () => {
