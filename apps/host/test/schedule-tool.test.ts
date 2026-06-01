@@ -8,11 +8,24 @@ import { createApprovalRegistry } from '../src/runtime/approvals.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-sched-')); }
 
+type CreatedSchedule = {
+  name?: unknown;
+  cron?: unknown;
+  tenantId?: unknown;
+  payload?: {
+    prompt?: unknown;
+    trustedRoot?: unknown;
+  };
+};
+
 test('ScheduleTask tool is exposed and creates a schedule via scheduler.create', async () => {
   const root = tmp();
-  let created = null;
+  const created: { value: CreatedSchedule | null } = { value: null };
   const scheduler = {
-    create: (rec) => { created = rec; return { id: 'sched_1', name: rec.name, kind: rec.cron ? 'cron' : 'one-shot', nextFireAt: '2026-05-24T06:00:00Z', cronHuman: '每天 06:00' }; },
+    create: (rec: Record<string, unknown>) => {
+      created.value = rec as CreatedSchedule;
+      return { id: 'sched_1', name: rec.name, kind: rec.cron ? 'cron' : 'one-shot', nextFireAt: '2026-05-24T06:00:00Z', cronHuman: '每天 06:00' };
+    },
   };
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: { tenantId: 't1', userId: 'u1', traceId: 'tr1' } },
@@ -28,12 +41,14 @@ test('ScheduleTask tool is exposed and creates a schedule via scheduler.create',
   };
   const out = await runAgentChat({ prompt: '每天早上 6 点总结邮件', kimiConfig: {}, trustedRoot: root, tools, modelCall, runStoreRoot: path.join(root, 'runs') });
 
-  assert.ok(created, 'scheduler.create was called');
-  assert.equal(created.name, '每日简报');
-  assert.equal(created.cron, '0 6 * * *');
-  assert.equal(created.tenantId, 't1');
-  assert.equal(created.payload.prompt, '总结昨天的邮件');
-  assert.equal(created.payload.trustedRoot, root);
+  const schedule = created.value;
+  assert.ok(schedule, 'scheduler.create was called');
+  assert.equal(schedule.name, '每日简报');
+  assert.equal(schedule.cron, '0 6 * * *');
+  assert.equal(schedule.tenantId, 't1');
+  assert.ok(schedule.payload);
+  assert.equal(schedule.payload.prompt, '总结昨天的邮件');
+  assert.equal(schedule.payload.trustedRoot, root);
   assert.equal(out.text, '已为你创建定时任务「每日简报」。');
 });
 

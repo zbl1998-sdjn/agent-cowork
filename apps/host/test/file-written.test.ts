@@ -5,13 +5,25 @@ import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
+type EmittedEvent = {
+  t: string;
+  d: unknown;
+};
+
+function fileWrittenPayload(event: EmittedEvent): { path: string } {
+  assert.ok(event.d && typeof event.d === 'object');
+  const payload = event.d as { path?: unknown };
+  if (typeof payload.path !== 'string') throw new Error('file_written payload path must be a string');
+  return { path: payload.path };
+}
+
 // Use the repo-local workspace root (not os.tmpdir(), which on Windows resolves
 // under AppData and is — correctly — never a real user workspace).
 function tmp() { return makeTestWorkspace('kcw-fw'); }
 
 test('successful Write emits a file_written frame with the path (for openable artifact cards)', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
     n += 1;
@@ -21,13 +33,14 @@ test('successful Write emits a file_written frame with the path (for openable ar
   await runAgentChat({ prompt: '写报告', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   const fw = events.filter((e) => e.t === 'file_written');
   assert.equal(fw.length, 1, 'one file_written frame');
-  assert.equal(fw[0].d.path, 'report.md');
+  assert.ok(fw[0]);
+  assert.equal(fileWrittenPayload(fw[0]).path, 'report.md');
 });
 
 test('read-only tools do not emit file_written', async () => {
   const root = tmp();
   fs.writeFileSync(path.join(root, 'a.txt'), 'x', 'utf8');
-  const events = [];
+  const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
     n += 1;

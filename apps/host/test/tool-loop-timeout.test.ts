@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+
+type EmittedEvent = {
+  type: string;
+  payload: unknown;
+};
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-timeout-'));
@@ -11,9 +17,9 @@ function tmp() {
 
 test('runAgentChat aborts a hung model call when the run wall-clock timeout expires', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let sawSignal = false;
-  const modelCall = async ({ signal }) => {
+  const modelCall: ModelCall = async ({ signal }) => {
     sawSignal = !!signal;
     return new Promise((resolve, reject) => {
       signal.addEventListener('abort', () => {

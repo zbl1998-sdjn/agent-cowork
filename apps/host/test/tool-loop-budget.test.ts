@@ -5,16 +5,27 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createBudgetGuard } from '../src/runtime/budget-guard.js';
+import type { AgentTool } from '../src/kimi/agent-tools.js';
+
+type EmittedEvent = {
+  type: string;
+  payload: unknown;
+};
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-budget-'));
 }
 
+function isMaxRunTokensAbort(event: EmittedEvent): boolean {
+  if (event.type !== 'budget_guard_abort' || !event.payload || typeof event.payload !== 'object') return false;
+  return (event.payload as { limit?: unknown }).limit === 'maxRunTokens';
+}
+
 test('runAgentChat stops safely when model usage exceeds the run token budget before tools run', async () => {
   const root = tmp();
-  const events = [];
+  const events: EmittedEvent[] = [];
   let writes = 0;
-  const tools = [{
+  const tools: AgentTool[] = [{
     name: 'WriteReport',
     risk: 'safe',
     mutating: true,
@@ -45,5 +56,5 @@ test('runAgentChat stops safely when model usage exceeds the run token budget be
   assert.equal(writes, 0);
   assert.equal(out.budgetStopped, true);
   assert.match(out.text, /预算|budget|token/i);
-  assert.ok(events.some((event) => event.type === 'budget_guard_abort' && event.payload.limit === 'maxRunTokens'));
+  assert.ok(events.some(isMaxRunTokensAbort));
 });
