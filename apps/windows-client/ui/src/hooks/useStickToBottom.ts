@@ -3,6 +3,7 @@
 // 职责:聊天滚动「粘底」逻辑——新消息流入时若用户在底部则自动滚到底,用户上滑查看历史时则不打扰,并提供回到底部。
 //       依赖:无(仅 DOM 滚动测量)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { RefCallback } from 'react';
 
 const DEFAULT_THRESHOLD_PX = 48;
 
@@ -40,11 +41,18 @@ export function useStickToBottom(
 ) {
   const thresholdPx = options.thresholdPx ?? DEFAULT_THRESHOLD_PX;
   const containerRef = useRef<HTMLElement | null>(null);
+  const [containerVersion, setContainerVersion] = useState(0);
   const stickRef = useRef(true);
   const previousHeightRef = useRef(0);
   const lastResetKeyRef = useRef<unknown>(undefined);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [hasNewContent, setHasNewContent] = useState(false);
+
+  const setContainerRef = useCallback<RefCallback<HTMLElement>>((node) => {
+    if (containerRef.current === node) return;
+    containerRef.current = node;
+    if (node) setContainerVersion((version) => version + 1);
+  }, []);
 
   const updateStickState = useCallback(() => {
     const el = containerRef.current;
@@ -80,7 +88,7 @@ export function useStickToBottom(
     updateStickState();
     el.addEventListener('scroll', updateStickState, { passive: true });
     return () => el.removeEventListener('scroll', updateStickState);
-  }, [updateStickState]);
+  }, [containerVersion, updateStickState]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -104,7 +112,7 @@ export function useStickToBottom(
     }
     setIsAtBottom(true);
     setHasNewContent(false);
-  }, [resetKey]);
+  }, [containerVersion, resetKey]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -128,5 +136,5 @@ export function useStickToBottom(
     setIsAtBottom(isNearBottom(el, thresholdPx));
   }, [contentVersion, thresholdPx]);
 
-  return { containerRef, isAtBottom, hasNewContent, scrollToBottom };
+  return { containerRef: setContainerRef, isAtBottom, hasNewContent, scrollToBottom };
 }
