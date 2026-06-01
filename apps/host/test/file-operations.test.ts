@@ -1,11 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { previewFileOperations, applyFileOperations, rollbackFileOperations } from '../src/workspace/file-operations.js';
+import type { FileOperationEvent } from '../src/workspace/file-operations.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const root = makeTestWorkspace('kfcowork-ops');
+
+function appliedAt(events: readonly FileOperationEvent[], index: number): FileOperationEvent {
+  const event = events[index];
+  assert.ok(event, `expected applied event at index ${index}`);
+  return event;
+}
+
+function requireRollback(event: FileOperationEvent) {
+  assert.ok(event.rollback, 'expected rollback metadata');
+  return event.rollback;
+}
 
 test('forbids delete operations', () => {
   assert.throws(() => previewFileOperations([{ type: 'delete', path: path.join(root, 'a.txt') }], { trustedRoot: root }), /forbidden/i);
@@ -24,7 +36,7 @@ test('applies safe write without overwrite flag when file missing', () => {
   const target = path.join(root, 'new.txt');
   const applied = applyFileOperations([{ type: 'write', path: target, content: 'created' }], { trustedRoot: root });
   assert.equal(applied.applied.length, 1);
-  assert.equal(applied.applied[0].status, 'applied');
+  assert.equal(appliedAt(applied.applied, 0).status, 'applied');
   assert.equal(fs.readFileSync(target, 'utf8'), 'created');
 });
 
@@ -58,7 +70,7 @@ test('applies each write using its corresponding content and jailed target', () 
 
   assert.equal(applied.applied.length, 2);
   assert.equal(fs.readFileSync(target, 'utf8'), 'second');
-  assert.equal(path.resolve(applied.applied[1].path), target);
+  assert.equal(path.resolve(appliedAt(applied.applied, 1).path), target);
 });
 
 test('rolls back a newly created file only when the expected hash still matches', () => {
@@ -68,7 +80,7 @@ test('rolls back a newly created file only when the expected hash still matches'
 
   const rolledBack = rollbackFileOperations(applied.applied, { trustedRoot: root });
   assert.equal(rolledBack.rolledBack.length, 1);
-  assert.equal(rolledBack.rolledBack[0].status, 'rolled_back');
+  assert.equal(rolledBack.rolledBack[0]?.status, 'rolled_back');
   assert.equal(fs.existsSync(target), false);
 });
 
@@ -80,7 +92,10 @@ test('restores overwritten file content from a jailed rollback backup', () => {
     { trustedRoot: root, rollbackBatchId: 'test-overwrite' },
   );
   assert.equal(fs.readFileSync(target, 'utf8'), 'after');
-  assert.match(applied.applied[0].rollback.backupPath, /[\\/]rollback[\\/]test-overwrite[\\/]/);
+  const rollback = requireRollback(appliedAt(applied.applied, 0));
+  const backupPath = rollback.backupPath;
+  assert.ok(backupPath, 'expected rollback backup path');
+  assert.match(backupPath, /[\\/]rollback[\\/]test-overwrite[\\/]/);
 
   rollbackFileOperations(applied.applied, { trustedRoot: root });
   assert.equal(fs.readFileSync(target, 'utf8'), 'before');

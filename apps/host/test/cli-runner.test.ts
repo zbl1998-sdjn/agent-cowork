@@ -1,11 +1,17 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import assert from 'node:assert/strict';
+import test from 'node:test';
 import {
   buildKimiChatPrompt,
   buildKimiCliChatArgs,
   buildKimiCliPlanArgs,
   buildKimiPlanPrompt,
 } from '../src/kimi/cli-runner.js';
+
+function stringArg(args: string[], index: number): string {
+  const value = args[index];
+  assert.ok(value);
+  return value;
+}
 
 test('buildKimiPlanPrompt constrains Kimi CLI to plan-only output', () => {
   const prompt = buildKimiPlanPrompt({
@@ -43,7 +49,7 @@ test('buildKimiCliPlanArgs uses non-interactive plan mode with trusted root', ()
   ]);
   assert.equal(args[7], 'kimi-test');
   assert.equal(args[8], '--prompt');
-  assert.match(args[9], /本地摘要/);
+  assert.match(stringArg(args, 9), /本地摘要/);
 });
 
 test('buildKimiCliPlanArgs rejects empty prompts', () => {
@@ -83,5 +89,5 @@ test('buildKimiCliChatArgs uses non-interactive chat mode', () => {
     '3',
   ]);
   assert.equal(args[6], '--prompt');
-  assert.match(args[7], /用户消息：你好/);
+  assert.match(stringArg(args, 7), /用户消息：你好/);
 });

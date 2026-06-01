@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { assertReadableWorkspacePath, assertTrustedPath, isSensitivePath } from '../src/security/path-policy.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
@@ -10,6 +10,17 @@ const workspace = path.join(root, 'workspace');
 const outside = path.join(root, 'outside');
 fs.mkdirSync(workspace, { recursive: true });
 fs.mkdirSync(outside, { recursive: true });
+
+const fsWithSymlink = fs as typeof fs & {
+  symlinkSync(target: string, linkPath: string, type?: string): void;
+};
+
+function describe(name: string, fn: () => void): void {
+  void name;
+  fn();
+}
+
+const it = test;
 
 describe('path-policy', () => {
   it('rejects escaped paths', () => {
@@ -62,9 +73,9 @@ describe('path-policy', () => {
     const aliasRoot = path.join(root, 'read-alias');
     fs.mkdirSync(path.join(realRoot, 'docs'), { recursive: true });
     try {
-      fs.symlinkSync(realRoot, aliasRoot, 'junction');
+      fsWithSymlink.symlinkSync(realRoot, aliasRoot, 'junction');
     } catch {
-      fs.symlinkSync(realRoot, aliasRoot);
+      fsWithSymlink.symlinkSync(realRoot, aliasRoot);
     }
     const note = path.join(aliasRoot, 'docs', 'note.txt');
     fs.writeFileSync(note, 'ok', 'utf8');

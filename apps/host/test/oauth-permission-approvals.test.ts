@@ -1,8 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOAuthPermissionApprovalStore } from '../src/runtime/oauth-permission-approvals.js';
+import type {
+  OAuthPermissionApprovalStore,
+  OAuthPermissionRequest,
+} from '../src/runtime/oauth-permission-approvals.js';
 
-function createStore() {
+type StoreFixture = {
+  store: OAuthPermissionApprovalStore;
+  advance(ms: number): void;
+};
+
+function expectedHttpError(statusCode: number, message: RegExp): (error: unknown) => boolean {
+  return (error: unknown): boolean => {
+    if (!(error instanceof Error)) return false;
+    const err = error as Error & { statusCode?: unknown };
+    return err.statusCode === statusCode && message.test(err.message);
+  };
+}
+
+function createStore(): StoreFixture {
   let current = 1000;
   let next = 1;
   const store = createOAuthPermissionApprovalStore({
@@ -18,7 +35,7 @@ function createStore() {
   };
 }
 
-function approvalRequest(overrides = {}) {
+function approvalRequest(overrides: Partial<OAuthPermissionRequest> = {}): OAuthPermissionRequest {
   return {
     connectorId: 'github',
     provider: 'github',
@@ -39,10 +56,10 @@ test('OAuth permission approvals are one-time receipts scoped to the request has
   assert.equal(consumed.connectorId, 'github');
   assert.equal(store.pendingCount(), 0);
 
-  assert.throws(() => store.consume(issued.id, approvalRequest()), {
-    statusCode: 403,
-    message: /invalid or expired/i,
-  });
+  assert.throws(
+    () => store.consume(issued.id, approvalRequest()),
+    expectedHttpError(403, /invalid or expired/i),
+  );
 });
 
 test('OAuth permission approvals reject tenant and user mismatches', () => {
@@ -51,13 +68,13 @@ test('OAuth permission approvals reject tenant and user mismatches', () => {
 
   assert.throws(
     () => store.consume(issued.id, approvalRequest({ context: { tenantId: 'tenant-b', userId: 'user-a' } })),
-    { statusCode: 403, message: /does not match/i },
+    expectedHttpError(403, /does not match/i),
   );
   assert.equal(store.pendingCount(), 1);
 
   assert.throws(
     () => store.consume(issued.id, approvalRequest({ context: { tenantId: 'tenant-a', userId: 'user-b' } })),
-    { statusCode: 403, message: /does not match/i },
+    expectedHttpError(403, /does not match/i),
   );
   assert.equal(store.pendingCount(), 1);
 
@@ -70,15 +87,15 @@ test('OAuth permission approvals reject connector provider and scope mismatches'
 
   assert.throws(
     () => store.consume(issued.id, approvalRequest({ connectorId: 'filesystem' })),
-    { statusCode: 403, message: /does not match/i },
+    expectedHttpError(403, /does not match/i),
   );
   assert.throws(
     () => store.consume(issued.id, approvalRequest({ provider: 'gitlab' })),
-    { statusCode: 403, message: /does not match/i },
+    expectedHttpError(403, /does not match/i),
   );
   assert.throws(
     () => store.consume(issued.id, approvalRequest({ scopes: ['read:user'] })),
-    { statusCode: 403, message: /does not match/i },
+    expectedHttpError(403, /does not match/i),
   );
 
   assert.equal(store.consume(issued.id, approvalRequest()).id, issued.id);
@@ -90,12 +107,12 @@ test('OAuth permission approvals expire and reject missing receipt ids', () => {
   advance(101);
 
   assert.equal(store.pendingCount(), 0);
-  assert.throws(() => store.consume(issued.id, approvalRequest()), {
-    statusCode: 403,
-    message: /invalid or expired/i,
-  });
-  assert.throws(() => store.consume('', approvalRequest()), {
-    statusCode: 428,
-    message: /required/i,
-  });
+  assert.throws(
+    () => store.consume(issued.id, approvalRequest()),
+    expectedHttpError(403, /invalid or expired/i),
+  );
+  assert.throws(
+    () => store.consume('', approvalRequest()),
+    expectedHttpError(428, /required/i),
+  );
 });

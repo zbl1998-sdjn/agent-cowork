@@ -1,11 +1,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { chunkText } from '../src/workspace/index/chunk.js';
 import { createWorkspaceIndex } from '../src/workspace/index/store.js';
 import { createWorkspaceRetriever } from '../src/workspace/index/retriever.js';
+import type { SearchResult } from '../src/workspace/index/store.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+
+function describe(name: string, fn: () => void): void {
+  void name;
+  fn();
+}
+
+const it = test;
+
+function firstChunk(result: SearchResult) {
+  const chunk = result.chunks[0];
+  assert.ok(chunk, 'expected at least one search result chunk');
+  return chunk;
+}
 
 describe('workspace index chunking', () => {
   it('chunks text by lines and preserves source line ranges', () => {
@@ -103,10 +117,11 @@ describe('workspace index store and retriever', () => {
     });
 
     const result = retriever.search('rag sources');
+    const chunk = firstChunk(result);
     assert.equal(result.chunks.length, 1);
-    assert.equal(result.chunks[0].sourcePath, realPlan);
-    assert.equal(result.chunks[0].startLine, 2);
-    assert.equal(result.chunks[0].endLine, 2);
+    assert.equal(chunk.sourcePath, realPlan);
+    assert.equal(chunk.startLine, 2);
+    assert.equal(chunk.endLine, 2);
     assert.deepEqual(result.sources, [{ path: realPlan, startLine: 2, endLine: 2 }]);
   });
 });

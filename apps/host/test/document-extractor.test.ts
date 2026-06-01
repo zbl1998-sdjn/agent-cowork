@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { extractDocumentText } from '../src/workspace/document-extractor.js';
 import { createZip, readZipEntries } from '../src/workspace/zip-utils.js';
 import { createXlsxWorkbook } from '../src/artifacts/xlsx-writer.js';
