@@ -3,6 +3,7 @@
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "emitDeclarationOnly": true,
     "skipLibCheck": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
