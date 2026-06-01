@@ -165,7 +165,7 @@ const checks: CheckConfig[] = [
   {
     name: 'live-mvp smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-live-mvp.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-live-mvp.ts')],
   },
   {
     name: 'plan closed-loop smoke script syntax',

@@ -34,6 +34,7 @@
     "scripts/release.ts",
     "scripts/smoke-kimi-api.ts",
     "scripts/smoke-local-operations.ts",
+    "scripts/smoke-live-mvp.ts",
     "scripts/smoke-mvp-runtime.ts",
     "scripts/smoke-plan-closed-loop.ts",
     "scripts/browser-smoke-utils.ts",

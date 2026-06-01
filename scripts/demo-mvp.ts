@@ -217,7 +217,7 @@ async function main(): Promise<void> {
   console.log(`MVP ready: ${runtimeUrl(readyStatus.runtime, readyStatus.healthUrl)}`);
 
   const steps = [
-    runStep('live MVP operation smoke', nodeBin, [path.join(repoRoot, 'scripts', 'smoke-live-mvp.mjs')]),
+    runStep('live MVP operation smoke', nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'smoke-live-mvp.ts')]),
     runStep('default MVP verification', nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'verify-mvp.ts')]),
   ];
 

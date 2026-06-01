@@ -1,10 +1,24 @@
 import { spawn } from 'node:child_process';
+import type { ChildProcessLike } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  CdpClient,
+  assert,
+  errorDetails,
+  evaluate,
+  findBrowser,
+  getFreePort,
+  getJson,
+  isRecord,
+  type CdpSession,
+  type CdpTarget,
+  type CdpVersion,
+  type ScreenshotResult,
+  type SendPage,
+} from './browser-smoke-utils.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -12,27 +26,69 @@ const runtimeFile = path.join(buildDir, 'mvp-runtime.json');
 const reportPath = path.join(buildDir, 'live-mvp-smoke-report.json');
 const screenshotPath = path.join(buildDir, 'live-mvp-smoke-1536x900.png');
 
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
+type MvpRuntime = {
+  pid: number;
+  host: string;
+  port: number;
+  url: string;
+  workspace: string;
+  auditPath?: string | undefined;
+  kimiApiPlanEnabled?: boolean | undefined;
+};
 
-function findBrowser() {
-  const candidates =
-    process.platform === 'win32'
-      ? [
-          path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        ]
-      : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge'];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
-}
+type HealthSnapshot = {
+  ok?: boolean;
+  service?: string;
+};
 
-function isPidAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) {
+type AuthSnapshot = {
+  usedGuest: boolean;
+  alreadyAuthed?: boolean | undefined;
+  user?: string | undefined;
+};
+
+type ScrollMetrics = {
+  width: number;
+  clientWidth: number;
+  height: number;
+  clientHeight: number;
+};
+
+type DesktopLayout = {
+  title: string;
+  location: string;
+  workspace: string;
+  user: string;
+  hasShell: boolean;
+  hasTimeline: boolean;
+  hasComposer: boolean;
+  hasEmptyState: boolean;
+  hasCowork: boolean;
+  hasConversationRail: boolean;
+  hasHeaderActions: boolean;
+  hasQuickActions: boolean;
+  starterCount: number;
+  starterText: string;
+  scroll: ScrollMetrics;
+};
+
+type LiveInteraction = {
+  afterPlan: {
+    preview: string;
+    opCount: number;
+    timeline: string;
+    bubbleCount: number;
+    approveText: string;
+  };
+  afterApprove: {
+    approval: string;
+    timeline: string;
+    artifactCards: number;
+  };
+};
+
+function isPidAlive(pid: unknown): boolean {
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
     return false;
   }
   try {
@@ -43,125 +99,126 @@ function isPidAlive(pid) {
   }
 }
 
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
+function stringField(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  assert(typeof value === 'string' && value.length > 0, `runtime field ${key} must be a non-empty string`);
+  return value;
 }
 
-async function getJson(url, timeoutMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
-          let body = '';
-          response.setEncoding('utf8');
-          response.on('data', (chunk) => {
-            body += chunk;
-          });
-          response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
-              return;
-            }
-            resolve(JSON.parse(body));
-          });
-        });
-        request.on('error', reject);
-        request.setTimeout(1000, () => request.destroy(new Error(`Timed out fetching ${url}`)));
-      });
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-  throw new Error(`Timed out waiting for ${url}`);
+function numberField(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  assert(typeof value === 'number' && Number.isFinite(value), `field ${key} must be a finite number`);
+  return value;
 }
 
-class CdpClient {
-  constructor(url) {
-    this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-  }
-
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener(
-        'open',
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
-      this.socket.addEventListener(
-        'error',
-        () => {
-          clearTimeout(timeout);
-          reject(new Error('Failed opening DevTools websocket'));
-        },
-        { once: true },
-      );
-    });
-
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (!message.id || !this.pending.has(message.id)) {
-        return;
-      }
-      const { resolve, reject } = this.pending.get(message.id);
-      this.pending.delete(message.id);
-      if (message.error) {
-        reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
-      } else {
-        resolve(message.result || {});
-      }
-    });
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    const message = sessionId ? { id, method, params, sessionId } : { id, method, params };
-    this.socket.send(JSON.stringify(message));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
-  }
-
-  close() {
-    this.socket?.close();
-  }
+function booleanField(record: Record<string, unknown>, key: string): boolean {
+  const value = record[key];
+  assert(typeof value === 'boolean', `field ${key} must be a boolean`);
+  return value;
 }
 
-async function evaluate(client, expression, awaitPromise = true) {
-  const result = await client.send('Runtime.evaluate', {
-    expression,
-    awaitPromise,
-    returnByValue: true,
-  });
-  if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.text || 'Runtime.evaluate failed');
-  }
-  return result.result?.value;
+function optionalStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
 }
 
-function readRuntime() {
+function optionalBooleanField(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function recordField(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = record[key];
+  assert(isRecord(value), `field ${key} must be an object`);
+  return value;
+}
+
+function readRuntime(): MvpRuntime {
   assert(fs.existsSync(runtimeFile), `MVP runtime file is missing: ${runtimeFile}. Start the product with npm run start:mvp first.`);
-  const runtime = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
-  assert(isPidAlive(runtime.pid), `MVP runtime pid is not alive: ${runtime.pid}`);
-  assert(runtime.url && runtime.workspace, 'MVP runtime file is missing url or workspace');
-  return runtime;
+  const runtime = JSON.parse(fs.readFileSync(runtimeFile, 'utf8')) as unknown;
+  assert(isRecord(runtime), 'MVP runtime file must contain an object');
+  const pid = numberField(runtime, 'pid');
+  assert(isPidAlive(pid), `MVP runtime pid is not alive: ${pid}`);
+  return {
+    pid,
+    host: stringField(runtime, 'host'),
+    port: numberField(runtime, 'port'),
+    url: stringField(runtime, 'url'),
+    workspace: stringField(runtime, 'workspace'),
+    auditPath: optionalStringField(runtime, 'auditPath'),
+    kimiApiPlanEnabled: optionalBooleanField(runtime, 'kimiApiPlanEnabled'),
+  };
 }
 
-function listArtifacts(workspace) {
+function readAuthSnapshot(value: unknown): AuthSnapshot {
+  assert(isRecord(value), 'auth snapshot must be an object');
+  return {
+    usedGuest: booleanField(value, 'usedGuest'),
+    alreadyAuthed: optionalBooleanField(value, 'alreadyAuthed'),
+    user: optionalStringField(value, 'user'),
+  };
+}
+
+function readScrollMetrics(value: unknown): ScrollMetrics {
+  assert(isRecord(value), 'scroll metrics must be an object');
+  return {
+    width: numberField(value, 'width'),
+    clientWidth: numberField(value, 'clientWidth'),
+    height: numberField(value, 'height'),
+    clientHeight: numberField(value, 'clientHeight'),
+  };
+}
+
+function readDesktopLayout(value: unknown): DesktopLayout {
+  assert(isRecord(value), 'desktop layout snapshot must be an object');
+  return {
+    title: stringField(value, 'title'),
+    location: stringField(value, 'location'),
+    workspace: stringField(value, 'workspace'),
+    user: stringField(value, 'user'),
+    hasShell: booleanField(value, 'hasShell'),
+    hasTimeline: booleanField(value, 'hasTimeline'),
+    hasComposer: booleanField(value, 'hasComposer'),
+    hasEmptyState: booleanField(value, 'hasEmptyState'),
+    hasCowork: booleanField(value, 'hasCowork'),
+    hasConversationRail: booleanField(value, 'hasConversationRail'),
+    hasHeaderActions: booleanField(value, 'hasHeaderActions'),
+    hasQuickActions: booleanField(value, 'hasQuickActions'),
+    starterCount: numberField(value, 'starterCount'),
+    starterText: stringField(value, 'starterText'),
+    scroll: readScrollMetrics(value.scroll),
+  };
+}
+
+function readInteraction(value: unknown): LiveInteraction {
+  assert(isRecord(value), 'interaction snapshot must be an object');
+  const afterPlan = recordField(value, 'afterPlan');
+  const afterApprove = recordField(value, 'afterApprove');
+  return {
+    afterPlan: {
+      preview: stringField(afterPlan, 'preview'),
+      opCount: numberField(afterPlan, 'opCount'),
+      timeline: stringField(afterPlan, 'timeline'),
+      bubbleCount: numberField(afterPlan, 'bubbleCount'),
+      approveText: stringField(afterPlan, 'approveText'),
+    },
+    afterApprove: {
+      approval: stringField(afterApprove, 'approval'),
+      timeline: stringField(afterApprove, 'timeline'),
+      artifactCards: numberField(afterApprove, 'artifactCards'),
+    },
+  };
+}
+
+function normalizePathText(value: string): string {
+  return value.trim().replace(/\//g, '\\').replace(/\\+$/g, '').toLowerCase();
+}
+
+function sameDisplayedPath(actual: string, expected: string): boolean {
+  return normalizePathText(actual) === normalizePathText(expected);
+}
+
+function listArtifacts(workspace: string): string[] {
   const artifactsDir = path.join(workspace, '.AgentCowork', 'artifacts');
   if (!fs.existsSync(artifactsDir)) {
     return [];
@@ -175,7 +232,7 @@ function listArtifacts(workspace) {
 async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   const runtime = readRuntime();
-  const health = await getJson(`http://${runtime.host}:${runtime.port}/health`, 5000);
+  const health = await getJson<HealthSnapshot>(`http://${runtime.host}:${runtime.port}/health`, 5000);
   assert(health.ok === true && health.service === 'agent-cowork-host', 'live MVP health check failed');
 
   const browserPath = findBrowser();
@@ -187,7 +244,7 @@ async function main() {
 
   const debugPort = await getFreePort();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-live-mvp-profile-'));
-  const browser = spawn(
+  const browser: ChildProcessLike = spawn(
     browserPath,
     [
       '--headless=new',
@@ -203,17 +260,21 @@ async function main() {
     ],
     { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true },
   );
-  const stderr = [];
-  browser.stderr.on('data', (chunk) => stderr.push(chunk.toString()));
+  const stderr: string[] = [];
+  browser.stderr.on('data', (chunk) => stderr.push(String(chunk)));
 
-  let client;
+  let client: CdpClient | undefined;
+  let desktopLayout: DesktopLayout | null = null;
   try {
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'CDP client is not initialized');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -225,7 +286,7 @@ async function main() {
     });
     await sendPage('Page.navigate', { url: runtime.url });
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
         function tick() {
@@ -238,8 +299,8 @@ async function main() {
         tick();
       })`,
     );
-    const auth = await evaluate(
-      { send: sendPage },
+    const auth = readAuthSnapshot(await evaluate(
+      sendPage,
       `new Promise((resolve, reject) => {
         const guest = document.querySelector(".auth-guest");
         if (!guest) {
@@ -258,24 +319,35 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ));
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         const expectedWorkspace = ${JSON.stringify(runtime.workspace)};
+        function workspaceValue() {
+          const chip = document.querySelector(".workspace-chip");
+          const title = chip?.getAttribute("title") || "";
+          const prefix = "当前工作区:";
+          if (title.startsWith(prefix)) return title.slice(prefix.length).split("\\n")[0].trim();
+          return chip?.innerText.replace(/^\\S+\\s*/, "").replace(/▾$/, "").trim() || "";
+        }
+        function samePath(actual, expected) {
+          return String(actual || "").trim().replace(/\\//g, "\\\\").replace(/\\\\+$/g, "").toLowerCase()
+            === String(expected || "").trim().replace(/\\//g, "\\\\").replace(/\\\\+$/g, "").toLowerCase();
+        }
         const deadline = Date.now() + 8000;
         function tick() {
-          const workspace = document.querySelector(".workspace-path")?.innerText.trim();
+          const workspace = workspaceValue();
           const ready = Boolean(document.querySelector(".timeline") && document.querySelector(".composer textarea"));
-          if (ready && workspace === expectedWorkspace) resolve(true);
-          else if (Date.now() > deadline) reject(new Error("live MVP workspace did not synchronize with runtime"));
+          if (ready && samePath(workspace, expectedWorkspace)) resolve(true);
+          else if (Date.now() > deadline) reject(new Error("live MVP workspace did not synchronize with runtime: " + JSON.stringify({ workspace, expectedWorkspace })));
           else setTimeout(tick, 50);
         }
         tick();
       })`,
     );
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
         function token() { return localStorage.getItem("kcw.authToken"); }
@@ -302,9 +374,40 @@ async function main() {
       })`,
     );
 
-    const desktopLayout = await evaluate(
-      { send: sendPage },
+    await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000;
+        function snapshot() {
+          const starterChips = [...document.querySelectorAll(".starter-chip")]
+            .map((chip) => chip.innerText.trim())
+            .filter(Boolean);
+          return {
+            emptyState: Boolean(document.querySelector(".empty-state")),
+            starterCount: starterChips.length,
+            starterText: starterChips.join("|")
+          };
+        }
+        function tick() {
+          const current = snapshot();
+          if (!current.emptyState || current.starterCount >= 4) resolve(current);
+          else if (Date.now() > deadline) reject(new Error("live MVP starter actions did not render: " + JSON.stringify(current)));
+          else setTimeout(tick, 50);
+        }
+        tick();
+      })`,
+    );
+
+    desktopLayout = readDesktopLayout(await evaluate(
+      sendPage,
       `(() => {
+        function workspaceValue() {
+          const chip = document.querySelector(".workspace-chip");
+          const title = chip?.getAttribute("title") || "";
+          const prefix = "当前工作区:";
+          if (title.startsWith(prefix)) return title.slice(prefix.length).split("\\n")[0].trim();
+          return chip?.innerText.replace(/^\\S+\\s*/, "").replace(/▾$/, "").trim() || "";
+        }
         const scroll = {
           width: document.documentElement.scrollWidth,
           clientWidth: document.documentElement.clientWidth,
@@ -313,10 +416,13 @@ async function main() {
         };
         const text = document.body.innerText;
         const buttons = [...document.querySelectorAll("button")].map((button) => button.innerText.trim()).filter(Boolean);
+        const starterChips = [...document.querySelectorAll(".starter-chip")]
+          .map((chip) => chip.innerText.trim())
+          .filter(Boolean);
         return {
           title: document.title,
           location: window.location.href,
-          workspace: document.querySelector(".workspace-path")?.innerText.trim(),
+          workspace: workspaceValue(),
           user: document.querySelector(".header-user")?.innerText.trim(),
           hasShell: Boolean(document.querySelector(".app-shell")),
           hasTimeline: Boolean(document.querySelector(".timeline")),
@@ -325,25 +431,28 @@ async function main() {
           hasCowork: text.includes("Agent Cowork"),
           hasConversationRail: Boolean(document.querySelector(".conversation-rail")),
           hasHeaderActions: ["工具", "可视化", "连接器", "产物", "定时任务", "记忆"].every((label) => buttons.includes(label)),
-          hasQuickActions: document.querySelectorAll(".starter-chip").length >= 4 && text.includes("整理工作区"),
+          hasQuickActions: starterChips.length >= 4,
+          starterCount: starterChips.length,
+          starterText: starterChips.join("|"),
           scroll
         };
       })()`,
-    );
+    ));
     assert(desktopLayout.title === 'Agent Cowork', 'live MVP title mismatch');
     assert(desktopLayout.location.startsWith(runtime.url), 'live MVP did not load runtime URL');
-    assert(desktopLayout.workspace === runtime.workspace, 'live MVP workspace does not match runtime workspace');
+    assert(sameDisplayedPath(desktopLayout.workspace, runtime.workspace), 'live MVP workspace does not match runtime workspace');
     assert(desktopLayout.hasShell && desktopLayout.hasTimeline && desktopLayout.hasComposer, 'live MVP missing React functional shell');
     assert(desktopLayout.hasConversationRail && desktopLayout.hasHeaderActions, 'live MVP missing navigation/actions');
-    assert(desktopLayout.hasCowork && desktopLayout.hasQuickActions, 'live MVP missing starter actions');
+    assert(desktopLayout.hasCowork, 'live MVP missing product identity text');
+    assert(!desktopLayout.hasEmptyState || desktopLayout.hasQuickActions, 'empty live MVP missing starter actions');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'live MVP desktop layout has horizontal overflow');
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     const planTimeoutMs = runtime.kimiApiPlanEnabled ? 90_000 : 5000;
-    const interaction = await evaluate(
-      { send: sendPage },
+    const interaction = readInteraction(await evaluate(
+      sendPage,
       `new Promise((resolve, reject) => {
         const textarea = document.querySelector(".composer textarea");
         const send = document.querySelector(".send-button");
@@ -390,7 +499,7 @@ async function main() {
           })
           .then(resolve, reject);
       })`,
-    );
+    ));
     assert(interaction.afterPlan.opCount >= 1, 'live MVP did not render any operation preview');
     assert(interaction.afterPlan.preview.includes('操作预览'), 'live MVP preview card missing');
     assert(interaction.afterPlan.approveText === '审批执行', 'live MVP approval button missing');
@@ -431,11 +540,12 @@ async function main() {
       generatedAt: new Date().toISOString(),
       runtime,
       browserPath,
-      error: error.stack || error.message,
+      desktopLayout,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(errorDetails(error));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -449,6 +559,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });
