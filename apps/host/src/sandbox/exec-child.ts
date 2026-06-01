@@ -97,7 +97,7 @@ export function createCappedBuffer(maxBytes: number): CappedBuffer {
  * Run a child process under resource limits.
  *
  */
-export function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }: RunChildOptions): Promise<RunChildResult> {
+export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }: RunChildOptions): Promise<RunChildResult> {
   const startedAt = Date.now();
   const child = spawn(command, args, {
     cwd,
@@ -124,9 +124,9 @@ export function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs,
     child.on('close', (code, signal) => resolve({ code, signal }));
   });
 
-  return closed
-    .finally(() => clearTimeout(timer))
-    .then(({ code, signal }) => ({
+  try {
+    const { code, signal } = await closed;
+    return {
       exitCode: code === null ? -1 : code,
       signal,
       stdout: out.text,
@@ -136,5 +136,8 @@ export function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs,
       bytesStdout: out.bytes,
       bytesStderr: err.bytes,
       durationMs: Date.now() - startedAt,
-    }));
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }

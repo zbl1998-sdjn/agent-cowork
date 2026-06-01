@@ -119,13 +119,16 @@ export class PostgresEventBus {
   // Fan out via NOTIFY only; the publisher's own LISTEN connection delivers it
   // back locally, so subscribers (here or on any instance) receive it exactly once.
   /** 仅通过 NOTIFY 扇出事件(本地由自身 LISTEN 连接收回投递)。 */
-  publish(runId: string, event: RunEventPublishInput): Promise<void> {
+  async publish(runId: string, event: RunEventPublishInput): Promise<void> {
     if (!runId) throw new Error('PostgresEventBus.publish: runId required');
     if (!event || !event.type) throw new Error('PostgresEventBus.publish: event.type required');
-    return this._getClient()
-      .then((client) => (this._pool || client).query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ runId, event })]))
-      .then(() => undefined)
-      .catch(() => undefined);
+    try {
+      const client = await this._getClient();
+      await (this._pool || client).query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ runId, event })]);
+    } catch {
+      // Preserve the in-memory bus contract: transient NOTIFY failures do not
+      // break the caller's run loop; health checks own surfacing PG outages.
+    }
   }
 
   /** 订阅某 run 的事件(透传本地总线)。 */

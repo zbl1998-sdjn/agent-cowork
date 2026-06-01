@@ -164,7 +164,7 @@ export async function handleProjectRoutes(options: ProjectRouteOptions): Promise
   }
 
   if (request.method === 'DELETE' && !collection) {
-    await withJsonBody(request, response, async (body) => cachedWrite(options, body, baseWriteBodySchema, (input, store, root) => ({
+    await withJsonBody(request, response, async (body) => cachedWrite(options, body, baseWriteBodySchema, (_input, store, root) => ({
       trustedRoot: root,
       deleted: store.remove(id),
     })));
@@ -192,7 +192,7 @@ export async function handleProjectRoutes(options: ProjectRouteOptions): Promise
   }
 
   if (request.method === 'DELETE' && collection && childId) {
-    await withJsonBody(request, response, async (body) => cachedWrite(options, body, baseWriteBodySchema, (input, store, root) => {
+    await withJsonBody(request, response, async (body) => cachedWrite(options, body, baseWriteBodySchema, (_input, store, root) => {
       const removed = collection === 'conversations'
         ? store.unassignConversation(childId)
         : store.unassignArtifact(childId);

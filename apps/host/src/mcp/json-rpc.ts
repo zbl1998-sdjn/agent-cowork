@@ -27,7 +27,7 @@ type PendingRequest = {
   reject: (reason?: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
 };
-export type JsonRpcClientOptions = { send?: JsonRpcSend; timeoutMs?: number; now?: () => number };
+export type JsonRpcClientOptions = { send?: JsonRpcSend; timeoutMs?: number };
 
 export class JsonRpcError extends Error {
   code: unknown;
@@ -44,18 +44,16 @@ export class JsonRpcError extends Error {
 export class JsonRpcClient {
   private readonly _send: JsonRpcSend;
   private readonly _timeoutMs: number;
-  private readonly _now: () => number;
   private _nextId: number;
   private readonly _pending: Map<number, PendingRequest>;
   private readonly _notificationHandlers: Set<NotificationHandler>;
 
-  constructor({ send, timeoutMs = 15_000, now = Date.now }: JsonRpcClientOptions = {}) {
+  constructor({ send, timeoutMs = 15_000 }: JsonRpcClientOptions = {}) {
     if (typeof send !== 'function') {
       throw new Error('JsonRpcClient: send(message) is required');
     }
     this._send = send;
     this._timeoutMs = timeoutMs;
-    this._now = now;
     this._nextId = 1;
     this._pending = new Map(); // id -> { resolve, reject, timer }
     this._notificationHandlers = new Set();

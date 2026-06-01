@@ -79,12 +79,13 @@ export function LiveArtifactStatusView({
   return <p className="panel-note">{state.statusText}{lastRefresh ? ` · ${new Date(lastRefresh).toLocaleString()}` : ''}</p>;
 }
 
-function copyToClipboard(text: string): Promise<boolean> {
-  if (!text) return Promise.resolve(false);
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
   try {
-    return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+    await navigator.clipboard.writeText(text);
+    return true;
   } catch {
-    return Promise.resolve(false);
+    return false;
   }
 }
 
