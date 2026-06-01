@@ -6,7 +6,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const checkHostTypesScript = path.join(repoRoot, 'scripts', 'check-host-types.mjs');
+const checkHostTypesScript = path.join(repoRoot, 'scripts', 'check-host-types.ts');
 
 type HostTypeCoverage = {
   missing: string[];

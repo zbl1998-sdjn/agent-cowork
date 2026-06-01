@@ -23,6 +23,7 @@ declare const Buffer: {
 
 declare const process: {
   arch: string;
+  argv: string[];
   env: Record<string, string | undefined>;
   execPath?: string;
   platform: string;

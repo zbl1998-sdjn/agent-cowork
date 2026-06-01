@@ -14,6 +14,7 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "scripts/check-host-types.ts",
     "scripts/check-filesize.ts",
     "scripts/check-icons.ts",
     "scripts/check-resource-js.ts",
