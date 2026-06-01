@@ -13,11 +13,28 @@ const resourceBrowserGlobals = {
   window: 'readonly',
 };
 
+const typedSourceFiles = [
+  'apps/host/src/**/*.ts',
+  'apps/host/test/**/*.ts',
+  'eval/**/*.ts',
+  'apps/windows-client/resources-src/**/*.ts',
+  'apps/windows-client/ui/src/**/*.{ts,tsx}',
+  'apps/windows-client/ui/vite.config.ts',
+];
+
+const typedStrictConfigs = [
+  ...tseslint.configs.strict,
+  ...tseslint.configs.stylistic,
+].map((config) => ({
+  ...config,
+  files: typedSourceFiles,
+}));
+
 export default tseslint.config(
   {
     ignores: [
-      'build/**',
-      'dist/**',
+      '**/build/**',
+      '**/dist/**',
       'node_modules/**',
       'apps/windows-client/ui-dist/**',
       'apps/windows-client/ui/node_modules/**',
@@ -25,11 +42,15 @@ export default tseslint.config(
       'apps/windows-client/src-tauri/target/**',
       'reports/**',
       'releases/**',
+      '**/*.d.ts',
+      '**/*.d.mts',
     ],
   },
-  js.configs.recommended,
-  ...tseslint.configs.strict,
-  ...tseslint.configs.stylistic,
+  {
+    ...js.configs.recommended,
+    files: ['apps/windows-client/resources/*.js'],
+  },
+  ...typedStrictConfigs,
   {
     files: ['apps/windows-client/resources/*.js'],
     languageOptions: {
@@ -41,6 +62,7 @@ export default tseslint.config(
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
+      'no-unused-vars': 'off',
     },
   },
   {
@@ -59,13 +81,7 @@ export default tseslint.config(
     },
   },
   {
-    files: [
-      'apps/host/src/**/*.ts',
-      'apps/host/test/**/*.ts',
-      'eval/**/*.ts',
-      'apps/windows-client/ui/src/**/*.{ts,tsx}',
-      'apps/windows-client/ui/vite.config.ts',
-    ],
+    files: typedSourceFiles.filter((pattern) => pattern !== 'apps/windows-client/resources-src/**/*.ts'),
     languageOptions: {
       parserOptions: {
         project: [
