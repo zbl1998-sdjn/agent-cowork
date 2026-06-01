@@ -120,7 +120,7 @@ const checks = [
   {
     name: 'mvp runtime smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-mvp-runtime.ts')],
   },
   {
     name: 'kimi api smoke script syntax',
@@ -186,7 +186,7 @@ const checks = [
   {
     name: 'mvp runtime lifecycle smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-mvp-runtime.mjs'),
+    commandArgs: hostScriptArgs('smoke-mvp-runtime.ts'),
   },
   {
     name: 'plan closed-loop smoke',

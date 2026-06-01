@@ -38,9 +38,9 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
 
   const verifyMvp = fs.readFileSync(path.join(repoRoot, 'scripts/verify-mvp.mjs'), 'utf8');
   assert.match(verifyMvp, /run-host-node\.mjs/);
-  assert.match(verifyMvp, /hostScriptArgs\('smoke-mvp-runtime\.mjs'\)/);
+  assert.match(verifyMvp, /hostScriptArgs\('smoke-mvp-runtime\.ts'\)/);
 
-  const mvpRuntimeSmoke = fs.readFileSync(path.join(repoRoot, 'scripts/smoke-mvp-runtime.mjs'), 'utf8');
+  const mvpRuntimeSmoke = fs.readFileSync(path.join(repoRoot, 'scripts/smoke-mvp-runtime.ts'), 'utf8');
   assert.match(mvpRuntimeSmoke, /run-host-node\.mjs/);
   assert.match(mvpRuntimeSmoke, /isPidAlive\(runtime\.pid\)/);
 });

@@ -29,6 +29,7 @@
     "scripts/eval.ts",
     "scripts/smoke-kimi-api.ts",
     "scripts/smoke-local-operations.ts",
+    "scripts/smoke-mvp-runtime.ts",
     "scripts/smoke-tauri-scaffold.ts",
     "apps/host/scripts/load-sse.ts",
     "scripts/smoke-runtime-update-preservation.ts",
