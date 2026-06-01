@@ -20,6 +20,7 @@ test('JsonlWriter rotates by size and keeps maxFiles generations', () => {
   assert.ok(fs.statSync(file).size <= 400, 'live file is bounded');
   // content is valid JSONL.
   const last = fs.readFileSync(file, 'utf8').trim().split('\n').pop();
+  assert.ok(last);
   assert.doesNotThrow(() => JSON.parse(last));
 });
 
@@ -27,7 +28,8 @@ test('JsonlWriter without rotation pressure keeps a single file', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-jsonl2-'));
   const file = path.join(dir, 'a.jsonl');
   const w = new JsonlWriter(file, { maxBytes: 1024 * 1024 });
-  w.append({ ok: 1 }); w.append({ ok: 2 });
+  w.append({ ok: 1 });
+  w.append({ ok: 2 });
   assert.ok(!fs.existsSync(`${file}.1`), 'no rotation when under cap');
   assert.equal(fs.readFileSync(file, 'utf8').trim().split('\n').length, 2);
 });

@@ -6,15 +6,18 @@ import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../src/security/path-policy.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
+type SymlinkSync = (target: string, path: string, type?: 'file' | 'dir' | 'junction') => void;
+const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
+
 test('create-aware check blocks junction/symlink escape for NEW files', () => {
   const root = makeTestWorkspace('kcw-pp-root');
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-pp-outside-'));
   const link = path.join(root, 'link');
   // 'junction' works on Windows without admin; falls back to a symlink on POSIX.
   try {
-    fs.symlinkSync(outside, link, 'junction');
+    symlinkSync(outside, link, 'junction');
   } catch {
-    fs.symlinkSync(outside, link);
+    symlinkSync(outside, link);
   }
   const escaped = path.join(link, 'new.txt'); // does not exist yet
 

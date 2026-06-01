@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createDocxDocument, createPdfDocument, createPptxPresentation } from '../src/artifacts/office-writers.js';
 import { readZipEntries } from '../src/workspace/zip-utils.js';
 
-function zipText(buffer, name) {
+function zipText(buffer: Buffer, name: string): string {
   const entry = readZipEntries(buffer).find((item) => item.name === name);
   assert.ok(entry, `${name} exists in zip`);
   return entry.content.toString('utf8');
@@ -44,5 +44,5 @@ test('createPdfDocument writes a bounded PDF document', () => {
   assert.match(text, /^%PDF-1\.4/);
   assert.match(text, /xref/);
   assert.match(text, /Summary line/);
-  assert.doesNotMatch(text, /\(paren \) and slash \\/);
+  assert.ok(!/\(paren \) and slash \\/.test(text));
 });

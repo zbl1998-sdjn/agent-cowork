@@ -5,7 +5,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { loadLayeredMemory } from '../src/memory/memory-layers.js';
 
-function seed() {
+type SeededMemoryPaths = {
+  home: string;
+  root: string;
+};
+
+function seed(): SeededMemoryPaths {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-home-'));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-proj-'));
   fs.mkdirSync(path.join(home, '.AgentCowork'), { recursive: true });
