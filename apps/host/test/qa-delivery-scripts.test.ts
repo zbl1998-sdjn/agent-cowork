@@ -12,7 +12,7 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as PackageJson;
   assert.equal(packageJson.scripts['smoke:e2e'], hostNode('scripts/e2e-smoke.mjs'));
   assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.ts'));
-  assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.mjs'));
+  assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.ts'));
   assert.equal(packageJson.scripts['check:secrets'], hostNode('scripts/check-secrets.ts'));
   const windowsClientSmokeScript = packageJson.scripts['smoke:windows-client'];
   assert.ok(windowsClientSmokeScript);
@@ -22,13 +22,13 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
     'scripts/e2e-smoke.mjs',
     'scripts/bench.ts',
     'scripts/check-secrets.ts',
-    'scripts/smoke-kimi-api.mjs',
+    'scripts/smoke-kimi-api.ts',
   ] as const;
   for (const script of deliveryScripts) {
     assert.ok(fs.existsSync(path.join(repoRoot, script)), `${script} is missing`);
   }
 
-  const kimiSmoke = fs.readFileSync(path.join(repoRoot, 'scripts/smoke-kimi-api.mjs'), 'utf8');
+  const kimiSmoke = fs.readFileSync(path.join(repoRoot, 'scripts/smoke-kimi-api.ts'), 'utf8');
   assert.match(kimiSmoke, /\/api\/auth\/guest/);
   assert.match(kimiSmoke, /Bearer \$\{guest\.token\}/);
 

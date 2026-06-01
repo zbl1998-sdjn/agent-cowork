@@ -660,7 +660,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - **启动与 smoke**:
   - `apps/host/src/main.js`、`scripts/start-mvp.ts`、`scripts/start-tauri-host.ts` 改读 API env。
   - `npm run smoke:kimi-cli` 改为 `npm run smoke:kimi-api`。
-  - 删除旧 `scripts/smoke-kimi-cli.mjs`, 新增 `scripts/smoke-kimi-api.mjs`。
+  - 删除旧 `scripts/smoke-kimi-cli.mjs`, 新增 `scripts/smoke-kimi-api.ts`。
 
 新增/更新测试:
 

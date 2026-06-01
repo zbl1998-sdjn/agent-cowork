@@ -1,56 +1,70 @@
 import fs from 'node:fs';
-import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { AddressInfo } from 'node:http';
+import type { HostServer } from '../apps/host/src/server.js';
 
-function assert(condition, message) {
+type JsonRecord = Record<string, unknown>;
+type RequestHeaders = Record<string, string>;
+type GuestAuthResponse = JsonRecord & {
+  token?: string;
+  userId?: unknown;
+};
+type KimiPlanResponse = JsonRecord & {
+  ok?: unknown;
+  provider?: unknown;
+  text?: string;
+  runId?: string;
+  runPath?: string;
+  durationMs?: unknown;
+};
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-function requestJson(baseUrl, route, body, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify(body);
-    const request = http.request(
-      `${baseUrl}${route}`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'content-length': Buffer.byteLength(payload),
-          ...headers,
-        },
-      },
-      (response) => {
-        let raw = '';
-        response.on('data', (chunk) => {
-          raw += chunk.toString();
-        });
-        response.on('end', () => {
-          let parsed;
-          try {
-            parsed = JSON.parse(raw);
-          } catch (error) {
-            reject(new Error(`${route} returned invalid JSON: ${error.message}`));
-            return;
-          }
-          if (response.statusCode < 200 || response.statusCode >= 300) {
-            reject(new Error(`${route} returned ${response.statusCode}: ${JSON.stringify(parsed)}`));
-            return;
-          }
-          resolve(parsed);
-        });
-      },
-    );
-    request.on('error', reject);
-    request.write(payload);
-    request.end();
+async function requestJson<T extends JsonRecord>(
+  baseUrl: string,
+  route: string,
+  body: JsonRecord,
+  headers: RequestHeaders = {},
+): Promise<T> {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(body),
   });
+  const text = await response.text();
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${route} returned invalid JSON: ${message}`);
+  }
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`${route} returned ${response.status}: ${JSON.stringify(parsed)}`);
+  }
+  return parsed as T;
 }
 
-async function main() {
+async function listenLocal(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert(address && typeof address === 'object', 'Kimi API smoke server did not bind to a TCP port');
+  return `http://127.0.0.1:${(address as AddressInfo).port}`;
+}
+
+async function main(): Promise<void> {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.dirname(scriptDir);
   const buildDir = path.join(repoRoot, 'build');
@@ -77,20 +91,14 @@ async function main() {
     staticRoot: false,
   });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-
-  const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const baseUrl = await listenLocal(server);
 
   try {
-    const guest = await requestJson(baseUrl, '/api/auth/guest', {});
+    const guest = await requestJson<GuestAuthResponse>(baseUrl, '/api/auth/guest', {});
     assert(guest.token, 'Kimi API smoke guest auth did not return a token');
     const authHeaders = { authorization: `Bearer ${guest.token}` };
 
-    const plan = await requestJson(baseUrl, '/api/kimi/plan', {
+    const plan = await requestJson<KimiPlanResponse>(baseUrl, '/api/kimi/plan', {
       trustedRoot: workspace,
       mode: 'cowork',
       summary: 'Contract draft. Party A, Party B, renewal date, payment terms.',
@@ -101,6 +109,7 @@ async function main() {
     assert(plan.provider === 'kimi-api', 'Kimi API smoke returned unexpected provider');
     assert(typeof plan.text === 'string' && plan.text.length > 8, 'Kimi API smoke returned empty text');
     assert(/^run_/.test(plan.runId || ''), 'Kimi API smoke did not return a run id');
+    assert(plan.runPath, 'Kimi API smoke did not return a run path');
     assert(fs.existsSync(plan.runPath), 'Kimi API smoke did not persist a run record');
 
     const report = {
