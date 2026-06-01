@@ -7,7 +7,7 @@
 **Architecture:** Follow `plan/00-架构基线与模块依赖.md`. Host imports must keep pointing inward across L0-L4. Source files may keep NodeNext-style `.js` import specifiers during migration because `scripts/check-arch.ts`, `scripts/host-ts-loader.mjs`, and `tsconfig.host-checkjs.json` support `.js` specifiers resolving to `.ts` sources.
 
 **Current Boundary (2026-06-02):**
-- Checked source files are TypeScript. `npm run check:js-boundary` allows only three Node loader bootstraps (`scripts/host-ts-loader.mjs`, `scripts/register-host-ts-loader.mjs`, `scripts/run-host-node.mjs`) plus generated Windows resource scripts.
+- Checked source files are TypeScript. `npm run check:js-boundary` allows only two Node loader bootstraps (`scripts/host-ts-loader.mjs`, `scripts/run-host-node.mjs`) plus generated Windows resource scripts.
 - Windows classic resource sources live in `apps/windows-client/resources-src/*.ts`; `apps/windows-client/resources/*.js` is generated output and is checked by `npm run check:resource-js`.
 - `npm run check:ts-coverage` fails if any TS-like source file is not covered by one of the checked tsconfig projects, which keeps VS Code Problems aligned with the repo gates.
 - Do not convert the loader bootstraps to TS without replacing the bootstrap strategy first: those files run before the repo TypeScript loader is active.

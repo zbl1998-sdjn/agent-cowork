@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const registerLoaderUrl = pathToFileURL(path.join(repoRoot, 'scripts', 'register-host-ts-loader.mjs')).href;
+const registerLoaderUrl = pathToFileURL(path.join(repoRoot, 'scripts', 'run-host-node.mjs'));
+registerLoaderUrl.searchParams.set('register-only', '1');
 
 function resolveCwd(input?: string): string {
   const cwd = path.resolve(repoRoot, input || '.');
@@ -28,7 +29,7 @@ if (!args.length) {
 
 // Centralize the migration-time loader so package scripts do not each need
 // their own copy of the .js -> .ts resolution rule.
-const result = spawnSync(process.execPath, ['--import', registerLoaderUrl, ...args], {
+const result = spawnSync(process.execPath, ['--import', registerLoaderUrl.href, ...args], {
   cwd,
   env: process.env,
   shell: false,

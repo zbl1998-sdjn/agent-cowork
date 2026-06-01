@@ -8,7 +8,6 @@ const RESOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources');
 const RESOURCE_SOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources-src');
 const ALLOWED_BOOTSTRAPS = new Set([
   'scripts/host-ts-loader.mjs',
-  'scripts/register-host-ts-loader.mjs',
   'scripts/run-host-node.mjs',
 ]);
 const SKIP_DIRS = new Set([
