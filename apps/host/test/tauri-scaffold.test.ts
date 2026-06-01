@@ -42,6 +42,7 @@ test('Tauri scaffold keeps host npm dependencies allowlisted and points at the N
     '@eslint/js',
     'eslint',
     'eslint-plugin-react-hooks',
+    'jiti',
     'typescript',
     'typescript-eslint',
   ]);
