@@ -74,6 +74,7 @@
     "apps/host/test/tree-budget.test.ts",
     "apps/host/test/untrusted-content.test.ts",
     "apps/host/test/web-fetch-ssrf.test.ts",
-    "apps/host/test/web-fetch.test.ts"
+    "apps/host/test/web-fetch.test.ts",
+    "apps/host/test/web-search.test.ts"
   ]
 }

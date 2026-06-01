@@ -3,6 +3,7 @@ import test from 'node:test';
 import { parseDdgLiteResults, unwrapDdgRedirect } from '../src/tools/search-providers/ddg.js';
 import { parseBingResults } from '../src/tools/search-providers/bing.js';
 import { webSearch } from '../src/tools/web-search.js';
+import type { SearchResult, WebSearchFetchLike } from '../src/tools/web-search.js';
 
 const FIXTURE_BING = `
 <html><body>
@@ -33,6 +34,14 @@ const FIXTURE_DDG_LITE = `
 </body></html>
 `;
 
+function requireResult(results: readonly SearchResult[], index: number): SearchResult {
+  const result = results[index];
+  assert.ok(result, `expected search result at index ${index}`);
+  return result;
+}
+
+const publicLookup = async (_host: string): Promise<string> => '8.8.8.8';
+
 test('unwrapDdgRedirect extracts underlying URL from /l/?uddg= redirect', () => {
   const wrapped = '//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpage&rut=trash';
   assert.equal(unwrapDdgRedirect(wrapped), 'https://example.com/page');
@@ -45,12 +54,14 @@ test('unwrapDdgRedirect passes plain URLs through', () => {
 test('parseDdgLiteResults returns title/url/snippet trio per anchor', () => {
   const results = parseDdgLiteResults(FIXTURE_DDG_LITE, 8);
   assert.equal(results.length, 2);
-  assert.equal(results[0].url, 'https://www.anthropic.com/news/claude-4');
-  assert.match(results[0].title, /Claude 4/);
-  assert.match(results[0].snippet, /long-context/);
-  assert.equal(results[1].url, 'https://blog.moonshot.cn/kimi-k2');
-  assert.match(results[1].title, /Kimi K2/);
-  assert.match(results[1].snippet, /18%/);
+  const first = requireResult(results, 0);
+  const second = requireResult(results, 1);
+  assert.equal(first.url, 'https://www.anthropic.com/news/claude-4');
+  assert.match(first.title, /Claude 4/);
+  assert.match(first.snippet, /long-context/);
+  assert.equal(second.url, 'https://blog.moonshot.cn/kimi-k2');
+  assert.match(second.title, /Kimi K2/);
+  assert.match(second.snippet, /18%/);
 });
 
 test('parseDdgLiteResults clamps to limit', () => {
@@ -70,39 +81,41 @@ test('webSearch rejects empty / overlong queries', async () => {
 });
 
 test('webSearch rejects unknown option keys before provider fetch', async () => {
+  const input = { query: 'test', extra: true };
   await assert.rejects(
-    () => webSearch({ query: 'test', extra: true }),
+    () => webSearch(input),
     /Unrecognized key|extra/,
   );
 });
 
 test('webSearch via DDG returns normalized results using injected fetch', async () => {
-  const fakeFetch = async () => ({
+  const fakeFetch: WebSearchFetchLike = async () => ({
     ok: true,
     status: 200,
     text: async () => FIXTURE_DDG_LITE,
   });
-  const fakeLookup = async () => '8.8.8.8'; // bypass SSRF guard with a public-looking IP
   const out = await webSearch({
     query: '最新 AI 新闻 2026',
-    fetchImpl: /** @type {any} */ (fakeFetch),
-    lookupImpl: fakeLookup,
+    fetchImpl: fakeFetch,
+    lookupImpl: publicLookup,
     maxResults: 5,
   });
   assert.equal(out.ok, true);
   assert.equal(out.provider, 'ddg');
   assert.equal(out.results.length, 2);
-  assert.equal(out.results[0].url, 'https://www.anthropic.com/news/claude-4');
+  assert.equal(requireResult(out.results, 0).url, 'https://www.anthropic.com/news/claude-4');
 });
 
 test('parseBingResults extracts title/url/snippet per b_algo block, skips pagination', () => {
   const results = parseBingResults(FIXTURE_BING, 8);
   assert.equal(results.length, 2);
-  assert.equal(results[0].url, 'https://www.anthropic.com/news/claude-4');
-  assert.match(results[0].title, /Claude 4/);
-  assert.match(results[0].snippet, /long-context/);
-  assert.equal(results[1].url, 'https://blog.moonshot.cn/kimi-k2');
-  assert.match(results[1].title, /Kimi K2/);
+  const first = requireResult(results, 0);
+  const second = requireResult(results, 1);
+  assert.equal(first.url, 'https://www.anthropic.com/news/claude-4');
+  assert.match(first.title, /Claude 4/);
+  assert.match(first.snippet, /long-context/);
+  assert.equal(second.url, 'https://blog.moonshot.cn/kimi-k2');
+  assert.match(second.title, /Kimi K2/);
 });
 
 test('parseBingResults returns [] for empty / malformed HTML', () => {
@@ -111,12 +124,12 @@ test('parseBingResults returns [] for empty / malformed HTML', () => {
 });
 
 test('webSearch via bing returns normalized results using injected fetch', async () => {
-  const fakeFetch = async () => ({ ok: true, status: 200, text: async () => FIXTURE_BING });
+  const fakeFetch: WebSearchFetchLike = async () => ({ ok: true, status: 200, text: async () => FIXTURE_BING });
   const out = await webSearch({
     query: 'test',
     provider: 'bing',
-    fetchImpl: /** @type {any} */ (fakeFetch),
-    lookupImpl: async () => '8.8.8.8',
+    fetchImpl: fakeFetch,
+    lookupImpl: publicLookup,
     maxResults: 5,
   });
   assert.equal(out.ok, true);
@@ -126,7 +139,7 @@ test('webSearch via bing returns normalized results using injected fetch', async
 
 test('webSearch auto provider falls back to bing when DDG fails', async () => {
   let calls = 0;
-  const fakeFetch = async (url) => {
+  const fakeFetch: WebSearchFetchLike = async (url) => {
     calls += 1;
     if (String(url).includes('duckduckgo')) {
       const err = new Error('connect timeout');
@@ -141,8 +154,8 @@ test('webSearch auto provider falls back to bing when DDG fails', async () => {
     query: 'test',
     // omit provider -> defaults to 'auto' via the handler; here we set it explicitly
     provider: 'auto',
-    fetchImpl: /** @type {any} */ (fakeFetch),
-    lookupImpl: async () => '8.8.8.8',
+    fetchImpl: fakeFetch,
+    lookupImpl: publicLookup,
     maxResults: 5,
   });
   assert.equal(out.ok, true);
@@ -159,13 +172,12 @@ test('webSearch returns ok:false + note for unknown providers (tavily etc.)', as
 });
 
 test('webSearch surfaces HTTP errors as 502 with provider context', async () => {
-  const fakeFetch = async () => ({ ok: false, status: 503, text: async () => 'svc down' });
-  const fakeLookup = async () => '8.8.8.8';
+  const fakeFetch: WebSearchFetchLike = async () => ({ ok: false, status: 503, text: async () => 'svc down' });
   await assert.rejects(
     () => webSearch({
       query: 'q',
-      fetchImpl: /** @type {any} */ (fakeFetch),
-      lookupImpl: fakeLookup,
+      fetchImpl: fakeFetch,
+      lookupImpl: publicLookup,
     }),
     /HTTP 503/,
   );
