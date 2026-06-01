@@ -102,6 +102,7 @@ async function main() {
     assert(scriptRoutes.includes('/app-chat-runner.js'), 'index missing app-chat-runner.js script');
     assert(scriptRoutes.includes('/app-approval-runner.js'), 'index missing app-approval-runner.js script');
     assert(scriptRoutes.includes('/app-message-actions.js'), 'index missing app-message-actions.js script');
+    assert(scriptRoutes.includes('/app-recipe-runner.js'), 'index missing app-recipe-runner.js script');
     assert(scriptRoutes.includes('/app-file-upload.js'), 'index missing app-file-upload.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
     assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
@@ -119,6 +120,7 @@ async function main() {
     assert(scriptRoutes.indexOf('/app-chat-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-chat-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-approval-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-approval-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-actions.js') < scriptRoutes.indexOf('/app.js'), 'app-message-actions.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-recipe-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-recipe-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-file-upload.js') < scriptRoutes.indexOf('/app.js'), 'app-file-upload.js must load before app.js');
     const scriptBodies = [];
     for (const route of scriptRoutes) {

@@ -41,6 +41,7 @@ const STATIC_FILES = new Map<string, StaticAsset>([
   ['/app-chat-runner.js', { file: 'app-chat-runner.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-approval-runner.js', { file: 'app-approval-runner.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-message-actions.js', { file: 'app-message-actions.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-recipe-runner.js', { file: 'app-recipe-runner.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-file-upload.js', { file: 'app-file-upload.js', type: 'text/javascript; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
 ]);

@@ -157,6 +157,7 @@ async function main() {
   assert(fs.existsSync(path.join(resourcesDir, 'app-chat-runner.js')), 'Windows client chat runner resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-approval-runner.js')), 'Windows client approval runner resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-actions.js')), 'Windows client message actions resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-recipe-runner.js')), 'Windows client recipe runner resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-file-upload.js')), 'Windows client file upload resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app.js')), 'Windows client JS resource is missing');
 

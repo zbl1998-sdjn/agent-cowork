@@ -93,6 +93,7 @@
     "apps/host/test/host-header.test.ts",
     "apps/host/test/host-type-check.test.ts",
     "apps/host/test/history-compactor.test.ts",
+    "apps/host/test/hooks-subagent.test.ts",
     "apps/host/test/image-loader.test.ts",
     "apps/host/test/jsonl-rotation.test.ts",
     "apps/host/test/jwt.test.ts",
