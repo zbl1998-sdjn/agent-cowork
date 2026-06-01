@@ -10,6 +10,9 @@ const loaderUrl = pathToFileURL(path.join(repoRoot, 'scripts', 'host-ts-loader.m
 
 register(loaderUrl, pathToFileURL(`${repoRoot}${path.sep}`));
 
+// Normal mode runs the TS CLI wrapper. Child Node processes import this same
+// file with ?register-only=1 so they only install the TS loader before running
+// their own entrypoint.
 if (!currentUrl.searchParams.has('register-only')) {
   await import('./run-host-node.ts');
 }
