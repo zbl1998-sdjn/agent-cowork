@@ -147,6 +147,7 @@ async function main() {
   assert(fs.existsSync(indexPath), `Windows client resource entry is missing: ${indexPath}`);
   assert(fs.existsSync(path.join(resourcesDir, 'app.css')), 'Windows client CSS resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-composer-popover.js')), 'Windows client composer popover resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-artifacts.js')), 'Windows client artifacts resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app.js')), 'Windows client JS resource is missing');
 
   const browserPath = findBrowser();

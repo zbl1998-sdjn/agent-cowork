@@ -82,6 +82,15 @@ const {
 } = window.AgentCoworkUtils;
 const { getJson, postJson } = window.AgentCoworkApi;
 const { renderRunEventPayload, subscribeRunEvents } = window.AgentCoworkRunEvents;
+const { createArtifactCatalog } = window.AgentCoworkArtifacts;
+const { setArtifact, renderArtifactCatalog, loadArtifactCatalog } = createArtifactCatalog({
+  state,
+  artifactText,
+  artifactPath,
+  artifactList,
+  getJson,
+  basename,
+});
 
 function setStatus(text) {
   statusText.textContent = text;
@@ -94,57 +103,6 @@ function setRunChip(text, variant = "muted") {
   runChip.textContent = text;
   runChip.classList.toggle("is-ready", variant === "ready");
   runChip.classList.toggle("is-muted", variant === "muted");
-}
-
-function setArtifact(message, pathText = artifactPath.textContent) {
-  artifactText.textContent = message;
-  artifactPath.textContent = pathText;
-}
-
-function renderArtifactCatalog(items) {
-  if (!artifactList) {
-    return;
-  }
-  artifactList.replaceChildren();
-  const artifacts = Array.isArray(items) ? items : [];
-  if (artifacts.length === 0) {
-    const empty = document.createElement("button");
-    empty.type = "button";
-    empty.className = "artifact-empty";
-    empty.innerHTML = "<strong>暂无活页产物</strong><span>审批执行后，这里会显示可打开的 HTML Artifact。</span>";
-    artifactList.append(empty);
-    return;
-  }
-  for (const item of artifacts.slice(0, 12)) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.artifactPath = item.path || "";
-    const title = document.createElement("strong");
-    title.textContent = item.name || basename(item.path);
-    const meta = document.createElement("span");
-    meta.textContent = `${item.kind || "artifact"} · ${item.relativePath || item.path}`;
-    button.append(title, meta);
-    button.addEventListener("click", () => openArtifactView(item));
-    artifactList.append(button);
-  }
-}
-
-async function loadArtifactCatalog() {
-  if (!state.hostApi || !artifactList) {
-    return;
-  }
-  const payload = await getJson("/api/artifacts?limit=12");
-  renderArtifactCatalog(payload.artifacts || []);
-}
-
-function openArtifactView(item) {
-  if (!state.hostApi || !item?.path) {
-    setArtifact("静态预览模式不能打开 Artifact 活页；请通过 localhost 启动本地 Host。");
-    return;
-  }
-  const url = `/api/artifacts/view?path=${encodeURIComponent(item.path)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
-  setArtifact(`已打开 Artifact 活页：${item.name || basename(item.path)}`, item.relativePath || item.path);
 }
 
 function renderInteraction(items, subtitle = "任务运行中") {
