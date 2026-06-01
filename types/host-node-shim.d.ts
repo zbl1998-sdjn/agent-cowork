@@ -26,12 +26,16 @@ declare const process: {
   argv: string[];
   env: Record<string, string | undefined>;
   execPath: string;
+  exitCode?: number;
   platform: string;
   pid: number;
+  stderr: { write(data: Buffer | string): unknown };
+  stdout: { write(data: Buffer | string): unknown };
   version: string;
   versions?: Record<string, string | undefined>;
   cwd(): string;
   exit(code?: number): never;
+  kill(pid: number, signal?: string | number): boolean;
   memoryUsage(): { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number };
   once(event: string, listener: (...args: any[]) => void): unknown;
   uptime(): number;
@@ -83,6 +87,7 @@ declare module 'node:child_process' {
   }
 
   export interface ChildProcessLike {
+    pid?: number;
     stdin?: WritableStreamLike;
     stdout: StreamLike;
     stderr: StreamLike;
@@ -94,8 +99,10 @@ declare module 'node:child_process' {
 
   export interface SpawnSyncResult<T = string | Buffer> {
     status?: number | null;
+    signal?: string | null;
     stdout?: T;
     stderr?: T;
+    error?: Error;
   }
 
   export interface ExecFileError extends Error {
@@ -163,9 +170,11 @@ declare module 'node:fs' {
 
   export function existsSync(path: string): boolean;
   export function appendFileSync(path: string, data: Buffer | string, encoding?: string): void;
+  export function closeSync(fd: number): void;
   export function copyFileSync(src: string, dest: string): void;
   export function mkdtempSync(prefix: string): string;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
+  export function openSync(path: string, flags: string | number, mode?: number): number;
   export function readFileSync(path: string): Buffer;
   export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string): string[];

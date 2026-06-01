@@ -27,6 +27,7 @@
     "scripts/check-secrets.ts",
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
+    "scripts/demo-mvp.ts",
     "scripts/e2e-smoke.ts",
     "scripts/eval.ts",
     "scripts/smoke-kimi-api.ts",
