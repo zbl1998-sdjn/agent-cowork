@@ -1,157 +1,198 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
+import {
+  CdpClient,
+  assert,
+  bind,
+  errorDetails,
+  evaluate,
+  findBrowser,
+  getFreePort,
+  getJson,
+  isRecord,
+  type CdpSession,
+  type CdpTarget,
+  type CdpVersion,
+  type ScreenshotResult,
+  type SendPage,
+} from './browser-smoke-utils.js';
+import type { ChildProcessLike } from 'node:child_process';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
 const reportPath = path.join(buildDir, 'rendered-ui-smoke-report.json');
 const screenshotPath = path.join(buildDir, 'rendered-ui-smoke-1536x900.png');
 
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
+type ScrollMetrics = {
+  width: number;
+  clientWidth: number;
+  height: number;
+  clientHeight: number;
+};
+
+type DesktopLayout = {
+  title: string;
+  status: string;
+  activeMode: string;
+  hasGreeting: boolean;
+  hasCowork: boolean;
+  hasModeTabs: boolean;
+  hasSidebarActions: boolean;
+  hasQuickActions: boolean;
+  hasInteractionStream: boolean;
+  hasRunCards: boolean;
+  hasFrameworkOverlay: boolean;
+  scroll: ScrollMetrics;
+};
+
+type CompactLayout = {
+  viewport: { width: number; height: number };
+  issues: string[];
+  scroll: ScrollMetrics;
+};
+
+type RenderedInteraction = {
+  afterPlan: {
+    status: string;
+    artifact: string;
+    opCount: number;
+    stream: string;
+    runCardCount: number;
+    activeRunCard: string;
+    runSummary: string;
+  };
+  afterApprove: {
+    status: string;
+    artifact: string;
+    approve: string;
+    doneClass: boolean;
+    stream: string;
+  };
+};
+
+type UploadAndChat = {
+  uploadState: {
+    status: string;
+    artifact: string;
+    files: string[];
+  };
+  taskState: {
+    activeMode: string;
+    status: string;
+    artifact: string;
+    chatHidden: boolean;
+    stream: string;
+    runCardCount: number;
+    activeRunCard: string;
+  };
+};
+
+function readScrollMetrics(value: unknown, label: string): ScrollMetrics {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    width: typeof value.width === 'number' ? value.width : 0,
+    clientWidth: typeof value.clientWidth === 'number' ? value.clientWidth : 0,
+    height: typeof value.height === 'number' ? value.height : 0,
+    clientHeight: typeof value.clientHeight === 'number' ? value.clientHeight : 0,
+  };
 }
 
-function findBrowser() {
-  const candidates =
-    process.platform === 'win32'
-      ? [
-          path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        ]
-      : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge'];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+function readDesktopLayout(value: unknown): DesktopLayout {
+  if (!isRecord(value)) throw new TypeError('desktop layout snapshot must be an object');
+  return {
+    title: typeof value.title === 'string' ? value.title : '',
+    status: typeof value.status === 'string' ? value.status : '',
+    activeMode: typeof value.activeMode === 'string' ? value.activeMode : '',
+    hasGreeting: value.hasGreeting === true,
+    hasCowork: value.hasCowork === true,
+    hasModeTabs: value.hasModeTabs === true,
+    hasSidebarActions: value.hasSidebarActions === true,
+    hasQuickActions: value.hasQuickActions === true,
+    hasInteractionStream: value.hasInteractionStream === true,
+    hasRunCards: value.hasRunCards === true,
+    hasFrameworkOverlay: value.hasFrameworkOverlay === true,
+    scroll: readScrollMetrics(value.scroll, 'desktop scroll metrics'),
+  };
 }
 
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
+function readCompactLayout(value: unknown): CompactLayout {
+  if (!isRecord(value)) throw new TypeError('compact layout snapshot must be an object');
+  const viewport = isRecord(value.viewport) ? value.viewport : {};
+  return {
+    viewport: {
+      width: typeof viewport.width === 'number' ? viewport.width : 0,
+      height: typeof viewport.height === 'number' ? viewport.height : 0,
+    },
+    issues: Array.isArray(value.issues) ? value.issues.filter((issue): issue is string => typeof issue === 'string') : [],
+    scroll: readScrollMetrics(value.scroll, 'compact scroll metrics'),
+  };
 }
 
-async function getJson(url, timeoutMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
-          let body = '';
-          response.setEncoding('utf8');
-          response.on('data', (chunk) => {
-            body += chunk;
-          });
-          response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
-              return;
-            }
-            resolve(JSON.parse(body));
-          });
-        });
-        request.on('error', reject);
-        request.setTimeout(1000, () => request.destroy(new Error(`Timed out fetching ${url}`)));
-      });
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+function readRenderedInteraction(value: unknown): RenderedInteraction {
+  if (!isRecord(value)) throw new TypeError('rendered interaction snapshot must be an object');
+  const afterPlan = isRecord(value.afterPlan) ? value.afterPlan : {};
+  const afterApprove = isRecord(value.afterApprove) ? value.afterApprove : {};
+  return {
+    afterPlan: {
+      status: typeof afterPlan.status === 'string' ? afterPlan.status : '',
+      artifact: typeof afterPlan.artifact === 'string' ? afterPlan.artifact : '',
+      opCount: typeof afterPlan.opCount === 'number' ? afterPlan.opCount : 0,
+      stream: typeof afterPlan.stream === 'string' ? afterPlan.stream : '',
+      runCardCount: typeof afterPlan.runCardCount === 'number' ? afterPlan.runCardCount : 0,
+      activeRunCard: typeof afterPlan.activeRunCard === 'string' ? afterPlan.activeRunCard : '',
+      runSummary: typeof afterPlan.runSummary === 'string' ? afterPlan.runSummary : '',
+    },
+    afterApprove: {
+      status: typeof afterApprove.status === 'string' ? afterApprove.status : '',
+      artifact: typeof afterApprove.artifact === 'string' ? afterApprove.artifact : '',
+      approve: typeof afterApprove.approve === 'string' ? afterApprove.approve : '',
+      doneClass: afterApprove.doneClass === true,
+      stream: typeof afterApprove.stream === 'string' ? afterApprove.stream : '',
+    },
+  };
+}
+
+function readUploadAndChat(value: unknown): UploadAndChat {
+  if (!isRecord(value)) throw new TypeError('upload and chat snapshot must be an object');
+  const uploadState = isRecord(value.uploadState) ? value.uploadState : {};
+  const taskState = isRecord(value.taskState) ? value.taskState : {};
+  return {
+    uploadState: {
+      status: typeof uploadState.status === 'string' ? uploadState.status : '',
+      artifact: typeof uploadState.artifact === 'string' ? uploadState.artifact : '',
+      files: Array.isArray(uploadState.files)
+        ? uploadState.files.filter((file): file is string => typeof file === 'string')
+        : [],
+    },
+    taskState: {
+      activeMode: typeof taskState.activeMode === 'string' ? taskState.activeMode : '',
+      status: typeof taskState.status === 'string' ? taskState.status : '',
+      artifact: typeof taskState.artifact === 'string' ? taskState.artifact : '',
+      chatHidden: taskState.chatHidden === true,
+      stream: typeof taskState.stream === 'string' ? taskState.stream : '',
+      runCardCount: typeof taskState.runCardCount === 'number' ? taskState.runCardCount : 0,
+      activeRunCard: typeof taskState.activeRunCard === 'string' ? taskState.activeRunCard : '',
+    },
+  };
+}
+
+function listFilesRecursive(root: string, predicate: (name: string) => boolean): string[] {
+  if (!fs.existsSync(root)) return [];
+  const found: string[] = [];
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...listFilesRecursive(full, predicate));
+    } else if (entry.isFile() && predicate(entry.name)) {
+      found.push(full);
     }
   }
-  throw new Error(`Timed out waiting for ${url}`);
-}
-
-class CdpClient {
-  constructor(url) {
-    this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-    this.handlers = new Map();
-  }
-
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener(
-        'open',
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
-      this.socket.addEventListener(
-        'error',
-        () => {
-          clearTimeout(timeout);
-          reject(new Error('Failed opening DevTools websocket'));
-        },
-        { once: true },
-      );
-    });
-
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (message.id && this.pending.has(message.id)) {
-        const { resolve, reject } = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        if (message.error) {
-          reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
-        } else {
-          resolve(message.result || {});
-        }
-        return;
-      }
-      if (message.method && this.handlers.has(message.method)) {
-        for (const handler of this.handlers.get(message.method)) {
-          handler(message.params || {});
-        }
-      }
-    });
-  }
-
-  on(method, handler) {
-    const handlers = this.handlers.get(method) || [];
-    handlers.push(handler);
-    this.handlers.set(method, handlers);
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    const message = sessionId ? { id, method, params, sessionId } : { id, method, params };
-    this.socket.send(JSON.stringify(message));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
-  }
-
-  close() {
-    this.socket?.close();
-  }
-}
-
-async function evaluate(client, expression, awaitPromise = true) {
-  const result = await client.send('Runtime.evaluate', {
-    expression,
-    awaitPromise,
-    returnByValue: true,
-  });
-  if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.text || 'Runtime.evaluate failed');
-  }
-  return result.result?.value;
+  return found;
 }
 
 async function main() {
@@ -176,30 +217,27 @@ async function main() {
     journalWriter: new JsonlWriter(auditPath),
     requireAuth: false,
     uiDist: false,
-    kimiPlanRunner: async ({ prompt, summary, mode }) => ({
+    kimiPlanRunner: async (options = {}) => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-test',
-      text: `测试 Kimi 计划：${mode} / ${prompt} / ${summary}`,
+      mode: 'plan',
+      text: `测试 Kimi 计划：${options.mode} / ${options.prompt} / ${options.summary}`,
       durationMs: 16,
     }),
-    kimiChatRunner: async ({ prompt, summary }) => ({
+    kimiChatRunner: async (options = {}) => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-test',
-      text: `测试 Kimi 对话：${prompt} / ${summary}`,
+      mode: 'chat',
+      text: `测试 Kimi 对话：${options.prompt} / ${options.summary}`,
       durationMs: 12,
     }),
   });
-  await new Promise((resolve, reject) => {
-    host.once('error', reject);
-    host.listen(0, '127.0.0.1', resolve);
-  });
-
-  const baseUrl = `http://127.0.0.1:${host.address().port}`;
+  const baseUrl = await bind(host);
   const debugPort = await getFreePort();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-chrome-profile-'));
-  const browser = spawn(
+  const browser: ChildProcessLike = spawn(
     browserPath,
     [
       '--headless=new',
@@ -216,19 +254,22 @@ async function main() {
     { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true },
   );
 
-  const stderr = [];
+  const stderr: string[] = [];
   browser.stderr.on('data', (chunk) => {
     stderr.push(chunk.toString());
   });
 
-  let client;
+  let client: CdpClient | undefined;
   try {
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client is not open');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -241,7 +282,7 @@ async function main() {
 
     await sendPage('Page.navigate', { url: baseUrl });
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
@@ -253,7 +294,7 @@ async function main() {
       })`,
     );
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 5000;
         function tick() {
@@ -266,8 +307,8 @@ async function main() {
       })`,
     );
 
-    const desktopLayout = await evaluate(
-      { send: sendPage },
+    const desktopLayout = readDesktopLayout(await evaluate(
+      sendPage,
       `(() => {
         const scroll = {
           width: document.documentElement.scrollWidth,
@@ -291,7 +332,7 @@ async function main() {
           scroll
         };
       })()`,
-    );
+    ));
     assert(desktopLayout.title === 'Agent Cowork', 'rendered page title mismatch');
     assert(desktopLayout.activeMode === '对话', 'rendered page should default to 对话 mode');
     assert(desktopLayout.hasGreeting && desktopLayout.hasModeTabs && desktopLayout.hasSidebarActions, 'rendered page missing Image #1 functional shell');
@@ -301,7 +342,7 @@ async function main() {
     assert(!desktopLayout.hasFrameworkOverlay, 'rendered page appears to show a framework error overlay');
     assert(desktopLayout.scroll.width <= desktopLayout.scroll.clientWidth + 1, 'desktop layout has horizontal overflow');
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     await sendPage('Emulation.setDeviceMetricsOverride', {
@@ -311,7 +352,7 @@ async function main() {
       mobile: false,
     });
     await evaluate(
-      { send: sendPage },
+      sendPage,
       `new Promise((resolve, reject) => {
         document.querySelector('[data-mode="cowork"]').click();
         const deadline = Date.now() + 2000;
@@ -326,8 +367,8 @@ async function main() {
         tick();
       })`,
     );
-    const compactLayout = await evaluate(
-      { send: sendPage },
+    const compactLayout = readCompactLayout(await evaluate(
+      sendPage,
       `(() => {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
         const selectors = [".sidebar", ".hero", ".composer", ".cowork-panel", ".run-history-panel", ".task-grid", ".interaction-stream", ".approve-button"];
@@ -355,7 +396,7 @@ async function main() {
           }
         };
       })()`,
-    );
+    ));
     assert(compactLayout.issues.length === 0, `compact layout issues: ${compactLayout.issues.join(', ')}`);
     assert(compactLayout.scroll.width <= compactLayout.scroll.clientWidth + 1, 'compact layout has horizontal overflow');
     assert(compactLayout.scroll.height <= compactLayout.scroll.clientHeight + 1, 'compact layout has vertical overflow');
@@ -366,8 +407,8 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    const interaction = await evaluate(
-      { send: sendPage },
+    const interaction = readRenderedInteraction(await evaluate(
+      sendPage,
       `new Promise((resolve, reject) => {
         document.querySelector('[data-mode="cowork"]').click();
         const textarea = document.querySelector(".composer textarea");
@@ -418,7 +459,7 @@ async function main() {
           })
           .then(resolve, reject);
       })`,
-    );
+    ));
     assert(interaction.afterPlan.status === '计划就绪', 'send interaction did not reach 计划就绪');
     assert(interaction.afterPlan.artifact.includes('renewal date'), 'plan did not include trusted file summary');
     assert(interaction.afterPlan.stream.includes('用户指令') && interaction.afterPlan.stream.includes('读取本地上下文'), 'plan interaction stream missing task steps');
@@ -435,12 +476,14 @@ async function main() {
       ? fs.readdirSync(artifactsDir).filter((name) => name.endsWith('.md'))
       : [];
     assert(artifacts.length > 0, 'browser interaction did not write an artifact');
-    const artifactContent = fs.readFileSync(path.join(artifactsDir, artifacts[0]), 'utf8');
+    const firstArtifact = artifacts[0];
+    assert(firstArtifact, 'browser interaction did not write a readable artifact');
+    const artifactContent = fs.readFileSync(path.join(artifactsDir, firstArtifact), 'utf8');
     assert(artifactContent.includes('来源摘要'), 'artifact missing source summary');
     assert(fs.readFileSync(auditPath, 'utf8').includes('"action":"write"'), 'audit log missing browser write action');
 
-    const uploadAndChat = await evaluate(
-      { send: sendPage },
+    const uploadAndChat = readUploadAndChat(await evaluate(
+      sendPage,
       `new Promise((resolve, reject) => {
         const currentState = () => JSON.stringify({
           mode: document.querySelector(".mode-tab.is-active")?.innerText.trim(),
@@ -497,7 +540,7 @@ async function main() {
           })
           .then(resolve, reject);
       })`,
-    );
+    ));
     assert(uploadAndChat.uploadState.status === '文件已导入', 'upload interaction did not reach 文件已导入');
     assert(uploadAndChat.uploadState.artifact.includes('已上传 1 个文件'), 'upload interaction did not report imported file');
     assert(uploadAndChat.uploadState.files.some((name) => name.includes('invoice-ui-smoke.txt')), 'uploaded file was not visible in file list');
@@ -510,9 +553,7 @@ async function main() {
     assert(uploadAndChat.taskState.activeRunCard.includes('协作') && uploadAndChat.taskState.activeRunCard.includes('完成'), 'cowork handoff did not highlight latest task card');
     assert(uploadAndChat.taskState.chatHidden === true, 'chat output should stay hidden after cowork task handoff');
     const uploadRoot = path.join(workspace, 'Agent_Cowork上传');
-    const uploadedFiles = fs.existsSync(uploadRoot)
-      ? fs.readdirSync(uploadRoot, { recursive: true }).filter((name) => String(name).endsWith('invoice-ui-smoke.txt'))
-      : [];
+    const uploadedFiles = listFilesRecursive(uploadRoot, (name) => name.endsWith('invoice-ui-smoke.txt'));
     assert(uploadedFiles.length === 1, 'browser upload did not persist file into Agent_Cowork上传');
 
     const report = {
@@ -538,16 +579,21 @@ async function main() {
       baseUrl,
       browserPath,
       workspace,
-      error: error.stack || error.message,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(errorDetails(error));
     process.exitCode = 1;
   } finally {
     client?.close();
     browser.kill();
-    await new Promise((resolve) => host.close(resolve));
+    await new Promise<void>((resolve, reject) => {
+      host.close((error?: Error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
     try {
       fs.rmSync(userDataDir, { recursive: true, force: true });
     } catch {
@@ -557,6 +603,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });

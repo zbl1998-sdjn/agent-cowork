@@ -180,7 +180,7 @@ const checks: CheckConfig[] = [
   {
     name: 'rendered ui smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-rendered-ui.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-rendered-ui.ts')],
   },
   {
     name: 'react scroll smoke script syntax',
@@ -236,7 +236,7 @@ const checks: CheckConfig[] = [
   {
     name: 'rendered browser ui smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-rendered-ui.mjs'),
+    commandArgs: hostScriptArgs('smoke-rendered-ui.ts'),
   },
   {
     name: 'react timeline scroll smoke',

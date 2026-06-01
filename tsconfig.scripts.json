@@ -37,6 +37,7 @@
     "scripts/smoke-mvp-runtime.ts",
     "scripts/smoke-plan-closed-loop.ts",
     "scripts/browser-smoke-utils.ts",
+    "scripts/smoke-rendered-ui.ts",
     "scripts/smoke-react-artifacts-panel.ts",
     "scripts/smoke-react-branches.ts",
     "scripts/smoke-react-live-artifact.ts",
