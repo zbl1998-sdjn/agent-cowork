@@ -5,10 +5,18 @@ import test from 'node:test';
 import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { planFileOrganization } from '../src/workspace/file-organizer.js';
+import type { OrganizeOperation } from '../src/workspace/file-organizer.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 function root() {
   return makeTestWorkspace('kcw-organize');
+}
+
+function assertMoveOperation(
+  operation: OrganizeOperation | undefined,
+): asserts operation is Extract<OrganizeOperation, { type: 'move' }> {
+  assert.ok(operation);
+  assert.equal(operation.type, 'move');
 }
 
 test('plans extension-based file organization without applying it', () => {
@@ -19,9 +27,13 @@ test('plans extension-based file organization without applying it', () => {
   const plan = planFileOrganization({ trustedRoot, files: ['a.csv', 'b.md'], mode: 'byExtension' });
 
   assert.equal(plan.operations.length, 2);
-  assert.match(plan.operations[0].to, /organized[\\/]csv[\\/]a\.csv$/);
+  const firstOperation = plan.operations[0];
+  assertMoveOperation(firstOperation);
+  assert.match(firstOperation.to, /organized[\\/]csv[\\/]a\.csv$/);
   assert.equal(fs.existsSync(path.join(trustedRoot, 'organized')), false);
-  assert.equal(plan.preview.operations[0].type, 'move');
+  const firstPreview = plan.preview.operations[0];
+  assert.ok(firstPreview);
+  assert.equal(firstPreview.type, 'move');
 });
 
 test('plans duplicate moves by content hash', () => {
@@ -33,7 +45,9 @@ test('plans duplicate moves by content hash', () => {
   const plan = planFileOrganization({ trustedRoot, files: ['a.txt', 'b.txt', 'c.txt'], mode: 'dedupe' });
 
   assert.equal(plan.operations.length, 1);
-  assert.match(plan.operations[0].to, /duplicates[\\/]b\.txt$/);
+  const firstOperation = plan.operations[0];
+  assertMoveOperation(firstOperation);
+  assert.match(firstOperation.to, /duplicates[\\/]b\.txt$/);
 });
 
 test('rejects organization paths outside the trusted root', () => {
