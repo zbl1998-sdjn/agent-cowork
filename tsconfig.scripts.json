@@ -30,6 +30,7 @@
     "scripts/demo-mvp.ts",
     "scripts/e2e-smoke.ts",
     "scripts/eval.ts",
+    "scripts/release.ts",
     "scripts/smoke-kimi-api.ts",
     "scripts/smoke-local-operations.ts",
     "scripts/smoke-mvp-runtime.ts",

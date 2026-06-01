@@ -56,7 +56,7 @@
     "check:icons": "node scripts/run-host-node.mjs scripts/check-icons.ts",
     "check": "npm run check:arch && npm run check:filesize && npm run check:secrets && npm run check:host-types && npm run check:eval-types && npm run check:host-test-types && npm run check:root-types && npm run check:script-types && npm run check:resource-types && npm run check:ui-types && npm run check:lint && npm run check:resource-js && npm run check:icons",
     "ci": "node scripts/run-host-node.mjs scripts/ci.ts",
-    "release": "node scripts/release.mjs",
+    "release": "node scripts/run-host-node.mjs scripts/release.ts",
     "test": "npm run test:host && npm run test:ui",
     "test:isolated": "node scripts/run-host-node.mjs --cwd apps/host -- --test",
     "build:ui": "node scripts/run-host-node.mjs scripts/build-ui.ts",

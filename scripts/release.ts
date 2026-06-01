@@ -1,19 +1,70 @@
 import { spawnSync } from 'node:child_process';
+import type { SpawnSyncResult } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+type PackageJson = {
+  name: string;
+  version: string;
+};
+
+type ReleaseOptions = {
+  execute: boolean;
+  skipCi: boolean;
+  skipSign: boolean;
+  version: string | null;
+};
+
+type RunOptions = {
+  execute?: boolean;
+  cwd?: string;
+  capture?: boolean;
+};
+
+type CommandSpec = {
+  command: string;
+  args: string[];
+};
+
+type CommandResult = SpawnSyncResult<string | Buffer> | {
+  status: number;
+  stdout: string;
+  stderr: string;
+};
+
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const packageJsonPath = path.join(repoRoot, 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const packageJson = readPackageJson();
 const semverRe = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
-process.on('uncaughtException', (error) => {
-  console.error(`[release] ${error.message}`);
+process.once('uncaughtException', (error) => {
+  console.error(`[release] ${formatErrorMessage(error)}`);
   process.exit(1);
 });
 
-function usage(exitCode = 0) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readPackageJson(): PackageJson {
+  const parsed: unknown = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  if (!isRecord(parsed) || typeof parsed.name !== 'string' || typeof parsed.version !== 'string') {
+    throw new Error('package.json is missing string name/version fields');
+  }
+  return { name: parsed.name, version: parsed.version };
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function requiredArg(value: string | undefined, message: string): string {
+  if (value === undefined) throw new Error(message);
+  return value;
+}
+
+function usage(exitCode = 0): never {
   const stream = exitCode === 0 ? process.stdout : process.stderr;
   stream.write(`Usage: npm run release -- --version <semver> [--execute] [--skip-ci] [--skip-sign]\n`);
   stream.write(`       npm run release -- <semver> [--execute]\n\n`);
@@ -22,15 +73,15 @@ function usage(exitCode = 0) {
   process.exit(exitCode);
 }
 
-function parseArgs(argv) {
-  const options = {
+function parseArgs(argv: string[]): ReleaseOptions {
+  const options: ReleaseOptions = {
     execute: false,
     skipCi: false,
     skipSign: false,
     version: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+    const arg = requiredArg(argv[index], 'Missing release argument');
     if (arg === '--help' || arg === '-h') usage(0);
     if (arg === '--execute') {
       options.execute = true;
@@ -39,7 +90,7 @@ function parseArgs(argv) {
     } else if (arg === '--skip-sign') {
       options.skipSign = true;
     } else if (arg === '--version') {
-      options.version = argv[index + 1];
+      options.version = requiredArg(argv[index + 1], 'Missing value after --version');
       index += 1;
     } else if (!arg.startsWith('-') && !options.version) {
       options.version = arg;
@@ -50,7 +101,7 @@ function parseArgs(argv) {
   return options;
 }
 
-function normalizeVersion(version) {
+function normalizeVersion(version: string): string {
   if (!version) {
     throw new Error('Missing release version. Pass --version <semver>.');
   }
@@ -61,11 +112,11 @@ function normalizeVersion(version) {
   return normalized;
 }
 
-function commandLine(command, args) {
+function commandLine(command: string, args: readonly string[]): string {
   return [command, ...args].map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(' ');
 }
 
-function spawnSpec(command, args) {
+function spawnSpec(command: string, args: string[]): CommandSpec {
   if (process.platform !== 'win32') {
     return { command, args };
   }
@@ -75,7 +126,7 @@ function spawnSpec(command, args) {
   };
 }
 
-function run(command, args, options = {}) {
+function run(command: string, args: string[], options: RunOptions = {}): CommandResult {
   const printable = commandLine(command, args);
   if (!options.execute) {
     console.log(`[dry-run] ${printable}`);
@@ -98,11 +149,11 @@ function run(command, args, options = {}) {
   return result;
 }
 
-function git(args, options = {}) {
+function git(args: string[], options: RunOptions = {}): CommandResult {
   return run('git', ['-c', `safe.directory=${repoRoot.replaceAll('\\', '/')}`, ...args], options);
 }
 
-function gitCapture(args) {
+function gitCapture(args: string[]): string | null {
   const spec = spawnSpec('git', ['-c', `safe.directory=${repoRoot.replaceAll('\\', '/')}`, ...args]);
   const result = spawnSync(spec.command, spec.args, {
     cwd: repoRoot,
@@ -113,10 +164,11 @@ function gitCapture(args) {
   if (result.status !== 0) {
     return null;
   }
-  return result.stdout.trim();
+  const stdout = typeof result.stdout === 'string' ? result.stdout : result.stdout?.toString('utf8') ?? '';
+  return stdout.trim();
 }
 
-function readGitHeadShort() {
+function readGitHeadShort(): string | null {
   const gitDir = path.join(repoRoot, '.git');
   const headPath = path.join(gitDir, 'HEAD');
   if (!fs.existsSync(headPath)) return null;
@@ -124,7 +176,9 @@ function readGitHeadShort() {
   if (/^[0-9a-f]{40}$/i.test(head)) return head.slice(0, 7);
   const refMatch = /^ref:\s+(.+)$/.exec(head);
   if (!refMatch) return null;
-  const refPath = path.join(gitDir, ...refMatch[1].split('/'));
+  const refNameFromHead = refMatch[1];
+  if (!refNameFromHead) return null;
+  const refPath = path.join(gitDir, ...refNameFromHead.split('/'));
   if (fs.existsSync(refPath)) {
     const ref = fs.readFileSync(refPath, 'utf8').trim();
     if (/^[0-9a-f]{40}$/i.test(ref)) return ref.slice(0, 7);
@@ -134,22 +188,22 @@ function readGitHeadShort() {
   const packed = fs.readFileSync(packedRefsPath, 'utf8').split(/\r?\n/);
   for (const line of packed) {
     if (line.startsWith('#') || line.startsWith('^')) continue;
-    const [sha, refName] = line.split(' ');
-    if (refName === refMatch[1] && /^[0-9a-f]{40}$/i.test(sha)) {
+    const [sha = '', refName = ''] = line.split(' ');
+    if (refName === refNameFromHead && /^[0-9a-f]{40}$/i.test(sha)) {
       return sha.slice(0, 7);
     }
   }
   return null;
 }
 
-function ensureInside(child, parent) {
+function ensureInside(child: string, parent: string): void {
   const relative = path.relative(parent, child);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error(`Refusing path outside ${parent}: ${child}`);
   }
 }
 
-function findInstallerFiles() {
+function findInstallerFiles(): string[] {
   const installersDir = path.join(repoRoot, 'installers');
   if (!fs.existsSync(installersDir)) return [];
   return fs
@@ -158,7 +212,7 @@ function findInstallerFiles() {
     .map((entry) => path.join(installersDir, entry.name));
 }
 
-function findFilesUnder(root, predicate) {
+function findFilesUnder(root: string, predicate: (filePath: string) => boolean): string[] {
   if (!fs.existsSync(root)) return [];
   const entries = fs.readdirSync(root, { withFileTypes: true });
   return entries.flatMap((entry) => {
@@ -168,22 +222,22 @@ function findFilesUnder(root, predicate) {
   });
 }
 
-function findUpdaterArtifacts() {
+function findUpdaterArtifacts(): string[] {
   const bundleRoot = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri', 'target', 'release', 'bundle');
   return ['nsis-updater', 'msi-updater', 'updater']
     .flatMap((name) => findFilesUnder(path.join(bundleRoot, name), (file) => /\.(zip|sig)$/i.test(file)));
 }
 
-function updaterSignatureFor(filePath, artifactSet) {
+function updaterSignatureFor(filePath: string, artifactSet: Set<string>): string | null {
   const candidates = [`${filePath}.sig`, filePath.replace(/\.[^.]+$/, '.sig')];
   return candidates.find((candidate) => artifactSet.has(candidate) && fs.existsSync(candidate)) || null;
 }
 
-function updateArtifactUrl(baseUrl, fileName) {
+function updateArtifactUrl(baseUrl: string, fileName: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/${encodeURIComponent(fileName)}`;
 }
 
-function writeFilePlanned(filePath, content, execute) {
+function writeFilePlanned(filePath: string, content: string, execute: boolean): void {
   if (!execute) {
     console.log(`[dry-run] write ${path.relative(repoRoot, filePath)}:`);
     console.log(content.trimEnd());
@@ -261,7 +315,7 @@ if (options.skipSign) {
   }
 }
 
-const archivedInstallers = [];
+const archivedInstallers: string[] = [];
 for (const installer of installers) {
   const dest = path.join(releaseDir, path.basename(installer));
   archivedInstallers.push(path.relative(repoRoot, dest));
@@ -273,7 +327,7 @@ for (const installer of installers) {
   }
 }
 
-const archivedUpdaterArtifacts = [];
+const archivedUpdaterArtifacts: string[] = [];
 for (const artifact of updaterArtifacts) {
   const dest = path.join(releaseDir, path.basename(artifact));
   archivedUpdaterArtifacts.push(path.relative(repoRoot, dest));
@@ -285,7 +339,7 @@ for (const artifact of updaterArtifacts) {
   }
 }
 
-let updateManifest = null;
+let updateManifest: string | null = null;
 const artifactSet = new Set(updaterArtifacts);
 const updatePayload = updaterArtifacts.find((artifact) => !/\.sig$/i.test(artifact));
 const updateSignature = updatePayload ? updaterSignatureFor(updatePayload, artifactSet) : null;
