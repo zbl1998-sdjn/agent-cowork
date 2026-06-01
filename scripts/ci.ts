@@ -1,7 +1,13 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCiSteps, changedFilesFromEnv } from './ci-gates.mjs';
+import { buildCiSteps, changedFilesFromEnv } from './ci-gates.js';
+import type { CiStep } from './ci-gates.js';
+
+type StepResult = {
+  code: number;
+  signal: string | null;
+};
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const npmCommand = 'npm';
@@ -10,7 +16,7 @@ const steps = buildCiSteps({
   forceEval: process.env.KCW_CI_FORCE_EVAL === '1',
 });
 
-function runStep(step) {
+function runStep(step: CiStep): Promise<StepResult> {
   return new Promise((resolve) => {
     console.log(`\n[ci] ${step.name}: npm ${step.args.join(' ')}`);
     const command = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : npmCommand;
