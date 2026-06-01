@@ -5,6 +5,7 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "apps/host/dbg-del.ts",
     "apps/host/test/helpers/close-server.ts",
     "apps/host/test/helpers/artifacts.ts",
     "apps/host/test/helpers/connector-oauth.ts",

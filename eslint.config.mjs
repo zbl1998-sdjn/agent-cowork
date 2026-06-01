@@ -14,6 +14,7 @@ const resourceBrowserGlobals = {
 };
 
 const typedSourceFiles = [
+  'apps/host/*.ts',
   'apps/host/src/**/*.ts',
   'apps/host/test/**/*.ts',
   'eval/**/*.ts',
