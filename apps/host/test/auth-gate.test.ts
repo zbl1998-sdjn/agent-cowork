@@ -1,13 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from '../src/server.js';
+import type { AddressInfo } from 'node:http';
+import { createServer, type ServerConfig } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
+import { recordValue, stringField } from './helpers/host-http.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+type AuthRouteOptions = {
+  method: 'GET' | 'POST' | 'PUT';
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+type AuthRouteCase = readonly [route: string, options: AuthRouteOptions];
+
+async function withServer(config: ServerConfig, fn: (base: string) => Promise<void>): Promise<void> {
   const server = createServer(config); // requireAuth defaults ON
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  const { port } = server.address();
-  try { await fn(`http://127.0.0.1:${port}`); } finally { await new Promise((r) => server.close(r)); }
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'auth gate test server should bind to a TCP port');
+  const { port } = address as AddressInfo;
+  try {
+    await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await closeTestServer(server);
+  }
 }
 
 test('unauthenticated /api is blocked; spoofed identity headers do not authenticate', async () => {
@@ -34,7 +53,7 @@ test('unauthenticated /api is blocked; spoofed identity headers do not authentic
 test('new file and route surfaces are covered by the auth gate', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-surfaces');
   await withServer({ trustedRoot, requireAuth: true, trustIdentityHeaders: false }, async (base) => {
-    const routes = [
+    const routes: AuthRouteCase[] = [
       ['/api/workspace/search', { method: 'POST', body: { trustedRoot, query: 'alpha' } }],
       ['/api/file-ops/preview', { method: 'POST', body: { trustedRoot, operations: [] } }],
       ['/api/conversations', { method: 'GET' }],
@@ -51,14 +70,17 @@ test('new file and route surfaces are covered by the auth gate', async () => {
     ];
 
     for (const [route, options] of routes) {
-      const response = await fetch(`${base}${route}`, {
+      const init: RequestInit = {
         method: options.method,
         headers: {
-          ...(options.body ? { 'content-type': 'application/json' } : {}),
-          ...(options.headers || {}),
+          ...(options.body == null ? {} : { 'content-type': 'application/json' }),
+          ...(options.headers ?? {}),
         },
-        body: options.body == null ? undefined : JSON.stringify(options.body),
-      });
+      };
+      if (options.body != null) {
+        init.body = JSON.stringify(options.body);
+      }
+      const response = await fetch(`${base}${route}`, init);
       assert.equal(response.status, 401, `${options.method} ${route} should require auth`);
     }
   });
@@ -67,12 +89,14 @@ test('new file and route surfaces are covered by the auth gate', async () => {
 test('public auth routes work without a token, and the token then unlocks /api', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-2');
   await withServer({ trustedRoot, requireAuth: true }, async (base) => {
-    const reg = await (await fetch(`${base}/api/auth/register`, {
+    const registerResponse = await fetch(`${base}/api/auth/register`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username: 'gateuser', password: 'passw0rd' }),
-    })).json();
-    assert.ok(reg.token, 'register returns a token');
-    const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${reg.token}` } });
+    });
+    const reg = recordValue(await registerResponse.json(), 'register response');
+    const token = stringField(reg, 'token');
+    assert.ok(token, 'register returns a token');
+    const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(ok.status, 200);
   });
 });
@@ -80,10 +104,13 @@ test('public auth routes work without a token, and the token then unlocks /api',
 test('guest endpoint mints an isolated token that passes the gate', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-guest');
   await withServer({ trustedRoot, requireAuth: true }, async (base) => {
-    const guest = await (await fetch(`${base}/api/auth/guest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
-    assert.ok(guest.token, 'guest returns a token');
-    assert.match(guest.tenantId, /^tenant_guest_/, 'guest gets its own tenant');
-    const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${guest.token}` } });
+    const guestResponse = await fetch(`${base}/api/auth/guest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const guest = recordValue(await guestResponse.json(), 'guest response');
+    const token = stringField(guest, 'token');
+    const tenantId = stringField(guest, 'tenantId');
+    assert.ok(token, 'guest returns a token');
+    assert.match(tenantId, /^tenant_guest_/, 'guest gets its own tenant');
+    const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(ok.status, 200);
   });
 });

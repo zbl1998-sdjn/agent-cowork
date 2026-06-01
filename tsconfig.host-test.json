@@ -44,6 +44,7 @@
     "apps/host/test/arg-validator.test.ts",
     "apps/host/test/audit-events.test.ts",
     "apps/host/test/auth-env.test.ts",
+    "apps/host/test/auth-gate.test.ts",
     "apps/host/test/auth-store-sqlite.test.ts",
     "apps/host/test/auth.test.ts",
     "apps/host/test/background-tasks.test.ts",
