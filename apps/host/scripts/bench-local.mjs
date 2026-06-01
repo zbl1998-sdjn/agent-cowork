@@ -3,7 +3,7 @@
 // Fires N concurrent agent streams against a real host (with a fast mock model),
 // reports throughput + latency percentiles, and asserts the in-memory registries
 // drain to zero (no leak under load). For the 1万→10万 target, run the
-// multi-instance harness scripts/load-sse.mjs against a load-balanced cluster.
+// multi-instance harness apps/host/scripts/load-sse.ts against a load-balanced cluster.
 //
 // Usage: N=500 node scripts/bench-local.mjs
 import fs from 'node:fs';

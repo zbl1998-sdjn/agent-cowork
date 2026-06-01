@@ -141,6 +141,10 @@ declare module 'node:util' {
   export function promisify(fn: (...args: any[]) => unknown): any;
 }
 
+declare module 'node:timers/promises' {
+  export function setTimeout(delay?: number, value?: unknown): Promise<unknown>;
+}
+
 declare module 'node:fs' {
   export interface Stats {
     size: number;
