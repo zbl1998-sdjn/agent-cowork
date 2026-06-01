@@ -6,7 +6,7 @@ import test from 'node:test';
 import { createMemoryStore } from '../src/memory/memory-store.js';
 import { createUserProfile } from '../src/memory/profile.js';
 
-function tempRoot() {
+function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-profile-'));
 }
 
@@ -50,5 +50,7 @@ test('UserProfile upserts matching entries instead of duplicating them', async (
 
   const loaded = await profile.load(root);
   assert.equal(loaded.entries.length, 1);
-  assert.equal(loaded.entries[0].value, '新解释');
+  const [entry] = loaded.entries;
+  assert.ok(entry);
+  assert.equal(entry.value, '新解释');
 });

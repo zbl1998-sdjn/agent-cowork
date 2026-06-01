@@ -4,18 +4,26 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createCredentialStore } from '../src/security/credential-store.js';
+import type { CredentialProtector } from '../src/security/credential-store.js';
 
-function tmpFile() {
+type JsonRecord = Record<string, unknown>;
+
+function tmpFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-credentials-'));
   return path.join(dir, 'credentials.json');
 }
 
-function testProtector() {
+function requireJsonRecord(value: unknown, label: string): JsonRecord {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as JsonRecord;
+}
+
+function testProtector(): CredentialProtector {
   return {
-    protect(plainText) {
+    protect(plainText: unknown): string {
       return `sealed:${Buffer.from(String(plainText), 'utf8').toString('base64')}`;
     },
-    unprotect(sealedText) {
+    unprotect(sealedText: unknown): string {
       assert.ok(String(sealedText).startsWith('sealed:'));
       return Buffer.from(String(sealedText).slice('sealed:'.length), 'base64').toString('utf8');
     },
@@ -45,12 +53,12 @@ test('credential store seals OAuth tokens on disk and returns redacted summaries
   assert.equal(JSON.stringify(summary).includes(token), false);
   assert.equal(fs.readFileSync(filePath, 'utf8').includes(token), false);
 
-  const loaded = store.get({
+  const loaded = requireJsonRecord(store.get({
     tenantId: 'tenant-a',
     userId: 'user-a',
     provider: 'github',
     accountId: 'octocat',
-  });
+  }), 'loaded credential');
   assert.equal(loaded.accessToken, token);
   assert.deepEqual(loaded.account, { login: 'octocat', id: 1 });
 
