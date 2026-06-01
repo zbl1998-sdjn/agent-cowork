@@ -12,7 +12,7 @@ type SecretScanModule = {
   scanTextForSecrets(text: string, filePath: string): SecretFinding[];
   shouldSkipWalkFallback(filePath: string): boolean;
 };
-const checkSecretsScript = '../../../scripts/check-secrets.mjs';
+const checkSecretsScript = '../../../scripts/check-secrets.ts';
 
 async function loadSecretScan(): Promise<SecretScanModule> {
   return await import(checkSecretsScript) as SecretScanModule;

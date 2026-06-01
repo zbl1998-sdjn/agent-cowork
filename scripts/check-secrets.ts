@@ -3,6 +3,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+type SecretDetector = {
+  id: string;
+  re: RegExp;
+};
+
+export type SecretFinding = {
+  detector: string;
+  path: string;
+  line: number;
+  excerpt: string;
+};
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set([
   '.git',
@@ -40,7 +52,7 @@ const TEXT_EXTENSIONS = new Set([
   '.yaml',
   '.yml',
 ]);
-const DETECTORS = [
+const DETECTORS: SecretDetector[] = [
   { id: 'private-key', re: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/g },
   { id: 'github-token', re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}\b/g },
   { id: 'github-pat', re: /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g },
@@ -53,16 +65,16 @@ const DETECTORS = [
   },
 ];
 
-function toPosix(filePath) {
+function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
 }
 
-function isTestPath(relativePath) {
+function isTestPath(relativePath: string): boolean {
   return /(^|\/)(test|tests|fixtures)(\/|$)/.test(relativePath)
     || /\.(test|spec)\.(js|mjs|ts|tsx)$/.test(relativePath);
 }
 
-function shouldSkip(relativePath) {
+function shouldSkip(relativePath: string): boolean {
   if (!relativePath || relativePath.startsWith('..')) return true;
   const normalized = relativePath.split('\\').join('/');
   if (isTestPath(normalized)) return true;
@@ -70,54 +82,56 @@ function shouldSkip(relativePath) {
   if (normalized.endsWith('.tsbuildinfo')) return true;
   if (normalized.split('/').some((segment) => SKIP_DIRS.has(segment))) return true;
   const ext = path.extname(normalized).toLowerCase();
-  return ext && !TEXT_EXTENSIONS.has(ext);
+  return Boolean(ext && !TEXT_EXTENSIONS.has(ext));
 }
 
-export function shouldSkipWalkFallback(relativePath) {
+export function shouldSkipWalkFallback(relativePath: string): boolean {
   const normalized = relativePath.split('\\').join('/');
-  const basename = path.posix.basename(normalized);
+  const slash = normalized.lastIndexOf('/');
+  const basename = slash === -1 ? normalized : normalized.slice(slash + 1);
   return WALK_FALLBACK_SKIP_BASENAMES.has(basename)
     || basename.startsWith('.fuse_hidden');
 }
 
-function looksLikePlaceholder(value) {
+function looksLikePlaceholder(value: string): boolean {
   return /(?:dummy|example|fake|placeholder|redacted|sample|test|todo|your[_-]?key|do-not-echo)/i.test(value);
 }
 
-function lineForIndex(text, index) {
+function lineForIndex(text: string, index: number): number {
   return text.slice(0, index).split(/\r\n|\r|\n/).length;
 }
 
-function safeLine(text, index, matched) {
+function safeLine(text: string, index: number, matched: string): string {
   const lineStart = text.lastIndexOf('\n', index) + 1;
   const lineEnd = text.indexOf('\n', index);
   const raw = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
   return raw.replace(matched, '[REDACTED]').trim().slice(0, 160);
 }
 
-function scanDetector(text, relativePath, detector) {
-  const findings = [];
+function scanDetector(text: string, relativePath: string, detector: SecretDetector): SecretFinding[] {
+  const findings: SecretFinding[] = [];
   detector.re.lastIndex = 0;
   for (const match of text.matchAll(detector.re)) {
-    const matched = match[0];
+    const matched = match[0] || '';
     const secretValue = match[1] || matched;
     if (looksLikePlaceholder(secretValue)) continue;
+    const index = match.index ?? 0;
     findings.push({
       detector: detector.id,
       path: relativePath,
-      line: lineForIndex(text, match.index || 0),
-      excerpt: safeLine(text, match.index || 0, matched),
+      line: lineForIndex(text, index),
+      excerpt: safeLine(text, index, matched),
     });
   }
   return findings;
 }
 
-export function scanTextForSecrets(text, relativePath = 'inline') {
+export function scanTextForSecrets(text: string, relativePath = 'inline'): SecretFinding[] {
   if (shouldSkip(relativePath)) return [];
   return DETECTORS.flatMap((detector) => scanDetector(text, relativePath, detector));
 }
 
-function walk(dir, out = []) {
+function walk(dir: string, out: string[] = []): string[] {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (SKIP_DIRS.has(entry.name)) continue;
@@ -131,20 +145,28 @@ function walk(dir, out = []) {
   return out;
 }
 
-export function candidateFiles() {
+function stdoutText(stdout: string | Buffer | undefined): string {
+  return Buffer.isBuffer(stdout) ? stdout.toString('utf8') : String(stdout || '');
+}
+
+export function candidateFiles(): string[] {
   const git = spawnSync('git', ['-c', `safe.directory=${ROOT}`, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: ROOT,
     encoding: 'buffer',
     windowsHide: true,
   });
-  if (git.status === 0 && git.stdout?.length) {
-    return git.stdout.toString('utf8').split('\0').filter(Boolean).map((item) => item.split('\\').join('/')).filter((item) => !shouldSkip(item));
+  if (git.status === 0 && git.stdout && stdoutText(git.stdout).length) {
+    return stdoutText(git.stdout)
+      .split('\0')
+      .filter(Boolean)
+      .map((item) => item.split('\\').join('/'))
+      .filter((item) => !shouldSkip(item));
   }
   return walk(ROOT);
 }
 
-export function scanRepoForSecrets(files = candidateFiles()) {
-  const findings = [];
+export function scanRepoForSecrets(files = candidateFiles()): SecretFinding[] {
+  const findings: SecretFinding[] = [];
   for (const relative of files) {
     const full = path.join(ROOT, relative);
     if (!fs.existsSync(full)) continue;
@@ -156,7 +178,7 @@ export function scanRepoForSecrets(files = candidateFiles()) {
   return findings;
 }
 
-function main() {
+function main(): void {
   const findings = scanRepoForSecrets();
   if (findings.length) {
     console.error(`Secret scan failed (${findings.length} finding${findings.length === 1 ? '' : 's'}):`);
@@ -168,6 +190,7 @@ function main() {
   console.log('Secret scan passed.');
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const argv = (process as { argv?: string[] }).argv || [];
+if (argv[1] && path.resolve(argv[1]) === fileURLToPath(import.meta.url)) {
   main();
 }
