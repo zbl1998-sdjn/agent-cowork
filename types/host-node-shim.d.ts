@@ -285,6 +285,7 @@ declare module 'node:http' {
 
 declare module 'node:url' {
   export function fileURLToPath(url: string): string;
+  export function pathToFileURL(path: string): URL;
 }
 
 declare module 'node:vm' {

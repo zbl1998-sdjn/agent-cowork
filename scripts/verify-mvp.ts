@@ -200,7 +200,7 @@ const checks: CheckConfig[] = [
   {
     name: 'windows client resource smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.ts')],
   },
   {
     name: 'host operation smoke script syntax',
@@ -256,7 +256,7 @@ const checks: CheckConfig[] = [
   {
     name: 'windows client static resource smoke',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'smoke-windows-client-resources.mjs')],
+    commandArgs: hostScriptArgs('smoke-windows-client-resources.ts'),
   },
 ];
 

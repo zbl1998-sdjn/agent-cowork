@@ -41,6 +41,7 @@
     "scripts/smoke-react-branches.ts",
     "scripts/smoke-react-live-artifact.ts",
     "scripts/smoke-react-scroll.ts",
+    "scripts/smoke-windows-client-resources.ts",
     "scripts/smoke-sqlite-runtime.ts",
     "scripts/smoke-tauri-scaffold.ts",
     "apps/host/scripts/load-sse.ts",

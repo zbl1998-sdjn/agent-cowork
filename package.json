@@ -27,7 +27,7 @@
     "smoke:react-branches": "node scripts/run-host-node.mjs scripts/smoke-react-branches.ts",
     "smoke:react-connectors": "node scripts/run-host-node.mjs scripts/smoke-react-connectors.mjs",
     "smoke:react-connectors:live-github": "node scripts/run-host-node.mjs scripts/smoke-react-connectors.mjs --live-github",
-    "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
+    "smoke:windows-resources": "node scripts/run-host-node.mjs scripts/smoke-windows-client-resources.ts",
     "smoke:windows-paths": "node scripts/run-host-node.mjs scripts/smoke-windows-paths.ts",
     "smoke:sqlite-runtime": "node scripts/run-host-node.mjs scripts/smoke-sqlite-runtime.ts",
     "smoke:runtime-update": "node scripts/run-host-node.mjs scripts/smoke-runtime-update-preservation.ts",
