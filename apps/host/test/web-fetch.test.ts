@@ -1,18 +1,37 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { webFetch } from '../src/tools/web-fetch.js';
+import type { WebFetchResult } from '../src/tools/web-fetch.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 
-async function startServer(handler) {
+type TestHandler = (req: IncomingMessage, res: ServerResponse) => void;
+
+async function startServer(handler: TestHandler): Promise<{ server: Server; port: number }> {
   const server = http.createServer(handler);
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  return { server, port: server.address().port };
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('test server did not bind to a TCP port');
+  }
+  return { server, port: address.port };
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+function requireWebFetchResult(value: unknown): WebFetchResult {
+  assert.ok(value && typeof value === 'object', 'tool result must be an object');
+  return value as WebFetchResult;
 }
 
 test('webFetch retrieves a page body with status + content-type', async () => {
-  const { server, port } = await startServer((req, res) => {
+  const { server, port } = await startServer((_req, res) => {
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
     res.end('hello from fixture');
   });
@@ -24,12 +43,12 @@ test('webFetch retrieves a page body with status + content-type', async () => {
     assert.match(out.contentType, /text\/plain/);
     assert.equal(out.text, 'hello from fixture');
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeServer(server);
   }
 });
 
 test('webFetch caps the body at maxBytes and flags truncation', async () => {
-  const { server, port } = await startServer((req, res) => {
+  const { server, port } = await startServer((_req, res) => {
     res.writeHead(200, { 'content-type': 'text/plain' });
     res.end('x'.repeat(5000));
   });
@@ -38,7 +57,7 @@ test('webFetch caps the body at maxBytes and flags truncation', async () => {
     assert.equal(out.truncated, true);
     assert.equal(out.text.length, 100);
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeServer(server);
   }
 });
 
@@ -50,22 +69,30 @@ test('webFetch rejects non-http schemes and internal hosts by default', async ()
 });
 
 test('webFetch rejects unknown option keys before network access', async () => {
+  const input = { url: 'http://example.com/', extra: true };
   await assert.rejects(
-    () => webFetch({ url: 'http://example.com/', extra: true }),
+    () => webFetch(input),
     /Unrecognized key|extra/,
   );
 });
 
 test('web.fetch is exposed as a built-in tool', async () => {
-  const { server, port } = await startServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"k":1}'); });
+  const { server, port } = await startServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"k":1}');
+  });
   try {
     const registry = new ToolRegistry().registerMany(createBuiltinTools({}));
     assert.equal(registry.has('web.fetch'), true);
-    assert.equal(registry.descriptor('web.fetch').requiresApproval, true);
-    const res = await registry.call('web.fetch', { url: `http://127.0.0.1:${port}/`, allowInternal: true });
+    const descriptor = registry.descriptor('web.fetch');
+    assert.ok(descriptor, 'web.fetch descriptor exists');
+    assert.equal(descriptor.requiresApproval, true);
+    const res = requireWebFetchResult(
+      await registry.call('web.fetch', { url: `http://127.0.0.1:${port}/`, allowInternal: true }),
+    );
     assert.equal(res.status, 200);
     assert.match(res.text, /"k":1/);
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeServer(server);
   }
 });
