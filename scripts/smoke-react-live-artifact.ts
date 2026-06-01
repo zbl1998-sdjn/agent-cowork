@@ -1,11 +1,26 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import {
+  CdpClient,
+  assert,
+  bind,
+  errorDetails,
+  evaluate,
+  findBrowser,
+  getFreePort,
+  getJson,
+  isRecord,
+  type CdpSession,
+  type CdpTarget,
+  type CdpVersion,
+  type ScreenshotResult,
+  type SendPage,
+} from './browser-smoke-utils.js';
+import type { ChildProcessLike } from 'node:child_process';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -20,137 +35,45 @@ const reportPath = archiveRequested
   : defaultReportPath;
 const screenshotPath = path.join(buildDir, 'react-live-artifact-smoke-1280x760.png');
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
+type LiveFrameSnapshot = {
+  srcdoc: string;
+  dataUrl: string;
+};
+
+type LiveArtifactFetch = {
+  url: string | undefined;
+  body: unknown;
+};
+
+type AutoRefreshUi = {
+  label: string;
+  status: string;
+  interval: string;
+};
+
+function liveFrameSnapshot(value: unknown, label: string): LiveFrameSnapshot {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    srcdoc: typeof value.srcdoc === 'string' ? value.srcdoc : '',
+    dataUrl: typeof value.dataUrl === 'string' ? value.dataUrl : '',
+  };
 }
 
-function findBrowser() {
-  const candidates =
-    process.platform === 'win32'
-      ? [
-          path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        ]
-      : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge'];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+function liveFetchSnapshot(value: unknown, label: string): LiveArtifactFetch {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    url: typeof value.url === 'string' ? value.url : undefined,
+    body: value.body,
+  };
 }
 
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-async function getJson(url, timeoutMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
-          let body = '';
-          response.setEncoding('utf8');
-          response.on('data', (chunk) => {
-            body += chunk;
-          });
-          response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
-              return;
-            }
-            resolve(JSON.parse(body));
-          });
-        });
-        request.on('error', reject);
-        request.setTimeout(1000, () => request.destroy(new Error(`Timed out fetching ${url}`)));
-      });
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-  throw new Error(`Timed out waiting for ${url}`);
-}
-
-class CdpClient {
-  constructor(url) {
-    this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-  }
-
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener(
-        'open',
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
-      this.socket.addEventListener(
-        'error',
-        () => {
-          clearTimeout(timeout);
-          reject(new Error('Failed opening DevTools websocket'));
-        },
-        { once: true },
-      );
-    });
-
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (message.id && this.pending.has(message.id)) {
-        const { resolve, reject } = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        if (message.error) reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
-        else resolve(message.result || {});
-        return;
-      }
-    });
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    this.socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
-  }
-
-  close() {
-    this.socket?.close();
-  }
-}
-
-async function evaluate(sendPage, expression, awaitPromise = true, contextId = undefined) {
-  const result = await sendPage('Runtime.evaluate', {
-    expression,
-    awaitPromise,
-    returnByValue: true,
-    ...(contextId ? { contextId } : {}),
-  });
-  if (result.exceptionDetails) {
-    const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate failed';
-    throw new Error(detail);
-  }
-  return result.result?.value;
-}
-
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  return `http://127.0.0.1:${server.address().port}`;
+function autoRefreshSnapshot(value: unknown, label: string): AutoRefreshUi {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    label: typeof value.label === 'string' ? value.label : '',
+    status: typeof value.status === 'string' ? value.status : '',
+    interval: typeof value.interval === 'string' ? value.interval : '',
+  };
 }
 
 async function main() {
@@ -185,16 +108,16 @@ async function main() {
   });
 
   const startedAt = Date.now();
-  let baseUrl = null;
-  let browser = null;
-  let client = null;
-  let userDataDir = null;
+  let baseUrl: string | null = null;
+  let browser: ChildProcessLike | null = null;
+  let client: CdpClient | null = null;
+  let userDataDir: string | null = null;
   let beforeRefresh = '';
   let afterRefresh = '';
-  let autoRefreshFetch = null;
+  let autoRefreshFetch: LiveArtifactFetch | null = null;
   let livePageBefore = '';
   let livePageAfter = '';
-  const stderr = [];
+  const stderr: string[] = [];
 
   try {
     baseUrl = await bind(host);
@@ -220,12 +143,15 @@ async function main() {
       stderr.push(chunk.toString());
     });
 
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client closed unexpectedly');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -265,7 +191,7 @@ async function main() {
         const deadline = Date.now() + 8000;
         function tick() {
           const headerReady = [...document.querySelectorAll('button')].some((button) => button.innerText.trim() === '可视化');
-          const workspaceReady = document.body.innerText.includes(${JSON.stringify(workspace)});
+          const workspaceReady = document.querySelector('.workspace-chip')?.getAttribute('title')?.includes(${JSON.stringify(workspace)});
           if (headerReady && workspaceReady) resolve(true);
           else if (Date.now() > deadline) reject(new Error('React shell did not become ready for live artifact smoke'));
           else setTimeout(tick, 50);
@@ -282,6 +208,19 @@ async function main() {
         button.click();
         return true;
       })()`,
+    );
+
+    await evaluate(
+      sendPage,
+      `new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000;
+        function tick() {
+          if (document.querySelector('.side-panel textarea')) resolve(true);
+          else if (Date.now() > deadline) reject(new Error('visualization panel did not finish loading'));
+          else setTimeout(tick, 50);
+        }
+        tick();
+      })`,
     );
 
     const vizSpec = {
@@ -318,7 +257,7 @@ async function main() {
       })`,
     );
 
-    const initialFrame = await evaluate(
+    const initialFrame = liveFrameSnapshot(await evaluate(
       sendPage,
       `(() => {
         const frame = document.querySelector('.viz-frame');
@@ -326,7 +265,7 @@ async function main() {
         const dataUrl = srcdoc.match(/var DATA_URL = "([^"]+)"/)?.[1] || '';
         return { srcdoc, dataUrl };
       })()`,
-    );
+    ), 'initialFrame');
     assert(initialFrame.srcdoc.includes('before') && initialFrame.srcdoc.includes('1'), 'initial iframe srcDoc lacks seeded table data');
     assert(initialFrame.dataUrl.includes('/api/artifacts/data/'), `live artifact data URL missing from srcDoc: ${initialFrame.dataUrl}`);
     beforeRefresh = initialFrame.srcdoc.slice(0, 800);
@@ -358,7 +297,7 @@ async function main() {
       })()`,
     );
 
-    autoRefreshFetch = await evaluate(
+    autoRefreshFetch = liveFetchSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 10000;
@@ -374,28 +313,31 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'autoRefreshFetch');
 
-    const autoRefreshUi = await evaluate(
+    const autoRefreshUi = autoRefreshSnapshot(await evaluate(
       sendPage,
       `(() => ({
         label: document.querySelector('.live-artifact-auto')?.innerText || '',
         status: document.querySelector('.live-artifact-view .panel-note')?.innerText || '',
         interval: document.querySelector('input[aria-label="自动刷新间隔秒"]')?.value || ''
       }))()`,
-    );
+    ), 'autoRefreshUi');
     assert(autoRefreshUi.label.includes('自动刷新 1s'), `auto refresh label did not update: ${autoRefreshUi.label}`);
     assert(autoRefreshUi.interval === '1', `auto refresh interval did not remain at 1: ${autoRefreshUi.interval}`);
 
     const liveId = initialFrame.dataUrl.split('/').pop();
     assert(liveId, `could not derive live artifact id from ${initialFrame.dataUrl}`);
     const liveUrl = `${baseUrl}/api/artifacts/live/${encodeURIComponent(liveId)}`;
-    const { targetId: liveTargetId } = await client.send('Target.createTarget', { url: liveUrl });
-    const { sessionId: liveSessionId } = await client.send('Target.attachToTarget', { targetId: liveTargetId, flatten: true });
-    const sendLivePage = (method, params = {}) => client.send(method, params, liveSessionId);
+    const { targetId: liveTargetId } = await client.send<CdpTarget>('Target.createTarget', { url: liveUrl });
+    const { sessionId: liveSessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId: liveTargetId, flatten: true });
+    const sendLivePage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client closed unexpectedly');
+      return client.send(method, params, liveSessionId);
+    };
     await sendLivePage('Page.enable');
     await sendLivePage('Runtime.enable');
-    livePageBefore = await evaluate(
+    livePageBefore = String(await evaluate(
       sendLivePage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
@@ -407,7 +349,7 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ));
     await evaluate(
       sendLivePage,
       `(() => {
@@ -417,7 +359,7 @@ async function main() {
         return true;
       })()`,
     );
-    livePageAfter = await evaluate(
+    livePageAfter = String(await evaluate(
       sendLivePage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
@@ -429,10 +371,10 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ));
     afterRefresh = livePageAfter;
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     const report = {
@@ -471,11 +413,11 @@ async function main() {
       autoRefreshFetch,
       livePageBefore,
       livePageAfter,
-      error: error.stack || error.message,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(errorDetails(error));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -497,9 +439,9 @@ main().catch((error) => {
     ok: false,
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: errorDetails(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });
