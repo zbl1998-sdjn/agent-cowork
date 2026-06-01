@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -9,10 +10,24 @@ import { SqliteRunsIndex, createUlid } from '../src/runtime/runs-index.js';
 import { Scheduler, SqliteScheduleStore } from '../src/runtime/scheduler.js';
 import { createServer } from '../src/server.js';
 import { migrateSqliteDatabase, openSqliteDatabase } from '../src/storage/sqlite.js';
+import { closeTestServer } from './helpers/close-server.js';
+import type { HostServer } from '../src/server.js';
+
+type JsonRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+type JsonResponse = {
+  status: number;
+  body: unknown;
+  headers: Headers;
+};
 
 const require = createRequire(import.meta.url);
 
-function hasNodeSqlite() {
+function hasNodeSqlite(): boolean {
   try {
     require('node:sqlite');
     return true;
@@ -23,29 +38,49 @@ function hasNodeSqlite() {
 
 const sqliteAvailable = hasNodeSqlite();
 
-function tempRoot(prefix = 'kcw-sqlite-') {
+function tempRoot(prefix = 'kcw-sqlite-'): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-async function bind(server) {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { address, port } = server.address();
-  return `http://${address}:${port}`;
+function present<T>(value: T | null | undefined, label: string): T {
+  assert.ok(value, `${label} should exist`);
+  return value;
 }
 
-async function jsonRequest(base, route, { method = 'GET', body, headers = {} } = {}) {
-  const response = await fetch(`${base}${route}`, {
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function recordArray(value: unknown, label: string): Array<Record<string, unknown>> {
+  assert.ok(Array.isArray(value), `${label} should be an array`);
+  return value.map((item, index) => recordValue(item, `${label}[${index}]`));
+}
+
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object', 'test server should bind to a TCP port');
+  const { address: host, port } = address as AddressInfo;
+  return `http://${host}:${port}`;
+}
+
+async function jsonRequest(base: string, route: string, { method = 'GET', body, headers = {} }: JsonRequestOptions = {}): Promise<JsonResponse> {
+  const init: RequestInit = {
     method,
     headers: {
       'content-type': 'application/json',
       ...headers,
     },
-    body: body == null ? undefined : JSON.stringify(body),
-  });
+  };
+  if (body != null) {
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(`${base}${route}`, init);
   const text = await response.text();
   return {
     status: response.status,
-    body: text ? JSON.parse(text) : null,
+    body: text ? JSON.parse(text) as unknown : null,
     headers: response.headers,
   };
 }
@@ -77,7 +112,7 @@ test('SqliteRunsIndex matches file adapter semantics for upsert/list/stats/remov
     finishedAt: '2026-05-20T10:00:01Z',
   });
 
-  const got = index.get(id, { tenantId: 'tenant_alice' });
+  const got = present(index.get(id, { tenantId: 'tenant_alice' }), 'sqlite run index record');
   assert.equal(got.status, 'succeeded');
   assert.equal(got.version, 2);
   assert.equal(index.get(id, { tenantId: 'tenant_bob' }), null);
@@ -85,7 +120,7 @@ test('SqliteRunsIndex matches file adapter semantics for upsert/list/stats/remov
   assert.equal(index.stats({ tenantId: 'tenant_alice' }).total, 1);
 
   const reopened = new SqliteRunsIndex({ dbPath });
-  assert.equal(reopened.get(id).status, 'succeeded');
+  assert.equal(present(reopened.get(id), 'reopened run index record').status, 'succeeded');
   assert.equal(reopened.remove(id), true);
   assert.equal(reopened.size(), 0);
 });
@@ -106,7 +141,7 @@ test('SqliteMemoryStore stores tenant-scoped facts and notes', { skip: !sqliteAv
   store.appendMemoryFact(root, { key: '隔离', value: '不应泄漏' }, { tenantId: 'tenant_bob' });
   const body = store.readMainMemory(root, { tenantId: 'tenant_alice' });
   assert.match(body, /客户简称/);
-  assert.doesNotMatch(body, /不应泄漏/);
+  assert.equal(/不应泄漏/.test(body), false, 'tenant-scoped memory should not leak other tenants');
 
   const notePath = store.writeMemoryNote(
     root,
@@ -115,7 +150,7 @@ test('SqliteMemoryStore stores tenant-scoped facts and notes', { skip: !sqliteAv
     { tenantId: 'tenant_alice', userId: 'user_alice' },
   );
   assert.match(notePath, /^sqlite:\/\/memory_notes\//);
-  assert.match(store.readMemoryNote(root, 'projects.md', { tenantId: 'tenant_alice' }), /Alpha/);
+  assert.match(present(store.readMemoryNote(root, 'projects.md', { tenantId: 'tenant_alice' }), 'sqlite memory note'), /Alpha/);
   assert.equal(store.listMemoryNotes(root, { tenantId: 'tenant_alice' }).length, 1);
   assert.equal(store.loadMemoryContext(root, { context: { tenantId: 'tenant_alice' } }).enabled, true);
 });
@@ -124,7 +159,7 @@ test('SqliteScheduleStore persists schedules across Scheduler instances', { skip
   const root = tempRoot();
   const dbPath = path.join(root, 'state.sqlite');
   let nowMs = new Date('2026-05-18T08:59:00').getTime();
-  const fired = [];
+  const fired: string[] = [];
   const scheduler = new Scheduler({
     store: new SqliteScheduleStore({ dbPath }),
     executor: async (record) => {
@@ -143,7 +178,7 @@ test('SqliteScheduleStore persists schedules across Scheduler instances', { skip
   assert.match(record.id, /^sched_/);
   assert.equal(scheduler.list({ tenantId: 'tenant_alice' }).length, 1);
 
-  nowMs = Date.parse(record.nextFireAt) + 1000;
+  nowMs = Date.parse(present(record.nextFireAt, 'sqlite schedule nextFireAt')) + 1000;
   const results = await scheduler.tickOnce();
   assert.equal(results.length, 1);
   assert.equal(fired.length, 1);
@@ -153,7 +188,7 @@ test('SqliteScheduleStore persists schedules across Scheduler instances', { skip
     executor: async () => ({ runId: 'unused' }),
     now: () => new Date(nowMs),
   });
-  const after = reopened.get(record.id);
+  const after = present(reopened.get(record.id), 'reopened sqlite schedule');
   assert.equal(after.runs, 1);
   assert.equal(after.lastRunId, `run_${record.id}`);
 });
@@ -180,12 +215,13 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
     await flushMemoryAuditEvents(trustedRoot);
     const auditPath = path.join(trustedRoot, '.AgentCowork', 'audit', 'memory.jsonl');
     assert.ok(fs.existsSync(auditPath), 'sqlite memory writes must emit audit JSONL');
-    const auditLines = fs.readFileSync(auditPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    const auditLines = fs.readFileSync(auditPath, 'utf8').trim().split('\n').map((line) => recordValue(JSON.parse(line) as unknown, 'memory audit line'));
     assert.ok(auditLines.some((line) => line.trace_id === 'trace_sqlite' && line.action === 'memory_fact_append'));
 
     const memory = await jsonRequest(base, '/api/memory', { headers });
     assert.equal(memory.status, 200);
-    assert.match(memory.body.memory.text, /OKR/);
+    const memoryBody = recordValue(memory.body, 'memory response body');
+    assert.match(String(recordValue(memoryBody.memory, 'memory payload').text), /OKR/);
 
     const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
@@ -196,8 +232,9 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
 
     const index = await jsonRequest(base, '/api/runs/index', { headers });
     assert.equal(index.status, 200);
-    assert.equal(index.body.runs.length, 1);
-    assert.equal(index.body.runs[0].recipeId, 'meeting-actions');
+    const indexedRuns = recordArray(recordValue(index.body, 'runs index response body').runs, 'runs index records');
+    assert.equal(indexedRuns.length, 1);
+    assert.equal(present(indexedRuns[0], 'first sqlite indexed run').recipeId, 'meeting-actions');
 
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const schedule = await jsonRequest(base, '/api/schedules', {
@@ -206,9 +243,9 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
       body: { name: 'once', fireAt, payload: { recipeId: 'meeting-actions' } },
     });
     assert.equal(schedule.status, 200);
-    assert.match(schedule.body.schedule.id, /^sched_/);
+    assert.match(String(recordValue(recordValue(schedule.body, 'schedule response body').schedule, 'schedule payload').id), /^sched_/);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 });
 
@@ -226,9 +263,9 @@ test('SQLite migrations can use embedded SQL when migration files are not presen
     WHERE type = 'table'
       AND name IN ('runs_index', 'memory_facts', 'memory_notes', 'schedules')
     ORDER BY name
-  `).all().map((row) => row.name);
+  `).all().map((row) => String(recordValue(row, 'sqlite table row').name));
   assert.deepEqual(tables, ['memory_facts', 'memory_notes', 'runs_index', 'schedules']);
-  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => row.id);
+  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => String(recordValue(row, 'schema migration row').id));
   assert.deepEqual(applied, ['0001_init.sql']);
 });
 
@@ -250,7 +287,7 @@ test('SQLite migrations roll back failed migration files atomically', { skip: !s
   const db = openSqliteDatabase(path.join(root, 'state.sqlite'));
   assert.throws(() => migrateSqliteDatabase(db, { migrationsPath }), /table_that_does_not_exist|no such table/i);
 
-  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => row.id);
+  const applied = db.prepare('SELECT id FROM schema_migrations ORDER BY id').all().map((row) => String(recordValue(row, 'schema migration row').id));
   assert.deepEqual(applied, ['0001_ok.sql']);
   const leakedTable = db.prepare(`
     SELECT name

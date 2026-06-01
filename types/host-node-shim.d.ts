@@ -269,7 +269,9 @@ declare module 'node:dns' {
 
 declare module 'node:test' {
   export type TestFunction = (context?: unknown) => unknown | Promise<unknown>;
+  export type TestOptions = { only?: boolean; skip?: boolean | string; todo?: boolean | string; timeout?: number };
   export default function test(name: string, fn: TestFunction): unknown;
+  export default function test(name: string, options: TestOptions, fn: TestFunction): unknown;
 }
 
 declare module 'node:assert/strict' {
@@ -285,6 +287,7 @@ declare module 'node:assert/strict' {
       message?: string
     ): Promise<void>;
     doesNotThrow(block: () => unknown, message?: string): void;
+    doesNotMatch(actual: string, expected: RegExp, message?: string): void;
   }
 
   const assert: Assert;

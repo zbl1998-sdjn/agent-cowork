@@ -1,18 +1,44 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const appsRoot = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const workspaceRoot = path.dirname(appsRoot);
 const tauriRoot = path.join(appsRoot, 'windows-client', 'src-tauri');
 const resourcesRoot = path.join(appsRoot, 'windows-client', 'resources');
-const packageJson = JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf8'));
+const packageJson = recordValue(JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf8')) as unknown, 'package.json');
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function recordArray(value: unknown, label: string): Array<Record<string, unknown>> {
+  assert.ok(Array.isArray(value), `${label} should be an array`);
+  return value.map((item, index) => recordValue(item, `${label}[${index}]`));
+}
+
+function stringArray(value: unknown, label: string): string[] {
+  assert.ok(Array.isArray(value), `${label} should be an array`);
+  return value.map((item, index) => {
+    assert.equal(typeof item, 'string', `${label}[${index}] should be a string`);
+    return item;
+  });
+}
+
+function permissionIds(value: unknown): string[] {
+  assert.ok(Array.isArray(value), 'tauri capability permissions should be an array');
+  return value.map((permission, index) => {
+    if (typeof permission === 'string') return permission;
+    return String(recordValue(permission, `tauri capability permissions[${index}]`).identifier || '');
+  });
+}
 
 test('Tauri scaffold keeps host npm dependencies allowlisted and points at the Node host/static resources', () => {
-  assert.deepEqual(Object.keys(packageJson.dependencies || {}).sort(), ['zod']);
-  assert.deepEqual(Object.keys(packageJson.devDependencies || {}).sort(), [
+  assert.deepEqual(Object.keys(recordValue(packageJson.dependencies, 'package dependencies')).sort(), ['zod']);
+  assert.deepEqual(Object.keys(recordValue(packageJson.devDependencies, 'package devDependencies')).sort(), [
     '@eslint/js',
     'eslint',
     'eslint-plugin-react-hooks',
@@ -20,28 +46,33 @@ test('Tauri scaffold keeps host npm dependencies allowlisted and points at the N
     'typescript-eslint',
   ]);
 
-  const config = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8'));
+  const config = recordValue(JSON.parse(fs.readFileSync(path.join(tauriRoot, 'tauri.conf.json'), 'utf8')) as unknown, 'tauri config');
   assert.equal(config.productName, 'Agent Cowork');
-  assert.equal(config.build.devUrl, 'http://127.0.0.1:5173');
-  assert.equal(config.build.frontendDist, '../ui-dist');
-  assert.match(config.build.beforeBuildCommand, /prepare-embedded-python\.ps1/);
-  assert.equal(config.app.windows[0].label, 'main');
-  assert.ok(config.app.security.csp, 'Tauri CSP must not be null');
-  assert.equal(config.bundle.active, true);
-  assert.equal(config.bundle.createUpdaterArtifacts, true);
-  assert.equal(config.bundle.useLocalToolsDir, true);
-  assert.deepEqual(config.bundle.targets, ['nsis']);
-  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: 'embedBootstrapper' });
-  assert.equal(config.bundle.windows.nsis.installMode, 'currentUser');
-  assert.deepEqual(config.bundle.resources, {
+  const build = recordValue(config.build, 'tauri build config');
+  assert.equal(build.devUrl, 'http://127.0.0.1:5173');
+  assert.equal(build.frontendDist, '../ui-dist');
+  assert.match(String(build.beforeBuildCommand), /prepare-embedded-python\.ps1/);
+  const app = recordValue(config.app, 'tauri app config');
+  assert.equal(recordArray(app.windows, 'tauri windows')[0]?.label, 'main');
+  assert.ok(recordValue(app.security, 'tauri security config').csp, 'Tauri CSP must not be null');
+  const bundle = recordValue(config.bundle, 'tauri bundle config');
+  assert.equal(bundle.active, true);
+  assert.equal(bundle.createUpdaterArtifacts, true);
+  assert.equal(bundle.useLocalToolsDir, true);
+  assert.deepEqual(bundle.targets, ['nsis']);
+  const bundleWindows = recordValue(bundle.windows, 'tauri bundle windows config');
+  assert.deepEqual(bundleWindows.webviewInstallMode, { type: 'embedBootstrapper' });
+  assert.equal(recordValue(bundleWindows.nsis, 'tauri nsis config').installMode, 'currentUser');
+  assert.deepEqual(bundle.resources, {
     '../resources/python-embedded': 'python-embedded',
   });
-  assert.deepEqual(config.bundle.externalBin, ['binaries/agent-cowork-host']);
-  assert.ok(config.plugins?.updater?.pubkey, 'Tauri updater pubkey must be configured');
-  assert.deepEqual(config.plugins.updater.endpoints, [
+  assert.deepEqual(bundle.externalBin, ['binaries/agent-cowork-host']);
+  const updater = recordValue(recordValue(config.plugins, 'tauri plugins').updater, 'tauri updater config');
+  assert.ok(updater.pubkey, 'Tauri updater pubkey must be configured');
+  assert.deepEqual(updater.endpoints, [
     'https://updates.agent-cowork.local/desktop-update/{{target}}/{{arch}}/{{current_version}}',
   ]);
-  for (const endpoint of config.plugins.updater.endpoints) {
+  for (const endpoint of stringArray(updater.endpoints, 'tauri updater endpoints')) {
     assert.ok(endpoint.startsWith('https://'), 'release updater endpoints must use HTTPS');
   }
 });
@@ -103,17 +134,18 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   // The packaged app must spawn the bundled host binary, never a PATH node.
   assert.equal(rust.includes('Command::new("node")'), false, 'must not spawn PATH node');
 
-  const capability = JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8'));
+  const capability = recordValue(JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8')) as unknown, 'tauri default capability');
   // Hardened: broad opener:default / shell:allow-open / shell:default grants are
   // intentionally absent; the safe opener is the custom open_path command above.
-  assert.equal(capability.permissions.includes('opener:default'), false);
-  assert.equal(capability.permissions.includes('shell:default'), false);
-  assert.equal(capability.permissions.includes('shell:allow-open'), false);
+  const permissions = permissionIds(capability.permissions);
+  assert.equal(permissions.includes('opener:default'), false);
+  assert.equal(permissions.includes('shell:default'), false);
+  assert.equal(permissions.includes('shell:allow-open'), false);
 });
 
 test('component manifest covers the React rewrite component contract', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(resourcesRoot, 'component-manifest.json'), 'utf8'));
-  const names = new Set(manifest.components.map((component) => component.name));
+  const manifest = recordValue(JSON.parse(fs.readFileSync(path.join(resourcesRoot, 'component-manifest.json'), 'utf8')) as unknown, 'component manifest');
+  const names = new Set(recordArray(manifest.components, 'component manifest entries').map((component) => String(component.name)));
   for (const name of [
     'MessageBubble',
     'ClarificationCard',

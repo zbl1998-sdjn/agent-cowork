@@ -20,7 +20,9 @@
     "apps/host/test/body-limit.test.ts",
     "apps/host/test/budget-guard.test.ts",
     "apps/host/test/cancellation.test.ts",
+    "apps/host/test/chat-stream.test.ts",
     "apps/host/test/ci-gates.test.ts",
+    "apps/host/test/clarify.test.ts",
     "apps/host/test/cli-runner.test.ts",
     "apps/host/test/cli-detect.test.ts",
     "apps/host/test/command-runner.test.ts",
@@ -64,6 +66,7 @@
     "apps/host/test/model-provider.test.ts",
     "apps/host/test/model-recorder.test.ts",
     "apps/host/test/model-resilience.test.ts",
+    "apps/host/test/multimodal.test.ts",
     "apps/host/test/office-writers.test.ts",
     "apps/host/test/oauth-permission-approvals.test.ts",
     "apps/host/test/onboarding.test.ts",
@@ -97,9 +100,11 @@
     "apps/host/test/selfcheck.test.ts",
     "apps/host/test/seeded-ids.test.ts",
     "apps/host/test/shutdown.test.ts",
+    "apps/host/test/sqlite-adapters.test.ts",
     "apps/host/test/skills.test.ts",
     "apps/host/test/ssrf-guard.test.ts",
     "apps/host/test/system-prompt.test.ts",
+    "apps/host/test/tauri-scaffold.test.ts",
     "apps/host/test/todo-state.test.ts",
     "apps/host/test/token-estimator.test.ts",
     "apps/host/test/tool-loop-budget.test.ts",
@@ -119,6 +124,7 @@
     "apps/host/test/web-fetch-ssrf.test.ts",
     "apps/host/test/web-fetch.test.ts",
     "apps/host/test/web-search.test.ts",
+    "apps/host/test/workspace-search.test.ts",
     "apps/host/test/workspace-index.test.ts"
   ]
 }
