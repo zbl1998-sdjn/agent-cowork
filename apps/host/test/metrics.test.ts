@@ -2,13 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import { closeTestServer } from './helpers/close-server.js';
 
 test('GET /metrics is exempt from the auth gate and exposes only operational gauges', async () => {
   const trustedRoot = makeTestWorkspace('kcw-metrics');
   // requireAuth defaults ON; /metrics must still be reachable (like /health).
   const server = createServer({ trustedRoot });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
   try {
     const res = await fetch(`${base}/metrics`);
     assert.equal(res.status, 200, '/metrics should be reachable without a token');
@@ -21,6 +26,6 @@ test('GET /metrics is exempt from the auth gate and exposes only operational gau
     // hardening headers still applied.
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   } finally {
-    await new Promise((r) => server.close(r));
+    await closeTestServer(server);
   }
 });

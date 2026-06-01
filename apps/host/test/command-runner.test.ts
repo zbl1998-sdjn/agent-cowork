@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import assert from 'node:assert/strict';
 import { runCommand } from '../src/workspace/command-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
@@ -9,7 +9,7 @@ mkdirSync(workspace, { recursive: true });
 
 test('command runner is disabled unless allowCommands is true', async () => {
   await assert.rejects(
-    runCommand({
+    () => runCommand({
       command: 'node',
       cwd: workspace,
       trustedRoot: workspace,
