@@ -7,11 +7,17 @@
     "types/host-node-shim.d.ts",
     "apps/host/test/helpers/close-server.ts",
     "apps/host/test/test-fixtures.ts",
+    "apps/host/test/arg-validator.test.ts",
+    "apps/host/test/cli-detect.test.ts",
     "apps/host/test/eval-redteam.test.ts",
     "apps/host/test/eval-replay-backend.test.ts",
     "apps/host/test/eval-report.test.ts",
     "apps/host/test/eval-runner.test.ts",
     "apps/host/test/eval-scorers.test.ts",
-    "apps/host/test/eval-tasks.test.ts"
+    "apps/host/test/eval-tasks.test.ts",
+    "apps/host/test/loop-guard.test.ts",
+    "apps/host/test/todo-state.test.ts",
+    "apps/host/test/token-estimator.test.ts",
+    "apps/host/test/untrusted-content.test.ts"
   ]
 }

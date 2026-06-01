@@ -32,6 +32,10 @@ test('heuristic token estimator estimates chat messages with per-message overhea
   assert.equal(summary.messageCount, 4);
   assert.equal(summary.messages.length, 4);
   assert.ok(summary.totalTokens >= summary.textTokens + 4 * 4 + 2);
-  assert.ok(summary.messages[2].textTokens > 0, 'tool call name and args are counted');
-  assert.ok(summary.messages[3].textTokens > 0, 'object tool content is counted');
+  const toolCallEstimate = summary.messages[2];
+  const toolContentEstimate = summary.messages[3];
+  assert.ok(toolCallEstimate);
+  assert.ok(toolContentEstimate);
+  assert.ok(toolCallEstimate.textTokens > 0, 'tool call name and args are counted');
+  assert.ok(toolContentEstimate.textTokens > 0, 'object tool content is counted');
 });

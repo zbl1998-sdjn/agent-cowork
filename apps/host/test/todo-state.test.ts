@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createToolTodoTracker, todoItemsFromPlan } from '../src/kimi/agent/todo-state.js';
+import type { TodoItem } from '../src/kimi/agent/todo-state.js';
 
 test('todoItemsFromPlan turns numbered plan lines into pending todos', () => {
   const items = todoItemsFromPlan('1. 读取现状\n2. 修改文件\n3. 运行测试');
@@ -11,7 +12,7 @@ test('todoItemsFromPlan turns numbered plan lines into pending todos', () => {
 });
 
 test('createToolTodoTracker emits running and terminal updates for a tool call', () => {
-  const events = [];
+  const events: Array<{ type: 'todo_update'; payload: TodoItem }> = [];
   const tracker = createToolTodoTracker((type, payload) => events.push({ type, payload }));
 
   const todo = tracker.start('Read');

@@ -1,5 +1,5 @@
-import { test } from 'node:test';
-import { strict as assert } from 'node:assert';
+import assert from 'node:assert/strict';
+import test from 'node:test';
 import { parseKimiVersion, parseKimiInfo } from '../src/kimi/cli-detect.js';
 
 test('parseKimiVersion handles standard version text', () => {
