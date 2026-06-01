@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export function manualChunks(id) {
+export function manualChunks(id: string): string | undefined {
   const normalized = id.replace(/\\/g, '/');
   if (normalized.indexOf('/node_modules/react') >= 0 || normalized.indexOf('/node_modules/react-dom') >= 0) return 'vendor-react';
   if (normalized.indexOf('/node_modules/recharts') >= 0) return 'vendor-charts';
