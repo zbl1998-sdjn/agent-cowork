@@ -46,13 +46,14 @@
     "check:eval-types": "npx tsc -p tsconfig.eval.json --pretty false",
     "check:host-test-types": "npx tsc -p tsconfig.host-test.json --pretty false",
     "check:root-types": "npx tsc -p tsconfig.json --pretty false",
+    "check:resource-types": "npx tsc -p tsconfig.windows-resources.json --noEmit --pretty false",
     "check:ui-types": "npm --prefix apps/windows-client/ui run typecheck",
-    "lint:ts": "eslint \"apps/host/src/**/*.ts\" \"apps/host/test/**/*.ts\" \"eval/**/*.ts\" \"apps/windows-client/ui/src/**/*.{ts,tsx}\" \"apps/windows-client/ui/vite.config.ts\"",
+    "lint:ts": "eslint \"apps/host/src/**/*.ts\" \"apps/host/test/**/*.ts\" \"eval/**/*.ts\" \"apps/windows-client/resources-src/**/*.ts\" \"apps/windows-client/ui/src/**/*.{ts,tsx}\" \"apps/windows-client/ui/vite.config.ts\"",
     "lint:resources-js": "eslint \"apps/windows-client/resources/*.js\"",
     "check:lint": "npm run lint:ts && npm run lint:resources-js",
     "check:resource-js": "node scripts/check-resource-js.mjs",
     "check:icons": "node scripts/check-icons.mjs",
-    "check": "npm run check:arch && npm run check:filesize && npm run check:secrets && npm run check:host-types && npm run check:eval-types && npm run check:host-test-types && npm run check:root-types && npm run check:ui-types && npm run check:lint && npm run check:resource-js && npm run check:icons",
+    "check": "npm run check:arch && npm run check:filesize && npm run check:secrets && npm run check:host-types && npm run check:eval-types && npm run check:host-test-types && npm run check:root-types && npm run check:resource-types && npm run check:ui-types && npm run check:lint && npm run check:resource-js && npm run check:icons",
     "ci": "node scripts/ci.mjs",
     "release": "node scripts/release.mjs",
     "test": "npm run test:host && npm run test:ui",
@@ -62,7 +63,8 @@
     "build:host-source": "node scripts/build-host-source.mjs",
     "build:host": "node scripts/build-host.mjs",
     "test:host": "npm run check && node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-timeout=60000 --import ../../test-setup.mjs \"test/*.test.js\" \"test/*.test.ts\"",
-    "test:ui": "npm --prefix apps/windows-client/ui run test"
+    "test:ui": "npm --prefix apps/windows-client/ui run test",
+    "build:resources": "npx tsc -p tsconfig.windows-resources.json --pretty false"
   },
   "engines": {
     "node": ">=20"
