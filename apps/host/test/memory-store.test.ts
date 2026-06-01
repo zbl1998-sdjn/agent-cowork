@@ -17,8 +17,20 @@ import {
   MEMORY_LIMITS,
 } from '../src/memory/memory-store.js';
 
-function tempRoot() {
+type JsonRecord = Record<string, unknown>;
+
+function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-mem-'));
+}
+
+function requireJsonRecord(value: unknown, label: string): JsonRecord {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as JsonRecord;
+}
+
+function requireText(value: string | null, label: string): string {
+  assert.ok(value, `${label} should exist`);
+  return value;
 }
 
 test('readMainMemory returns empty string when MEMORY.md absent', () => {
@@ -42,7 +54,9 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
     .readFileSync(path.join(root, '.AgentCowork', 'audit', 'memory.jsonl'), 'utf8')
     .trim()
     .split('\n');
-  const event = JSON.parse(auditLines[0]);
+  const [auditLine] = auditLines;
+  assert.ok(auditLine);
+  const event = requireJsonRecord(JSON.parse(auditLine), 'memory audit event');
   assert.equal(event.action, 'memory_fact_append');
   assert.equal(event.key, '客户简称');
   assert.equal(event.tenantId, 'tenant_test');
@@ -77,11 +91,13 @@ test('writeMemoryNote stores file under .AgentCowork/memory/', () => {
     userId: 'U',
   });
   assert.match(file, /\.AgentCowork[\\/]memory[\\/]projects\.md$/);
-  const note = readMemoryNote(root, 'projects.md');
+  const note = requireText(readMemoryNote(root, 'projects.md'), 'projects memory note');
   assert.match(note, /# Projects/);
   const notes = listMemoryNotes(root);
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].name, 'projects.md');
+  const [firstNote] = notes;
+  assert.ok(firstNote);
+  assert.equal(firstNote.name, 'projects.md');
 });
 
 test('writeMemoryNote rejects invalid note names', () => {
@@ -112,7 +128,9 @@ test('loadMemoryContext exposes enabled flag, bytes and notes', () => {
   assert.ok(ctx.bytes > 0);
   assert.ok(ctx.text.includes('术语'));
   assert.equal(ctx.notes.length, 1);
-  assert.equal(ctx.notes[0].name, 'glossary.md');
+  const [firstNote] = ctx.notes;
+  assert.ok(firstNote);
+  assert.equal(firstNote.name, 'glossary.md');
 });
 
 test('loadMemoryContext disabled when MEMORY.md absent', () => {
