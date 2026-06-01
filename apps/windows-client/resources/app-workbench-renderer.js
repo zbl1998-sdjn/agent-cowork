@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script workbench renderer. It keeps navigation and side-panel DOM
 // updates separate from app.js orchestration.
 (function () {

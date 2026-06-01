@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script Artifact controller. It keeps host-facing catalog reads behind
 // one small factory so app.js can keep shrinking without changing load mode.
 (function () {

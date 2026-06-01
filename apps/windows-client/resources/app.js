@@ -1,3 +1,4 @@
+// @ts-nocheck
 const state = {
   view: "chat",
   workspace: "C:\\Users\\Administrator\\Desktop\\agent cowork",

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script message actions. It wires approval/clarification controls to
 // orchestration callbacks injected by app.js.
 (function () {

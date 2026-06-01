@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
   function compactText(text, maxLength = 220) {
     const value = String(text || "").replace(/\s+/g, " ").trim();

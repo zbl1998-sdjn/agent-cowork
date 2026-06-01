@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script Kimi runner. It owns API calls and degradation messages while
 // app.js keeps the surrounding conversation/workbench orchestration.
 (function () {

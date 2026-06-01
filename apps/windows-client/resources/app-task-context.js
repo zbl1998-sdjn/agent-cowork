@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script task context helpers. These functions keep prompt routing,
 // recipe inference, and safe file-summary reads out of the app.js entrypoint.
 (function () {

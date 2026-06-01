@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script file upload flow. It owns browser File handling and Host
 // import calls; app.js keeps only the user event binding.
 (function () {

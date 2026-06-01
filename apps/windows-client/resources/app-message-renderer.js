@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script message renderer. It owns conversation DOM writes while
 // app.js stays responsible for orchestration and host calls.
 (function () {

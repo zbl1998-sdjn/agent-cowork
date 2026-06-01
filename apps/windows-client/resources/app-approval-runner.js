@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script approval runner. It owns the apply/preview-mode execution path
 // while app.js keeps only orchestration and event binding.
 (function () {

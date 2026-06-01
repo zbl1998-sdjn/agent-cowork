@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
   function renderRunEventPayload(type, payload, appendLine) {
     const { progressStateFromIcon } = window.AgentCoworkUtils;

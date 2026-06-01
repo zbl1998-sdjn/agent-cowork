@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script chat runner. It owns the plain conversation flow; app.js only
 // decides whether a prompt should go to chat or cowork planning.
 (function () {

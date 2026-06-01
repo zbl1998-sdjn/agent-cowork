@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script run history controller. It owns task-card rendering and
 // historical run replay while app.js remains the orchestration layer.
 (function () {

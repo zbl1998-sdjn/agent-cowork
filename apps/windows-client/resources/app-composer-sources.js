@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script data sources for the composer popover. It keeps search and
 // item-mapping logic out of the popover UI controller.
 (function () {

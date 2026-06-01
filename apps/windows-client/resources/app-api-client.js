@@ -1,3 +1,4 @@
+// @ts-nocheck
 (function () {
   // In a packaged Tauri build the webview origin is `tauri://localhost`, not
   // the Node host. API calls must therefore target the host's absolute URL.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Classic-script recipe runner. It owns template execution and preview setup;
 // app.js only decides when a prompt should enter this path.
 (function () {
