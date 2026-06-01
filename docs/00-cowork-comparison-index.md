@@ -767,7 +767,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - 校验 (此 VM 无 tsc/esbuild, npm 全局安装被 OS 拒): `.ts` 经 `node --check --experimental-strip-types` 真语法过; `.tsx` 括号平衡 + 无未用导入 + JSX 标签核对; 真 TS/React 编译按既定约束在用户机器做。
 
 **迭代 B 一键激活**:
-- `scripts/build-ui.mjs` + 根 `package.json` 脚本 `build:ui` / `build:ui:fresh`: 自动 (按需) `npm install` + `npm run build` → `ui-dist`, 并打印 `cargo tauri dev/build` 下一步。
+- `scripts/build-ui.ts` + 根 `package.json` 脚本 `build:ui` / `build:ui:fresh`: 自动 (按需) `npm install` + `npm run build` → `ui-dist`, 并打印 `cargo tauri dev/build` 下一步。
 - 激活: `npm run build:ui`, 然后逐行 `cd apps/windows-client/src-tauri` 再 `cargo tauri dev` (PowerShell 勿用 &&)。
 
 验收 (host 侧): 本轮 host 相关测试分组跑 **66/66** + 其余 **115/115** 全绿 (全量曾因 VM 负载超时, 分组确认 0 fail); MCP 连接器经真子进程端到端验证。前端/脚本为纯增量, 不影响 host 测试。

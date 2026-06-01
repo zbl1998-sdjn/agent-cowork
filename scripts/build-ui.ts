@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // One-command activation for the React UI (iteration B).
 //
-//   node scripts/build-ui.mjs            # install if needed, then build -> ui-dist
-//   node scripts/build-ui.mjs --install  # force a fresh npm install first
+//   npm run build:ui        # install if needed, then build -> ui-dist
+//   npm run build:ui:fresh  # force a fresh npm install first
 //
 // Must run on a machine with Node + npm (this repo's host is zero-dependency;
 // only the ui/ subproject has npm deps). After it succeeds, the Tauri shell's
@@ -18,7 +18,7 @@ const uiDir = path.join(root, 'apps', 'windows-client', 'ui');
 // Run a full command line through the shell. We pass a single command string
 // (no separate args array) so Node never emits DEP0190 for shell:true, and the
 // same call works in cmd.exe / PowerShell / sh.
-function run(cmdline, cwd) {
+function run(cmdline: string, cwd: string): void {
   console.log(`\n> ${cmdline}   (cwd: ${path.relative(root, cwd) || '.'})`);
   const result = spawnSync(cmdline, { cwd, stdio: 'inherit', shell: true });
   if (result.status !== 0) {

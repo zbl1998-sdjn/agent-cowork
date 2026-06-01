@@ -110,6 +110,10 @@ declare module 'node:child_process' {
     args?: readonly string[],
     options?: Record<string, unknown>
   ): SpawnSyncResult;
+  export function spawnSync(
+    command: string,
+    options?: Record<string, unknown>
+  ): SpawnSyncResult;
   export function spawn(
     command: string,
     args?: readonly string[],
