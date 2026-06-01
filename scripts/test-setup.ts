@@ -1,4 +1,4 @@
-// Preloaded via `node --test --import ./test-setup.mjs` for the HOST suite.
+// Preloaded via `node --test --import ../../scripts/test-setup.ts` for the HOST suite.
 //  - KCW_REQUIRE_AUTH=false: open the gate so tokenless functional tests aren't
 //    401'd (auth-gate.test.js sets requireAuth:true explicitly, so the gate is
 //    still verified there).

@@ -22,6 +22,7 @@
     "scripts/check-secrets.ts",
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
-    "scripts/smoke-runtime-update-preservation.ts"
+    "scripts/smoke-runtime-update-preservation.ts",
+    "scripts/test-setup.ts"
   ]
 }
