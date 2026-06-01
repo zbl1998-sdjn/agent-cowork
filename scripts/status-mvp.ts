@@ -19,6 +19,7 @@ type HealthResult = HttpHealth | {
 
 type ProcessWithKill = typeof process & {
   kill(pid: number, signal?: string | number): void;
+  exitCode?: number;
 };
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -112,10 +113,10 @@ async function main(): Promise<void> {
   };
 
   console.log(JSON.stringify(status, null, 2));
-  process.exit(status.ok ? 0 : 1);
+  processWithKill.exitCode = status.ok ? 0 : 1;
 }
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.stack || error.message : String(error));
-  process.exit(1);
+  processWithKill.exitCode = 1;
 });
