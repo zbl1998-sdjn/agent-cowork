@@ -25,6 +25,7 @@
     "scripts/ci.ts",
     "scripts/smoke-runtime-update-preservation.ts",
     "scripts/status-mvp.ts",
+    "scripts/stop-mvp.ts",
     "scripts/test-setup.ts"
   ]
 }

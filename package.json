@@ -8,7 +8,7 @@
     "start": "node scripts/run-host-node.mjs apps/host/src/main.ts",
     "start:mvp": "node scripts/run-host-node.mjs scripts/start-mvp.mjs",
     "status:mvp": "node scripts/run-host-node.mjs scripts/status-mvp.ts",
-    "stop:mvp": "node scripts/stop-mvp.mjs",
+    "stop:mvp": "node scripts/run-host-node.mjs scripts/stop-mvp.ts",
     "demo:mvp": "node scripts/demo-mvp.mjs",
     "start:tauri-host": "node scripts/run-host-node.mjs scripts/start-tauri-host.mjs",
     "audit:mvp": "node scripts/audit-mvp.mjs",

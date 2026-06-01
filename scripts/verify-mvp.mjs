@@ -105,7 +105,7 @@ const checks = [
   {
     name: 'stop-mvp script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'stop-mvp.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'stop-mvp.ts')],
   },
   {
     name: 'audit-mvp script syntax',

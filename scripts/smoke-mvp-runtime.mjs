@@ -118,7 +118,7 @@ async function main() {
     const statusPayload = JSON.parse(statusBefore.stdout);
     assert(statusPayload.ok === true && statusPayload.pidAlive === true, 'status:mvp did not report a live runtime');
 
-    const stop = runNodeScript('stop-mvp.mjs', env);
+    const stop = runNodeScript('stop-mvp.ts', env);
     assert(stop.status === 0, `stop:mvp failed: ${stop.stderr || stop.stdout}`);
     const stopPayload = JSON.parse(stop.stdout);
     assert(stopPayload.ok === true && stopPayload.stopped === true, 'stop:mvp did not stop the runtime');
