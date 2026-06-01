@@ -4,9 +4,18 @@ import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 import { getSessionPath } from '../apps/host/src/storage/app-home.js';
 
+type ProcessWithLoadEnvFile = typeof process & {
+  loadEnvFile(path: string): void;
+};
+
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const processWithEnvFile = process as ProcessWithLoadEnvFile;
 // Load repo-root .env (KIMI_API_KEY etc.) if present; Node >= 20.12 has loadEnvFile.
-try { process.loadEnvFile(path.join(repoRoot, '.env')); } catch { /* no .env: fall back to process env */ }
+try {
+  processWithEnvFile.loadEnvFile(path.join(repoRoot, '.env'));
+} catch {
+  // No .env: fall back to the process environment provided by Tauri/dev shell.
+}
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3017);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || repoRoot);

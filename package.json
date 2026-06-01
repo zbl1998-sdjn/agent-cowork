@@ -10,7 +10,7 @@
     "status:mvp": "node scripts/run-host-node.mjs scripts/status-mvp.ts",
     "stop:mvp": "node scripts/run-host-node.mjs scripts/stop-mvp.ts",
     "demo:mvp": "node scripts/demo-mvp.mjs",
-    "start:tauri-host": "node scripts/run-host-node.mjs scripts/start-tauri-host.mjs",
+    "start:tauri-host": "node scripts/run-host-node.mjs scripts/start-tauri-host.ts",
     "audit:mvp": "node scripts/audit-mvp.mjs",
     "verify:mvp": "node scripts/verify-mvp.mjs",
     "verify:windows-readiness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-client-readiness.ps1",

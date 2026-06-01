@@ -37,7 +37,10 @@ function launch(command, args, opts = {}) {
 }
 
 // Node host (3017)
-launch(process.execPath, [path.join(repoRoot, 'scripts', 'start-tauri-host.mjs')], { env: process.env });
+launch(process.execPath, [
+  path.join(repoRoot, 'scripts', 'run-host-node.mjs'),
+  path.join(repoRoot, 'scripts', 'start-tauri-host.ts'),
+], { env: process.env });
 // Vite dev server (5173)
 launch(npm, ['run', 'dev'], { cwd: uiDir, shell: process.platform === 'win32' });
 
