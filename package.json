@@ -33,7 +33,7 @@
     "smoke:runtime-update": "node scripts/run-host-node.mjs scripts/smoke-runtime-update-preservation.ts",
     "smoke:offline-local": "node scripts/run-host-node.mjs scripts/smoke-offline-local.mjs",
     "smoke:e2e": "node scripts/run-host-node.mjs scripts/e2e-smoke.mjs",
-    "bench": "node scripts/run-host-node.mjs scripts/bench.mjs",
+    "bench": "node scripts/run-host-node.mjs scripts/bench.ts",
     "eval": "node scripts/run-host-node.mjs scripts/eval.mjs",
     "smoke:windows-client": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-windows-client.ps1",
     "smoke:installed-tauri": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installed-tauri.ps1",

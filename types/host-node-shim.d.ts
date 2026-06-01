@@ -211,6 +211,12 @@ declare module 'node:path' {
   export const sep: string;
 }
 
+declare module 'node:perf_hooks' {
+  export const performance: {
+    now(): number;
+  };
+}
+
 declare module 'node:module' {
   export function createRequire(url: string): (specifier: string) => unknown;
 }

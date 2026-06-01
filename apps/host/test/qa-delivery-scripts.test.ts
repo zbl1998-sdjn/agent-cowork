@@ -11,7 +11,7 @@ type PackageJson = { scripts: Record<string, string> };
 test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as PackageJson;
   assert.equal(packageJson.scripts['smoke:e2e'], hostNode('scripts/e2e-smoke.mjs'));
-  assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.mjs'));
+  assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.ts'));
   assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.mjs'));
   assert.equal(packageJson.scripts['check:secrets'], hostNode('scripts/check-secrets.ts'));
   const windowsClientSmokeScript = packageJson.scripts['smoke:windows-client'];
@@ -20,7 +20,7 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
 
   const deliveryScripts = [
     'scripts/e2e-smoke.mjs',
-    'scripts/bench.mjs',
+    'scripts/bench.ts',
     'scripts/check-secrets.ts',
     'scripts/smoke-kimi-api.mjs',
   ] as const;
