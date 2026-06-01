@@ -609,6 +609,7 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-task-context.js'), 'window.AgentCoworkTaskContext = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-kimi-runner.js'), 'window.AgentCoworkKimiRunner = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-renderer.js'), 'window.AgentCoworkMessageRenderer = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-approval-runner.js'), 'window.AgentCoworkApprovalRunner = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-actions.js'), 'window.AgentCoworkMessageActions = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-file-upload.js'), 'window.AgentCoworkFileUpload = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
@@ -662,6 +663,10 @@ test('serves the local preview shell and assets', async () => {
     const messageRenderer = await fetch(`${baseUrl}/app-message-renderer.js`);
     assert.equal(messageRenderer.status, 200);
     assert.match(messageRenderer.headers.get('content-type') || '', /javascript/);
+
+    const approvalRunner = await fetch(`${baseUrl}/app-approval-runner.js`);
+    assert.equal(approvalRunner.status, 200);
+    assert.match(approvalRunner.headers.get('content-type') || '', /javascript/);
 
     const messageActions = await fetch(`${baseUrl}/app-message-actions.js`);
     assert.equal(messageActions.status, 200);

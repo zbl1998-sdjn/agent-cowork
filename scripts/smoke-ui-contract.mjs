@@ -98,6 +98,7 @@ async function main() {
     assert(scriptRoutes.includes('/app-task-context.js'), 'index missing app-task-context.js script');
     assert(scriptRoutes.includes('/app-kimi-runner.js'), 'index missing app-kimi-runner.js script');
     assert(scriptRoutes.includes('/app-message-renderer.js'), 'index missing app-message-renderer.js script');
+    assert(scriptRoutes.includes('/app-approval-runner.js'), 'index missing app-approval-runner.js script');
     assert(scriptRoutes.includes('/app-message-actions.js'), 'index missing app-message-actions.js script');
     assert(scriptRoutes.includes('/app-file-upload.js'), 'index missing app-file-upload.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
@@ -111,6 +112,7 @@ async function main() {
     assert(scriptRoutes.indexOf('/app-task-context.js') < scriptRoutes.indexOf('/app.js'), 'app-task-context.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-kimi-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-kimi-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-renderer.js') < scriptRoutes.indexOf('/app.js'), 'app-message-renderer.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-approval-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-approval-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-actions.js') < scriptRoutes.indexOf('/app.js'), 'app-message-actions.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-file-upload.js') < scriptRoutes.indexOf('/app.js'), 'app-file-upload.js must load before app.js');
     const scriptBodies = [];
