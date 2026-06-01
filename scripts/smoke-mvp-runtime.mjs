@@ -93,7 +93,7 @@ async function main() {
     NO_OPEN: '1',
   };
 
-  const child = spawn(nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'start-mvp.mjs')], {
+  const child = spawn(nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'start-mvp.ts')], {
     cwd: repoRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],

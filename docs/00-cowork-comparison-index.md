@@ -658,7 +658,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `apps/windows-client/resources/index.html` / `app.js` 中的运行芯片、降级说明、产物摘要全部改为 Kimi API。
   - 未配置 API key 时保留本地只读 fallback, 不阻断审批预览和本地 artifact 生成。
 - **启动与 smoke**:
-  - `apps/host/src/main.js`、`scripts/start-mvp.mjs`、`scripts/start-tauri-host.mjs` 改读 API env。
+  - `apps/host/src/main.js`、`scripts/start-mvp.ts`、`scripts/start-tauri-host.ts` 改读 API env。
   - `npm run smoke:kimi-cli` 改为 `npm run smoke:kimi-api`。
   - 删除旧 `scripts/smoke-kimi-cli.mjs`, 新增 `scripts/smoke-kimi-api.mjs`。
 

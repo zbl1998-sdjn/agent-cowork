@@ -87,6 +87,7 @@ declare module 'node:child_process' {
     stdout: StreamLike;
     stderr: StreamLike;
     kill(signal?: string): void;
+    unref(): void;
     on(event: 'error', listener: (error: Error) => void): unknown;
     on(event: 'close', listener: (code: number | null, signal: string | null) => void): unknown;
   }

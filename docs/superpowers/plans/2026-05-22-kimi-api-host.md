@@ -26,7 +26,7 @@
 **Files:**
 - Modify: `apps/host/src/server.js`
 - Modify: `apps/host/src/main.js`
-- Modify: `scripts/start-mvp.mjs`
+- Modify: `scripts/start-mvp.ts`
 - Modify: `scripts/start-tauri-host.mjs`
 
 - [ ] Remove `detectKimiInfo` and default `runKimiCli*` imports from `server.js`.

@@ -6,7 +6,7 @@
   "description": "Kimi-only local cowork host MVP scaffold",
   "scripts": {
     "start": "node scripts/run-host-node.mjs apps/host/src/main.ts",
-    "start:mvp": "node scripts/run-host-node.mjs scripts/start-mvp.mjs",
+    "start:mvp": "node scripts/run-host-node.mjs scripts/start-mvp.ts",
     "status:mvp": "node scripts/run-host-node.mjs scripts/status-mvp.ts",
     "stop:mvp": "node scripts/run-host-node.mjs scripts/stop-mvp.ts",
     "demo:mvp": "node scripts/demo-mvp.mjs",

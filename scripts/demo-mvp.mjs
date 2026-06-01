@@ -10,6 +10,7 @@ const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(build
 const reportPath = path.join(buildDir, 'mvp-demo-report.json');
 const serverLogPath = path.join(buildDir, 'mvp-demo-server.log');
 const nodeBin = process.execPath;
+const runHostNodeScript = path.join(repoRoot, 'scripts', 'run-host-node.mjs');
 
 function isPidAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) {
@@ -85,7 +86,7 @@ function startMvpServer() {
   fs.mkdirSync(buildDir, { recursive: true });
   fs.appendFileSync(serverLogPath, `\n--- demo:mvp start ${new Date().toISOString()} ---\n`, 'utf8');
   const logFd = fs.openSync(serverLogPath, 'a');
-  const child = spawn(nodeBin, [path.join(repoRoot, 'scripts', 'start-mvp.mjs')], {
+  const child = spawn(nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'start-mvp.ts')], {
     cwd: repoRoot,
     env: process.env,
     detached: true,

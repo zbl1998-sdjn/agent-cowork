@@ -5,11 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 
-function ensureDemoWorkspace(workspace) {
+type RuntimeFileState = {
+  pid?: unknown;
+};
+
+function ensureDemoWorkspace(workspace: string): void {
   fs.mkdirSync(path.join(workspace, 'contracts'), { recursive: true });
   fs.mkdirSync(path.join(workspace, 'finance'), { recursive: true });
 
-  const samples = [
+  const samples: Array<[filePath: string, content: string]> = [
     [
       path.join(workspace, 'meeting-notes.md'),
       '# 会议纪要\n- 跟进采购合同\n- 汇总发票和付款周期\n',
@@ -31,7 +35,7 @@ function ensureDemoWorkspace(workspace) {
   }
 }
 
-function openBrowser(url) {
+function openBrowser(url: string): void {
   if (process.env.NO_OPEN === '1') {
     return;
   }
@@ -69,7 +73,7 @@ const server = createServer({
   journalWriter: new JsonlWriter(auditPath),
 });
 
-function writeRuntimeFile() {
+function writeRuntimeFile(): void {
   const runtime = {
     ok: true,
     pid: process.pid,
@@ -84,12 +88,12 @@ function writeRuntimeFile() {
   fs.writeFileSync(runtimeFile, `${JSON.stringify(runtime, null, 2)}\n`, 'utf8');
 }
 
-function removeRuntimeFile() {
+function removeRuntimeFile(): void {
   try {
     if (!fs.existsSync(runtimeFile)) {
       return;
     }
-    const current = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
+    const current = JSON.parse(fs.readFileSync(runtimeFile, 'utf8')) as RuntimeFileState;
     if (current.pid === process.pid) {
       fs.rmSync(runtimeFile, { force: true });
     }
@@ -98,7 +102,7 @@ function removeRuntimeFile() {
   }
 }
 
-function shutdown() {
+function shutdown(): void {
   server.close(() => {
     removeRuntimeFile();
     process.exit(0);

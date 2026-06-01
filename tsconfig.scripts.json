@@ -25,6 +25,7 @@
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
     "scripts/smoke-runtime-update-preservation.ts",
+    "scripts/start-mvp.ts",
     "scripts/start-tauri-dev.ts",
     "scripts/start-tauri-host.ts",
     "scripts/status-mvp.ts",
