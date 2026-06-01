@@ -1,14 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PostgresConversationStore } from '../src/storage/postgres-conversation-store.js';
+import type { PgPool } from '../src/storage/postgres-conversation-store.js';
+import type { ConversationBranch } from '../src/storage/conversation-store.js';
+
+type ConversationRow = {
+  tenant_id: unknown;
+  user_id: unknown;
+  workspace_key: unknown;
+  id: unknown;
+  title: unknown;
+  pinned: unknown;
+  messages: unknown[];
+  branches: ConversationBranch[];
+  active_branch_id: unknown;
+  created_at: unknown;
+  updated_at: unknown;
+};
 
 // In-memory mock pool that understands the store's SQL well enough to verify
 // isolation, search, pagination and upsert semantics.
-function convPool() {
-  const rows = new Map(); // tenant|user|workspace|id -> record
-  const key = (t, u, w, i) => `${t}|${u}|${w}|${i}`;
+function convPool(): PgPool {
+  const rows = new Map<string, ConversationRow>(); // tenant|user|workspace|id -> record
+  const key = (...parts: unknown[]) => parts.map((part) => String(part ?? '')).join('|');
   return {
-    async query(text, params = []) {
+    async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
       if (t.startsWith('INSERT INTO conversations')) {
         const [tenant, user, workspace, id, title, pinned, messagesJson, branchesJson, activeBranchId, createdAt, updatedAt] = params;
@@ -16,8 +32,8 @@ function convPool() {
         const existing = rows.get(k);
         const rec = {
           tenant_id: tenant, user_id: user, workspace_key: workspace, id, title, pinned,
-          messages: JSON.parse(messagesJson),
-          branches: JSON.parse(branchesJson),
+          messages: JSON.parse(String(messagesJson ?? '[]')) as unknown[],
+          branches: JSON.parse(String(branchesJson ?? '[]')) as ConversationBranch[],
           active_branch_id: activeBranchId,
           created_at: existing ? existing.created_at : createdAt,
           updated_at: updatedAt,
@@ -35,16 +51,18 @@ function convPool() {
       if (t.startsWith('SELECT COUNT(*)')) {
         const [tenant, user, workspace, like] = params;
         let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace);
-        if (like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => (r.title || '').toLowerCase().includes(q)); }
+        if (typeof like === 'string' && like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => String(r.title || '').toLowerCase().includes(q)); }
         return { rows: [{ total: list.length }] };
       }
       if (t.includes('OFFSET')) { // paginated query items
         const tenant = params[0], user = params[1], workspace = params[2];
-        let like = null, lim, off;
-        if (params.length === 6) { like = params[3]; lim = params[4]; off = params[5]; }
-        else { lim = params[3]; off = params[4]; }
+        let like: unknown = null;
+        let lim: number;
+        let off: number;
+        if (params.length === 6) { like = params[3]; lim = Number(params[4] ?? 0); off = Number(params[5] ?? 0); }
+        else { lim = Number(params[3] ?? 0); off = Number(params[4] ?? 0); }
         let list = [...rows.values()].filter((r) => r.tenant_id === tenant && r.user_id === user && r.workspace_key === workspace);
-        if (like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => (r.title || '').toLowerCase().includes(q)); }
+        if (typeof like === 'string' && like) { const q = like.replace(/%/g, '').toLowerCase(); list = list.filter((r) => String(r.title || '').toLowerCase().includes(q)); }
         list.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
         list = list.slice(off, off + lim);
         return { rows: list.map((r) => ({ id: r.id, title: r.title, pinned: r.pinned, message_count: r.messages.length, branch_count: (r.branches || []).length, active_branch_id: r.active_branch_id, created_at: r.created_at, updated_at: r.updated_at })) };
@@ -85,16 +103,21 @@ test('PG conversations: save/get/list/query/remove with tenant+user isolation', 
   assert.equal((await store.list('/r', a)).length, 2);
   const listB = await store.list('/r', b);
   assert.equal(listB.length, 1);
-  assert.equal(listB[0].id, 'c3');
+  const [onlyB] = listB;
+  assert.ok(onlyB);
+  assert.equal(onlyB.id, 'c3');
 
   const c1 = await store.get('/r', 'c1', a);
+  assert.ok(c1);
   assert.equal(c1.title, 'Alpha');
   assert.equal(c1.messages.length, 1);
   assert.equal(await store.get('/r', 'c1', b), null);
 
   const search = await store.query('/r', a, { q: 'alp', limit: 10, offset: 0 });
   assert.equal(search.total, 1);
-  assert.equal(search.items[0].id, 'c1');
+  const [firstSearch] = search.items;
+  assert.ok(firstSearch);
+  assert.equal(firstSearch.id, 'c1');
 
   const page = await store.query('/r', a, { q: '', limit: 1, offset: 0 });
   assert.equal(page.total, 2);
@@ -102,7 +125,9 @@ test('PG conversations: save/get/list/query/remove with tenant+user isolation', 
 
   const full = await store.listFull('/r', a, { limit: 1 });
   assert.equal(full.length, 1);
-  assert.ok(Array.isArray(full[0].messages));
+  const [fullFirst] = full;
+  assert.ok(fullFirst);
+  assert.ok(Array.isArray(fullFirst.messages));
 
   assert.equal(await store.remove('/r', 'c1', a), true);
   assert.equal(await store.remove('/r', 'c1', a), false);
@@ -122,6 +147,8 @@ test('PG conversations: same tenant/user/id is isolated by workspace', async () 
 
   const fromA = await store.get('/r-a', 'shared', ctx);
   const fromB = await store.get('/r-b', 'shared', ctx);
+  assert.ok(fromA);
+  assert.ok(fromB);
   assert.equal(fromA.title, 'Workspace A');
   assert.equal(fromB.title, 'Workspace B');
   assert.equal((await store.query('/r-a', ctx, { q: 'Workspace', limit: 10, offset: 0 })).total, 1);
@@ -135,12 +162,16 @@ test('PG conversations preserve branch metadata', async () => {
     { id: 'main', title: '主线', messages: [{ id: 'u1', role: 'user', text: 'old' }] },
     { id: 'b1', title: '分支 1', parentBranchId: 'main', baseMessageId: 'u1', messages: [{ id: 'u2', role: 'user', text: 'new' }] },
   ];
+  const branchB = branches[1];
+  assert.ok(branchB);
 
-  const summary = await store.save('/r', { id: 'c1', title: 'Branchy', messages: branches[1].messages, activeBranchId: 'b1', branches }, ctx);
+  const summary = await store.save('/r', { id: 'c1', title: 'Branchy', messages: branchB.messages, activeBranchId: 'b1', branches }, ctx);
   assert.equal(summary.branchCount, 2);
   assert.equal(summary.activeBranchId, 'b1');
 
   const full = await store.get('/r', 'c1', ctx);
+  assert.ok(full);
+  assert.ok(full.branches);
   assert.equal(full.activeBranchId, 'b1');
   assert.deepEqual(full.branches.map((branch) => branch.id), ['main', 'b1']);
 });
