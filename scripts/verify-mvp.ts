@@ -190,7 +190,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react artifacts panel smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-artifacts-panel.mjs')],
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-artifacts-panel.ts')],
   },
   {
     name: 'react branches smoke script syntax',
@@ -246,7 +246,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react artifacts panel smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-react-artifacts-panel.mjs'),
+    commandArgs: hostScriptArgs('smoke-react-artifacts-panel.ts'),
   },
   {
     name: 'react branches smoke',
