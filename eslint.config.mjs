@@ -2,6 +2,17 @@ import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
+const resourceBrowserGlobals = {
+  AbortController: 'readonly',
+  TextDecoder: 'readonly',
+  btoa: 'readonly',
+  document: 'readonly',
+  fetch: 'readonly',
+  requestAnimationFrame: 'readonly',
+  setTimeout: 'readonly',
+  window: 'readonly',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -10,6 +21,7 @@ export default tseslint.config(
       'node_modules/**',
       'apps/windows-client/ui-dist/**',
       'apps/windows-client/ui/node_modules/**',
+      'apps/windows-client/resources/python-embedded/**',
       'apps/windows-client/src-tauri/target/**',
       'reports/**',
       'releases/**',
@@ -18,6 +30,18 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
+  {
+    files: ['apps/windows-client/resources/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: resourceBrowserGlobals,
+    },
+    rules: {
+      '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
   {
     files: [
       'apps/host/src/**/*.ts',

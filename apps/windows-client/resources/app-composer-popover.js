@@ -96,7 +96,7 @@
 
     async function refreshMentionItems(query) {
       const token = ++mentionSearchToken;
-      let results = [];
+      let results;
       try {
         results = await searchLocalFiles(query);
       } catch {
@@ -147,7 +147,7 @@
 
     async function refreshHistoryRunItems(query) {
       const token = ++historySearchToken;
-      let results = [];
+      let results;
       try {
         results = await historyRunItems(query);
       } catch {
