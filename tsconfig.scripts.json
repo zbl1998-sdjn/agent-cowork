@@ -14,6 +14,7 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "eslint.config.ts",
     "apps/host/scripts/bench-local.ts",
     "scripts/audit-mvp.ts",
     "scripts/bench.ts",

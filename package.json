@@ -49,7 +49,7 @@
     "check:script-types": "npx tsc -p tsconfig.scripts.json --pretty false",
     "check:resource-types": "npx tsc -p tsconfig.windows-resources.json --noEmit --pretty false",
     "check:ui-types": "npm --prefix apps/windows-client/ui run typecheck",
-    "lint:ts": "eslint \"apps/host/*.ts\" \"apps/host/mcp-servers/**/*.ts\" \"apps/host/scripts/**/*.ts\" \"apps/host/src/**/*.ts\" \"apps/host/test/**/*.ts\" \"eval/**/*.ts\" \"scripts/**/*.ts\" \"apps/windows-client/resources-src/**/*.ts\" \"apps/windows-client/ui/src/**/*.{ts,tsx}\" \"apps/windows-client/ui/*.ts\"",
+    "lint:ts": "eslint \"eslint.config.ts\" \"apps/host/*.ts\" \"apps/host/mcp-servers/**/*.ts\" \"apps/host/scripts/**/*.ts\" \"apps/host/src/**/*.ts\" \"apps/host/test/**/*.ts\" \"eval/**/*.ts\" \"scripts/**/*.ts\" \"apps/windows-client/resources-src/**/*.ts\" \"apps/windows-client/ui/src/**/*.{ts,tsx}\" \"apps/windows-client/ui/*.ts\"",
     "lint:resources-js": "eslint \"apps/windows-client/resources/*.js\"",
     "check:lint": "npm run lint:ts && npm run lint:resources-js",
     "check:resource-js": "node scripts/run-host-node.mjs scripts/check-resource-js.ts",
@@ -77,6 +77,7 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.1",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "jiti": "^2.7.0",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.60.0"
   }

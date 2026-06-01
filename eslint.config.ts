@@ -1,6 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
+
+const configRootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const resourceBrowserGlobals = {
   AbortController: 'readonly',
@@ -11,9 +15,10 @@ const resourceBrowserGlobals = {
   requestAnimationFrame: 'readonly',
   setTimeout: 'readonly',
   window: 'readonly',
-};
+} as const;
 
 const typedSourceFiles = [
+  'eslint.config.ts',
   'apps/host/*.ts',
   'apps/host/mcp-servers/**/*.ts',
   'apps/host/scripts/**/*.ts',
@@ -34,7 +39,7 @@ const typedStrictConfigs = [
   files: typedSourceFiles,
 }));
 
-export default tseslint.config(
+export default [
   {
     ignores: [
       '**/build/**',
@@ -97,7 +102,7 @@ export default tseslint.config(
           './apps/windows-client/ui/tsconfig.json',
           './apps/windows-client/ui/tsconfig.node.json',
         ],
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: configRootDir,
       },
     },
     plugins: {
@@ -136,4 +141,4 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
-);
+];
