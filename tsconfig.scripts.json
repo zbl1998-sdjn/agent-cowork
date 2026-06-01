@@ -17,6 +17,7 @@
     "apps/host/scripts/bench-local.ts",
     "scripts/bench.ts",
     "scripts/build-ui.ts",
+    "scripts/build-host.ts",
     "scripts/build-host-source.ts",
     "scripts/check-arch.ts",
     "scripts/check-host-types.ts",

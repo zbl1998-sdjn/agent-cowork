@@ -21,6 +21,20 @@ import {
   runTypeScriptProject,
 } from './host-ts-support.mjs';
 
+type ProcessWithStreams = typeof process & {
+  stdout: { write(message: string): unknown };
+  stderr: { write(message: string): unknown };
+};
+
+type SearchableBuffer = Buffer & {
+  indexOf(value: Buffer | string): number;
+  toString(encoding?: string, start?: number, end?: number): string;
+};
+
+type SpawnOptions = Record<string, unknown>;
+
+const processWithStreams = process as ProcessWithStreams;
+
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const hostDir = path.join(repoRoot, 'apps', 'host');
 const distDir = path.join(hostDir, 'dist');
@@ -29,28 +43,28 @@ const tauriDir = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri');
 const binariesDir = path.join(tauriDir, 'binaries');
 const targetReleaseDir = path.join(tauriDir, 'target', 'release');
 
-function log(msg) { process.stdout.write(`[build-host] ${msg}\n`); }
-function die(msg) { process.stderr.write(`[build-host] ERROR: ${msg}\n`); process.exit(1); }
+function log(msg: string): void {
+  processWithStreams.stdout.write(`[build-host] ${msg}\n`);
+}
 
-function run(cmd, args, options = {}) {
+function die(msg: string): never {
+  processWithStreams.stderr.write(`[build-host] ERROR: ${msg}\n`);
+  process.exit(1);
+}
+
+function run(cmd: string, args: readonly string[], options: SpawnOptions = {}): void {
   log(`$ ${cmd} ${args.join(' ')}`);
   const result = spawnSync(cmd, args, { stdio: 'inherit', shell: false, ...options });
   if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmd}`);
 }
 
-function runShell(cmdline, options = {}) {
+function runShell(cmdline: string, options: SpawnOptions = {}): void {
   log(`$ ${cmdline}`);
   const result = spawnSync(cmdline, { stdio: 'inherit', shell: true, ...options });
   if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmdline}`);
 }
 
-function runCapture(cmd, args, options = {}) {
-  const result = spawnSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false, ...options });
-  if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmd}\n${result.stderr?.toString() || ''}`);
-  return result.stdout?.toString() || '';
-}
-
-function cleanCompiledHostDir() {
+function cleanCompiledHostDir(): void {
   const relative = path.relative(path.join(repoRoot, 'build'), compiledHostDir);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
     die(`refusing to clean outside build/: ${compiledHostDir}`);
@@ -59,7 +73,7 @@ function cleanCompiledHostDir() {
   fs.mkdirSync(compiledHostDir, { recursive: true });
 }
 
-function findEsbuild() {
+function findEsbuild(): string {
   // The repo doesn't install esbuild at the root; reuse the one Vite pulls in.
   const candidates = [
     path.join(repoRoot, 'node_modules', 'esbuild', 'bin', 'esbuild'),
@@ -70,7 +84,7 @@ function findEsbuild() {
   return found;
 }
 
-function findSigntoolWindows() {
+function findSigntoolWindows(): string | null {
   // signtool is needed on Windows to strip the Authenticode signature from the
   // copied node.exe; postject can't find the SEA fuse sentinel through the
   // signature's overlay otherwise.
@@ -87,11 +101,11 @@ function findSigntoolWindows() {
   return null;
 }
 
-function extractFuse(exePath) {
+function extractFuse(exePath: string): string {
   // Node's SEA fuse hex changes across versions (v24 ≠ the legacy fce680ab…7e0e6
   // value postject hard-codes in its examples). Read the actual sentinel out of
   // the copied node.exe and pass it through to postject.
-  const buffer = fs.readFileSync(exePath);
+  const buffer = fs.readFileSync(exePath) as SearchableBuffer;
   const marker = Buffer.from('NODE_SEA_FUSE_');
   const index = buffer.indexOf(marker);
   if (index < 0) die(`SEA fuse sentinel not found in ${exePath}`);
@@ -149,7 +163,7 @@ log(`    fuse: ${fuse}`);
 // splits at the space and postject sees "agent" + "cowork\…\.exe" as separate
 // resources, surfacing as "Can't read resource file". Manually double-quote any
 // arg with whitespace so cmd.exe leaves it intact.
-const quoteForShell = (arg) => (/\s/.test(arg) ? `"${arg}"` : arg);
+const quoteForShell = (arg: string): string => (/\s/.test(arg) ? `"${arg}"` : arg);
 runShell(['npx', '-y', 'postject', quoteForShell(exePath), 'NODE_SEA_BLOB', quoteForShell(blobPath), '--sentinel-fuse', fuse].join(' '), { cwd: repoRoot });
 
 log('6/6 deploy to binaries/ and target/release/');
