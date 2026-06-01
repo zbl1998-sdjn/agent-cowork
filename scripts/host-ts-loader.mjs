@@ -7,7 +7,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const hostSourceRoot = path.join(repoRoot, 'apps', 'host', 'src');
 const hostTestRoot = path.join(repoRoot, 'apps', 'host', 'test');
 const evalSourceRoot = path.join(repoRoot, 'eval');
-const runtimeTypescriptRoots = [hostSourceRoot, hostTestRoot, evalSourceRoot];
+const scriptsRoot = path.join(repoRoot, 'scripts');
+const runtimeTypescriptRoots = [hostSourceRoot, hostTestRoot, evalSourceRoot, scriptsRoot];
 const require = createRequire(import.meta.url);
 
 function isInsideRuntimeTypescriptRoot(filePath) {

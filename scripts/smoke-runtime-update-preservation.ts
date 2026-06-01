@@ -9,7 +9,7 @@ const repoRoot = path.dirname(scriptDir);
 const runRoot = path.join(repoRoot, 'build', 'runtime-update-preservation');
 const appDataRoot = path.join(runRoot, 'AgentCowork');
 
-function writeSentinel(relativePath, value) {
+function writeSentinel(relativePath: string, value: string): string {
   const target = path.join(appDataRoot, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, value, 'utf8');
@@ -39,7 +39,11 @@ assert.equal(plan.destructiveActions.length, 0);
 assert.deepEqual(plan.components.map((item) => item.id), ['data-science', 'playwright-chromium']);
 for (const item of [...plan.retained, ...plan.components]) {
   assert.equal(item.action, 'preserve');
-  assert.ok(item.path === appDataRoot || item.path.startsWith(`${appDataRoot}${path.sep}`), `${item.path} escaped ${appDataRoot}`);
+  const itemPath = item.path;
+  if (typeof itemPath !== 'string') {
+    throw new Error('preserved dependency item must include a concrete path');
+  }
+  assert.ok(itemPath === appDataRoot || itemPath.startsWith(`${appDataRoot}${path.sep}`), `${itemPath} escaped ${appDataRoot}`);
 }
 for (const file of sentinels) {
   assert.equal(fs.existsSync(file), true, `sentinel was not preserved: ${file}`);
