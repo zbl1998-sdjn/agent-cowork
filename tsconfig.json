@@ -13,7 +13,13 @@
     "types": []
   },
   "files": ["types/host-node-shim.d.ts"],
-  "include": ["apps/host/src/**/*.ts", "apps/host/test/**/*.ts", "eval/**/*.ts"],
+  "include": [
+    "apps/host/src/**/*.ts",
+    "apps/host/test/**/*.ts",
+    "apps/host/scripts/**/*.ts",
+    "eval/**/*.ts",
+    "scripts/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "build",

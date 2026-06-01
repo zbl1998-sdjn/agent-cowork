@@ -555,7 +555,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `/api/recipes/:id/run` 对非法 route id 返回 400, 避免 encoded slash 等异常 id 落到 registry lookup。
 - **前端 composer controller 拆分**:
   - 新增 `apps/windows-client/resources/app-composer-popover.js`, 承接 `/` 模板、`@` 文件 mention、`#` 历史 run picker 的 state、渲染、键盘处理。
-  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.ts`、`verify-mvp.mjs`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
+  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.ts`、`verify-mvp.ts`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
   - `apps/windows-client/resources/app.js` 降到约 1739 行; `node --check` 已验证未截断。
 - **测试入口对齐**:
   - `package.json` 的 `test` script 对齐为默认 `node --test`, 与 handoff 要求一致; 受 Windows 沙箱限制时仍可用 `node --test --test-isolation=none` 做本地补充验证。
@@ -577,7 +577,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/server-runtime-features.test.js`: recipe route 非法 id 返回 400。
 - `apps/host/test/server.test.js`: 新增 composer popover 静态资源。
 - `services/kimi-gateway/internal/kimi/client_test.go`: 覆盖 missing `[DONE]`、错误 body 不泄漏、breaker fallback、空 content parts、非法 multipart、超大 multipart。
-- `scripts/smoke-ui-contract.ts` / `scripts/verify-mvp.mjs` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
+- `scripts/smoke-ui-contract.ts` / `scripts/verify-mvp.ts` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
 
 验收:
 

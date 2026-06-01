@@ -12,7 +12,7 @@
     "demo:mvp": "node scripts/run-host-node.mjs scripts/demo-mvp.ts",
     "start:tauri-host": "node scripts/run-host-node.mjs scripts/start-tauri-host.ts",
     "audit:mvp": "node scripts/audit-mvp.mjs",
-    "verify:mvp": "node scripts/verify-mvp.mjs",
+    "verify:mvp": "node scripts/run-host-node.mjs scripts/verify-mvp.ts",
     "verify:windows-readiness": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-client-readiness.ps1",
     "smoke:host": "node scripts/run-host-node.mjs scripts/smoke-local-operations.ts",
     "smoke:live-mvp": "node scripts/smoke-live-mvp.mjs",

@@ -14,6 +14,7 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
   assert.equal(packageJson.scripts['smoke:ui'], hostNode('scripts/smoke-ui-contract.ts'));
   assert.equal(packageJson.scripts['smoke:windows-paths'], hostNode('scripts/smoke-windows-paths.ts'));
   assert.equal(packageJson.scripts['demo:mvp'], hostNode('scripts/demo-mvp.ts'));
+  assert.equal(packageJson.scripts['verify:mvp'], hostNode('scripts/verify-mvp.ts'));
   assert.equal(packageJson.scripts.bench, hostNode('scripts/bench.ts'));
   assert.equal(packageJson.scripts['smoke:kimi-api'], hostNode('scripts/smoke-kimi-api.ts'));
   assert.equal(packageJson.scripts['check:secrets'], hostNode('scripts/check-secrets.ts'));
@@ -26,6 +27,7 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
     'scripts/smoke-ui-contract.ts',
     'scripts/smoke-windows-paths.ts',
     'scripts/demo-mvp.ts',
+    'scripts/verify-mvp.ts',
     'scripts/bench.ts',
     'scripts/check-secrets.ts',
     'scripts/smoke-kimi-api.ts',
@@ -42,7 +44,7 @@ test('Q6/Q7/R5 delivery scripts are registered and parseable', () => {
   assert.match(windowsSmoke, /\[string\]\$ReportPath/);
   assert.match(windowsSmoke, /reports\\windows-client-smoke/);
 
-  const verifyMvp = fs.readFileSync(path.join(repoRoot, 'scripts/verify-mvp.mjs'), 'utf8');
+  const verifyMvp = fs.readFileSync(path.join(repoRoot, 'scripts/verify-mvp.ts'), 'utf8');
   assert.match(verifyMvp, /run-host-node\.mjs/);
   assert.match(verifyMvp, /demo-mvp\.ts/);
   assert.match(verifyMvp, /hostScriptArgs\('smoke-mvp-runtime\.ts'\)/);

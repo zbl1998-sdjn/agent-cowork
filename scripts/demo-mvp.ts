@@ -218,7 +218,7 @@ async function main(): Promise<void> {
 
   const steps = [
     runStep('live MVP operation smoke', nodeBin, [path.join(repoRoot, 'scripts', 'smoke-live-mvp.mjs')]),
-    runStep('default MVP verification', nodeBin, [path.join(repoRoot, 'scripts', 'verify-mvp.mjs')]),
+    runStep('default MVP verification', nodeBin, [runHostNodeScript, path.join(repoRoot, 'scripts', 'verify-mvp.ts')]),
   ];
 
   if (process.platform === 'win32') {

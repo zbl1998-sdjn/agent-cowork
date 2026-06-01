@@ -45,6 +45,7 @@
     "scripts/start-tauri-host.ts",
     "scripts/status-mvp.ts",
     "scripts/stop-mvp.ts",
-    "scripts/test-setup.ts"
+    "scripts/test-setup.ts",
+    "scripts/verify-mvp.ts"
   ]
 }

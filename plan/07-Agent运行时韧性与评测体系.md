@@ -45,7 +45,7 @@
 | A3 | `EvalRunner`:逐任务在隔离 trusted root 跑、收集 run 指标、聚合 | `eval/runner.js` | 单测(mock model) | 一次跑完任务集出汇总 | M |
 | A4 | 评测报告产物:pass-rate / 基线回归对比 / 趋势(HTML + JSON) | `eval/report.ts` `scripts/eval.ts` | — | **一条命令 `npm run eval` 出报告 + 基线对比** | M |
 | A5 | 离线复现后端(复用 D3 录制/回放),eval 默认不联网不烧 token | 复用 `runtime/model-recorder.js` | 单测 | eval 默认离线、确定性可复现 | S |
-| A6 | 接入 CI:prompt/模型/agent 循环变更触发回归 eval,**低于基线阈值即失败** | `scripts/ci.mjs` | — | 改 system-prompt 即跑 eval;pass-rate 跌破"基线−5%"则 CI 红 | S |
+| A6 | 接入 CI:prompt/模型/agent 循环变更触发回归 eval,**低于基线阈值即失败** | `scripts/ci.ts` | — | 改 system-prompt 即跑 eval;pass-rate 跌破"基线−5%"则 CI 红 | S |
 | A7 | **安全 / 红队任务集**:间接提示注入、诱导危险命令、越权读写、绕过审批等,断言护栏不退化 | `eval/tasks/redteam/*` | 单测 | 红队任务 100% 被正确拦截 / 拒绝;退化即 CI 红 | M |
 
 **量化目标**:建立 pass-rate 基线;回归不得低于基线 −5%;**红队任务拦截率 100%**;eval 全程离线可复现;`npm run eval` 接入 `npm run ci`。

@@ -15,7 +15,42 @@ const reportPath = path.join(
   includeWindowsClient ? 'mvp-verification-report-windows.json' : 'mvp-verification-report.json',
 );
 
-function runCheck({ name, command, commandArgs, cwd = repoRoot, detectAsr = false, extraEnv = {} }) {
+type CheckStatus = 'passed' | 'blocked' | 'failed';
+type EnvOverrides = Record<string, string | undefined>;
+type CheckConfig = {
+  name: string;
+  command: string;
+  commandArgs: string[];
+  cwd?: string;
+  detectAsr?: boolean;
+  extraEnv?: EnvOverrides;
+};
+type CheckResult = {
+  name: string;
+  status: CheckStatus;
+  exitCode: number | null | undefined;
+  durationMs: number;
+  command: string;
+  cwd: string;
+  blockedByAsr: boolean;
+  spawnError: string;
+  outputTail: string[];
+};
+type VerificationSummary = {
+  ok: boolean;
+  passed: number;
+  failed: number;
+  blocked: number;
+};
+
+function runCheck({
+  name,
+  command,
+  commandArgs,
+  cwd = repoRoot,
+  detectAsr = false,
+  extraEnv = {},
+}: CheckConfig): CheckResult {
   const startedAt = Date.now();
   const result = spawnSync(command, commandArgs, {
     cwd,
@@ -31,7 +66,7 @@ function runCheck({ name, command, commandArgs, cwd = repoRoot, detectAsr = fals
     detectAsr &&
     result.status !== 0 &&
     output.includes('01443614-CD74-433A-B99E-2ECDC07BFC25');
-  const status = result.status === 0 ? 'passed' : blockedByAsr ? 'blocked' : 'failed';
+  const status: CheckStatus = result.status === 0 ? 'passed' : blockedByAsr ? 'blocked' : 'failed';
 
   console.log(`[${status}] ${name} (${durationMs}ms)`);
   if (status !== 'passed') {
@@ -52,7 +87,7 @@ function runCheck({ name, command, commandArgs, cwd = repoRoot, detectAsr = fals
   };
 }
 
-function summarize(checks) {
+function summarize(checks: CheckResult[]): VerificationSummary {
   const failed = checks.filter((check) => check.status === 'failed');
   const blocked = checks.filter((check) => check.status === 'blocked');
   return {
@@ -65,11 +100,11 @@ function summarize(checks) {
 
 fs.mkdirSync(buildDir, { recursive: true });
 
-function hostScriptArgs(scriptName) {
+function hostScriptArgs(scriptName: string): string[] {
   return [runHostNodeScript, path.join(repoRoot, 'scripts', scriptName)];
 }
 
-function localStaticUnitGateEnv() {
+function localStaticUnitGateEnv(): EnvOverrides {
   if (
     process.env.KCW_CI_CHANGED_FILES ||
     process.env.CHANGED_FILES ||
@@ -78,10 +113,10 @@ function localStaticUnitGateEnv() {
   ) {
     return {};
   }
-  return { KCW_CI_CHANGED_FILES: 'scripts/verify-mvp.mjs' };
+  return { KCW_CI_CHANGED_FILES: 'scripts/verify-mvp.ts' };
 }
 
-const checks = [
+const checks: CheckConfig[] = [
   {
     name: 'frontend app.js syntax',
     command: nodeBin,
@@ -175,7 +210,7 @@ const checks = [
   {
     name: 'ci static and unit gates',
     command: nodeBin,
-    commandArgs: [path.join(repoRoot, 'scripts', 'ci.mjs')],
+    commandArgs: [runHostNodeScript, path.join(repoRoot, 'scripts', 'ci.ts')],
     extraEnv: localStaticUnitGateEnv(),
   },
   {

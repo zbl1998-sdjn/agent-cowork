@@ -41,7 +41,7 @@
 - Modify: `apps/windows-client/resources/app.js`
 - Modify: `scripts/smoke-live-mvp.mjs`
 - Modify: `scripts/smoke-rendered-ui.mjs`
-- Modify: `scripts/verify-mvp.mjs`
+- Modify: `scripts/verify-mvp.ts`
 
 - [ ] Replace user-facing CLI status text with API status text.
 - [ ] Keep local fallback when no API key is configured.
