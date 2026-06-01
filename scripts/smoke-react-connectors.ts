@@ -1,13 +1,57 @@
 import { spawn } from 'node:child_process';
+import type { ChildProcessLike } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { ServerConfig } from '../apps/host/src/server.js';
 import { createCredentialStore } from '../apps/host/src/security/credential-store.js';
+import type { CredentialProtector } from '../apps/host/src/security/credential-store.js';
+import {
+  CdpClient,
+  assert,
+  bind,
+  errorDetails,
+  evaluate,
+  findBrowser,
+  getFreePort,
+  getJson,
+  type CdpSession,
+  type CdpTarget,
+  type CdpVersion,
+  type ScreenshotResult,
+  type SendPage,
+} from './browser-smoke-utils.js';
+
+type JsonObject = Record<string, unknown>;
+type RequestHeaders = Record<string, string>;
+type SmokeProtector = CredentialProtector;
+type OAuthFetchCall = { url: string; body: string };
+type PostResult<T = JsonObject> = { ok: boolean; statusCode: number; body: T };
+type OAuthStatus = {
+  configured?: boolean;
+  requiredEnv?: string[];
+  connected: boolean;
+};
+type ToolSearchResponse = { tools: Array<{ name?: string }> };
+type ConnectorsResponse = { connected: string[] };
+type OAuthApprovalResponse = { approvalId?: string };
+type OAuthStartResponse = {
+  sessionId?: string;
+  userCode?: string;
+  verificationUri?: string;
+  interval?: number;
+};
+type OAuthCompleteResponse = {
+  status?: string;
+  connected?: boolean;
+  account?: { login?: string };
+  credential?: { accountId?: string };
+  interval?: number;
+};
+type OAuthRevokeResponse = { removed?: boolean };
+type FetchLike = NonNullable<ServerConfig['oauthFetch']>;
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -22,118 +66,67 @@ const reportPath = archiveRequested
 const screenshotPath = path.join(buildDir, 'react-connectors-smoke-1280x760.png');
 const liveGitHubTimeoutMs = Number(process.env.REACT_CONNECTORS_LIVE_GITHUB_TIMEOUT_MS || 5 * 60 * 1000);
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function smokeProtector() {
+function smokeProtector(): SmokeProtector {
   return {
-    protect(text) {
+    protect(text: unknown): string {
       return `sealed:${Buffer.from(String(text), 'utf8').toString('base64')}`;
     },
-    unprotect(text) {
+    unprotect(text: unknown): string {
       return Buffer.from(String(text).slice('sealed:'.length), 'base64').toString('utf8');
     },
   };
 }
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body: JsonObject, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json' },
   });
 }
 
-function githubClientIdFromEnv() {
+function githubClientIdFromEnv(): string {
   return String(process.env.KCW_GITHUB_OAUTH_CLIENT_ID || process.env.GITHUB_OAUTH_CLIENT_ID || '').trim();
 }
 
-function redactText(text) {
+function redactText(text: unknown): string {
   return String(text)
     .replace(/github_pat_[A-Za-z0-9_]+/g, '[redacted-github-token]')
     .replace(/gh[oOpsuUrRsS]_[A-Za-z0-9_]+/g, '[redacted-github-token]')
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]');
 }
 
-function redactReport(value) {
-  if (typeof value === 'string') return redactText(value);
-  if (Array.isArray(value)) return value.map((item) => redactReport(item));
+function redactReport<T>(value: T): T {
+  if (typeof value === 'string') return redactText(value) as T;
+  if (Array.isArray(value)) return value.map((item) => redactReport(item)) as T;
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).map(([key, item]) => {
     if (/token|secret|deviceCode|authorization/i.test(key)) return [key, '[redacted]'];
     return [key, redactReport(item)];
-  }));
+  })) as T;
 }
 
-function findBrowser() {
-  const candidates = process.platform === 'win32'
-    ? [
-        path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-        path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-        path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-      ]
-    : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge'];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
-}
-
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-async function getJson(url, timeoutMs = 5000, headers = {}) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = http.get(url, { headers }, (response) => {
-          let body = '';
-          response.setEncoding('utf8');
-          response.on('data', (chunk) => { body += chunk; });
-          response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
-              return;
-            }
-            resolve(JSON.parse(body));
-          });
-        });
-        request.on('error', reject);
-        request.setTimeout(1000, () => request.destroy(new Error(`Timed out fetching ${url}`)));
-      });
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-  throw new Error(`Timed out waiting for ${url}`);
-}
-
-async function postJsonRaw(url, body, headers = {}) {
+async function postJsonRaw<T = JsonObject>(url: string, body: JsonObject, headers: RequestHeaders = {}): Promise<PostResult<T>> {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
-  let payload = {};
+  let payload: JsonObject = {};
   try {
-    payload = await response.json();
+    payload = await response.json() as JsonObject;
   } catch {
     payload = {};
   }
-  return { ok: response.ok, statusCode: response.status, body: payload };
+  return { ok: response.ok, statusCode: response.status, body: payload as T };
 }
 
-async function postJson(url, body, headers = {}) {
-  const result = await postJsonRaw(url, body, headers);
+async function postJson<T = JsonObject>(url: string, body: JsonObject, headers: RequestHeaders = {}): Promise<{ statusCode: number; body: T }> {
+  const result = await postJsonRaw<T>(url, body, headers);
   if (!result.ok) {
-    const err = new Error(`${url} returned ${result.statusCode}: ${JSON.stringify(redactReport(result.body))}`);
+    const err = new Error(`${url} returned ${result.statusCode}: ${JSON.stringify(redactReport(result.body))}`) as Error & {
+      statusCode?: number;
+      payload?: T;
+    };
     err.statusCode = result.statusCode;
     err.payload = result.body;
     throw err;
@@ -141,82 +134,19 @@ async function postJson(url, body, headers = {}) {
   return { statusCode: result.statusCode, body: result.body };
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-class CdpClient {
-  constructor(url) {
-    this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-  }
-
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
-      this.socket.addEventListener('error', () => {
-        clearTimeout(timeout);
-        reject(new Error('Failed opening DevTools websocket'));
-      }, { once: true });
-    });
-
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (message.id && this.pending.has(message.id)) {
-        const { resolve, reject } = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        if (message.error) reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
-        else resolve(message.result || {});
-      }
-    });
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    this.socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
-  }
-
-  close() {
-    this.socket?.close();
-  }
-}
-
-async function evaluate(sendPage, expression, awaitPromise = true) {
-  const result = await sendPage('Runtime.evaluate', {
-    expression,
-    awaitPromise,
-    returnByValue: true,
-  });
-  if (result.exceptionDetails) {
-    const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate failed';
-    throw new Error(detail);
-  }
-  return result.result?.value;
-}
-
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  return `http://127.0.0.1:${server.address().port}`;
-}
-
-async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
+async function runLiveGitHubOAuthSmoke(baseUrl: string, authHeader: RequestHeaders): Promise<JsonObject> {
   const requestedScopes = ['read:user'];
-  const approval = await postJson(`${baseUrl}/api/connectors/oauth/approve`, {
+  const approval = await postJson<OAuthApprovalResponse>(`${baseUrl}/api/connectors/oauth/approve`, {
     id: 'github',
     scopes: requestedScopes,
   }, authHeader);
   assert(String(approval.body.approvalId || '').startsWith('oauth_'), 'GitHub OAuth approval id was not issued');
 
-  const started = await postJson(`${baseUrl}/api/connectors/oauth/start`, {
+  const started = await postJson<OAuthStartResponse>(`${baseUrl}/api/connectors/oauth/start`, {
     id: 'github',
     scopes: requestedScopes,
     approvalId: approval.body.approvalId,
@@ -230,21 +160,12 @@ async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
   Scope: ${requestedScopes.join(' ')}
 `);
 
-  if (process.stdin.isTTY) {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    try {
-      await rl.question('Authorize in the browser, then press Enter to start polling...');
-    } finally {
-      rl.close();
-    }
-  }
-
   const deadline = Date.now() + liveGitHubTimeoutMs;
-  let complete = null;
+  let complete: OAuthCompleteResponse | null = null;
   let pollCount = 0;
   while (Date.now() < deadline) {
     pollCount += 1;
-    const result = await postJson(`${baseUrl}/api/connectors/oauth/complete`, {
+    const result = await postJson<OAuthCompleteResponse>(`${baseUrl}/api/connectors/oauth/complete`, {
       id: 'github',
       sessionId: started.body.sessionId,
     }, authHeader);
@@ -257,12 +178,12 @@ async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
   }
   assert(complete?.connected === true, 'GitHub OAuth live authorization was not completed before timeout');
 
-  const status = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+  const status = await getJson<OAuthStatus>(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
   assert(status.connected === true, 'GitHub OAuth live status did not become connected');
   assert(!/(github_pat_|gh[oOpsuUrRsS]_)/.test(JSON.stringify(status)), 'GitHub OAuth status appears to include a plaintext token');
 
-  const revoked = await postJson(`${baseUrl}/api/connectors/oauth/revoke`, { id: 'github' }, authHeader);
-  const statusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+  const revoked = await postJson<OAuthRevokeResponse>(`${baseUrl}/api/connectors/oauth/revoke`, { id: 'github' }, authHeader);
+  const statusAfterRevoke = await getJson<OAuthStatus>(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
   assert(statusAfterRevoke.connected === false, 'GitHub OAuth live status remained connected after revoke');
 
   return redactReport({
@@ -279,7 +200,7 @@ async function runLiveGitHubOAuthSmoke(baseUrl, authHeader) {
   });
 }
 
-async function runMissingGitHubClientIdSmoke() {
+async function runMissingGitHubClientIdSmoke(): Promise<JsonObject> {
   const previousClientId = process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
   const previousLegacyClientId = process.env.GITHUB_OAUTH_CLIENT_ID;
   delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
@@ -287,12 +208,12 @@ async function runMissingGitHubClientIdSmoke() {
 
   const workspace = fs.mkdtempSync(path.join(buildDir, 'kcw-react-connectors-no-client-'));
   const credentialPath = path.join(workspace, '.AgentCowork', 'credentials.json');
-  const oauthFetchCalls = [];
+  const oauthFetchCalls: OAuthFetchCall[] = [];
   const credentialStore = createCredentialStore({
     filePath: credentialPath,
     protector: smokeProtector(),
   });
-  const oauthFetch = async (url, init = {}) => {
+  const oauthFetch: FetchLike = async (url, init = {}) => {
     oauthFetchCalls.push({ url: String(url), body: String(init.body || '') });
     if (String(url).endsWith('/login/device/code')) {
       return jsonResponse({
@@ -319,20 +240,20 @@ async function runMissingGitHubClientIdSmoke() {
   let baseUrl = null;
   try {
     baseUrl = await bind(host);
-    const status = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`);
+    const status = await getJson<OAuthStatus>(`${baseUrl}/api/connectors/oauth/status?id=github`);
     assert(status.configured === false, 'GitHub OAuth status should report missing client id');
     assert(
       Array.isArray(status.requiredEnv) && status.requiredEnv.includes('KCW_GITHUB_OAUTH_CLIENT_ID'),
       'GitHub OAuth status did not report the required client id env var',
     );
 
-    const approval = await postJson(`${baseUrl}/api/connectors/oauth/approve`, {
+    const approval = await postJson<OAuthApprovalResponse>(`${baseUrl}/api/connectors/oauth/approve`, {
       id: 'github',
       scopes: ['read:user'],
     });
     assert(String(approval.body.approvalId || '').startsWith('oauth_'), 'GitHub OAuth approval id was not issued');
 
-    const missingConfig = await postJsonRaw(`${baseUrl}/api/connectors/oauth/start`, {
+    const missingConfig = await postJsonRaw<{ code?: string; error?: string }>(`${baseUrl}/api/connectors/oauth/start`, {
       id: 'github',
       clientId: 'body-client',
       scopes: ['read:user'],
@@ -341,19 +262,21 @@ async function runMissingGitHubClientIdSmoke() {
     assert(missingConfig.statusCode === 428, `GitHub OAuth missing client id should return 428, got ${missingConfig.statusCode}`);
     assert(missingConfig.body.code === 'OAUTH_NOT_CONFIGURED', 'GitHub OAuth missing client id returned the wrong error code');
     assert(String(missingConfig.body.error || '').includes('KCW_GITHUB_OAUTH_CLIENT_ID'), 'GitHub OAuth missing client id error did not mention the env var');
-    assert(oauthFetchCalls.length === 0, 'GitHub OAuth missing client id should not call the external device-flow endpoint');
+    assert(Number(oauthFetchCalls.length) === 0, 'GitHub OAuth missing client id should not call the external device-flow endpoint');
 
     process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'smoke-env-client';
-    const started = await postJson(`${baseUrl}/api/connectors/oauth/start`, {
+    const started = await postJson<OAuthStartResponse>(`${baseUrl}/api/connectors/oauth/start`, {
       id: 'github',
       clientId: 'body-client',
       scopes: ['read:user'],
       approvalId: approval.body.approvalId,
     });
     assert(started.body.userCode === 'NOID-1234', 'GitHub OAuth approval was not reusable after client id was configured');
-    assert(oauthFetchCalls.length === 1, 'GitHub OAuth configured retry should call the device-flow endpoint exactly once');
-    assert(oauthFetchCalls[0].body.includes('client_id=smoke-env-client'), 'GitHub OAuth configured retry did not use the env client id');
-    assert(!oauthFetchCalls[0].body.includes('body-client'), 'GitHub OAuth configured retry used the request body client id');
+    assert(Number(oauthFetchCalls.length) === 1, 'GitHub OAuth configured retry should call the device-flow endpoint exactly once');
+    const configuredFetchCall = oauthFetchCalls[0];
+    assert(configuredFetchCall, 'GitHub OAuth configured retry did not record the device-flow request');
+    assert(configuredFetchCall.body.includes('client_id=smoke-env-client'), 'GitHub OAuth configured retry did not use the env client id');
+    assert(!configuredFetchCall.body.includes('body-client'), 'GitHub OAuth configured retry used the request body client id');
     assert(!fs.existsSync(credentialPath), 'GitHub OAuth start preflight should not persist credentials');
 
     return redactReport({
@@ -380,7 +303,7 @@ async function runMissingGitHubClientIdSmoke() {
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   fs.mkdirSync(buildDir, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   assert(fs.existsSync(path.join(uiDistRoot, 'index.html')), 'React UI dist is missing; run npm run build:ui first');
@@ -398,7 +321,7 @@ async function main() {
     filePath: path.join(workspace, '.AgentCowork', 'credentials.json'),
     protector: smokeProtector(),
   });
-  const oauthFetch = liveGitHubRequested ? undefined : async (url, init = {}) => {
+  const oauthFetch: FetchLike = async (url, init = {}) => {
     const href = String(url);
     if (href.endsWith('/login/device/code')) {
       assert(String(init.body || '').includes('client_id=smoke-client'), 'OAuth start did not send the configured client id');
@@ -415,29 +338,35 @@ async function main() {
       return jsonResponse({ access_token: oauthToken, token_type: 'bearer', scope: 'read:user' });
     }
     if (href.endsWith('/user')) {
-      assert(init.headers.authorization === `Bearer ${oauthToken}`, 'OAuth user lookup did not use the stored token');
+      assert(
+        Boolean(init.headers) && !Array.isArray(init.headers) && (init.headers as Record<string, string>).authorization === `Bearer ${oauthToken}`,
+        'OAuth user lookup did not use the stored token',
+      );
       return jsonResponse({ login: 'octocat', id: 1 });
     }
     throw new Error(`unexpected OAuth fetch: ${href}`);
   };
 
-  const host = createServer({
+  const serverConfig: ServerConfig = {
     trustedRoot: workspace,
     requireAuth: false,
     persistAuth: false,
     enableScheduler: false,
     uiDistRoot,
     credentialStore,
-    oauthFetch,
     oauthConfig: liveGitHubRequested ? {} : { github: { clientId: 'smoke-client' } },
-  });
+  };
+  if (!liveGitHubRequested) {
+    serverConfig.oauthFetch = oauthFetch;
+  }
+  const host = createServer(serverConfig);
 
   const startedAt = Date.now();
-  let baseUrl = null;
-  let browser = null;
-  let client = null;
-  let userDataDir = null;
-  const stderr = [];
+  let baseUrl: string | null = null;
+  let browser: ChildProcessLike | null = null;
+  let client: CdpClient | null = null;
+  let userDataDir: string | null = null;
+  const stderr: string[] = [];
 
   try {
     baseUrl = await bind(host);
@@ -461,12 +390,15 @@ async function main() {
     );
     browser.stderr.on('data', (chunk) => { stderr.push(chunk.toString()); });
 
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client is not open');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -488,12 +420,28 @@ async function main() {
     await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
+        const expectedWorkspace = ${JSON.stringify(workspace)};
         const deadline = Date.now() + 8000;
+        function workspaceValue() {
+          const chip = document.querySelector('.workspace-chip');
+          const title = chip?.getAttribute('title') || '';
+          const prefix = '当前工作区:';
+          if (title.startsWith(prefix)) {
+            return title.slice(prefix.length).split('\\n')[0].trim();
+          }
+          return chip?.innerText.replace(/^\\S+\\s*/, '').replace(/▾$/, '').trim() || '';
+        }
+        function normalizePath(value) {
+          return String(value || '').replace(/\\//g, '\\\\').replace(/\\\\+$/g, '').toLowerCase();
+        }
         function tick() {
           const ready = [...document.querySelectorAll('button')].some((button) => button.innerText.trim() === '连接器')
-            && document.body.innerText.includes(${JSON.stringify(workspace)});
+            && normalizePath(workspaceValue()) === normalizePath(expectedWorkspace);
           if (ready) resolve(true);
-          else if (Date.now() > deadline) reject(new Error('React app did not become ready for connectors smoke'));
+          else if (Date.now() > deadline) {
+            reject(new Error('React app did not become ready for connectors smoke: '
+              + JSON.stringify({ workspace: workspaceValue(), expectedWorkspace })));
+          }
           else setTimeout(tick, 50);
         }
         tick();
@@ -577,9 +525,9 @@ async function main() {
       })`,
     );
 
-    const tools = await getJson(`${baseUrl}/api/tools/search?q=read_text&limit=10`);
+    const tools = await getJson<ToolSearchResponse>(`${baseUrl}/api/tools/search?q=read_text&limit=10`);
     assert(tools.tools.some((tool) => tool.name === 'mcp__fs__read_text'), 'filesystem MCP read_text tool was not registered');
-    const connectors = await getJson(`${baseUrl}/api/connectors`);
+    const connectors = await getJson<ConnectorsResponse>(`${baseUrl}/api/connectors`);
     assert(connectors.connected.includes('fs'), 'connector catalog did not report fs as connected');
 
     await evaluate(
@@ -589,7 +537,7 @@ async function main() {
           .find((item) => item.innerText.includes('文件系统'));
         if (!filesystemItem) throw new Error('filesystem connector item missing before disconnect');
         const button = [...filesystemItem.querySelectorAll('button')]
-          .find((item) => item.innerText.trim() === '断开');
+          .find((item) => item.innerText.trim() === '断开连接');
         if (!button) throw new Error('filesystem disconnect button missing');
         button.click();
         return true;
@@ -622,21 +570,21 @@ async function main() {
         tick();
       })`,
     );
-    const toolsAfterDisconnect = await getJson(`${baseUrl}/api/tools/search?q=read_text&limit=10`);
+    const toolsAfterDisconnect = await getJson<ToolSearchResponse>(`${baseUrl}/api/tools/search?q=read_text&limit=10`);
     assert(
       !toolsAfterDisconnect.tools.some((tool) => tool.name === 'mcp__fs__read_text'),
       'filesystem MCP read_text tool remained registered after disconnect',
     );
-    const connectorsAfterDisconnect = await getJson(`${baseUrl}/api/connectors`);
+    const connectorsAfterDisconnect = await getJson<ConnectorsResponse>(`${baseUrl}/api/connectors`);
     assert(!connectorsAfterDisconnect.connected.includes('fs'), 'connector catalog still reported fs as connected');
 
     let afterOAuthApproval = null;
     let afterOAuthStart = null;
     let afterOAuthComplete = null;
     let afterOAuthRevoke = null;
-    let oauthStatus = { connected: false };
-    let oauthStatusAfterRevoke = { connected: false };
-    const authToken = await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`);
+    let oauthStatus: OAuthStatus = { connected: false };
+    let oauthStatusAfterRevoke: OAuthStatus = { connected: false };
+    const authToken = String(await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`) || '');
     const authHeader = authToken ? { authorization: `Bearer ${authToken}` } : {};
 
     if (!liveGitHubRequested) {
@@ -671,7 +619,7 @@ async function main() {
         }
         function tick() {
           const current = snapshot();
-          if (current.buttonText.includes('开始授权') && current.resultText.includes('已审批 GitHub 权限')) resolve(current);
+          if (current.buttonText.includes('去登录授权') && current.resultText.includes('已审批 GitHub 权限')) resolve(current);
           else if (Date.now() > deadline) reject(new Error('GitHub OAuth permission approval did not render: ' + JSON.stringify(current)));
           else setTimeout(tick, 100);
         }
@@ -685,7 +633,7 @@ async function main() {
         const githubItem = [...document.querySelectorAll('.tool-list li')]
           .find((item) => item.innerText.includes('GitHub'));
         const button = [...githubItem.querySelectorAll('button')]
-          .find((item) => item.innerText.trim() === '开始授权');
+          .find((item) => item.innerText.trim() === '去登录授权');
         if (!button) throw new Error('GitHub start OAuth button missing after permission approval');
         button.click();
         return true;
@@ -754,7 +702,7 @@ async function main() {
       })`,
     );
     assert(authToken, 'guest auth token missing after OAuth connector login');
-    oauthStatus = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    oauthStatus = await getJson<OAuthStatus>(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
     assert(oauthStatus.connected === true, 'GitHub OAuth status did not become connected');
     assert(!JSON.stringify(oauthStatus).includes(oauthToken), 'OAuth status leaked the access token');
 
@@ -796,7 +744,7 @@ async function main() {
         tick();
       })`,
     );
-    oauthStatusAfterRevoke = await getJson(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
+    oauthStatusAfterRevoke = await getJson<OAuthStatus>(`${baseUrl}/api/connectors/oauth/status?id=github`, 5000, authHeader);
     assert(oauthStatusAfterRevoke.connected === false, 'GitHub OAuth status remained connected after revoke');
     assert(
       fs.readFileSync(path.join(workspace, '.AgentCowork', 'credentials.json'), 'utf8').includes(oauthToken) === false,
@@ -808,7 +756,7 @@ async function main() {
       ? await runLiveGitHubOAuthSmoke(baseUrl, authHeader)
       : null;
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     const report = redactReport({
@@ -861,11 +809,11 @@ async function main() {
       workspace,
       uiDistRoot,
       reportPath,
-      error: error.stack || error.message,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     });
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(redactText(error.stack || error.message));
+    console.error(redactText(errorDetails(error)));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -893,9 +841,9 @@ main().catch((error) => {
     mode: liveGitHubRequested ? 'mock-and-live-github' : 'mock',
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: errorDetails(error),
   });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(redactText(error.stack || error.message));
+  console.error(redactText(errorDetails(error)));
   process.exit(1);
 });

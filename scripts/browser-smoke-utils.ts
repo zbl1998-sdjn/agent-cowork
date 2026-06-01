@@ -61,12 +61,17 @@ export async function getFreePort(): Promise<number> {
   });
 }
 
-export async function getJson<T>(url: string, timeoutMs = 5000): Promise<T> {
+export async function getJson<T>(url: string, timeoutMs = 5000, headers: Record<string, string> = {}): Promise<T> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     try {
       return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
+        const httpGet = http.get as unknown as (
+          requestUrl: string,
+          options: { headers: Record<string, string> },
+          callback: (response: http.IncomingMessage) => void,
+        ) => http.ClientRequest;
+        const request = httpGet(url, { headers }, (response) => {
           let body = '';
           response.setEncoding('utf8');
           response.on('data', (chunk) => { body += String(chunk); });
