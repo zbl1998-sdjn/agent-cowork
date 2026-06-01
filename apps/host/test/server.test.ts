@@ -610,12 +610,13 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-kimi-runner.js'), 'window.AgentCoworkKimiRunner = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-renderer.js'), 'window.AgentCoworkMessageRenderer = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-actions.js'), 'window.AgentCoworkMessageActions = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-file-upload.js'), 'window.AgentCoworkFileUpload = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
     const index = await fetch(`${baseUrl}/`);
     assert.equal(index.status, 200);
-    assert.match(index.headers.get('content-type') || '', /text\/html/);
+    assert.match(index.headers.get('content-type') || '', /text[/]html/);
     assert.match(await index.text(), /Agent Cowork/);
 
     const script = await fetch(`${baseUrl}/app.js`);
@@ -665,6 +666,10 @@ test('serves the local preview shell and assets', async () => {
     const messageActions = await fetch(`${baseUrl}/app-message-actions.js`);
     assert.equal(messageActions.status, 200);
     assert.match(messageActions.headers.get('content-type') || '', /javascript/);
+
+    const fileUpload = await fetch(`${baseUrl}/app-file-upload.js`);
+    assert.equal(fileUpload.status, 200);
+    assert.match(fileUpload.headers.get('content-type') || '', /javascript/);
   });
 });
 

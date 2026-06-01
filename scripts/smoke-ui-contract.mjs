@@ -99,6 +99,7 @@ async function main() {
     assert(scriptRoutes.includes('/app-kimi-runner.js'), 'index missing app-kimi-runner.js script');
     assert(scriptRoutes.includes('/app-message-renderer.js'), 'index missing app-message-renderer.js script');
     assert(scriptRoutes.includes('/app-message-actions.js'), 'index missing app-message-actions.js script');
+    assert(scriptRoutes.includes('/app-file-upload.js'), 'index missing app-file-upload.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
     assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-api-client.js') < scriptRoutes.indexOf('/app.js'), 'app-api-client.js must load before app.js');
@@ -111,6 +112,7 @@ async function main() {
     assert(scriptRoutes.indexOf('/app-kimi-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-kimi-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-renderer.js') < scriptRoutes.indexOf('/app.js'), 'app-message-renderer.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-actions.js') < scriptRoutes.indexOf('/app.js'), 'app-message-actions.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-file-upload.js') < scriptRoutes.indexOf('/app.js'), 'app-file-upload.js must load before app.js');
     const scriptBodies = [];
     for (const route of scriptRoutes) {
       const asset = await getText(baseUrl, route);
@@ -129,6 +131,7 @@ async function main() {
     assert(allScripts.includes('window.AgentCoworkKimiRunner'), 'kimi runner module global missing');
     assert(allScripts.includes('window.AgentCoworkMessageRenderer'), 'message renderer module global missing');
     assert(allScripts.includes('window.AgentCoworkMessageActions'), 'message actions module global missing');
+    assert(allScripts.includes('window.AgentCoworkFileUpload'), 'file upload module global missing');
     assert(allScripts.includes('createComposerPopover'), 'composer popover factory missing');
     assert(allScripts.includes('createArtifactCatalog'), 'artifact catalog factory missing');
     assert(allScripts.includes('createRunHistoryController'), 'run history factory missing');
@@ -137,6 +140,7 @@ async function main() {
     assert(allScripts.includes('createKimiRunner'), 'kimi runner factory missing');
     assert(allScripts.includes('createMessageRenderer'), 'message renderer factory missing');
     assert(allScripts.includes('createMessageActions'), 'message actions factory missing');
+    assert(allScripts.includes('createFileUploadController'), 'file upload factory missing');
     assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');
     assert(allScripts.includes('function appendAssistantMessage'), 'app scripts missing message bubble controller');
     assert(allScripts.includes('function handleComposerSend'), 'app scripts missing composer send router');

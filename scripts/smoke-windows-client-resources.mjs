@@ -154,6 +154,7 @@ async function main() {
   assert(fs.existsSync(path.join(resourcesDir, 'app-kimi-runner.js')), 'Windows client Kimi runner resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-renderer.js')), 'Windows client message renderer resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-actions.js')), 'Windows client message actions resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-file-upload.js')), 'Windows client file upload resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app.js')), 'Windows client JS resource is missing');
 
   const browserPath = findBrowser();
