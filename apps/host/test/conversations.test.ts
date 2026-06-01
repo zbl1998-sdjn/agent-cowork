@@ -4,31 +4,42 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createServer } from '../src/server.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
+import { bind, close, recordArray, recordValue, stringField } from './helpers/host-http.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import type { ServerConfig, HostServer } from '../src/server.js';
 
-async function withServer(config, fn) {
+type JsonRecord = Record<string, unknown>;
+
+async function withServer(config: ServerConfig, fn: (baseUrl: string, server: HostServer) => Promise<void>): Promise<void> {
   const server = createServer(config);
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const { port } = server.address();
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = await bind(server);
   try {
     await fn(baseUrl, server);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await close(server);
   }
 }
 
-async function registerUser(baseUrl, username) {
+async function jsonRecord(response: Response, label: string): Promise<JsonRecord> {
+  return recordValue(await response.json() as unknown, label);
+}
+
+async function conversationFrom(response: Response, label: string): Promise<JsonRecord> {
+  return recordValue((await jsonRecord(response, `${label} response`)).conversation, label);
+}
+
+async function conversationListFrom(response: Response, label: string): Promise<JsonRecord[]> {
+  return recordArray((await jsonRecord(response, `${label} response`)).conversations, label);
+}
+
+async function registerUser(baseUrl: string, username: string): Promise<string> {
   const res = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username, password: 'passw0rd' }),
   });
   assert.equal(res.status, 200, `register ${username}`);
-  return (await res.json()).token;
+  return stringField(await jsonRecord(res, `register ${username}`), 'token');
 }
 
 test('conversations are isolated per signed-in user', async () => {
@@ -45,29 +56,31 @@ test('conversations are isolated per signed-in user', async () => {
       body: JSON.stringify({ title: 'Alice 的对话', messages: [{ role: 'user', text: 'hi' }] }),
     });
     assert.equal(res.status, 200);
-    assert.equal((await res.json()).conversation.title, 'Alice 的对话');
+    assert.equal((await conversationFrom(res, 'Alice conversation')).title, 'Alice 的对话');
 
     res = await fetch(`${baseUrl}/api/conversations`, { headers: authA });
-    const list = (await res.json()).conversations;
+    const list = await conversationListFrom(res, 'Alice conversations');
     assert.equal(list.length, 1);
-    assert.equal(list[0].id, 'c1');
+    const [conversation] = list;
+    assert.ok(conversation, 'Alice conversation summary should exist');
+    assert.equal(conversation.id, 'c1');
 
     res = await fetch(`${baseUrl}/api/conversations`, { headers: authB });
-    assert.deepEqual((await res.json()).conversations, []);
+    assert.deepEqual(await conversationListFrom(res, 'Bob conversations'), []);
 
     res = await fetch(`${baseUrl}/api/conversations/c1`, { headers: authB });
     assert.equal(res.status, 404);
 
     res = await fetch(`${baseUrl}/api/conversations/c1`, { headers: authA });
     assert.equal(res.status, 200);
-    const full = (await res.json()).conversation;
-    assert.equal(full.messages.length, 1);
+    const full = await conversationFrom(res, 'full conversation');
+    assert.equal(recordArray(full.messages, 'full conversation messages').length, 1);
     assert.ok(full.createdAt && full.updatedAt);
 
     res = await fetch(`${baseUrl}/api/conversations/c1`, { method: 'DELETE', headers: authA });
-    assert.equal((await res.json()).deleted, true);
+    assert.equal((await jsonRecord(res, 'delete conversation response')).deleted, true);
     res = await fetch(`${baseUrl}/api/conversations`, { headers: authA });
-    assert.deepEqual((await res.json()).conversations, []);
+    assert.deepEqual(await conversationListFrom(res, 'Alice conversations after delete'), []);
   });
 });
 
@@ -79,18 +92,18 @@ test('upsert preserves createdAt and updates title/messages', async () => {
     let res = await fetch(`${baseUrl}/api/conversations/x1`, {
       method: 'PUT', headers: auth, body: JSON.stringify({ title: 'v1', messages: [] }),
     });
-    const created = (await res.json()).conversation;
+    const created = await conversationFrom(res, 'created conversation');
     await new Promise((r) => setTimeout(r, 5));
     res = await fetch(`${baseUrl}/api/conversations/x1`, {
       method: 'PUT', headers: auth, body: JSON.stringify({ title: 'v2', pinned: true, messages: [{ role: 'user', text: 'a' }] }),
     });
     assert.equal(res.status, 200);
     res = await fetch(`${baseUrl}/api/conversations/x1`, { headers: auth });
-    const full = (await res.json()).conversation;
+    const full = await conversationFrom(res, 'updated conversation');
     assert.equal(full.title, 'v2');
     assert.equal(full.pinned, true);
-    assert.equal(full.createdAt, created.createdAt);
-    assert.ok(full.updatedAt >= created.updatedAt);
+    assert.equal(stringField(full, 'createdAt'), stringField(created, 'createdAt'));
+    assert.ok(stringField(full, 'updatedAt') >= stringField(created, 'updatedAt'));
 
     res = await fetch(`${baseUrl}/api/conversations/bad-body`, {
       method: 'PUT',
@@ -114,20 +127,23 @@ test('conversation storage preserves branch metadata and active branch', async (
     let res = await fetch(`${baseUrl}/api/conversations/branched`, {
       method: 'PUT',
       headers: auth,
-      body: JSON.stringify({ title: '有分支', messages: branches[1].messages, activeBranchId: 'b1', branches }),
+      body: JSON.stringify({ title: '有分支', messages: branches[1]?.messages || [], activeBranchId: 'b1', branches }),
     });
     assert.equal(res.status, 200);
-    const summary = (await res.json()).conversation;
+    const summary = await conversationFrom(res, 'branched summary');
     assert.equal(summary.branchCount, 2);
     assert.equal(summary.activeBranchId, 'b1');
 
     res = await fetch(`${baseUrl}/api/conversations/branched`, { headers: auth });
     assert.equal(res.status, 200);
-    const full = (await res.json()).conversation;
+    const full = await conversationFrom(res, 'branched full conversation');
     assert.equal(full.activeBranchId, 'b1');
-    assert.equal(full.branches.length, 2);
-    assert.deepEqual(full.branches.map((branch) => branch.id), ['main', 'b1']);
-    assert.equal(full.branches[0].messages.length, 2);
+    const savedBranches = recordArray(full.branches, 'saved branches');
+    assert.equal(savedBranches.length, 2);
+    assert.deepEqual(savedBranches.map((branch) => branch.id), ['main', 'b1']);
+    const [mainBranch] = savedBranches;
+    assert.ok(mainBranch, 'main branch should exist');
+    assert.equal(recordArray(mainBranch.messages, 'main branch messages').length, 2);
   });
 });
 
