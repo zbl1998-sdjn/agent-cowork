@@ -23,7 +23,7 @@
 | 录制/回放 | host L2 | `runtime/model-recorder.js` | `ModelRecorder` / `ModelReplayer`(model-call 装饰器) | 装饰 `kimi/model-call`,不改其签名 |
 | 运行指标 | host L2 | `runtime/run-metrics.js` | `RunMetrics{ record(runId, metric) }` | 依赖 run-events(L2) |
 | 版本归因 | host L2 | `runtime/run-store` 增字段 + `kimi/system-prompt` 版本戳 | — | 先补 run-store 特征测试 |
-| **评测体系** | **eval(离线)+ scripts** | `eval/{tasks,scorers,runner,report}.js` + `scripts/eval.mjs` | `EvalTask` `Scorer` `EvalRunner` | **只读调用 host;不被任何运行时模块依赖** |
+| **评测体系** | **eval(离线)+ scripts** | `eval/{tasks,scorers,runner,report}.ts` + `scripts/eval.ts` | `EvalTask` `Scorer` `EvalRunner` | **只读调用 host;不被任何运行时模块依赖** |
 | 预算/熔断 | host L2 | `runtime/budget-guard.js` | `BudgetGuard{ check(usage,elapsed) -> ok|abort }` | 依赖 run-metrics(L2) |
 | 整轮超时 | host L1 | tool-loop 注入 wall-clock | 复用 `AbortController`/signal | — |
 | 回路注入防护 | host L1 | `kimi/safety/untrusted-content.js` | `InjectionGuard{ wrap(toolOutput) }` | 纯函数 |
@@ -43,14 +43,14 @@
 | A1 | `EvalTask` schema + 代表性任务集(覆盖:文件读写、工作区检索、多步重构、审批流、Office 产物、批量文件、对话分支) | `eval/tasks/*` | 新模块单测 | **≥ 20 个 golden 任务**,可加载、可扩展、带预期断言 | M |
 | A2 | `Scorer` 接口 + 多维打分:成功/失败、工具调用次数与效率、步数、延迟、token 与成本 | `eval/scorers/*` | 单测 | 每任务产出结构化分数 JSON | M |
 | A3 | `EvalRunner`:逐任务在隔离 trusted root 跑、收集 run 指标、聚合 | `eval/runner.js` | 单测(mock model) | 一次跑完任务集出汇总 | M |
-| A4 | 评测报告产物:pass-rate / 基线回归对比 / 趋势(HTML + JSON) | `eval/report.js` `scripts/eval.mjs` | — | **一条命令 `npm run eval` 出报告 + 基线对比** | M |
+| A4 | 评测报告产物:pass-rate / 基线回归对比 / 趋势(HTML + JSON) | `eval/report.ts` `scripts/eval.ts` | — | **一条命令 `npm run eval` 出报告 + 基线对比** | M |
 | A5 | 离线复现后端(复用 D3 录制/回放),eval 默认不联网不烧 token | 复用 `runtime/model-recorder.js` | 单测 | eval 默认离线、确定性可复现 | S |
 | A6 | 接入 CI:prompt/模型/agent 循环变更触发回归 eval,**低于基线阈值即失败** | `scripts/ci.mjs` | — | 改 system-prompt 即跑 eval;pass-rate 跌破"基线−5%"则 CI 红 | S |
 | A7 | **安全 / 红队任务集**:间接提示注入、诱导危险命令、越权读写、绕过审批等,断言护栏不退化 | `eval/tasks/redteam/*` | 单测 | 红队任务 100% 被正确拦截 / 拒绝;退化即 CI 红 | M |
 
 **量化目标**:建立 pass-rate 基线;回归不得低于基线 −5%;**红队任务拦截率 100%**;eval 全程离线可复现;`npm run eval` 接入 `npm run ci`。
 
-A5 加固记录(2026-05-26):`scripts/eval.mjs` 默认改为 fail-closed:必须通过 `KCW_EVAL_REPLAY_RECORDS` 指向 JSON/JSONL ModelRecorder 记录后才运行离线回放;缺 records 不再使用合约造假执行器合成通过结果。原合约执行器仅保留为 `KCW_EVAL_CONTRACT_EXECUTOR=1` 的显式 schema/scorer dry-run,并在输出中标明 executor mode。新增单测锁定默认缺 records 会失败、contract executor 必须显式 opt-in、JSONL 记录可读取。
+A5 加固记录(2026-05-26):`scripts/eval.ts` 默认改为 fail-closed:必须通过 `KCW_EVAL_REPLAY_RECORDS` 指向 JSON/JSONL ModelRecorder 记录后才运行离线回放;缺 records 不再使用合约造假执行器合成通过结果。原合约执行器仅保留为 `KCW_EVAL_CONTRACT_EXECUTOR=1` 的显式 schema/scorer dry-run,并在输出中标明 executor mode。新增单测锁定默认缺 records 会失败、contract executor 必须显式 opt-in、JSONL 记录可读取。
 
 ---
 

@@ -38,11 +38,11 @@ test('Eval report emits JSON, HTML, and baseline regression metadata', async () 
 
 test('package exposes npm run eval command', () => {
   const pkg = JSON.parse(fs.readFileSync('../../package.json', 'utf8')) as PackageJson;
-  assert.equal(pkg.scripts?.eval, 'node scripts/run-host-node.mjs scripts/eval.mjs');
+  assert.equal(pkg.scripts?.eval, 'node scripts/run-host-node.mjs scripts/eval.ts');
 });
 
 test('eval executor requires replay records by default', async () => {
-  const { createEvalExecutorFromEnv } = await import('../../../scripts/eval.mjs');
+  const { createEvalExecutorFromEnv } = await import('../../../scripts/eval.js');
 
   assert.throws(
     () => createEvalExecutorFromEnv({ recordsPath: null, allowContractExecutor: false }),
@@ -58,7 +58,7 @@ test('eval executor requires replay records by default', async () => {
 });
 
 test('eval contract executor is explicit opt-in only', async () => {
-  const { createEvalExecutorFromEnv } = await import('../../../scripts/eval.mjs');
+  const { createEvalExecutorFromEnv } = await import('../../../scripts/eval.js');
   const { mode, executor } = createEvalExecutorFromEnv({ recordsPath: null, allowContractExecutor: true });
 
   assert.equal(mode, 'contract');
@@ -81,7 +81,7 @@ test('eval contract executor is explicit opt-in only', async () => {
 });
 
 test('eval replay records loader accepts JSONL ModelRecorder files', async () => {
-  const { readReplayRecords } = await import('../../../scripts/eval.mjs');
+  const { readReplayRecords } = await import('../../../scripts/eval.js');
   const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-eval-records-')), 'records.jsonl');
   fs.writeFileSync(
     filePath,

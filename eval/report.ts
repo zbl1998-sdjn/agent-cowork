@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export type EvalSummaryResult = {
   taskId?: unknown;
-  score?: { passed?: unknown; score?: unknown };
+  score?: unknown;
   [key: string]: unknown;
 };
 export type EvalSummary = {
@@ -59,6 +59,14 @@ function escapeHtml(value: unknown): string {
     .replaceAll('"', '&quot;');
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resultScore(result: EvalSummaryResult): { passed?: unknown; score?: unknown } {
+  return isObject(result.score) ? result.score : {};
+}
+
 function baselinePassRate(baseline: EvalBaseline | null): number | null {
   if (!baseline) return null;
   const value = baseline.passRate ?? baseline.summary?.passRate;
@@ -89,8 +97,9 @@ function compareBaseline(summary: EvalSummary, baseline: EvalBaseline | null, re
 
 function renderHtml(report: EvalReportJson): string {
   const rows = report.results.map((result) => {
-    const passed = result.score?.passed ? 'pass' : 'fail';
-    const score = Number(result.score?.score ?? 0).toFixed(3);
+    const scoreResult = resultScore(result);
+    const passed = scoreResult.passed ? 'pass' : 'fail';
+    const score = Number(scoreResult.score ?? 0).toFixed(3);
     return `<tr><td>${escapeHtml(result.taskId)}</td><td>${passed}</td><td>${score}</td></tr>`;
   }).join('\n');
   const passRate = (report.summary.passRate * 100).toFixed(1);
