@@ -1,6 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createProviderRouter, orderProviderChain, runWithFallback } from '../src/kimi/provider/router.js';
+import type { ProviderCandidate } from '../src/kimi/provider/router.js';
+
+type FallbackEvent = { failed: ProviderCandidate; next: ProviderCandidate; error: unknown };
+type AggregateProviderError = Error & { attempts?: unknown[] };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function aggregateAttempts(error: unknown): unknown[] | undefined {
+  return error && typeof error === 'object' && 'attempts' in error
+    ? (error as AggregateProviderError).attempts
+    : undefined;
+}
 
 test('orderProviderChain de-dupes and preserves order', () => {
   assert.deepEqual(orderProviderChain(['kimi', 'openai', 'kimi', 'anthropic']), ['kimi', 'openai', 'anthropic']);
@@ -9,7 +23,7 @@ test('orderProviderChain de-dupes and preserves order', () => {
 test('orderProviderChain puts circuit-open providers last', () => {
   const open = new Set(['kimi']);
   assert.deepEqual(
-    orderProviderChain(['kimi', 'openai', 'anthropic'], { isOpen: (n) => open.has(n) }),
+    orderProviderChain(['kimi', 'openai', 'anthropic'], { isOpen: (n) => typeof n === 'string' && open.has(n) }),
     ['openai', 'anthropic', 'kimi'],
   );
 });
@@ -42,20 +56,20 @@ test('runWithFallback throws an aggregate error when all providers fail', async 
   await assert.rejects(
     () => runWithFallback(['kimi', 'openai'], async (name) => { throw new Error(`${name} boom`); }),
     (err) => {
-      assert.match(err.message, /all providers failed/);
-      assert.equal(err.attempts.length, 2);
+      assert.match(errorMessage(err), /all providers failed/);
+      assert.equal(aggregateAttempts(err)?.length, 2);
       return true;
     },
   );
 });
 
 test('runWithFallback can stop on non-fallbackable errors', async () => {
-  const tried = [];
+  const tried: string[] = [];
   await assert.rejects(
     () => runWithFallback(
       ['openai', 'openai/local'],
-      async (name) => { tried.push(name); throw new Error('OpenAI request failed with status 401'); },
-      { shouldFallback: (err) => !/status 401/.test(err.message) },
+      async (name) => { tried.push(String(name)); throw new Error('OpenAI request failed with status 401'); },
+      { shouldFallback: (err) => !/status 401/.test(errorMessage(err)) },
     ),
     /status 401/,
   );
@@ -65,7 +79,7 @@ test('runWithFallback can stop on non-fallbackable errors', async () => {
 test('runWithFallback reports object candidates when falling through', async () => {
   const primary = { provider: 'openai', baseUrl: 'https://primary.example/v1', model: 'gpt-primary' };
   const fallback = { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local' };
-  const events = [];
+  const events: FallbackEvent[] = [];
   const out = await runWithFallback(
     [primary, fallback],
     async (candidate) => {
@@ -76,17 +90,17 @@ test('runWithFallback reports object candidates when falling through', async () 
   );
   assert.equal(out.provider, fallback);
   assert.equal(out.result, 'ok');
-  assert.equal(events[0].failed, primary);
-  assert.equal(events[0].next, fallback);
+  assert.equal(events[0]?.failed, primary);
+  assert.equal(events[0]?.next, fallback);
 });
 
 test('runWithFallback tries circuit-open providers last', async () => {
-  const tried = [];
+  const tried: string[] = [];
   const open = new Set(['kimi']);
   const out = await runWithFallback(
     ['kimi', 'openai'],
-    async (name) => { tried.push(name); return name; },
-    { isOpen: (n) => open.has(n) },
+    async (name) => { tried.push(String(name)); return name; },
+    { isOpen: (n) => typeof n === 'string' && open.has(n) },
   );
   assert.equal(out.provider, 'openai');
   assert.deepEqual(tried, ['openai']);
@@ -100,6 +114,6 @@ test('empty chain and missing runner are rejected', async () => {
 test('createProviderRouter exposes order() and run()', async () => {
   const router = createProviderRouter({ chain: ['kimi', 'openai'] });
   assert.deepEqual(router.order(), ['kimi', 'openai']);
-  const out = await router.run(async (name) => name.toUpperCase());
+  const out = await router.run(async (name) => String(name).toUpperCase());
   assert.equal(out.result, 'KIMI');
 });

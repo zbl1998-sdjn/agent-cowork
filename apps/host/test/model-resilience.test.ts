@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { callModelResilient, friendlyAgentError } from '../src/kimi/agent-runner.js';
+import type { ModelConfig } from '../src/kimi/agent/model-resilience.js';
+
+type ModelOutput = { content?: unknown; provider?: unknown; model?: unknown };
+type FallbackSummary = { provider?: unknown };
+type FallbackEvent = { failed: FallbackSummary; next: FallbackSummary; error: string };
+type SeenModelConfig = Pick<ModelConfig, 'provider' | 'baseUrl' | 'model' | 'apiKey'>;
+
+function errorCode(error: unknown): unknown {
+  return error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 test('callModelResilient passes a success through and supplies an abort signal', async () => {
   let sawSignal = false;
@@ -9,7 +23,7 @@ test('callModelResilient passes a success through and supplies an abort signal',
     {},
     { kimiConfig: { baseUrl: 'u-pass', model: 'm-pass' }, timeoutMs: 5000 },
   );
-  assert.equal(r.content, 'ok');
+  assert.equal((r as ModelOutput).content, 'ok');
   assert.ok(sawSignal, 'modelCall must receive an AbortSignal');
 });
 
@@ -22,7 +36,7 @@ test('callModelResilient opens the breaker after repeated failures', async () =>
   // 5th call short-circuits (breaker open) instead of hitting the upstream.
   await assert.rejects(
     () => callModelResilient(fail, {}, { kimiConfig: cfg, timeoutMs: 5000 }),
-    (e) => e.code === 'CIRCUIT_OPEN',
+    (e) => errorCode(e) === 'CIRCUIT_OPEN',
   );
 });
 
@@ -38,11 +52,11 @@ test('callModelResilient aborts a hung call via timeout', async () => {
 });
 
 test('callModelResilient falls back to the next provider without inheriting the primary key', async () => {
-  const seen = [];
-  const events = [];
+  const seen: ModelConfig[] = [];
+  const events: FallbackEvent[] = [];
   const cfg = {
     provider: 'openai',
-    apiKey: 'sk-PRIMARYSECRET1234567890',
+    apiKey: 'sk-test-primary-secret-1234567890',
     baseUrl: 'https://primary.example/v1',
     model: 'primary-model',
     fallbacks: [
@@ -54,26 +68,27 @@ test('callModelResilient falls back to the next provider without inheriting the 
     async ({ kimiConfig }) => {
       seen.push(kimiConfig);
       if (kimiConfig.provider === 'openai') {
-        throw new Error('primary failed for sk-PRIMARYSECRET1234567890');
+        throw new Error('primary failed for sk-test-primary-secret-1234567890');
       }
       return { content: 'fallback ok', provider: kimiConfig.provider, model: kimiConfig.model };
     },
     {},
-    { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event) },
+    { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
   );
 
-  assert.equal(out.content, 'fallback ok');
-  assert.equal(out.provider, 'openai/local');
+  const result = out as ModelOutput;
+  assert.equal(result.content, 'fallback ok');
+  assert.equal(result.provider, 'openai/local');
   assert.equal(seen.length, 2);
-  assert.equal(seen[1].apiKey, undefined);
+  assert.equal(seen[1]?.apiKey, undefined);
   assert.equal(events.length, 1);
-  assert.equal(events[0].failed.provider, 'openai');
-  assert.equal(events[0].next.provider, 'openai/local');
-  assert.ok(!events[0].error.includes('sk-PRIMARYSECRET'), 'fallback event leaked primary key');
+  assert.equal(events[0]?.failed.provider, 'openai');
+  assert.equal(events[0]?.next.provider, 'openai/local');
+  assert.ok(!String(events[0]?.error).includes('sk-test-primary-secret'), 'fallback event leaked primary key');
 });
 
 test('callModelResilient keeps same-provider fallbacks distinct by baseUrl and model', async () => {
-  const seen = [];
+  const seen: SeenModelConfig[] = [];
   const cfg = {
     provider: 'openai',
     apiKey: 'sk-primary-same-provider-123456',
@@ -96,15 +111,15 @@ test('callModelResilient keeps same-provider fallbacks distinct by baseUrl and m
     { kimiConfig: cfg, timeoutMs: 5000 },
   );
 
-  assert.equal(out.content, 'same provider fallback ok');
+  assert.equal((out as ModelOutput).content, 'same provider fallback ok');
   assert.deepEqual(seen.map((item) => item.baseUrl), ['https://primary-openai.example/v1', 'https://fallback-openai.example/v1']);
-  assert.equal(seen[1].apiKey, 'sk-fallback-same-provider-123456');
+  assert.equal(seen[1]?.apiKey, 'sk-fallback-same-provider-123456');
 });
 
 test('callModelResilient reports exhausted fallback chains with redacted layer errors', async () => {
   const cfg = {
     provider: 'openai',
-    apiKey: 'sk-EXHAUSTSECRET1234567890',
+    apiKey: 'sk-test-exhaust-secret-1234567890',
     baseUrl: 'https://primary-exhaust.example/v1',
     model: 'primary-exhaust',
     fallbacks: [
@@ -115,21 +130,21 @@ test('callModelResilient reports exhausted fallback chains with redacted layer e
   await assert.rejects(
     () => callModelResilient(
       async ({ kimiConfig }) => {
-        throw new Error(`failed ${kimiConfig.provider} sk-EXHAUSTSECRET1234567890`);
+        throw new Error(`failed ${kimiConfig.provider} sk-test-exhaust-secret-1234567890`);
       },
       {},
       { kimiConfig: cfg, timeoutMs: 5000 },
     ),
-    (err) => err.code === 'FALLBACK_EXHAUSTED' && !err.message.includes('sk-EXHAUSTSECRET'),
+    (err) => errorCode(err) === 'FALLBACK_EXHAUSTED' && !errorMessage(err).includes('sk-test-exhaust-secret'),
   );
 });
 
 test('callModelResilient does not fall back on auth or 4xx configuration errors', async () => {
-  const seen = [];
-  const events = [];
+  const seen: unknown[] = [];
+  const events: FallbackEvent[] = [];
   const cfg = {
     provider: 'openai',
-    apiKey: 'sk-AUTHSECRET1234567890',
+    apiKey: 'sk-test-auth-secret-1234567890',
     baseUrl: 'https://auth.example/v1',
     model: 'auth-model',
     fallbacks: [
@@ -144,7 +159,7 @@ test('callModelResilient does not fall back on auth or 4xx configuration errors'
         throw new Error('OpenAI request failed with status 401: invalid api key');
       },
       {},
-      { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event) },
+      { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
     ),
     /status 401/,
   );
@@ -157,6 +172,6 @@ test('friendlyAgentError degrades known states and redacts everything else', () 
   assert.match(friendlyAgentError({ code: 'CIRCUIT_OPEN' }, { traceId: 't1' }), /熔断/);
   assert.match(friendlyAgentError({ code: 'CIRCUIT_OPEN' }, { traceId: 't1' }), /t1/);
   assert.match(friendlyAgentError({ code: 'ETIMEDOUT' }, {}), /超时/);
-  const leaky = friendlyAgentError({ message: 'failed for key sk-LIVEKEY1234567890abc' }, {});
-  assert.ok(!leaky.includes('sk-LIVEKEY'), 'error message must be redacted');
+  const leaky = friendlyAgentError({ message: 'failed for key sk-test-live-key-1234567890abc' }, {});
+  assert.ok(!leaky.includes('sk-test-live-key'), 'error message must be redacted');
 });

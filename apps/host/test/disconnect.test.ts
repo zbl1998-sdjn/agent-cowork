@@ -3,12 +3,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import type { KimiTextResult } from '../src/kimi/api-runner.js';
 import { createServer } from '../src/server.js';
+import type { HostServer } from '../src/server.js';
 import { createApprovalRegistry } from '../src/runtime/approvals.js';
 import { createCancellationRegistry } from '../src/runtime/cancellation.js';
+import { closeTestServer } from './helpers/close-server.js';
 
-function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-dc-')); }
-async function bind(s) { await new Promise((r) => s.listen(0, '127.0.0.1', r)); return `http://127.0.0.1:${s.address().port}`; }
+function tmp(): string { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-dc-')); }
+
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function fakeKimiChatRunner(): Promise<KimiTextResult> {
+  return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'ok', durationMs: 0 };
+}
 
 test('E2E: client disconnect mid-question cancels the run and frees the approval registry', async () => {
   const root = tmp();
@@ -17,21 +32,26 @@ test('E2E: client disconnect mid-question cancels the run and frees the approval
   // The agent keeps asking the user a question; the user never answers — instead
   // the client disconnects. The server must not leak the pending question.
   const agentModelCall = async () => ({ content: '', tool_calls: [{ id: 'c1', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '继续吗?', options: ['是', '否'] }) } }] });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => ({}), agentModelCall, approvalRegistry, cancellation });
+  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: fakeKimiChatRunner, agentModelCall, approvalRegistry, cancellation });
   const base = await bind(server);
   try {
     const ac = new AbortController();
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }), signal: ac.signal });
+    assert.ok(res.body);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let all = '';
-    let qid = null;
+    let qid: string | null = null;
     while (!qid) {
       const { value, done } = await reader.read();
       if (done) break;
       all += dec.decode(value, { stream: true });
       const m = /event: question\r?\ndata: (\{.*\})/.exec(all);
-      if (m) qid = JSON.parse(m[1]).id;
+      const payload = m?.[1];
+      if (payload) {
+        const parsed = JSON.parse(payload) as { id?: unknown };
+        if (typeof parsed.id === 'string') qid = parsed.id;
+      }
     }
     assert.ok(qid, 'agent asked a question');
     assert.equal(approvalRegistry.pendingCount(), 1, 'one pending question while awaiting the user');
@@ -41,7 +61,6 @@ test('E2E: client disconnect mid-question cancels the run and frees the approval
     assert.equal(approvalRegistry.pendingCount(), 0, 'pending question freed on disconnect');
     assert.equal(cancellation.isCancelled(qid) || true, true);
   } finally {
-    if (server.closeMcp) server.closeMcp();
-    await new Promise((r) => server.close(r));
+    await closeTestServer(server);
   }
 });

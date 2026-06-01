@@ -1,20 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { AddressInfo } from 'node:http';
 import { createServer } from '../src/server.js';
 import { buildOnboardingRecommendations } from '../src/onboarding/recommendations.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+type ServerConfig = Parameters<typeof createServer>[0];
+type RecommendationItem = { id: string };
+type OnboardingResponse = {
+  selectedRole: string;
+  workspaceType: string;
+  dependencyCheck: { recommendedIds: string[] };
+  recommendations: {
+    connectors: RecommendationItem[];
+    skills: RecommendationItem[];
+  };
+};
+
+async function withServer(config: ServerConfig, fn: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = createServer({ enableScheduler: false, ...config });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  const { port } = server.address();
+  const address = server.address();
+  assert.ok(address !== null);
+  assert.equal(typeof address, 'object');
+  const { port } = address as AddressInfo;
   try {
     await fn(`http://127.0.0.1:${port}`);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
@@ -36,7 +52,7 @@ test('onboarding recommendations differ by role', () => {
   const developer = buildOnboardingRecommendations({ role: 'developer' });
   const research = buildOnboardingRecommendations({ role: 'research' });
 
-  assert.notDeepEqual(developer.recommendations.skills, office.recommendations.skills);
+  assert.ok(JSON.stringify(developer.recommendations.skills) !== JSON.stringify(office.recommendations.skills));
   assert.ok(developer.dependencyCheck.recommendedIds.includes('mingit'));
   assert.ok(!office.dependencyCheck.recommendedIds.includes('mingit'));
   assert.ok(research.dependencyCheck.recommendedIds.includes('tesseract-ocr'));
@@ -53,7 +69,7 @@ test('POST /api/onboarding/recommendations returns recommendations', async () =>
     });
 
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = await response.json() as OnboardingResponse;
     assert.equal(body.selectedRole, 'developer');
     assert.equal(body.workspaceType, 'repo');
     assert.ok(body.dependencyCheck.recommendedIds.includes('mingit'));
@@ -71,7 +87,7 @@ test('POST /api/onboarding/recommendations sanitizes invalid optional fields', a
     });
 
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = await response.json() as OnboardingResponse;
     assert.equal(body.selectedRole, 'office');
     assert.equal(body.workspaceType, 'local');
   });

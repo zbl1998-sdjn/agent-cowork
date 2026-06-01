@@ -4,19 +4,55 @@ import { defaultAgentModelCall } from '../src/kimi/agent-runner.js';
 import { resolveModelProvider } from '../src/kimi/provider/index.js';
 import { parseOpenAiCompatibleStream } from '../src/kimi/provider/kimi.js';
 
-function streamReader(lines) {
+type StreamReader = { read(): Promise<{ value?: Uint8Array; done?: boolean }> };
+type RequestBody = Record<string, unknown> & {
+  messages?: Array<{ role?: unknown; content?: Array<{ text?: unknown }> }>;
+  tools?: Array<{
+    function?: { name?: unknown };
+    name?: unknown;
+    input_schema?: { type?: unknown };
+  }>;
+};
+type CapturedRequest = {
+  url?: string;
+  headers?: Record<string, string>;
+  body?: RequestBody;
+};
+type ToolCall = { id?: unknown; function: { name?: unknown; arguments?: unknown } };
+type ModelMessage = Record<string, unknown> & {
+  usage?: Record<string, unknown>;
+  tool_calls?: ToolCall[];
+  partial_tool_calls?: ToolCall[];
+  stream_error?: string;
+};
+type FetchInit = { headers: Record<string, string>; body: string };
+
+function assertCaptured(captured: CapturedRequest): asserts captured is {
+  url: string;
+  headers: Record<string, string>;
+  body: RequestBody;
+} {
+  assert.equal(typeof captured.url, 'string');
+  assert.ok(captured.headers);
+  assert.ok(captured.body);
+}
+
+function streamReader(lines: string[]): StreamReader {
   const encoder = new TextEncoder();
   const chunks = lines.map((line) => encoder.encode(line));
   let index = 0;
   return {
     async read() {
       if (index >= chunks.length) return { done: true };
-      return { value: chunks[index++], done: false };
+      const value = chunks[index];
+      index += 1;
+      assert.ok(value);
+      return { value, done: false };
     },
   };
 }
 
-function interruptedStreamReader(lines, error = new Error('stream socket closed')) {
+function interruptedStreamReader(lines: string[], error = new Error('stream socket closed')): StreamReader {
   const reader = streamReader(lines);
   return {
     async read() {
@@ -35,7 +71,7 @@ test('resolveModelProvider accepts an injected provider seam', async () => {
   };
   assert.equal(resolveModelProvider({ provider }), provider);
   const message = await defaultAgentModelCall({ kimiConfig: { provider }, messages: [], tools: [] });
-  assert.equal(message.content, 'custom-provider');
+  assert.equal((message as ModelMessage).content, 'custom-provider');
 });
 
 test('resolveModelProvider registers OpenAI-compatible providers', () => {
@@ -51,11 +87,11 @@ test('resolveModelProvider registers Anthropic aliases', () => {
 });
 
 test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch', async () => {
-  const captured = {};
-  const fetchImpl = async (url, init) => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
     captured.url = url;
     captured.headers = init.headers;
-    captured.body = JSON.parse(init.body);
+    captured.body = JSON.parse(init.body) as RequestBody;
     return {
       ok: true,
       status: 200,
@@ -81,28 +117,29 @@ test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch
     messages: [{ role: 'user', content: 'hi' }],
     tools: [{ type: 'function', function: { name: 'Read', parameters: { type: 'object' } } }],
     fetchImpl,
-  });
+  }) as ModelMessage;
 
+  assertCaptured(captured);
   assert.equal(captured.url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(captured.headers.authorization, 'Bearer sk-test-secret');
   assert.equal(captured.body.model, 'gpt-test');
   assert.equal(captured.body.stream, true);
   assert.equal(captured.body.max_tokens, 123);
   assert.equal(captured.body.temperature, 0.2);
-  assert.equal(captured.body.tools[0].function.name, 'Read');
+  assert.equal(captured.body.tools?.[0]?.function?.name, 'Read');
   assert.equal(message.content, 'openai');
   assert.equal(message.provider, 'openai');
   assert.equal(message.model, 'gpt-test');
-  assert.equal(message.usage.total_tokens, 5);
+  assert.equal(message.usage?.total_tokens, 5);
 });
 
 test('defaultAgentModelCall routes Anthropic provider through fake fetch', async () => {
-  const tokens = [];
-  const captured = {};
-  const fetchImpl = async (url, init) => {
+  const tokens: string[] = [];
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
     captured.url = url;
     captured.headers = init.headers;
-    captured.body = JSON.parse(init.body);
+    captured.body = JSON.parse(init.body) as RequestBody;
     return {
       ok: true,
       status: 200,
@@ -136,8 +173,9 @@ test('defaultAgentModelCall routes Anthropic provider through fake fetch', async
     tools: [{ type: 'function', function: { name: 'Read', description: 'read file', parameters: { type: 'object' } } }],
     fetchImpl,
     onContent: (delta) => tokens.push(delta),
-  });
+  }) as ModelMessage;
 
+  assertCaptured(captured);
   assert.equal(captured.url, 'https://api.anthropic.test/v1/messages');
   assert.equal(captured.headers['x-api-key'], 'sk-ant-test-secret');
   assert.equal(captured.headers['anthropic-version'], '2023-06-01');
@@ -147,28 +185,28 @@ test('defaultAgentModelCall routes Anthropic provider through fake fetch', async
   assert.equal(captured.body.max_tokens, 456);
   assert.equal(captured.body.temperature, 0.1);
   assert.equal(captured.body.system, 'be brief');
-  assert.equal(captured.body.messages[0].role, 'user');
-  assert.equal(captured.body.messages[0].content[0].text, 'hi');
-  assert.equal(captured.body.tools[0].name, 'Read');
-  assert.equal(captured.body.tools[0].input_schema.type, 'object');
+  assert.equal(captured.body.messages?.[0]?.role, 'user');
+  assert.equal(captured.body.messages?.[0]?.content?.[0]?.text, 'hi');
+  assert.equal(captured.body.tools?.[0]?.name, 'Read');
+  assert.equal(captured.body.tools?.[0]?.input_schema?.type, 'object');
   assert.deepEqual(tokens, ['hel', 'lo']);
   assert.equal(message.content, 'hello');
   assert.equal(message.provider, 'anthropic');
   assert.equal(message.model, 'claude-test');
-  assert.equal(message.usage.prompt_tokens, 3);
-  assert.equal(message.usage.completion_tokens, 5);
-  assert.equal(message.usage.total_tokens, 8);
-  assert.equal(message.tool_calls[0].id, 'toolu_1');
-  assert.equal(message.tool_calls[0].function.name, 'Read');
-  assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
+  assert.equal(message.usage?.prompt_tokens, 3);
+  assert.equal(message.usage?.completion_tokens, 5);
+  assert.equal(message.usage?.total_tokens, 8);
+  assert.equal(message.tool_calls?.[0]?.id, 'toolu_1');
+  assert.equal(message.tool_calls?.[0]?.function.name, 'Read');
+  assert.equal(message.tool_calls?.[0]?.function.arguments, '{"path":"a.txt"}');
 });
 
 test('local OpenAI-compatible provider does not require or send an API key', async () => {
-  const captured = {};
-  const fetchImpl = async (url, init) => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
     captured.url = url;
     captured.headers = init.headers;
-    captured.body = JSON.parse(init.body);
+    captured.body = JSON.parse(init.body) as RequestBody;
     return {
       ok: true,
       status: 200,
@@ -188,15 +226,16 @@ test('local OpenAI-compatible provider does not require or send an API key', asy
     messages: [{ role: 'user', content: 'hi' }],
     tools: [],
     fetchImpl,
-  });
+  }) as ModelMessage;
 
+  assertCaptured(captured);
   assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.headers.authorization, undefined);
   assert.equal(captured.body.model, 'local-model');
   assert.equal(message.content, 'local ok');
   assert.equal(message.provider, 'openai/local');
   assert.equal(message.model, 'local-model');
-  assert.equal(message.usage.total_tokens, 3);
+  assert.equal(message.usage?.total_tokens, 3);
 });
 
 test('OpenAI provider fails closed without an API key', async () => {
@@ -227,7 +266,7 @@ test('Anthropic provider fails closed without API key or model', async () => {
   );
   await assert.rejects(
     () => defaultAgentModelCall({
-      kimiConfig: { provider: 'claude', apiKey: 'sk-ant', baseUrl: 'https://api.anthropic.test/v1' },
+      kimiConfig: { provider: 'claude', apiKey: 'sk-test-ant', baseUrl: 'https://api.anthropic.test/v1' },
       messages: [],
       tools: [],
       fetchImpl: async () => {
@@ -239,8 +278,8 @@ test('Anthropic provider fails closed without API key or model', async () => {
 });
 
 test('parseOpenAiCompatibleStream accumulates content, reasoning, tools, and usage', async () => {
-  const tokens = [];
-  const reasoning = [];
+  const tokens: string[] = [];
+  const reasoning: string[] = [];
   const message = await parseOpenAiCompatibleStream(streamReader([
     'data: {"choices":[{"delta":{"reasoning_content":"why","content":"hel","tool_calls":[{"index":0,"id":"call_1","function":{"name":"Read","arguments":"{\\"path\\""}}]}}]}\n',
     'data: {"choices":[{"delta":{"content":"lo","tool_calls":[{"index":0,"function":{"arguments":":\\"a.txt\\"}"}}]}}],"usage":{"total_tokens":7}}\n',
@@ -253,14 +292,15 @@ test('parseOpenAiCompatibleStream accumulates content, reasoning, tools, and usa
   assert.equal(message.reasoning_content, 'why');
   assert.deepEqual(tokens, ['hel', 'lo']);
   assert.deepEqual(reasoning, ['why']);
-  assert.equal(message.tool_calls[0].function.name, 'Read');
-  assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
-  assert.equal(message.usage.total_tokens, 7);
+  const parsed = message as ModelMessage;
+  assert.equal(parsed.tool_calls?.[0]?.function.name, 'Read');
+  assert.equal(parsed.tool_calls?.[0]?.function.arguments, '{"path":"a.txt"}');
+  assert.equal(parsed.usage?.total_tokens, 7);
 });
 
 test('parseOpenAiCompatibleStream returns accumulated message when stream breaks mid-flight', async () => {
-  const tokens = [];
-  const reasoning = [];
+  const tokens: string[] = [];
+  const reasoning: string[] = [];
   const message = await parseOpenAiCompatibleStream(interruptedStreamReader([
     'data: {"choices":[{"delta":{"reasoning_content":"why","content":"hel","tool_calls":[{"index":0,"id":"call_1","function":{"name":"Read","arguments":"{\\"path\\""}}]}}]}\n',
     'data: {"choices":[{"delta":{"content":"lo","tool_calls":[{"index":0,"function":{"arguments":":\\"a.txt\\"}"}}]}}],"usage":{"total_tokens":7}}\n',
@@ -273,12 +313,13 @@ test('parseOpenAiCompatibleStream returns accumulated message when stream breaks
   assert.equal(message.reasoning_content, 'why');
   assert.deepEqual(tokens, ['hel', 'lo']);
   assert.deepEqual(reasoning, ['why']);
-  assert.equal(message.tool_calls[0].function.name, 'Read');
-  assert.equal(message.tool_calls[0].function.arguments, '{"path":"a.txt"}');
-  assert.equal(message.usage.total_tokens, 7);
+  const parsed = message as ModelMessage;
+  assert.equal(parsed.tool_calls?.[0]?.function.name, 'Read');
+  assert.equal(parsed.tool_calls?.[0]?.function.arguments, '{"path":"a.txt"}');
+  assert.equal(parsed.usage?.total_tokens, 7);
   assert.equal(message.stream_interrupted, true);
   assert.equal(message.finish_reason, 'stream_interrupted');
-  assert.match(message.stream_error, /stream socket closed/);
+  assert.match(String(parsed.stream_error), /stream socket closed/);
 });
 
 test('parseOpenAiCompatibleStream does not promote interrupted partial tool calls to executable calls', async () => {
@@ -289,6 +330,7 @@ test('parseOpenAiCompatibleStream does not promote interrupted partial tool call
   assert.equal(message.content, 'need file');
   assert.equal(message.stream_interrupted, true);
   assert.equal(message.tool_calls, undefined);
-  assert.equal(message.partial_tool_calls[0].function.name, 'Read');
-  assert.equal(message.partial_tool_calls[0].function.arguments, '{"path"');
+  const parsed = message as ModelMessage;
+  assert.equal(parsed.partial_tool_calls?.[0]?.function.name, 'Read');
+  assert.equal(parsed.partial_tool_calls?.[0]?.function.arguments, '{"path"');
 });

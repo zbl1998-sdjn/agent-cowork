@@ -1,21 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { AddressInfo } from 'node:http';
 import { createServer } from '../src/server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+type ServerConfig = Parameters<typeof createServer>[0];
+type PromptContext = Record<string, unknown> & {
+  profile?: { terms: string[] };
+  project?: string;
+  tenantId?: string;
+  trustedRoot?: string;
+};
+type PromptRefineResult = {
+  refined: string;
+  changed: boolean;
+  intent: string;
+  missing: string[];
+};
+type PromptRefineBody = PromptRefineResult & {
+  context: { tenantId: string };
+  trustedRoot: string;
+};
+
+async function withServer(config: ServerConfig, fn: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = createServer({ requireAuth: false, ...config });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
 
   const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  assert.ok(address !== null);
+  assert.equal(typeof address, 'object');
+  const { port } = address as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${port}`;
   try {
     await fn(baseUrl);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
@@ -29,7 +51,7 @@ test('prompt refine route returns visible missing fields instead of rewriting va
     });
 
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = await response.json() as PromptRefineBody;
     assert.equal(body.changed, false);
     assert.equal(body.refined, '帮我处理一下');
     assert.deepEqual(body.missing, ['action', 'target', 'desiredOutput']);
@@ -39,11 +61,11 @@ test('prompt refine route returns visible missing fields instead of rewriting va
 
 test('prompt refine route can use an injected refiner and preserves request identity', async () => {
   const trustedRoot = makeTestWorkspace('prompt-refine');
-  let capturedContext;
+  let capturedContext: PromptContext | undefined;
   await withServer({
     trustedRoot,
     promptRefiner: {
-      async refine(raw, ctx) {
+      async refine(raw: string, ctx: PromptContext): Promise<PromptRefineResult> {
         capturedContext = ctx;
         return {
           refined: `${raw}\n请给出验证命令。`,
@@ -65,10 +87,11 @@ test('prompt refine route can use an injected refiner and preserves request iden
     });
 
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = await response.json() as PromptRefineBody;
     assert.equal(body.changed, true);
     assert.match(body.refined, /验证命令/);
     assert.equal(body.context.tenantId, 'tenant_local');
+    assert.ok(capturedContext);
     assert.equal(capturedContext.project, 'Agent Cowork');
     assert.equal(capturedContext.trustedRoot, trustedRoot);
     assert.equal(capturedContext.tenantId, 'tenant_local');
@@ -77,12 +100,12 @@ test('prompt refine route can use an injected refiner and preserves request iden
 
 test('prompt refine route rejects malformed required prompt and normalizes optional context', async () => {
   const trustedRoot = makeTestWorkspace('prompt-refine-normalize');
-  let capturedRaw;
-  let capturedContext;
+  let capturedRaw: string | undefined;
+  let capturedContext: PromptContext | undefined;
   await withServer({
     trustedRoot,
     promptRefiner: {
-      async refine(raw, ctx) {
+      async refine(raw: string, ctx: PromptContext): Promise<PromptRefineResult> {
         capturedRaw = raw;
         capturedContext = ctx;
         return {
@@ -111,6 +134,7 @@ test('prompt refine route rejects malformed required prompt and normalizes optio
 
     assert.equal(response.status, 200);
     assert.equal(capturedRaw, '继续优化');
+    assert.ok(capturedContext);
     assert.equal(capturedContext.trustedRoot, trustedRoot);
     assert.equal(capturedContext.tenantId, 'tenant_local');
     assert.equal(Object.hasOwn(capturedContext, '0'), false);
@@ -119,11 +143,11 @@ test('prompt refine route rejects malformed required prompt and normalizes optio
 
 test('prompt refine route injects recalled user profile into refinement context', async () => {
   const trustedRoot = makeTestWorkspace('prompt-refine-profile');
-  let capturedContext;
+  let capturedContext: PromptContext | undefined;
   await withServer({
     trustedRoot,
     promptRefiner: {
-      async refine(raw, ctx) {
+      async refine(raw: string, ctx: PromptContext): Promise<PromptRefineResult> {
         capturedContext = ctx;
         return {
           refined: raw,
@@ -154,6 +178,7 @@ test('prompt refine route injects recalled user profile into refinement context'
     });
 
     assert.equal(response.status, 200);
+    assert.ok(capturedContext?.profile);
     assert.ok(capturedContext.profile.terms.includes('FE = 前端体验验收'));
     assert.equal(capturedContext.trustedRoot, trustedRoot);
   });

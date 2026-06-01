@@ -1,44 +1,68 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { AddressInfo } from 'node:http';
 import { createServer } from '../src/server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+type ServerConfig = Parameters<typeof createServer>[0];
+type JsonRequestOptions = { method?: string; token?: string; body?: unknown; idem?: string };
+type JsonResponse<T> = { status: number; body: T };
+type ProjectRecord = {
+  id: string;
+  name?: string;
+  archived?: boolean;
+  artifacts?: string[];
+  conversations?: string[];
+  stats?: unknown;
+};
+type ProjectRoutesBody = {
+  deleted?: boolean;
+  error?: string;
+  project: ProjectRecord;
+  projects: ProjectRecord[];
+};
+
+async function withServer(config: ServerConfig, fn: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = createServer(config);
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  const { port } = server.address();
+  const address = server.address();
+  assert.ok(address !== null);
+  assert.equal(typeof address, 'object');
+  const { port } = address as AddressInfo;
   try {
     await fn(`http://127.0.0.1:${port}`);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
-async function registerUser(baseUrl, username) {
+async function registerUser(baseUrl: string, username: string): Promise<string> {
   const res = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username, password: 'passw0rd' }),
   });
   assert.equal(res.status, 200);
-  return (await res.json()).token;
+  return ((await res.json()) as { token: string }).token;
 }
 
-async function jsonRequest(baseUrl, route, { method = 'GET', token, body, idem } = {}) {
-  const headers = {};
+async function jsonRequest<T = ProjectRoutesBody>(
+  baseUrl: string,
+  route: string,
+  { method = 'GET', token, body, idem }: JsonRequestOptions = {},
+): Promise<JsonResponse<T>> {
+  const headers: Record<string, string> = {};
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (idem) headers['idempotency-key'] = idem;
-  const res = await fetch(`${baseUrl}${route}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const init: RequestInit = { method, headers };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await fetch(`${baseUrl}${route}`, init);
   const text = await res.text();
-  return { status: res.status, body: text ? JSON.parse(text) : null };
+  return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
 }
 
 test('project routes scope projects per signed-in user and manage memberships', async () => {
@@ -113,7 +137,9 @@ test('project routes scope projects per signed-in user and manage memberships', 
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.projects, []);
     res = await jsonRequest(baseUrl, '/api/projects?includeArchived=1', { token: tokenA });
-    assert.equal(res.body.projects[0].archived, true);
+    const firstProject = res.body.projects[0];
+    assert.ok(firstProject);
+    assert.equal(firstProject.archived, true);
 
     res = await jsonRequest(baseUrl, `/api/projects/${project.id}`, {
       method: 'DELETE',
@@ -131,6 +157,7 @@ test('project routes reject trustedRoot outside the configured jail', async () =
   await withServer({ trustedRoot, requireAuth: false }, async (baseUrl) => {
     const res = await jsonRequest(baseUrl, '/api/projects?trustedRoot=C:/', {});
     assert.equal(res.status, 400);
+    assert.ok(res.body.error);
     assert.match(res.body.error, /trusted root/i);
   });
 });

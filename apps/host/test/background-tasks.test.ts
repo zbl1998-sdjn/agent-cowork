@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createBackgroundTasks } from '../src/runtime/background-tasks.js';
+import type { BackgroundTask } from '../src/runtime/background-tasks.js';
+
+function mustTask(task: BackgroundTask | null): BackgroundTask {
+  assert.ok(task);
+  return task;
+}
 
 test('register creates a running task at zero progress', () => {
   const bt = createBackgroundTasks();
@@ -19,32 +25,32 @@ test('register requires an id', () => {
 test('update clamps progress into 0..1 and patches fields', () => {
   const bt = createBackgroundTasks();
   bt.register({ id: 'a' });
-  assert.equal(bt.update('a', { progress: 2 }).progress, 1);
-  assert.equal(bt.update('a', { progress: -1 }).progress, 0);
-  assert.equal(bt.update('a', { title: '改了' }).title, '改了');
+  assert.equal(mustTask(bt.update('a', { progress: 2 })).progress, 1);
+  assert.equal(mustTask(bt.update('a', { progress: -1 })).progress, 0);
+  assert.equal(mustTask(bt.update('a', { title: '改了' })).title, '改了');
   assert.equal(bt.update('missing', { progress: 0.5 }), null);
 });
 
 test('complete(ok) marks done, fills progress, and notifies subscribers', () => {
   const bt = createBackgroundTasks();
-  const seen = [];
+  const seen: BackgroundTask[] = [];
   bt.onComplete((task) => seen.push(task));
   bt.register({ id: 'a' });
-  const done = bt.complete('a', { ok: true, result: { files: 3 } });
+  const done = mustTask(bt.complete('a', { ok: true, result: { files: 3 } }));
   assert.equal(done.status, 'done');
   assert.equal(done.progress, 1);
   assert.deepEqual(done.result, { files: 3 });
   assert.equal(seen.length, 1);
-  assert.equal(seen[0].id, 'a');
+  assert.equal(seen[0]?.id, 'a');
   assert.equal(bt.pendingCount(), 0);
 });
 
 test('complete(fail) records the error and notifies', () => {
   const bt = createBackgroundTasks();
-  const seen = [];
+  const seen: BackgroundTask[] = [];
   bt.onComplete((task) => seen.push(task));
   bt.register({ id: 'a' });
-  const failed = bt.complete('a', { ok: false, error: 'timeout' });
+  const failed = mustTask(bt.complete('a', { ok: false, error: 'timeout' }));
   assert.equal(failed.status, 'failed');
   assert.equal(failed.error, 'timeout');
   assert.equal(seen.length, 1);
@@ -53,7 +59,7 @@ test('complete(fail) records the error and notifies', () => {
 test('cancel marks the task cancelled', () => {
   const bt = createBackgroundTasks();
   bt.register({ id: 'a' });
-  assert.equal(bt.cancel('a').status, 'cancelled');
+  assert.equal(mustTask(bt.cancel('a')).status, 'cancelled');
   assert.equal(bt.pendingCount(), 0);
 });
 
@@ -84,5 +90,5 @@ test('a throwing subscriber does not break completion', () => {
   bt.onComplete(() => { throw new Error('boom'); });
   bt.register({ id: 'a' });
   assert.doesNotThrow(() => bt.complete('a', { ok: true }));
-  assert.equal(bt.get('a').status, 'done');
+  assert.equal(mustTask(bt.get('a')).status, 'done');
 });
