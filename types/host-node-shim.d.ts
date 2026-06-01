@@ -189,7 +189,7 @@ declare module 'node:path' {
     name: string;
   }
 
-  export function basename(path: string): string;
+  export function basename(path: string, suffix?: string): string;
   export function dirname(path: string): string;
   export function extname(path: string): string;
   export function isAbsolute(path: string): boolean;
@@ -245,6 +245,12 @@ declare module 'node:http' {
 
 declare module 'node:url' {
   export function fileURLToPath(url: string): string;
+}
+
+declare module 'node:vm' {
+  export class Script {
+    constructor(code: string, options?: { filename?: string; displayErrors?: boolean });
+  }
 }
 
 declare module 'node:zlib' {

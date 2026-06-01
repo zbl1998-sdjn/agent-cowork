@@ -1,23 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { Script } from 'node:vm';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RESOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources');
 const RESOURCE_SOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources-src');
 const RESOURCE_TSCONFIG = path.join(ROOT, 'tsconfig.windows-resources.json');
 
-function toPosix(filePath) {
+function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
 }
 
-function rel(filePath) {
+function rel(filePath: string): string {
   return toPosix(path.relative(ROOT, filePath));
 }
 
-function listResourceScripts() {
+function listResourceScripts(): string[] {
   return fs
     .readdirSync(RESOURCE_DIR, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
@@ -25,7 +25,7 @@ function listResourceScripts() {
     .sort((a, b) => rel(a).localeCompare(rel(b)));
 }
 
-function listResourceSources() {
+function listResourceSources(): string[] {
   return fs
     .readdirSync(RESOURCE_SOURCE_DIR, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts'))
@@ -33,11 +33,11 @@ function listResourceSources() {
     .sort((a, b) => rel(a).localeCompare(rel(b)));
 }
 
-function normalizeNewlines(text) {
+function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, '\n');
 }
 
-function formatDiagnostic(diagnostic) {
+function formatDiagnostic(diagnostic: ts.Diagnostic): string {
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
   if (diagnostic.file && typeof diagnostic.start === 'number') {
     const pos = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
@@ -46,7 +46,7 @@ function formatDiagnostic(diagnostic) {
   return `TS${diagnostic.code}: ${message}`;
 }
 
-function emitResourcesTo(outDir) {
+function emitResourcesTo(outDir: string): void {
   const configFile = ts.readConfigFile(RESOURCE_TSCONFIG, ts.sys.readFile);
   if (configFile.error) {
     throw new Error(formatDiagnostic(configFile.error));
@@ -69,7 +69,7 @@ function emitResourcesTo(outDir) {
   }
 }
 
-function assertGeneratedScriptsAreCurrent(sources, scripts) {
+function assertGeneratedScriptsAreCurrent(sources: string[], scripts: string[]): void {
   const expectedScriptNames = new Set(sources.map((source) => `${path.basename(source, '.ts')}.js`));
   const actualScriptNames = new Set(scripts.map((script) => path.basename(script)));
   for (const expected of expectedScriptNames) {
@@ -102,12 +102,12 @@ function assertGeneratedScriptsAreCurrent(sources, scripts) {
   }
 }
 
-function assertClassicScriptSyntax(filePath) {
+function assertClassicScriptSyntax(filePath: string): void {
   const source = fs.readFileSync(filePath, 'utf8');
   try {
     // These files are loaded by index.html as classic scripts, so parse them
     // with the same non-module boundary before the TS migration removes them.
-    new vm.Script(source, { filename: filePath, displayErrors: true });
+    new Script(source, { filename: filePath, displayErrors: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`${rel(filePath)}: ${message}`);
