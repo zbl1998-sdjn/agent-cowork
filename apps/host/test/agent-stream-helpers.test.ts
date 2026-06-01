@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from '../src/routes/agent-stream-budget.js';
 import { buildAgentConfigSnapshot } from '../src/routes/agent-config-snapshot.js';
 import { resolveAgentRunStart } from '../src/routes/agent-resume.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
+import type { RunsIndexLike } from '../src/routes/agent-stream-record.js';
 import { readRunRecord } from '../src/runtime/run-store.js';
+import { present, recordValue, stringField, tempRoot } from './helpers/host-http.js';
 
-function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-agent-stream-')); }
+function tmp(): string {
+  return tempRoot('kcw-agent-stream-');
+}
 
 test('agent stream budget helpers ignore non-positive limits and choose the tightest valid limit', () => {
   const body = {
@@ -57,9 +58,11 @@ test('agent config snapshot normalizes diagnostics without leaking fallback keys
   assert.equal(snapshot.verify, true);
   assert.equal(snapshot.maxSteps, 16);
   assert.equal(snapshot.temperature, 0.25);
-  assert.equal(snapshot.fallbacks[0].hasKey, true);
-  assert.equal(Object.hasOwn(snapshot.fallbacks[0], 'apiKey'), false);
-  assert.equal(snapshot.fallbacks[1].hasKey, false);
+  const firstFallback = present(snapshot.fallbacks[0], 'first fallback');
+  const secondFallback = present(snapshot.fallbacks[1], 'second fallback');
+  assert.equal(firstFallback.hasKey, true);
+  assert.equal(Object.hasOwn(firstFallback, 'apiKey'), false);
+  assert.equal(secondFallback.hasKey, false);
 });
 
 test('agent resume helper trims resume ids and keeps seeded ids deterministic', () => {
@@ -78,8 +81,8 @@ test('agent resume helper trims resume ids and keeps seeded ids deterministic', 
 
 test('recordAgentRun normalizes provider, writes index summary, and swallows record failures', () => {
   const runStoreRoot = tmp();
-  const summaries = [];
-  const runsIndex = { upsert: (summary) => summaries.push(summary) };
+  const summaries: unknown[] = [];
+  const runsIndex: RunsIndexLike = { upsert: (summary) => summaries.push(summary) };
 
   recordAgentRun({
     runStoreRoot,
@@ -97,10 +100,13 @@ test('recordAgentRun normalizes provider, writes index summary, and swallows rec
   });
 
   const record = readRunRecord(runStoreRoot, 'run_agent_stream_helper');
-  assert.equal(record.provider, 'openai-compatible');
-  assert.equal(record.result.text, 'done');
+  const savedRecord = present(record, 'saved run record');
+  assert.equal(savedRecord.provider, 'openai-compatible');
+  const result = recordValue(savedRecord.result, 'saved run result');
+  assert.equal(stringField(result, 'text'), 'done');
   assert.equal(summaries.length, 1);
-  assert.equal(summaries[0].provider, 'openai-compatible');
+  const summary = recordValue(present(summaries[0], 'index summary'), 'index summary');
+  assert.equal(stringField(summary, 'provider'), 'openai-compatible');
 
   assert.doesNotThrow(() => recordAgentRun({
     runStoreRoot: '',

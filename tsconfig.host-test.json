@@ -23,6 +23,7 @@
     "apps/host/test/agent-stream-basic-e2e.test.ts",
     "apps/host/test/agent-stream-lazy-resume.test.ts",
     "apps/host/test/agent-stream-provider-routing.test.ts",
+    "apps/host/test/agent-stream-helpers.test.ts",
     "apps/host/test/agent-stream-input.test.ts",
     "apps/host/test/agent-stream-session-model.test.ts",
     "apps/host/test/agent-stream-write.test.ts",
