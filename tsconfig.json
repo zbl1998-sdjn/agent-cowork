@@ -19,7 +19,8 @@
     "apps/host/test/**/*.ts",
     "apps/host/scripts/**/*.ts",
     "eval/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "scripts/**/*.d.mts"
   ],
   "exclude": [
     "node_modules",

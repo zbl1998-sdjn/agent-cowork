@@ -1,0 +1,7 @@
+{
+  "extends": "../../../tsconfig.windows-resources.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["./**/*.ts"]
+}
