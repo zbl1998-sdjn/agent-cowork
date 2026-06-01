@@ -2,6 +2,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { HostServer } from '../apps/host/src/server.js';
+
+type ToolCall = {
+  id: string;
+  function: { name: string; arguments: string };
+};
+
+type ModelResponse = {
+  content: string;
+  tool_calls?: ToolCall[];
+};
+
+type SseEvent = {
+  event: string;
+  data: unknown;
+};
+
+type PlanSummary = {
+  start: boolean;
+  planProposed: boolean;
+  todoSnapshot: boolean;
+  verifyStart: boolean;
+  done: boolean;
+  toolNames: string[];
+  toolCallCount: number;
+  toolResultCount: number;
+  fileWrittenCount: number;
+  errors: unknown[];
+};
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildRoot = path.join(repoRoot, 'build');
@@ -13,11 +42,25 @@ const reportPath = archiveRequested
   ? path.join(reportRoot, `plan-closed-loop-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
   : defaultReportPath;
 
-function assert(condition, message) {
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function writeFixtureWorkspace() {
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.stack || error.message : String(error);
+}
+
+function hasEventId(data: unknown): data is { id: string } {
+  return typeof data === 'object' && data !== null && typeof (data as { id?: unknown }).id === 'string';
+}
+
+function getServerPort(server: HostServer): number {
+  const address = server.address();
+  assert(typeof address === 'object' && address !== null, 'plan-loop smoke server did not expose a TCP port');
+  return address.port;
+}
+
+function writeFixtureWorkspace(): void {
   fs.rmSync(workspaceRoot, { recursive: true, force: true });
   fs.mkdirSync(path.join(workspaceRoot, 'research'), { recursive: true });
   fs.writeFileSync(
@@ -46,15 +89,15 @@ function writeFixtureWorkspace() {
   );
 }
 
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  return `http://127.0.0.1:${server.address().port}`;
+  return `http://127.0.0.1:${getServerPort(server)}`;
 }
 
-async function postJson(baseUrl, route, body) {
+async function postJson(baseUrl: string, route: string, body: unknown): Promise<unknown> {
   const response = await fetch(`${baseUrl}${route}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -65,7 +108,10 @@ async function postJson(baseUrl, route, body) {
   return payload;
 }
 
-async function parseSseChunk(buffer, onEvent) {
+async function parseSseChunk(
+  buffer: string,
+  onEvent: (event: string, data: unknown) => void | Promise<void>,
+): Promise<string> {
   let rest = buffer;
   for (;;) {
     const match = /\r?\n\r?\n/.exec(rest);
@@ -73,15 +119,15 @@ async function parseSseChunk(buffer, onEvent) {
     const raw = rest.slice(0, match.index);
     rest = rest.slice(match.index + match[0].length);
     let event = 'message';
-    const dataLines = [];
+    const dataLines: string[] = [];
     for (const line of raw.split(/\r?\n/)) {
       if (line.startsWith('event:')) event = line.slice(6).trim();
       if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
     }
     if (!dataLines.length) continue;
-    let data = dataLines.join('\n');
+    let data: unknown = dataLines.join('\n');
     try {
-      data = JSON.parse(data);
+      data = JSON.parse(String(data));
     } catch {
       /* keep text data */
     }
@@ -89,8 +135,8 @@ async function parseSseChunk(buffer, onEvent) {
   }
 }
 
-async function runPlanStream(baseUrl) {
-  const events = [];
+async function runPlanStream(baseUrl: string): Promise<SseEvent[]> {
+  const events: SseEvent[] = [];
   const response = await fetch(`${baseUrl}/api/agent/chat/stream`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -105,6 +151,7 @@ async function runPlanStream(baseUrl) {
   });
   assert(response.ok, `/api/agent/chat/stream returned ${response.status}`);
 
+  assert(response.body, '/api/agent/chat/stream did not return a readable body');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -114,19 +161,21 @@ async function runPlanStream(baseUrl) {
     buffer += decoder.decode(value, { stream: true });
     buffer = await parseSseChunk(buffer, async (event, data) => {
       events.push({ event, data });
-      if (event === 'plan_proposed' && data && data.id) {
+      if (event === 'plan_proposed' && hasEventId(data)) {
         await postJson(baseUrl, `/api/approvals/${data.id}`, { decision: 'once' });
       }
-      if (event === 'approval_request' && data && data.id) {
+      if (event === 'approval_request' && hasEventId(data)) {
         await postJson(baseUrl, `/api/approvals/${data.id}`, { decision: 'once' });
       }
     });
   }
-  await parseSseChunk(buffer, (event, data) => events.push({ event, data }));
+  await parseSseChunk(buffer, (event, data) => {
+    events.push({ event, data });
+  });
   return events;
 }
 
-function makeClosedLoopModelCall() {
+function makeClosedLoopModelCall(): () => Promise<ModelResponse> {
   let step = 0;
   return async () => {
     step += 1;
@@ -225,9 +274,18 @@ function makeClosedLoopModelCall() {
   };
 }
 
-function summarize(events) {
+function getToolName(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const name = (data as { name?: unknown }).name;
+  return typeof name === 'string' ? name : undefined;
+}
+
+function summarize(events: SseEvent[]): PlanSummary {
   const eventNames = events.map((item) => item.event);
-  const toolNames = events.filter((item) => item.event === 'tool_call').map((item) => item.data?.name);
+  const toolNames = events
+    .filter((item) => item.event === 'tool_call')
+    .map((item) => getToolName(item.data))
+    .filter((name): name is string => typeof name === 'string');
   return {
     start: eventNames.includes('start'),
     planProposed: eventNames.includes('plan_proposed'),
@@ -242,7 +300,7 @@ function summarize(events) {
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   fs.mkdirSync(buildRoot, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   writeFixtureWorkspace();
@@ -253,11 +311,18 @@ async function main() {
     requireAuth: false,
     enableScheduler: false,
     agentModelCall: makeClosedLoopModelCall(),
-    kimiChatRunner: async () => ({ ok: true, text: 'dry-run' }),
+    kimiChatRunner: async () => ({
+      ok: true,
+      provider: 'smoke',
+      model: 'closed-loop-scripted',
+      mode: 'chat',
+      text: 'dry-run',
+      durationMs: 0,
+    }),
   });
 
   const startedAt = Date.now();
-  let baseUrl = null;
+  let baseUrl: string | null = null;
   try {
     baseUrl = await bind(server);
     const events = await runPlanStream(baseUrl);
@@ -293,7 +358,7 @@ async function main() {
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify({ ok: true, reportPath, summary }, null, 2));
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
 
@@ -304,9 +369,9 @@ main().catch((error) => {
     generatedAt: new Date().toISOString(),
     workspace: workspaceRoot,
     reportPath,
-    error: error.stack || error.message,
+    error: formatError(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(formatError(error));
   process.exit(1);
 });

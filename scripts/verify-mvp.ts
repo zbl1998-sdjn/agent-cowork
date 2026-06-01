@@ -170,7 +170,7 @@ const checks: CheckConfig[] = [
   {
     name: 'plan closed-loop smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-plan-closed-loop.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-plan-closed-loop.ts')],
   },
   {
     name: 'ui contract smoke script syntax',
@@ -226,7 +226,7 @@ const checks: CheckConfig[] = [
   {
     name: 'plan closed-loop smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-plan-closed-loop.mjs'),
+    commandArgs: hostScriptArgs('smoke-plan-closed-loop.ts'),
   },
   {
     name: 'ui to host api contract smoke',
