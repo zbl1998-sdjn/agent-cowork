@@ -35,6 +35,7 @@ const STATIC_FILES = new Map<string, StaticAsset>([
   ['/app-run-history.js', { file: 'app-run-history.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-workbench-renderer.js', { file: 'app-workbench-renderer.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-task-context.js', { file: 'app-task-context.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-kimi-runner.js', { file: 'app-kimi-runner.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-message-renderer.js', { file: 'app-message-renderer.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-message-actions.js', { file: 'app-message-actions.js', type: 'text/javascript; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],

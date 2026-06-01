@@ -607,6 +607,7 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-run-history.js'), 'window.AgentCoworkRunHistory = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-workbench-renderer.js'), 'window.AgentCoworkWorkbenchRenderer = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-task-context.js'), 'window.AgentCoworkTaskContext = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-kimi-runner.js'), 'window.AgentCoworkKimiRunner = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-renderer.js'), 'window.AgentCoworkMessageRenderer = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-message-actions.js'), 'window.AgentCoworkMessageActions = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
@@ -652,6 +653,10 @@ test('serves the local preview shell and assets', async () => {
     const taskContext = await fetch(`${baseUrl}/app-task-context.js`);
     assert.equal(taskContext.status, 200);
     assert.match(taskContext.headers.get('content-type') || '', /javascript/);
+
+    const kimiRunner = await fetch(`${baseUrl}/app-kimi-runner.js`);
+    assert.equal(kimiRunner.status, 200);
+    assert.match(kimiRunner.headers.get('content-type') || '', /javascript/);
 
     const messageRenderer = await fetch(`${baseUrl}/app-message-renderer.js`);
     assert.equal(messageRenderer.status, 200);
