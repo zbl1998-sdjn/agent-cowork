@@ -185,7 +185,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react scroll smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-scroll.mjs')],
+    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-scroll.ts')],
   },
   {
     name: 'react artifacts panel smoke script syntax',
@@ -241,7 +241,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react timeline scroll smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-react-scroll.mjs'),
+    commandArgs: hostScriptArgs('smoke-react-scroll.ts'),
   },
   {
     name: 'react artifacts panel smoke',

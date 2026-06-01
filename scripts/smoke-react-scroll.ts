@@ -1,11 +1,26 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import {
+  CdpClient,
+  assert,
+  bind,
+  errorDetails,
+  evaluate,
+  findBrowser,
+  getFreePort,
+  getJson,
+  isRecord,
+  type CdpSession,
+  type CdpTarget,
+  type CdpVersion,
+  type ScreenshotResult,
+  type SendPage,
+} from './browser-smoke-utils.js';
+import type { ChildProcessLike } from 'node:child_process';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -18,136 +33,58 @@ const reportPath = archiveRequested
   : defaultReportPath;
 const screenshotPath = path.join(buildDir, 'react-scroll-smoke-1280x760.png');
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
+type ScrollMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  status?: 'done';
+  progress?: unknown[];
+  operations?: unknown[];
+  sources?: unknown[];
+  approvalState?: 'idle';
+};
+
+type ScrollConversation = {
+  id: string;
+  title: string;
+  messages: ScrollMessage[];
+};
+
+type ScrollSnapshot = {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  distanceFromBottom: number;
+  bubbleCount: number;
+  buttonVisible: boolean;
+  jumpVisible: boolean;
+  hasStartMarker: boolean;
+  hasDoneMarker: boolean;
+  buttonText: string;
+};
+
+type ScrollModelCallArgs = {
+  onContent?: (chunk: string) => void;
+};
+
+function scrollSnapshot(value: unknown, label: string): ScrollSnapshot {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    scrollTop: typeof value.scrollTop === 'number' ? value.scrollTop : 0,
+    scrollHeight: typeof value.scrollHeight === 'number' ? value.scrollHeight : 0,
+    clientHeight: typeof value.clientHeight === 'number' ? value.clientHeight : 0,
+    distanceFromBottom: typeof value.distanceFromBottom === 'number' ? value.distanceFromBottom : 0,
+    bubbleCount: typeof value.bubbleCount === 'number' ? value.bubbleCount : 0,
+    buttonVisible: value.buttonVisible === true,
+    jumpVisible: value.jumpVisible === true,
+    hasStartMarker: value.hasStartMarker === true,
+    hasDoneMarker: value.hasDoneMarker === true,
+    buttonText: typeof value.buttonText === 'string' ? value.buttonText : '',
+  };
 }
 
-function findBrowser() {
-  const candidates =
-    process.platform === 'win32'
-      ? [
-          path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-          path.join(process.env.ProgramFiles || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-          path.join(process.env['ProgramFiles(x86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-        ]
-      : ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge'];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
-}
-
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-async function getJson(url, timeoutMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    try {
-      return await new Promise((resolve, reject) => {
-        const request = http.get(url, (response) => {
-          let body = '';
-          response.setEncoding('utf8');
-          response.on('data', (chunk) => {
-            body += chunk;
-          });
-          response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
-              return;
-            }
-            resolve(JSON.parse(body));
-          });
-        });
-        request.on('error', reject);
-        request.setTimeout(1000, () => request.destroy(new Error(`Timed out fetching ${url}`)));
-      });
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-  throw new Error(`Timed out waiting for ${url}`);
-}
-
-class CdpClient {
-  constructor(url) {
-    this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-    this.handlers = new Map();
-  }
-
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener(
-        'open',
-        () => {
-          clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
-      this.socket.addEventListener(
-        'error',
-        () => {
-          clearTimeout(timeout);
-          reject(new Error('Failed opening DevTools websocket'));
-        },
-        { once: true },
-      );
-    });
-
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (message.id && this.pending.has(message.id)) {
-        const { resolve, reject } = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        if (message.error) reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
-        else resolve(message.result || {});
-        return;
-      }
-      if (message.method && this.handlers.has(message.method)) {
-        for (const handler of this.handlers.get(message.method)) handler(message.params || {});
-      }
-    });
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    this.socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-    });
-  }
-
-  close() {
-    this.socket?.close();
-  }
-}
-
-async function evaluate(sendPage, expression, awaitPromise = true) {
-  const result = await sendPage('Runtime.evaluate', {
-    expression,
-    awaitPromise,
-    returnByValue: true,
-  });
-  if (result.exceptionDetails) {
-    const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate failed';
-    throw new Error(detail);
-  }
-  return result.result?.value;
-}
-
-function seededConversations() {
-  const messages = [];
+function seededConversations(): ScrollConversation[] {
+  const messages: ScrollMessage[] = [];
   for (let i = 1; i <= 36; i += 1) {
     messages.push({
       id: `seed-user-${i}`,
@@ -181,7 +118,7 @@ function makeScrollModelCall() {
     'FE-1 stream marker done.',
   ].join('\n');
 
-  return async ({ onContent }) => {
+  return async ({ onContent }: ScrollModelCallArgs) => {
     for (let i = 0; i < responseText.length; i += 90) {
       const chunk = responseText.slice(i, i + 90);
       if (chunk) onContent?.(chunk);
@@ -192,14 +129,6 @@ function makeScrollModelCall() {
       usage: { prompt_tokens: 12, completion_tokens: 48, total_tokens: 60 },
     };
   };
-}
-
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  return `http://127.0.0.1:${server.address().port}`;
 }
 
 async function main() {
@@ -218,16 +147,16 @@ async function main() {
     enableScheduler: false,
     uiDistRoot,
     agentModelCall: makeScrollModelCall(),
-    kimiChatRunner: async () => ({ ok: true, text: 'dry-run' }),
-    kimiPlanRunner: async () => ({ ok: true, text: 'dry-run' }),
+    kimiChatRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'chat', text: 'dry-run', durationMs: 1 }),
+    kimiPlanRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'plan', text: 'dry-run', durationMs: 1 }),
   });
 
   const startedAt = Date.now();
-  let baseUrl = null;
-  let browser = null;
-  let client = null;
-  let userDataDir = null;
-  const stderr = [];
+  let baseUrl: string | null = null;
+  let browser: ChildProcessLike | null = null;
+  let client: CdpClient | null = null;
+  let userDataDir: string | null = null;
+  const stderr: string[] = [];
 
   try {
     baseUrl = await bind(host);
@@ -253,12 +182,15 @@ async function main() {
       stderr.push(chunk.toString());
     });
 
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client closed unexpectedly');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -292,7 +224,7 @@ async function main() {
       })`,
     );
 
-    const initial = await evaluate(
+    const initial = scrollSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 3000;
@@ -323,9 +255,9 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'initial');
 
-    const scrolledAway = await evaluate(
+    const scrolledAway = scrollSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve) => {
         const el = document.querySelector('.timeline');
@@ -339,7 +271,7 @@ async function main() {
           });
         }));
       })`,
-    );
+    ), 'scrolledAway');
 
     await evaluate(
       sendPage,
@@ -353,7 +285,7 @@ async function main() {
       })()`,
     );
 
-    const afterStream = await evaluate(
+    const afterStream = scrollSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
@@ -379,7 +311,7 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'afterStream');
 
     await evaluate(
       sendPage,
@@ -389,7 +321,7 @@ async function main() {
       })()`,
     );
 
-    const afterJump = await evaluate(
+    const afterJump = scrollSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 3000;
@@ -411,7 +343,7 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'afterJump');
 
     assert(initial.bubbleCount >= 60, 'seeded conversation did not render enough timeline messages');
     assert(scrolledAway.distanceFromBottom > 300, 'manual scroll did not leave the bottom');
@@ -421,7 +353,7 @@ async function main() {
     assert(afterJump.distanceFromBottom <= 48, 'jump-to-bottom button did not scroll near bottom');
     assert(!afterJump.jumpVisible, 'jump-to-bottom button stayed visible after returning to bottom');
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     const report = {
@@ -451,11 +383,11 @@ async function main() {
       workspace,
       uiDistRoot,
       reportPath,
-      error: error.stack || error.message,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(errorDetails(error));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -477,9 +409,9 @@ main().catch((error) => {
     ok: false,
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: errorDetails(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });
