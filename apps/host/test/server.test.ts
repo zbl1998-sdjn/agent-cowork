@@ -604,6 +604,7 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.AgentCoworkRunEvents = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-composer-popover.js'), 'window.AgentCoworkComposerPopover = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-artifacts.js'), 'window.AgentCoworkArtifacts = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-run-history.js'), 'window.AgentCoworkRunHistory = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
@@ -635,6 +636,10 @@ test('serves the local preview shell and assets', async () => {
     const artifacts = await fetch(`${baseUrl}/app-artifacts.js`);
     assert.equal(artifacts.status, 200);
     assert.match(artifacts.headers.get('content-type') || '', /javascript/);
+
+    const runHistory = await fetch(`${baseUrl}/app-run-history.js`);
+    assert.equal(runHistory.status, 200);
+    assert.match(runHistory.headers.get('content-type') || '', /javascript/);
   });
 });
 
