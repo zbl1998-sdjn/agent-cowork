@@ -113,7 +113,7 @@ async function main() {
     assert(runtime.port === port, 'runtime port mismatch');
     assert(runtime.workspace === workspace, 'runtime workspace mismatch');
 
-    const statusBefore = runNodeScript('status-mvp.mjs', env);
+    const statusBefore = runNodeScript('status-mvp.ts', env);
     assert(statusBefore.status === 0, `status:mvp failed before stop: ${statusBefore.stderr || statusBefore.stdout}`);
     const statusPayload = JSON.parse(statusBefore.stdout);
     assert(statusPayload.ok === true && statusPayload.pidAlive === true, 'status:mvp did not report a live runtime');
@@ -130,7 +130,7 @@ async function main() {
     assert(stopped, 'start:mvp child did not exit after stop:mvp');
     assert(!fs.existsSync(runtimeFile), 'runtime file still exists after stop');
 
-    const statusAfter = runNodeScript('status-mvp.mjs', env);
+    const statusAfter = runNodeScript('status-mvp.ts', env);
     assert(statusAfter.status !== 0, 'status:mvp unexpectedly reported running after stop');
 
     const report = {
