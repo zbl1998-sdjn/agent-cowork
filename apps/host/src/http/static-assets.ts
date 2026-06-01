@@ -30,6 +30,7 @@ const STATIC_FILES = new Map<string, StaticAsset>([
   ['/app-utils.js', { file: 'app-utils.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-api-client.js', { file: 'app-api-client.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-run-events.js', { file: 'app-run-events.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-composer-sources.js', { file: 'app-composer-sources.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-composer-popover.js', { file: 'app-composer-popover.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-artifacts.js', { file: 'app-artifacts.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-run-history.js', { file: 'app-run-history.js', type: 'text/javascript; charset=utf-8' }],

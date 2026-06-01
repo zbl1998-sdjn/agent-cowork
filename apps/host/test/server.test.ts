@@ -602,6 +602,7 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-utils.js'), 'window.AgentCoworkUtils = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-api-client.js'), 'window.AgentCoworkApi = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-run-events.js'), 'window.AgentCoworkRunEvents = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-composer-sources.js'), 'window.AgentCoworkComposerSources = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-composer-popover.js'), 'window.AgentCoworkComposerPopover = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-artifacts.js'), 'window.AgentCoworkArtifacts = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-run-history.js'), 'window.AgentCoworkRunHistory = {};', 'utf8');
@@ -635,6 +636,10 @@ test('serves the local preview shell and assets', async () => {
     const runEvents = await fetch(`${baseUrl}/app-run-events.js`);
     assert.equal(runEvents.status, 200);
     assert.match(runEvents.headers.get('content-type') || '', /javascript/);
+
+    const composerSources = await fetch(`${baseUrl}/app-composer-sources.js`);
+    assert.equal(composerSources.status, 200);
+    assert.match(composerSources.headers.get('content-type') || '', /javascript/);
 
     const composerPopover = await fetch(`${baseUrl}/app-composer-popover.js`);
     assert.equal(composerPopover.status, 200);

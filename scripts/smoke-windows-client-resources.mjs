@@ -146,6 +146,7 @@ async function main() {
   fs.mkdirSync(buildDir, { recursive: true });
   assert(fs.existsSync(indexPath), `Windows client resource entry is missing: ${indexPath}`);
   assert(fs.existsSync(path.join(resourcesDir, 'app.css')), 'Windows client CSS resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-composer-sources.js')), 'Windows client composer sources resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-composer-popover.js')), 'Windows client composer popover resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-artifacts.js')), 'Windows client artifacts resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-run-history.js')), 'Windows client run history resource is missing');

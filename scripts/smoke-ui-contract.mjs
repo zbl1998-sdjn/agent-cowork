@@ -91,6 +91,7 @@ async function main() {
     assert(scriptRoutes.includes('/app-utils.js'), 'index missing app-utils.js script');
     assert(scriptRoutes.includes('/app-api-client.js'), 'index missing app-api-client.js script');
     assert(scriptRoutes.includes('/app-run-events.js'), 'index missing app-run-events.js script');
+    assert(scriptRoutes.includes('/app-composer-sources.js'), 'index missing app-composer-sources.js script');
     assert(scriptRoutes.includes('/app-composer-popover.js'), 'index missing app-composer-popover.js script');
     assert(scriptRoutes.includes('/app-artifacts.js'), 'index missing app-artifacts.js script');
     assert(scriptRoutes.includes('/app-run-history.js'), 'index missing app-run-history.js script');
@@ -105,6 +106,8 @@ async function main() {
     assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-api-client.js') < scriptRoutes.indexOf('/app.js'), 'app-api-client.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-run-events.js') < scriptRoutes.indexOf('/app.js'), 'app-run-events.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-composer-sources.js') < scriptRoutes.indexOf('/app-composer-popover.js'), 'app-composer-sources.js must load before app-composer-popover.js');
+    assert(scriptRoutes.indexOf('/app-composer-sources.js') < scriptRoutes.indexOf('/app.js'), 'app-composer-sources.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-composer-popover.js') < scriptRoutes.indexOf('/app.js'), 'app-composer-popover.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-artifacts.js') < scriptRoutes.indexOf('/app.js'), 'app-artifacts.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-run-history.js') < scriptRoutes.indexOf('/app.js'), 'app-run-history.js must load before app.js');
