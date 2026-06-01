@@ -94,6 +94,7 @@ async function main() {
     assert(scriptRoutes.includes('/app-composer-popover.js'), 'index missing app-composer-popover.js script');
     assert(scriptRoutes.includes('/app-artifacts.js'), 'index missing app-artifacts.js script');
     assert(scriptRoutes.includes('/app-run-history.js'), 'index missing app-run-history.js script');
+    assert(scriptRoutes.includes('/app-workbench-renderer.js'), 'index missing app-workbench-renderer.js script');
     assert(scriptRoutes.includes('/app-message-renderer.js'), 'index missing app-message-renderer.js script');
     assert(scriptRoutes.includes('/app-message-actions.js'), 'index missing app-message-actions.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
@@ -103,6 +104,7 @@ async function main() {
     assert(scriptRoutes.indexOf('/app-composer-popover.js') < scriptRoutes.indexOf('/app.js'), 'app-composer-popover.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-artifacts.js') < scriptRoutes.indexOf('/app.js'), 'app-artifacts.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-run-history.js') < scriptRoutes.indexOf('/app.js'), 'app-run-history.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-workbench-renderer.js') < scriptRoutes.indexOf('/app.js'), 'app-workbench-renderer.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-renderer.js') < scriptRoutes.indexOf('/app.js'), 'app-message-renderer.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-message-actions.js') < scriptRoutes.indexOf('/app.js'), 'app-message-actions.js must load before app.js');
     const scriptBodies = [];
@@ -118,11 +120,13 @@ async function main() {
     assert(allScripts.includes('window.AgentCoworkComposerPopover'), 'composer popover module global missing');
     assert(allScripts.includes('window.AgentCoworkArtifacts'), 'artifact module global missing');
     assert(allScripts.includes('window.AgentCoworkRunHistory'), 'run history module global missing');
+    assert(allScripts.includes('window.AgentCoworkWorkbenchRenderer'), 'workbench renderer module global missing');
     assert(allScripts.includes('window.AgentCoworkMessageRenderer'), 'message renderer module global missing');
     assert(allScripts.includes('window.AgentCoworkMessageActions'), 'message actions module global missing');
     assert(allScripts.includes('createComposerPopover'), 'composer popover factory missing');
     assert(allScripts.includes('createArtifactCatalog'), 'artifact catalog factory missing');
     assert(allScripts.includes('createRunHistoryController'), 'run history factory missing');
+    assert(allScripts.includes('createWorkbenchRenderer'), 'workbench renderer factory missing');
     assert(allScripts.includes('createMessageRenderer'), 'message renderer factory missing');
     assert(allScripts.includes('createMessageActions'), 'message actions factory missing');
     assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');

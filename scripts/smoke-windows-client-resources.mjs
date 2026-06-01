@@ -149,6 +149,7 @@ async function main() {
   assert(fs.existsSync(path.join(resourcesDir, 'app-composer-popover.js')), 'Windows client composer popover resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-artifacts.js')), 'Windows client artifacts resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-run-history.js')), 'Windows client run history resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-workbench-renderer.js')), 'Windows client workbench renderer resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-renderer.js')), 'Windows client message renderer resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-actions.js')), 'Windows client message actions resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app.js')), 'Windows client JS resource is missing');
