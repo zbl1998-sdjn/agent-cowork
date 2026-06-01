@@ -23,24 +23,24 @@ const HARD_WAIVERS = new Map([
   ['apps/host/src/memory/memory-store.js', 'P0-T6 splits memory IO, layers, and query logic'],
 ]);
 
-function toPosix(filePath) {
+function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
 }
 
-function rel(filePath) {
+function rel(filePath: string): string {
   return toPosix(path.relative(ROOT, filePath));
 }
 
-function isGeneratedUiJs(filePath) {
-  const uiSrc = path.join(ROOT, 'apps', 'windows-client', 'ui', 'src') + path.sep;
+function isGeneratedUiJs(filePath: string): boolean {
+  const uiSrc = `${path.join(ROOT, 'apps', 'windows-client', 'ui', 'src')}${path.sep}`;
   return filePath.startsWith(uiSrc) && path.extname(filePath) === '.js';
 }
 
-function isTestFile(filePath) {
+function isTestFile(filePath: string): boolean {
   return /\.(test|spec)\.(js|mjs|ts|tsx)$/.test(filePath) || /_test\.go$/.test(filePath);
 }
 
-function shouldSkip(filePath) {
+function shouldSkip(filePath: string): boolean {
   const name = path.basename(filePath);
   if (name.endsWith('.d.ts')) return true;
   if (isGeneratedUiJs(filePath)) return true;
@@ -48,7 +48,7 @@ function shouldSkip(filePath) {
   return false;
 }
 
-function walk(dir, out = []) {
+function walk(dir: string, out: string[] = []): string[] {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === 'target' || entry.name === 'dist') continue;
@@ -62,15 +62,15 @@ function walk(dir, out = []) {
   return out;
 }
 
-function lineCount(filePath) {
+function lineCount(filePath: string): number {
   const text = fs.readFileSync(filePath, 'utf8');
   if (text.length === 0) return 0;
   return text.split(/\r\n|\r|\n/).length;
 }
 
 const files = ROOTS.flatMap((root) => walk(root));
-const warnings = [];
-const failures = [];
+const warnings: string[] = [];
+const failures: string[] = [];
 
 for (const file of files) {
   const lines = lineCount(file);

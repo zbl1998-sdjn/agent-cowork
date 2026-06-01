@@ -40,7 +40,7 @@
     "smoke:ui": "node scripts/run-host-node.mjs scripts/smoke-ui-contract.mjs",
     "prepare:embedded-python": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-embedded-python.ps1",
     "check:arch": "node scripts/check-arch.mjs",
-    "check:filesize": "node scripts/check-filesize.mjs",
+    "check:filesize": "node scripts/run-host-node.mjs scripts/check-filesize.ts",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:host-types": "node scripts/check-host-types.mjs",
     "check:eval-types": "npx tsc -p tsconfig.eval.json --pretty false",

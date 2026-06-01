@@ -14,6 +14,7 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "scripts/check-filesize.ts",
     "scripts/ci-gates.ts",
     "scripts/ci.ts",
     "scripts/smoke-runtime-update-preservation.ts"
