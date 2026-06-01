@@ -36,6 +36,7 @@ type ConnectorRouteOptions = {
   oauthConfig?: { github?: { clientId?: unknown } };
   safeTrustedRoot(input?: unknown): string;
   fsServerPath?: string;
+  fsServerRunnerPath?: string;
 };
 
 const connectorIdPattern = /^[a-z0-9_-]{1,64}$/;
@@ -70,10 +71,13 @@ function connectedServers(toolRegistry?: ToolRegistryLike | null): string[] {
 
 // SECURITY: never spawn a client-supplied command. Request bodies may only
 // select a host-defined id; command/args stay fully controlled by this allowlist.
-function buildConnectorSpec(id: unknown, { fsServerPath, trustedRoot }: { fsServerPath?: string; trustedRoot: string }): ConnectorSpec | null {
+function buildConnectorSpec(
+  id: unknown,
+  { fsServerPath, fsServerRunnerPath, trustedRoot }: { fsServerPath?: string; fsServerRunnerPath?: string; trustedRoot: string },
+): ConnectorSpec | null {
   const nodePath = typeof process.execPath === 'string' && process.execPath ? process.execPath : undefined;
-  if (id === 'filesystem' && fsServerPath && nodePath) {
-    return { name: 'fs', command: nodePath, args: [fsServerPath, trustedRoot] };
+  if (id === 'filesystem' && fsServerPath && fsServerRunnerPath && nodePath) {
+    return { name: 'fs', command: nodePath, args: [fsServerRunnerPath, fsServerPath, trustedRoot] };
   }
   return null;
 }
@@ -98,6 +102,7 @@ export async function handleConnectorRoutes({
   oauthConfig,
   safeTrustedRoot,
   fsServerPath,
+  fsServerRunnerPath,
 }: ConnectorRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/connectors') {
     sendJson(response, 200, {
@@ -144,7 +149,7 @@ export async function handleConnectorRoutes({
         return;
       }
       const trustedRoot = safeTrustedRoot(input.trustedRoot);
-      const spec = buildConnectorSpec(input.id, omitUndefined({ fsServerPath, trustedRoot }));
+      const spec = buildConnectorSpec(input.id, omitUndefined({ fsServerPath, fsServerRunnerPath, trustedRoot }));
       if (!spec) {
         sendJson(response, 400, { error: 'unsupported connector: only host-defined builtins can be connected (client-supplied commands are not allowed)' });
         return;

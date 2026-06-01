@@ -44,7 +44,7 @@ const CONNECTORS = [
   {
     id: 'filesystem', name: '文件系统', description: '读取/列出本地目录, jail 在指定 root 内',
     keywords: ['file', '文件', '目录', 'folder', 'fs', 'filesystem', 'read', 'list'],
-    builtin: true, command: 'node', args: ['apps/host/mcp-servers/fs-server.mjs', '<root>'],
+    builtin: true, command: 'node', args: ['scripts/run-host-node.mjs', 'apps/host/mcp-servers/fs-server.ts', '<root>'],
   },
   {
     id: 'web-fetch', name: 'Web 抓取', description: '抓取网页内容做联网研究 (内置 web.fetch 工具)',

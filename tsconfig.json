@@ -14,6 +14,7 @@
   },
   "files": ["types/host-node-shim.d.ts"],
   "include": [
+    "apps/host/mcp-servers/**/*.ts",
     "apps/host/src/**/*.ts",
     "apps/host/test/**/*.ts",
     "apps/host/scripts/**/*.ts",

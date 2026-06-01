@@ -180,7 +180,8 @@ export async function handleRouteChain({
     oauthFetch: state.oauthFetch,
     oauthConfig: state.oauthConfig,
     safeTrustedRoot: state.safeTrustedRoot,
-    fsServerPath: path.join(state.hostSrcDir, '../mcp-servers/fs-server.mjs'),
+    fsServerPath: path.join(state.hostSrcDir, '../mcp-servers/fs-server.ts'),
+    fsServerRunnerPath: path.join(state.hostSrcDir, '../../../scripts/run-host-node.mjs'),
     connectMcp: (servers: Parameters<ConnectMcp>[0]) => server.connectMcpServers(servers),
   }))) return true;
   if (await handleScheduleRoutes(routeOptions<RouteHandlerOptions<typeof handleScheduleRoutes>>({

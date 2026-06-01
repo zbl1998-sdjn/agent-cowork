@@ -9,7 +9,8 @@ import { connectMcpServers, closeMcpClients } from '../src/mcp/connect.js';
 import { createToolRegistry } from '../src/tools/tool-registry.js';
 import { itemAt, toolCallResultSchema } from './helpers/mcp.js';
 
-const FS_SERVER = fileURLToPath(new URL('../mcp-servers/fs-server.mjs', import.meta.url).href);
+const FS_SERVER = fileURLToPath(new URL('../mcp-servers/fs-server.ts', import.meta.url).href);
+const RUN_HOST_NODE = fileURLToPath(new URL('../../../scripts/run-host-node.mjs', import.meta.url).href);
 
 const fsEntrySchema = z.object({
   name: z.string(),
@@ -34,6 +35,10 @@ function nodeExecPath(): string {
   return execPath;
 }
 
+function fsServerArgs(root: string): string[] {
+  return [RUN_HOST_NODE, FS_SERVER, root];
+}
+
 function textContent(value: unknown, label: string): string {
   const result = toolCallResultSchema.parse(value);
   return itemAt(result.content, 0, label).text;
@@ -44,7 +49,7 @@ test('fs-server exposes jailed filesystem tools over a real subprocess', async (
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: fsServerArgs(root) }],
   });
   try {
     assert.equal(out.toolCount, 3);
@@ -69,7 +74,7 @@ test('fs-server blocks hidden and credential-like files inside the root', async 
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: fsServerArgs(root) }],
   });
   try {
     await assert.rejects(
@@ -90,7 +95,7 @@ test('fs-server rejects path traversal outside the root', async () => {
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: fsServerArgs(root) }],
   });
   try {
     await assert.rejects(
@@ -117,7 +122,7 @@ test('fs-server rejects symlink or junction escapes outside the root', async (t)
   const registry = createToolRegistry();
   const out = await connectMcpServers({
     registry,
-    servers: [{ name: 'fs', command: nodeExecPath(), args: [FS_SERVER, root] }],
+    servers: [{ name: 'fs', command: nodeExecPath(), args: fsServerArgs(root) }],
   });
   try {
     await assert.rejects(

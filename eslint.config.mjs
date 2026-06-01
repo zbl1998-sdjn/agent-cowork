@@ -15,6 +15,7 @@ const resourceBrowserGlobals = {
 
 const typedSourceFiles = [
   'apps/host/*.ts',
+  'apps/host/mcp-servers/**/*.ts',
   'apps/host/scripts/**/*.ts',
   'apps/host/src/**/*.ts',
   'apps/host/test/**/*.ts',
@@ -88,6 +89,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         project: [
+          './tsconfig.json',
           './tsconfig.host-checkjs.json',
           './tsconfig.host-test.json',
           './tsconfig.eval.json',

@@ -30,6 +30,10 @@ declare const process: {
   platform: string;
   pid: number;
   stderr: { write(data: Buffer | string): unknown };
+  stdin: {
+    setEncoding(encoding: string): unknown;
+    on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
+  };
   stdout: { write(data: Buffer | string): unknown };
   version: string;
   versions?: Record<string, string | undefined>;
