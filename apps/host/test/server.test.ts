@@ -1,23 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { AddressInfo } from 'node:http';
 import path from 'node:path';
 import { createServer } from '../src/server.js';
+import type { ServerConfig } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-async function withServer(config, fn) {
+type KimiPlanInput = NonNullable<Parameters<NonNullable<ServerConfig['kimiPlanRunner']>>[0]>;
+type KimiChatInput = NonNullable<Parameters<NonNullable<ServerConfig['kimiChatRunner']>>[0]>;
+type KimiRunnerCapture<T> = T & { trustedRoot?: unknown };
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function recordArray(value: unknown, label: string): Array<Record<string, unknown>> {
+  assert.ok(Array.isArray(value), `${label} should be an array`);
+  return value.map((item, index) => recordValue(item, `${label}[${index}]`));
+}
+
+function present<T>(value: T | null | undefined, label: string): T {
+  assert.ok(value, `${label} should exist`);
+  return value;
+}
+
+function assertMatches(value: unknown, expected: RegExp, message?: string): void {
+  assert.match(String(value), expected, message);
+}
+
+async function jsonBody(response: Response, label: string): Promise<Record<string, unknown>> {
+  return recordValue(await response.json(), label);
+}
+
+async function withServer(config: Partial<ServerConfig>, fn: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = createServer({ requireAuth: false, ...config });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
   });
 
   const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  assert.ok(address && typeof address === 'object', 'test server should bind to a TCP port');
+  const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
   try {
     await fn(baseUrl);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await closeTestServer(server);
   }
 }
 
@@ -38,14 +68,16 @@ test('workspace endpoint returns configured trusted root', async () => {
   await withServer({ trustedRoot }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/workspace`);
     assert.equal(response.status, 200);
-    const body = await response.json();
+    const body = await jsonBody(response, 'workspace response');
     assert.equal(body.trustedRoot, trustedRoot);
-    assert.equal(body.kimiApi.configured, false);
-    assert.equal(body.kimiApi.chatEnabled, false);
-    assert.equal(body.kimiApi.planEnabled, false);
-    assert.equal(body.kimiCli.chatEnabled, false);
-    assert.equal(body.kimiCli.planEnabled, false);
-    assert.equal(body.context.tenantId, 'tenant_local');
+    const kimiApi = recordValue(body.kimiApi, 'workspace kimiApi');
+    assert.equal(kimiApi.configured, false);
+    assert.equal(kimiApi.chatEnabled, false);
+    assert.equal(kimiApi.planEnabled, false);
+    const kimiCli = recordValue(body.kimiCli, 'workspace kimiCli');
+    assert.equal(kimiCli.chatEnabled, false);
+    assert.equal(kimiCli.planEnabled, false);
+    assert.equal(recordValue(body.context, 'workspace context').tenantId, 'tenant_local');
     assert.ok(response.headers.get('x-trace-id'));
   });
 });
@@ -59,22 +91,23 @@ test('kimi plan endpoint is disabled unless API key or runner is configured', as
       body: JSON.stringify({ trustedRoot, prompt: '生成计划' }),
     });
     assert.equal(response.status, 503);
-    assert.match((await response.json()).error, /本地文件功能仍可离线使用/);
+    assert.match(String((await jsonBody(response, 'kimi disabled error')).error), /本地文件功能仍可离线使用/);
   });
 });
 
 test('kimi plan endpoint calls configured API runner inside trusted root', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
-  let captured;
+  let captured: KimiRunnerCapture<KimiPlanInput> | null = null;
   await withServer({
     trustedRoot,
-    kimiPlanRunner: async (input) => {
-      captured = input;
+    kimiPlanRunner: async (input = {}) => {
+      const runnerInput = input as KimiRunnerCapture<KimiPlanInput>;
+      captured = runnerInput;
       return {
         ok: true,
         provider: 'kimi-api',
-        model: input.model,
-        mode: input.mode,
+        model: String(runnerInput.model || 'kimi-k2.6'),
+        mode: String(runnerInput.mode || 'cowork'),
         text: 'Kimi API 计划输出',
         durationMs: 12,
       };
@@ -91,37 +124,39 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
       }),
     });
     assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.match(body.runId, /^run_/);
-    assert.equal(fs.existsSync(body.runPath), true);
+    const body = await jsonBody(response, 'kimi plan response');
+    assertMatches(body.runId, /^run_/);
+    assert.equal(fs.existsSync(String(body.runPath)), true);
     assert.equal(body.text, 'Kimi API 计划输出');
-    assert.equal(captured.baseUrl, 'https://api.moonshot.ai/v1');
-    assert.equal(captured.model, 'kimi-k2.6');
-    assert.equal(captured.trustedRoot, trustedRoot);
-    assert.equal(captured.prompt, '生成计划');
-    assert.equal(captured.summary, '本地摘要');
+    const capturedPlan = present(captured, 'captured plan input');
+    assert.equal(capturedPlan.baseUrl, 'https://api.moonshot.ai/v1');
+    assert.equal(capturedPlan.model, 'kimi-k2.6');
+    assert.equal(capturedPlan.trustedRoot, trustedRoot);
+    assert.equal(capturedPlan.prompt, '生成计划');
+    assert.equal(capturedPlan.summary, '本地摘要');
 
-    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    const record = recordValue(JSON.parse(fs.readFileSync(String(body.runPath), 'utf8')) as unknown, 'kimi plan record');
     assert.equal(record.id, body.runId);
     assert.equal(record.status, 'succeeded');
     assert.equal(record.type, 'kimi-plan');
     assert.equal(record.provider, 'kimi-api');
-    assert.equal(record.input.prompt, '生成计划');
-    assert.equal(record.result.text, 'Kimi API 计划输出');
+    assert.equal(recordValue(record.input, 'kimi plan record input').prompt, '生成计划');
+    assert.equal(recordValue(record.result, 'kimi plan record result').text, 'Kimi API 计划输出');
   });
 });
 
 test('kimi chat endpoint calls configured Kimi API runner', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
-  let captured;
+  let captured: KimiRunnerCapture<KimiChatInput> | null = null;
   await withServer({
     trustedRoot,
-    kimiChatRunner: async (input) => {
-      captured = input;
+    kimiChatRunner: async (input = {}) => {
+      const runnerInput = input as KimiRunnerCapture<KimiChatInput>;
+      captured = runnerInput;
       return {
         ok: true,
         provider: 'kimi-api',
-        model: input.model,
+        model: String(runnerInput.model || 'kimi-k2.6'),
         mode: 'chat',
         text: 'Kimi 对话输出',
         durationMs: 15,
@@ -138,18 +173,19 @@ test('kimi chat endpoint calls configured Kimi API runner', async () => {
       }),
     });
     assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.match(body.runId, /^run_/);
+    const body = await jsonBody(response, 'kimi chat response');
+    assertMatches(body.runId, /^run_/);
     assert.equal(body.text, 'Kimi 对话输出');
-    assert.equal(captured.mode, 'chat');
-    assert.equal(captured.baseUrl, 'https://api.moonshot.ai/v1');
-    assert.equal(captured.trustedRoot, trustedRoot);
-    assert.equal(captured.prompt, '你好');
+    const capturedChat = present(captured, 'captured chat input');
+    assert.equal(capturedChat.mode, 'chat');
+    assert.equal(capturedChat.baseUrl, 'https://api.moonshot.ai/v1');
+    assert.equal(capturedChat.trustedRoot, trustedRoot);
+    assert.equal(capturedChat.prompt, '你好');
 
-    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    const record = recordValue(JSON.parse(fs.readFileSync(String(body.runPath), 'utf8')) as unknown, 'kimi chat record');
     assert.equal(record.type, 'kimi-chat');
     assert.equal(record.status, 'succeeded');
-    assert.equal(record.result.text, 'Kimi 对话输出');
+    assert.equal(recordValue(record.result, 'kimi chat record result').text, 'Kimi 对话输出');
   });
 });
 
@@ -172,11 +208,13 @@ test('upload import persists selected local files under trusted workspace', asyn
       }),
     });
     assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.equal(body.imported.length, 1);
+    const body = await jsonBody(response, 'upload import response');
+    const imported = recordArray(body.imported, 'imported files');
+    const firstImport = present(imported[0], 'first imported file');
+    assert.equal(imported.length, 1);
     assert.equal(body.totalBytes, Buffer.byteLength('amount=100'));
-    assert.equal(fs.readFileSync(body.imported[0].path, 'utf8'), 'amount=100');
-    assert.match(body.imported[0].path, /[\\\/]Agent_Cowork上传[\\\/]/);
+    assert.equal(fs.readFileSync(String(firstImport.path), 'utf8'), 'amount=100');
+    assert.equal(String(firstImport.path).replaceAll('\\', '/').includes('/Agent_Cowork上传/'), true);
   });
 });
 
@@ -198,14 +236,14 @@ test('upload import rejects path traversal', async () => {
         ],
       }),
     });
-    assert.notEqual(response.status, 200);
-    assert.match((await response.json()).error, /invalid segment|relativePath/i);
+    assert.equal(response.status === 200, false);
+    assert.match(String((await jsonBody(response, 'upload traversal error')).error), /invalid segment|relativePath/i);
   });
 });
 
 test('run endpoints expose persisted Kimi plan records', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
-  let runId;
+  let runId = '';
   await withServer({
     trustedRoot,
     kimiPlanRunner: async () => ({
@@ -228,21 +266,23 @@ test('run endpoints expose persisted Kimi plan records', async () => {
       }),
     });
     assert.equal(planResponse.status, 200);
-    runId = (await planResponse.json()).runId;
+    runId = String((await jsonBody(planResponse, 'plan run response')).runId);
 
     const listResponse = await fetch(`${baseUrl}/api/runs`);
     assert.equal(listResponse.status, 200);
-    const listBody = await listResponse.json();
-    assert.equal(listBody.runs.length, 1);
-    assert.equal(listBody.runs[0].id, runId);
-    assert.equal(listBody.runs[0].status, 'succeeded');
-    assert.equal(listBody.runs[0].prompt, '生成可追踪计划');
+    const listBody = await jsonBody(listResponse, 'runs list response');
+    const listedRuns = recordArray(listBody.runs, 'runs list');
+    const firstRun = present(listedRuns[0], 'first listed run');
+    assert.equal(listedRuns.length, 1);
+    assert.equal(firstRun.id, runId);
+    assert.equal(firstRun.status, 'succeeded');
+    assert.equal(firstRun.prompt, '生成可追踪计划');
 
     const detailResponse = await fetch(`${baseUrl}/api/runs/${encodeURIComponent(runId)}`);
     assert.equal(detailResponse.status, 200);
-    const detail = await detailResponse.json();
-    assert.equal(detail.result.text, '可复跑的计划记录');
-    assert.equal(detail.input.summary, '运行记录摘要');
+    const detail = await jsonBody(detailResponse, 'run detail response');
+    assert.equal(recordValue(detail.result, 'run detail result').text, '可复跑的计划记录');
+    assert.equal(recordValue(detail.input, 'run detail input').summary, '运行记录摘要');
   });
 });
 
@@ -266,11 +306,13 @@ test('task endpoint maps persisted runs into task cards', async () => {
     });
     const response = await fetch(`${baseUrl}/api/tasks`);
     assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.equal(body.tasks.length, 1);
-    assert.equal(body.tasks[0].status, 'done');
-    assert.equal(body.tasks[0].activeForm, '已完成');
-    assert.equal(body.tasks[0].prompt, '生成任务卡片');
+    const body = await jsonBody(response, 'tasks response');
+    const tasks = recordArray(body.tasks, 'task cards');
+    const task = present(tasks[0], 'first task card');
+    assert.equal(tasks.length, 1);
+    assert.equal(task.status, 'done');
+    assert.equal(task.activeForm, '已完成');
+    assert.equal(task.prompt, '生成任务卡片');
   });
 });
 
@@ -282,7 +324,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
   await withServer({ trustedRoot }, async (baseUrl) => {
     const recipes = await fetch(`${baseUrl}/api/recipes`);
     assert.equal(recipes.status, 200);
-    assert.equal((await recipes.json()).recipes.length, 8);
+    assert.equal(recordArray((await jsonBody(recipes, 'recipes response')).recipes, 'recipes').length, 8);
 
     const extract = await fetch(`${baseUrl}/api/files/extract`, {
       method: 'POST',
@@ -290,7 +332,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
       body: JSON.stringify({ trustedRoot, path: notes }),
     });
     assert.equal(extract.status, 200);
-    assert.match((await extract.json()).content, /准备周报/);
+    assert.match(String((await jsonBody(extract, 'extract response')).content), /准备周报/);
 
     const search = await fetch(`${baseUrl}/api/files/search`, {
       method: 'POST',
@@ -298,7 +340,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
       body: JSON.stringify({ trustedRoot, query: '准备周报', includeContent: true }),
     });
     assert.equal(search.status, 200);
-    assert.equal((await search.json()).results[0].match, 'content');
+    assert.equal(present(recordArray((await jsonBody(search, 'search response')).results, 'search results')[0], 'first search result').match, 'content');
 
     const run = await fetch(`${baseUrl}/api/recipes/meeting-actions/run`, {
       method: 'POST',
@@ -306,12 +348,13 @@ test('document extraction, search, and recipe endpoints generate approval operat
       body: JSON.stringify({ trustedRoot, prompt: '提取会议行动项', files: [notes] }),
     });
     assert.equal(run.status, 200);
-    const body = await run.json();
-    assert.match(body.runId, /^run_/);
-    assert.equal(body.operations.length, 2);
-    assert.match(body.fileOperationApprovalId, /^fop_/);
-    assert.equal(body.operations.some((op) => op.path.endsWith('.xlsx') && op.contentBase64), true);
-    assert.equal(fs.existsSync(body.runPath), true);
+    const body = await jsonBody(run, 'recipe run response');
+    assertMatches(body.runId, /^run_/);
+    const generatedOperations = recordArray(body.operations, 'recipe operations');
+    assert.equal(generatedOperations.length, 2);
+    assertMatches(body.fileOperationApprovalId, /^fop_/);
+    assert.equal(generatedOperations.some((op) => String(op.path).endsWith('.xlsx') && Boolean(op.contentBase64)), true);
+    assert.equal(fs.existsSync(String(body.runPath)), true);
   });
 });
 
@@ -327,7 +370,7 @@ test('file-ops apply requires a server-issued approval receipt', async () => {
       body: JSON.stringify({ trustedRoot, operations }),
     });
     assert.equal(rejected.status, 428);
-    assert.match((await rejected.json()).error, /approval/i);
+    assert.match(String((await jsonBody(rejected, 'file ops rejected response')).error), /approval/i);
     assert.equal(fs.existsSync(target), false);
 
     const malformedPreview = await fetch(`${baseUrl}/api/file-ops/preview`, {
@@ -351,8 +394,8 @@ test('file-ops apply requires a server-issued approval receipt', async () => {
       body: JSON.stringify({ trustedRoot, operations }),
     });
     assert.equal(preview.status, 200);
-    const previewBody = await preview.json();
-    assert.match(previewBody.fileOperationApprovalId, /^fop_/);
+    const previewBody = await jsonBody(preview, 'file ops preview response');
+    assertMatches(previewBody.fileOperationApprovalId, /^fop_/);
 
     const applied = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
@@ -380,7 +423,7 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
       body: JSON.stringify({ trustedRoot, operations }),
     });
     assert.equal(preview.status, 200);
-    const previewBody = await preview.json();
+    const previewBody = await jsonBody(preview, 'idempotent preview response');
 
     const first = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
@@ -388,7 +431,7 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
       body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: previewBody.fileOperationApprovalId }),
     });
     assert.equal(first.status, 200);
-    assert.equal((await first.json()).applied.length, 1);
+    assert.equal(recordArray((await jsonBody(first, 'file ops first apply response')).applied, 'first applied operations').length, 1);
 
     const second = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
@@ -396,7 +439,7 @@ test('apply endpoint replays duplicate idempotency key without applying twice', 
       body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: previewBody.fileOperationApprovalId }),
     });
     assert.equal(second.status, 200);
-    const replay = await second.json();
+    const replay = await jsonBody(second, 'file ops replay response');
     assert.equal(replay.idempotentReplay, true);
     assert.equal(fs.readFileSync(target, 'utf8'), 'once');
   });
@@ -416,7 +459,7 @@ test('file-ops rollback endpoint restores an applied write', async () => {
       body: JSON.stringify({ trustedRoot, operations }),
     });
     assert.equal(previewResponse.status, 200);
-    const preview = await previewResponse.json();
+    const preview = await jsonBody(previewResponse, 'rollback preview response');
 
     const appliedResponse = await fetch(`${baseUrl}/api/file-ops/apply`, {
       method: 'POST',
@@ -424,28 +467,30 @@ test('file-ops rollback endpoint restores an applied write', async () => {
       body: JSON.stringify({ trustedRoot, operations, fileOperationApprovalId: preview.fileOperationApprovalId }),
     });
     assert.equal(appliedResponse.status, 200);
-    const applied = await appliedResponse.json();
+    const applied = await jsonBody(appliedResponse, 'rollback apply response');
+    const appliedOperations = recordArray(applied.applied, 'applied rollback operations');
+    const firstApplied = present(appliedOperations[0], 'first applied rollback operation');
     assert.equal(fs.readFileSync(target, 'utf8'), 'after-route');
-    assert.equal(applied.applied[0].rollback.type, 'restore-backup');
-    assert.match(applied.rollbackApprovalId, /^fop_/);
+    assert.equal(recordValue(firstApplied.rollback, 'rollback metadata').type, 'restore-backup');
+    assertMatches(applied.rollbackApprovalId, /^fop_/);
 
     const rollbackMissingApproval = await fetch(`${baseUrl}/api/file-ops/rollback`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-missing-approval' },
-      body: JSON.stringify({ trustedRoot, applied: applied.applied }),
+      body: JSON.stringify({ trustedRoot, applied: appliedOperations }),
     });
     assert.equal(rollbackMissingApproval.status, 428);
-    assert.match((await rollbackMissingApproval.json()).error, /approval/i);
+    assert.match(String((await jsonBody(rollbackMissingApproval, 'rollback missing approval response')).error), /approval/i);
     assert.equal(fs.readFileSync(target, 'utf8'), 'after-route');
 
     const rollbackResponse = await fetch(`${baseUrl}/api/file-ops/rollback`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'idempotency-key': 'rollback-apply-undo' },
-      body: JSON.stringify({ trustedRoot, applied: applied.applied, rollbackApprovalId: applied.rollbackApprovalId }),
+      body: JSON.stringify({ trustedRoot, applied: appliedOperations, rollbackApprovalId: applied.rollbackApprovalId }),
     });
     assert.equal(rollbackResponse.status, 200);
-    const rollback = await rollbackResponse.json();
-    assert.equal(rollback.rolledBack.length, 1);
+    const rollback = await jsonBody(rollbackResponse, 'rollback response');
+    assert.equal(recordArray(rollback.rolledBack, 'rolled back operations').length, 1);
     assert.equal(fs.readFileSync(target, 'utf8'), 'before-route');
   });
 });
@@ -460,15 +505,17 @@ test('artifact endpoints list local artifacts and render safe HTML views', async
   await withServer({ trustedRoot }, async (baseUrl) => {
     const list = await fetch(`${baseUrl}/api/artifacts?limit=10`);
     assert.equal(list.status, 200);
-    const body = await list.json();
-    assert.equal(body.artifacts.length, 1);
-    assert.equal(body.artifacts[0].name, 'report.md');
-    assert.equal(body.artifacts[0].relativePath, '.AgentCowork/artifacts/report.md');
-    assert.equal(body.artifacts[0].viewable, true);
+    const body = await jsonBody(list, 'artifacts list response');
+    const artifacts = recordArray(body.artifacts, 'artifacts');
+    const artifact = present(artifacts[0], 'first artifact');
+    assert.equal(artifacts.length, 1);
+    assert.equal(artifact.name, 'report.md');
+    assert.equal(artifact.relativePath, '.AgentCowork/artifacts/report.md');
+    assert.equal(artifact.viewable, true);
 
     const view = await fetch(`${baseUrl}/api/artifacts/view?path=${encodeURIComponent(artifactPath)}`);
     assert.equal(view.status, 200);
-    assert.match(view.headers.get('content-type'), /text\/html/);
+    assert.match(view.headers.get('content-type') || '', /text\/html/);
     const html = await view.text();
     assert.match(html, /Artifact Live Page/);
     assert.match(html, /Report/);
@@ -485,9 +532,10 @@ test('artifact endpoints list local artifacts and render safe HTML views', async
       }),
     });
     assert.equal(rename.status, 200);
-    const renamed = await rename.json();
-    assert.equal(renamed.artifact.name, 'report-final.md');
-    assert.equal(renamed.artifact.relativePath, '.AgentCowork/artifacts/report-final.md');
+    const renamed = await jsonBody(rename, 'artifact rename response');
+    const renamedArtifact = recordValue(renamed.artifact, 'renamed artifact');
+    assert.equal(renamedArtifact.name, 'report-final.md');
+    assert.equal(renamedArtifact.relativePath, '.AgentCowork/artifacts/report-final.md');
     assert.equal(fs.existsSync(path.join(artifactDir, 'report-final.md')), true);
     assert.equal(fs.existsSync(artifactPath), false);
 
@@ -534,15 +582,15 @@ test('kimi plan failures persist run record and expose run id', async () => {
       }),
     });
     assert.equal(response.status, 502);
-    const body = await response.json();
-    assert.match(body.error, /simulated kimi failure/);
-    assert.match(body.runId, /^run_/);
-    assert.equal(fs.existsSync(body.runPath), true);
+    const body = await jsonBody(response, 'kimi failure response');
+    assertMatches(body.error, /simulated kimi failure/);
+    assertMatches(body.runId, /^run_/);
+    assert.equal(fs.existsSync(String(body.runPath)), true);
 
-    const record = JSON.parse(fs.readFileSync(body.runPath, 'utf8'));
+    const record = recordValue(JSON.parse(fs.readFileSync(String(body.runPath), 'utf8')) as unknown, 'failed kimi run record');
     assert.equal(record.status, 'failed');
-    assert.equal(record.error.message, 'simulated kimi failure');
-    assert.equal(record.input.prompt, '生成失败记录');
+    assert.equal(recordValue(record.error, 'failed kimi error').message, 'simulated kimi failure');
+    assert.equal(recordValue(record.input, 'failed kimi input').prompt, '生成失败记录');
   });
 });
 
@@ -560,28 +608,28 @@ test('serves the local preview shell and assets', async () => {
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
     const index = await fetch(`${baseUrl}/`);
     assert.equal(index.status, 200);
-    assert.match(index.headers.get('content-type'), /text\/html/);
+    assert.match(index.headers.get('content-type') || '', /text\/html/);
     assert.match(await index.text(), /Agent Cowork/);
 
     const script = await fetch(`${baseUrl}/app.js`);
     assert.equal(script.status, 200);
-    assert.match(script.headers.get('content-type'), /javascript/);
+    assert.match(script.headers.get('content-type') || '', /javascript/);
 
     const utils = await fetch(`${baseUrl}/app-utils.js`);
     assert.equal(utils.status, 200);
-    assert.match(utils.headers.get('content-type'), /javascript/);
+    assert.match(utils.headers.get('content-type') || '', /javascript/);
 
     const apiClient = await fetch(`${baseUrl}/app-api-client.js`);
     assert.equal(apiClient.status, 200);
-    assert.match(apiClient.headers.get('content-type'), /javascript/);
+    assert.match(apiClient.headers.get('content-type') || '', /javascript/);
 
     const runEvents = await fetch(`${baseUrl}/app-run-events.js`);
     assert.equal(runEvents.status, 200);
-    assert.match(runEvents.headers.get('content-type'), /javascript/);
+    assert.match(runEvents.headers.get('content-type') || '', /javascript/);
 
     const composerPopover = await fetch(`${baseUrl}/app-composer-popover.js`);
     assert.equal(composerPopover.status, 200);
-    assert.match(composerPopover.headers.get('content-type'), /javascript/);
+    assert.match(composerPopover.headers.get('content-type') || '', /javascript/);
   });
 });
 
@@ -596,9 +644,9 @@ test('file tree rejects roots outside configured trusted root', async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ root: outsideRoot }),
     });
-    assert.notEqual(response.status, 200);
-    const body = await response.json();
-    assert.match(body.error, /trusted root/i);
+    assert.equal(response.status === 200, false);
+    const body = await jsonBody(response, 'file tree error response');
+    assert.match(String(body.error), /trusted root/i);
   });
 });
 

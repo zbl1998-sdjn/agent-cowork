@@ -98,6 +98,7 @@
     "apps/host/test/secret-scan.test.ts",
     "apps/host/test/security-headers.test.ts",
     "apps/host/test/selfcheck.test.ts",
+    "apps/host/test/server.test.ts",
     "apps/host/test/seeded-ids.test.ts",
     "apps/host/test/shutdown.test.ts",
     "apps/host/test/sqlite-adapters.test.ts",
