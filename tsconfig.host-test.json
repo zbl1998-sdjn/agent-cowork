@@ -51,6 +51,7 @@
     "apps/host/test/background-tasks.test.ts",
     "apps/host/test/body-limit.test.ts",
     "apps/host/test/budget-guard.test.ts",
+    "apps/host/test/cancel-usage.test.ts",
     "apps/host/test/cancellation.test.ts",
     "apps/host/test/chat-stream.test.ts",
     "apps/host/test/ci-gates.test.ts",
