@@ -21,12 +21,12 @@ const gitDiffArgsSchema = z.object({
   path: z.string().min(1).optional(),
   staged: z.boolean().optional(),
   stat: z.boolean().optional(),
-  context: z.number().finite().optional(),
+  context: z.number().optional(),
 }).strict();
 
 const gitLogArgsSchema = z.object({
   workspace: z.string().optional(),
-  maxCount: z.number().finite().optional(),
+  maxCount: z.number().optional(),
   path: z.string().min(1).optional(),
 }).strict();
 

@@ -43,7 +43,7 @@ const connectorIdSchema = z.string().trim().regex(connectorIdPattern, 'connector
 const suggestQuerySchema = z.object({
   q: z.string().optional(),
   query: z.string().optional(),
-  limit: z.coerce.number().int().finite().catch(5),
+  limit: z.coerce.number().int().catch(5),
 }).loose();
 const connectBodySchema = z.object({
   id: connectorIdSchema.optional(),

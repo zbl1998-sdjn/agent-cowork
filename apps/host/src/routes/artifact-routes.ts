@@ -23,7 +23,7 @@ type ArtifactRouteOptions = {
   sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): unknown;
 };
 
-const limitParamSchema = z.coerce.number().int().finite().catch(20);
+const limitParamSchema = z.coerce.number().int().catch(20);
 const artifactViewQuerySchema = z.object({
   trustedRoot: z.preprocess(
     (value) => (typeof value === 'string' && value.length > 0 ? value : undefined),

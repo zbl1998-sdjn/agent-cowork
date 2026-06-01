@@ -39,7 +39,7 @@ const selectedIdsSchema = z.preprocess(
 );
 const freeBytesSchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
-  z.number().finite().nonnegative().optional(),
+  z.number().nonnegative().optional(),
 );
 const safePathSegmentSchema = z.string()
   .trim()

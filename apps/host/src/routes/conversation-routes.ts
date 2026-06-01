@@ -44,8 +44,8 @@ const listQuerySchema = z.object({
   trustedRoot: trustedRootSchema,
   full: z.string().optional(),
   q: z.string().optional(),
-  limit: z.coerce.number().int().finite().optional(),
-  offset: z.coerce.number().int().finite().optional(),
+  limit: z.coerce.number().int().optional(),
+  offset: z.coerce.number().int().optional(),
 }).loose();
 const conversationBodySchema = z.object({
   trustedRoot: trustedRootSchema,

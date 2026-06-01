@@ -43,7 +43,7 @@ const trustedRootSchema = z.preprocess(
 const profileQuerySchema = z.object({
   trustedRoot: trustedRootSchema,
   query: z.string().optional(),
-  limit: z.coerce.number().int().finite().catch(8),
+  limit: z.coerce.number().int().catch(8),
 }).loose();
 const factBodySchema = z.object({
   trustedRoot: trustedRootSchema,

@@ -71,7 +71,7 @@ const webSearchOptionsSchema = z.object({
   allowInternal: z.boolean().optional(),
   fetchImpl: optionalFunction.optional(),
   lookupImpl: optionalFunction.optional(),
-  timeoutMs: z.number().positive().finite().optional(),
+  timeoutMs: z.number().positive().optional(),
 }).strict();
 
 function inputError(prefix: 'web.fetch' | 'web.search', message: string): WebFetchError | WebSearchError {

@@ -21,7 +21,7 @@ const optionalNonEmptyText = (max: number) => z.preprocess(
 );
 const optionalNumber = (min?: number) => z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
-  (min == null ? z.number().finite() : z.number().finite().min(min)).optional(),
+  (min == null ? z.number() : z.number().min(min)).optional(),
 );
 const promptSchema = z.string().refine((value) => value.trim().length > 0, 'body.prompt is required');
 const trustedRootSchema = optionalNonEmptyText(1000);
