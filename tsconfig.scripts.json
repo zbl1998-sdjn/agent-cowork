@@ -36,6 +36,7 @@
     "scripts/smoke-local-operations.ts",
     "scripts/smoke-mvp-runtime.ts",
     "scripts/smoke-plan-closed-loop.ts",
+    "scripts/smoke-react-branches.ts",
     "scripts/smoke-sqlite-runtime.ts",
     "scripts/smoke-tauri-scaffold.ts",
     "apps/host/scripts/load-sse.ts",

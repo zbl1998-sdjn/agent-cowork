@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { ChildProcessLike } from 'node:child_process';
+import type { Server } from 'node:http';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const buildDir = path.join(repoRoot, 'build');
@@ -18,25 +20,89 @@ const reportPath = archiveRequested
   : defaultReportPath;
 const screenshotPath = path.join(buildDir, 'react-branches-smoke-1280x760.png');
 
-function assert(condition, message) {
+type BranchMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  status?: 'done';
+  progress?: unknown[];
+  operations?: unknown[];
+  sources?: unknown[];
+  approvalState?: 'idle';
+};
+type BranchConversation = {
+  id: string;
+  title: string;
+  messages: BranchMessage[];
+  activeBranchId: string;
+  branches: {
+    id: string;
+    title: string;
+    parentBranchId?: string;
+    baseMessageId?: string;
+    createdAt?: string;
+    messages: BranchMessage[];
+  }[];
+};
+type CdpSuccess<T> = { id?: number; result?: T; method?: undefined; params?: undefined; error?: undefined };
+type CdpEvent = { id?: undefined; result?: undefined; method?: string; params?: unknown; error?: undefined };
+type CdpFailure = { id?: number; result?: undefined; method?: undefined; params?: undefined; error: { message?: string; data?: string } };
+type CdpMessage<T = unknown> = CdpSuccess<T> | CdpEvent | CdpFailure;
+type CdpPending = { resolve: (value: unknown) => void; reject: (reason?: unknown) => void };
+type CdpHandler = (params: unknown) => void;
+type CdpEvaluateResult = { exceptionDetails?: { exception?: { description?: string }; text?: string }; result?: { value?: unknown } };
+type CdpVersion = { webSocketDebuggerUrl: string };
+type CdpTarget = { targetId: string };
+type CdpSession = { sessionId: string };
+type ScreenshotResult = { data: string };
+type BranchSnapshot = {
+  selected: string;
+  optionLabels: string[];
+  meta: string;
+  hasMain: boolean;
+  hasBranch: boolean;
+  timeline: string;
+};
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function assistant(id, text) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function errorDetails(error: unknown): string {
+  return error instanceof Error ? error.stack || error.message : String(error);
+}
+
+function branchSnapshot(value: unknown, label: string): BranchSnapshot {
+  if (!isRecord(value)) throw new TypeError(`${label} must be an object`);
+  return {
+    selected: typeof value.selected === 'string' ? value.selected : '',
+    optionLabels: Array.isArray(value.optionLabels) ? value.optionLabels.filter((item): item is string => typeof item === 'string') : [],
+    meta: typeof value.meta === 'string' ? value.meta : '',
+    hasMain: value.hasMain === true,
+    hasBranch: value.hasBranch === true,
+    timeline: typeof value.timeline === 'string' ? value.timeline : '',
+  };
+}
+
+function assistant(id: string, text: string): BranchMessage {
   return { id, role: 'assistant', status: 'done', text, progress: [], operations: [], sources: [], approvalState: 'idle' };
 }
 
-function seededConversations() {
-  const common = [
+function seededConversations(): BranchConversation[] {
+  const common: BranchMessage[] = [
     { id: 'u-root', role: 'user', text: 'COMMON_NODE_MARKER 共同节点：准备季度报告' },
     assistant('a-root', 'COMMON_ASSISTANT_MARKER 共同上下文：先确认受众和摘要结构。'),
   ];
-  const mainMessages = [
+  const mainMessages: BranchMessage[] = [
     ...common,
     { id: 'u-main', role: 'user', text: 'MAIN_ONLY_MARKER 主线继续：预算版本' },
     assistant('a-main', 'MAIN_ASSISTANT_MARKER 主线回复：使用预算版叙事。'),
   ];
-  const branchMessages = [
+  const branchMessages: BranchMessage[] = [
     ...common,
     { id: 'u-branch', role: 'user', text: 'BRANCH_ONLY_MARKER 分支继续：董事会版本' },
     assistant('a-branch', 'BRANCH_ASSISTANT_MARKER 分支回复：使用董事会版叙事。'),
@@ -61,7 +127,7 @@ function seededConversations() {
   }];
 }
 
-function findBrowser() {
+function findBrowser(): string | null {
   const candidates = process.platform === 'win32'
     ? [
         path.join(process.env.ProgramFiles || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
@@ -73,18 +139,23 @@ function findBrowser() {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
 
-async function getFreePort() {
+async function getFreePort(): Promise<number> {
   return await new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        reject(new Error('free port probe did not return an address object'));
+        return;
+      }
+      const { port } = address;
       server.close(() => resolve(port));
     });
   });
 }
 
-async function getJson(url, timeoutMs = 5000) {
+async function getJson<T>(url: string, timeoutMs = 5000): Promise<T> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     try {
@@ -92,13 +163,14 @@ async function getJson(url, timeoutMs = 5000) {
         const request = http.get(url, (response) => {
           let body = '';
           response.setEncoding('utf8');
-          response.on('data', (chunk) => { body += chunk; });
+          response.on('data', (chunk) => { body += String(chunk); });
           response.on('end', () => {
-            if (response.statusCode < 200 || response.statusCode >= 300) {
+            const statusCode = response.statusCode ?? 0;
+            if (statusCode < 200 || statusCode >= 300) {
               reject(new Error(`${url} returned ${response.statusCode}: ${body}`));
               return;
             }
-            resolve(JSON.parse(body));
+            resolve(JSON.parse(body) as T);
           });
         });
         request.on('error', reject);
@@ -112,54 +184,66 @@ async function getJson(url, timeoutMs = 5000) {
 }
 
 class CdpClient {
-  constructor(url) {
+  private socket?: WebSocket;
+  private nextId = 1;
+  private readonly pending = new Map<number, CdpPending>();
+  private readonly handlers = new Map<string, CdpHandler[]>();
+  private readonly url: string;
+
+  constructor(url: string) {
     this.url = url;
-    this.nextId = 1;
-    this.pending = new Map();
-    this.handlers = new Map();
   }
 
-  async open() {
-    this.socket = new WebSocket(this.url);
-    await new Promise((resolve, reject) => {
+  async open(): Promise<void> {
+    const socket = new WebSocket(this.url);
+    this.socket = socket;
+    await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Timed out opening DevTools websocket')), 5000);
-      this.socket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
-      this.socket.addEventListener('error', () => {
+      socket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
+      socket.addEventListener('error', () => {
         clearTimeout(timeout);
         reject(new Error('Failed opening DevTools websocket'));
       }, { once: true });
     });
 
-    this.socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(String(event.data)) as CdpMessage;
       if (message.id && this.pending.has(message.id)) {
-        const { resolve, reject } = this.pending.get(message.id);
+        const pending = this.pending.get(message.id);
+        assert(pending, `missing pending CDP call for id ${message.id}`);
+        const { resolve, reject } = pending;
         this.pending.delete(message.id);
         if (message.error) reject(new Error(`${message.error.message}: ${message.error.data || ''}`.trim()));
         else resolve(message.result || {});
         return;
       }
       if (message.method && this.handlers.has(message.method)) {
-        for (const handler of this.handlers.get(message.method)) handler(message.params || {});
+        for (const handler of this.handlers.get(message.method) || []) handler(message.params || {});
       }
     });
   }
 
-  send(method, params = {}, sessionId) {
+  send<T = unknown>(method: string, params: Record<string, unknown> = {}, sessionId?: string): Promise<T> {
     const id = this.nextId++;
+    assert(this.socket, 'DevTools websocket is not open');
     this.socket.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+    return new Promise<T>((resolve, reject) => {
+      this.pending.set(id, {
+        resolve: (value) => resolve(value as T),
+        reject,
+      });
     });
   }
 
-  close() {
+  close(): void {
     this.socket?.close();
   }
 }
 
-async function evaluate(sendPage, expression, awaitPromise = true) {
-  const result = await sendPage('Runtime.evaluate', {
+type SendPage = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+
+async function evaluate(sendPage: SendPage, expression: string, awaitPromise = true): Promise<unknown> {
+  const result = await sendPage<CdpEvaluateResult>('Runtime.evaluate', {
     expression,
     awaitPromise,
     returnByValue: true,
@@ -171,12 +255,14 @@ async function evaluate(sendPage, expression, awaitPromise = true) {
   return result.result?.value;
 }
 
-async function bind(server) {
-  await new Promise((resolve, reject) => {
+async function bind(server: Server): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  return `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  assert(address && typeof address === 'object', 'host server did not bind to a TCP address');
+  return `http://127.0.0.1:${address.port}`;
 }
 
 async function main() {
@@ -197,11 +283,11 @@ async function main() {
   });
 
   const startedAt = Date.now();
-  let baseUrl = null;
-  let browser = null;
-  let client = null;
-  let userDataDir = null;
-  const stderr = [];
+  let baseUrl: string | null = null;
+  let browser: ChildProcessLike | null = null;
+  let client: CdpClient | null = null;
+  let userDataDir: string | null = null;
+  const stderr: string[] = [];
 
   try {
     baseUrl = await bind(host);
@@ -225,12 +311,15 @@ async function main() {
     );
     browser.stderr.on('data', (chunk) => { stderr.push(chunk.toString()); });
 
-    const version = await getJson(`http://127.0.0.1:${debugPort}/json/version`, 10000);
+    const version = await getJson<CdpVersion>(`http://127.0.0.1:${debugPort}/json/version`, 10000);
     client = new CdpClient(version.webSocketDebuggerUrl);
     await client.open();
-    const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true });
-    const sendPage = (method, params = {}) => client.send(method, params, sessionId);
+    const { targetId } = await client.send<CdpTarget>('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await client.send<CdpSession>('Target.attachToTarget', { targetId, flatten: true });
+    const sendPage: SendPage = (method, params = {}) => {
+      assert(client, 'DevTools client closed unexpectedly');
+      return client.send(method, params, sessionId);
+    };
 
     await sendPage('Page.enable');
     await sendPage('Runtime.enable');
@@ -265,7 +354,7 @@ async function main() {
       })`,
     );
 
-    const initialMain = await evaluate(
+    const initialMain = branchSnapshot(await evaluate(
       sendPage,
       `(() => {
         const select = document.querySelector('.conv-branch-select');
@@ -278,7 +367,7 @@ async function main() {
           hasBranch: document.body.innerText.includes('BRANCH_ONLY_MARKER')
         };
       })()`,
-    );
+    ), 'initialMain');
 
     await evaluate(
       sendPage,
@@ -291,7 +380,7 @@ async function main() {
       })()`,
     );
 
-    const branchView = await evaluate(
+    const branchView = branchSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
@@ -314,7 +403,7 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'branchView');
 
     await evaluate(
       sendPage,
@@ -327,7 +416,7 @@ async function main() {
       })()`,
     );
 
-    const returnedMain = await evaluate(
+    const returnedMain = branchSnapshot(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
@@ -350,15 +439,15 @@ async function main() {
         }
         tick();
       })`,
-    );
+    ), 'returnedMain');
 
     assert(initialMain.selected === 'main', 'seeded conversation did not start on main branch');
-    assert(initialMain.optionLabels.includes('主线') && initialMain.optionLabels.includes('分支 1'), 'branch options were not rendered');
+    assert(initialMain.optionLabels?.includes('主线') && initialMain.optionLabels.includes('分支 1'), 'branch options were not rendered');
     assert(initialMain.hasMain && !initialMain.hasBranch, 'initial timeline did not show only main branch messages');
     assert(branchView.meta.includes('共同上下文') && branchView.meta.includes('分支差异'), 'branch diff summary was not visible after switching');
     assert(returnedMain.meta.includes('4 条消息'), 'main branch metadata was not restored after returning');
 
-    const screenshot = await sendPage('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    const screenshot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
     const report = {
@@ -387,11 +476,11 @@ async function main() {
       workspace,
       uiDistRoot,
       reportPath,
-      error: error.stack || error.message,
+      error: errorDetails(error),
       browserStderrTail: stderr.join('').split(/\r?\n/).slice(-40),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
+    console.error(errorDetails(error));
     process.exitCode = 1;
   } finally {
     client?.close();
@@ -413,9 +502,9 @@ main().catch((error) => {
     ok: false,
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: errorDetails(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(errorDetails(error));
   process.exit(1);
 });

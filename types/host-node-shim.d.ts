@@ -273,6 +273,7 @@ declare module 'node:http' {
     address(): AddressInfo | string | null;
     close(callback?: (err?: Error) => void): Server;
     on(event: 'error', listener: (error: Error & { code?: string }) => void): Server;
+    once(event: 'error', listener: (error: Error & { code?: string }) => void): Server;
     closeAllConnections?(): void;
   }
 
@@ -297,6 +298,14 @@ declare module 'node:zlib' {
 }
 
 declare module 'node:net' {
+  export interface Server {
+    listen(port: number, host: string, callback?: () => void): Server;
+    address(): import('node:http').AddressInfo | string | null;
+    close(callback?: () => void): Server;
+    once(event: 'error', listener: (error: Error) => void): Server;
+  }
+
+  export function createServer(): Server;
   export function isIP(input: string): number;
 }
 

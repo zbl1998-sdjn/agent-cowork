@@ -195,7 +195,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react branches smoke script syntax',
     command: nodeBin,
-    commandArgs: ['--check', path.join(repoRoot, 'scripts', 'smoke-react-branches.mjs')],
+    commandArgs: [runHostNodeScript, '--', '--check', path.join(repoRoot, 'scripts', 'smoke-react-branches.ts')],
   },
   {
     name: 'windows client resource smoke script syntax',
@@ -251,7 +251,7 @@ const checks: CheckConfig[] = [
   {
     name: 'react branches smoke',
     command: nodeBin,
-    commandArgs: hostScriptArgs('smoke-react-branches.mjs'),
+    commandArgs: hostScriptArgs('smoke-react-branches.ts'),
   },
   {
     name: 'windows client static resource smoke',

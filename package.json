@@ -24,7 +24,7 @@
     "smoke:react-scroll": "node scripts/run-host-node.mjs scripts/smoke-react-scroll.mjs",
     "smoke:react-artifacts": "node scripts/run-host-node.mjs scripts/smoke-react-artifacts-panel.mjs",
     "smoke:react-live-artifact": "node scripts/run-host-node.mjs scripts/smoke-react-live-artifact.mjs",
-    "smoke:react-branches": "node scripts/run-host-node.mjs scripts/smoke-react-branches.mjs",
+    "smoke:react-branches": "node scripts/run-host-node.mjs scripts/smoke-react-branches.ts",
     "smoke:react-connectors": "node scripts/run-host-node.mjs scripts/smoke-react-connectors.mjs",
     "smoke:react-connectors:live-github": "node scripts/run-host-node.mjs scripts/smoke-react-connectors.mjs --live-github",
     "smoke:windows-resources": "node scripts/smoke-windows-client-resources.mjs",
