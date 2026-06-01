@@ -58,6 +58,7 @@
     "apps/host/test/cli-detect.test.ts",
     "apps/host/test/command-runner.test.ts",
     "apps/host/test/connector-allowlist.test.ts",
+    "apps/host/test/connector-connect.test.ts",
     "apps/host/test/connector-oauth-approvals.test.ts",
     "apps/host/test/connector-oauth-device-flow.test.ts",
     "apps/host/test/connector-oauth-security.test.ts",
