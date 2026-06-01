@@ -14,6 +14,7 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "apps/host/scripts/bench-local.ts",
     "scripts/build-ui.ts",
     "scripts/build-host-source.ts",
     "scripts/check-arch.ts",
