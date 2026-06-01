@@ -9,6 +9,13 @@ const UI_ROOT = path.join(ROOT, 'apps', 'windows-client', 'ui', 'src');
 const WINDOWS_CLIENT_ROOT = path.join(ROOT, 'apps', 'windows-client');
 const HOST_SOURCE_EXTENSIONS = new Set(['.js', '.ts']);
 
+type HostLayer = {
+  name: string;
+  rank: number;
+  prefixes?: string[];
+  files?: string[];
+};
+
 const HOST_LAYERS = [
   { name: 'L0', rank: 0, prefixes: ['security/', 'http/', 'util/'] },
   {
@@ -32,7 +39,7 @@ const HOST_LAYERS = [
   { name: 'L2', rank: 2, prefixes: ['runtime/'] },
   { name: 'L3', rank: 3, prefixes: ['routes/'] },
   { name: 'L4', rank: 4, files: ['server.ts', 'main.ts'] },
-];
+] satisfies HostLayer[];
 
 // Known debt from plan/00, kept explicit so the guard still catches new
 // violations while P0 split tasks remove these one by one.
@@ -69,15 +76,15 @@ const STATIC_EXPORT_FROM_RE = /^\s*export\s+[^;'"]*?\bfrom\s+['"]([^'"\n]+)['"]/
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-function toPosix(filePath) {
+function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
 }
 
-function relFromRoot(filePath) {
+function relFromRoot(filePath: string): string {
   return toPosix(path.relative(ROOT, filePath));
 }
 
-function walk(dir, predicate, out = []) {
+function walk(dir: string, predicate: (filePath: string) => boolean, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name.endsWith('.tsbuildinfo')) continue;
     const full = path.join(dir, entry.name);
@@ -90,11 +97,11 @@ function walk(dir, predicate, out = []) {
   return out;
 }
 
-function isHostSource(filePath) {
+function isHostSource(filePath: string): boolean {
   return filePath.startsWith(HOST_ROOT + path.sep) && HOST_SOURCE_EXTENSIONS.has(path.extname(filePath));
 }
 
-function isUiSource(filePath) {
+function isUiSource(filePath: string): boolean {
   if (!filePath.startsWith(UI_ROOT + path.sep)) return false;
   if (/\.(test|spec)\.(ts|tsx)$/.test(filePath)) return false;
   return /\.(ts|tsx)$/.test(filePath);
@@ -106,8 +113,8 @@ function isUiSource(filePath) {
 // to appear inside a doc comment — the regex already requires line-start, but
 // stripping comments outright also kills `/* import x from 'foo' */` style
 // trap strings that managed to land at column 0.
-export function stripComments(text) {
-  const out = [];
+export function stripComments(text: string): string {
+  const out: string[] = [];
   let i = 0;
   let inLine = false;
   let inBlock = false;
@@ -115,7 +122,7 @@ export function stripComments(text) {
   let inDouble = false;
   let inTemplate = false;
   while (i < text.length) {
-    const ch = text[i];
+    const ch = text[i] ?? '';
     const next = text[i + 1];
     if (inLine) {
       if (ch === '\n') { inLine = false; out.push(ch); }
@@ -160,18 +167,18 @@ export function stripComments(text) {
   return out.join('');
 }
 
-function readImports(filePath) {
+function readImports(filePath: string): string[] {
   const raw = fs.readFileSync(filePath, 'utf8');
   const text = stripComments(raw);
-  const imports = [];
-  for (const match of text.matchAll(STATIC_IMPORT_RE)) imports.push(match[1]);
-  for (const match of text.matchAll(STATIC_EXPORT_FROM_RE)) imports.push(match[1]);
-  for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) imports.push(match[1]);
-  for (const match of text.matchAll(REQUIRE_RE)) imports.push(match[1]);
+  const imports: string[] = [];
+  for (const match of text.matchAll(STATIC_IMPORT_RE)) if (match[1]) imports.push(match[1]);
+  for (const match of text.matchAll(STATIC_EXPORT_FROM_RE)) if (match[1]) imports.push(match[1]);
+  for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) if (match[1]) imports.push(match[1]);
+  for (const match of text.matchAll(REQUIRE_RE)) if (match[1]) imports.push(match[1]);
   return imports;
 }
 
-function candidateFiles(base) {
+function candidateFiles(base: string): string[] {
   const ext = path.extname(base);
   if (ext === '.js') {
     const withoutExt = base.slice(0, -ext.length);
@@ -189,7 +196,7 @@ function candidateFiles(base) {
   ];
 }
 
-function resolveImport(fromFile, specifier) {
+function resolveImport(fromFile: string, specifier: string): string | null {
   if (!specifier.startsWith('.')) return null;
   const absolute = path.resolve(path.dirname(fromFile), specifier);
   for (const candidate of candidateFiles(absolute)) {
@@ -200,7 +207,7 @@ function resolveImport(fromFile, specifier) {
   return null;
 }
 
-function hostLayer(filePath) {
+function hostLayer(filePath: string): HostLayer | null {
   const rel = toPosix(path.relative(HOST_ROOT, filePath));
   for (const layer of HOST_LAYERS) {
     if (layer.files?.includes(rel)) return layer;
@@ -209,7 +216,7 @@ function hostLayer(filePath) {
   return null;
 }
 
-function waiverRel(filePath) {
+function waiverRel(filePath: string): string {
   const rel = toPosix(path.relative(HOST_ROOT, filePath));
   // During JS->TS migration source imports intentionally keep NodeNext-style
   // `.js` specifiers. Normalize waiver keys so existing debt markers survive a
@@ -217,7 +224,7 @@ function waiverRel(filePath) {
   return rel.replace(/\.(?:js|ts)$/u, '.js');
 }
 
-function checkBoundary(fromFile, targetFile, violations) {
+function checkBoundary(fromFile: string, targetFile: string, violations: string[]): void {
   const fromRel = relFromRoot(fromFile);
   const targetRel = relFromRoot(targetFile);
   const fromIsHost = fromFile.startsWith(HOST_ROOT + path.sep);
@@ -251,12 +258,12 @@ function checkBoundary(fromFile, targetFile, violations) {
   }
 }
 
-function findCycles(graph) {
-  const cycles = [];
-  const state = new Map();
-  const stack = [];
+function findCycles(graph: Map<string, string[]>): string[][] {
+  const cycles: string[][] = [];
+  const state = new Map<string, 'visiting' | 'done'>();
+  const stack: string[] = [];
 
-  function dfs(node) {
+  function dfs(node: string): void {
     state.set(node, 'visiting');
     stack.push(node);
     for (const next of graph.get(node) || []) {
@@ -278,21 +285,21 @@ function findCycles(graph) {
   return cycles;
 }
 
-function runMain() {
+function runMain(): void {
   const files = [
     ...walk(HOST_ROOT, isHostSource),
     ...walk(UI_ROOT, isUiSource),
   ];
   const fileSet = new Set(files);
-  const graph = new Map(files.map((file) => [file, []]));
-  const violations = [];
+  const graph = new Map<string, string[]>(files.map((file) => [file, []]));
+  const violations: string[] = [];
 
   for (const file of files) {
     for (const specifier of readImports(file)) {
       const target = resolveImport(file, specifier);
       if (!target) continue;
       if (!fileSet.has(target)) continue;
-      graph.get(file).push(target);
+      graph.get(file)?.push(target);
       checkBoundary(file, target, violations);
     }
   }
@@ -315,5 +322,5 @@ function runMain() {
 // Only run the architecture scan when invoked as the main entrypoint.
 // `check-icons.ts` uses the same strip-comments rule; without the guard
 // loading that import would run the scan a second time as a side-effect.
-const invokedAsMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const invokedAsMain = Boolean(process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url));
 if (invokedAsMain) runMain();

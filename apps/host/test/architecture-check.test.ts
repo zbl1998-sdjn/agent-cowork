@@ -7,7 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const checkArchScript = path.join(repoRoot, 'scripts', 'check-arch.mjs');
+const runHostNodeScript = path.join(repoRoot, 'scripts', 'run-host-node.mjs');
+const checkArchScript = path.join(repoRoot, 'scripts', 'check-arch.ts');
 const nodeExecutable = process.execPath ?? 'node';
 
 function writeFile(filePath: string, text: string): void {
@@ -25,7 +26,7 @@ test('architecture check includes host .ts sources and resolves .js specifiers t
   );
   writeFile(path.join(root, 'apps', 'host', 'src', 'routes', 'later.ts'), 'export const later = 1;\n');
 
-  const result = spawnSync(nodeExecutable, [checkArchScript], {
+  const result = spawnSync(nodeExecutable, [runHostNodeScript, checkArchScript], {
     cwd: repoRoot,
     env: { ...process.env, KCW_ARCH_CHECK_ROOT: root },
     encoding: 'utf8',
@@ -53,7 +54,7 @@ test('architecture waivers survive js-to-ts target migration', () => {
     'export function modelBreaker() { return null; }\n',
   );
 
-  const result = spawnSync(nodeExecutable, [checkArchScript], {
+  const result = spawnSync(nodeExecutable, [runHostNodeScript, checkArchScript], {
     cwd: repoRoot,
     env: { ...process.env, KCW_ARCH_CHECK_ROOT: root },
     encoding: 'utf8',

@@ -39,7 +39,7 @@
     "smoke:installed-tauri": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installed-tauri.ps1",
     "smoke:ui": "node scripts/run-host-node.mjs scripts/smoke-ui-contract.mjs",
     "prepare:embedded-python": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-embedded-python.ps1",
-    "check:arch": "node scripts/check-arch.mjs",
+    "check:arch": "node scripts/run-host-node.mjs scripts/check-arch.ts",
     "check:filesize": "node scripts/run-host-node.mjs scripts/check-filesize.ts",
     "check:secrets": "node scripts/run-host-node.mjs scripts/check-secrets.ts",
     "check:host-types": "node scripts/run-host-node.mjs scripts/check-host-types.ts",
