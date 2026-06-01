@@ -9,11 +9,22 @@ export const hostBuildConfigPath = path.join(repoRoot, 'tsconfig.host-build.json
 
 const HOST_SOURCE_EXTENSIONS = new Set(['.js', '.ts']);
 
-function toPosix(filePath) {
-  return filePath.split(path.sep).join('/');
+type TypeCoverageConfig = {
+  files?: string[];
+};
+
+export type HostTypeCoverageIssues = {
+  sources: string[];
+  configuredHostSources: string[];
+  missing: string[];
+  stale: string[];
+};
+
+function toPosix(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
 }
 
-function walkHostSources(dir, out = []) {
+function walkHostSources(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -25,9 +36,12 @@ function walkHostSources(dir, out = []) {
   return out;
 }
 
-export function findHostTypeCoverageIssues(rootDir = repoRoot, hostConfigPath = hostCheckConfigPath) {
-  const config = JSON.parse(fs.readFileSync(hostConfigPath, 'utf8'));
-  const configured = new Set((config.files || []).map((file) => toPosix(path.normalize(file))));
+export function findHostTypeCoverageIssues(
+  rootDir = repoRoot,
+  hostConfigPath = hostCheckConfigPath,
+): HostTypeCoverageIssues {
+  const config = JSON.parse(fs.readFileSync(hostConfigPath, 'utf8')) as TypeCoverageConfig;
+  const configured = new Set((config.files || []).map(toPosix));
   const hostSourceRoot = path.join(rootDir, 'apps', 'host', 'src');
   const sources = fs.existsSync(hostSourceRoot)
     ? walkHostSources(hostSourceRoot).map((file) => toPosix(path.relative(rootDir, file))).sort()
@@ -44,7 +58,7 @@ export function findHostTypeCoverageIssues(rootDir = repoRoot, hostConfigPath = 
   };
 }
 
-export function assertHostTypeCoverage(rootDir = repoRoot, hostConfigPath = hostCheckConfigPath) {
+export function assertHostTypeCoverage(rootDir = repoRoot, hostConfigPath = hostCheckConfigPath): void {
   const issues = findHostTypeCoverageIssues(rootDir, hostConfigPath);
   if (!issues.missing.length && !issues.stale.length) return;
 
@@ -54,7 +68,7 @@ export function assertHostTypeCoverage(rootDir = repoRoot, hostConfigPath = host
   process.exit(1);
 }
 
-export function findTypescriptCompiler(rootDir = repoRoot) {
+export function findTypescriptCompiler(rootDir = repoRoot): string | undefined {
   const candidates = [
     path.join(rootDir, 'node_modules', 'typescript', 'bin', 'tsc'),
     path.join(rootDir, 'apps', 'windows-client', 'ui', 'node_modules', 'typescript', 'bin', 'tsc'),
@@ -62,7 +76,7 @@ export function findTypescriptCompiler(rootDir = repoRoot) {
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
-export function runTypeScriptProject(configPath, rootDir = repoRoot) {
+export function runTypeScriptProject(configPath: string, rootDir = repoRoot): number {
   const tscPath = findTypescriptCompiler(rootDir);
   if (!tscPath) {
     console.error('[host-ts] TypeScript compiler not found. Run npm install in apps/windows-client/ui first.');

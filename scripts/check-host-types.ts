@@ -5,7 +5,7 @@ import {
   findHostTypeCoverageIssues,
   hostCheckConfigPath,
   runTypeScriptProject,
-} from './host-ts-support.mjs';
+} from './host-ts-support.js';
 
 export { findHostTypeCoverageIssues };
 

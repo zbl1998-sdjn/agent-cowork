@@ -5,7 +5,7 @@ import {
   hostBuildConfigPath,
   repoRoot,
   runTypeScriptProject,
-} from './host-ts-support.mjs';
+} from './host-ts-support.js';
 
 const outDir = path.join(repoRoot, 'build', 'host-src');
 

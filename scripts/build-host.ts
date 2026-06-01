@@ -19,7 +19,7 @@ import {
   assertHostTypeCoverage,
   hostBuildConfigPath,
   runTypeScriptProject,
-} from './host-ts-support.mjs';
+} from './host-ts-support.js';
 
 type ProcessWithStreams = typeof process & {
   stdout: { write(message: string): unknown };
