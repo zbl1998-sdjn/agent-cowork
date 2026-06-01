@@ -6,7 +6,7 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, '..', '..', '..');
 const testWorkspaceRoot = path.join(repoRoot, 'build', 'test-workspaces');
 
-export function makeTestWorkspace(prefix) {
+export function makeTestWorkspace(prefix: string): string {
   fs.mkdirSync(testWorkspaceRoot, { recursive: true });
   return fs.mkdtempSync(path.join(testWorkspaceRoot, `${prefix}-`));
 }

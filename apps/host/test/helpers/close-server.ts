@@ -7,11 +7,24 @@
 // open, which keeps the event loop alive and causes the full-suite hang /
 // libuv "UV_HANDLE_CLOSING" close-race assertion. Falls back to close() for any
 // server-like object without shutdown().
-export async function closeTestServer(server) {
+type TestServer = {
+  close(callback?: (error?: Error) => void): unknown;
+  shutdown?: (options?: { timeoutMs?: number }) => unknown | Promise<unknown>;
+};
+
+export async function closeTestServer(server: TestServer | null | undefined): Promise<void> {
   if (!server) return;
   if (typeof server.shutdown === 'function') {
     await server.shutdown({ timeoutMs: 2000 });
     return;
   }
-  await new Promise((resolve) => server.close(() => resolve()));
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
 }

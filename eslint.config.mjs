@@ -30,7 +30,7 @@ export default tseslint.config(
       parserOptions: {
         project: [
           './tsconfig.host-checkjs.json',
-          './tsconfig.host-test-eval.json',
+          './tsconfig.host-test.json',
           './tsconfig.eval.json',
           './apps/windows-client/ui/tsconfig.json',
           './apps/windows-client/ui/tsconfig.node.json',

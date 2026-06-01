@@ -44,7 +44,7 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:host-types": "node scripts/check-host-types.mjs",
     "check:eval-types": "npx tsc -p tsconfig.eval.json --pretty false",
-    "check:host-test-types": "npx tsc -p tsconfig.host-test-eval.json --pretty false",
+    "check:host-test-types": "npx tsc -p tsconfig.host-test.json --pretty false",
     "check:ui-types": "npm --prefix apps/windows-client/ui run typecheck",
     "lint:ts": "eslint \"apps/host/src/**/*.ts\" \"apps/host/test/**/*.ts\" \"eval/**/*.ts\" \"apps/windows-client/ui/src/**/*.{ts,tsx}\" \"apps/windows-client/ui/vite.config.ts\"",
     "check:lint": "npm run lint:ts",

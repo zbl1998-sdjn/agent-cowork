@@ -5,6 +5,8 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "apps/host/test/helpers/close-server.ts",
+    "apps/host/test/test-fixtures.ts",
     "apps/host/test/eval-redteam.test.ts",
     "apps/host/test/eval-replay-backend.test.ts",
     "apps/host/test/eval-report.test.ts",
