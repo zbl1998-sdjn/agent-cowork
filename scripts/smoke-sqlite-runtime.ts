@@ -3,6 +3,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
+import type { AddressInfo } from 'node:http';
+import type { HostServer } from '../apps/host/src/server.js';
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -14,39 +16,95 @@ const reportPath = archiveRequested
   ? path.join(reportRoot, `sqlite-runtime-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
   : defaultReportPath;
 
-function assert(condition, message) {
+type JsonRecord = Record<string, unknown>;
+type JsonResponse = {
+  status: number;
+  body: unknown;
+};
+type RequestJsonOptions = {
+  method?: string;
+  token?: string;
+  idempotencyKey?: string;
+  body?: unknown;
+};
+type ProcessWithExitCode = typeof process & {
+  exitCode?: number;
+};
+type RuntimeDependency = {
+  id?: unknown;
+  status?: unknown;
+  version?: unknown;
+};
+
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function assertInside(child, parent, label) {
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function stackOrMessage(error: unknown): string {
+  return error instanceof Error ? error.stack || error.message : String(error);
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value != null;
+}
+
+function asRecord(value: unknown, label: string): JsonRecord {
+  assert(isRecord(value), `${label} was not an object: ${JSON.stringify(value)}`);
+  return value;
+}
+
+function readString(value: unknown, label: string): string {
+  assert(typeof value === 'string' && value.length > 0, `${label} missing`);
+  return value;
+}
+
+function readRecordArray(value: unknown, label: string): JsonRecord[] {
+  assert(Array.isArray(value), `${label} was not an array`);
+  return value.map((item, index) => asRecord(item, `${label}[${index}]`));
+}
+
+function assertInside(child: string, parent: string, label: string): void {
   const relative = path.relative(parent, child);
   assert(relative && !relative.startsWith('..') && !path.isAbsolute(relative), `${label} escaped expected parent: ${child}`);
 }
 
-async function bind(server) {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
-  const { address, port } = server.address();
+  const addressInfo = server.address();
+  assert(addressInfo && typeof addressInfo === 'object', 'sqlite smoke server did not bind to a TCP address');
+  const { address, port } = addressInfo as AddressInfo;
   return `http://${address}:${port}`;
 }
 
-async function requestJson(baseUrl, route, { method = 'GET', token = '', idempotencyKey = '', body } = {}) {
-  const headers = { 'content-type': 'application/json' };
+async function requestJson(
+  baseUrl: string,
+  route: string,
+  { method = 'GET', token = '', idempotencyKey = '', body }: RequestJsonOptions = {},
+): Promise<JsonResponse> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
-  const response = await fetch(`${baseUrl}${route}`, {
+  const request: RequestInit = {
     method,
     headers,
-    body: body == null ? undefined : JSON.stringify(body),
-  });
+  };
+  if (body != null) {
+    request.body = JSON.stringify(body);
+  }
+  const response = await fetch(`${baseUrl}${route}`, request);
   const text = await response.text();
   const payload = text ? JSON.parse(text) : {};
   return { status: response.status, body: payload };
 }
 
-function createSqliteHost({ workspace, dbPath, authDbPath }) {
+function createSqliteHost({ workspace, dbPath, authDbPath }: { workspace: string; dbPath: string; authDbPath: string }): HostServer {
   return createServer({
     trustedRoot: workspace,
     storeBackend: 'sqlite',
@@ -58,15 +116,19 @@ function createSqliteHost({ workspace, dbPath, authDbPath }) {
   });
 }
 
-async function closeHost(server) {
-  if (typeof server.shutdown === 'function') {
-    await server.shutdown({ timeoutMs: 3000 });
-    return;
-  }
-  await new Promise((resolve) => server.close(resolve));
+async function closeHost(server: HostServer): Promise<void> {
+  await server.shutdown({ timeoutMs: 3000 });
 }
 
-async function main() {
+function findSqliteDependency(dependencies: JsonRecord[]): RuntimeDependency | undefined {
+  return dependencies.find((item) => item.id === 'sqlite');
+}
+
+function getProcessVersions(): Record<string, string | undefined> {
+  return process.versions || {};
+}
+
+async function main(): Promise<void> {
   const startedAt = Date.now();
   fs.mkdirSync(buildDir, { recursive: true });
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
@@ -74,7 +136,7 @@ async function main() {
   try {
     require('node:sqlite');
   } catch (err) {
-    throw new Error(`node:sqlite is not available in this runtime: ${err.message}`);
+    throw new Error(`node:sqlite is not available in this runtime: ${formatError(err)}`);
   }
 
   const workspace = path.join(buildDir, 'sqlite-runtime-smoke-workspace');
@@ -93,12 +155,14 @@ async function main() {
 
   try {
     const guest = await requestJson(baseUrl, '/api/auth/guest', { method: 'POST', body: {} });
-    assert(guest.status === 200 && guest.body.token, `guest auth failed: ${JSON.stringify(guest.body)}`);
-    token = guest.body.token;
+    const guestBody = asRecord(guest.body, 'guest auth body');
+    assert(guest.status === 200, `guest auth failed: ${JSON.stringify(guestBody)}`);
+    token = readString(guestBody.token, 'guest token');
 
     const runtime = await requestJson(baseUrl, '/api/runtime/dependencies', { token });
     assert(runtime.status === 200, `runtime dependencies failed: ${JSON.stringify(runtime.body)}`);
-    const sqliteDep = runtime.body.dependencies.find((item) => item.id === 'sqlite');
+    const runtimeBody = asRecord(runtime.body, 'runtime dependencies body');
+    const sqliteDep = findSqliteDependency(readRecordArray(runtimeBody.dependencies, 'runtime dependencies'));
     assert(sqliteDep?.status === 'available' && sqliteDep.version, `sqlite dependency unavailable: ${JSON.stringify(sqliteDep)}`);
 
     const fact = await requestJson(baseUrl, '/api/memory/facts', {
@@ -114,8 +178,9 @@ async function main() {
       idempotencyKey: 'sqlite-runtime-run',
       body: { prompt: 'SQLite smoke run', files: [] },
     });
-    assert(run.status === 200 && run.body.runId, `recipe run failed: ${JSON.stringify(run.body)}`);
-    createdRunId = run.body.runId;
+    const runBody = asRecord(run.body, 'recipe run body');
+    assert(run.status === 200, `recipe run failed: ${JSON.stringify(runBody)}`);
+    createdRunId = readString(runBody.runId, 'recipe run id');
 
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const schedule = await requestJson(baseUrl, '/api/schedules', {
@@ -124,8 +189,10 @@ async function main() {
       idempotencyKey: 'sqlite-runtime-schedule',
       body: { name: 'sqlite-smoke', fireAt, payload: { recipeId: 'meeting-actions' } },
     });
-    assert(schedule.status === 200 && schedule.body.schedule?.id, `schedule create failed: ${JSON.stringify(schedule.body)}`);
-    createdScheduleId = schedule.body.schedule.id;
+    const scheduleBody = asRecord(schedule.body, 'schedule create body');
+    const scheduleRecord = asRecord(scheduleBody.schedule, 'created schedule');
+    assert(schedule.status === 200, `schedule create failed: ${JSON.stringify(scheduleBody)}`);
+    createdScheduleId = readString(scheduleRecord.id, 'created schedule id');
   } finally {
     await closeHost(server);
   }
@@ -142,22 +209,26 @@ async function main() {
 
     const memory = await requestJson(baseUrl, '/api/memory', { token });
     assert(memory.status === 200, `memory read failed after restart: ${JSON.stringify(memory.body)}`);
-    assert(String(memory.body.memory?.text || '').includes('SQLite smoke'), 'sqlite memory did not persist through restart');
+    const memoryBody = asRecord(memory.body, 'memory body');
+    const memoryRecord = asRecord(memoryBody.memory, 'memory payload');
+    assert(String(memoryRecord.text || '').includes('SQLite smoke'), 'sqlite memory did not persist through restart');
 
     const runs = await requestJson(baseUrl, '/api/runs/index', { token });
     assert(runs.status === 200, `runs index failed after restart: ${JSON.stringify(runs.body)}`);
-    assert(runs.body.runs.some((item) => item.id === createdRunId), 'sqlite runs index did not persist recipe run');
+    const runsBody = asRecord(runs.body, 'runs index body');
+    assert(readRecordArray(runsBody.runs, 'runs index').some((item) => item.id === createdRunId), 'sqlite runs index did not persist recipe run');
 
     const schedules = await requestJson(baseUrl, '/api/schedules', { token });
     assert(schedules.status === 200, `schedule list failed after restart: ${JSON.stringify(schedules.body)}`);
-    assert(schedules.body.schedules.some((item) => item.id === createdScheduleId), 'sqlite schedule did not persist through restart');
+    const schedulesBody = asRecord(schedules.body, 'schedules body');
+    assert(readRecordArray(schedulesBody.schedules, 'schedules').some((item) => item.id === createdScheduleId), 'sqlite schedule did not persist through restart');
 
     const report = {
       ok: true,
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       platform: process.platform,
-      sqliteVersion: process.versions.sqlite,
+      sqliteVersion: getProcessVersions().sqlite,
       workspace,
       dbPath,
       authDbPath,
@@ -177,16 +248,16 @@ async function main() {
       generatedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       platform: process.platform,
-      sqliteVersion: process.versions.sqlite,
+      sqliteVersion: getProcessVersions().sqlite,
       workspace,
       dbPath,
       authDbPath,
       reportPath,
-      error: error.stack || error.message,
+      error: stackOrMessage(error),
     };
     fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.error(error.stack || error.message);
-    process.exitCode = 1;
+    console.error(stackOrMessage(error));
+    (process as ProcessWithExitCode).exitCode = 1;
   } finally {
     await closeHost(server);
   }
@@ -198,9 +269,9 @@ main().catch((error) => {
     ok: false,
     generatedAt: new Date().toISOString(),
     reportPath,
-    error: error.stack || error.message,
+    error: stackOrMessage(error),
   };
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  console.error(error.stack || error.message);
+  console.error(stackOrMessage(error));
   process.exit(1);
 });
