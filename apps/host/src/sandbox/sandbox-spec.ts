@@ -24,8 +24,8 @@ const NUL = String.fromCharCode(0);
 
 export type HttpError = Error & { statusCode?: number };
 export type SandboxLimits = {
-  allowTools?: string[] | null;
-  allowEnv?: string[];
+  allowTools?: readonly string[] | null;
+  allowEnv?: readonly string[];
   maxTimeoutMs?: number;
   defaultMaxOutputBytes?: number;
 };
@@ -66,7 +66,7 @@ function cleanArg(value: unknown, index: number): string {
   return value;
 }
 
-function cleanEnv(env: unknown, allowEnv?: string[]): Record<string, string> {
+function cleanEnv(env: unknown, allowEnv?: readonly string[]): Record<string, string> {
   if (env == null) {
     return {};
   }

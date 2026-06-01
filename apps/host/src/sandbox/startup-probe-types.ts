@@ -23,7 +23,16 @@ export type StartupBackends = {
   wsl: BackendProbe;
   local: { available: boolean; usable: boolean; networkIsolated: boolean };
 };
+export type SandboxStartupInfo = {
+  requestedBackend: string;
+  selectedBackend: string;
+  networkIsolated: boolean;
+  fallback: boolean;
+  fallbackReason: string | null;
+  userMessage: string;
+  backends: StartupBackends;
+};
 export type SandboxStartupResult = {
   options: SandboxStartupOptions;
-  info: Record<string, unknown>;
+  info: SandboxStartupInfo;
 };

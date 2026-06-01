@@ -9,7 +9,7 @@ import path from 'node:path';
 export type SandboxLike = { backend?: unknown };
 export type RuntimeEnv = Record<string, string | undefined>;
 export type LocalRuntimeTool = { tool: string; pathPrefix: string };
-export type SandboxLimits = { allowTools?: string[] | null; allowEnv?: string[] };
+export type SandboxLimits = { allowTools?: readonly string[] | null; allowEnv?: readonly string[] };
 
 const PYTHON_TOOLS = new Set(['python', 'python3']);
 const NODE_TOOLS = new Set(['node']);

@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import test from 'node:test';
 import { createSandbox } from '../src/sandbox/index.js';
 import { normalizeSandboxSpec } from '../src/sandbox/sandbox-spec.js';
-
-function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-sbx-docker-'));
-}
+import { recordValue, tempRoot } from './helpers/host-http.js';
 
 const image = process.env.KCW_SANDBOX_REAL_DOCKER_IMAGE || '';
 
@@ -29,11 +23,12 @@ test('docker VM sandbox blocks outbound network with --network=none', {
     timeoutMs: 8000,
   }, { allowTools: ['sh'] });
 
-  const result = await sandbox.exec(spec, { trustedRoot: tempRoot() });
+  const result = recordValue(await sandbox.exec(spec, { trustedRoot: tempRoot('kcw-sbx-docker-') }), 'docker sandbox result');
+  const argv = result.argv;
 
   assert.equal(result.networkIsolated, true);
-  assert.ok(result.argv.includes('--network=none'), 'docker must be launched with no network');
-  assert.notEqual(result.exitCode, 125, 'integration image must provide wget');
-  assert.notEqual(result.exitCode, 0, 'network fetch must not succeed inside the isolated container');
-  assert.match(result.stderr, /network|unreachable|can't connect|operation timed out/i);
+  assert.ok(Array.isArray(argv) && argv.includes('--network=none'), 'docker must be launched with no network');
+  assert.ok(result.exitCode !== 125, 'integration image must provide wget');
+  assert.ok(result.exitCode !== 0, 'network fetch must not succeed inside the isolated container');
+  assert.match(String(result.stderr), /network|unreachable|can't connect|operation timed out/i);
 });
