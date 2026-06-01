@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RESOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources');
 const RESOURCE_SOURCE_DIR = path.join(ROOT, 'apps', 'windows-client', 'resources-src');
-const ALLOWED_BOOTSTRAPS = new Set([
-  'scripts/host-ts-loader.mjs',
-  'scripts/run-host-node.mjs',
+const BOOTSTRAP_SOURCE_BY_SCRIPT = new Map([
+  ['scripts/host-ts-loader.mjs', 'scripts/bootstrap-src/host-ts-loader.ts'],
+  ['scripts/run-host-node.mjs', 'scripts/bootstrap-src/run-host-node.ts'],
 ]);
 const SKIP_DIRS = new Set([
   '.git',
@@ -78,9 +78,14 @@ function isGeneratedResourceScript(relativePath: string): boolean {
   return fs.existsSync(path.join(RESOURCE_SOURCE_DIR, sourceName));
 }
 
+function isGeneratedBootstrapScript(relativePath: string): boolean {
+  const source = BOOTSTRAP_SOURCE_BY_SCRIPT.get(relativePath);
+  return Boolean(source && fs.existsSync(path.join(ROOT, source)));
+}
+
 const files = trackedJsFiles();
 const unexpected = files.filter((file) => {
-  return !ALLOWED_BOOTSTRAPS.has(file) && !isGeneratedResourceScript(file);
+  return !isGeneratedBootstrapScript(file) && !isGeneratedResourceScript(file);
 });
 
 if (unexpected.length > 0) {
@@ -91,6 +96,6 @@ if (unexpected.length > 0) {
   process.exit(1);
 }
 
-const bootstraps = files.filter((file) => ALLOWED_BOOTSTRAPS.has(file)).length;
+const bootstraps = files.filter(isGeneratedBootstrapScript).length;
 const generatedResources = files.filter(isGeneratedResourceScript).length;
-console.log(`JS/TS boundary check passed (${bootstraps} loader bootstraps, ${generatedResources} generated resource scripts).`);
+console.log(`JS/TS boundary check passed (${bootstraps} generated bootstraps, ${generatedResources} generated resource scripts).`);

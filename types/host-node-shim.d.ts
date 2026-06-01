@@ -195,6 +195,9 @@ declare module 'node:fs' {
   export namespace realpathSync {
     export function native(path: string): string;
   }
+  export namespace promises {
+    export function readFile(path: string, encoding: string): Promise<string>;
+  }
 }
 
 declare module 'node:os' {
@@ -233,6 +236,7 @@ declare module 'node:perf_hooks' {
 
 declare module 'node:module' {
   export function createRequire(url: string): (specifier: string) => unknown;
+  export function register(specifier: string | URL, parentURL?: string | URL): void;
 }
 
 declare module 'node:http' {
@@ -284,7 +288,7 @@ declare module 'node:http' {
 }
 
 declare module 'node:url' {
-  export function fileURLToPath(url: string): string;
+  export function fileURLToPath(url: string | URL): string;
   export function pathToFileURL(path: string): URL;
 }
 

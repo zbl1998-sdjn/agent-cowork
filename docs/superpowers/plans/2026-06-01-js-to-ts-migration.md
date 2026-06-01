@@ -7,10 +7,11 @@
 **Architecture:** Follow `plan/00-架构基线与模块依赖.md`. Host imports must keep pointing inward across L0-L4. Source files may keep NodeNext-style `.js` import specifiers during migration because `scripts/check-arch.ts`, `scripts/host-ts-loader.mjs`, and `tsconfig.host-checkjs.json` support `.js` specifiers resolving to `.ts` sources.
 
 **Current Boundary (2026-06-02):**
-- Checked source files are TypeScript. `npm run check:js-boundary` allows only two Node loader bootstraps (`scripts/host-ts-loader.mjs`, `scripts/run-host-node.mjs`) plus generated Windows resource scripts.
+- Checked source files are TypeScript. `npm run check:js-boundary` allows only generated JavaScript outputs: two Node loader bootstraps (`scripts/host-ts-loader.mjs`, `scripts/run-host-node.mjs`) plus Windows resource scripts.
+- Bootstrap sources live in `scripts/bootstrap-src/*.ts`; `npm run check:bootstrap-js` fails if the checked-in `.mjs` bootstraps are stale.
 - Windows classic resource sources live in `apps/windows-client/resources-src/*.ts`; `apps/windows-client/resources/*.js` is generated output and is checked by `npm run check:resource-js`.
 - `npm run check:ts-coverage` fails if any TS-like source file is not covered by one of the checked tsconfig projects, which keeps VS Code Problems aligned with the repo gates.
-- Do not convert the loader bootstraps to TS without replacing the bootstrap strategy first: those files run before the repo TypeScript loader is active.
+- Do not remove the generated `.mjs` bootstraps without replacing the bootstrap strategy first: those files run before the repo TypeScript loader is active.
 
 **Scope Order:**
 - Host source first: `apps/host/src/**/*.js`, because it is already covered by `tsconfig.host-checkjs.json`, `check:arch`, and `build:host-source`.
@@ -23,6 +24,7 @@
 - Pre-change focused test for the module behavior.
 - `npm run check:arch`
 - `npm run check:host-types`
+- `npm run check:bootstrap-js`
 - `npm run check:js-boundary`
 - `npm run check:ts-coverage`
 - `npm run check`
