@@ -1,3 +1,9 @@
+// 凭据脱敏摘要生成器(host · L0 基础层 · security)
+// ---------------------------------------------------------------------------
+// 职责:把原始凭据(含密钥的 secret)归一为「可对外展示的摘要」——只保留身份、
+//       scopes、账户安全字段(login/id/name/email)与更新时间,剔除一切敏感内容。
+// 依赖:L0 security/credential-store-types(仅类型)。导出:summarizeCredential。
+// 实现:safeAccount 白名单摘取账户字段;scopesFrom 兼容数组 scopes 与空格分隔的 scope 串。
 import type { CredentialIdentity, CredentialSummary } from './credential-store-types.js';
 
 function scopesFrom(value: Record<string, unknown>): string[] {

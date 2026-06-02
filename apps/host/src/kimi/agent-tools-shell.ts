@@ -1,5 +1,11 @@
-// Agent Shell 工具(host · L1 领域层):高风险命令执行入口,始终依赖审批门。
-
+// Agent Shell 工具(host · L1 领域层 · kimi)
+// ---------------------------------------------------------------------------
+// 职责:构造 mutating/high-risk 的 Shell 工具——在工作区内执行一条命令并回传
+//       stdout/stderr/退出码;标记 requiresApproval 语义,由 Agent 循环逐条走审批门。
+// 依赖:同层 ./agent-tools-support(clip)、./agent-tools-types;L1 ../sandbox(normalizeSandboxSpec)。
+//       导出:createShellTool。
+// 实现:本地后端(local-subprocess)经系统 shell(Windows→powershell.exe,其余→sh -c)执行,
+//       并把该 wrapper shell 加入 allowTools;非本地后端则按空白拆分命令、沿用严格 allowlist。
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { clip } from './agent-tools-support.js';
 import type { AgentTool, SandboxLike, SandboxLimits, ToolArgs } from './agent-tools-types.js';

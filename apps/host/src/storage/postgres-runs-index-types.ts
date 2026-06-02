@@ -1,3 +1,7 @@
+// Postgres runs 索引类型契约(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:集中定义 Postgres runs 索引的类型——连接池/结果、run 记录输入与落盘形态、
+//       查询/统计选项,以及异步索引接口 AsyncRunsIndex,供 records 与索引实现共享。
 export type PgResult = { rows?: unknown[]; rowCount?: number | null };
 export type PgPool = { query(text: string, params?: unknown[]): Promise<PgResult>; end?: () => Promise<unknown> };
 export type RunRecordInput = {

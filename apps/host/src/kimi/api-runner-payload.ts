@@ -1,4 +1,8 @@
-// Kimi API 响应体解析:兼容 OpenAI content 字符串和多段数组。
+// Kimi API 响应体解析(host · L1 领域层 · kimi)
+// ---------------------------------------------------------------------------
+// 职责:从 Kimi/OpenAI 风格的响应体中提取首条 message 文本;兼容 content 为
+//       字符串或多段数组(各段取 string 或 { text } 字段),拼接后做清洗。
+// 依赖:同层 ./api-runner-config.js(cleanText)。导出:extractMessageText。
 import { cleanText } from './api-runner-config.js';
 
 type KimiPayload = {

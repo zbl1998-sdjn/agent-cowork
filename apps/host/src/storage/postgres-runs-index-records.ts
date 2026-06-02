@@ -1,3 +1,9 @@
+// runs 索引记录归一与解析(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:为 Postgres runs 索引做记录层处理——归一化单条 run 记录(必填校验、租户/用户回落、
+//       字段截断、默认版本)、校验表名防注入、从 record_json 列还原 RunRecord。
+// 依赖:L1 storage(postgres-runs-index-types 的类型契约)。
+// 导出:normaliseTenantId, normaliseUserId, safePgIdentifier, normaliseRecord, parseRecord。
 import type { RunRecord, RunRecordInput } from './postgres-runs-index-types.js';
 
 type RunsIndexRow = { record_json?: unknown };

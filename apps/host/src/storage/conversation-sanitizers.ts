@@ -1,3 +1,10 @@
+// 对话数据清洗工具(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:对外部传入的对话字段做安全归一与裁剪——校验 id 合法性、限制消息/分支数量、
+//       补默认标题与分支 id,避免单文档膨胀或脏数据落库。
+// 依赖:L1 storage(conversation-types 的类型契约)。
+// 导出:MAX_CONVERSATION_TITLE, cleanConversationId, sanitizeConversationMessages,
+//       safeOptionalConversationId, sanitizeConversationBranches。
 import type { ConversationBranch } from './conversation-types.js';
 
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;

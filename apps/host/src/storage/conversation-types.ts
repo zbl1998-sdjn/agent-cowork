@@ -1,3 +1,7 @@
+// 对话存储类型契约(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:集中定义对话相关的输入/记录/摘要/查询等类型,供 sanitizers 与对话 store 共享,
+//       避免类型契约散落各处。
 export type ConversationContext = { tenantId?: unknown; userId?: unknown };
 export type ConversationBranch = {
   id: string;

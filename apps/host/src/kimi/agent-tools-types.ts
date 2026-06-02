@@ -1,4 +1,8 @@
-// Agent tool shared contracts(host · L1 领域层):只放类型,不引入运行依赖。
+// Agent 工具共享类型契约(host · L1 领域层 · kimi)
+// ---------------------------------------------------------------------------
+// 职责:集中放置 agent 工具集的输入/输出与沙箱契约(ToolArgs、SandboxLike、
+//       AgentToolsContext、AgentTool 等),只声明类型、不引入任何运行期依赖,
+//       让 agent-tools.ts 及各工具实现共享同一份接口定义。
 
 export type ToolArgs = Record<string, unknown>;
 export type SandboxLimits = { allowTools?: string[] };

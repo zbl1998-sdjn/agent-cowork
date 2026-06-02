@@ -1,4 +1,9 @@
-// Web 内置工具描述符(host · L1 领域层 · tools):隔离联网工具的描述与 handler。
+// Web 内置工具描述符(host · L1 领域层 · tools)
+// ---------------------------------------------------------------------------
+// 职责:把联网类内置工具(web.fetch / WebSearch)的名称、描述、风险等级、
+// 入参 schema 与 handler 收敛到一处,供工具集装配方按统一描述符形态接入。
+// 依赖:L1 tools(web-fetch/web-search),L0 util(object.omitUndefined)。导出:createWebBuiltinTools。
+// 实现:把当前日期(now)注入 WebSearch 描述,提示模型搜「最新/今天」时带上当前年份。
 
 import { webFetch } from './web-fetch.js';
 import { webSearch } from './web-search.js';

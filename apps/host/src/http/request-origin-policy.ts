@@ -1,4 +1,8 @@
-// HTTP Origin/Host 策略(host · L0 基础层):集中处理 CORS 与 DNS rebinding 防护。
+// HTTP Origin/Host 来源策略(host · L0 基础层 · http)
+// ---------------------------------------------------------------------------
+// 职责:集中判定请求来源是否可信 —— CORS Origin 白名单、Host 头白名单(防 DNS
+//       rebinding),以及哪些请求需要做来源校验,供 HTTP 入口在处理前据此放行/拒绝。
+// 依赖:无(纯函数)。导出:isLoopbackHostname, isAllowedOrigin, isAllowedHost, requiresOriginCheck。
 
 /** 是否为回环主机名(localhost / 127.0.0.1 / ::1)。 */
 export function isLoopbackHostname(hostname: unknown): boolean {

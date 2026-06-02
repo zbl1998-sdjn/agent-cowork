@@ -1,3 +1,7 @@
+// 沙箱代码执行(run-code)的类型契约(host · L1 领域层 · sandbox)
+// ---------------------------------------------------------------------------
+// 职责:定义在沙箱中跑用户代码的输入选项(RunCodeOptions)、执行结果与依赖端口
+//       (SandboxLike/RunEventsLike/RunsIndexLike),让 code-runner 专注执行编排。
 import type { SandboxLimits, SandboxSpec } from './sandbox-spec.js';
 
 export type SandboxExecResult = {

@@ -1,4 +1,9 @@
-// Kimi API 流式聊天(host · L1 领域层):OpenAI-compatible SSE 解析与 token 回调。
+// Kimi API 流式聊天(host · L1 领域层 · kimi)
+// ---------------------------------------------------------------------------
+// 职责:对 OpenAI 兼容的 /chat/completions 端点发起 stream:true 请求,逐块解析 SSE,
+//       通过 onToken/onReasoning 回调增量推送正文与思考内容,并处理超时/中止。
+// 依赖:同层 kimi(api-runner-config 默认值/常量、api-runner-prompts 拼接提示)。
+//       导出:KimiStreamResult, KimiStreamOptions, runKimiApiChatStream。
 
 import {
   cleanProvider,
