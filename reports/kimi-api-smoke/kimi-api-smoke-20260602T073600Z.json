@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T07:36:00.927Z",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kimi-api-smoke-workspace",
+  "baseUrl": "https://api.moonshot.cn/v1",
+  "model": "kimi-k2.6",
+  "durationMs": 47389,
+  "runId": "run_20260602073513_bd48484a",
+  "runPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kimi-api-smoke-workspace\\.AgentCowork\\runs\\run_20260602073513_bd48484a.json",
+  "auth": {
+    "guestUserId": "guest_4856e3a96d7f"
+  },
+  "textPreview": "```markdown\n模式：cowork\n\n## 目标理解\n\n基于当前合同草稿摘要，核心任务是对**甲方（Party A）、乙方（Party B）、续约日期（Renewal Date）、付款条款（Payment Terms）**四个关键要素进行结构化整理，形成清晰、可执行的中文文档框架，并明确提交正式审批前应在本地完成的核验与准备动作。整个过程仅基于现有摘要信息进行梳理，不涉及文件修改或系统操作。\n\n---\n\n## 三条整理建议\n\n### 1. 统一主体信息归档\n将甲乙双方的身份信息、联系主体及签约权限集中归拢。建议在整理时预留标准字段（如法定名称、注册地址、授权代表），确保合同主体条款与历史协议或工商信息保持一致，避免混用简称或旧称。\n\n### 2. 时间轴化续约日期\n针对续约日期，建议脱离孤立字段，将其与合同生效日、届满日、通知期等串联成时间轴或对照表。通过可视化方式检查续约条件触发逻辑、是否存在空档或重叠，保证日期条款的连续性与合规性。\n\n### 3. 拆解付款条款为“条件-动作-时限”结构\n将付款条款从笼统描述拆分为金额/币种、付款前提条件、账期/节点、支付方式、逾期责任及发"
+}
