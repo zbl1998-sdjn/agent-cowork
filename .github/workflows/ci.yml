@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, docs/zh-core-comments]
+    branches: [main, master]
   pull_request:
     branches: [main, master]
 
