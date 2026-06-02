@@ -61,7 +61,7 @@
 - 新增 `services/kimi-gateway/internal/kimi/stream_handler.go`。
 - `index.html` 改为先加载 `app-utils.js`、`app-api-client.js`、`app-run-events.js`、`app-composer-popover.js`, 再加载 `app.js`, 保持 classic script, 不用 `type=module`。
 - Host 静态白名单新增 `/app-utils.js`、`/app-api-client.js`、`/app-run-events.js`、`/app-composer-popover.js`。
-- `scripts/smoke-ui-contract.mjs` 改为解析 `index.html` 中所有 script, 逐个 GET 并拼接检查契约, 防止拆文件后 smoke 误报或漏报。
+- `scripts/smoke-ui-contract.ts` 改为解析 `index.html` 中所有 script, 逐个 GET 并拼接检查契约, 防止拆文件后 smoke 误报或漏报。
 - `apps/host/test/server.test.js` 覆盖新增静态 JS 资源。
 - 修复 `readJsonBody` 只按 UTF-16 字符数判断限制的问题, 改为按 UTF-8 byte length 累计。
 - 修复 schedule cancel/delete/_tick 缺 `Idempotency-Key` 与跨租户归属校验的问题; 手动 tick 只触发当前 tenant due schedules。

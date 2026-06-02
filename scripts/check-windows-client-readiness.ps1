@@ -177,7 +177,7 @@ $report = [ordered]@{
     explicitApprovalText = "同意为 $exe 添加 Microsoft Defender ASR-only 精确路径排除项"
     proposedUnblockCommand = $unblockCommand
     rerunCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows-client.ps1"
-    fullVerificationCommand = "node .\scripts\verify-mvp.mjs --windows-client"
+    fullVerificationCommand = "node .\scripts\run-host-node.mjs .\scripts\verify-mvp.ts --windows-client"
     strictAuditCommand = "npm run audit:mvp -- --strict"
     requiredUserAction = $requiredUserAction
 }

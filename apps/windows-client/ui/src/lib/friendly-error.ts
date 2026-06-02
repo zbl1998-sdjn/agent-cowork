@@ -1,13 +1,8 @@
-// Pure helper: turn a low-level error (network / fetch / HTTP / JSON parse)
-// into a short Chinese sentence a non-technical user can act on.
-//
-// Goals:
-//   1. Never crash on weird inputs (string, Error, unknown).
-//   2. Map the common technical "tell" strings to plain-language guidance.
-//   3. Fall back to the original message so power users / logs still see truth.
-//
-// Used by App.tsx, MemoryPanel, ObservabilityPanel, ProjectsPanel, etc.
-
+// 友好错误(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把底层错误(网络/fetch/HTTP/JSON 解析)翻译成非技术用户可读、可行动的简短中文,
+// 对未命中映射的原始信息做截断兜底,任何输入都不崩溃。呼应 host「错误可读/永不空交代」原则。
+// 被 App.tsx、各面板(Memory/Observability/Projects 等)使用。导出:humanizeError、FriendlyErrorOptions。
 export type FriendlyErrorOptions = {
   /** Optional verb fragment, e.g. "保存". Shown when no specific mapping fires. */
   action?: string;

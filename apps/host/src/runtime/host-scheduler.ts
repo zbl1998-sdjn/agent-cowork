@@ -1,0 +1,102 @@
+// 主机调度器装配(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:从 host-state 中分离计划任务调度器的创建逻辑,保持主状态装配文件聚焦在依赖汇总。
+// 依赖:同层 scheduler + storage/cached-pg-schedule-store + L1 recipes。
+import path from 'node:path';
+import { runRecipe } from '../recipes/run-recipe.js';
+import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule-store.js';
+import { omitUndefined } from '../util/object.js';
+import { Scheduler, createScheduleStore } from './scheduler.js';
+import type { RunEventsLike, RunsIndexLike } from '../recipes/run-recipe-types.js';
+import type { ScheduleStore, SchedulerExecutor } from './scheduler.js';
+import type { StoreBackend } from './store-backend-config.js';
+
+type HostSchedulerConfig = Record<string, unknown> & {
+  scheduler?: Scheduler | null;
+  enableScheduler?: boolean;
+  scheduleStoreDir?: string;
+  scheduleExecutor?: SchedulerExecutor;
+  scheduleStore?: ScheduleStore | null;
+  schedulerTickMs?: number;
+  startScheduler?: boolean;
+};
+type HostSchedulerState = Record<string, unknown> & {
+  activeScheduler?: Scheduler | null;
+  databaseUrl?: string | null;
+  runEvents?: unknown;
+  runsIndex?: unknown;
+  runStoreRoot: string;
+  safeTrustedRoot(requestedRoot?: unknown): string;
+  sqliteDbPath?: string;
+  storeBackend?: StoreBackend;
+  usePostgresState?: boolean;
+};
+type ScheduleRecordLike = {
+  id: string;
+  tenantId?: string;
+  userId?: string;
+  traceId?: string | null;
+  payload?: unknown;
+};
+type RecipeSchedulePayload = {
+  recipeId?: unknown;
+  trustedRoot?: unknown;
+  prompt?: unknown;
+  files?: unknown;
+  maxSize?: unknown;
+};
+
+function schedulePayload(value: unknown): RecipeSchedulePayload {
+  return value && typeof value === 'object' ? value as RecipeSchedulePayload : {};
+}
+
+export function configureHostScheduler({
+  config,
+  state,
+  trustedRootDefault,
+}: {
+  config: HostSchedulerConfig;
+  state: HostSchedulerState;
+  trustedRootDefault: string;
+}): void {
+  state.activeScheduler = config.scheduler || null;
+  if (state.activeScheduler || config.enableScheduler === false) {
+    return;
+  }
+
+  const scheduleStoreDir = path.resolve(
+    config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules'),
+  );
+  const defaultScheduleExecutor = async (record: ScheduleRecordLike) => {
+    const payload = schedulePayload(record.payload);
+    if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
+    const result = runRecipe(omitUndefined({
+      recipeId: String(payload.recipeId),
+      trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
+      prompt: payload.prompt || '',
+      files: Array.isArray(payload.files) ? payload.files : [],
+      maxSize: payload.maxSize,
+      context: { tenantId: record.tenantId, userId: record.userId, traceId: record.traceId || '' },
+      runStoreRoot: state.runStoreRoot,
+      runEvents: state.runEvents as RunEventsLike | null | undefined,
+      runsIndex: state.runsIndex as RunsIndexLike | null | undefined,
+    }));
+    return { runId: result.runId, operations: result.operations.length };
+  };
+  const executor = config.scheduleExecutor || defaultScheduleExecutor;
+  state.activeScheduler = new Scheduler({
+    storeDir: scheduleStoreDir,
+    store: config.scheduleStore || (
+      state.usePostgresState
+      ? createCachedPostgresScheduleStore(omitUndefined({ connectionString: state.databaseUrl })) as unknown as ScheduleStore
+      : createScheduleStore(omitUndefined({
+        backend: state.storeBackend,
+        storeDir: scheduleStoreDir,
+        dbPath: state.sqliteDbPath,
+      }))
+    ),
+    executor,
+    tickIntervalMs: config.schedulerTickMs || 30_000,
+  });
+  if (config.startScheduler !== false) state.activeScheduler.start();
+}

@@ -1,3 +1,7 @@
+// 鉴权 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装注册/登录/访客登录/登出/当前身份查询,成功后落地或清除本地 token(经 transport)。
+// 依赖/对应路由:POST /api/auth/register、/api/auth/login、/api/auth/guest、/api/auth/logout、GET /api/auth/me。导出:register / login / guestLogin / getMe / logout + AuthIdentity 类型。
 import { getAuthToken, getJson, postJson, setAuthToken } from './transport';
 
 export interface AuthIdentity {

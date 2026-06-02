@@ -1,5 +1,6 @@
 package domain
 
+// 本文件:领域内强类型 ID 的生成与解析(基于时间 + 随机,类 ULID),保证可排序且全局唯一。
 import (
 	"crypto/rand"
 	"errors"

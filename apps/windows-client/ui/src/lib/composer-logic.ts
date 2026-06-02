@@ -1,3 +1,5 @@
+// 输入框逻辑(UI · lib):聊天输入区的纯逻辑——草稿拼装、提示词精炼结果合并、模型配置整理等,
+// 供 Composer 组件调用而不内嵌业务逻辑。依赖:api/prompt、api/chat 类型。
 import type { PromptRefineResult } from './api/prompt';
 import type { ModelRunConfig } from './api/chat';
 

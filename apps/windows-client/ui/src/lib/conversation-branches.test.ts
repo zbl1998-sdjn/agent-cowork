@@ -39,7 +39,7 @@ describe('conversation branches', () => {
     expect(forked?.messages.map((message) => message.id)).toEqual(['u1', 'a1']);
     expect(forked?.conversation.activeBranchId).toBe('b1');
     expect(forked?.conversation.branches?.map((branch) => branch.id)).toEqual(['main', 'b1']);
-    expect(forked?.conversation.branches?.[0].messages.map((message) => message.id)).toEqual(['u1', 'a1', 'u2']);
+    expect(forked?.conversation.branches?.[0]!.messages.map((message) => message.id)).toEqual(['u1', 'a1', 'u2']);
     expect(forked?.conversation.branches?.[1]).toMatchObject({
       parentBranchId: 'main',
       baseMessageId: 'u2',
@@ -72,7 +72,7 @@ describe('conversation branches', () => {
       rightOnlyCount: 1,
       forkLabel: '继续',
     });
-    expect(conversationBranchOptions(withNewMessages)[1].description).toBe('2 条共同上下文 · 1 条父线差异 · 1 条分支差异');
+    expect(conversationBranchOptions(withNewMessages)[1]!.description).toBe('2 条共同上下文 · 1 条父线差异 · 1 条分支差异');
   });
 
   it('compacts branch histories independently for storage', () => {

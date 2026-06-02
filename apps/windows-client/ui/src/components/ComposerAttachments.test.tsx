@@ -37,7 +37,7 @@ describe('ComposerAttachments', () => {
     const buttons = collectByType(ComposerAttachments({ attachments, onRemove }), IconButton);
 
     expect(buttons).toHaveLength(2);
-    buttons[1].props.onClick();
+    buttons[1]!.props.onClick();
     expect(onRemove).toHaveBeenCalledWith(1);
   });
 });

@@ -1,3 +1,7 @@
+// 顶部栏(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:渲染品牌标题、工作区切换、运行模式选择、侧栏标签开关、安装包/设置入口与登录身份;仅触发 App 传入的回调。
+// 依赖:WorkspaceSwitcher、Button、ICONS;打开安装包目录走 lib/api/transport 的 invokeDesktop。同文件导出 AppHeaderActions。
 import type { AuthIdentity } from '../lib/api';
 import { invokeDesktop, isDesktop } from '../lib/api/transport';
 import type { SidePanel } from '../lib/app-types';

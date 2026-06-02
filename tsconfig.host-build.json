@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.host-checkjs.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "apps/host/src",
+    "outDir": "build/host-src",
+    "declaration": false,
+    "sourceMap": false
+  }
+}

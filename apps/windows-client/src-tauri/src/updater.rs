@@ -1,3 +1,4 @@
+//! 桌面自动更新(updater)——基于 Tauri updater 插件的检查更新/安装更新命令,供 commands 层调用、UI 触发。
 //! Desktop auto-update commands backed by the Tauri updater plugin.
 
 use serde::Serialize;

@@ -1,17 +1,21 @@
+// 起步建议(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:依据历史运行、配方与基础项,去重裁剪生成一组「起步卡片」建议文案,引导用户快速上手。
+// 纯函数、无依赖。导出:buildContextualStarters 及 StarterRecipe / StarterHistoryRun 类型。
 export interface StarterRecipe {
-  name?: string | null;
-  summary?: string | null;
+  name?: string | null | undefined;
+  summary?: string | null | undefined;
 }
 
 export interface StarterHistoryRun {
-  promptPreview?: string | null;
+  promptPreview?: string | null | undefined;
 }
 
 interface StarterOptions {
   base: string[];
-  recipes?: StarterRecipe[];
-  historyRuns?: StarterHistoryRun[];
-  max?: number;
+  recipes?: StarterRecipe[] | undefined;
+  historyRuns?: StarterHistoryRun[] | undefined;
+  max?: number | undefined;
 }
 
 const DEFAULT_MAX_STARTERS = 4;

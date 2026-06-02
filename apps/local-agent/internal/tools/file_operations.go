@@ -1,3 +1,7 @@
+// Package tools 是 local-agent 的受控文件能力(apps/local-agent · Go)。
+// 职责:在可信根内安全执行 write/rename/move 批量操作(禁 delete)、列文件树、读文本并计算哈希;
+// 路径经 policy 围栏校验,变更写入审计 journal。镜像 Node host 的 workspace 文件操作语义。
+// 本文件:批量文件操作(ApplyOperations/ApplyOptions/FileOperation),写前校验、记账、禁删除。
 package tools
 
 import (
@@ -6,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"agent-cowork/apps/local-agent/internal/journal"
-	"agent-cowork/apps/local-agent/internal/policy"
+	"kimi-cowork/apps/local-agent/internal/journal"
+	"kimi-cowork/apps/local-agent/internal/policy"
 )
 
 type FileOperation struct {

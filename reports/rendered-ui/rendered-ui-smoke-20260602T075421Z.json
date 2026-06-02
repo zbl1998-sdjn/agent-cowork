@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T07:54:21.346Z",
+  "baseUrl": "http://127.0.0.1:65534",
+  "browserPath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kcw-rendered-ui-dSQpBc",
+  "screenshotPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\rendered-ui-smoke-1536x900.png",
+  "desktopLayout": {
+    "title": "Agent Cowork",
+    "status": "本地 Agent 就绪",
+    "activeMode": "对话",
+    "hasGreeting": true,
+    "hasCowork": true,
+    "hasModeTabs": true,
+    "hasSidebarActions": true,
+    "hasQuickActions": true,
+    "hasInteractionStream": true,
+    "hasRunCards": true,
+    "hasFrameworkOverlay": false,
+    "scroll": {
+      "width": 1536,
+      "clientWidth": 1536,
+      "height": 900,
+      "clientHeight": 900
+    }
+  },
+  "compactLayout": {
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "issues": [],
+    "scroll": {
+      "width": 1366,
+      "clientWidth": 1366,
+      "height": 768,
+      "clientHeight": 768
+    }
+  },
+  "interaction": {
+    "afterPlan": {
+      "status": "计划就绪",
+      "artifact": "合同摘要 已生成 1 个操作；来源：contracts/sample-contract.txt、finance/invoices.csv、meeting-notes.md；摘要：Contract draft. Party A, Party B, renewal date, payment terms.",
+      "opCount": 1,
+      "stream": "执行动态\n等待审批\nLocal run\n用户指令\n\n请读取本地工作区，生成合同摘要和整理计划\n\n读取本地上下文\n\ncontracts/sample-contract.txt、finance/invoices.csv、meeting-notes.md: Contract draft. Party A, Party B, renewal date, payment terms.\n\n3 个来源\n模板：合同摘要\n\n提取合同主体、付款、续约、风险点和待确认事项。\n\nMarkdown\nSources\n\ncontracts/sample-contract.txt、finance/invoices.csv、meeting-notes.md: Contract draft. Party A, Party B, renewal date, payment terms.\n\nrun 64ba0167\n等待审批\n\n已生成 1 个可审批操作，审批后才会写入本机。\n\n.\\.AgentCowork\\artifacts\\contract-summary-20260602075421-5ac5-合同摘要.md",
+      "runCardCount": 1,
+      "activeRunCard": "协作 · 完成\n请读取本地工作区，生成合同摘要和整理计划\n64ba0167 · 2ms · 06/02 17:54",
+      "runSummary": "最近 1 次 Kimi 任务，点击可查看输入和结果"
+    },
+    "afterApprove": {
+      "status": "已在本机执行",
+      "artifact": "已在本机执行 1 个审批操作，并写入审计日志。",
+      "approve": "已审批",
+      "doneClass": true,
+      "stream": "执行动态\n执行完成\nLocal run\n用户指令\n\n请读取本地工作区，生成合同摘要和整理计划\n\n读取本地上下文\n\ncontracts/sample-contract.txt、finance/invoices.csv、meeting-notes.md: Contract draft. Party A, Party B, renewal date, payment terms.\n\n3 个来源\n模板：合同摘要\n\n提取合同主体、付款、续约、风险点和待确认事项。\n\nMarkdown\nSources\n\ncontracts/sample-contract.txt、finance/invoices.csv、meeting-notes.md: Contract draft. Party A, Party B, renewal date, payment terms.\n\nrun 64ba0167\n审批已确认\n\n已生成 1 个可审批操作，审批后才会写入本机。\n\n.\\.AgentCowork\\artifacts\\contract-summary-20260602075421-5ac5-合同摘要.md\n执行完成\n\n已应用 1 个操作，产物和审计日志已写入可信工作区。\n\n.AgentCowork/audit/host-events.jsonl"
+    }
+  },
+  "uploadAndChat": {
+    "uploadState": {
+      "status": "文件已导入",
+      "artifact": "已上传 1 个文件，合计 24 字节。现在可以直接发送任务让 Kimi 基于摘要生成计划。",
+      "files": [
+        "Agent_Cowork上传/20260602075421226-b794e5/invoice-ui-smoke.txt",
+        "contracts/sample-contract.txt",
+        "finance/invoices.csv",
+        "meeting-notes.md"
+      ]
+    },
+    "taskState": {
+      "activeMode": "协作",
+      "status": "计划就绪",
+      "artifact": "已读取本地内容：invoice smoke amount=128；Kimi API 已生成计划，运行记录 5f0ec71a。",
+      "chatHidden": true,
+      "stream": "执行动态\n等待审批\nLocal run\n用户指令\n\n请说明刚上传的文件可以怎么处理\n\n读取本地上下文\n\ninvoice smoke amount=128\n\nAgent_Cowork上传/20260602075421226-b794e5/invoice-ui-smoke.txt\nKimi 计划已返回\n\n测试 Kimi 计划：cowork / 请说明刚上传的文件可以怎么处理 / invoice smoke amount=128\n\nrun 5f0ec71a · 16ms\n等待审批\n\n已生成 1 个可审批操作，点击“审批执行”后才会写入本机。\n\n.\\.AgentCowork\\artifacts\\ui-plan-20260602075421294-9ebd.md",
+      "runCardCount": 2,
+      "activeRunCard": "协作 · 完成\n请说明刚上传的文件可以怎么处理\n5f0ec71a · 16ms · 06/02 17:54"
+    }
+  },
+  "artifacts": [
+    "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kcw-rendered-ui-dSQpBc\\.AgentCowork\\artifacts\\contract-summary-20260602075421-5ac5-合同摘要.md"
+  ],
+  "auditPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\kcw-rendered-ui-dSQpBc\\.AgentCowork\\audit\\rendered-ui.jsonl"
+}

@@ -1,9 +1,9 @@
+// Modal 模态对话框(UI · 组件层 · components/ui)
+// ---------------------------------------------------------------------------
+// 职责:可访问的模态弹窗(role=dialog/aria-modal),关闭时不渲染;点遮罩或关闭按钮触发 onClose,弹窗内点击不冒泡。纯展示+回调。
+// 依赖:ui/Button(IconButton)。关键 props:open、title、onClose、children、footer。
 import type { CSSProperties, ReactNode } from 'react';
 import { IconButton } from './Button';
-
-// UI primitive (FE-2a): modal dialog. Renders nothing when closed. Accessible
-// (role=dialog, aria-modal, labelled by title). Clicking the overlay or the
-// close button calls onClose; clicks inside the dialog don't bubble out.
 
 export interface ModalProps {
   open: boolean;

@@ -35,6 +35,6 @@
 ## 5. 建议(后续)
 
 - 引入前端单测(vitest)+ 关键 e2e 纳入 CI;CI 加全量 `node --check` 门禁。
-- 在真实环境按 `docs/01` 第 8 节联通 PostgreSQL,跑 `scripts/load-sse.mjs` 多实例阶梯压测。
+- 在真实环境按 `docs/01` 第 8 节联通 PostgreSQL,跑 `node scripts/run-host-node.mjs apps/host/scripts/load-sse.ts` 多实例阶梯压测。
 - schedules 多实例分布式锁;会话后端持久化;memory 注入统一到 PG。
 - 真实 SaaS 连接器(OAuth:Slack/Notion/Gmail)——价值高,需 OAuth 基建。

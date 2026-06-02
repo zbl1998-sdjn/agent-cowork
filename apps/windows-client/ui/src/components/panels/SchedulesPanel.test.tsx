@@ -78,7 +78,7 @@ describe('SchedulesPanel state views', () => {
       );
 
       expect(buttons).toHaveLength(1);
-      buttons[0].props.onClick();
+      buttons[0]!.props.onClick();
 
       expect(confirmFn).toHaveBeenCalledOnce();
       expect(onCancel).toHaveBeenCalledOnce();
@@ -96,7 +96,7 @@ describe('SchedulesPanel state views', () => {
         }),
         Button,
       );
-      buttons[0].props.onClick();
+      buttons[0]!.props.onClick();
 
       expect(confirmFn).toHaveBeenCalledOnce();
       expect(onCancel).not.toHaveBeenCalled();

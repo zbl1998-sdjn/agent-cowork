@@ -16,10 +16,12 @@ const (
 	maxMultipartRequestBytes = 16 << 20
 )
 
+// StreamHandler 是 kimi-gateway 的 HTTP 入口:接收对话请求(JSON 或 multipart),以 SSE 把模型流式输出转发给调用方。
 type StreamHandler struct {
 	Client Client
 }
 
+// NewStreamHandler 用给定 Client 构造流式 HTTP 处理器。
 func NewStreamHandler(client Client) http.Handler {
 	return StreamHandler{Client: client}
 }
@@ -151,6 +153,7 @@ func eventName(event StreamEvent) string {
 	return event.Type
 }
 
+// AddMultipartField 向 multipart 写入器追加一个文本字段(构造 multipart 请求体的辅助)。
 func AddMultipartField(w *multipart.Writer, name string, value string) error {
 	field, err := w.CreateFormField(name)
 	if err != nil {

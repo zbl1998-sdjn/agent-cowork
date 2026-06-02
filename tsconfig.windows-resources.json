@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "declaration": false,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "noImplicitAny": true,
+    "noEmitOnError": true,
+    "outDir": "apps/windows-client/resources",
+    "removeComments": false,
+    "rootDir": "apps/windows-client/resources-src",
+    "skipLibCheck": true,
+    "strict": false,
+    "target": "ES2022"
+  },
+  "include": ["apps/windows-client/resources-src/**/*.ts"]
+}

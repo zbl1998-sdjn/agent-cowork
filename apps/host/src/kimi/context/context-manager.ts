@@ -1,0 +1,179 @@
+// 对话上下文统一编排门面(host · L1 领域层 · kimi/context)
+// ---------------------------------------------------------------------------
+// 职责:对外暴露 ContextManager,把历史压缩、工具结果摘要与不可信内容防护
+//       串成一条管线;按 token 预算裁剪工具结果并标注其可信度。
+// 依赖:同层 token-estimator / history-compactor / tool-result-summarizer +
+//       safety/untrusted-content(同属 L1,无向上依赖)。
+// 导出:ContextManager(类)、createContextManager(工厂)。
+
+import { createHeuristicTokenEstimator } from './token-estimator.js';
+import { createHistoryCompactor } from './history-compactor.js';
+import { createToolResultSummarizer } from './tool-result-summarizer.js';
+import { createInjectionGuard } from '../safety/untrusted-content.js';
+import { omitUndefined } from '../../util/object.js';
+
+type ChatMessageLike = {
+  role?: string;
+  content?: unknown;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: unknown[];
+};
+
+type ContextBudgetOptions = {
+  maxContextTokens?: number;
+  keepRecentMessages?: number;
+  maxFacts?: number;
+};
+
+type ToolResultOptions = {
+  maxToolResultTokens?: number;
+  maxTokens?: number;
+  maxSources?: number;
+  maxKeyPoints?: number;
+  toolName?: string;
+};
+
+type TokenEstimatorLike = {
+  estimateText(value: unknown): number;
+  estimateMessages(messages: ChatMessageLike[]): { totalTokens: number };
+};
+
+type HistoryCompactionResult = {
+  compacted: boolean;
+  beforeTokens: number;
+  afterTokens: number;
+  messages: ChatMessageLike[];
+  keyFacts?: string[];
+  summary?: string;
+};
+
+type HistoryCompactorLike = {
+  compact(messages: unknown[], options?: ContextBudgetOptions): HistoryCompactionResult;
+};
+
+type ToolShrinkResult = {
+  summarized: boolean;
+  beforeTokens: number;
+  afterTokens: number;
+  content: string;
+  sources?: string[];
+  keyPoints?: string[];
+};
+
+type ToolResultSummarizerLike = {
+  shrink(result: unknown, options?: Pick<ToolResultOptions, 'maxTokens' | 'maxSources' | 'maxKeyPoints'>): ToolShrinkResult;
+};
+
+type InjectionGuardLike = {
+  wrap(value: unknown, meta?: { source?: string; toolName?: string }): {
+    content: string;
+    wrapped: boolean;
+    alreadyWrapped?: boolean;
+    flagged: boolean;
+    reasons: string[];
+  };
+};
+
+type ContextManagerOptions = ContextBudgetOptions & {
+  estimator?: TokenEstimatorLike;
+  historyCompactor?: HistoryCompactorLike;
+  toolResultSummarizer?: ToolResultSummarizerLike;
+  injectionGuard?: InjectionGuardLike;
+  maxToolResultTokens?: number;
+  maxSources?: number;
+  maxKeyPoints?: number;
+};
+
+type FormattedToolResult = ToolShrinkResult & {
+  untrusted: boolean;
+  injectionFlagged: boolean;
+  injectionReasons: string[];
+};
+
+/**
+ * 用二分查找把文本裁到不超过 token 预算(尾部加截断标记)。
+ */
+function clipToTokenBudget(text: string, maxTokens: number, estimator: TokenEstimatorLike): string {
+  if (maxTokens <= 0 || estimator.estimateText(text) <= maxTokens) return text;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const candidate = `${text.slice(0, mid).trim()} ...[truncated]`;
+    if (estimator.estimateText(candidate) <= maxTokens) low = mid;
+    else high = mid - 1;
+  }
+  return `${text.slice(0, low).trim()} ...[truncated]`;
+}
+
+export class ContextManager {
+  estimator: TokenEstimatorLike;
+  maxToolResultTokens: number;
+  injectionGuard: InjectionGuardLike;
+  historyCompactor: HistoryCompactorLike;
+  toolResultSummarizer: ToolResultSummarizerLike;
+
+  constructor(options: ContextManagerOptions = {}) {
+    const estimator = options.estimator || createHeuristicTokenEstimator();
+    this.estimator = estimator;
+    this.maxToolResultTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens) || 0));
+    this.injectionGuard = options.injectionGuard || createInjectionGuard();
+    this.historyCompactor = options.historyCompactor || createHistoryCompactor(omitUndefined({
+      estimator,
+      maxContextTokens: options.maxContextTokens,
+      keepRecentMessages: options.keepRecentMessages,
+      maxFacts: options.maxFacts,
+    }));
+    this.toolResultSummarizer = options.toolResultSummarizer || createToolResultSummarizer(omitUndefined({
+      estimator,
+      maxTokens: options.maxToolResultTokens,
+      maxSources: options.maxSources,
+      maxKeyPoints: options.maxKeyPoints,
+    }));
+  }
+
+  /**
+   * 压缩历史消息以适配上下文 token 预算,返回压缩结果。
+   */
+  prepareMessages(messages: unknown[], options: ContextBudgetOptions = {}): HistoryCompactionResult {
+    return this.historyCompactor.compact(messages, options);
+  }
+
+  /**
+   * 摘要工具结果、套上不可信内容防护壳,并按 token 预算二次裁剪。
+   */
+  formatToolResult(result: unknown, options: ToolResultOptions = {}): FormattedToolResult {
+    const maxTokens = Math.max(0, Math.round(Number(options.maxToolResultTokens || options.maxTokens || this.maxToolResultTokens) || 0));
+    const output = this.toolResultSummarizer.shrink(result, omitUndefined({
+      maxTokens: options.maxToolResultTokens || options.maxTokens,
+      maxSources: options.maxSources,
+      maxKeyPoints: options.maxKeyPoints,
+    }));
+    const meta = omitUndefined({ source: 'tool', toolName: options.toolName });
+    let guarded = this.injectionGuard.wrap(output.content, meta);
+    let afterTokens = this.estimator.estimateText(guarded.content);
+    if (maxTokens > 0 && afterTokens > maxTokens) {
+      // 防护壳本身有固定开销;先量空壳开销,再把正文裁到剩余预算内。
+      const overhead = this.estimator.estimateText(this.injectionGuard.wrap('', meta).content);
+      const bodyBudget = Math.max(1, maxTokens - overhead);
+      guarded = this.injectionGuard.wrap(clipToTokenBudget(output.content, bodyBudget, this.estimator), meta);
+      afterTokens = this.estimator.estimateText(guarded.content);
+    }
+    return {
+      ...output,
+      content: guarded.content,
+      afterTokens,
+      untrusted: guarded.wrapped,
+      injectionFlagged: guarded.flagged,
+      injectionReasons: guarded.reasons,
+    };
+  }
+}
+
+/**
+ * 创建 ContextManager 实例的工厂(便于注入依赖与测试)。
+ */
+export function createContextManager(options: ContextManagerOptions = {}): ContextManager {
+  return new ContextManager(options);
+}

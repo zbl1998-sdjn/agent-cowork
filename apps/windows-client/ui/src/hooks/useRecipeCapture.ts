@@ -1,10 +1,13 @@
+// useRecipeCapture(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:把「这次运行」捕获并保存为自定义配方的交互——调 capture/save API,管理保存状态与反馈。依赖:lib/api。
 import { useCallback } from 'react';
 import { captureRecipeDraft, saveCustomRecipe } from '../lib/api';
 import type { AssistantMessage, RecipeCaptureResponse, RecipeSaveResponse } from '../lib/app-types';
 
 interface RecipeCaptureOptions {
   patchAssistant: (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
-  onRecipeSaved?: (recipe: { id: string; name: string; summary?: string }) => void;
+  onRecipeSaved?: ((recipe: { id: string; name: string; summary?: string | undefined }) => void) | undefined;
 }
 
 export function useRecipeCapture({ patchAssistant, onRecipeSaved }: RecipeCaptureOptions) {

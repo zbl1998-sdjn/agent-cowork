@@ -33,7 +33,7 @@ describe('splitVizBlocks', () => {
   it('plain text is a single md segment', () => {
     const segs = splitVizBlocks('没有图表');
     expect(segs).toHaveLength(1);
-    expect(segs[0].type).toBe('md');
+    expect(segs[0]!.type).toBe('md');
   });
   it('invalid chart JSON falls back to md (not a broken viz)', () => {
     const segs = splitVizBlocks('```chart\nnot json\n```');

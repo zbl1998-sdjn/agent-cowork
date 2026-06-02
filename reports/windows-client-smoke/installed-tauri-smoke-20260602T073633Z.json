@@ -1,0 +1,185 @@
+{
+  "ok": true,
+  "mode": "installed-tauri",
+  "generatedAt": "2026-06-02T07:36:33.8081183Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "installer": "",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace",
+  "checks": {
+    "webviewInstallMode": "passed",
+    "nsisCleanupHook": "passed",
+    "installedExeExists": true,
+    "sidecarExists": true,
+    "embeddedPythonHomeExists": "passed",
+    "embeddedPythonExeExists": "passed",
+    "bundledPythonProbe": "passed",
+    "bundledPythonRuntime": "passed",
+    "perUserInstallRoot": "passed",
+    "hkcuUninstallEntry": "passed",
+    "hklmUninstallEntryAbsent": "passed",
+    "mainWindow": "passed",
+    "sidecarHealth": "passed",
+    "authRoundTrip": "passed",
+    "sqliteRuntime": "passed",
+    "sqliteWriteChain": "passed",
+    "sqliteRestartPersistence": "passed"
+  },
+  "deferred": [
+    "deep WebView UI interaction",
+    "real Kimi reply",
+    "production signing trust chain"
+  ],
+  "webviewInstallMode": {
+    "configured": true,
+    "type": "embedBootstrapper",
+    "configPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\tauri.conf.json",
+    "purpose": "Install WebView2 runtime on Windows machines that do not already have it"
+  },
+  "installerCleanupHook": {
+    "configured": true,
+    "configPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\tauri.conf.json",
+    "hookPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\windows\\nsis-hooks.nsh",
+    "safeRoot": "$APPDATA\\AgentCowork",
+    "gatedBy": [
+      "DeleteAppDataCheckboxState",
+      "not UpdateMode"
+    ]
+  },
+  "installDir": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork",
+  "sidecar": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe",
+  "embeddedPython": {
+    "home": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded",
+    "exe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+    "homeExists": true,
+    "exeExists": true,
+    "probe": {
+      "version": "3.12.10",
+      "executable": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+      "prefix": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded"
+    }
+  },
+  "signatures": {
+    "installedExe": {
+      "status": "NotSigned",
+      "subject": null,
+      "thumbprint": null
+    },
+    "installer": null
+  },
+  "installScope": {
+    "expected": "currentUser",
+    "expectedRoot": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork",
+    "resolvedInstallDir": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork",
+    "hkcuUninstallEntry": {
+      "DisplayName": "Agent Cowork",
+      "DisplayVersion": "0.2.0",
+      "InstallLocation": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\"",
+      "UninstallString": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\uninstall.exe\"",
+      "PSPath": "Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Agent Cowork"
+    },
+    "hklmUninstallEntry": null
+  },
+  "uninstallEntry": {
+    "DisplayName": "Agent Cowork",
+    "DisplayVersion": "0.2.0",
+    "InstallLocation": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\"",
+    "UninstallString": "\"C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\uninstall.exe\"",
+    "PSPath": "Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Agent Cowork"
+  },
+  "liveReplyConfigured": false,
+  "process": {
+    "pid": 38456,
+    "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+    "window": {
+      "handle": 2163306,
+      "title": "Agent Cowork"
+    },
+    "restartWindow": {
+      "handle": 331966,
+      "title": "Agent Cowork"
+    }
+  },
+  "host": {
+    "url": "http://127.0.0.1:3017",
+    "health": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "restartHealth": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "portOwner": {
+      "pid": 38628,
+      "processName": "agent-cowork-host",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe"
+    }
+  },
+  "auth": {
+    "guestUserId": "guest_0720b344cf72",
+    "meUserId": "guest_0720b344cf72",
+    "tenantId": "tenant_guest_0720b344cf72"
+  },
+  "kimi": {
+    "configured": false,
+    "provider": "kimi-api",
+    "model": "kimi-k2.6"
+  },
+  "sqlite": {
+    "dbPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace\\.AgentCowork\\state.sqlite",
+    "dependency": {
+      "id": "sqlite",
+      "section": "F2",
+      "label": "SQLite runtime",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "available",
+      "version": "3.51.2",
+      "detail": "node:sqlite available"
+    },
+    "dependencySummary": {
+      "total": 13,
+      "requiredMissing": 1,
+      "byStatus": {
+        "available": 2,
+        "unknown": 3,
+        "configured": 2,
+        "missing": 6
+      }
+    },
+    "memoryFactFile": "sqlite://memory_facts/memfact_01KT3M6PJDQHSPA318Y7991SG5",
+    "runId": "run_20260602073638_e030f81b",
+    "scheduleId": "sched_01KT3M6PJTCE6P25WPGM36287K",
+    "persistedAfterRestart": {
+      "auth": true,
+      "memory": true,
+      "run": true,
+      "schedule": true
+    }
+  },
+  "python": {
+    "dependency": {
+      "id": "python-embedded",
+      "section": "A2",
+      "label": "Embedded Python",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "configured",
+      "source": "KCW_EMBEDDED_PYTHON",
+      "detail": "embedded Python path configured"
+    },
+    "home": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded",
+    "exe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+    "probe": {
+      "version": "3.12.10",
+      "executable": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+      "prefix": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded"
+    }
+  },
+  "cleanup": {
+    "closedDesktop": true,
+    "hostStoppedAfterClose": true
+  }
+}

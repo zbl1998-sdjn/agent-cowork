@@ -1,3 +1,5 @@
+//! Node host sidecar 生命周期(sidecar)——打包的 Node 二进制(agent-cowork-host(.exe))随桌面程序分发。
+//! 本模块在锁后持有其唯一子进程句柄,负责启动/停止/查询状态与优雅停机,保证关窗不遗留孤儿 Node 进程。
 //! Lifecycle management for the bundled Node host sidecar.
 //!
 //! The host is a packaged Node binary (`agent-cowork-host(.exe)`) shipped next

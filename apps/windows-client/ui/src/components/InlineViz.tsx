@@ -1,3 +1,4 @@
+// InlineViz(UI · components):聊天内嵌可视化——在消息流里直接渲染图表/表格(chart/mermaid/table)。纯展示。
 import { useEffect, useState } from 'react';
 import { renderViz, type VizSpec } from '../lib/api';
 import { ErrorState, Loading } from './ui/StateViews';
@@ -11,9 +12,9 @@ export function InlineVizLoadingState() {
   return <Loading message="渲染图表中…" />;
 }
 
-// Renders a viz spec inline in the conversation by asking the host to render it
-// (persist:false) and embedding the returned self-contained HTML in an iframe.
-export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: string }) {
+// 在对话流内联渲染可视化:请求 host 渲染该 viz spec(persist:false),
+// 再把返回的自包含 HTML 嵌入 iframe 展示。
+export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: string | undefined }) {
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');
   const key = JSON.stringify(spec);

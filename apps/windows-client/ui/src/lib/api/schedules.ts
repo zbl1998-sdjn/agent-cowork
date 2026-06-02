@@ -1,3 +1,7 @@
+// 计划任务 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:列出计划任务(cron/定时)并取消指定任务(取消带幂等键)。
+// 对应路由:/api/schedules、/api/schedules/:id/cancel。导出:listSchedules、cancelSchedule、ScheduleItem。
 import { newIdempotencyKey, getJson, postJson } from './transport';
 
 export interface ScheduleItem {

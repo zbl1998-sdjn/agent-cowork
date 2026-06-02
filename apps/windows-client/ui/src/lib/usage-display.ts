@@ -1,29 +1,33 @@
+// 用量展示(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把用量透明度数据(token 数、费用、时长/阶段)格式化成易读字符串与展示行,供可观测/计费面板使用。
+// 纯函数、无依赖。导出:formatTokenCount / formatDurationMs / formatEstimatedCost / buildUsageDisplayRows 及 UsageTransparency / UsageDisplayRow 类型。
 export interface UsageTransparency {
-  schemaVersion?: number;
-  model?: string;
+  schemaVersion?: number | undefined;
+  model?: string | undefined;
   tokens?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
+    prompt_tokens?: number | undefined;
+    completion_tokens?: number | undefined;
+    total_tokens?: number | undefined;
+  } | undefined;
   cost?: {
-    currency?: string;
-    input?: number;
-    output?: number;
-    total?: number;
-    estimated?: boolean;
-    source?: string;
-  };
+    currency?: string | undefined;
+    input?: number | undefined;
+    output?: number | undefined;
+    total?: number | undefined;
+    estimated?: boolean | undefined;
+    source?: string | undefined;
+  } | undefined;
   duration?: {
-    totalMs?: number;
-    phases?: Array<{ key?: string; label?: string; durationMs?: number; percent?: number }>;
-    unaccountedMs?: number;
-  };
+    totalMs?: number | undefined;
+    phases?: Array<{ key?: string | undefined; label?: string | undefined; durationMs?: number | undefined; percent?: number | undefined }> | undefined;
+    unaccountedMs?: number | undefined;
+  } | undefined;
   disclosure?: {
-    estimated?: boolean;
-    source?: string;
-    requiresSecret?: boolean;
-  };
+    estimated?: boolean | undefined;
+    source?: string | undefined;
+    requiresSecret?: boolean | undefined;
+  } | undefined;
 }
 
 export interface UsageDisplayRow {
@@ -83,4 +87,3 @@ export function buildUsageDisplayRows(summary: UsageTransparency | null | undefi
   }
   return rows;
 }
-

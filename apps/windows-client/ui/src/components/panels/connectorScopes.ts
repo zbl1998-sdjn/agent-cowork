@@ -1,3 +1,4 @@
+// 连接器权限范围(UI · components/panels):整理连接器声明的 OAuth 权限项(标签/风险/默认勾选)供授权选择 UI。纯逻辑。
 import type { ConnectorInfo, OAuthPermission } from '../../lib/api';
 
 export function connectorPermissions(connector: ConnectorInfo): OAuthPermission[] {

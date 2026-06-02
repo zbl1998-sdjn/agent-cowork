@@ -1,3 +1,4 @@
+// RuntimeDependenciesPanel(UI · components/panels):运行时依赖面板容器——加载依赖探测结果与安装状态,编排视图与安装动作。
 import { useEffect, useMemo, useState } from 'react';
 import {
   getRuntimeDependencies,

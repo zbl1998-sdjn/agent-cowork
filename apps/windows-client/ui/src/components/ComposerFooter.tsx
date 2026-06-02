@@ -1,3 +1,4 @@
+// ComposerFooter(UI · components):输入框底部栏——组合模型控制、工具开关与发送动作的一行布局。纯展示+回调。
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerModelControls } from './ComposerModelControls';
 

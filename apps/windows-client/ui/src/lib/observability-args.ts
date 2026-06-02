@@ -1,7 +1,7 @@
-// Pure helper: turn a tool-call `args` blob into a short human-friendly
-// summary so the Observability panel shows WHAT was invoked when the event
-// doesn't carry an explicit `reason` field.
-
+// 可观测参数摘要(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把工具调用的 args(字符串/对象/任意值)浓缩成一句带截断的可读摘要,
+// 让可观测面板在事件无显式 reason 时也能显示「调用了什么」。导出:summariseArgs。
 export function summariseArgs(args: unknown): string {
   if (args == null) return '';
   if (typeof args === 'string') return args.length > 140 ? `${args.slice(0, 138)}…` : args;

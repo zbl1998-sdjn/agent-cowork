@@ -1,12 +1,16 @@
+// MessageBubble 消息气泡(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:按角色(用户/助手)渲染气泡外框,显示头像、名字、时间、状态,并以 children 承载消息正文与子卡片。
+// 依赖:lib/types(MessageRole)。关键 props:role、status、time、children。
 import type { ReactNode } from 'react';
 import type { MessageRole } from '../lib/types';
 
 export interface MessageBubbleProps {
   role: MessageRole;
-  runId?: string;
-  status?: string;
-  time?: string;
-  children?: ReactNode;
+  runId?: string | undefined;
+  status?: string | undefined;
+  time?: string | undefined;
+  children?: ReactNode | undefined;
 }
 
 const NAME: Record<MessageRole, string> = { user: 'Derrick', assistant: 'Kimi' };

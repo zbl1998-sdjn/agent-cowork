@@ -1,3 +1,7 @@
+// 工作区搜索 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:在可信工作区根目录内检索文件内容,返回命中分块与来源引用。
+// 对应路由:/api/workspace/search。导出:searchWorkspace、WorkspaceSearchResult/Chunk 类型。
 import { postJson } from './transport';
 import type { SourceRef } from '../types';
 

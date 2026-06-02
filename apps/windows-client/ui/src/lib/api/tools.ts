@@ -1,3 +1,8 @@
+// 工具/连接器 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装工具列举/检索/调用、子代理运行,以及连接器列举/连断与 OAuth 授权全流程(写操作带幂等键)。
+// 对应路由:/api/tools(/search、/call)、/api/subagent/run、/api/connectors(/suggest、/connect、/disconnect、/oauth/*)。
+// 导出:listTools/searchTools/callTool、runSubagent、连接器与 OAuth 系列函数及相关类型。
 import { getJson, newIdempotencyKey, postJson } from './transport';
 
 export interface ToolDescriptor {

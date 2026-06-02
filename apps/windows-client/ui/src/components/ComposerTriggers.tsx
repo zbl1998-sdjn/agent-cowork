@@ -1,3 +1,4 @@
+// ComposerTriggers(UI · components):输入框触发按钮组——快捷插入模板/提及/历史触发符,提示可用的智能输入入口。纯展示+回调。
 import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 
@@ -7,9 +8,9 @@ interface ComposerTriggersProps {
   onTrigger: (char: ComposerTriggerChar) => void;
 }
 
-// Visual replacement for the cryptic /-@-# slash hints in the textarea
-// placeholder. Each button just delegates to a parent `insertTrigger` that knows
-// how to splice the char into the current value + caret + refocus the textarea.
+// 用可视按钮替代输入框 placeholder 里晦涩的 /-@-# 提示。
+// 每个按钮只把触发符委托给父级 `insertTrigger`,由其负责将字符插入
+// 当前值 + 光标位置并重新聚焦输入框。
 export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
   return (
     <div className="composer-triggers" role="group" aria-label="快捷插入">

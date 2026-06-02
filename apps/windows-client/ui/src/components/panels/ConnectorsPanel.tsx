@@ -1,3 +1,5 @@
+// ConnectorsPanel(UI · components/panels):连接器面板——列出/建议连接器、展示授权状态、发起 OAuth 与安装。
+// 数据逻辑在 useConnectorsPanelState,本组件只渲染+回调。
 import { Empty, ErrorState } from '../ui/StateViews';
 import { ConnectorBuiltinAction, ConnectorOAuthAction, ConnectorSearchAction } from './ConnectorActions';
 import { connectorPermissions } from './connectorScopes';
@@ -41,10 +43,8 @@ export function ConnectorsPanelMessageState({ message }: { message: string }) {
 
 export { ConnectorBuiltinAction, ConnectorOAuthAction, ConnectorSearchAction } from './ConnectorActions';
 
-// Connector catalog + one-click MCP connect. Mirrors Claude Cowork's "suggest
-// connectors": browse the curated catalog, search by keyword, and connect a
-// builtin (e.g. filesystem) with one click. Non-builtin connectors show their
-// install command for the user to run.
+// 连接器目录 + 一键连接:浏览精选目录、按关键词搜索、对内置连接器(如 filesystem)一键连接;
+// 非内置连接器展示安装命令供用户自行运行。
 export function ConnectorsPanel({ trustedRoot, onConnected }: ConnectorsPanelProps) {
   const {
     query,

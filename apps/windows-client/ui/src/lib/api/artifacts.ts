@@ -1,3 +1,7 @@
+// 制品 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装可视化制品的渲染/读取/列出/重命名,渲染前先预检申请文件写入审批再落盘。
+// 依赖/对应路由:POST /api/viz/render(/preview)、GET /api/artifacts、GET /api/artifacts/view、POST /api/artifacts/rename、活页数据/视图 URL。导出:renderViz / previewVizRender / fetchArtifactHtml / fetchLiveArtifactData / liveArtifactUrl / listArtifacts / artifactViewUrl / renameArtifact + 相关类型。
 import { authHeaders, getJson, hostReady, newIdempotencyKey, postJson, resolveUrl } from './transport';
 
 export async function fetchArtifactHtml(viewUrl: string): Promise<string> {

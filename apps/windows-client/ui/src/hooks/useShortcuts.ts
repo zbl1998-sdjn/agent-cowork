@@ -1,3 +1,6 @@
+// useShortcuts(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:注册全局键盘快捷键(发送、新建会话、聚焦输入、停止等)并在卸载时清理,集中管理避免散落各组件。依赖:无。
 import { useEffect } from 'react';
 
 // Keyboard shortcut registry (05-B2 frontend foundation).

@@ -1,5 +1,9 @@
+// ArtifactsPanel 产物面板(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:列出工作区下智能体保存的产物,支持刷新、在系统中打开、重命名;含大小/元信息格式化与重命名名校验等纯函数。
+// 依赖:lib/api(listArtifacts/openPath/renameArtifact)+ ui/Button/Input/StateViews。关键 props:trustedRoot。
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -90,8 +94,6 @@ export function ArtifactPanelItem({
   );
 }
 
-// Lists the work products the agent has saved under .AgentCowork/artifacts. Each
-// can be opened in the OS, or previewed via the host's live-artifact page.
 export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [items, setItems] = useState<ArtifactItem[]>([]);
   const [error, setError] = useState('');
@@ -99,7 +101,7 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [renamingPath, setRenamingPath] = useState('');
   const [renameText, setRenameText] = useState('');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setBusy(true);
     setError('');
     try {
@@ -109,9 +111,9 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
     } finally {
       setBusy(false);
     }
-  };
+  }, [trustedRoot]);
 
-  useEffect(() => { void refresh(); }, [trustedRoot]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const beginRename = (item: ArtifactItem) => {
     setError('');

@@ -1,0 +1,444 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import type { AddressInfo } from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { createServer } from '../src/server.js';
+import type { HostServer, ServerConfig } from '../src/server.js';
+import { closeTestServer } from './helpers/close-server.js';
+
+type JsonRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+type JsonResponse = {
+  status: number;
+  body: Record<string, unknown>;
+  headers: Headers;
+};
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function tempRoot(prefix = 'kcw-security-'): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+async function bind(server: HostServer): Promise<string> {
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const addressInfo = server.address();
+  assert.ok(addressInfo && typeof addressInfo === 'object', 'test server should bind to a TCP port');
+  const { address, port } = addressInfo as AddressInfo;
+  return `http://${address}:${port}`;
+}
+
+async function close(server: HostServer): Promise<void> {
+  await closeTestServer(server);
+}
+
+function createSecurityServer(config: Partial<ServerConfig> = {}): HostServer {
+  return createServer({ requireAuth: false, trustIdentityHeaders: true, ...config });
+}
+
+async function jsonRequest(
+  base: string,
+  route: string,
+  { method = 'GET', body, headers = {} }: JsonRequestOptions = {},
+): Promise<JsonResponse> {
+  const init: RequestInit = {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      ...headers,
+    },
+  };
+  if (body != null) {
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(`${base}${route}`, init);
+  const text = await response.text();
+  let parsed: unknown = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { raw: text };
+  }
+  return { status: response.status, body: recordValue(parsed, `${method} ${route} response`), headers: response.headers };
+}
+
+test('API rejects cross-origin mutating requests and text/plain JSON bodies', async () => {
+  const trustedRoot = tempRoot();
+  const target = path.join(trustedRoot, 'csrf.txt');
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const plain = await fetch(`${base}/api/file-ops/apply`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'text/plain',
+        'idempotency-key': 'plain-body',
+      },
+      body: JSON.stringify({
+        trustedRoot,
+        operations: [{ type: 'write', path: target, content: 'plain' }],
+      }),
+    });
+    assert.equal(plain.status, 415);
+    assert.equal(fs.existsSync(target), false);
+
+    const crossOrigin = await jsonRequest(base, '/api/file-ops/apply', {
+      method: 'POST',
+      headers: {
+        origin: 'https://evil.example',
+        'idempotency-key': 'cross-origin',
+      },
+      body: {
+        trustedRoot,
+        operations: [{ type: 'write', path: target, content: 'cross-origin' }],
+      },
+    });
+    assert.equal(crossOrigin.status, 403);
+    assert.equal(fs.existsSync(target), false);
+  } finally {
+    await close(server);
+  }
+});
+
+test('request-supplied trustedRoot cannot escape configured workspace', async () => {
+  const trustedRoot = tempRoot();
+  const outsideRoot = tempRoot('kcw-outside-');
+  const outsideSecret = path.join(outsideRoot, 'secret.txt');
+  const outsideWrite = path.join(outsideRoot, 'write.txt');
+  fs.writeFileSync(outsideSecret, 'outside-ok', 'utf8');
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const read = await jsonRequest(base, '/api/files/read', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, path: outsideSecret },
+    });
+    assert.equal(read.status, 400);
+
+    const bundle = await jsonRequest(base, '/api/context/bundle', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, paths: [outsideSecret] },
+    });
+    assert.equal(bundle.status, 400);
+
+    const preview = await jsonRequest(base, '/api/file-ops/preview', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, operations: [{ type: 'write', path: outsideWrite, content: 'x' }] },
+    });
+    assert.equal(preview.status, 400);
+
+    const apply = await jsonRequest(base, '/api/file-ops/apply', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'escape-apply' },
+      body: { trustedRoot: outsideRoot, operations: [{ type: 'write', path: outsideWrite, content: 'x' }] },
+    });
+    assert.equal(apply.status, 400);
+    assert.equal(fs.existsSync(outsideWrite), false);
+
+    const rag = await jsonRequest(base, '/api/workspace/search', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, query: 'outside-ok' },
+    });
+    assert.equal(rag.status, 400);
+
+    const conversations = await jsonRequest(base, `/api/conversations?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(conversations.status, 400);
+
+    const conversation = await jsonRequest(base, `/api/conversations/escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(conversation.status, 400);
+
+    const conversationWrite = await jsonRequest(base, '/api/conversations/escape', {
+      method: 'PUT',
+      body: { trustedRoot: outsideRoot, title: 'outside', messages: [] },
+    });
+    assert.equal(conversationWrite.status, 400);
+
+    const conversationDelete = await jsonRequest(
+      base,
+      `/api/conversations/escape?trustedRoot=${encodeURIComponent(outsideRoot)}`,
+      { method: 'DELETE' },
+    );
+    assert.equal(conversationDelete.status, 400);
+
+    const memory = await jsonRequest(base, `/api/memory?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(memory.status, 400);
+
+    const memoryProfile = await jsonRequest(base, `/api/memory/profile?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(memoryProfile.status, 400);
+
+    const memoryNote = await jsonRequest(
+      base,
+      `/api/memory/notes/projects.md?trustedRoot=${encodeURIComponent(outsideRoot)}`,
+    );
+    assert.equal(memoryNote.status, 400);
+
+    const memoryFact = await jsonRequest(base, '/api/memory/facts', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, key: 'secret', value: 'outside' },
+    });
+    assert.equal(memoryFact.status, 400);
+
+    const memoryNoteWrite = await jsonRequest(base, '/api/memory/notes', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, name: 'projects.md', body: 'outside' },
+    });
+    assert.equal(memoryNoteWrite.status, 400);
+
+    const memoryProfileLearn = await jsonRequest(base, '/api/memory/profile/learn', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, type: 'term', key: 'secret', value: 'outside' },
+    });
+    assert.equal(memoryProfileLearn.status, 400);
+
+    const memoryProfileForget = await jsonRequest(base, '/api/memory/profile/forget', {
+      method: 'POST',
+      body: { trustedRoot: outsideRoot, key: 'secret' },
+    });
+    assert.equal(memoryProfileForget.status, 400);
+    assert.equal(fs.existsSync(path.join(outsideRoot, '.AgentCowork')), false);
+
+    const artifacts = await jsonRequest(base, `/api/artifacts?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(artifacts.status, 400);
+
+    const artifactView = await jsonRequest(
+      base,
+      `/api/artifacts/view?trustedRoot=${encodeURIComponent(outsideRoot)}&path=${encodeURIComponent(outsideSecret)}`,
+    );
+    assert.equal(artifactView.status, 400);
+
+    const viz = await jsonRequest(base, '/api/viz/render', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-escape-root' },
+      body: {
+        trustedRoot: outsideRoot,
+        kind: 'table',
+        data: { columns: ['secret'], rows: [['outside-ok']] },
+      },
+    });
+    assert.equal(viz.status, 400);
+
+    const liveData = await jsonRequest(base, `/api/artifacts/data/viz_escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(liveData.status, 400);
+
+    const livePage = await jsonRequest(base, `/api/artifacts/live/viz_escape?trustedRoot=${encodeURIComponent(outsideRoot)}`);
+    assert.equal(livePage.status, 400);
+  } finally {
+    await close(server);
+  }
+});
+
+test('run detail, task list, run list, and SSE history are tenant scoped', async () => {
+  const trustedRoot = tempRoot();
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_a',
+        'x-user-id': 'user_a',
+        'idempotency-key': 'tenant-a-run',
+      },
+      body: { prompt: 'secret a', files: [] },
+    });
+    assert.equal(run.status, 200);
+    const runId = String(run.body.runId);
+
+    const otherDetail = await jsonRequest(base, `/api/runs/${encodeURIComponent(runId)}`, {
+      headers: { 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+    });
+    assert.equal(otherDetail.status, 404);
+
+    const otherRuns = await jsonRequest(base, '/api/runs', {
+      headers: { 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+    });
+    assert.equal(otherRuns.status, 200);
+    assert.deepEqual(otherRuns.body.runs, []);
+
+    const otherTasks = await jsonRequest(base, '/api/tasks', {
+      headers: { 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+    });
+    assert.equal(otherTasks.status, 200);
+    assert.deepEqual(otherTasks.body.tasks, []);
+
+    const controller = new AbortController();
+    const events = await fetch(`${base}/api/runs/${encodeURIComponent(runId)}/events`, {
+      headers: { accept: 'text/event-stream', 'x-tenant-id': 'tenant_b', 'x-user-id': 'user_b' },
+      signal: controller.signal,
+    });
+    controller.abort();
+    assert.equal(events.status, 404);
+  } finally {
+    await close(server);
+  }
+});
+
+test('critical writes require Idempotency-Key and reject same key with different body', async () => {
+  const trustedRoot = tempRoot();
+  const target = path.join(trustedRoot, 'apply.txt');
+  const server = createSecurityServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+  });
+  const base = await bind(server);
+  try {
+    const recipeMissing = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      body: { prompt: 'missing key', files: [] },
+    });
+    assert.equal(recipeMissing.status, 428);
+
+    const applyMissing = await jsonRequest(base, '/api/file-ops/apply', {
+      method: 'POST',
+      body: { trustedRoot, operations: [{ type: 'write', path: target, content: 'x' }] },
+    });
+    assert.equal(applyMissing.status, 428);
+    assert.equal(fs.existsSync(target), false);
+
+    const scheduleMissing = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      body: { name: 'once', fireAt: new Date(Date.now() + 60_000).toISOString(), payload: {} },
+    });
+    assert.equal(scheduleMissing.status, 428);
+
+    const scheduled = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'schedule-for-mutations' },
+      body: { name: 'cancel target', fireAt: new Date(Date.now() + 60_000).toISOString(), payload: {} },
+    });
+    assert.equal(scheduled.status, 200);
+    const scheduledRecord = recordValue(scheduled.body.schedule, 'scheduled record');
+    const scheduleId = String(scheduledRecord.id);
+
+    const tickMissing = await jsonRequest(base, '/api/schedules/_tick', { method: 'POST' });
+    assert.equal(tickMissing.status, 428);
+
+    const cancelMissing = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, { method: 'POST' });
+    assert.equal(cancelMissing.status, 428);
+
+    const deleteMissing = await jsonRequest(base, `/api/schedules/${scheduleId}`, { method: 'DELETE' });
+    assert.equal(deleteMissing.status, 428);
+
+    const first = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'same-key' },
+      body: { prompt: 'first body', files: [] },
+    });
+    assert.equal(first.status, 200);
+
+    const replay = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'same-key' },
+      body: { prompt: 'first body', files: [] },
+    });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.idempotentReplay, true);
+    assert.equal(replay.body.runId, first.body.runId);
+
+    const mismatch = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'same-key' },
+      body: { prompt: 'different body', files: [] },
+    });
+    assert.equal(mismatch.status, 409);
+    assert.match(String(mismatch.body.error), /reused/i);
+  } finally {
+    await close(server);
+  }
+});
+
+test('schedule mutation routes are tenant scoped', async () => {
+  const trustedRoot = tempRoot();
+  const fired: string[] = [];
+  const server = createSecurityServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    scheduleExecutor: async (record) => {
+      fired.push(record.id);
+      return { runId: `run_${record.id}` };
+    },
+  });
+  const base = await bind(server);
+  try {
+    const created = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'tenant-schedule-create',
+      },
+      body: {
+        name: 'tenant-owned',
+        fireAt: new Date(Date.now() + 60_000).toISOString(),
+        payload: {},
+      },
+    });
+    assert.equal(created.status, 200);
+    const createdRecord = recordValue(created.body.schedule, 'created schedule record');
+    const scheduleId = String(createdRecord.id);
+
+    const bobCancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-cancel',
+      },
+    });
+    assert.equal(bobCancel.status, 404);
+
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
+
+    const bobTick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-tick',
+      },
+    });
+    assert.equal(bobTick.status, 200);
+    assert.equal(bobTick.body.fired, 0);
+    assert.equal(fired.length, 0);
+
+    const bobDelete = await jsonRequest(base, `/api/schedules/${scheduleId}`, {
+      method: 'DELETE',
+      headers: {
+        'x-tenant-id': 'tenant_bob',
+        'x-user-id': 'user_bob',
+        'idempotency-key': 'bob-delete',
+      },
+    });
+    assert.equal(bobDelete.status, 404);
+
+    const aliceTick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'alice-tick',
+      },
+    });
+    assert.equal(aliceTick.status, 200);
+    assert.equal(aliceTick.body.fired, 1);
+    assert.equal(fired.length, 1);
+  } finally {
+    await close(server);
+  }
+});

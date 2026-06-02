@@ -1,3 +1,7 @@
+// SSE 流解析(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:逐帧解析 host 的 Server-Sent Events 响应体,拆出事件类型与 JSON 负载回调给上层(聊天/运行时间线);并从错误响应提取消息。
+// 导出:streamSse、responseErrorMessage、SsePayload 类型。
 export type SsePayload = Record<string, unknown>;
 
 export async function streamSse(response: Response, onFrame: (type: string, data: SsePayload) => void): Promise<void> {
@@ -16,16 +20,17 @@ export async function streamSse(response: Response, onFrame: (type: string, data
       buffer = buffer.slice(idx + 2);
       const evMatch = /^event:\s*(.*)$/m.exec(frame);
       const dataMatch = /^data:\s*(.*)$/m.exec(frame);
-      if (!evMatch) continue;
+      const eventType = evMatch?.[1];
+      if (!eventType) continue;
 
       let data: SsePayload = {};
       try {
-        const parsed = dataMatch ? JSON.parse(dataMatch[1]) : {};
+        const parsed = dataMatch?.[1] ? JSON.parse(dataMatch[1]) : {};
         if (parsed && typeof parsed === 'object') data = parsed as SsePayload;
       } catch {
         /* ignore malformed frame */
       }
-      onFrame(evMatch[1].trim(), data);
+      onFrame(eventType.trim(), data);
     }
   }
 }

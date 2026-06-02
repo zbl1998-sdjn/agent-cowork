@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// CircuitBreaker 是并发安全的熔断器:连续失败达到 MaxFailures 即「打开」并冷却 Cooldown,期间 Allow 返回 false 快速失败;
+// 成功则复位。与 Node host 的 circuit-breaker 同思路,保护上游模型 API。
 type CircuitBreaker struct {
 	MaxFailures int
 	Cooldown    time.Duration

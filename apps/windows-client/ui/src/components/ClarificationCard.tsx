@@ -1,3 +1,4 @@
+// ClarificationCard(UI · components):澄清提问卡片——把 AskUserQuestion 的选项渲染成可点选项,回传用户选择。纯展示+回调。
 import { ChoiceButton } from './ui/ChoiceButton';
 
 export interface ClarificationOption {

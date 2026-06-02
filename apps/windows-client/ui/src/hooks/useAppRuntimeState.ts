@@ -1,3 +1,7 @@
+// useAppRuntimeState(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:聚合应用级运行时状态——host 连通性/健康、Kimi 配置、运行时依赖、能力开关等的加载与轮询,
+//       为顶层组件提供统一的「环境就绪度」。依赖:lib/api(诊断/配置/依赖)。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getJson,

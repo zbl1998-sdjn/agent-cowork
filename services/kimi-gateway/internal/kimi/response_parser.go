@@ -1,5 +1,6 @@
 package kimi
 
+// 本文件:把上游(OpenAI 兼容)的非流式响应 JSON 与流式 SSE 行解析成内部 ChatResponse/StreamEvent,容错处理缺字段。
 import (
 	"encoding/json"
 	"errors"

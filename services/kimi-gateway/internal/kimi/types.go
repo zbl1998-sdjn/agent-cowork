@@ -1,7 +1,12 @@
+// Package kimi 是 kimi-gateway 服务的核心:对上游 Kimi/大模型 API 的健壮客户端(services/kimi-gateway · Go)。
+// 职责:聊天(含流式)请求、多 BaseURL/多 Key 轮换、重试退避、熔断保护、预算校验、响应/流解析。
+// 文件分工:types(数据契约)、client(客户端主体)、client_helpers(辅助)、response_parser(响应解析)、
+// stream_handler(SSE 流处理)、breaker(熔断)、retry(重试策略)、budget(预算)。
 package kimi
 
 import "net/http"
 
+// Client 是带韧性的 Kimi API 客户端:支持多 BaseURL/多 APIKey 轮换、重试策略与熔断器。
 type Client struct {
 	BaseURL     string
 	BaseURLs    []string
@@ -56,6 +61,7 @@ type Usage struct {
 	TotalTokens  int `json:"total_tokens"`
 }
 
+// ChatRequest / ChatResponse / StreamEvent 是与上游对话的请求、聚合响应与流式事件契约。
 type ChatRequest struct {
 	Model       string    `json:"model"`
 	Messages    []Message `json:"messages"`

@@ -1,3 +1,8 @@
+// 运行历史 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:拉取运行历史列表/单条记录,并经 SSE 订阅单次运行的事件时间线。
+// 对应路由:/api/runs、/api/runs/:id、/api/runs/:id/events(SSE)。
+// 导出:listRunRecords、getRunRecord、subscribeRunEvents。
 import type { RunEvent, RunRecord } from '../types';
 import { getJson } from './transport';
 import { authHeaders, hostReady, resolveUrl } from './transport';

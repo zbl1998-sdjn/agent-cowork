@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+// ProjectsPanel(UI · components/panels):项目面板——列出/新建/切换/删除项目(对应不同可信工作区)。纯展示+回调。
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   assignProjectArtifact,
   assignProjectConversation,
@@ -144,7 +145,7 @@ export function ProjectsPanel({ trustedRoot }: ProjectsPanelProps) {
   const [error, setError] = useState('');
   const selected = useMemo(() => projects.find((project) => project.id === selectedId) || projects[0] || null, [projects, selectedId]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setBusy(true); setError('');
     try {
       const [projectRes, conversationRes, artifactRes] = await Promise.all([
@@ -160,9 +161,9 @@ export function ProjectsPanel({ trustedRoot }: ProjectsPanelProps) {
     } finally {
       setBusy(false);
     }
-  };
+  }, [trustedRoot]);
 
-  useEffect(() => { void refresh(); }, [trustedRoot]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const mutate = async (fn: () => Promise<ProjectRecord | null>) => {
     setBusy(true); setError('');

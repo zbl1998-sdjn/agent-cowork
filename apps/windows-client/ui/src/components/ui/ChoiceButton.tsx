@@ -1,3 +1,4 @@
+// ChoiceButton(UI · components/ui 基础组件):可选中的选项按钮(用于澄清选项/分段选择等),纯展示+回调。
 import type { CSSProperties, ReactNode } from 'react';
 import { Button } from './Button';
 

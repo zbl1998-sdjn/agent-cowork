@@ -1,3 +1,7 @@
+// 文件 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:文件预览与上传——预览返回分类内容(图片/PDF/文本/表格等),并把浏览器 File 编码为 base64 上传载荷。
+// 依赖/对应路由:POST /api/files/preview、POST /api/uploads/import。导出:previewFile / importUploads / fileToUpload + FilePreviewResult / UploadFile 类型。
 import { postJson } from './transport';
 
 export interface FilePreviewResult {
@@ -31,8 +35,8 @@ export async function fileToUpload(file: File, dir = 'uploads'): Promise<UploadF
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
   return { relativePath: `${dir}/${file.name}`, contentBase64: btoa(binary), size: file.size };
 }

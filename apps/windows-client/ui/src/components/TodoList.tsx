@@ -1,3 +1,4 @@
+// TodoList(UI · components):待办清单——展示 Agent 规划/执行中的 todo 项及其勾选状态,反映任务进展。纯展示。
 import type { TodoItem } from '../lib/types';
 
 const STATUS_LABELS: Record<TodoItem['status'], string> = {

@@ -1,3 +1,7 @@
+// 运行时依赖计划预览组件组(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:把安装/清理/更新保留三类计划视图模型渲染成预检卡片(组件数、磁盘缺口、清理与保留目标、破坏性动作),供卸载/更新界面确认。只渲染。
+// 依赖:lib/runtime-dependencies 的 *PlanViewModel 类型。导出:RuntimeDependencyInstall/Cleanup/UpdatePlanPreview。
 import type {
   RuntimeDependencyCleanupPlanViewModel,
   RuntimeDependencyInstallPlanViewModel,

@@ -1,25 +1,29 @@
+// 会话 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装会话的列出/搜索/读取/保存/删除,统一吞错返回空集或布尔结果。
+// 依赖/对应路由:GET /api/conversations(?full|?q)、GET/PUT/DELETE /api/conversations/:id。导出:listStoredConversations / searchStoredConversations / getStoredConversation / saveStoredConversation / deleteStoredConversation + 相关类型。
 import { getJson, sendJsonMethod } from './transport';
 
 export interface StoredConversation {
   id: string;
   title: string;
-  pinned?: boolean;
+  pinned?: boolean | undefined;
   messages: unknown[];
-  activeBranchId?: string;
-  branches?: unknown[];
-  createdAt?: string;
-  updatedAt?: string;
+  activeBranchId?: string | undefined;
+  branches?: unknown[] | undefined;
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
 }
 
 export interface ConversationSummary {
   id: string;
   title: string;
-  pinned?: boolean;
-  activeBranchId?: string;
-  branchCount?: number;
-  messageCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
+  pinned?: boolean | undefined;
+  activeBranchId?: string | undefined;
+  branchCount?: number | undefined;
+  messageCount?: number | undefined;
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
 }
 
 export async function listStoredConversations(limit = 50): Promise<StoredConversation[]> {
@@ -57,7 +61,13 @@ export async function getStoredConversation(id: string): Promise<StoredConversat
 
 export async function saveStoredConversation(
   id: string,
-  data: { title?: string; pinned?: boolean; messages?: unknown[]; activeBranchId?: string; branches?: unknown[] },
+  data: {
+    title?: string | undefined;
+    pinned?: boolean | undefined;
+    messages?: unknown[] | undefined;
+    activeBranchId?: string | undefined;
+    branches?: unknown[] | undefined;
+  },
 ): Promise<boolean> {
   try {
     await sendJsonMethod('PUT', `/api/conversations/${encodeURIComponent(id)}`, data);

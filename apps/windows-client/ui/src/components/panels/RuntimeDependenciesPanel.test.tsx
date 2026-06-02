@@ -232,13 +232,13 @@ describe('RuntimeDependenciesPanelView', () => {
 
     expect(headerButtons).toHaveLength(1);
     expect(planButtons).toHaveLength(4);
-    expect(headerButtons[0].props.disabled).toBe(false);
+    expect(headerButtons[0]!.props.disabled).toBe(false);
     expect(planButtons.map((button) => button.props.disabled)).toEqual([false, false, false, false]);
-    headerButtons[0].props.onClick();
-    planButtons[0].props.onClick();
-    planButtons[1].props.onClick();
-    planButtons[2].props.onClick();
-    planButtons[3].props.onClick();
+    headerButtons[0]!.props.onClick();
+    planButtons[0]!.props.onClick();
+    planButtons[1]!.props.onClick();
+    planButtons[2]!.props.onClick();
+    planButtons[3]!.props.onClick();
 
     expect(onLoad).toHaveBeenCalledOnce();
     expect(onLoadInstallPlan).toHaveBeenCalledOnce();

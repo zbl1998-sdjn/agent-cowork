@@ -1,3 +1,4 @@
+// ObservabilityPanel(UI · components/panels):可观测面板——展示运行历史、事件时间线、用量/费用/耗时与工具调用详情。纯展示+回调。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRunRecord, listRunRecords, openPath } from '../../lib/api';
 import { buildRunObservabilityView, selectInitialRunId, type ObservabilityRow } from '../../lib/run-observability';
@@ -27,18 +28,21 @@ function Rows({ empty, rows }: { empty: string; rows: ObservabilityRow[] }) {
   if (!rows.length) return <ObservabilityEmptyState title={empty} />;
   return (
     <dl className="observe-rows">
-      {rows.map((item) => (
-        <div key={`${item.label}:${item.value}`} className="observe-row">
-          <dt>{item.label}</dt>
-          <dd>
-            {item.path ? (
-              <Button size="sm" onClick={() => void openPath(item.path!)} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>
-                {item.value}
-              </Button>
-            ) : item.value}
-          </dd>
-        </div>
-      ))}
+      {rows.map((item) => {
+        const itemPath = item.path;
+        return (
+          <div key={`${item.label}:${item.value}`} className="observe-row">
+            <dt>{item.label}</dt>
+            <dd>
+              {itemPath ? (
+                <Button size="sm" onClick={() => void openPath(itemPath)} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                  {item.value}
+                </Button>
+              ) : item.value}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }

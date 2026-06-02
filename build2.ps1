@@ -6,9 +6,9 @@ function Log($m) { "$([DateTime]::Now.ToString('HH:mm:ss')) $m" | Out-File $log 
 function Fail($s){ Log "FAIL: $s"; "FAIL_$s" | Out-File $done -Encoding ascii; exit 1 }
 
 Log 'STEP 1 vite ui-dist (chatEnabled self-heal)'
-Set-Location $root; node scripts/build-ui.mjs *>> $log; if($LASTEXITCODE -ne 0){Fail 'ui'}
+Set-Location $root; node scripts/run-host-node.mjs scripts/build-ui.ts *>> $log; if($LASTEXITCODE -ne 0){Fail 'ui'}
 Log 'STEP 2 esbuild + SEA blob (CORS tauri.localhost)'
-Set-Location "$root\apps\windows-client\ui"; node build-host-sea.mjs *>> $log; if($LASTEXITCODE -ne 0){Fail 'esbuild'}
+Set-Location "$root\apps\windows-client\ui"; node "$root\scripts\run-host-node.mjs" "$root\apps\windows-client\ui\build-host-sea.ts" *>> $log; if($LASTEXITCODE -ne 0){Fail 'esbuild'}
 Set-Location "$root\apps\host"; node --experimental-sea-config sea-config.json *>> $log
 if (-not (Test-Path "$root\apps\host\dist\host.blob")){Fail 'blob'}
 Log 'STEP 3 postject'

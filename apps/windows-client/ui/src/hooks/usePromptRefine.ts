@@ -1,3 +1,6 @@
+// usePromptRefine(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:对接 lib/api/prompt 的提示词精炼能力,管理一次精炼请求的状态(进行中/结果/错误)。依赖:lib/api/prompt。
 import { useCallback, useState } from 'react';
 import { refinePrompt, type PromptRefineContext, type PromptRefineResult } from '../lib/api/prompt';
 

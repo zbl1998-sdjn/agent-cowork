@@ -1,0 +1,145 @@
+// 跨实例 run 事件 pub/sub(PostgreSQL LISTEN/NOTIFY)(host · L1 领域层 · storage)
+// ---------------------------------------------------------------------------
+// 职责:把本地 RunEventBus 包装成多实例可用——publish 只走 NOTIFY,发布者自己的 LISTEN
+//       连接收回并注入本地总线,保证每实例本地恰好投递一次;subscribe/replay/count 透传本地。
+// 依赖:runtime/run-events(L2,架构基线已显式豁免:本总线适配 runtime 的事件形状)。
+//       pg 运行时按需 import。后端:PostgreSQL(NOTIFY 通道)。
+// 导出:PostgresEventBus(类) · createPostgresEventBus(工厂)。
+//
+// Cross-instance run-event pub/sub backed by PostgreSQL LISTEN/NOTIFY.
+//
+// Keeps the RunEventBus surface (publish / subscribe / replay / subscriberCount)
+// so it is a drop-in for multi-instance SSE: an event produced on instance A is
+// NOTIFY'd and re-injected into every instance's LOCAL bus, so an SSE client
+// connected to instance B receives it. Delivery goes through NOTIFY only (the
+// publisher receives its own NOTIFY too), guaranteeing single local delivery.
+import { RunEventBus } from '../runtime/run-events.js';
+import type { RunEvent, RunEventHandler, RunEventPublishInput } from '../runtime/run-events.js';
+
+type PgNotification = { payload?: string | null };
+type PgNotifyClient = {
+  on(event: 'notification', handler: (message: PgNotification) => void): unknown;
+  query(text: string, params?: unknown[]): Promise<unknown>;
+  connect?: () => Promise<unknown>;
+  end?: () => Promise<unknown>;
+};
+type PgNotifyPool = { query(text: string, params?: unknown[]): Promise<unknown> };
+type PgNotifyClientConstructor = new (options?: Record<string, unknown>) => PgNotifyClient;
+type PgModule = { default?: { Client?: PgNotifyClientConstructor }; Client?: PgNotifyClientConstructor };
+export type PostgresEventBusOptions = {
+  local?: RunEventBus;
+  client?: PgNotifyClient | null;
+  pool?: PgNotifyPool | null;
+  connectionString?: string | null;
+  channel?: string;
+  pg?: PgModule | null;
+};
+
+/** 校验 NOTIFY 通道名合法(通道名不能参数化,需防注入)。 */
+function safePgIdentifier(value: unknown): string {
+  const text = String(value || '').trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
+    throw new Error('PostgresEventBus: invalid channel name');
+  }
+  return text;
+}
+
+/** 跨实例 run 事件总线:本地 RunEventBus + PG NOTIFY 扇出,保持其原有订阅/回放接口。 */
+export class PostgresEventBus {
+  private _local: RunEventBus;
+  private _client: PgNotifyClient | null;
+  private _pool: PgNotifyPool | null;
+  private _connectionString: string | null;
+  private _pg: PgModule | null;
+  private _channel: string;
+  private _started: boolean;
+
+  constructor({
+    local = new RunEventBus(),
+    client = null,
+    pool = null,
+    connectionString = null,
+    channel = 'kcw_run_events',
+    pg = null,
+  }: PostgresEventBusOptions = {}) {
+    this._local = local;
+    this._client = client;
+    this._pool = pool || client;
+    this._connectionString = connectionString;
+    this._pg = pg;
+    this._channel = safePgIdentifier(channel);
+    this._started = false;
+  }
+
+  /** 取/建专用 LISTEN 连接(pg 按需 import,缺包给出安装提示)。 */
+  async _getClient(): Promise<PgNotifyClient> {
+    if (this._client) return this._client;
+    if (!this._connectionString) {
+      throw new Error('PostgresEventBus: client or connectionString is required');
+    }
+    let pg: PgModule;
+    try {
+      pg = this._pg || await import('pg') as PgModule;
+    } catch {
+      throw new Error("PostgreSQL backend requires the 'pg' package — run `npm i pg`.");
+    }
+    const Client = pg.default?.Client || pg.Client;
+    if (!Client) {
+      throw new Error("PostgreSQL backend requires the 'pg' Client export.");
+    }
+    const client = new Client({ connectionString: this._connectionString });
+    if (typeof client.connect === 'function') {
+      await client.connect();
+    }
+    this._client = client;
+    if (!this._pool) {
+      this._pool = client;
+    }
+    return client;
+  }
+
+  /** 启动监听:订阅通道,收到合法 NOTIFY 后把远端事件重新注入本地总线。 */
+  async start(): Promise<void> {
+    if (this._started) return;
+    this._started = true;
+    const client = await this._getClient();
+    client.on('notification', (msg) => {
+      let data: unknown;
+      if (typeof msg.payload !== 'string') return;
+      try { data = JSON.parse(msg.payload); } catch { return; }
+      if (data && typeof data === 'object' && 'runId' in data && 'event' in data) {
+        const remote = data as { runId?: unknown; event?: RunEventPublishInput };
+        // Re-inject the remote event into the local bus -> local subscribers + replay ring.
+        try { this._local.publish(String(remote.runId), remote.event as RunEventPublishInput); } catch { /* ignore */ }
+      }
+    });
+    await client.query(`LISTEN ${this._channel}`);
+  }
+
+  // Fan out via NOTIFY only; the publisher's own LISTEN connection delivers it
+  // back locally, so subscribers (here or on any instance) receive it exactly once.
+  /** 仅通过 NOTIFY 扇出事件(本地由自身 LISTEN 连接收回投递)。 */
+  async publish(runId: string, event: RunEventPublishInput): Promise<void> {
+    if (!runId) throw new Error('PostgresEventBus.publish: runId required');
+    if (!event || !event.type) throw new Error('PostgresEventBus.publish: event.type required');
+    try {
+      const client = await this._getClient();
+      await (this._pool || client).query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ runId, event })]);
+    } catch {
+      // Preserve the in-memory bus contract: transient NOTIFY failures do not
+      // break the caller's run loop; health checks own surfacing PG outages.
+    }
+  }
+
+  /** 订阅某 run 的事件(透传本地总线)。 */
+  subscribe(runId: string, handler: RunEventHandler): () => void { return this._local.subscribe(runId, handler); }
+  /** 回放某 run 自 afterSeq 之后的事件(透传本地总线)。 */
+  replay(runId: string, afterSeq = 0): RunEvent[] { return this._local.replay(runId, afterSeq); }
+  /** 返回某 run 的本地订阅者数量。 */
+  subscriberCount(runId: string): number { return this._local.subscriberCount(runId); }
+}
+
+/** 工厂:构造跨实例 PG run 事件总线。 */
+export function createPostgresEventBus(options: PostgresEventBusOptions = {}): PostgresEventBus {
+  return new PostgresEventBus(options);
+}

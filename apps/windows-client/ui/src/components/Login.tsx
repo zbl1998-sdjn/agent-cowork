@@ -1,3 +1,7 @@
+// Login 登录门面(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:全屏登录/注册卡片,校验用户名与密码后调 lib/api 的 login/register,成功经 onAuthed 回传身份;另提供访客入口 onGuest。
+// 依赖:lib/api(login/register/AuthIdentity)+ ui/Button。关键回调:onAuthed、onGuest。
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { login as apiLogin, register as apiRegister, type AuthIdentity } from '../lib/api';
 import { Button } from './ui/Button';
@@ -20,9 +24,6 @@ function authTabStyle(active: boolean): CSSProperties {
   };
 }
 
-// Full-screen sign-in gate, styled after the Kimi desktop app: a branded left
-// panel and a clean centered auth card on the right. Login + register share one
-// form; a guest link lets local single-user setups skip straight in.
 export function Login({ onAuthed, onGuest }: LoginProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');

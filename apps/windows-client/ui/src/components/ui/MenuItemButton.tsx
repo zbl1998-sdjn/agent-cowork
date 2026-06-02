@@ -1,3 +1,4 @@
+// MenuItemButton(UI · components/ui 基础组件):菜单项按钮(图标+文本+快捷键提示),供 ContextMenu/命令面板复用。
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type MenuItemRole = 'menuitem' | 'option';

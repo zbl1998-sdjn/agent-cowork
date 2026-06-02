@@ -1,3 +1,7 @@
+// 记忆 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:读取/学习/遗忘用户画像记忆条目(术语/项目/偏好),并按 trustedRoot 与查询召回。
+// 依赖/对应路由:GET /api/memory/profile、POST /api/memory/profile/learn、POST /api/memory/profile/forget。导出:getMemoryProfile / learnMemoryProfile / forgetMemoryProfile + 相关类型。
 import { getJson, postJson } from './transport';
 
 export type MemoryProfileType = 'term' | 'project' | 'preference';

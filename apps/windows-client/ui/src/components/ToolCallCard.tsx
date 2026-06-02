@@ -1,3 +1,4 @@
+// ToolCallCard(UI · components):工具调用卡——展示一次工具调用(名称/参数摘要/结果/状态),可展开看详情。纯展示+回调。
 import { useState, type CSSProperties } from 'react';
 import type { ToolCallItem } from '../lib/app-types';
 import { Button } from './ui/Button';
@@ -41,8 +42,6 @@ function failureReason(call: ToolCall): string {
   return '';
 }
 
-// Collapsible tool-call card: shows the tool name + status, expands to reveal the
-// input args and a result preview — the Claude Cowork "what the agent did" view.
 export function ToolCallCard({ call }: { call: ToolCall }) {
   const [open, setOpen] = useState(false);
   const duration = formatDuration(call.durationMs);

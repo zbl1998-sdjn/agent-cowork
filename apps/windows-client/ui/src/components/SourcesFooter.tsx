@@ -1,3 +1,4 @@
+// SourcesFooter(UI · components):来源脚注——在助手回答下展示引用来源(文件/检索块,路径+行号),可点开定位。纯展示+回调。
 import { useState } from 'react';
 import type { SourceRef } from '../lib/types';
 import { Button } from './ui/Button';

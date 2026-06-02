@@ -51,9 +51,9 @@ describe('buildChatStreamCallbacks', () => {
     cb.onToolCall?.('Read', { path: '/a' });
     const tools = getState().tools!;
     expect(tools).toHaveLength(1);
-    expect(tools[0].name).toBe('Read');
-    expect(tools[0].status).toBe('running');
-    expect(tools[0].startedAt).toBeTypeOf('number');
+    expect(tools[0]!.name).toBe('Read');
+    expect(tools[0]!.status).toBe('running');
+    expect(tools[0]!.startedAt).toBeTypeOf('number');
   });
 
   it('onDone clears streamingId and finalises text/usage', () => {
@@ -106,21 +106,21 @@ describe('applyToolResult', () => {
     ];
     const next = applyToolResult(initial, 'Read', 'ok', { content: 'hello' });
     expect(next).toHaveLength(1);
-    expect(next[0].status).toBe('ok');
-    expect(next[0].result).toEqual({ content: 'hello' });
-    expect(next[0].durationMs).toBeGreaterThanOrEqual(1000);
+    expect(next[0]!.status).toBe('ok');
+    expect(next[0]!.result).toEqual({ content: 'hello' });
+    expect(next[0]!.durationMs).toBeGreaterThanOrEqual(1000);
   });
 
   it('honours an explicit durationMs from the host over the local clock', () => {
     const initial = [{ name: 'Read', status: 'running' as const, startedAt: Date.now() - 5000 }];
     const next = applyToolResult(initial, 'Read', 'ok', null, 999);
-    expect(next[0].durationMs).toBe(999);
+    expect(next[0]!.durationMs).toBe(999);
   });
 
   it('extracts an error string when the result has one', () => {
     const initial = [{ name: 'Read', status: 'running' as const, startedAt: Date.now() }];
     const next = applyToolResult(initial, 'Read', 'failed', { error: 'EACCES' });
-    expect(next[0].error).toBe('EACCES');
+    expect(next[0]!.error).toBe('EACCES');
   });
 
   it('only merges into the most recent running entry with the matching name', () => {
@@ -130,10 +130,10 @@ describe('applyToolResult', () => {
       { name: 'Read', status: 'running' as const, startedAt: now - 1000 },
     ];
     const next = applyToolResult(initial, 'Read', 'ok', { content: 'two' });
-    expect(next[0].status).toBe('ok');
-    expect(next[0].result).toBeUndefined(); // first entry untouched
-    expect(next[1].status).toBe('ok');
-    expect(next[1].result).toEqual({ content: 'two' });
+    expect(next[0]!.status).toBe('ok');
+    expect(next[0]!.result).toBeUndefined(); // first entry untouched
+    expect(next[1]!.status).toBe('ok');
+    expect(next[1]!.result).toEqual({ content: 'two' });
   });
 
   it('handles undefined tool list', () => {

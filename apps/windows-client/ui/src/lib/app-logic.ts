@@ -1,3 +1,5 @@
+// 应用纯逻辑(UI · lib):把流式事件/审批/待办/子任务等聚合归并的「纯函数」逻辑从 App/hooks 抽出,便于单测,
+// 让组件只管渲染、hooks 只管编排。依赖:lib/types + api/chat 类型。
 import type { ApprovalState, RunEvent, SourceRef, SubtaskGroupItem, SubtaskStatus, TodoItem, TodoStatus } from './types';
 import type { ModelRunConfig } from './api/chat';
 
@@ -14,8 +16,8 @@ export interface AssistantRunState {
   status: string;
   progress: ProgressEntry[];
   sources: SourceRef[];
-  todos?: TodoItem[];
-  subtasks?: SubtaskGroupItem[];
+  todos?: TodoItem[] | undefined;
+  subtasks?: SubtaskGroupItem[] | undefined;
   approvalState: ApprovalState;
 }
 
@@ -136,14 +138,14 @@ export function reconcileChatEnabled(
 }
 
 export function buildAgentChatStreamOptions(input: {
-  trustedRoot?: string;
-  model?: string;
-  modelConfig?: ModelRunConfig;
-  thinking?: string;
-  autoApprove?: boolean;
-  planMode?: boolean;
-  images?: string[];
-  resumeRunId?: string;
+  trustedRoot?: string | undefined;
+  model?: string | undefined;
+  modelConfig?: ModelRunConfig | undefined;
+  thinking?: string | undefined;
+  autoApprove?: boolean | undefined;
+  planMode?: boolean | undefined;
+  images?: string[] | undefined;
+  resumeRunId?: string | undefined;
 }) {
   return {
     trustedRoot: input.trustedRoot,

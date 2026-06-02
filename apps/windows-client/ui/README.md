@@ -17,7 +17,7 @@ cd apps/windows-client/ui
 npm install
 npm run dev          # Vite on http://127.0.0.1:5173
 # in another terminal, start the host so the UI has an API:
-node ../../../scripts/start-tauri-host.mjs   # host on :3017
+node ../../../scripts/run-host-node.mjs scripts/start-tauri-host.ts   # host on :3017
 ```
 
 The UI calls the host at `http://127.0.0.1:3017` via `src/lib/api.ts`

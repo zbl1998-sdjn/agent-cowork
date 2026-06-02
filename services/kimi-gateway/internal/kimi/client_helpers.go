@@ -1,5 +1,6 @@
 package kimi
 
+// 本文件:client.go 的内部辅助——请求校验、有效重试策略/端点与 Key 轮换的解析、单次 HTTP 调用与错误归类等。
 import (
 	"context"
 	"errors"

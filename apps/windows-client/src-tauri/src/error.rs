@@ -1,3 +1,4 @@
+//! 桌面外壳错误处理(error)——所有可失败操作返回 DesktopResult;错误类型小而可序列化,以便跨 Tauri IPC 边界传给 webview。
 //! Error handling for the Agent Cowork desktop shell.
 //!
 //! Every fallible operation in the shell returns [`DesktopResult`]. The error
@@ -27,7 +28,9 @@ pub enum DesktopError {
 }
 
 impl DesktopError {
+    /// 稳定的错误「类别」短字符串,供日志/指标打标使用;有意保留的公共诊断 API,暂未在内部调用。
     /// Short, stable category string. Useful for logging / metrics tags.
+    #[allow(dead_code)] // intentionally-public diagnostic helper kept for logging/metrics tags
     pub fn kind(&self) -> &'static str {
         match self {
             DesktopError::Sidecar(_) => "sidecar",

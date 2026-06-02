@@ -1,3 +1,7 @@
+// ConnectorActions 连接器操作按钮组(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:从连接器面板抽出的纯展示按钮——搜索、OAuth(网页授权)四态机(审批→去登录→完成→撤销)、内置连接器一键连接/断开。
+// 依赖:ui/Button。仅按 busy/connected 等状态出文案并触发对应回调,不直接通信。
 import { Button } from '../ui/Button';
 
 export function ConnectorSearchAction({ onSearch }: { onSearch: () => void }) {

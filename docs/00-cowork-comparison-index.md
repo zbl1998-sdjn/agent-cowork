@@ -72,7 +72,7 @@
 | Kimi CLI Bridge | 🟡 | legacy/developer-only 代码仍保留, 但桌面产品主路径不再 spawn Kimi CLI |
 | Kimi Gateway (OpenAI-compatible chat) | ✅ | 非流式 + 重试 + 超时, 已 httptest 覆盖 |
 | Kimi Gateway 流式 / tool calls / vision | ✅ | `services/kimi-gateway` 已支持 `ChatStream`、`POST /v1/chat/stream` SSE handler、OpenAI tools/tool_calls、multipart `image_url` vision、`llm.usage` 事件、多 key/baseURL fallback、熔断；client 已拆成 types/breaker/parser/stream handler, 并补齐 stream `[DONE]`、multipart limit、content part、错误泄漏回归测试 |
-| MCP 客户端 | ✅ | `apps/host/src/mcp/connect.js` stdio MCP client + `mcp-servers/fs-server.mjs` 内置 fs server; 连上的工具以 `mcp__<server>__<tool>` 注入工具注册表, agent 工具集 (`buildAgentToolset`) 把 `mcp:*` 工具按 high-risk 接入审批; `mcp-connect`/`mcp-fs-server`/`connector-connect` 测试覆盖, 实机 HTTP 冒烟连 fs → 3 工具可见 |
+| MCP 客户端 | ✅ | `apps/host/src/mcp/connect.js` stdio MCP client + `mcp-servers/fs-server.ts` 内置 fs server; 连上的工具以 `mcp__<server>__<tool>` 注入工具注册表, agent 工具集 (`buildAgentToolset`) 把 `mcp:*` 工具按 high-risk 接入审批; `mcp-connect`/`mcp-fs-server`/`connector-connect` 测试覆盖, 实机 HTTP 冒烟连 fs → 3 工具可见 |
 | 外部 SaaS 连接器 (Slack/Notion/Gmail/...) | 🟡 | 连接器目录 (`connectors/catalog.js`: filesystem/web-fetch/memory/sqlite/git/postgres) + 关键词 suggest + 一键连 (`POST /api/connectors/connect`, builtin id 或通用 command/args) + 前端 `ConnectorsPanel` 抽屉; 内置 fs 一键连可用, 通用 MCP 给出安装命令; 尚无打包好的 SaaS OAuth 连接器 |
 | 工具懒加载 (ToolSearch 等价) | ✅ | agent 主链路只常驻核心文件工具 + `search_tools` 元工具; 连接器(mcp)工具按需检索激活进工具集, prompt 不随连接器数量膨胀; `lazy-tools` 测试覆盖。另有 `/api/tools/search` + `ToolsPanel` 懒搜面板 |
 | Scheduled Tasks | ✅ | `apps/host/src/runtime/scheduler.js` + cron 解析器 (零依赖); `/api/schedules` CRUD + `_tick`; cron + 一次性; tenant 隔离; create/cancel/delete/_tick 均强制 Idempotency-Key, 手动 tick 只触发当前 tenant; 默认 executor 已接 `runRecipe` 真正产出可审批产物 + 入索引; 文件 store + SQLite store adapter |
@@ -417,13 +417,13 @@ P2-B 完成 — Composer 新增 `#` 历史任务 picker, 从 runs-index 列最�
   - 数据源走 `/api/runs/index?limit=20`, 不扫描文件系统。
   - 选中后读取 `/api/runs/:id`, 高亮最近任务卡, 回放 progress / preview / sources / assistant_end 事件。
   - 若历史 run 带 `recipeId`, 自动恢复 selected recipe; 若带 prompt, 自动回填 Composer 便于复跑。
-- **契约 smoke** (`scripts/smoke-ui-contract.mjs`):
+- **契约 smoke** (`scripts/smoke-ui-contract.ts`):
   - 新增 `historyRunItems`、`/api/runs/index`、`mode: "history"`、`replayRunEvents` 断言。
 
 验收:
 
 - `node --check apps/windows-client/resources/app.js` 通过。
-- `node --check scripts/smoke-ui-contract.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-ui-contract.ts` 通过。
 - `node --test` 全量 **96 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
 
@@ -447,12 +447,12 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - 覆盖 `MessageBubble` / `ProgressLine` / `PreviewCard` / `ApprovalActions` / `ArtifactCard` / `SourcesFooter` / `Composer` / `ClarificationCard` / `TaskStatusBadge`。
 - **测试覆盖**:
   - `apps/host/test/tauri-scaffold.test.js` 断言 npm zero-deps、Tauri config、externalBin、CSP、Rust sidecar/opener command/plugin 入口、capability 和组件清单。
-  - `scripts/smoke-tauri-scaffold.mjs` 输出当前工具链可运行性; 本机报告 `runnable:false`。
+  - `scripts/smoke-tauri-scaffold.ts` 输出当前工具链可运行性; 本机报告 `runnable:false`。
 
 验收:
 
 - `node --check scripts/start-tauri-host.mjs` 通过。
-- `node --check scripts/smoke-tauri-scaffold.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-tauri-scaffold.ts` 通过。
 - `npm run smoke:tauri-scaffold` 通过, 但报告 `cargo` / `rustc` / `cargo tauri` 不可用。
 - `node --test` 全量 **99 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
@@ -490,7 +490,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/server-security.test.js` 覆盖 Origin/JSON、trustedRoot escape、tenant run 泄漏、idempotency mismatch。
 - `apps/host/test/sqlite-adapters.test.js` 覆盖 SQLite memory audit 与 migration rollback。
 - `apps/host/test/audit-events.test.js` 覆盖 subscriber failure 可见性。
-- `apps/host/test/tauri-scaffold.test.js` 与 `scripts/smoke-tauri-scaffold.mjs` 覆盖 sidecar/opener/CSP/capability 契约。
+- `apps/host/test/tauri-scaffold.test.js` 与 `scripts/smoke-tauri-scaffold.ts` 覆盖 sidecar/opener/CSP/capability 契约。
 
 验收:
 
@@ -531,7 +531,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/request-utils.test.js` 覆盖多字节 JSON body 超限。
 - `apps/host/test/server-security.test.js` 覆盖 schedule mutation 缺 idempotency key 与跨租户 cancel/delete/tick。
 - `apps/host/test/server-runtime-features.test.js` 覆盖 schedule mutation 正常路径 idempotency header、run detail 非法 id。
-- `apps/host/test/server.test.js` 和 `scripts/smoke-ui-contract.mjs` 覆盖新增前端静态脚本。
+- `apps/host/test/server.test.js` 和 `scripts/smoke-ui-contract.ts` 覆盖新增前端静态脚本。
 
 验收:
 
@@ -555,7 +555,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `/api/recipes/:id/run` 对非法 route id 返回 400, 避免 encoded slash 等异常 id 落到 registry lookup。
 - **前端 composer controller 拆分**:
   - 新增 `apps/windows-client/resources/app-composer-popover.js`, 承接 `/` 模板、`@` 文件 mention、`#` 历史 run picker 的 state、渲染、键盘处理。
-  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.mjs`、`verify-mvp.mjs`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
+  - `index.html`、Host 静态白名单、`server.test.js`、`smoke-ui-contract.ts`、`verify-mvp.ts`、`smoke-windows-client-resources.mjs` 均同步新增脚本契约。
   - `apps/windows-client/resources/app.js` 降到约 1739 行; `node --check` 已验证未截断。
 - **测试入口对齐**:
   - `package.json` 的 `test` script 对齐为默认 `node --test`, 与 handoff 要求一致; 受 Windows 沙箱限制时仍可用 `node --test --test-isolation=none` 做本地补充验证。
@@ -577,7 +577,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `apps/host/test/server-runtime-features.test.js`: recipe route 非法 id 返回 400。
 - `apps/host/test/server.test.js`: 新增 composer popover 静态资源。
 - `services/kimi-gateway/internal/kimi/client_test.go`: 覆盖 missing `[DONE]`、错误 body 不泄漏、breaker fallback、空 content parts、非法 multipart、超大 multipart。
-- `scripts/smoke-ui-contract.mjs` / `scripts/verify-mvp.mjs` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
+- `scripts/smoke-ui-contract.ts` / `scripts/verify-mvp.ts` / `scripts/smoke-windows-client-resources.mjs`: 覆盖新增前端脚本。
 
 验收:
 
@@ -615,7 +615,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `apps/windows-client/resources/app.js` 增加 catalog 加载、空态、打开 live page、计划应用后刷新等流程。
   - `apps/windows-client/resources/app.css` 补齐 artifact list 的溢出与空态样式。
 - **契约 smoke**:
-  - `scripts/smoke-ui-contract.mjs` 覆盖 artifact catalog DOM contract、`/api/artifacts`、`/api/artifacts/view` 和 apply 后 catalog 刷新路径。
+  - `scripts/smoke-ui-contract.ts` 覆盖 artifact catalog DOM contract、`/api/artifacts`、`/api/artifacts/view` 和 apply 后 catalog 刷新路径。
   - `apps/host/test/server.test.js` 增加 endpoint 回归, 覆盖恶意 `<script>` 内容不会原样执行。
 
 验收:
@@ -624,7 +624,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - `node --check apps/host/src/routes/artifact-routes.js` 通过。
 - `node --check apps/host/src/server.js` 通过。
 - `node --check apps/windows-client/resources/app.js` 通过。
-- `node --check scripts/smoke-ui-contract.mjs` 通过。
+- `node scripts/run-host-node.mjs -- --check scripts/smoke-ui-contract.ts` 通过。
 - `node --test apps/host/test/server.test.js` **15/15 通过**。
 - `npm test` 全量 **111 通过 / 0 失败**。
 - `npm run smoke:ui` 通过。
@@ -658,9 +658,9 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
   - `apps/windows-client/resources/index.html` / `app.js` 中的运行芯片、降级说明、产物摘要全部改为 Kimi API。
   - 未配置 API key 时保留本地只读 fallback, 不阻断审批预览和本地 artifact 生成。
 - **启动与 smoke**:
-  - `apps/host/src/main.js`、`scripts/start-mvp.mjs`、`scripts/start-tauri-host.mjs` 改读 API env。
+  - `apps/host/src/main.js`、`scripts/start-mvp.ts`、`scripts/start-tauri-host.ts` 改读 API env。
   - `npm run smoke:kimi-cli` 改为 `npm run smoke:kimi-api`。
-  - 删除旧 `scripts/smoke-kimi-cli.mjs`, 新增 `scripts/smoke-kimi-api.mjs`。
+  - 删除旧 `scripts/smoke-kimi-cli.mjs`, 新增 `scripts/smoke-kimi-api.ts`。
 
 新增/更新测试:
 
@@ -767,7 +767,7 @@ P2-A 的离线迁移骨架完成 — 在不增加 npm dependencies 的前提下,
 - 校验 (此 VM 无 tsc/esbuild, npm 全局安装被 OS 拒): `.ts` 经 `node --check --experimental-strip-types` 真语法过; `.tsx` 括号平衡 + 无未用导入 + JSX 标签核对; 真 TS/React 编译按既定约束在用户机器做。
 
 **迭代 B 一键激活**:
-- `scripts/build-ui.mjs` + 根 `package.json` 脚本 `build:ui` / `build:ui:fresh`: 自动 (按需) `npm install` + `npm run build` → `ui-dist`, 并打印 `cargo tauri dev/build` 下一步。
+- `scripts/build-ui.ts` + 根 `package.json` 脚本 `build:ui` / `build:ui:fresh`: 自动 (按需) `npm install` + `npm run build` → `ui-dist`, 并打印 `cargo tauri dev/build` 下一步。
 - 激活: `npm run build:ui`, 然后逐行 `cd apps/windows-client/src-tauri` 再 `cargo tauri dev` (PowerShell 勿用 &&)。
 
 验收 (host 侧): 本轮 host 相关测试分组跑 **66/66** + 其余 **115/115** 全绿 (全量曾因 VM 负载超时, 分组确认 0 fail); MCP 连接器经真子进程端到端验证。前端/脚本为纯增量, 不影响 host 测试。

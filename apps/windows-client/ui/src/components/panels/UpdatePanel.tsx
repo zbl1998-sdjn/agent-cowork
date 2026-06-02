@@ -1,3 +1,7 @@
+// 桌面更新面板(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:检查桌面端更新、展示版本/更新说明,并触发下载安装;仅安装版可用,Web 端提示不可用。只渲染+触发回调。
+// 依赖:lib/api(isDesktop/checkDesktopUpdate/installDesktopUpdate)+ ui/Button。导出:UpdatePanel、UpdatePanelView。
 import { useState } from 'react';
 import { checkDesktopUpdate, installDesktopUpdate, isDesktop, type DesktopUpdateStatus } from '../../lib/api';
 import { Button } from '../ui/Button';

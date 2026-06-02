@@ -1,0 +1,133 @@
+//
+// 运行记录存储(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:生成 runId 并把每次「运行」(agent/recipe/sandbox)的完整记录落盘为 JSON——含输入、状态、
+//       结果、嵌入的事件时间线。写入前补充归因(租户/用户/trace)与指标(耗时/用量)。是可观测/可回放的底座。
+// 依赖:node:crypto/fs/path + 同层 run-attribution / run-metrics。导出:createRunId / writeRunRecord 等。
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { withRunAttribution } from './run-attribution.js';
+import { withRunMetrics } from './run-metrics.js';
+
+const RUN_ID_RE = /^[a-z0-9_-]+$/i;
+
+export type RunRecord = {
+  id: string;
+  type?: unknown;
+  status?: unknown;
+  provider?: unknown;
+  mode?: unknown;
+  recipeId?: unknown;
+  tenantId?: unknown;
+  userId?: unknown;
+  traceId?: unknown;
+  context?: Record<string, unknown>;
+  startedAt?: unknown;
+  finishedAt?: unknown;
+  durationMs?: unknown;
+  input?: { prompt?: unknown; [key: string]: unknown };
+  error?: { message?: unknown };
+  [key: string]: unknown;
+};
+
+export type RunSummary = {
+  id: string;
+  type: unknown;
+  status: unknown;
+  mode: unknown;
+  provider: unknown;
+  recipeId: unknown;
+  tenantId: unknown;
+  userId: unknown;
+  traceId: unknown;
+  context: Record<string, unknown> | undefined;
+  startedAt: unknown;
+  finishedAt: unknown;
+  durationMs: unknown;
+  prompt: unknown;
+  error: unknown;
+  path: string;
+};
+
+export type RunIdOptions = {
+  randomHex?: (length: number) => string;
+};
+
+type ListRunRecordsOptions = {
+  limit?: number;
+};
+
+export function createRunId(now: Date = new Date(), { randomHex }: RunIdOptions = {}): string {
+  const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+  const suffix = typeof randomHex === 'function'
+    ? randomHex(8)
+    : crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  return `run_${timestamp}_${suffix}`;
+}
+
+export function getRunPath(runStoreRoot: string, runId: string): string {
+  if (!RUN_ID_RE.test(runId || '')) {
+    throw new Error('Invalid run id');
+  }
+  return path.join(runStoreRoot, `${runId}.json`);
+}
+
+export function writeRunRecord(runStoreRoot: string, record: RunRecord): string {
+  if (!record || typeof record.id !== 'string' || !record.id.trim()) {
+    throw new Error('Run record id is required');
+  }
+  fs.mkdirSync(runStoreRoot, { recursive: true });
+  const enriched = withRunMetrics(withRunAttribution(record)) as RunRecord;
+  const runPath = getRunPath(runStoreRoot, enriched.id);
+  fs.writeFileSync(runPath, `${JSON.stringify(enriched, null, 2)}\n`, 'utf8');
+  return runPath;
+}
+
+export function readRunRecord(runStoreRoot: string, runId: string): RunRecord | null {
+  const runPath = getRunPath(runStoreRoot, runId);
+  if (!fs.existsSync(runPath)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
+}
+
+export function listRunRecords(
+  runStoreRoot: string,
+  { limit = 20 }: ListRunRecordsOptions = {},
+): RunSummary[] {
+  if (!fs.existsSync(runStoreRoot)) {
+    return [];
+  }
+  const records: RunSummary[] = [];
+  for (const entry of fs.readdirSync(runStoreRoot, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const fullPath = path.join(runStoreRoot, entry.name);
+    try {
+      const record = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as RunRecord;
+      records.push({
+        id: record.id,
+        type: record.type,
+        status: record.status,
+        provider: record.provider,
+        mode: record.mode,
+        recipeId: record.recipeId,
+        tenantId: record.context?.tenantId || record.tenantId || 'tenant_local',
+        userId: record.context?.userId || record.userId || 'user_local',
+        traceId: record.context?.traceId || record.traceId,
+        context: record.context,
+        startedAt: record.startedAt,
+        finishedAt: record.finishedAt,
+        durationMs: record.durationMs,
+        prompt: record.input?.prompt,
+        error: record.error?.message,
+        path: fullPath,
+      });
+    } catch {
+      // Ignore malformed run records; listing should remain best-effort.
+    }
+  }
+  return records
+    .sort((left, right) => String(right.startedAt || '').localeCompare(String(left.startedAt || '')))
+    .slice(0, limit);
+}

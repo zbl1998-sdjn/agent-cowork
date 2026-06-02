@@ -1,3 +1,4 @@
+// Composer(UI · components):聊天输入框主组件——文本输入、附件、模型控制、发送/停止,组合各 Composer* 子件与建议/触发弹窗。
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { buildSessionModelConfig } from '../lib/composer-logic';

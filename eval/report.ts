@@ -1,0 +1,178 @@
+// 评测报告生成器:把运行汇总产出 JSON + HTML 报告(eval · report)
+// ---------------------------------------------------------------------------
+// 职责:接收 runner 聚合出的 EvalSummary,计算通过率并与基线对比(判断是否回归),
+//       生成结构化 JSON 与可读 HTML 报告;writeEvalReport 还负责落盘 latest.json/latest.html。
+// 依赖:仅 node:fs / node:path,无业务下层依赖。
+//       导出:generateEvalReport、writeEvalReport 及报告相关类型。
+import fs from 'node:fs';
+import path from 'node:path';
+
+export type EvalSummaryResult = {
+  taskId?: unknown;
+  score?: unknown;
+  [key: string]: unknown;
+};
+export type EvalSummary = {
+  totalTasks: number;
+  passedTasks: number;
+  failedTasks: number;
+  passRate: number;
+  results?: EvalSummaryResult[];
+};
+export type EvalBaseline = {
+  passRate?: unknown;
+  summary?: { passRate?: unknown };
+};
+export type EvalReportOptions = {
+  baseline?: EvalBaseline | null;
+  regressionTolerance?: number;
+  generatedAt?: string;
+};
+export type WriteEvalReportOptions = EvalReportOptions & { outDir?: string };
+export type EvalBaselineComparison = {
+  available: boolean;
+  passRate: number | null;
+  delta: number | null;
+  regressionTolerance: number;
+  regressed: boolean;
+};
+export type EvalReportJson = {
+  generatedAt: string;
+  summary: {
+    totalTasks: number;
+    passedTasks: number;
+    failedTasks: number;
+    passRate: number;
+  };
+  baseline: EvalBaselineComparison;
+  results: EvalSummaryResult[];
+};
+export type EvalReport = {
+  json: EvalReportJson;
+  html: string;
+};
+
+function rate(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resultScore(result: EvalSummaryResult): { passed?: unknown; score?: unknown } {
+  return isObject(result.score) ? result.score : {};
+}
+
+function baselinePassRate(baseline: EvalBaseline | null): number | null {
+  if (!baseline) return null;
+  const value = baseline.passRate ?? baseline.summary?.passRate;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+function compareBaseline(summary: EvalSummary, baseline: EvalBaseline | null, regressionTolerance: number): EvalBaselineComparison {
+  const passRate = rate(summary.passRate);
+  const baselineRate = baselinePassRate(baseline);
+  if (baselineRate === null) {
+    return {
+      available: false,
+      passRate: null,
+      delta: null,
+      regressionTolerance,
+      regressed: false,
+    };
+  }
+  const delta = passRate - baselineRate;
+  return {
+    available: true,
+    passRate: baselineRate,
+    delta,
+    regressionTolerance,
+    regressed: delta < -regressionTolerance,
+  };
+}
+
+function renderHtml(report: EvalReportJson): string {
+  const rows = report.results.map((result) => {
+    const scoreResult = resultScore(result);
+    const passed = scoreResult.passed ? 'pass' : 'fail';
+    const score = Number(scoreResult.score ?? 0).toFixed(3);
+    return `<tr><td>${escapeHtml(result.taskId)}</td><td>${passed}</td><td>${score}</td></tr>`;
+  }).join('\n');
+  const passRate = (report.summary.passRate * 100).toFixed(1);
+  const baseline = report.baseline.available && report.baseline.passRate !== null && report.baseline.delta !== null
+    ? `${(report.baseline.passRate * 100).toFixed(1)}% (${report.baseline.delta >= 0 ? '+' : ''}${(report.baseline.delta * 100).toFixed(1)}%)`
+    : 'none';
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Eval Report</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 32px; color: #111; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h1>Eval Report</h1>
+  <p>Generated: ${escapeHtml(report.generatedAt)}</p>
+  <p>Pass rate: ${passRate}% (${report.summary.passedTasks}/${report.summary.totalTasks})</p>
+  <p>Baseline: ${escapeHtml(baseline)}</p>
+  <table>
+    <thead><tr><th>Task</th><th>Status</th><th>Score</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body>
+</html>`;
+}
+
+export function generateEvalReport(summary: EvalSummary, {
+  baseline = null,
+  regressionTolerance = 0.05,
+  generatedAt = new Date().toISOString(),
+}: EvalReportOptions = {}): EvalReport {
+  const json: EvalReportJson = {
+    generatedAt,
+    summary: {
+      totalTasks: summary.totalTasks,
+      passedTasks: summary.passedTasks,
+      failedTasks: summary.failedTasks,
+      passRate: rate(summary.passRate),
+    },
+    baseline: compareBaseline(summary, baseline, regressionTolerance),
+    results: Array.isArray(summary.results) ? summary.results : [],
+  };
+  return {
+    json,
+    html: renderHtml(json),
+  };
+}
+
+export function writeEvalReport(summary: EvalSummary, {
+  outDir,
+  baseline = null,
+  regressionTolerance = 0.05,
+  generatedAt,
+}: WriteEvalReportOptions = {}) {
+  if (!outDir) throw new Error('writeEvalReport requires outDir');
+  fs.mkdirSync(outDir, { recursive: true });
+  const options: EvalReportOptions = { baseline, regressionTolerance };
+  if (generatedAt !== undefined) options.generatedAt = generatedAt;
+  const report = generateEvalReport(summary, options);
+  const jsonPath = path.join(outDir, 'latest.json');
+  const htmlPath = path.join(outDir, 'latest.html');
+  fs.writeFileSync(jsonPath, `${JSON.stringify(report.json, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(htmlPath, report.html, 'utf8');
+  return { ...report, jsonPath, htmlPath };
+}

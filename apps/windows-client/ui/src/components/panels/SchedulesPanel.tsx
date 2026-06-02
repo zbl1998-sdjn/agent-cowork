@@ -1,3 +1,7 @@
+// 定时任务面板(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:列出 Kimi 安排的定时任务,展示人话化的下次触发时间与状态,支持刷新与二次确认取消。只渲染+触发回调。
+// 依赖:lib/api(listSchedules/cancelSchedule)+ schedule-humanize/friendly-error + ui/Button、ui/StateViews。
 import { useEffect, useState } from 'react';
 import { listSchedules, cancelSchedule, type ScheduleItem } from '../../lib/api';
 import { humanizeError } from '../../lib/friendly-error';

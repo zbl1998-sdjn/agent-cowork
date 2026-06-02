@@ -82,18 +82,18 @@ describe('ArtifactsPanel state views', () => {
       onBeginRename,
     });
 
-    const input = collectByType(element, Input)[0];
+    const input = collectByType(element, Input)[0]!;
     const buttons = collectByType(element, Button);
     expect(input).toBeTruthy();
     expect(buttons).toHaveLength(4);
-    expect(buttons[0].props.disabled).toBe(false);
+    expect(buttons[0]!.props.disabled).toBe(false);
 
     input.props.onChange({ target: { value: 'renamed.md' } });
     input.props.onKeyDown({ key: 'Enter' });
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
-    buttons[2].props.onClick();
-    buttons[3].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
+    buttons[2]!.props.onClick();
+    buttons[3]!.props.onClick();
 
     expect(onRenameTextChange).toHaveBeenCalledWith('renamed.md');
     expect(onCommitRename).toHaveBeenCalledTimes(2);
@@ -120,6 +120,6 @@ describe('ArtifactsPanel state views', () => {
       Button,
     );
 
-    expect(buttons[0].props.disabled).toBe(true);
+    expect(buttons[0]!.props.disabled).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ package kimi
 
 import "errors"
 
+// Budget 是单次请求的 token 预算(输入/输出上限);Validate 校验其为正。防止失控消耗。
 type Budget struct {
 	MaxInputTokens  int
 	MaxOutputTokens int

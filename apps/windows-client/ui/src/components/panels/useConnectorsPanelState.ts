@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react';
+// 连接器面板状态 hook(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:封装连接器面板的本地状态与数据逻辑——搜索/加载连接器、连接与断开 MCP、OAuth 审批/发起/确认/撤销与权限勾选,把数据逻辑从面板组件抽出。
+// 依赖:lib/api(listConnectors/connectConnector/*OAuthConnector 等)+ friendly-error + 同目录 connectorOAuthStatus/connectorScopes。导出:useConnectorsPanelState。
+import { useCallback, useEffect, useState } from 'react';
 import {
   approveOAuthConnector,
   completeOAuthConnector,
@@ -17,7 +21,12 @@ import { connectorScopeKey, defaultConnectorScopes } from './connectorScopes';
 
 type OAuthApprovalView = { approvalId: string; scopes: string[] };
 
-interface UseConnectorsPanelStateOptions { trustedRoot: string; onConnected?: (servers: string[]) => void; }
+interface UseConnectorsPanelStateOptions { trustedRoot: string; onConnected?: ((servers: string[]) => void) | undefined; }
+
+function withoutRecordKey<T>(record: Record<string, T>, keyToRemove: string): Record<string, T> {
+  const { [keyToRemove]: _removed, ...remaining } = record;
+  return remaining;
+}
 
 export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnectorsPanelStateOptions) {
   const [query, setQuery] = useState('');
@@ -38,11 +47,11 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
     return connectorScopeKey(approval.scopes) === connectorScopeKey(selectedScopes(connector)) ? approval : null;
   };
 
-  const refreshOAuthStatus = async (items: ConnectorInfo[]) => {
+  const refreshOAuthStatus = useCallback(async (items: ConnectorInfo[]) => {
     setOauthStatus(await readConnectorOAuthStatus(items));
-  };
+  }, []);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const res = await listConnectors();
       setConnectors(res.connectors);
@@ -51,9 +60,9 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
     } catch (error) {
       setMessage(`错误：${humanizeError(error)}`);
     }
-  };
+  }, [refreshOAuthStatus]);
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const onSearch = async () => {
     setMessage('');
@@ -160,14 +169,10 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
         return;
       }
       setOauthSessions((current) => {
-        const next = { ...current };
-        delete next[connector.id];
-        return next;
+        return withoutRecordKey(current, connector.id);
       });
       setOauthApprovals((current) => {
-        const next = { ...current };
-        delete next[connector.id];
-        return next;
+        return withoutRecordKey(current, connector.id);
       });
       await refreshOAuthStatus(connectors);
       const login = res.account?.login || res.credential?.accountId || connector.name;
@@ -185,14 +190,10 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
     try {
       const res = await revokeOAuthConnector({ id: connector.id });
       setOauthSessions((current) => {
-        const next = { ...current };
-        delete next[connector.id];
-        return next;
+        return withoutRecordKey(current, connector.id);
       });
       setOauthApprovals((current) => {
-        const next = { ...current };
-        delete next[connector.id];
-        return next;
+        return withoutRecordKey(current, connector.id);
       });
       await refreshOAuthStatus(connectors);
       setMessage(`已撤销 ${connector.name}（移除 ${res.removed} 个账户）`);
@@ -212,9 +213,7 @@ export function useConnectorsPanelState({ trustedRoot, onConnected }: UseConnect
       return { ...current, [connector.id]: nextScopes };
     });
     setOauthApprovals((current) => {
-      const next = { ...current };
-      delete next[connector.id];
-      return next;
+      return withoutRecordKey(current, connector.id);
     });
   };
 

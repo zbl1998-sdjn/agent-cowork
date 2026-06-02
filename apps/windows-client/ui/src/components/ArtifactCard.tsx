@@ -1,3 +1,7 @@
+// 制品卡片(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:在时间线里展示单个生成制品(文件名取自 relativePath/path,附元信息),提供「在系统中打开」。仅渲染+回调。
+// 依赖:Button;制品类型来自 lib/types。关键回调:onOpen(path)。
 import type { ArtifactFile } from '../lib/types';
 import { Button } from './ui/Button';
 

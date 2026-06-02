@@ -87,7 +87,7 @@ describe('run observability view model', () => {
 
     expect(view.title).toBe('run_pending');
     expect(view.cards.map((card) => card.value)).toEqual(['0 tokens', '≈USD 0.00', '0 次', '0.0%', '未记录']);
-    expect(view.cards[1].detail).toBe('未记录 · local-estimate');
+    expect(view.cards[1]!.detail).toBe('未记录 · local-estimate');
     expect(view.isSparse).toBe(true);
   });
 

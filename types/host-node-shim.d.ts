@@ -2,13 +2,14 @@ interface Buffer extends Iterable<number> {
   readonly length: number;
   readonly [index: number]: number;
   readUInt16LE(offset: number): number;
+  readUInt32BE(offset: number): number;
   readUInt32LE(offset: number): number;
   slice(start?: number, end?: number): Buffer;
   subarray(start?: number, end?: number): Buffer;
   writeUInt16LE(value: number, offset: number): number;
   writeUInt32LE(value: number, offset: number): number;
   values(): IterableIterator<number>;
-  toString(encoding?: string): string;
+  toString(encoding?: string, start?: number, end?: number): string;
 }
 
 declare const Buffer: {
@@ -23,14 +24,23 @@ declare const Buffer: {
 
 declare const process: {
   arch: string;
+  argv: string[];
   env: Record<string, string | undefined>;
-  execPath?: string;
+  execPath: string;
+  exitCode?: number;
   platform: string;
   pid: number;
+  stderr: { write(data: Buffer | string): unknown };
+  stdin: {
+    setEncoding(encoding: string): unknown;
+    on(event: 'data', listener: (chunk: Buffer | string) => void): unknown;
+  };
+  stdout: { write(data: Buffer | string): unknown };
   version: string;
   versions?: Record<string, string | undefined>;
   cwd(): string;
   exit(code?: number): never;
+  kill(pid: number, signal?: string | number): boolean;
   memoryUsage(): { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number };
   once(event: string, listener: (...args: any[]) => void): unknown;
   uptime(): number;
@@ -82,18 +92,22 @@ declare module 'node:child_process' {
   }
 
   export interface ChildProcessLike {
+    pid?: number;
     stdin?: WritableStreamLike;
     stdout: StreamLike;
     stderr: StreamLike;
     kill(signal?: string): void;
+    unref(): void;
     on(event: 'error', listener: (error: Error) => void): unknown;
     on(event: 'close', listener: (code: number | null, signal: string | null) => void): unknown;
   }
 
   export interface SpawnSyncResult<T = string | Buffer> {
     status?: number | null;
+    signal?: string | null;
     stdout?: T;
     stderr?: T;
+    error?: Error;
   }
 
   export interface ExecFileError extends Error {
@@ -107,6 +121,10 @@ declare module 'node:child_process' {
   export function spawnSync(
     command: string,
     args?: readonly string[],
+    options?: Record<string, unknown>
+  ): SpawnSyncResult;
+  export function spawnSync(
+    command: string,
     options?: Record<string, unknown>
   ): SpawnSyncResult;
   export function spawn(
@@ -135,6 +153,10 @@ declare module 'node:util' {
   export function promisify(fn: (...args: any[]) => unknown): any;
 }
 
+declare module 'node:timers/promises' {
+  export function setTimeout(delay?: number, value?: unknown): Promise<unknown>;
+}
+
 declare module 'node:fs' {
   export interface Stats {
     size: number;
@@ -153,9 +175,11 @@ declare module 'node:fs' {
 
   export function existsSync(path: string): boolean;
   export function appendFileSync(path: string, data: Buffer | string, encoding?: string): void;
+  export function closeSync(fd: number): void;
   export function copyFileSync(src: string, dest: string): void;
   export function mkdtempSync(prefix: string): string;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
+  export function openSync(path: string, flags: string | number, mode?: number): number;
   export function readFileSync(path: string): Buffer;
   export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string): string[];
@@ -163,12 +187,16 @@ declare module 'node:fs' {
   export function renameSync(oldPath: string, newPath: string): void;
   export function rmSync(path: string, options?: { recursive?: boolean, force?: boolean }): void;
   export function statSync(path: string): Stats;
+  export function symlinkSync(target: string, path: string, type?: string): void;
   export function unlinkSync(path: string): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function writeFileSync(path: string, data: Buffer | string, options?: Record<string, unknown>): void;
   export function realpathSync(path: string): string;
   export namespace realpathSync {
     export function native(path: string): string;
+  }
+  export namespace promises {
+    export function readFile(path: string, encoding: string): Promise<string>;
   }
 }
 
@@ -188,7 +216,7 @@ declare module 'node:path' {
     name: string;
   }
 
-  export function basename(path: string): string;
+  export function basename(path: string, suffix?: string): string;
   export function dirname(path: string): string;
   export function extname(path: string): string;
   export function isAbsolute(path: string): boolean;
@@ -200,16 +228,31 @@ declare module 'node:path' {
   export const sep: string;
 }
 
+declare module 'node:perf_hooks' {
+  export const performance: {
+    now(): number;
+  };
+}
+
 declare module 'node:module' {
   export function createRequire(url: string): (specifier: string) => unknown;
+  export function register(specifier: string | URL, parentURL?: string | URL): void;
 }
 
 declare module 'node:http' {
+  export interface ClientRequest {
+    on(event: 'error', listener: (error: Error) => void): ClientRequest;
+    setTimeout(timeout: number, callback?: () => void): ClientRequest;
+    destroy(error?: Error): void;
+  }
+
   export interface IncomingMessage {
     url?: string;
     method?: string;
     headers: Record<string, string | string[] | undefined>;
     socket?: { remoteAddress?: string };
+    statusCode?: number;
+    setEncoding(encoding: string): void;
     on(event: string, listener: (...args: any[]) => void): unknown;
   }
 
@@ -234,16 +277,25 @@ declare module 'node:http' {
     address(): AddressInfo | string | null;
     close(callback?: (err?: Error) => void): Server;
     on(event: 'error', listener: (error: Error & { code?: string }) => void): Server;
+    once(event: 'error', listener: (error: Error & { code?: string }) => void): Server;
     closeAllConnections?(): void;
   }
 
   export function createServer(
     listener?: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
   ): Server;
+  export function get(url: string, callback?: (response: IncomingMessage) => void): ClientRequest;
 }
 
 declare module 'node:url' {
-  export function fileURLToPath(url: string): string;
+  export function fileURLToPath(url: string | URL): string;
+  export function pathToFileURL(path: string): URL;
+}
+
+declare module 'node:vm' {
+  export class Script {
+    constructor(code: string, options?: { filename?: string; displayErrors?: boolean });
+  }
 }
 
 declare module 'node:zlib' {
@@ -251,6 +303,14 @@ declare module 'node:zlib' {
 }
 
 declare module 'node:net' {
+  export interface Server {
+    listen(port: number, host: string, callback?: () => void): Server;
+    address(): import('node:http').AddressInfo | string | null;
+    close(callback?: () => void): Server;
+    once(event: 'error', listener: (error: Error) => void): Server;
+  }
+
+  export function createServer(): Server;
   export function isIP(input: string): number;
 }
 
@@ -265,6 +325,34 @@ declare module 'node:dns' {
       options: { all: true; verbatim?: boolean }
     ): Promise<LookupAddress[]>;
   }
+}
+
+declare module 'node:test' {
+  export interface TestContext { skip(message?: string): void }
+  export interface TestFunction { (context: TestContext): unknown | Promise<unknown> }
+  export interface TestOptions { only?: boolean; skip?: boolean | string; todo?: boolean | string; timeout?: number }
+  export default function test(name: string, fn: TestFunction): unknown;
+  export default function test(name: string, options: TestOptions, fn: TestFunction): unknown;
+}
+
+declare module 'node:assert/strict' {
+  export interface Assert {
+    ok(value: unknown, message?: string): asserts value;
+    equal(actual: unknown, expected: unknown, message?: string): void;
+    deepEqual(actual: unknown, expected: unknown, message?: string): void;
+    match(actual: string, expected: RegExp, message?: string): void;
+    throws(block: () => unknown, validator?: RegExp | ((error: unknown) => boolean), message?: string): void;
+    rejects(
+      block: () => unknown | Promise<unknown>,
+      validator?: RegExp | ((error: unknown) => boolean),
+      message?: string
+    ): Promise<void>;
+    doesNotThrow(block: () => unknown, message?: string): void;
+    doesNotMatch(actual: string, expected: RegExp, message?: string): void;
+  }
+
+  const assert: Assert;
+  export default assert;
 }
 
 declare module 'pg' {

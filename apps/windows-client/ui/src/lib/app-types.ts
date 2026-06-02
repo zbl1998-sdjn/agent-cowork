@@ -1,3 +1,4 @@
+// 应用态类型(UI · lib):App 编排层用到的视图模型/会话/UI 状态类型聚合,补充 lib/types 的领域类型。
 import type { ProgressLineProps } from '../components/ProgressLine';
 import type { ApprovalState, FileOperation, SourceRef, SubtaskGroupItem, TodoItem } from './types';
 
@@ -5,59 +6,59 @@ export interface PendingApproval { id: string; name: string }
 
 export interface ToolCallItem {
   name: string;
-  args?: unknown;
+  args?: unknown | undefined;
   status: string;
-  result?: unknown;
-  startedAt?: number;
-  finishedAt?: number;
-  durationMs?: number;
-  error?: string;
+  result?: unknown | undefined;
+  startedAt?: number | undefined;
+  finishedAt?: number | undefined;
+  durationMs?: number | undefined;
+  error?: string | undefined;
 }
 
 export interface AssistantMessage {
   id: string;
   role: 'assistant';
   status: string;
-  runId?: string;
-  text?: string;
-  reasoning?: string;
+  runId?: string | undefined;
+  text?: string | undefined;
+  reasoning?: string | undefined;
   progress: ProgressLineProps[];
   operations: FileOperation[];
-  fileOperationApprovalId?: string | null;
-  rollbackApprovalId?: string | null;
+  fileOperationApprovalId?: string | null | undefined;
+  rollbackApprovalId?: string | null | undefined;
   sources: SourceRef[];
-  todos?: TodoItem[];
-  subtasks?: SubtaskGroupItem[];
+  todos?: TodoItem[] | undefined;
+  subtasks?: SubtaskGroupItem[] | undefined;
   approvalState: ApprovalState;
-  approval?: PendingApproval;
-  plan?: { id: string; text: string };
-  files?: string[];
-  verifying?: boolean;
-  question?: { id: string; question: string; options: Array<{ label: string; description?: string }> };
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-  tools?: ToolCallItem[];
-  recipeDraft?: CapturedRecipeDraft;
-  recipeCaptureStatus?: 'capturing' | 'captured' | 'failed';
-  recipeCaptureError?: string;
+  approval?: PendingApproval | undefined;
+  plan?: { id: string; text: string } | undefined;
+  files?: string[] | undefined;
+  verifying?: boolean | undefined;
+  question?: { id: string; question: string; options: Array<{ label: string; description?: string | undefined }> } | undefined;
+  usage?: { prompt_tokens?: number | undefined; completion_tokens?: number | undefined; total_tokens?: number | undefined } | undefined;
+  tools?: ToolCallItem[] | undefined;
+  recipeDraft?: CapturedRecipeDraft | undefined;
+  recipeCaptureStatus?: 'capturing' | 'captured' | 'failed' | undefined;
+  recipeCaptureError?: string | undefined;
 }
 
 export interface UserMessage { id: string; role: 'user'; text: string }
 export type Message = UserMessage | AssistantMessage;
 export interface ConversationBranch {
   id: string;
-  title?: string;
-  parentBranchId?: string;
-  baseMessageId?: string;
-  createdAt?: string;
+  title?: string | undefined;
+  parentBranchId?: string | undefined;
+  baseMessageId?: string | undefined;
+  createdAt?: string | undefined;
   messages: Message[];
 }
 export interface Conversation {
   id: string;
   title: string;
   messages: Message[];
-  pinned?: boolean;
-  activeBranchId?: string;
-  branches?: ConversationBranch[];
+  pinned?: boolean | undefined;
+  activeBranchId?: string | undefined;
+  branches?: ConversationBranch[] | undefined;
 }
 
 export type SidePanel = 'none' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'projects' | 'schedules' | 'memory' | 'observability';
@@ -67,32 +68,32 @@ export interface RecipeRunResponse {
   runId: string;
   operations: FileOperation[];
   sources: SourceRef[];
-  fileOperationApprovalId?: string | null;
+  fileOperationApprovalId?: string | null | undefined;
 }
 
 export interface CapturedRecipeStep {
   index: number;
   tool: string;
-  status?: string;
-  args?: unknown;
-  result?: unknown;
-  summary?: unknown;
+  status?: string | undefined;
+  args?: unknown | undefined;
+  result?: unknown | undefined;
+  summary?: unknown | undefined;
 }
 
 export interface CapturedRecipeArtifact {
   path: string;
-  kind?: string;
-  source?: unknown;
+  kind?: string | undefined;
+  source?: unknown | undefined;
 }
 
 export interface CapturedRecipeDraft {
-  id?: string;
+  id?: string | undefined;
   schemaVersion: number;
   draft: boolean;
   sourceRunId: string;
   name: string;
-  description?: string;
-  prompt?: string;
+  description?: string | undefined;
+  prompt?: string | undefined;
   steps: CapturedRecipeStep[];
   artifacts: CapturedRecipeArtifact[];
   redacted: boolean;

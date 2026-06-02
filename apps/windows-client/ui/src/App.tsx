@@ -1,3 +1,8 @@
+// App 根组件(UI · 应用编排层)
+// ---------------------------------------------------------------------------
+// 职责:顶层布局编排——组合各 hooks(会话/运行时/输入/流)与子组件(侧栏/时间线/输入框/面板),把用户操作接到
+//       lib/api。本身只做编排与连线,具体数据逻辑在 hooks、渲染在 components(plan/00 目标:App < 250 行)。
+// 依赖:hooks/* + components/* + lib/api + lib/app-logic 纯逻辑。
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
@@ -22,7 +27,7 @@ import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
 export function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0].messages || []);
+  const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0]?.messages || []);
   const [panel, setPanel] = useState<SidePanel>('none');
   const [mode, setMode] = useState<AgentMode>('execute');
   const planMode = mode === 'plan';
@@ -150,7 +155,7 @@ export function App() {
         resumeRunId,
       }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
-  }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, trustedRoot, uploadAttachments]);
+  }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
@@ -158,7 +163,8 @@ export function App() {
     const currentMessages = messagesRef.current;
     const idx = currentMessages.findIndex((m) => m.id === assistantId);
     for (let i = idx - 1; i >= 0; i -= 1) {
-      const text = currentMessages[i].role === 'user' ? currentMessages[i].text : '';
+      const candidate = currentMessages[i];
+      const text = candidate?.role === 'user' ? candidate.text : '';
       if (text) { quickSend(text); return; }
     }
   }, [quickSend]);
@@ -208,7 +214,7 @@ export function App() {
     { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
     { id: 'settings', label: 'API 设置', run: () => openSettings('api') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
-  ], [autoClarify, conversations.newConversation, doLogout, openSettings, theme, toggleTheme]);
+  ], [autoClarify, conversations.newConversation, doLogout, openSettings, setAutoClarify, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
   if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;

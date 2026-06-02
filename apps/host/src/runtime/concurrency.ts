@@ -1,0 +1,51 @@
+// 并发限制(host · L2 运行时 · runtime)
+// ---------------------------------------------------------------------------
+// 职责:限制「同时运行」的 Agent 流数量——全局上限 + 每租户上限。tryAcquire 取到则返回释放句柄,取不到返回 null。
+//       与 rate-limit.js(限每秒请求数)互补。状态在进程内,多实例可换共享存储。依赖:无。导出:并发限制器工厂。
+export type ReleaseHandle = () => void;
+export type ConcurrencyLimiterOptions = { maxConcurrent?: number; maxPerTenant?: number };
+export type ConcurrencyLimiterStats = {
+  active: number;
+  tenants: number;
+  maxConcurrent: number;
+  maxPerTenant: number;
+};
+export type ConcurrencyLimiter = {
+  tryAcquire(tenantId?: string): ReleaseHandle | null;
+  stats(): ConcurrencyLimiterStats;
+};
+
+/**
+ * In-process concurrency guard for long-running agent streams.
+ *
+ * Each active agent stream holds an upstream LLM connection plus working memory,
+ * so an unbounded number of concurrent streams can exhaust a host instance. This
+ * limiter caps the global active count and a per-tenant count, returning a
+ * release handle (or null when over the limit, so the route can reply 429). It is
+ * the in-process first line of defense; a multi-instance deployment would back
+ * the same contract with a shared store (Redis) — see docs/01-scalability.
+ *
+ */
+export function createConcurrencyLimiter({ maxConcurrent = 64, maxPerTenant = 8 }: ConcurrencyLimiterOptions = {}): ConcurrencyLimiter {
+  let active = 0;
+  const perTenant = new Map<string, number>(); // tenantId -> count
+
+  return {
+    tryAcquire(tenantId = 'tenant_local') {
+      const t = perTenant.get(tenantId) || 0;
+      if (active >= maxConcurrent || t >= maxPerTenant) return null;
+      active += 1;
+      perTenant.set(tenantId, t + 1);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        active = Math.max(0, active - 1);
+        const cur = (perTenant.get(tenantId) || 1) - 1;
+        if (cur <= 0) perTenant.delete(tenantId);
+        else perTenant.set(tenantId, cur);
+      };
+    },
+    stats() { return { active, tenants: perTenant.size, maxConcurrent, maxPerTenant }; },
+  };
+}

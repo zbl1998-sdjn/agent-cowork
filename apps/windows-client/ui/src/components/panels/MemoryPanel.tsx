@@ -1,3 +1,4 @@
+// MemoryPanel(UI · components/panels):记忆面板——查看/检索分层记忆与用户画像、手动增删记忆条目。纯展示+回调。
 import { useEffect, useState } from 'react';
 import {
   forgetMemoryProfile,

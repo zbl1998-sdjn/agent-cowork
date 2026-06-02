@@ -1,3 +1,5 @@
+//! 路径安全(security)——凡触碰文件系统的命令共用:强制「解析后的路径必须落在可信根内」。
+//! 与 host 的 path-policy 镜像对应,使外壳侧 open_path 等也守同一围栏(plan/01 D.12 路径 jail)。
 //! Path-safety helpers shared by every command that touches the filesystem.
 //!
 //! The single invariant enforced here: a resolved path must live inside the

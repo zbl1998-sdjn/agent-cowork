@@ -1,7 +1,10 @@
+// Package state 管理 orchestrator 的任务状态机(services/orchestrator · Go)。
+// 职责:定义任务状态(TaskState)及合法的状态流转规则,确保任务只能按允许的路径迁移,非法流转报错。
 package state
 
 import "fmt"
 
+// TaskState 是任务在编排生命周期中的状态枚举。
 type TaskState string
 
 const (

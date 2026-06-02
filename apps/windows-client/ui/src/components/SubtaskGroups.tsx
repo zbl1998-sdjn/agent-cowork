@@ -1,3 +1,4 @@
+// SubtaskGroups(UI · components):子任务分组——把并行/分解的子代理任务按组展示其状态与结果。纯展示+回调。
 import type { SubtaskGroupItem } from '../lib/types';
 
 const STATUS_LABELS: Record<SubtaskGroupItem['status'], string> = {

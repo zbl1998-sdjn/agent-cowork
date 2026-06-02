@@ -1,7 +1,10 @@
+// Package session 管理 relay 服务的设备会话(services/relay · Go)。
+// 职责:并发安全地登记/查询/移除按设备的会话状态,为后续中继转发提供会话上下文。
 package session
 
 import "sync"
 
+// DeviceSession 表示单个设备的会话状态。
 type DeviceSession struct {
 	DeviceID string
 	TenantID string

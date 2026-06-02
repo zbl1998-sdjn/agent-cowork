@@ -89,10 +89,10 @@ describe('ToolsPanel state views', () => {
 
     expect(callButtons).toHaveLength(2);
     expect(planButtons).toHaveLength(2);
-    callButtons[0].props.onClick();
-    callButtons[1].props.onClick();
-    planButtons[0].props.onClick();
-    planButtons[1].props.onClick();
+    callButtons[0]!.props.onClick();
+    callButtons[1]!.props.onClick();
+    planButtons[0]!.props.onClick();
+    planButtons[1]!.props.onClick();
 
     expect(onCall).toHaveBeenCalledOnce();
     expect(onAddStep).toHaveBeenCalledOnce();

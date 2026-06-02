@@ -7,4 +7,4 @@ Get-Content "$root\.env" | ForEach-Object {
 }
 $env:PORT = '3017'
 $env:TRUSTED_ROOT = $root
-node apps/host/src/main.js *> "$root\runhost3017.log"
+node scripts/run-host-node.mjs apps/host/src/main.ts *> "$root\runhost3017.log"

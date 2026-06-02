@@ -5,10 +5,11 @@
   "type": "module",
   "description": "Agent Cowork desktop UI (React + Vite + TS). Builds to ../ui-dist for the Tauri shell.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "tsc -b && vitest run"
+    "dev": "vite --config vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --pretty false && tsc -p tsconfig.node.json --pretty false",
+    "build": "npm run typecheck && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "test": "npm run typecheck && vitest run --config vite.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",

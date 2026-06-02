@@ -1,7 +1,5 @@
+// Input(UI · components/ui 基础组件):统一样式的输入框(尺寸/状态/前后缀),纯展示+回调,表单复用。
 import type { CSSProperties, InputHTMLAttributes } from 'react';
-
-// UI primitive (FE-2a): labelled text input with optional error message.
-// Accessible (label htmlFor, aria-invalid, role=alert on error). Self-contained.
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;

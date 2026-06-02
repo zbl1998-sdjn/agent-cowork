@@ -1,3 +1,4 @@
+// ComposerAttachments(UI · components):输入框附件区——展示已选文件/图片缩略、支持移除,供随消息上传。纯展示+回调。
 import { IconButton } from './ui/Button';
 
 interface ComposerAttachmentsProps {

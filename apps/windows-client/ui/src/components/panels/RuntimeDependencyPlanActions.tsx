@@ -1,3 +1,4 @@
+// RuntimeDependencyPlanActions(UI · components/panels):依赖安装计划的操作区——确认/执行/取消安装计划的按钮与状态。纯展示+回调。
 import type {
   RuntimeDependencyCleanupPlanViewModel,
   RuntimeDependencyInstallPlanViewModel,

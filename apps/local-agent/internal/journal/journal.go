@@ -1,3 +1,6 @@
+// Package journal 是 local-agent 的审计日志(apps/local-agent · Go)。
+// 职责:把文件操作以 JSONL 逐行追加写入审计 journal(并发安全),为「副作用先批准 + 留痕」提供不可抵赖记录。
+// 依赖:仅标准库。导出:Event / Writer。
 package journal
 
 import (

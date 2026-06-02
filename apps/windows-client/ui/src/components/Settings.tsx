@@ -1,3 +1,4 @@
+// Settings(UI · components):设置模态外框——管理标签切换与保存,内容由 SettingsTabsContent 承载。纯展示+回调。
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
 import { humanizeError } from '../lib/friendly-error';

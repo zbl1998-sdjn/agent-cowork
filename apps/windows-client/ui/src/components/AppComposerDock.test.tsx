@@ -51,8 +51,8 @@ describe('AppComposerDockStatus', () => {
     );
 
     expect(buttons).toHaveLength(2);
-    buttons[0].props.onClick();
-    buttons[1].props.onClick();
+    buttons[0]!.props.onClick();
+    buttons[1]!.props.onClick();
     expect(onStopStreaming).toHaveBeenCalledOnce();
     expect(onClearRecipe).toHaveBeenCalledOnce();
   });

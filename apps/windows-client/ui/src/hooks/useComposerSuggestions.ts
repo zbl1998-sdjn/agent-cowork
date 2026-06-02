@@ -1,3 +1,7 @@
+// useComposerSuggestions(UI · hooks 层)
+// ---------------------------------------------------------------------------
+// 职责:驱动输入框的智能建议弹窗——监听触发(/模板、@提及、↑历史)、维护候选列表与高亮项、处理键盘选择/插入。
+//       依赖:lib/composer-trigger 纯逻辑 + 起步建议数据源。
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
@@ -28,9 +32,9 @@ export interface UseComposerSuggestionsOptions {
   /** Slash-commands surfaced alongside templates. */
   slashCommands: Array<{ id: string; label: string; run: () => void }>;
   /** Notified when the user picks a template recipe. */
-  onPickTemplate?: (recipe: Recipe) => void;
+  onPickTemplate?: ((recipe: Recipe) => void) | undefined;
   /** Notified when the user picks a previous run. */
-  onPickHistory?: (run: HistoryRun) => void;
+  onPickHistory?: ((run: HistoryRun) => void) | undefined;
   /** From useComposerRefine — lets it reset its "the prompt changed" flag. */
   markChanged: (next: string) => void;
 }

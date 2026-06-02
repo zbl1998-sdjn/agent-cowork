@@ -1,7 +1,9 @@
 package domain
 
+// 本文件:领域「端口」接口(仓储/查询等抽象)与查询参数。基础设施层实现这些接口,实现依赖倒置(六边形架构)。
 import "context"
 
+// Query 是按租户等条件检索领域对象的查询参数。
 type Query struct {
 	TenantID ID
 	Limit    int

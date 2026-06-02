@@ -1,3 +1,4 @@
+// FilePreview(UI · components):文件预览——按类型渲染图片/PDF/文本/表格预览(数据来自 /api/files 预览)。纯展示+回调。
 import { useEffect, useState } from 'react';
 import { previewFile, openPath, type FilePreviewResult } from '../lib/api';
 import { renderMarkdown } from '../lib/md';
@@ -9,9 +10,9 @@ interface FilePreviewProps {
   onClose: () => void;
 }
 
-// Inline preview modal for produced artifacts: images render via a data: URL
-// (allowed by the desktop CSP), markdown is rendered, text shows as <pre>, and
-// PDF / unknown types fall back to "open with the system app".
+// 产物制品的内联预览弹窗:图片用 data: URL 渲染(桌面端 CSP 允许),
+// markdown 渲染为 HTML,纯文本以 <pre> 显示,PDF / 未知类型则回退到
+// 「用系统应用打开」。
 export function FilePreview({ path, trustedRoot, onClose }: FilePreviewProps) {
   const [data, setData] = useState<FilePreviewResult | null>(null);
   const [error, setError] = useState('');

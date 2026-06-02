@@ -1,3 +1,4 @@
+// ComposerActions(UI · components):输入框动作区——发送/停止按钮与工具开关(联网、沙箱等)。纯展示+回调。
 import { Button } from './ui/Button';
 
 export function ComposerToolActions({
