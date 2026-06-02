@@ -21,7 +21,6 @@ const resourceBrowserGlobals = {
 
 const typedSourceFiles = [
   'eslint.config.ts',
-  'apps/host/*.ts',
   'apps/host/mcp-servers/**/*.ts',
   'apps/host/scripts/**/*.ts',
   'apps/host/src/**/*.ts',
