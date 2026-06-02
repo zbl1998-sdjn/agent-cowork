@@ -59,15 +59,13 @@ jobs:
         run: npm install
 
       - name: Run host unit tests
-        # Excludes runtime-dependencies.test.ts: those tests call
-        # normalizeAgentCoworkRoot() which requires a Windows path ending in
-        # "AgentCowork" — they are intentionally Windows-only (CI runs on Linux).
-        # Tests migrated JS→TS: run them through the host TS loader
-        # (scripts/run-host-node.mjs) with scripts/test-setup.ts. No
-        # --test-isolation flag: it needs Node 22.8+ and CI pins Node 22; the
-        # suite is isolation-safe (single-process run passes 758/skip 1 locally).
+        # Windows-only plan tests in runtime-dependency-plans.test.ts self-skip on
+        # non-Windows via a platform guard (winOnly), so no file exclusion is needed.
+        # Tests run through the host TS loader (scripts/run-host-node.mjs) with
+        # scripts/test-setup.ts. No --test-isolation flag: it needs Node 22.8+ and
+        # CI pins Node 22; the suite is isolation-safe (single-process run locally).
         run: |
-          FILES=$(cd apps/host && ls test/*.test.ts | grep -v runtime-dependencies.test.ts | tr '\n' ' ')
+          FILES=$(cd apps/host && ls test/*.test.ts | tr '\n' ' ')
           node scripts/run-host-node.mjs --cwd apps/host -- --test --test-timeout=60000 --import ../../scripts/test-setup.ts $FILES
         env:
           KCW_REQUIRE_AUTH: "false"

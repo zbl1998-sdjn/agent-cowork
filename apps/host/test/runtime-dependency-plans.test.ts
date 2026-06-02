@@ -26,6 +26,11 @@ import { recordById, stringIds } from './helpers/runtime-dependency.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
 
+// 以下部分计划测试断言 Windows 安装版的 AppData 布局(C:\...\AgentCowork),依赖
+// normalizeAgentCoworkRoot 的 Windows 路径校验,在非 Windows(如 Linux CI)上无法成立。
+// 用 winOnly 让它们仅在 Windows 运行、其它平台跳过(Windows 本地行为与断言不变)。
+const winOnly = process.platform === 'win32' ? {} : { skip: 'Windows-only: AppData 路径规范化' };
+
 async function withServer(config: ServerConfig, fn: (base: string) => Promise<void>): Promise<void> {
   const server = createServer({ requireAuth: false, enableScheduler: false, ...config });
   const base = await bind(server);
@@ -36,7 +41,7 @@ async function withServer(config: ServerConfig, fn: (base: string) => Promise<vo
   }
 }
 
-test('runtime dependency plan routes expose install cleanup and update plans without side effects', async () => {
+test('runtime dependency plan routes expose install cleanup and update plans without side effects', winOnly, async () => {
   const trustedRoot = makeTestWorkspace('kcw-runtime-dep-plan-routes');
   const appDataRoot = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
   await withServer({ trustedRoot, runtimeDependencyAppDataRoot: appDataRoot }, async (base) => {
@@ -151,7 +156,7 @@ test('runtime dependency install plan accepts required bundled defaults without 
   assert.equal(plan.supplyChain.status, 'ok');
 });
 
-test('runtime dependency cleanup plan removes on-demand components while preserving user data', () => {
+test('runtime dependency cleanup plan removes on-demand components while preserving user data', winOnly, () => {
   const root = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
   const plan = buildRuntimeDependencyCleanupPlan({
     appDataRoot: root,
@@ -170,7 +175,7 @@ test('runtime dependency cleanup plan removes on-demand components while preserv
   }
 });
 
-test('runtime dependency cleanup plan requires confirmation before deleting user data', () => {
+test('runtime dependency cleanup plan requires confirmation before deleting user data', winOnly, () => {
   const plan = buildRuntimeDependencyCleanupPlan({
     appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
     selectedIds: ['tesseract-ocr', 'unknown-component'],
@@ -213,7 +218,7 @@ test('NSIS uninstall hook deletes AgentCowork AppData only after delete-data con
   assert.doesNotMatch(hookText, /RmDir\s+\/r\s+"\$APPDATA"/);
 });
 
-test('runtime dependency update plan preserves AppData components, venv and user data', () => {
+test('runtime dependency update plan preserves AppData components, venv and user data', winOnly, () => {
   const root = 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork';
   const plan = buildRuntimeDependencyUpdatePlan({
     appDataRoot: root,
@@ -240,7 +245,7 @@ test('runtime dependency update plan preserves AppData components, venv and user
   }
 });
 
-test('runtime dependency update plan reports unknown components without destructive fallback', () => {
+test('runtime dependency update plan reports unknown components without destructive fallback', winOnly, () => {
   const plan = buildRuntimeDependencyUpdatePlan({
     appDataRoot: 'C:\\Users\\Alice\\AppData\\Roaming\\AgentCowork',
     selectedIds: ['data-science', 'unknown-component'],
