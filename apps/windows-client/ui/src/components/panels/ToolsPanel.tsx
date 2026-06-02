@@ -1,4 +1,7 @@
-// ToolsPanel(UI · components/panels):工具面板——检索并浏览可用工具(内置 + MCP),查看其描述/风险/输入模式。纯展示+回调。
+// 工具面板(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:按关键字检索可用工具(内置 + MCP),手动调用单个工具或堆叠成计划交给子任务运行;高风险/需审批工具禁用直调。只渲染+触发回调。
+// 依赖:lib/api(searchTools/callTool)+ ui/Button、ui/StateViews;关键回调 onRunPlan(goal, steps)。
 import { useState } from 'react';
 import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../../lib/api';
 import { Button } from '../ui/Button';

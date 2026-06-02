@@ -1,4 +1,7 @@
-// PreviewCard(UI · components):文件操作预览卡——展示待审批的 write/rename/move 预案(前后哈希、目标路径)供用户确认。纯展示+回调。
+// 文件操作预览卡(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:把待审批的文件操作列表(write/rename/move 等)渲染成预览卡,展示操作类型、目标路径与风险等级,超出 4 条折叠提示。只渲染。
+// 依赖:lib/types 的 FileOperation。关键 props:operations、summary、risk。
 import type { FileOperation } from '../lib/types';
 
 export interface PreviewCardProps {

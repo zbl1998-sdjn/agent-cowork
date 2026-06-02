@@ -4,7 +4,6 @@ import { MenuItemButton } from './ui/MenuItemButton';
 
 export interface Command { id: string; label: string; hint?: string; run: () => void }
 
-// Cmd/Ctrl+K command palette: fuzzy-filter + keyboard-navigate app actions.
 export function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);

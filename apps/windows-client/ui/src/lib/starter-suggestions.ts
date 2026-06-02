@@ -1,4 +1,7 @@
-// 起步建议(UI · lib):为空会话/新用户生成「起步卡片」建议(基于配方/角色),引导用户快速上手。依赖:无。
+// 起步建议(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:依据历史运行、配方与基础项,去重裁剪生成一组「起步卡片」建议文案,引导用户快速上手。
+// 纯函数、无依赖。导出:buildContextualStarters 及 StarterRecipe / StarterHistoryRun 类型。
 export interface StarterRecipe {
   name?: string | null | undefined;
   summary?: string | null | undefined;

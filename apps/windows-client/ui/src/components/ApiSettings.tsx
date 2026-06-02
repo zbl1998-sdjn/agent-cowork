@@ -1,4 +1,8 @@
-// ApiSettings(UI · components):API/模型设置表单——填写并测试 Kimi/模型配置(base URL、key、模型),保存到 host。纯展示+回调。
+// API 设置弹窗(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:填写 Kimi/模型配置(API Key、Base URL、模型)的模态;从 host 预填 baseUrl/model 与
+//       hasKey(不回显明文),保存空 Key 即保留原值。仅渲染+回调,通过 lib/api 读写配置。
+// 依赖:getKimiInfo/saveKimiConfig(lib/api)、Button/IconButton。同文件导出 ApiSettingsActions(操作条)。
 import { useEffect, useState } from 'react';
 import { getKimiInfo, saveKimiConfig, type KimiInfo } from '../lib/api';
 import { Button, IconButton } from './ui/Button';
@@ -33,9 +37,6 @@ export function ApiSettingsActions({
   );
 }
 
-// API settings modal (kimi.exe style): pre-fills baseUrl/model from the host and
-// shows whether a key is set without ever exposing it. Saving an empty key keeps
-// the existing one; the host only ever returns a `hasKey` boolean.
 export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');

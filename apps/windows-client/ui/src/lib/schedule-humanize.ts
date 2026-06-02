@@ -1,9 +1,7 @@
-// 计划任务人话化(UI · lib):把调度器原始字段(cron/下次触发等)转成一眼能懂的简短中文短语。依赖:无。
-// Pure helpers: turn raw scheduler fields into one short Chinese phrase a
-// non-technical user can read at a glance.
-//
-// Used by SchedulesPanel. Kept dependency-free (L0) so it's trivially testable
-// and reusable from other panels or briefings later.
+// 计划任务人话化(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把调度器原始字段(状态/cron/fireAt/nextFireAt)转成一眼能懂的简短中文短语,供 SchedulesPanel 等展示。
+// 纯函数、无依赖(L0),now 可注入便于测试。导出:humanizeScheduleStatus / humanizeCron / humanizeFireAt / humanizeScheduleWhen / humanizeScheduleLine。
 
 export type ScheduleStatusLike = string | null | undefined;
 

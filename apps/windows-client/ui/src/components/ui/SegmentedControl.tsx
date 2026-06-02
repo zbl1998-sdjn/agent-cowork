@@ -1,4 +1,7 @@
-// SegmentedControl(UI · components/ui 基础组件):分段切换控件(多选一 tab 样式),纯展示+回调。
+// SegmentedControl 分段切换控件(UI · 组件层 · components/ui)
+// ---------------------------------------------------------------------------
+// 职责:多选一的分段/侧栏切换控件,按当前 value 高亮各选项并经 onChange 回传选中值;variant 决定 tablist 或 group 语义。纯展示+回调。
+// 依赖:ui/Button。关键 props:options、value、onChange、variant('sidebar' | 'segmented')。
 import type { CSSProperties } from 'react';
 import { Button } from './Button';
 

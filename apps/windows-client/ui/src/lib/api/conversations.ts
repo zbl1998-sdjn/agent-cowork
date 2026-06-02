@@ -1,4 +1,7 @@
-// 会话 API(UI · lib/api 传输层):封装 /api/conversations/* —— 会话列出/读取/创建/改名/删除。
+// 会话 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装会话的列出/搜索/读取/保存/删除,统一吞错返回空集或布尔结果。
+// 依赖/对应路由:GET /api/conversations(?full|?q)、GET/PUT/DELETE /api/conversations/:id。导出:listStoredConversations / searchStoredConversations / getStoredConversation / saveStoredConversation / deleteStoredConversation + 相关类型。
 import { getJson, sendJsonMethod } from './transport';
 
 export interface StoredConversation {

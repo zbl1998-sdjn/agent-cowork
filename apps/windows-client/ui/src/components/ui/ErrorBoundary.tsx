@@ -2,11 +2,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ErrorState } from './StateViews';
 
-// React error boundary (FE-3). Wraps the main area and each panel so a render
-// crash in one region shows a readable, retryable fallback instead of a white
-// screen. Pass `label` to name the failed region, `fallback` for a custom view,
-// and `onError` to log. Reset clears the error and re-renders children.
-
 export interface ErrorBoundaryProps {
   children: ReactNode;
   /** Human label for the region, shown in the default fallback title. */

@@ -1,4 +1,7 @@
-// AppSidePanel(UI · components):右侧侧边面板容器——按当前选中的标签 lazy 加载对应面板(制品/工具/记忆/项目等)。
+// 右侧侧边面板容器(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:按当前选中标签 lazy 加载并挂载对应面板(工具/可视化/连接器/产物/项目/定时任务/记忆/可观测),用 ErrorBoundary 隔离。
+// 依赖:panels/* 各懒加载面板、ErrorBoundary、Loading、IconButton。关键回调:onClose / onRunSubagent。
 import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';

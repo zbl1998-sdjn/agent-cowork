@@ -42,8 +42,6 @@ function failureReason(call: ToolCall): string {
   return '';
 }
 
-// Collapsible tool-call card: shows the tool name + status, expands to reveal the
-// input args and a result preview — the Claude Cowork "what the agent did" view.
 export function ToolCallCard({ call }: { call: ToolCall }) {
   const [open, setOpen] = useState(false);
   const duration = formatDuration(call.durationMs);

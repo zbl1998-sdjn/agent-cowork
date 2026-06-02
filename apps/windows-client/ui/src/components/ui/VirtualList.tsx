@@ -1,11 +1,9 @@
-// VirtualList(UI · components/ui 基础组件):虚拟滚动列表,只渲染可视区条目以支撑超长列表的流畅渲染。
+// VirtualList 虚拟滚动列表(UI · 组件层 · components/ui)
+// ---------------------------------------------------------------------------
+// 职责:按定高窗口化只渲染可视区条目,支撑数百条消息的长列表流畅滚动;滚动位置驱动可视窗口计算。纯展示+回调。
+// 依赖:hooks/useVirtualWindow 的纯函数 computeVirtualWindow。关键 props:items、itemHeight、height、overscan、renderItem。
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
-
-// Generic windowed list (FE-5): renders only the visible slice of `items` so a
-// conversation with hundreds of messages stays smooth. Uses fixed itemHeight
-// for the windowing math (good enough for chat rows); the heavy lifting lives
-// in the pure computeVirtualWindow. Self-contained, inline styling, no deps.
 
 export interface VirtualListProps<T> {
   items: T[];

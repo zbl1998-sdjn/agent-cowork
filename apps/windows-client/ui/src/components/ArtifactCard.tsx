@@ -1,4 +1,7 @@
-// ArtifactCard(UI · components):时间线里的制品卡片——展示一个生成制品(名称/类型/预览)并提供打开/下载。纯展示+回调。
+// 制品卡片(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:在时间线里展示单个生成制品(文件名取自 relativePath/path,附元信息),提供「在系统中打开」。仅渲染+回调。
+// 依赖:Button;制品类型来自 lib/types。关键回调:onOpen(path)。
 import type { ArtifactFile } from '../lib/types';
 import { Button } from './ui/Button';
 

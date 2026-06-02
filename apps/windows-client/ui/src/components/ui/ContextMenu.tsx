@@ -1,11 +1,6 @@
 // ContextMenu(UI · components/ui 基础组件):右键/触发式上下文菜单(定位、点外关闭、键盘导航),纯展示+回调。
 import type { CSSProperties } from 'react';
 
-// UI primitive (05-B2): right-click context menu. Renders nothing when closed.
-// Positioned at (x, y); clicking an item fires its onSelect then closes;
-// clicking the overlay (or right-clicking it) closes. Accessible (role=menu /
-// menuitem). Self-contained, inline styling, no deps.
-
 export interface ContextMenuItem {
   label: string;
   onSelect: () => void;

@@ -1,4 +1,8 @@
-// 引导逻辑(UI · lib):新用户引导的纯逻辑与本地状态键(是否已完成引导、所选角色等),配合 api/onboarding 推荐。依赖:无。
+// 引导逻辑(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:新用户引导的纯逻辑、类型与本地状态键——角色选项归一化、初始角色选择、
+// 按角色的离线兜底推荐(技能/连接器/设置)、视图模型整形与推荐依赖筛选。配合 api/onboarding。
+// 导出:ONBOARDING_DONE_KEY、selectInitialRole、getFallbackOnboarding、toOnboardingViewModel 等及相关类型。
 export const ONBOARDING_DONE_KEY = 'kcw.onboardingDone';
 
 export type OnboardingRole = 'office' | 'developer' | 'research' | 'operations';

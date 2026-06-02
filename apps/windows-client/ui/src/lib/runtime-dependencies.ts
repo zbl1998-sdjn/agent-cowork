@@ -1,5 +1,8 @@
-// 运行时依赖逻辑(UI · lib):把后端返回的依赖探测结果整理成前端可展示的状态(就绪/缺失/可安装),
-// 并算出安装动作。配合 api/runtimeDependencies 与依赖面板。依赖:lib/types。
+// 运行时依赖逻辑(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把 host 返回的依赖探测/计划结果整形成面板视图模型——状态与严重度标注、下载体积格式化、
+// 分区汇总,以及安装/清理/更新保留计划的候选与展示文案。依赖:lib/api/runtimeDependencies、
+// lib/runtime-dependency-view-types。导出:toRuntimeDependencyViewModel、各计划整形函数、formatDependencyBytes。
 import type {
   RuntimeDependency,
   RuntimeDependencyCleanupPlanResponse,

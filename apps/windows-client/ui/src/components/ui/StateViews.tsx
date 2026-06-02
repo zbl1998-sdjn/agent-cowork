@@ -1,11 +1,9 @@
-// StateViews(UI · components/ui 基础组件):统一的「空/加载/错误」状态视图,避免各处重复写占位 UI。
+// StateViews 状态视图(UI · 组件层 · components/ui)
+// ---------------------------------------------------------------------------
+// 职责:统一的「空/加载/错误」占位视图(Empty/Loading/ErrorState),自带行内样式与 role/aria,避免各处重复写占位 UI;ErrorState 可带 onRetry 重试。纯展示+回调。
+// 依赖:ui/Button(空态 action、错误态重试)。导出:Empty / Loading / ErrorState。
 import type { CSSProperties, ReactNode } from 'react';
 import { Button } from './Button';
-
-// Reusable empty / loading / error state views (FE-3).
-// Self-contained: minimal inline styling so they render correctly without
-// touching the shared styles.css. Semantic class names are kept so the theme
-// layer can style them later. Chinese, accessible (role/aria) by default.
 
 const container: CSSProperties = {
   display: 'flex',

@@ -1,4 +1,7 @@
-// 文件 API(UI · lib/api 传输层):封装 /api/files|workspace/* —— 列文件树、读/预览、上传、批量文件操作与回滚。
+// 文件 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:文件预览与上传——预览返回分类内容(图片/PDF/文本/表格等),并把浏览器 File 编码为 base64 上传载荷。
+// 依赖/对应路由:POST /api/files/preview、POST /api/uploads/import。导出:previewFile / importUploads / fileToUpload + FilePreviewResult / UploadFile 类型。
 import { postJson } from './transport';
 
 export interface FilePreviewResult {

@@ -1,4 +1,7 @@
-// 诊断 API(UI · lib/api 传输层):封装系统/健康/指标端点 —— 取 host 健康、熔断器/限流状态等运维信息。
+// 诊断 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:拉取 host 自检结果(安全头/CORS/限流/熔断器/存储/沙箱等运维信息)。
+// 依赖/对应路由:GET /api/selfcheck。导出:getSelfCheck + SelfCheckResult / SelfCheckItem 类型。
 import { getJson } from './transport';
 
 export interface SelfCheckItem {

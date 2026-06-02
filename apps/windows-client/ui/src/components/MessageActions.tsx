@@ -1,4 +1,7 @@
-// MessageActions(UI · components):消息悬浮操作——复制/重答(分叉)/编辑等单条消息动作。纯展示+回调。
+// MessageActions 消息操作条(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:助手消息底部的内联动作——复制(带"已复制"反馈)、继续、存为技能、重新生成,均通过回调上抛。
+// 依赖:ui/Button。关键回调:onCopy、onContinue、onCaptureRecipe、onRegenerate。
 import { useState } from 'react';
 import { Button } from './ui/Button';
 
@@ -11,7 +14,6 @@ interface MessageActionsProps {
   onRegenerate?: (() => void) | undefined;
 }
 
-// Inline actions under a completed assistant message.
 export function MessageActions({ onCopy, onContinue, onCaptureRecipe, captureRecipeDisabled, captureRecipeLabel, onRegenerate }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   return (

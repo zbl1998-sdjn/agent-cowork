@@ -1,4 +1,7 @@
-// WorkspaceSwitcher(UI · components):工作区切换器——选择/切换当前可信工作区目录(经 Tauri 选目录),影响后续文件操作根。纯展示+回调。
+// WorkspaceSwitcher 工作区切换器(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:选择/切换当前受信任工作区根(Tauri 原生选目录或粘贴路径),切换前用 GET /api/projects?trustedRoot 预检 host path-policy,通过后经 onSwitch 回传并记入最近列表(localStorage)。
+// 依赖:lib/api(getJson/isDesktop)+ lib/icons + ui/Button;@tauri-apps/plugin-dialog 动态导入。导出:组件 + 纯函数 pushRecentWorkspace / abbreviatePath。
 import { useEffect, useRef, useState } from 'react';
 import { getJson, isDesktop } from '../lib/api';
 import { ICONS } from '../lib/icons';

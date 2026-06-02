@@ -1,4 +1,7 @@
-// 聊天 API(UI · lib/api 传输层):封装 Agent 流式聊天(SSE)——发起对话请求、读取事件流、取消/续跑。
+// 聊天 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:封装普通对话与 Agent 流式对话(SSE),把 token/推理/工具调用/审批/计划/待办/问答/完成等事件分发到 handlers;并提供审批应答、问答应答与运行取消。
+// 依赖/对应路由:POST /api/kimi/chat(/stream)、/api/agent/chat/stream、/api/approvals/:id、/api/approvals/batch、/api/runs/:id/cancel;经 ./sse(streamSse)。导出:chat / chatStream / agentChatStream / respondApproval(s) / answerQuestion / cancelRun + 相关类型。
 import { authHeaders, hostReady, postJson, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse, type SsePayload } from './sse';
 import type { TodoItem, TodoStatus } from '../types';

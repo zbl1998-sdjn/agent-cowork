@@ -1,4 +1,7 @@
-// 连接器 OAuth 状态(UI · components/panels):查询并归一化连接器的授权状态(已连/未连/授权范围),供连接器面板展示。纯逻辑。
+// 连接器 OAuth 状态读取(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:面板辅助逻辑——筛出 oauth-device 类型连接器,经 lib/api 查询授权状态并归一化为视图对象(已连/账号/是否已配置),失败兜底为未连。
+// 依赖/对应路由:lib/api 的 getOAuthConnectorStatus。导出:OAuthStatusView 类型、readConnectorOAuthStatus()。
 import { getOAuthConnectorStatus, type ConnectorInfo } from '../../lib/api';
 
 export type OAuthStatusView = {

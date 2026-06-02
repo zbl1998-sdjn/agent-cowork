@@ -1,4 +1,7 @@
-// AppComposerDock(UI · components):底部输入区「停靠层」——把 Composer 及其建议/触发弹窗组合定位在底部,接 App 回调。
+// 底部输入区停靠层(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:把 Composer(输入框)连同停止生成条、已选模板提示固定在底部,转发 App 传入的发送/精炼/搜文件等回调。
+// 依赖:Composer 及其类型、Button。同文件导出 AppComposerDockStatus(停止/模板状态条)。
 import type { Command } from './CommandPalette';
 import { Composer, type ComposerMeta, type FileHit, type HistoryRun, type Recipe } from './Composer';
 import { Button } from './ui/Button';

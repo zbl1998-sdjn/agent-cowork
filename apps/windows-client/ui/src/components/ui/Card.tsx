@@ -1,9 +1,6 @@
 // Card(UI · components/ui 基础组件):卡片容器(标题/内容/留白),统一面板与卡片的视觉外框。
 import type { CSSProperties, ReactNode } from 'react';
 
-// UI primitive (FE-2a): simple content card with an optional title. Themeable
-// via class names, minimal inline styling, self-contained.
-
 export interface CardProps {
   title?: ReactNode;
   children?: ReactNode;

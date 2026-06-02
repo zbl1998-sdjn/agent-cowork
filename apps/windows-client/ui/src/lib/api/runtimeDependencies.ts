@@ -1,4 +1,8 @@
-// 运行时依赖 API(UI · lib/api 传输层):封装依赖探测/安装端点 —— 查询外部运行时是否就绪、触发按需安装。
+// 运行时依赖 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:查询外部运行时依赖是否就绪,并生成安装/清理/更新计划(供 UI 预演)。
+// 对应路由:/api/runtime/dependencies 及其 install-plan、cleanup-plan、update-plan。
+// 导出:getRuntimeDependencies 与三个 *Plan 查询函数,及相关请求/响应类型。
 import { getJson, postJson, type PostBody } from './transport';
 
 export type RuntimeDependencyStatus = 'available' | 'configured' | 'missing' | 'unknown' | 'not_applicable' | 'degraded' | string;

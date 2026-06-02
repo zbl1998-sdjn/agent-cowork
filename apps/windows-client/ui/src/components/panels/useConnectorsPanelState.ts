@@ -1,5 +1,7 @@
-// useConnectorsPanelState(UI · components/panels):连接器面板的本地状态 hook——加载连接器列表/状态、发起 OAuth、
-// 安装/吊销 MCP 连接器,把数据逻辑从面板组件抽出。依赖:lib/api + 同目录 connectorOAuthStatus/connectorScopes。
+// 连接器面板状态 hook(UI · 组件层 · components/panels)
+// ---------------------------------------------------------------------------
+// 职责:封装连接器面板的本地状态与数据逻辑——搜索/加载连接器、连接与断开 MCP、OAuth 审批/发起/确认/撤销与权限勾选,把数据逻辑从面板组件抽出。
+// 依赖:lib/api(listConnectors/connectConnector/*OAuthConnector 等)+ friendly-error + 同目录 connectorOAuthStatus/connectorScopes。导出:useConnectorsPanelState。
 import { useCallback, useEffect, useState } from 'react';
 import {
   approveOAuthConnector,

@@ -15,8 +15,8 @@ interface ComposerModelControlsProps {
   onModel: (value: string) => void;
 }
 
-// Per-turn provider + model picker. Base URL / API Key are intentionally NOT
-// here — those are credentials and belong in Settings (⚙), not in the composer.
+// 本轮提供商 + 模型选择器。Base URL / API Key 故意不在此处——
+// 那属于凭据,应放在设置(⚙)里,而非输入框。
 export function ComposerModelControls({
   model, modelOptions, provider, defaultModel,
   onProvider, onModel,

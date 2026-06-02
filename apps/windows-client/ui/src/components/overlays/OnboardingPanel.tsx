@@ -1,4 +1,8 @@
-// OnboardingPanel(UI · components/overlays):新用户引导浮层——选择角色、展示推荐配方/连接器、引导完成。纯展示+回调。
+// OnboardingPanel 首启引导浮层(UI · 组件层 · components/overlays)
+// ---------------------------------------------------------------------------
+// 职责:按所选角色拉取推荐(失败回退本地默认),做依赖体检并展示推荐配方/连接器/设置项,引导用户进入设置或完成。
+// 依赖:lib/api(getOnboardingRecommendations/getJson)+ lib/onboarding(回退/视图模型)+ ui/Button。
+//       关键回调:onComplete、onOpenSettings、onOpenSettingsTab。
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { getJson, getOnboardingRecommendations } from '../../lib/api';
 import {

@@ -1,4 +1,7 @@
-// 用量展示(UI · lib):把 token 数、费用、时长格式化成易读字符串(如 1.2k tokens、$0.003、1.4s),供可观测/计费展示。依赖:无。
+// 用量展示(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把用量透明度数据(token 数、费用、时长/阶段)格式化成易读字符串与展示行,供可观测/计费面板使用。
+// 纯函数、无依赖。导出:formatTokenCount / formatDurationMs / formatEstimatedCost / buildUsageDisplayRows 及 UsageTransparency / UsageDisplayRow 类型。
 export interface UsageTransparency {
   schemaVersion?: number | undefined;
   model?: string | undefined;

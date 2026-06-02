@@ -1,5 +1,8 @@
-// 运行可观测整形(UI · lib):把运行的用量/耗时/工具调用整理成可展示的「可观测信息」(费用/时长/参数摘要),
-// 供时间线与运行详情面板。依赖:同层 usage-display / observability-args。
+// 运行可观测整形(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:把一条运行记录(用量/成本/工具调用/失败率/耗时/归因/来源)整形成面板可直接渲染的
+// 视图模型(卡片+多组行),并选定初始运行 id。依赖:lib/usage-display、lib/observability-args、lib/types。
+// 导出:selectInitialRunId、buildRunObservabilityView 及 RunObservabilityView 等类型。
 import { formatDurationMs, formatEstimatedCost, formatTokenCount } from './usage-display';
 import { summariseArgs } from './observability-args';
 import type { RunRecord, SourceRef } from './types';

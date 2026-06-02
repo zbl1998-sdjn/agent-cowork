@@ -12,8 +12,8 @@ export function InlineVizLoadingState() {
   return <Loading message="渲染图表中…" />;
 }
 
-// Renders a viz spec inline in the conversation by asking the host to render it
-// (persist:false) and embedding the returned self-contained HTML in an iframe.
+// 在对话流内联渲染可视化:请求 host 渲染该 viz spec(persist:false),
+// 再把返回的自包含 HTML 嵌入 iframe 展示。
 export function InlineViz({ spec, trustedRoot }: { spec: VizSpec; trustedRoot?: string | undefined }) {
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');

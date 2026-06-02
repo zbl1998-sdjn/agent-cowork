@@ -1,7 +1,8 @@
-// 会话工具(UI · lib):多会话历史栏的纯函数(标题推断、排序、增删改的不可变更新等),从 App.tsx 抽出以便
-// 脱离 DOM/React 单测。依赖:app-types。
-// Pure, testable helpers for the multi-conversation history rail. Kept out of
-// App.tsx so they can be unit-tested without a DOM/React harness.
+// 会话工具(UI · 逻辑层 · lib)
+// ---------------------------------------------------------------------------
+// 职责:多会话历史栏的纯函数(图片路径判定、首条用户消息推断标题、会话导出 Markdown),
+// 从 App.tsx 抽出以便脱离 DOM/React 单测。依赖:lib/md 的 extractSuggestions。
+// 导出:isImagePath、convTitle、conversationToMarkdown 及 ConvLike/ConvMessageLike 类型。
 import { extractSuggestions } from './md';
 
 export interface ConvMessageLike { role: string; text?: string | undefined }

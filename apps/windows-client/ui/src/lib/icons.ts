@@ -1,14 +1,9 @@
-// 图标常量(UI · lib):应用外框 emoji 图标的单一事实来源(集中管理,供 check:icons 看护使用一致性)。
-// Single source of truth for emoji icons that appear in the chrome of the
-// app (header buttons, composer triggers, panel chips). Centralised so:
-//   - swapping to a real SVG icon set later is a one-file change;
-//   - we can lint for "naked emoji" usage (forbid raw 📦 in JSX, force ICONS.*);
-//   - variant selectors are uniform — e.g. ⚙ vs ⚙️ render very differently on
-//     Windows (line-only vs full-colour) and we previously used the bare form
-//     by accident.
-//
-// Keep this list short. If you find yourself adding 30+ entries, the answer
-// is probably "switch to a real icon font" rather than "add another emoji."
+// 图标常量(UI · lib)
+// ---------------------------------------------------------------------------
+// 职责:应用外框(头部按钮/输入区触发器/面板小标)所用 emoji 图标的单一事实来源;
+// 集中管理便于将来一处切换为 SVG 图标集、可被 check:icons 看护(禁止 JSX 裸 emoji)、
+// 并统一变体选择符(如 ⚙️ 强制 U+FE0F 全彩,避免 Windows 上的线框渲染)。
+// 导出:ICONS、IconKey。条目宜少,超 30 项应改用真正的图标字体。
 
 export const ICONS = Object.freeze({
   /** Folder / workspace chip. */

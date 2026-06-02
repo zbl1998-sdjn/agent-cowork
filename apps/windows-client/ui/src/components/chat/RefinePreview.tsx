@@ -1,4 +1,7 @@
-// RefinePreview(UI · components/chat):提示词精炼结果预览——展示「原稿 vs 精炼后」并提供采纳/放弃。纯展示+回调。
+// 提示优化预览(UI · 组件层 · components/chat)
+// ---------------------------------------------------------------------------
+// 职责:展示提示精炼结果——有缺失信息时列出待补项,否则给出可编辑的优化稿,并提供采用/编辑后采用/忽略。仅渲染+回调。
+// 依赖:Button;结果类型 PromptRefineResult 来自 lib/api/prompt。关键回调:onResolve(action, prompt)。
 import { useState } from 'react';
 import type { PromptRefineResult } from '../../lib/api/prompt';
 import { Button } from '../ui/Button';

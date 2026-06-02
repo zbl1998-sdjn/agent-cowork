@@ -1,4 +1,7 @@
-// 项目 API(UI · lib/api 传输层):封装 /api/projects/* —— 项目增删查与切换(写操作带幂等键)。
+// 项目 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:项目列出/创建/更新/删除,以及把会话/工件挂到项目;写操作均带幂等键并透传 trustedRoot。
+// 依赖/对应路由:GET/POST /api/projects、PATCH/DELETE /api/projects/:id、POST /api/projects/:id/conversations|artifacts。导出:listProjects / createProject / updateProject / deleteProject / assignProjectConversation / assignProjectArtifact + 相关类型。
 import { getJson, newIdempotencyKey, postJson, sendJsonMethod } from './transport';
 
 export interface ProjectRecord {

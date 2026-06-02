@@ -1,4 +1,7 @@
-// Kimi 配置 API(UI · lib/api 传输层):封装 /api/kimi/* —— 读取/保存模型配置与连通性诊断。
+// Kimi 配置 API(UI · 传输层 · lib/api)
+// ---------------------------------------------------------------------------
+// 职责:读取/保存模型(provider/key/baseUrl/model)配置及其启用与连通状态。
+// 依赖/对应路由:GET /api/kimi/info、POST /api/kimi/config。导出:getKimiInfo / saveKimiConfig + KimiInfo / SaveKimiConfigInput 类型。
 import { getJson, postJson } from './transport';
 
 export interface KimiInfo {

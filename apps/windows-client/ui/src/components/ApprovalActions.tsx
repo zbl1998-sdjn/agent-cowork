@@ -1,4 +1,7 @@
-// ApprovalActions(UI · components):审批操作条——展示待审批的高危/写操作,提供「本次/本轮/拒绝」按钮回传决定。纯展示+回调。
+// 审批操作条(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:按审批状态渲染待审批的写操作——pending 显示「审批执行/查看 diff/拒绝」,完成后显示已审批或已拒绝;仅回传决定。
+// 依赖:Button;状态/操作类型来自 lib/types。关键回调:onApprove / onReject / onViewDiff。
 import type { ApprovalState, FileOperation } from '../lib/types';
 import { Button } from './ui/Button';
 

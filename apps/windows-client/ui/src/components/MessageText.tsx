@@ -1,4 +1,7 @@
-// MessageText(UI · components):消息正文渲染——把文本经安全 Markdown 渲染(lib/md),处理链接/代码块/文件引用点击。纯展示+回调。
+// MessageText 消息正文(UI · 组件层 · components)
+// ---------------------------------------------------------------------------
+// 职责:把消息文本经 lib/md 安全渲染为 Markdown,拆出 chart/mermaid 块交 InlineViz 内联渲染,并代理代码块"复制"按钮点击。
+// 依赖:lib/md(renderMarkdown/splitVizBlocks)+ InlineViz + lib/api(VizSpec)。关键 props:text、trustedRoot。
 import type { MouseEvent } from 'react';
 import { renderMarkdown, splitVizBlocks } from '../lib/md';
 import { InlineViz } from './InlineViz';
@@ -19,8 +22,6 @@ function onCodeCopy(e: MouseEvent<HTMLDivElement>) {
   } catch { /* clipboard unavailable */ }
 }
 
-// Assistant message body: Markdown prose with any ```chart/```mermaid blocks
-// rendered as live inline charts, and ```code blocks with copy + light highlight.
 export function MessageText({ text, trustedRoot }: { text: string; trustedRoot?: string | undefined }) {
   const segments = splitVizBlocks(text);
   return (
