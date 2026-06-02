@@ -9,6 +9,7 @@ const HARD_LIMIT = 400;
 const ROOTS = [
   path.join(ROOT, 'apps', 'host', 'src'),
   path.join(ROOT, 'apps', 'windows-client', 'ui', 'src'),
+  path.join(ROOT, 'apps', 'windows-client', 'resources-src'),
   path.join(ROOT, 'apps', 'windows-client', 'src-tauri', 'src'),
   path.join(ROOT, 'apps', 'local-agent'),
   path.join(ROOT, 'services'),

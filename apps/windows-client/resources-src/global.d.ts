@@ -20,18 +20,27 @@ interface Window {
   scrollConversationToEnd?: () => void;
   AgentCoworkApi?: AgentCoworkJson;
   AgentCoworkApprovalRunner?: AgentCoworkJson;
+  AgentCoworkAppDom?: AgentCoworkJson;
+  AgentCoworkAppEvents?: AgentCoworkJson;
+  AgentCoworkAppState?: AgentCoworkJson;
   AgentCoworkArtifacts?: AgentCoworkJson;
   AgentCoworkChatRunner?: AgentCoworkJson;
+  AgentCoworkClarification?: AgentCoworkJson;
   AgentCoworkComposerPopover?: AgentCoworkJson;
   AgentCoworkComposerSources?: AgentCoworkJson;
+  AgentCoworkControllerAssembly?: AgentCoworkJson;
   AgentCoworkFileUpload?: AgentCoworkJson;
   AgentCoworkKimiRunner?: AgentCoworkJson;
   AgentCoworkMessageActions?: AgentCoworkJson;
   AgentCoworkMessageRenderer?: AgentCoworkJson;
+  AgentCoworkPlanPreview?: AgentCoworkJson;
+  AgentCoworkPlanRunner?: AgentCoworkJson;
   AgentCoworkRecipeRunner?: AgentCoworkJson;
   AgentCoworkRunEvents?: AgentCoworkJson;
   AgentCoworkRunHistory?: AgentCoworkJson;
+  AgentCoworkShellServices?: AgentCoworkJson;
   AgentCoworkTaskContext?: AgentCoworkJson;
   AgentCoworkUtils?: AgentCoworkJson;
   AgentCoworkWorkbenchRenderer?: AgentCoworkJson;
+  AgentCoworkWorkspaceLoader?: AgentCoworkJson;
 }

@@ -615,6 +615,15 @@ test('serves the local preview shell and assets', async () => {
   fs.writeFileSync(path.join(staticRoot, 'app-message-actions.js'), 'window.AgentCoworkMessageActions = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-recipe-runner.js'), 'window.AgentCoworkRecipeRunner = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app-file-upload.js'), 'window.AgentCoworkFileUpload = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-state.js'), 'window.AgentCoworkAppState = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-dom.js'), 'window.AgentCoworkAppDom = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-shell-services.js'), 'window.AgentCoworkShellServices = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-workspace-loader.js'), 'window.AgentCoworkWorkspaceLoader = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-clarification.js'), 'window.AgentCoworkClarification = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-plan-preview.js'), 'window.AgentCoworkPlanPreview = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-plan-runner.js'), 'window.AgentCoworkPlanRunner = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-events.js'), 'window.AgentCoworkAppEvents = {};', 'utf8');
+  fs.writeFileSync(path.join(staticRoot, 'app-controller-assembly.js'), 'window.AgentCoworkControllerAssembly = {};', 'utf8');
   fs.writeFileSync(path.join(staticRoot, 'app.js'), 'window.agentCowork = {};', 'utf8');
 
   await withServer({ trustedRoot, staticRoot }, async (baseUrl) => {
@@ -690,6 +699,42 @@ test('serves the local preview shell and assets', async () => {
     const fileUpload = await fetch(`${baseUrl}/app-file-upload.js`);
     assert.equal(fileUpload.status, 200);
     assert.match(fileUpload.headers.get('content-type') || '', /javascript/);
+
+    const appState = await fetch(`${baseUrl}/app-state.js`);
+    assert.equal(appState.status, 200);
+    assert.match(appState.headers.get('content-type') || '', /javascript/);
+
+    const appDom = await fetch(`${baseUrl}/app-dom.js`);
+    assert.equal(appDom.status, 200);
+    assert.match(appDom.headers.get('content-type') || '', /javascript/);
+
+    const shellServices = await fetch(`${baseUrl}/app-shell-services.js`);
+    assert.equal(shellServices.status, 200);
+    assert.match(shellServices.headers.get('content-type') || '', /javascript/);
+
+    const workspaceLoader = await fetch(`${baseUrl}/app-workspace-loader.js`);
+    assert.equal(workspaceLoader.status, 200);
+    assert.match(workspaceLoader.headers.get('content-type') || '', /javascript/);
+
+    const clarification = await fetch(`${baseUrl}/app-clarification.js`);
+    assert.equal(clarification.status, 200);
+    assert.match(clarification.headers.get('content-type') || '', /javascript/);
+
+    const planPreview = await fetch(`${baseUrl}/app-plan-preview.js`);
+    assert.equal(planPreview.status, 200);
+    assert.match(planPreview.headers.get('content-type') || '', /javascript/);
+
+    const planRunner = await fetch(`${baseUrl}/app-plan-runner.js`);
+    assert.equal(planRunner.status, 200);
+    assert.match(planRunner.headers.get('content-type') || '', /javascript/);
+
+    const appEvents = await fetch(`${baseUrl}/app-events.js`);
+    assert.equal(appEvents.status, 200);
+    assert.match(appEvents.headers.get('content-type') || '', /javascript/);
+
+    const controllerAssembly = await fetch(`${baseUrl}/app-controller-assembly.js`);
+    assert.equal(controllerAssembly.status, 200);
+    assert.match(controllerAssembly.headers.get('content-type') || '', /javascript/);
   });
 });
 

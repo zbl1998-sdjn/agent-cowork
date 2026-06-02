@@ -157,6 +157,15 @@ async function main(): Promise<void> {
     assert(scriptRoutes.includes('/app-message-actions.js'), 'index missing app-message-actions.js script');
     assert(scriptRoutes.includes('/app-recipe-runner.js'), 'index missing app-recipe-runner.js script');
     assert(scriptRoutes.includes('/app-file-upload.js'), 'index missing app-file-upload.js script');
+    assert(scriptRoutes.includes('/app-state.js'), 'index missing app-state.js script');
+    assert(scriptRoutes.includes('/app-dom.js'), 'index missing app-dom.js script');
+    assert(scriptRoutes.includes('/app-shell-services.js'), 'index missing app-shell-services.js script');
+    assert(scriptRoutes.includes('/app-workspace-loader.js'), 'index missing app-workspace-loader.js script');
+    assert(scriptRoutes.includes('/app-clarification.js'), 'index missing app-clarification.js script');
+    assert(scriptRoutes.includes('/app-plan-preview.js'), 'index missing app-plan-preview.js script');
+    assert(scriptRoutes.includes('/app-plan-runner.js'), 'index missing app-plan-runner.js script');
+    assert(scriptRoutes.includes('/app-events.js'), 'index missing app-events.js script');
+    assert(scriptRoutes.includes('/app-controller-assembly.js'), 'index missing app-controller-assembly.js script');
     assert(scriptRoutes.includes('/app.js'), 'index missing app.js script');
     assert(scriptRoutes.indexOf('/app-utils.js') < scriptRoutes.indexOf('/app.js'), 'app-utils.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-api-client.js') < scriptRoutes.indexOf('/app.js'), 'app-api-client.js must load before app.js');
@@ -175,6 +184,13 @@ async function main(): Promise<void> {
     assert(scriptRoutes.indexOf('/app-message-actions.js') < scriptRoutes.indexOf('/app.js'), 'app-message-actions.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-recipe-runner.js') < scriptRoutes.indexOf('/app.js'), 'app-recipe-runner.js must load before app.js');
     assert(scriptRoutes.indexOf('/app-file-upload.js') < scriptRoutes.indexOf('/app.js'), 'app-file-upload.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-state.js') < scriptRoutes.indexOf('/app.js'), 'app-state.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-dom.js') < scriptRoutes.indexOf('/app.js'), 'app-dom.js must load before app.js');
+    assert(scriptRoutes.indexOf('/app-shell-services.js') < scriptRoutes.indexOf('/app-controller-assembly.js'), 'app-shell-services.js must load before app-controller-assembly.js');
+    assert(scriptRoutes.indexOf('/app-plan-preview.js') < scriptRoutes.indexOf('/app-plan-runner.js'), 'app-plan-preview.js must load before app-plan-runner.js');
+    assert(scriptRoutes.indexOf('/app-plan-runner.js') < scriptRoutes.indexOf('/app-controller-assembly.js'), 'app-plan-runner.js must load before app-controller-assembly.js');
+    assert(scriptRoutes.indexOf('/app-events.js') < scriptRoutes.indexOf('/app-controller-assembly.js'), 'app-events.js must load before app-controller-assembly.js');
+    assert(scriptRoutes.indexOf('/app-controller-assembly.js') < scriptRoutes.indexOf('/app.js'), 'app-controller-assembly.js must load before app.js');
     const scriptBodies = [];
     for (const route of scriptRoutes) {
       const asset = await getText(baseUrl, route);
@@ -194,6 +210,15 @@ async function main(): Promise<void> {
     assert(allScripts.includes('window.AgentCoworkMessageRenderer'), 'message renderer module global missing');
     assert(allScripts.includes('window.AgentCoworkMessageActions'), 'message actions module global missing');
     assert(allScripts.includes('window.AgentCoworkFileUpload'), 'file upload module global missing');
+    assert(allScripts.includes('window.AgentCoworkAppState'), 'app state module global missing');
+    assert(allScripts.includes('window.AgentCoworkAppDom'), 'app dom module global missing');
+    assert(allScripts.includes('window.AgentCoworkShellServices'), 'shell services module global missing');
+    assert(allScripts.includes('window.AgentCoworkWorkspaceLoader'), 'workspace loader module global missing');
+    assert(allScripts.includes('window.AgentCoworkClarification'), 'clarification module global missing');
+    assert(allScripts.includes('window.AgentCoworkPlanPreview'), 'plan preview module global missing');
+    assert(allScripts.includes('window.AgentCoworkPlanRunner'), 'plan runner module global missing');
+    assert(allScripts.includes('window.AgentCoworkAppEvents'), 'app events module global missing');
+    assert(allScripts.includes('window.AgentCoworkControllerAssembly'), 'controller assembly module global missing');
     assert(allScripts.includes('createComposerPopover'), 'composer popover factory missing');
     assert(allScripts.includes('createArtifactCatalog'), 'artifact catalog factory missing');
     assert(allScripts.includes('createRunHistoryController'), 'run history factory missing');
@@ -203,6 +228,12 @@ async function main(): Promise<void> {
     assert(allScripts.includes('createMessageRenderer'), 'message renderer factory missing');
     assert(allScripts.includes('createMessageActions'), 'message actions factory missing');
     assert(allScripts.includes('createFileUploadController'), 'file upload factory missing');
+    assert(allScripts.includes('createShellServices'), 'shell service factory missing');
+    assert(allScripts.includes('createWorkspaceLoader'), 'workspace loader factory missing');
+    assert(allScripts.includes('renderStaticPlanPreview'), 'static plan preview function missing');
+    assert(allScripts.includes('createPlanRunner'), 'plan runner factory missing');
+    assert(allScripts.includes('bindAppEvents'), 'app event binder missing');
+    assert(allScripts.includes('function startApp'), 'controller assembly start function missing');
     assert(allScripts.includes('function setView'), 'app scripts missing view switching controller');
     assert(allScripts.includes('function appendAssistantMessage'), 'app scripts missing message bubble controller');
     assert(allScripts.includes('function handleComposerSend'), 'app scripts missing composer send router');

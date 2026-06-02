@@ -43,6 +43,15 @@ const STATIC_FILES = new Map<string, StaticAsset>([
   ['/app-message-actions.js', { file: 'app-message-actions.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-recipe-runner.js', { file: 'app-recipe-runner.js', type: 'text/javascript; charset=utf-8' }],
   ['/app-file-upload.js', { file: 'app-file-upload.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-state.js', { file: 'app-state.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-dom.js', { file: 'app-dom.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-shell-services.js', { file: 'app-shell-services.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-workspace-loader.js', { file: 'app-workspace-loader.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-clarification.js', { file: 'app-clarification.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-plan-preview.js', { file: 'app-plan-preview.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-plan-runner.js', { file: 'app-plan-runner.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-events.js', { file: 'app-events.js', type: 'text/javascript; charset=utf-8' }],
+  ['/app-controller-assembly.js', { file: 'app-controller-assembly.js', type: 'text/javascript; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
 ]);
 

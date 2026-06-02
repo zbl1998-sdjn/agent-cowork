@@ -152,6 +152,15 @@ async function main() {
   assert(fs.existsSync(path.join(resourcesDir, 'app-message-actions.js')), 'Windows client message actions resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-recipe-runner.js')), 'Windows client recipe runner resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app-file-upload.js')), 'Windows client file upload resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-state.js')), 'Windows client app state resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-dom.js')), 'Windows client app dom resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-shell-services.js')), 'Windows client shell services resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-workspace-loader.js')), 'Windows client workspace loader resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-clarification.js')), 'Windows client clarification resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-plan-preview.js')), 'Windows client plan preview resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-plan-runner.js')), 'Windows client plan runner resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-events.js')), 'Windows client app events resource is missing');
+  assert(fs.existsSync(path.join(resourcesDir, 'app-controller-assembly.js')), 'Windows client controller assembly resource is missing');
   assert(fs.existsSync(path.join(resourcesDir, 'app.js')), 'Windows client JS resource is missing');
 
   const browserPath = findBrowser();

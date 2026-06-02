@@ -1,3 +1,5 @@
+/// <reference path="./types/host-node-shim.d.ts" />
+
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
@@ -60,6 +62,12 @@ export default [
     files: ['apps/windows-client/resources/*.js'],
   },
   ...typedStrictConfigs,
+  {
+    files: ['eslint.config.ts'],
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off',
+    },
+  },
   {
     files: ['apps/windows-client/resources/*.js'],
     languageOptions: {

@@ -1,7 +1,7 @@
 {
   "extends": "../../../tsconfig.windows-resources.json",
   "compilerOptions": {
-    "module": "Preserve",
+    "module": "ES2022",
     "noEmit": true
   },
   "include": ["./**/*.ts"]
