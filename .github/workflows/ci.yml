@@ -59,13 +59,15 @@ jobs:
         run: npm install
 
       - name: Run host unit tests
-        # Excludes runtime-dependencies.test.js: those tests call
+        # Excludes runtime-dependencies.test.ts: those tests call
         # normalizeAgentCoworkRoot() which requires a Windows path ending in
-        # "AgentCowork" — they are intentionally Windows-only.
+        # "AgentCowork" — they are intentionally Windows-only (CI runs on Linux).
+        # Tests migrated JS→TS: run them through the host TS loader
+        # (scripts/run-host-node.mjs) with scripts/test-setup.ts, mirroring
+        # `npm run test:host`.
         run: |
-          cd apps/host
-          FILES=$(ls test/*.test.js | grep -v runtime-dependencies.test.js)
-          node --test --test-timeout=60000 --import ../../test-setup.mjs $FILES
+          FILES=$(cd apps/host && ls test/*.test.ts | grep -v runtime-dependencies.test.ts | tr '\n' ' ')
+          node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-timeout=60000 --import ../../scripts/test-setup.ts $FILES
         env:
           KCW_REQUIRE_AUTH: "false"
           KCW_TRUST_IDENTITY_HEADERS: "true"
