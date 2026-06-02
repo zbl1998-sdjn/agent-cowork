@@ -1,3 +1,12 @@
+// 源文件行数上限门禁(防上帝类)(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:递归扫描 host/UI/resources/Tauri/local-agent/services 等源码目录下的
+//   .js/.mjs/.ts/.tsx/.rs/.go 文件,按行数判定:超软上限(250)仅 WARN,超硬上限
+//   (400)则失败——除非在 HARD_WAIVERS 白名单内显式豁免。跳过 .d.ts、生成的 UI .js、
+//   测试文件。用来逼迫大文件拆分,避免上帝类。
+// 用法:npm run check:filesize(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环。
+// 依赖:无外部依赖;硬上限违例即 exit 1 阻断,软上限只告警不阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,12 +25,16 @@ const ROOTS = [
 ];
 
 const EXTENSIONS = new Set(['.js', '.mjs', '.ts', '.tsx', '.rs', '.go']);
-const HARD_WAIVERS = new Map([
-  ['apps/host/src/server.ts', 'P0-T2 splits server assembly, middleware, and routes'],
-  // P0-T4 retired: App.tsx is back under the soft limit after extracting the
-  // chat-stream callbacks (Settings tabs / composer types / app-types splits
-  // got it down earlier). Re-add if it ever creeps back over.
-  ['apps/host/src/memory/memory-store.js', 'P0-T6 splits memory IO, layers, and query logic'],
+const HARD_WAIVERS = new Map<string, string>([
+  // All P0 god-class waivers retired — every listed file is back under the limits:
+  // - P0-T2 retired: server.ts (~133 lines) — assembly thinned to "build deps +
+  //   mount routes", middleware → http/middleware/*, handlers → routes/*.
+  // - P0-T4 retired: App.tsx (~234 lines) — chat-stream callbacks / Settings tabs /
+  //   composer types / app-types splits got it under the soft limit.
+  // - P0-T6 retired: memory-store (~44 lines, now .ts; the .js target is gone after
+  //   JS→TS) — split into store(IO) / layers / query / utils.
+  // Re-add an entry (relative path → reason) here only if a file legitimately needs
+  // to exceed the hard limit (400).
 ]);
 
 function toPosix(filePath: string): string {
