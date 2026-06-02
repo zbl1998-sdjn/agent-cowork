@@ -5,7 +5,7 @@
     "declaration": false,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2022", "DOM"],
-    "module": "None",
+    "module": "Preserve",
     "noImplicitAny": true,
     "noEmitOnError": true,
     "outDir": "apps/windows-client/resources",
