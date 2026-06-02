@@ -1,3 +1,11 @@
+// 统一以 TS 加载器运行任意 host Node 入口的 CLI 包装器(scripts · 工具库)
+// ---------------------------------------------------------------------------
+// 职责:解析命令行(可选 --cwd <仓库内相对目录>,经路径 jail 限制不得越出仓库;
+//       -- 之后为传给 Node 的参数),再 spawn 子 Node 进程,用 --import 预载
+//       run-host-node.mjs 安装 .js→.ts 迁移加载器后执行目标入口,子进程退出码透传。
+// 用法:node scripts/run-host-node.mjs [--cwd <相对目录>] -- <node 参数...>;
+//       被各 package.json 脚本复用,免得每个脚本各自实现 .js→.ts 解析规则。
+// 依赖:scripts/run-host-node.mjs(register-only 预载入口)。
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

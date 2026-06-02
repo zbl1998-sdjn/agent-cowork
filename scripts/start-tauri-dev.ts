@@ -1,3 +1,13 @@
+// 拉起 tauri dev 所需的双开发进程并联动生命周期(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:同时启动两个长驻开发进程并绑定其生命周期——
+//       Node Host(:3017,UI 调用的 API,经 start-tauri-host.ts 启动)
+//       与 Vite 开发服务器(:5173,React UI,即 Tauri 的 devUrl);
+//       任一进程退出即连带关闭另一个,避免 tauri dev 残留孤儿进程。
+// 用法:由 Tauri 在 tauri dev 前自动调用(tauri.conf.json 的 beforeDevCommand:
+//       node ../../../scripts/run-host-node.mjs scripts/start-tauri-dev.ts),一般不单独运行。
+// 依赖:scripts/start-tauri-host.ts(Host 进程)、apps/windows-client/ui 的 npm run dev(Vite)。
+
 // Dev launcher for `tauri dev` with the React UI.
 //
 // Starts BOTH long-lived dev processes and links their lifecycles:

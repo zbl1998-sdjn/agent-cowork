@@ -1,3 +1,12 @@
+// TS 文件必须被某个受检 tsconfig 覆盖的门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:磁盘遍历仓库内所有 .ts/.tsx/.mts/.cts 源(跳过 node_modules、构建产物、
+//   嵌入式 python 等目录),再解析 CHECKED_TSCONFIGS 中每个 tsconfig 实际纳入的
+//   文件集合,二者求差:任何未被任一受检 tsconfig 覆盖的 TS 文件即视为「类型检查盲
+//   区」并失败。确保不存在游离于所有工程之外、悄悄逃过类型检查的源文件。
+// 用法:npm run check:ts-coverage(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环。
+// 依赖:typescript(解析 tsconfig);存在未覆盖文件或 tsconfig 解析错误即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';

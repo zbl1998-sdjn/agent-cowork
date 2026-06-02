@@ -1,3 +1,11 @@
+// Node ESM 钩子:运行时在受限根内即时把 .ts 转译为 ESM(scripts · 工具库)
+// ---------------------------------------------------------------------------
+// 职责:实现 Node module 自定义加载器的 resolve/load 钩子。迁移期内源码仍写
+//       NodeNext 风格的 .js 说明符,本钩子在解析失败时把已迁移的同名 .ts 兄弟文件
+//       接上(仅限 apps/host/src·test、eval、scripts 这些受限根),并对 .ts 文件用
+//       内存内 ts.transpileModule 转成 ES2022 源码返回,免去预编译。
+// 用法:不直接运行;经 bootstrap-src/run-host-node.ts 通过 register() 挂载为 ESM 加载器。
+// 依赖:typescript 编译器(优先仓库根,回退 ui 子项目的 node_modules)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';

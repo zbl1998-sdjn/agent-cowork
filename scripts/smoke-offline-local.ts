@@ -1,3 +1,13 @@
+// 离线本地能力冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:删除所有网络相关环境变量并劫持 globalThis.fetch 强制只允许 127.0.0.1/localhost,
+//       验证断网场景下本地文件能力仍可用——健康检查、工作区、文件树/读取、file-ops
+//       preview→apply 写入、运行时依赖(含 on-demand 安装模式)与审计 JSONL;同时断言
+//       模型类接口(/api/kimi/plan)在 enableKimiApi:false 下返回 503 且给出"本地文件
+//       功能仍可离线使用 / 需要模型回复时请联网"的边界提示。报告落地 reports/offline-local。
+// 用法:npm run smoke:offline-local(即 node scripts/run-host-node.mjs scripts/smoke-offline-local.ts);
+//       断言失败即 exit 1 阻断。
+// 依赖:apps/host 的 createServer 与 JsonlWriter 审计写入;顶层 await 直接执行(无 main 包装)。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

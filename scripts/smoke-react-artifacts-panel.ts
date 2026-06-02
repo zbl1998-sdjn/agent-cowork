@@ -1,3 +1,13 @@
+// React 产物面板 smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用无头浏览器(Edge/Chrome + CDP)拉起内置 host server 与 React UI,
+//       在临时工作区里预置一个 report.md 产物,打开"产物"侧栏,验证产物卡片
+//       渲染、点击"重命名"改名为 report-final.md,并断言 UI 与磁盘上的文件
+//       (新名存在、旧名消失)一致;最后截图并写出 JSON 报告。
+// 用法:由对应 npm script 经 run-host-node 触发(node 运行已编译的 .js);
+//       置 REACT_ARTIFACTS_ARCHIVE=1 时把报告归档到 reports/react-artifacts。
+// 依赖:apps/host/src/server.js(createServer)、./browser-smoke-utils;
+//       需先 npm run build:ui 产出 apps/windows-client/ui-dist。失败即 exit 1。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

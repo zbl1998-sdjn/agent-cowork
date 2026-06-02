@@ -1,3 +1,13 @@
+// 启动本地 MVP Host 服务并打开浏览器演示(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:在 build/mvp-workspace 下铺好演示工作区(示例合同/发票/会议纪要),
+//       以该目录为受信根(trustedRoot)拉起 Host HTTP 服务(默认 127.0.0.1:3017),
+//       写入 build/mvp-runtime.json 运行时状态(pid/host/port/url/审计路径等),
+//       并自动打开浏览器;收到 SIGINT/SIGTERM 时优雅关闭并清理运行时文件。
+// 用法:npm run start:mvp(即 node scripts/run-host-node.mjs scripts/start-mvp.ts);
+//       可用环境变量 PORT/HOST/TRUSTED_ROOT/MVP_RUNTIME_FILE、NO_OPEN=1 覆盖默认行为;
+//       配置 KIMI_API_KEY/MOONSHOT_API_KEY 后启用 Kimi 计划能力(默认仅会议纪要演示)。
+// 依赖:apps/host 的 createServer 与 JsonlWriter;与 stop-mvp.ts/status-mvp.ts 共享运行时文件契约。
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';

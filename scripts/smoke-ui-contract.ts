@@ -1,3 +1,13 @@
+// 内置 UI 契约冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:拉起 Host 服务(uiDist:false 走内置静态壳),校验首页 HTML 的关键结构与中文
+//       功能文案、app.css 的固定窗口/隐藏面板守卫,并逐个抓取页面声明的全部 app-*.js
+//       脚本,断言其加载顺序、模块全局(window.AgentCowork*)、工厂函数及所引用的 UI 契约
+//       API 路由都存在;随后跑通文件树/读取/抽取/recipes 与 file-ops 的 preview→apply
+//       和 artifact 目录/实时页,确保前端契约与后端能力一致且保持 Kimi-only(无 Claude)。
+// 用法:npm run smoke:ui(即 node scripts/run-host-node.mjs scripts/smoke-ui-contract.ts);
+//       任一断言失败即 exit 1 阻断。
+// 依赖:apps/host 的 createServer 与 JsonlWriter 审计写入。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

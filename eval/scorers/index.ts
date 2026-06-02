@@ -1,3 +1,10 @@
+// 评测打分器:按确定性断言 + 预算维度给任务结果打分(eval · scorers)
+// ---------------------------------------------------------------------------
+// 职责:把不同形态的执行结果(文件/工具调用/审批/产物/分支/安全越权)归一化,
+//       逐条评估任务断言判定成功率,并对步数/延迟/Token/成本等预算维度计分,
+//       汇总成多维度 score 对象供 runner 与 report 使用。
+// 依赖:tasks/schema 的断言与任务类型。
+//       导出:scoreEvalTaskResult、createDefaultScorer 及结果/选项类型。
 import type { EvalAssertion, EvalTask } from '../tasks/schema.js';
 
 export type EvalToolCall = string | { name?: unknown; tool?: unknown; function?: { name?: unknown } };

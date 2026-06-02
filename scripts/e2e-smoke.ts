@@ -1,3 +1,13 @@
+// 端到端 Agent 链路冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:在本地拉起 Host 服务,通过 /api/agent/chat/stream 跑完一条完整 Agent 链路
+//       (读取 input.txt → 写出 e2e-output.md → 执行无害 shell),消费 SSE 事件并
+//       自动应答审批,断言出现 done、足够的工具结果、shell-ok 与产物文件,落地 JSON 报告。
+//       默认 dry-run(注入假 ModelCall/KimiChatRunner);设 E2E_SMOKE_REAL/LIVE=1 且
+//       提供 KIMI/MOONSHOT API key 时切换为 live 真模型模式。
+// 用法:npm run smoke:e2e(即 node scripts/run-host-node.mjs scripts/e2e-smoke.ts);
+//       失败即 exit 1 阻断,并写出 *-failed.json 报告。
+// 依赖:apps/host 的 createServer;报告目录由 E2E_SMOKE_REPORT_DIR/WORKSPACE 覆盖。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

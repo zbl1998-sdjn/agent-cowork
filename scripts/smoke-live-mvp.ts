@@ -1,3 +1,13 @@
+// 在线 MVP 实例浏览器端到端冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:读取 build/mvp-runtime.json 找到正在运行的 MVP 实例(校验 pid 存活、
+//       /health 正常),用 headless Edge/Chrome 经 CDP 打开运行 URL,完成访客
+//       登录 → 校验工作区/导航/起始动作 → 发送指令触发计划预览 → 审批执行,
+//       断言时间线、产物卡片、磁盘上新写入的 Markdown 产物及审计日志增长,
+//       截图并写 build/live-mvp-smoke-report.json(失败时 ok=false 并退 1)。
+// 用法:npm run smoke:live-mvp(经 run-host-node.mjs 跑本 .ts);
+//       须先 npm run start:mvp 让 MVP 实例在运行,且本机有 Edge/Chrome。
+// 依赖:./browser-smoke-utils 的 CDP 工具;build/mvp-runtime.json;本地浏览器。
 import { spawn } from 'node:child_process';
 import type { ChildProcessLike } from 'node:child_process';
 import fs from 'node:fs';

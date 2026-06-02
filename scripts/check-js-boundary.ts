@@ -1,3 +1,12 @@
+// JS/TS 边界门禁:仓库不得残留手写 JS 源(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:列出仓库内全部 .js/.jsx/.mjs/.cjs 文件(优先用 git ls-files 含已跟踪与未
+//   跟踪文件,失败时回退磁盘遍历),只允许两类 JS 存在:由 TS 源生成的 bootstrap
+//   引导器(host-ts-loader.mjs / run-host-node.mjs)与由 resources-src/*.ts 生成的
+//   资源脚本。任何其他 JS-like 源都视为越界(防止手写 JS 悄悄混入 TS-only 代码库)。
+// 用法:npm run check:js-boundary(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环。
+// 依赖:git(取文件清单);发现意外 JS 源即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

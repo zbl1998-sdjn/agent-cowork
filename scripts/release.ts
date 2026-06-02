@@ -1,3 +1,13 @@
+// 版本发布流水线:跑 CI、生成 git bundle、归档安装包并打标签(scripts · 构建)
+// ---------------------------------------------------------------------------
+// 职责:校验 SemVer 版本与工作区干净度;默认 dry-run 仅打印发布计划,--execute 时
+//   依次执行 CI 门禁(除非 --skip-ci)、写 releases/v<ver>/VERSION.txt、创建源码
+//   git bundle、签名并归档 installers/*.exe|msi(除非 --skip-sign)、归档 Tauri
+//   updater 产物并生成 latest.json/manifest.json,最后打带注释的 git tag v<ver>。
+// 用法:npm run release -- --version <semver> [--execute] [--skip-ci] [--skip-sign]
+//   (即 node scripts/run-host-node.mjs scripts/release.ts);省略 --execute 为预演。
+// 依赖:npm run ci、git bundle/tag、scripts/sign-windows.ps1、KCW_UPDATE_BASE_URL。
+
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncResult } from 'node:child_process';
 import fs from 'node:fs';

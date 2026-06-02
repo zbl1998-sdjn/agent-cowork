@@ -1,3 +1,13 @@
+// 校验生成的 bootstrap .mjs 与其 TS 源是否同步(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:把 scripts/bootstrap-src/ 下的 host-ts-loader.ts、run-host-node.ts 用
+//   TypeScript transpileModule 重新编译,与已提交的 scripts/host-ts-loader.mjs、
+//   scripts/run-host-node.mjs 逐字节比对(忽略换行差异)。这两个 .mjs 是 Node 跑
+//   TS 的引导器,必须从 TS 源生成而非手改;不一致即判定为 stale。
+// 用法:npm run check:bootstrap-js(经 run-host-node.mjs 运行);带 --write 时直接
+//   把最新编译产物写回 .mjs(node scripts/run-host-node.mjs scripts/check-bootstrap-js.ts --write)。
+//   也是 npm run check 聚合门禁的一环。
+// 依赖:typescript;失败即 exit 1 阻断,并提示用 --write 重新生成。
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';

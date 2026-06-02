@@ -1,3 +1,10 @@
+// 离线 replay 执行器:把任务喂给已录制的模型调用并回放(eval · runner)
+// ---------------------------------------------------------------------------
+// 职责:基于内存中的 ModelRecord 录制集构造一个 EvalExecutor;
+//       负责把 EvalExecutorContext 转成模型输入、回放命中的录制响应,
+//       再把响应映射回 scorer 可消费的 EvalTaskResult(无需联网/真实模型)。
+// 依赖:apps/host 的 model-recorder(录制存储 + 回放包装)、runner 的执行器上下文类型、scorers 的结果类型。
+//       导出:createOfflineReplayExecutor、defaultEvalModelInput、相关输入/映射类型。
 import {
   createMemoryModelRecordStore,
   createModelReplayer,

@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// 一键构建 React UI 子项目到 ui-dist(scripts · 构建)
+// ---------------------------------------------------------------------------
+// 职责:进入 apps/windows-client/ui,按需 npm install,再 npm run build,产物
+//       落到 apps/windows-client/ui-dist(即 Tauri 外壳的 frontendDist),
+//       并打印后续 cargo tauri dev/build 的指引。
+// 用法:npm run build:ui;强制重装依赖用 npm run build:ui:fresh(透传 --install)。
+// 依赖:Node + npm;UI 子项目的 package.json(install/build 脚本)。
+//
 // One-command activation for the React UI (iteration B).
 //
 //   npm run build:ui        # install if needed, then build -> ui-dist

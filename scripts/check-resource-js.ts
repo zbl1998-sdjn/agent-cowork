@@ -1,3 +1,13 @@
+// 资源脚本与其 TS 源一致性 + 经典脚本语法门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:校验 apps/windows-client/resources/*.js 与 resources-src/*.ts 一一对应:
+//   1) 用 tsconfig.windows-resources.json 把 TS 源编译到临时目录,逐字节比对已提交
+//      的 .js,不一致即判定 stale;同时检查无孤立 .js(缺源)或漏生成的脚本;
+//   2) 每个 .js 以 node:vm 的 Script(非 module 边界)解析,确保仍是 index.html 可
+//      直接加载的经典脚本语法。
+// 用法:npm run check:resource-js(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环。
+// 依赖:typescript、node:vm;源/产物不一致或语法错误即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';

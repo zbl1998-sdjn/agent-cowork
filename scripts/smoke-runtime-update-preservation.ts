@@ -1,3 +1,13 @@
+// 运行时依赖更新保留冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:在临时 AppData 目录写入一批哨兵文件(已装组件标记、嵌入式 venv、config.json、
+//       state.sqlite、缓存等),调用 buildRuntimeDependencyUpdatePlan 生成版本升级计划,
+//       断言计划为 preserve-on-update 模式、无破坏性动作、所有条目动作为 preserve 且路径
+//       不越出 AppData 根,并核验升级后哨兵文件全部留存——证明依赖更新不会清掉用户数据。
+//       报告写入 reports/runtime-dependencies。
+// 用法:npm run smoke:runtime-update(即 node scripts/run-host-node.mjs scripts/smoke-runtime-update-preservation.ts);
+//       断言失败即 exit 1 阻断。
+// 依赖:apps/host 的 buildRuntimeDependencyUpdatePlan;顶层直接执行(无 main 包装)。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

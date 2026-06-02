@@ -1,3 +1,16 @@
+// MVP 验收证据汇总门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:不自己跑测试,而是聚合 build/ 下各路冒烟与验证报告(mvp-runtime、
+//       default-verifier、rendered-ui-smoke、live-mvp-smoke、runtime-smoke、
+//       windows-resource-smoke、windows-client-readiness、windows-verification),
+//       逐条评定验收需求 passed/failed/blocked(运行中实例健康、视觉保真、
+//       本地操作闭环、原生 Windows 资源/窗口冒烟等),并核证截图尺寸/产物字节/
+//       审计增长;strict 模式额外要求所有证据 <10min 且来自当前 repo。
+//       汇总写 build/mvp-acceptance-audit.json 并打印。
+// 用法:npm run audit:mvp(经 run-host-node.mjs 跑本 .ts);加 --strict 进严格门禁。
+//       非严格:webHostMvpReady 未达成或有 failed 即 exit 1 阻断;
+//       严格:再要求 completeGoal 且证据新鲜,否则 exit 1 阻断。
+// 依赖:build/ 下由各 smoke/verify 脚本预先产出的报告 JSON;运行中实例 /health。
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';

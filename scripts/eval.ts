@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// 评测入口:加载 eval 任务、离线回放打分并产出报告与基线回归判定(scripts · 评测)
+// ---------------------------------------------------------------------------
+// 职责:加载全部 eval 任务,按环境选择执行器——优先用 KCW_EVAL_REPLAY_RECORDS 指向的
+//   ModelRecorder 记录做离线回放(replay),或在 KCW_EVAL_CONTRACT_EXECUTOR=1 时用契约
+//   执行器据断言合成"应通过"结果(仅供 schema/scorer 自检);二者都缺则抛错退出。
+//   在临时工作目录跑任务,写 reports/eval 下的 JSON/HTML 报告,并对照 eval/baseline.json
+//   做通过率回归判定(容差 0.05),回归则 exitCode=1。
+// 用法:npm run eval(即 node scripts/run-host-node.mjs scripts/eval.ts);
+//   也作为 CI 的可选门禁步骤(命中 kimi/eval 相关变更时由 ci-gates 追加触发)。
+// 依赖:eval/tasks、eval/runner、eval/report、eval/replay-backend;环境变量见上。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

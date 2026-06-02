@@ -1,3 +1,12 @@
+// 浏览器 smoke 测试共享工具库(scripts · 工具库)
+// ---------------------------------------------------------------------------
+// 职责:为各 smoke-react-*/smoke-rendered-ui 脚本提供通用底座——查找本机浏览器
+//       (Edge/Chrome)、申请空闲端口、把 host server 绑定到 127.0.0.1、轮询 HTTP
+//       JSON、以及一个最小 CDP(Chrome DevTools Protocol)WebSocket 客户端,
+//       用于在无头浏览器里 evaluate 页面脚本、截图等。
+// 用法:不直接运行;被 scripts/smoke-react-*.ts、scripts/smoke-rendered-ui.ts
+//       import 复用(findBrowser/getFreePort/bind/getJson/evaluate/CdpClient 等)。
+// 依赖:node:http/net/fs、全局 WebSocket、被测的 host server(createServer)。
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';

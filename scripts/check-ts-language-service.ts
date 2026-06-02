@@ -1,3 +1,12 @@
+// 对齐 VS Code Problems 的 TS 语言服务诊断门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:遍历各 tsconfig 工程,逐文件用 TypeScript LanguageService 取语法、语义、
+//   建议(suggestion)诊断——这正是 VS Code「Problems」面板会呈现的那批问题。目的
+//   是把编辑器里能看到、但普通 tsc --noEmit 不一定报的诊断(尤其 suggestion 级)也
+//   纳入 CI 门禁,避免「本地飘红、门禁全绿」。诊断去重排序后统一输出。
+// 用法:npm run check:ts-language-service(经 run-host-node.mjs 运行),也是
+//   npm run check 聚合门禁的一环。
+// 依赖:typescript;存在任一诊断即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';

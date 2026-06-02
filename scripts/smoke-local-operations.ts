@@ -1,3 +1,12 @@
+// 本地文件操作链路冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:在临时受信工作区拉起 Host 服务,串测本地文件能力闭环——健康检查、预览壳、
+//       工作区信息、文件树/读取(含 sha256)、上下文打包,以及 file-ops 的
+//       preview→apply(write/rename/move)与幂等键;并验证越界/目标已存在被拦截、
+//       审计 JSONL 记录了 write/rename/move 的 after 阶段。
+// 用法:npm run smoke:host(即 node scripts/run-host-node.mjs scripts/smoke-local-operations.ts);
+//       断言失败即 exit 1 阻断。
+// 依赖:apps/host 的 createServer 与 JsonlWriter 审计写入。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

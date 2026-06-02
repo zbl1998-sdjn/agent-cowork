@@ -1,3 +1,10 @@
+// 评测运行器:逐个执行黄金集任务并聚合打分结果(eval · runner)
+// ---------------------------------------------------------------------------
+// 职责:校验任务 → 在受信工作根目录写入 fixture 文件 → 调用 executor 执行 →
+//       快照工作区并合并产出文件 → 用 scorer 打分 → 捕获异常 → 聚合出通过率汇总。
+//       含路径 jail(resolveInside 防止 fixture 越权写到受信根之外)。
+// 依赖:tasks/schema 校验、scorers 默认打分器、node:fs/os/path。
+//       导出:runEvalTasks 及 EvalExecutor/EvalRunResult 等运行期类型。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

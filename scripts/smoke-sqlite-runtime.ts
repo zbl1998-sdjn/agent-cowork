@@ -1,3 +1,12 @@
+// SQLite 后端持久化冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:以 storeBackend:'sqlite' 拉起 Host,确认 node:sqlite 可用后写入一批状态——
+//       游客鉴权 token、记忆事实、recipe 运行、定时计划;关闭服务后用同一 db 文件重启,
+//       断言 auth/memory/runs-index/schedules 全部跨重启持久化,以此验证 SQLite 后端的
+//       落盘与恢复。报告写 build/(或设 SQLITE_RUNTIME_ARCHIVE=1 归档到 reports/sqlite-runtime)。
+// 用法:npm run smoke:sqlite-runtime(即 node scripts/run-host-node.mjs scripts/smoke-sqlite-runtime.ts);
+//       失败置 exitCode=1 阻断。
+// 依赖:apps/host 的 createServer;需运行时内置 node:sqlite(缺失即抛错)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';

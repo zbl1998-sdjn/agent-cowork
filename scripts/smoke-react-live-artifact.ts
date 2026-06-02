@@ -1,3 +1,15 @@
+// React 实时活页产物 smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用无头浏览器拉起 host server 与 React UI,在"可视化"侧栏渲染一个绑定
+//       文件数据源(data/live.json)的活页(table 可视化 iframe);随后改写磁盘
+//       数据源、开启自动刷新(间隔 1s),通过 hook 后的 window.fetch 监控
+//       /api/artifacts/data/ 请求,断言自动刷新拉到了更新后的数据(before→after);
+//       并单独打开 /api/artifacts/live/<id> 独立页,点刷新验证表格更新;末尾截图
+//       并写出 JSON 报告。
+// 用法:由对应 npm script 经 run-host-node 触发;置 REACT_LIVE_ARTIFACT_ARCHIVE=1
+//       时把报告归档到 reports/react-live-artifact。
+// 依赖:apps/host/src/server.js、./browser-smoke-utils;需先 npm run build:ui。
+//       失败即 exit 1。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

@@ -1,3 +1,10 @@
+// host 构建/类型检查的共享工具库(scripts · 工具库)
+// ---------------------------------------------------------------------------
+// 职责:导出仓库根与 host 的 tsconfig 路径;扫描 apps/host/src 校验
+//       tsconfig.host-checkjs.json 是否逐一覆盖全部 host 源文件(缺漏/失效即
+//       exit 1 阻断);定位 tsc 并按指定 tsconfig 运行 TypeScript 编译。
+// 用法:作为库被 build-host.ts、build-host-source.ts 等构建脚本 import,不单独触发。
+// 依赖:typescript 编译器(优先仓库根,回退 ui 子项目的 node_modules)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

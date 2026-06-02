@@ -1,3 +1,9 @@
+// 评测任务 Schema:定义任务结构与断言类型并做校验(eval · tasks)
+// ---------------------------------------------------------------------------
+// 职责:用 zod 定义 EvalTask 的字段(id/分类/标签/prompt/maxSteps/fixture/断言)与断言枚举,
+//       强制 fixture 路径为工作区内相对路径(路径越权防护),提供 id kebab-case 等约束并产出可读错误。
+// 依赖:zod。
+//       导出:evalTaskSchema、validateEvalTask、分类/断言枚举常量及 EvalTask 等类型。
 import { z } from 'zod';
 
 export const EVAL_TASK_CATEGORIES = [

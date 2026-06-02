@@ -1,3 +1,13 @@
+// React 会话分支切换 smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用无头浏览器拉起 host server 与 React UI,预置一条含主线与分支 b1 的会话
+//       (共同节点 + 各自独有标记),验证分支下拉框渲染、切到分支后时间线只显示
+//       分支消息且出现分支差异摘要、切回主线后元数据恢复("4 条消息"),
+//       全程用 DOM 标记断言;最后截图并写出 JSON 报告。
+// 用法:由对应 npm script 经 run-host-node 触发;置 REACT_BRANCHES_ARCHIVE=1
+//       时把报告归档到 reports/react-branches。
+// 依赖:apps/host/src/server.js、./browser-smoke-utils;需先 npm run build:ui
+//       产出 ui-dist。失败即 exit 1。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

@@ -1,3 +1,14 @@
+// Windows 客户端静态资源(file://)冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:先断言 apps/windows-client/resources 下 index.html 及全部 app-*.js/css
+//       资源齐全;再用 headless Edge/Chrome 经 CDP 以 file:// 协议加载 index.html
+//       (静态预览模式、不调用 Host API),校验桌面布局(1536×900 无横向溢出、
+//       模式页签/侧栏/快捷操作/执行动态流/任务卡片)与紧凑布局(1366×768 无溢出),
+//       并模拟"发送指令 → 预览模式 → 审批 → 预览已应用"交互,截图并写
+//       build/windows-client-resource-smoke-report.json(失败时 ok=false 退 1)。
+// 用法:npm run smoke:windows-resources(经 run-host-node.mjs 跑本 .ts);
+//       须本机有 Edge/Chrome,无需起 Host 服务。
+// 依赖:./browser-smoke-utils 的 CDP 工具;apps/windows-client/resources 静态资源。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

@@ -1,3 +1,17 @@
+// React 连接器(MCP/OAuth)smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用无头浏览器拉起 host server 与 React UI,验证"连接器"侧栏的全链路:
+//       文件系统连接器一键连接/断开(校验 mcp__fs__read_text 工具的注册与注销)、
+//       GitHub OAuth 设备流(默认走 mock fetch:审批权限→去登录授权→完成授权→
+//       撤销授权,断言凭据存储不泄露明文 token);并单独跑一遍"缺少 client id"
+//       的预检场景(start 返回 428 / OAUTH_NOT_CONFIGURED,配置后审批可复用)。
+//       报告写出前统一脱敏(redact token/secret/Bearer)。
+// 用法:由对应 npm script 经 run-host-node 触发;加 --live-github 或置
+//       REACT_CONNECTORS_LIVE_GITHUB=1 走真实 GitHub 设备流(需
+//       KCW_GITHUB_OAUTH_CLIENT_ID);REACT_CONNECTORS_ARCHIVE=1 归档报告到
+//       reports/react-connectors。
+// 依赖:apps/host/src/server.js、security/credential-store、./browser-smoke-utils;
+//       需先 npm run build:ui。失败即 exit 1。
 import { spawn } from 'node:child_process';
 import type { ChildProcessLike } from 'node:child_process';
 import fs from 'node:fs';

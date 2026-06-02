@@ -1,3 +1,14 @@
+// 内置渲染版 UI 端到端 smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:对 host 自带渲染的桌面壳层(非 React dist,uiDist:false)做端到端验证:
+//       桌面布局(1536×900)校验标题/状态/模式标签/侧栏/快捷操作/执行动态/任务卡片
+//       且无框架报错遮罩与横向溢出;紧凑布局(1366×768)校验关键区块不越界;
+//       跑一遍"发指令→计划就绪→审批→已在本机执行"的协作交互(Kimi runner 走 mock),
+//       断言产物写盘(含"来源摘要")与审计日志记录 write;再跑"上传文件→对话转交协作"
+//       流程,断言上传文件落到 Agent_Cowork上传 目录。末尾截图并写出 JSON 报告。
+// 用法:由对应 npm script 经 run-host-node 触发(报告/截图固定写入 build/)。
+// 依赖:apps/host/src/server.js、storage/jsonl-writer、./browser-smoke-utils。
+//       失败即 exit 1。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

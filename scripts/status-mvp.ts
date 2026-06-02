@@ -1,3 +1,11 @@
+// 查询本地 MVP Host 运行状态(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:读取 build/mvp-runtime.json,综合判定 MVP 是否健康——
+//       校验 pid 进程是否存活、请求 /health 端点(1.5s 超时)并核对返回
+//       { ok:true, service:'agent-cowork-host' };以 JSON 打印 ok/pidAlive/health/runtime 等明细。
+// 用法:npm run status:mvp(即 node scripts/run-host-node.mjs scripts/status-mvp.ts);
+//       可用 MVP_RUNTIME_FILE 指定运行时文件位置;健康则退出码 0,否则退出码 1。
+// 依赖:与 start-mvp.ts 写入的运行时文件契约一致;只读不改,不会停止服务。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

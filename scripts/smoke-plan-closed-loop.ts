@@ -1,3 +1,15 @@
+// 计划模式闭环冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用脚本化(scripted)的 agentModelCall 起本地 Host server,经
+//       /api/agent/chat/stream 跑一条"研究 → 提计划 → 等审批 → 写两份产物 →
+//       读回自检 → 收尾"的 SSE 流;脚本侧自动审批 plan_proposed/approval_request,
+//       断言收到 start/plan_proposed/todo_snapshot/verify_start/done 事件、
+//       Glob/ExitPlanMode/Write×2/Read×4 等工具调用,以及产物文件已落盘,
+//       结果写 build/plan-closed-loop-smoke-report.json(PLAN_LOOP_ARCHIVE=1
+//       时改写到 reports/plan-closed-loop 带时间戳归档)。
+// 用法:npm run smoke:plan-loop(经 run-host-node.mjs 跑本 .ts);
+//       无需真实模型/网络,模型回复全为脚本桩。
+// 依赖:apps/host/src/server.ts 的 createServer(注入 agentModelCall 桩)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,3 +1,11 @@
+// Kimi 真实 API 联调冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:用真实 KIMI/MOONSHOT API key 起一个本地 Host server(jail 在临时工作区),
+//       走访客鉴权 → /api/kimi/plan,断言 provider=kimi-api、返回非空文本并落盘
+//       了一条 run 记录,最后把结果写入 build/kimi-api-smoke-report.json。
+// 用法:npm run smoke:kimi-api(经 run-host-node.mjs 跑本 .ts);
+//       必须先设置 KIMI_API_KEY 或 MOONSHOT_API_KEY,否则启动即 exit 1。
+// 依赖:apps/host/src/server.ts 的 createServer;真实 Moonshot/Kimi API 网络可达。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

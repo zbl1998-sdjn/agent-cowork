@@ -1,3 +1,14 @@
+// React 时间线滚动锚定 smoke(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:验证 FE-1 滚动行为——用无头浏览器拉起 host server 与 React UI,预置
+//       36 轮对话使时间线溢出,初始应停在底部;手动滚到顶部后发送一条消息触发
+//       流式回复(由注入的 agentModelCall 假流式产出),断言流式追加时不把正在
+//       看历史的用户拽到底部、且出现"回到底部"按钮;点击按钮后回到底部、按钮消失;
+//       末尾截图并写出 JSON 报告。
+// 用法:由对应 npm script 经 run-host-node 触发;置 REACT_SCROLL_ARCHIVE=1 时把
+//       报告归档到 reports/react-scroll。
+// 依赖:apps/host/src/server.js、./browser-smoke-utils;需先 npm run build:ui。
+//       失败即 exit 1。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

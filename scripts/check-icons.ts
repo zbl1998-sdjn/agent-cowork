@@ -1,3 +1,14 @@
+// UI 图标 emoji 单一来源门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:扫描 UI 源码(apps/windows-client/ui/src 下的 .ts/.tsx,排除测试与
+//   lib/icons.ts),禁止在 JSX/字符串中裸写 chrome 图标 emoji(📁📦📥📌⚙️📝📎🕘),
+//   必须改用 lib/icons.ts 暴露的 ICONS.* 常量,保证图标集是唯一来源(将来可只改
+//   一处切换为 SVG 库)。注释会先剥离再扫描;面板说明文案等个别合法用例走 WAIVERS
+//   白名单。新增图标需同时改本文件 ICON_EMOJI 与 lib/icons.ts。
+// 用法:npm run check:icons(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环。
+// 依赖:无外部依赖;发现裸写 emoji 即 exit 1 阻断。
+//
 // Lint guard: every chrome icon emoji in the UI must go through ICONS.* in
 // lib/icons.ts, never raw in JSX or string literals. Keeps the icon set a
 // single source of truth so we can swap to a real SVG library later by

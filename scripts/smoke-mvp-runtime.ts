@@ -1,3 +1,12 @@
+// MVP 运行时生命周期冒烟(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:以子进程方式启动 start-mvp.ts(指定空闲端口、临时工作区与 MVP_RUNTIME_FILE),
+//       等待 /health 就绪后校验 runtime 文件中的 pid/port/workspace;再依次调用
+//       status-mvp.ts(应报告存活)、stop-mvp.ts(应停止),并断言子进程随之退出、
+//       runtime 文件被清理、停止后 status 返回非零。结果写入 build/mvp-runtime-smoke-report.json。
+// 用法:npm run smoke:mvp-runtime(即 node scripts/run-host-node.mjs scripts/smoke-mvp-runtime.ts);
+//       失败置 exitCode=1 阻断。
+// 依赖:scripts/run-host-node.mjs 装载器,驱动 start-mvp.ts / status-mvp.ts / stop-mvp.ts。
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';

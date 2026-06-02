@@ -1,3 +1,12 @@
+// 本地离线性能基准(scripts · 评测)
+// ---------------------------------------------------------------------------
+// 职责:离线起本地 Host server,测量启动耗时、/health 与 / 首屏的首字节/总耗时、
+//       合成 SSE 帧解析吞吐,以及进程内存(rss/heap)快照;对照可由环境变量覆盖的
+//       阈值(BENCH_STARTUP_MS / FIRST_SCREEN_MS / FRAME_PROCESSING_MS / RSS_MB /
+//       HEAP_USED_MB)评定 pass/warn/fail,结果带时间戳写入 reports/bench/。
+// 用法:npm run bench(经 run-host-node.mjs 跑本 .ts);默认超阈值只 warn;
+//       设 BENCH_FAIL_ON_REGRESSION=1 时超阈值判 fail 并 exit 1 阻断。
+// 依赖:apps/host/src/server.ts 的 createServer;纯本地、无外部网络。
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';

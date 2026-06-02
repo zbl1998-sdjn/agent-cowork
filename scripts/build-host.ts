@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// 重建 host Node SEA 旁挂二进制 agent-cowork-host.exe(scripts · 构建)
+// ---------------------------------------------------------------------------
+// 职责:把 apps/host/src 编译→esbuild 打包→生成 SEA blob→复制 node.exe→去签名→
+//       postject 注入,产出可独立运行的 host.exe,并部署到 Tauri 的 binaries/ 与
+//       target/release/,确保旁挂二进制始终跟随当前源码(仅支持 Windows)。
+// 用法:npm run build:host;打包桌面应用前的必跑步骤。
+// 依赖:esbuild(复用 ui 子项目)、Windows SDK 的 signtool、postject;host-ts-support.js。
+//
 // Rebuild the host Node SEA sidecar (`agent-cowork-host.exe`).
 //
 // History: the host sidecar was a frozen 92MB binary with no reproducible

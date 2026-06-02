@@ -1,3 +1,11 @@
+// 为 Tauri 桌面端启动 Node Host API 服务(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:加载仓库根 .env(KIMI_API_KEY 等,Node ≥ 20.12 用 loadEnvFile,无文件则回退现有环境),
+//       以 TRUSTED_ROOT(默认仓库根)为受信根拉起 Host HTTP 服务(默认 127.0.0.1:3017),
+//       审计事件写入应用主目录 tauri 会话的 events.jsonl;监听 SIGINT/SIGTERM 优雅关闭。
+// 用法:npm run start:tauri-host;开发态由 start-tauri-dev.ts 作为子进程启动,
+//       供 Tauri React UI 调用其后端 API;可用 HOST/PORT/TRUSTED_ROOT 及 KIMI_* 环境变量调整。
+// 依赖:apps/host 的 createServer、JsonlWriter 与 getSessionPath(应用主目录会话路径)。
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';

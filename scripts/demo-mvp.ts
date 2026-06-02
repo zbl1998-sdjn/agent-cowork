@@ -1,3 +1,12 @@
+// 一键端到端跑通并验收 MVP 演示(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:若无健康运行时则后台拉起 start-mvp.ts(日志写 build/mvp-demo-server.log)并等待健康;
+//       依次执行各验收步骤——live MVP 操作 smoke、默认 MVP 校验、(Windows 上)客户端就绪检查、
+//       MVP 验收审计;汇总各步退出码与审计结果(ok/completeGoal)写入 build/mvp-demo-report.json。
+// 用法:npm run demo:mvp(即 node scripts/run-host-node.mjs scripts/demo-mvp.ts);
+//       任一步失败或审计未通过即 exit 1(门禁/验收用途)。
+// 依赖:start-mvp.ts、smoke-live-mvp.ts、verify-mvp.ts、audit-mvp.ts、
+//       check-windows-client-readiness.ps1;复用 start-mvp.ts 写入的运行时文件。
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

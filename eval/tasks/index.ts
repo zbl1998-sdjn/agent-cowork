@@ -1,3 +1,9 @@
+// 评测任务加载器:从磁盘读取并校验黄金集/红队任务(eval · tasks)
+// ---------------------------------------------------------------------------
+// 职责:递归扫描 golden/ 与 redteam/ 下的 JSON 任务文件,逐条按 schema 校验,
+//       并对任务 id 做去重(防止重复用例),按 id 稳定排序后返回。
+// 依赖:tasks/schema 的 validateEvalTask、node:fs/path/url。
+//       导出:loadEvalTaskFile、loadGoldenEvalTasks、loadRedteamEvalTasks、loadAllEvalTasks。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

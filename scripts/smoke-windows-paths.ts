@@ -1,3 +1,14 @@
+// Windows 中文/长路径与路径越权防护冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:在含中文目录名、超 260 字符长路径的工作区起本地 Host server(jail 在
+//       trustedRoot),逐项验证 files tree/read/preview/search、context bundle、
+//       uploads import、artifacts 列举/查看/改名、file-ops 预览/应用/回滚等接口
+//       对 Unicode 与长路径的正确处理;并断言越权读取、敏感路径(.ssh)、
+//       junction 软链逃逸均被拦在 trustedRoot 内,审计日志记录写/移动动作。
+//       结果写 build/windows-paths-smoke-report.json(WINDOWS_PATHS_ARCHIVE=1
+//       时改写到 reports/windows-paths 带时间戳归档,失败 ok=false 退 1)。
+// 用法:npm run smoke:windows-paths(经 run-host-node.mjs 跑本 .ts);无需网络。
+// 依赖:apps/host/src/server.ts 的 createServer;storage/jsonl-writer 审计写入。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

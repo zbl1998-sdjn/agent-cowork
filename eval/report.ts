@@ -1,3 +1,9 @@
+// 评测报告生成器:把运行汇总产出 JSON + HTML 报告(eval · report)
+// ---------------------------------------------------------------------------
+// 职责:接收 runner 聚合出的 EvalSummary,计算通过率并与基线对比(判断是否回归),
+//       生成结构化 JSON 与可读 HTML 报告;writeEvalReport 还负责落盘 latest.json/latest.html。
+// 依赖:仅 node:fs / node:path,无业务下层依赖。
+//       导出:generateEvalReport、writeEvalReport 及报告相关类型。
 import fs from 'node:fs';
 import path from 'node:path';
 

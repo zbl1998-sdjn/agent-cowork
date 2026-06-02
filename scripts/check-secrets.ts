@@ -1,3 +1,13 @@
+// 仓库明文凭据扫描门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:遍历仓库文本文件(优先 git ls-files 含未跟踪文件,失败回退磁盘遍历;跳过
+//   测试/fixtures、二进制、超 512KB 文件及构建产物目录),用一组正则探测器匹配私钥、
+//   GitHub token/PAT、Slack/AWS/OpenAI 风格 key 以及 api_key=/password= 等赋值形态。
+//   命中含 dummy/fake/test/sample 等占位词的值会被忽略,降低误报。导出
+//   scanTextForSecrets / scanRepoForSecrets 等供测试与其他门禁复用。
+// 用法:npm run check:secrets(经 run-host-node.mjs 运行),也是 npm run check
+//   聚合门禁的一环;仅作为主入口时执行扫描。
+// 依赖:git(取候选文件清单);命中任一疑似凭据即 exit 1 阻断(输出已脱敏)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

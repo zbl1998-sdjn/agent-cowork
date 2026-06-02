@@ -1,3 +1,15 @@
+// Tauri/Windows 客户端脚手架契约冒烟(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:静态校验 Windows 桌面客户端脚手架是否符合契约——package.json 依赖白名单、
+//       src-tauri 的 tauri.conf.json(产品名/devUrl/frontendDist/CSP/updater/
+//       sidecar/嵌入式 Python 资源等)、Cargo.toml 必需 crate、Rust 入口必需符号
+//       (start_node_host、check_desktop_update、仅用打包 sidecar 而非 PATH node)、
+//       capability 权限最小化、组件迁移清单完整、嵌入式 Python staging 脚本指纹;
+//       并探测本机 cargo/rustc/cargo-tauri 工具链是否可用,结果打印为 JSON。
+// 用法:npm run smoke:tauri-scaffold(经 run-host-node.mjs 跑本 .ts);
+//       任一契约断言不满足即抛错 exit 1 阻断;工具链缺失只标记 runnable=false 不阻断。
+// 依赖:apps/windows-client/src-tauri 配置与 resources/component-manifest.json;
+//       scripts/prepare-embedded-python.ps1。
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,3 +1,11 @@
+// 停止本地 MVP Host 服务并清理运行时文件(scripts · MVP生命周期)
+// ---------------------------------------------------------------------------
+// 职责:读取 build/mvp-runtime.json 中的 pid——文件缺失视为已停止;进程已死则
+//       清理过期运行时文件;否则发送 SIGTERM 并轮询至多 5s 等待退出,成功后删除文件;
+//       拒绝停止当前进程,超时未退出则抛错。运行结果以 JSON 打印。
+// 用法:npm run stop:mvp(即 node scripts/run-host-node.mjs scripts/stop-mvp.ts);
+//       可用 MVP_RUNTIME_FILE 指定运行时文件位置;失败即 exit 1。
+// 依赖:与 start-mvp.ts 写入的运行时文件契约一致(pid 字段),配合 status-mvp.ts 使用。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

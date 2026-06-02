@@ -1,3 +1,13 @@
+// MVP 验收聚合器:批量跑语法检查/CI 门禁/各类 smoke 并产出验收报告(scripts · smoke·E2E)
+// ---------------------------------------------------------------------------
+// 职责:顺序执行一组验收检查——前端与各 *-mvp/smoke 脚本的语法检查(node --check)、
+//   ci.ts 静态+单测门禁、host 操作与 MVP 运行时/计划闭环/UI 契约/渲染 UI/React 等 smoke;
+//   逐项标记 passed/failed/blocked(Defender ASR 拦截本地 exe 记为 blocked),汇总后写
+//   build/mvp-verification-report*.json 作为验收证据;有 failed/blocked 即 exit 1。
+// 用法:npm run verify:mvp(即 node scripts/run-host-node.mjs scripts/verify-mvp.ts);
+//   加 --windows-client 或 VERIFY_WINDOWS_CLIENT=1 追加原生 Windows 客户端窗口级 smoke。
+// 依赖:scripts/run-host-node.mjs、众多 smoke-*.ts、scripts/ci.ts、smoke-windows-client.ps1。
+
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

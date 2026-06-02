@@ -1,3 +1,14 @@
+// 架构分层与依赖方向门禁(scripts · 门禁(gate))
+// ---------------------------------------------------------------------------
+// 职责:扫描 host(apps/host/src)与 UI(apps/windows-client/ui/src)源码,解析
+//   静态/动态 import、export-from、require 的相对依赖,校验三类边界:UI 不得直接
+//   import host 源码(只能走 lib/api 的 HTTP/SSE 契约)、host 不得依赖前端或 Tauri
+//   外壳代码、host 内部 import 必须指向更低分层(L0→L4,不得反向)。同时检测 import
+//   环。已知技术债通过 HOST_LAYER_WAIVERS 白名单显式豁免。
+// 用法:npm run check:arch(经 node scripts/run-host-node.mjs scripts/check-arch.ts
+//   运行);也作为 npm run check 聚合门禁的一环。仅作为主入口时执行扫描,被其他脚本
+//   (如 check-icons.ts)import 时不触发(共用 stripComments)。
+// 依赖:分层定义内置于本文件 HOST_LAYERS;失败即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
