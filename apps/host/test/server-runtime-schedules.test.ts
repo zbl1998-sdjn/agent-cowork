@@ -167,6 +167,9 @@ test('scheduler default executor runs a recipe and records a run', async () => {
   });
   const base = await bind(server);
   try {
+    // meeting-actions 配方现在要求可用来源:给计划任务也铺好会议纪要并显式传入。
+    const sourcePath = path.join(trustedRoot, 'meeting-notes.md');
+    fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同\n', 'utf8');
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const created = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
@@ -174,7 +177,7 @@ test('scheduler default executor runs a recipe and records a run', async () => {
       body: {
         name: '每周会议纪要',
         fireAt,
-        payload: { recipeId: 'meeting-actions', prompt: '自动整理', files: [] },
+        payload: { recipeId: 'meeting-actions', prompt: '自动整理', files: [sourcePath] },
       },
     });
     assert.equal(created.status, 200);
