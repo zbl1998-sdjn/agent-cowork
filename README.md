@@ -78,7 +78,7 @@ npm run smoke:host
 `npm run start:mvp` 会创建 `build/mvp-workspace` 演示工作区，启动本地服务并打开 Agent Cowork UI。
 `npm run status:mvp` 会读取 `build/mvp-runtime.json` 并检查 PID 与 `/health`；`npm run stop:mvp` 会根据 runtime 文件停止由 `start:mvp` 启动的服务。
 
-启动服务后会监听 `http://127.0.0.1:3001`，并直接服务 Agent Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览，并在审批后写入 `.AgentCowork/artifacts/`。如果端口被占用，用 `PORT` 覆盖；trusted root 可用 `TRUSTED_ROOT` 覆盖。
+`npm run start:mvp` 默认监听 `http://127.0.0.1:3017`(与 Tauri sidecar 同端口;`npm start` 走 `main.ts` 默认 `3001`),并直接服务 Agent Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览,并在审批后写入 `.AgentCowork/artifacts/`。如果端口被占用,用 `PORT` 覆盖;trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
 Kimi API 计划生成功能默认只在配置服务端 API key 后启用，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时调用 Kimi API：
 
