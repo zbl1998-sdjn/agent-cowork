@@ -66,6 +66,20 @@ describe('buildChatStreamCallbacks', () => {
     expect(getState().usage?.total_tokens).toBe(42);
   });
 
+  it('onDone marks leftover plan todos done so the checklist does not stay stuck at 待处理', () => {
+    const { cb, getState } = makeHarness('plan');
+    cb.onTodoSnapshot?.([
+      { id: 'plan-1', text: '提取合同要点', status: 'pending', kind: 'plan' },
+      { id: 'plan-2', text: '汇总发票数据', status: 'pending', kind: 'plan' },
+      { id: 'tool-1-Write', text: '调用 Write', status: 'done', kind: 'tool' },
+    ]);
+    cb.onDone?.({ text: '完成。' });
+    const todos = getState().todos!;
+    expect(todos.find((t) => t.id === 'plan-1')!.status).toBe('done');
+    expect(todos.find((t) => t.id === 'plan-2')!.status).toBe('done');
+    expect(todos.find((t) => t.id === 'tool-1-Write')!.status).toBe('done');
+  });
+
   it('onCancelled uses friendly fallback text when no body was streamed', () => {
     const { cb, getState, setStreamingId } = makeHarness();
     cb.onCancelled?.({ text: '' });

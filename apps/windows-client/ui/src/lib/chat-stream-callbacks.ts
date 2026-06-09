@@ -87,6 +87,9 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
         ...m,
         status: 'done',
         verifying: false,
+        // 计划清单(kind=plan)是按计划文本逐行生成的、没有逐项完成回调,运行收尾即代表计划已执行,
+        // 把仍 pending 的计划项收敛为 done,避免清单永远停在「待处理」造成困惑。
+        todos: (m.todos || []).map((todo) => (todo.kind === 'plan' && todo.status === 'pending' ? { ...todo, status: 'done' } : todo)),
         text: full.text || m.text || '',
         runId: full.runId || m.runId,
         usage: full.usage || m.usage,
