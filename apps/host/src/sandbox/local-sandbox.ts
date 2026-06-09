@@ -12,7 +12,7 @@ import { runConstrainedChild } from './exec-child.js';
 import type { RunChildResult, SpawnLike } from './exec-child.js';
 import type { SandboxSpec } from './sandbox-spec.js';
 
-export type SandboxExecContext = { trustedRoot?: string; context?: Record<string, unknown> };
+export type SandboxExecContext = { trustedRoot?: string; context?: Record<string, unknown>; signal?: AbortSignal | null };
 export type SandboxExecResult = RunChildResult & {
   backend: string;
   networkIsolated: boolean;
@@ -60,6 +60,7 @@ export class LocalSubprocessSandbox {
       env,
       timeoutMs: spec.timeoutMs,
       maxOutputBytes: spec.maxOutputBytes,
+      abortSignal: ctx.signal ?? null,
     });
 
     return {

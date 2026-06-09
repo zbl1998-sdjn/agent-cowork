@@ -65,6 +65,7 @@ export type ExecuteToolCallOptions = {
   steps: Array<Record<string, unknown>>;
   context?: RequestContext;
   runTrace?: RunTraceLike | null;
+  signal?: AbortSignal | null;
   callbacks: ExecutorCallbacks;
 };
 export type ExecuteToolCallResult = { planApproved?: boolean; didMutate?: boolean; stopForBudget?: boolean; stopForLoopGuard?: boolean; breakToolLoop?: boolean };
@@ -103,6 +104,7 @@ export async function executeToolCall({
   steps,
   context,
   runTrace,
+  signal,
   callbacks,
 }: ExecuteToolCallOptions): Promise<ExecuteToolCallResult> {
   const { name, args } = parseToolCall(call);
@@ -181,8 +183,10 @@ export async function executeToolCall({
   const toolStartedAt = Date.now();
   let result: unknown;
   try {
+    // 把取消/超时信号并入工具上下文,让支持中断的工具(沙箱/MCP/网络)在"停止"后真正止损。
+    const handlerCtx = signal ? { ...toolCtx, signal } : toolCtx;
     result = await activeRetryPolicy.run(async () => (
-      tool && typeof tool.handler === 'function' ? tool.handler(args, toolCtx) : { error: `unknown tool: ${toolName}` }
+      tool && typeof tool.handler === 'function' ? tool.handler(args, handlerCtx) : { error: `unknown tool: ${toolName}` }
     ));
   } catch (err) {
     const error = err && typeof err === 'object' ? err as { message?: unknown } : {};

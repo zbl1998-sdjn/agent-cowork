@@ -32,6 +32,7 @@ export type RunChildOptions = {
   env: Record<string, string>;
   timeoutMs: number;
   maxOutputBytes: number;
+  abortSignal?: AbortSignal | null;
 };
 export type RunChildResult = {
   exitCode: number;
@@ -71,7 +72,7 @@ export function createCappedBuffer(maxBytes: number): CappedBuffer {
 }
 
 /** 在资源限制下运行子进程:无 shell、限时(到点 SIGKILL)、stdout/stderr 各自限额,返回结构化结果。 */
-export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }: RunChildOptions): Promise<RunChildResult> {
+export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes, abortSignal }: RunChildOptions): Promise<RunChildResult> {
   const startedAt = Date.now();
   const child = spawn(command, args, {
     cwd,
@@ -93,6 +94,13 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
     child.kill('SIGKILL');
   }, timeoutMs);
 
+  // 取消/超时信号到达即 SIGKILL 杀子进程——治"UI 已停止后 shell 仍在跑/写文件"。
+  const onAbort = () => child.kill('SIGKILL');
+  if (abortSignal) {
+    if (abortSignal.aborted) onAbort();
+    else abortSignal.addEventListener('abort', onAbort, { once: true });
+  }
+
   const closed: Promise<{ code: number | null; signal: string | null }> = new Promise((resolve, reject) => {
     child.on('error', (err2) => reject(err2));
     child.on('close', (code, signal) => resolve({ code, signal }));
@@ -113,5 +121,6 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
     };
   } finally {
     clearTimeout(timer);
+    if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
   }
 }

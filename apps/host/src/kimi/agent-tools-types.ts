@@ -10,7 +10,7 @@ export type SandboxLike = {
   backend?: string;
   exec(
     spec: unknown,
-    options: { trustedRoot: string; context?: unknown },
+    options: { trustedRoot: string; context?: unknown; signal?: AbortSignal | null },
   ): Promise<{ exitCode?: unknown; stdout?: unknown; stderr?: unknown; timedOut?: unknown }>;
 };
 export type AgentToolsContext = {

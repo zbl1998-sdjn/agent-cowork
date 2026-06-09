@@ -206,11 +206,14 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       traceToolDecision(runTrace, stepNumber, message);
       saveCheckpoint('assistant_tool_calls', stepNumber);
       for (const call of calls) {
+        // 取消/超时后不再启动本批剩余的工具调用——避免"UI 已停止"后后台仍继续调用工具。
+        if (runTimeout.aborted()) break;
         const result = await executeToolCall({
           call, stepNumber, toolMap, activeContextManager, activeRetryPolicy,
           activeBudgetGuard, activeLoopGuard, toolCtx, toolTodos,
           hasApprovals, autoApprove, approvals, sessionApproved, runId,
           planMode, planApproved, hooks, audit, emit, messages, steps, context, runTrace,
+          signal: runTimeout.signal,
           callbacks: { saveCheckpoint, stopOnBudget },
         });
         if (result.planApproved) planApproved = true;

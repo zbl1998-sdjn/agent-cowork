@@ -29,7 +29,7 @@ export function createShellTool({ root, sandbox, sandboxLimits, context }: Shell
       ? '在工作区目录里运行一条命令(经系统 shell)。优先用 Windows/PowerShell 命令(如 Get-ChildItem、dir、type)或 node/python 脚本；返回 stdout/stderr/退出码。每条命令都需用户确认。'
       : '在隔离沙箱里运行一个命令（如 `node script.js`、`python x.py`），返回 stdout/stderr/退出码。默认无网络、cwd 限定工作区。',
     parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
-    handler: async (args: ToolArgs = {}) => {
+    handler: async (args: ToolArgs = {}, ctx?: { signal?: AbortSignal | null }) => {
       const command = String(args.command || '').trim();
       if (!command) throw new Error('command is required');
       let spec;
@@ -44,7 +44,7 @@ export function createShellTool({ root, sandbox, sandboxLimits, context }: Shell
         const parts = command.split(/\s+/).filter(Boolean);
         spec = normalizeSandboxSpec({ tool: parts[0], args: parts.slice(1) }, sandboxLimits);
       }
-      const result = await sandbox.exec(spec, { trustedRoot: root, context });
+      const result = await sandbox.exec(spec, { trustedRoot: root, context, signal: ctx?.signal ?? null });
       return {
         exitCode: result.exitCode,
         stdout: clip(result.stdout, 4000),
