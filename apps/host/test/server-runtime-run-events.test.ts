@@ -17,7 +17,7 @@ test('SSE: /api/runs/:id/events replays a completed recipe run timeline', async 
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
-    const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const run = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sse-run' },
       body: { prompt: '会议纪要整理', files: [] },
@@ -65,7 +65,7 @@ test('SSE: Last-Event-ID skips already-delivered events', async () => {
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
-    const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const run = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { 'idempotency-key': 'sse-last-event-id' },
       body: { prompt: 'x', files: [] },

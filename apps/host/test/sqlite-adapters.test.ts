@@ -223,7 +223,7 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
     const memoryBody = recordValue(memory.body, 'memory response body');
     assert.match(String(recordValue(memoryBody.memory, 'memory payload').text), /OKR/);
 
-    const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const run = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'sqlite-run' },
       body: { prompt: '把会议纪要整理', files: [] },
@@ -234,7 +234,7 @@ test('server storeBackend=sqlite wires memory, runs index, and schedules', { ski
     assert.equal(index.status, 200);
     const indexedRuns = recordArray(recordValue(index.body, 'runs index response body').runs, 'runs index records');
     assert.equal(indexedRuns.length, 1);
-    assert.equal(present(indexedRuns[0], 'first sqlite indexed run').recipeId, 'meeting-actions');
+    assert.equal(present(indexedRuns[0], 'first sqlite indexed run').recipeId, 'email-draft');
 
     const fireAt = new Date(Date.now() + 60_000).toISOString();
     const schedule = await jsonRequest(base, '/api/schedules', {
