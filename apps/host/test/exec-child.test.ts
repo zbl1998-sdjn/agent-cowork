@@ -99,3 +99,25 @@ test('runConstrainedChild: aborting the signal SIGKILLs the in-flight child (can
   assert.ok(elapsedMs < 5000, `aborted child must return promptly (~150ms), got ${elapsedMs}ms (~60s if not killed)`);
   assert.equal(res.timedOut, false, 'an abort-kill is not a timeout');
 });
+
+// 回归:真实 Shell 是 powershell.exe -Command "<长命令>",长命令(ping)是孙进程。
+// 旧实现只 kill powershell 壳 → ping 孤儿继续跑、其继承的管道不关 → 'close' 要等 ~59s,取消无效(live 实测 55s)。
+// 上面的单进程用例 kill 得掉、掩盖了这点;这里 spawn 整棵树,验证 abort 杀树后秒级返回。Windows 专用。
+test('runConstrainedChild: aborting a shell-wrapper kills the whole process tree, not just the wrapper (Windows)', { skip: process.platform !== 'win32' }, async () => {
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  setTimeout(() => controller.abort(), 400);
+  const res = await runConstrainedChild({
+    spawn,
+    command: 'powershell.exe',
+    args: ['-NoProfile', '-NonInteractive', '-Command', 'ping -n 60 127.0.0.1'],
+    cwd: process.cwd(),
+    env: stringEnv(),
+    timeoutMs: 90000,
+    maxOutputBytes: 1024 * 1024,
+    abortSignal: controller.signal,
+  });
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(elapsedMs < 8000, `tree-kill must return promptly, got ${elapsedMs}ms (~59s if grandchild ping not killed)`);
+  assert.equal(res.timedOut, false, 'an abort-kill is not a timeout');
+});
