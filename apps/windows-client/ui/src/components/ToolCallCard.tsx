@@ -10,8 +10,8 @@ function fmt(v: unknown): string {
   try { return typeof v === 'string' ? v : JSON.stringify(v, null, 2); } catch { return String(v); }
 }
 
-const ICON: Record<string, string> = { running: '⟳', succeeded: '✓', failed: '✕', rejected: '✕', blocked: '⊘' };
-const LABEL: Record<string, string> = { running: '运行中', succeeded: '成功', failed: '失败', rejected: '已拒绝', blocked: '已阻止' };
+const ICON: Record<string, string> = { running: '⟳', succeeded: '✓', failed: '✕', rejected: '✕', blocked: '⊘', cancelled: '⊘' };
+const LABEL: Record<string, string> = { running: '运行中', succeeded: '成功', failed: '失败', rejected: '已拒绝', blocked: '已阻止', cancelled: '已取消' };
 
 const headStyle: CSSProperties = {
   width: '100%',

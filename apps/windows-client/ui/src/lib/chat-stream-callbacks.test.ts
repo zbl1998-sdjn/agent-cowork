@@ -74,6 +74,20 @@ describe('buildChatStreamCallbacks', () => {
     expect(getState().text).toContain('已取消本轮运行');
   });
 
+  it('onCancelled clears parked approval/plan/question and marks running tools cancelled', () => {
+    const { cb, getState } = makeHarness('execute');
+    cb.onToolCall?.('Shell', { command: 'dir' });
+    cb.onApprovalRequest?.('appr-9', 'Shell', undefined);
+    cb.onPlanProposed?.('plan-1', '步骤一');
+    cb.onQuestion?.('q-1', '继续吗?', []);
+    cb.onCancelled?.({ text: '' });
+    const state = getState();
+    expect(state.approval).toBeUndefined();
+    expect(state.plan).toBeUndefined();
+    expect(state.question).toBeUndefined();
+    expect(state.tools?.[0]?.status).toBe('cancelled');
+  });
+
   it('onError marks the message failed with the raw error string', () => {
     const { cb, getState, setStreamingId } = makeHarness();
     cb.onError?.('upstream blew up');

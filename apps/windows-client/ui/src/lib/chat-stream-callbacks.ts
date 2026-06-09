@@ -95,10 +95,16 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
 
     onCancelled: (full) => {
       setStreamingId(null);
+      // 取消即终局:清掉待决审批/计划/提问(host 已吊销,残留按钮点了也只会 404),
+      // 在跑工具一并置为已取消,避免界面停在「运行中 + 可点批准」的假活状态。
       patch((m) => ({
         ...m,
         status: 'cancelled',
         verifying: false,
+        approval: undefined,
+        plan: undefined,
+        question: undefined,
+        tools: (m.tools || []).map((tool) => (tool.status === 'running' ? { ...tool, status: 'cancelled' } : tool)),
         text: full.text || m.text || '已取消本轮运行。可点击继续发起下一轮。',
         runId: full.runId || m.runId,
         usage: full.usage || m.usage,
