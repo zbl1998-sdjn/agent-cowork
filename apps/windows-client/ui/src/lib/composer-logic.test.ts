@@ -23,9 +23,9 @@ describe('composer refine send logic', () => {
     });
   });
 
-  it('pauses for preview when the prompt was rewritten or still misses fields', () => {
+  it('pauses for preview when the prompt was rewritten or needs clarification', () => {
     expect(resolveRefineSendDecision('看看这个', { ...base, changed: true }).action).toBe('preview');
-    expect(resolveRefineSendDecision('看看这个', { ...base, missing: ['目标文件'] }).action).toBe('preview');
+    expect(resolveRefineSendDecision('看看这个', { ...base, needsClarification: true }).action).toBe('preview');
   });
 
   it('debounces file mention searches only when there is a query', () => {

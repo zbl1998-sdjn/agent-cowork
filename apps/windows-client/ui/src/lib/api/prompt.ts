@@ -15,6 +15,7 @@ export interface PromptRefineContext {
 export interface PromptRefineResult {
   refined: string;
   changed: boolean;
+  needsClarification?: boolean;
   intent: string;
   missing: string[];
   trustedRoot?: string;

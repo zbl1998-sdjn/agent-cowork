@@ -14,7 +14,7 @@ export function shouldRefineBeforeSend(autoClarify: boolean, text: string): bool
 }
 
 export function resolveRefineSendDecision(original: string, result: PromptRefineResult): RefineSendDecision {
-  if (result.changed || result.missing.length > 0) return { action: 'preview', result };
+  if (result.changed || result.needsClarification) return { action: 'preview', result };
   return { action: 'send', text: original.trim() };
 }
 

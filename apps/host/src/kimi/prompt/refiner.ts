@@ -12,7 +12,7 @@ export type PromptContext = { profile?: ProfileLike | null; userProfile?: Profil
 type PromptModelInput = { prompt: string; context: PromptContext; intent: PromptIntent; missing: PromptMissing[] };
 export type PromptModelCall = (input: PromptModelInput) => unknown | Promise<unknown>;
 type PromptRefinerOptions = PromptAnalyzeOptions & { modelCall?: PromptModelCall; timeoutMs?: number };
-export type PromptRefineResult = { refined: string; changed: boolean; intent: PromptIntent; missing: PromptMissing[] };
+export type PromptRefineResult = { refined: string; changed: boolean; needsClarification: boolean; intent: PromptIntent; missing: PromptMissing[] };
 export type PromptRefiner = { refine(raw: unknown, ctx?: PromptContext): Promise<PromptRefineResult> };
 
 const INTENT_LABELS = {
@@ -53,6 +53,7 @@ function resultFromPolicy(policy: PromptPolicy): PromptRefineResult {
   return {
     refined: policy.normalized,
     changed: false,
+    needsClarification: policy.needsClarification,
     intent: policy.intent,
     missing: policy.missing,
   };
@@ -102,17 +103,24 @@ export async function refinePrompt(raw: unknown, ctx: PromptContext = {}, option
       }), options.timeoutMs ?? 3500);
       const refined = modelText(output).trim();
       if (refined && refined !== policy.normalized) {
-        return { refined, changed: true, intent: policy.intent, missing: [] };
+        return { refined, changed: true, needsClarification: false, intent: policy.intent, missing: [] };
       }
+      // 模型认为无需改写(返回原文或空)→ 视为已足够明确,不再套模板兜底。
+      return resultFromPolicy(policy);
     } catch {
       return resultFromPolicy(policy);
     }
   }
 
+  // 没有模型可用:已足够明确就原样返回(避免把完整 prompt 套成模板),否则结构化兜底改写。
+  if (policy.explicit) {
+    return resultFromPolicy(policy);
+  }
   const refined = fallbackRefinement(policy.normalized, policy, ctx);
   return {
     refined,
     changed: refined !== policy.normalized,
+    needsClarification: false,
     intent: policy.intent,
     missing: [],
   };

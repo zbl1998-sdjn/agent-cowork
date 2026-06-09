@@ -34,6 +34,7 @@ import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
+import { createKimiRefineModelCall } from '../kimi/prompt/refine-model-call.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import { resolveStoreBackendConfig } from './store-backend-config.js';
 import {
@@ -54,6 +55,8 @@ import type {
 } from './host-state-types.js';
 
 export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
+  // 配置优先级统一在装配根处理:测试/嵌入式调用传入 config,本地运行再读环境变量,最后落到安全默认值。
+  // 这样面试或部署排查时只需从 HostConfig + `.env.example` 两个入口追配置来源。
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
   const staticRoot = config.staticRoot === false
     ? null
@@ -102,7 +105,19 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.recomputeKimiEnabled();
   state.persistKimiConfig = () => persistKimiConfig(kimiConfigFile, kimiApiConfig);
 
+  // 提示词改写(/api/prompt/refine)默认接入当前模型:未显式注入且已配置 API Key 时,
+  // 用当前 Kimi 配置造一个 refine 专用的非流式模型调用;否则保持空,refiner 走本地兜底。
+  if (!config.promptRefineModelCall && !config.promptRefiner && kimiApiConfig.configured) {
+    config.promptRefineModelCall = createKimiRefineModelCall({
+      kimiConfig: kimiApiConfig as unknown as Record<string, unknown>,
+    });
+    if (config.promptRefineTimeoutMs == null) {
+      config.promptRefineTimeoutMs = 20_000;
+    }
+  }
+
   const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.AgentCowork', 'index'));
+  // 存储后端在此分流:file/sqlite 适合单机演示,postgres 才启用跨实例 approvals/run-events/memory。
   Object.assign(state, resolveStoreBackendConfig(config, trustedRootDefault));
   state.runsIndex = config.runsIndex || (state.storeBackend === 'postgres'
     ? withSafeWrites(createPostgresRunsIndex(omitUndefined({ connectionString: state.databaseUrl })))
@@ -119,6 +134,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     : new RunEventBus())) as RunEventsState;
 
   state.sandboxEnabled = config.enableSandbox !== false;
+  // 沙箱启动必须“诚实”:Docker 镜像可用才声明网络隔离,否则回退 local 并暴露 networkIsolated=false。
   state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup(omitUndefined({
     requestedBackend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'auto',
     sandboxOptions: config.sandboxOptions || {},
@@ -167,6 +183,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.authStore = config.authStore || ((config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false'))
     ? createSqliteUserStore({ dbPath: path.resolve(config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.AgentCowork', 'auth.sqlite')) })
     : createUserStore());
+  // 凭证仓库是 OAuth/API token 的唯一持久入口;前端只拿脱敏状态,不接触明文凭证。
   state.credentialStore = config.credentialStore || createCredentialStore({
     filePath: path.resolve(config.credentialStorePath || process.env.KCW_CREDENTIAL_STORE || path.join(getAppHome(), 'credentials.json')),
   });
@@ -176,8 +193,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.jwtSecret = config.jwtSecret || process.env.KCW_JWT_SECRET || null;
   state.requireAuth = config.requireAuth ?? (process.env.KCW_REQUIRE_AUTH !== 'false');
   state.trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');
-  // Anti-DNS-rebinding Host-header allowlist; on by default. Disable only when
-  // intentionally binding to a non-loopback address (KCW_VALIDATE_HOST=false).
+  // Host 头白名单用于抵御 DNS rebinding,默认开启;只有明确绑定非回环地址时才关闭。
   state.validateHost = config.validateHost ?? (process.env.KCW_VALIDATE_HOST !== 'false');
 
   state.safeTrustedRoot = (requestedRoot: unknown = trustedRootDefault) => (
@@ -189,7 +205,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
       const context = ctx || (rawContext && typeof rawContext === 'object' ? rawContext as Record<string, unknown> : {});
       state.runsIndex.upsert(summariseRunForIndex({ ...record, runPath: record.runPath }, context), context);
     } catch {
-      // index failures must never break the request path
+      // 索引失败不应打断请求主路径。
     }
   };
   state.cacheKeyFor = (context: RequestContextLike, method: string, pathname: string): string => (
