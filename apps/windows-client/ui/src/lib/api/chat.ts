@@ -144,6 +144,7 @@ export async function agentChatStream(
     planMode?: boolean | undefined;
     images?: string[] | undefined;
     resumeRunId?: string | undefined;
+    conversationId?: string | undefined;
   } = {},
   handlers: AgentStreamHandlers = {},
 ): Promise<void> {
@@ -161,6 +162,7 @@ export async function agentChatStream(
       planMode: opts.planMode,
       images: opts.images,
       resumeRunId: opts.resumeRunId,
+      conversationId: opts.conversationId,
     }),
   });
   if (!response.ok || !response.body) {

@@ -16,8 +16,11 @@ const RECALL_TOOL = 'mcp__mase-memory__mase_recall';
 const REMEMBER_TOOL = 'mcp__mase-memory__mase_remember';
 const UPSERT_FACT_TOOL = 'mcp__mase-memory__mase_upsert_fact';
 const GET_FACTS_TOOL = 'mcp__mase-memory__mase_get_facts';
+const TIMELINE_TOOL = 'mcp__mase-memory__mase_recall_thread_tail';
 const REMEMBER_MAX_CHARS = 4000;
 const FACT_CATEGORY = 'conversation_facts';
+const TIMELINE_LIMIT = 24;        // 注入最近 ~12 轮:够答"第一句/刚聊了啥"又不过度膨胀上下文。
+const TIMELINE_CONTENT_MAX = 200; // 每条内容截断上限,控制注入 token。
 // 召回硬超时:MASE 慢/卡也只让本轮"不带记忆"地走,绝不让对话干等(避免 demo 卡 60s)。
 const RECALL_TIMEOUT_MS = 2500;
 
@@ -78,18 +81,48 @@ function parseCurrentFacts(result: unknown): Array<{ key: string; value: string 
   return facts;
 }
 
+// 解析 mase_recall_thread_tail 返回的对话时间线(content[].text 是 JSON 数组),按时序升序返回。
+function parseTimeline(result: unknown): Array<{ role: string; content: string }> {
+  const rows: Array<{ role: string; content: string; ts: string; id: number }> = [];
+  for (const text of mcpTextItems(result)) {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of arr) {
+        if (!item || typeof item !== 'object') continue;
+        const row = item as Record<string, unknown>;
+        const content = typeof row.content === 'string' ? row.content.trim() : '';
+        if (!content) continue;
+        rows.push({
+          role: typeof row.role === 'string' ? row.role : 'user',
+          content,
+          ts: String(row.timestamp ?? row.event_timestamp ?? row.created_at ?? ''),
+          id: Number(row.id ?? 0),
+        });
+      }
+    } catch {
+      // 非 JSON 文本忽略。
+    }
+  }
+  // 时序升序(优先时间戳、回退 id),让模型按先后顺序读这段对话。
+  rows.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.id - b.id));
+  return rows.map(({ role, content }) => ({ role, content }));
+}
+
 // 读缝:拼出注入 loadLayeredMemory 的 sessionMemory 文本——
-//   ①【当前事实】无条件全量注入 entity_state(不依赖 query 措辞,保证当前状态始终在场);
-//   ②【相关历史】再按本轮输入做关键词召回补充。
+//   ①【最近对话】按本线程时序注入最近若干轮(对话连续性,答“第一句/刚才/继续上文”);
+//   ②【当前事实】无条件全量注入 entity_state(不依赖 query 措辞,保证当前状态始终在场);
+//   ③【相关历史】再按本轮输入做关键词召回补充。
 // 真·fail-safe:整段召回有 RECALL_TIMEOUT_MS 短超时——MASE 慢/卡也只降级到"本轮不带记忆",
 // 绝不让对话干等;出错/无内容同样返空串(慢也降级,不只是错才降级)。
 export async function maseRecallSessionMemory(
   registry: ToolCaller | null | undefined,
   query: string,
+  threadId?: string,
   topK = 5,
 ): Promise<string> {
   return Promise.race([
-    recallSessionMemoryInner(registry, query, topK),
+    recallSessionMemoryInner(registry, query, threadId, topK),
     new Promise<string>((resolve) => { setTimeout(() => resolve(''), RECALL_TIMEOUT_MS); }),
   ]);
 }
@@ -97,11 +130,32 @@ export async function maseRecallSessionMemory(
 async function recallSessionMemoryInner(
   registry: ToolCaller | null | undefined,
   query: string,
+  threadId?: string,
   topK = 5,
 ): Promise<string> {
   const blocks: string[] = [];
 
-  // ① 当前结构化事实(全部,高优先级,不依赖 query)。
+  // ① 最近对话时间线(本线程、按时序)——给模型真正的对话连续性;
+  //    "我第一句说了啥 / 刚才聊了啥 / 接着上文"这类问题只能靠它(BM25 片段无序,答不了)。
+  if (threadId && toolAvailable(registry, TIMELINE_TOOL)) {
+    try {
+      const turns = parseTimeline(await registry.call(TIMELINE_TOOL, { thread_id: threadId, limit: TIMELINE_LIMIT }));
+      if (turns.length) {
+        const lines = turns.map((turn) => {
+          const who = turn.role === 'assistant' ? '助手' : '用户';
+          const body = turn.content.length > TIMELINE_CONTENT_MAX
+            ? `${turn.content.slice(0, TIMELINE_CONTENT_MAX)}…`
+            : turn.content;
+          return `${who}: ${body.replace(/\s+/g, ' ')}`;
+        });
+        blocks.push(['【最近对话】(本会话按时间先后、最早在前;回答“第一句/刚才/继续上文”以此为准):', ...lines].join('\n'));
+      }
+    } catch {
+      // 时间线取不到不影响后续的事实/召回。
+    }
+  }
+
+  // ② 当前结构化事实(全部,高优先级,不依赖 query)。
   if (toolAvailable(registry, GET_FACTS_TOOL)) {
     try {
       const facts = parseCurrentFacts(await registry.call(GET_FACTS_TOOL, {}));
@@ -116,7 +170,7 @@ async function recallSessionMemoryInner(
     }
   }
 
-  // ② 按本轮输入召回相关历史(facts-first BM25)。
+  // ③ 按本轮输入召回相关历史(facts-first BM25)。
   const trimmedQuery = String(query || '').trim();
   if (trimmedQuery && toolAvailable(registry, RECALL_TOOL)) {
     try {

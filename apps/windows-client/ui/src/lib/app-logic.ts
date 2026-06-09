@@ -146,6 +146,7 @@ export function buildAgentChatStreamOptions(input: {
   planMode?: boolean | undefined;
   images?: string[] | undefined;
   resumeRunId?: string | undefined;
+  conversationId?: string | undefined;
 }) {
   return {
     trustedRoot: input.trustedRoot,
@@ -156,6 +157,7 @@ export function buildAgentChatStreamOptions(input: {
     planMode: input.planMode,
     images: input.images,
     ...(input.resumeRunId ? { resumeRunId: input.resumeRunId } : {}),
+    ...(input.conversationId ? { conversationId: input.conversationId } : {}),
   };
 }
 

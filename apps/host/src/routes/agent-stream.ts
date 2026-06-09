@@ -124,6 +124,10 @@ export async function streamAgentChat({
   };
   let outcome: AgentOutcome = { text: '', steps: [] };
   let status = 'succeeded';
+  // MASE 记忆线程:稳定的「按租户/用户/会话」标识,读缝(时间线召回)与写缝(回写)共用。
+  // conversationId 由 UI 每个对话窗口透传 → 各窗口对话时间线互不串(窗口隔离);UI 不传时回退 default。
+  const maseConversation = String(body.conversationId ?? '').trim().slice(0, 64) || 'default';
+  const maseThread = `cowork:${String(requestContext.tenantId ?? 'default')}:${String(requestContext.userId ?? 'default')}:${maseConversation}`;
   try {
     const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext };
     const hooks = loadHooksConfig(omitUndefined({
@@ -157,8 +161,8 @@ export async function streamAgentChat({
     });
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
-    // 读缝:MASE 作为记忆后端——用本轮输入召回相关历史事实,注入会话记忆层。
-    const maseSessionMemory = await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''));
+    // 读缝:MASE 作为记忆后端——注入【最近对话(本线程时序)+ 当前事实 + 相关历史】到会话记忆层。
+    const maseSessionMemory = await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread);
     const memory = loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }));
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
@@ -235,7 +239,6 @@ export async function streamAgentChat({
     // 写缝:MASE 作为记忆后端——把成功一轮的「用户输入+助手回答」写回长期记忆。
     // 用稳定的会话 thread(按租户/用户)而非每轮变化的 runId,timeline 才能按"一段对话"归组。
     if (status === 'succeeded' && outcome.text) {
-      const maseThread = `cowork:${String(requestContext.tenantId ?? 'default')}:${String(requestContext.userId ?? 'default')}`;
       await maseRememberTurn(toolRegistry, String(body.prompt || ''), outcome.text, maseThread);
     }
     response.end();
