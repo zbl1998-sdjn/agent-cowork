@@ -80,6 +80,7 @@
     "apps/host/src/kimi/provider/openai-compatible.ts",
     "apps/host/src/kimi/provider/router.ts",
     "apps/host/src/kimi/provider/types.ts",
+    "apps/host/src/kimi/prompt/refine-model-call.ts",
     "apps/host/src/kimi/prompt/refine-policy.ts",
     "apps/host/src/kimi/prompt/refiner.ts",
     "apps/host/src/kimi/safety/untrusted-content.ts",

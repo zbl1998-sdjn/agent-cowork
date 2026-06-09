@@ -1,35 +1,25 @@
 //! 桌面外壳配置(config)——绑定地址、dev URL、可信根解析的单一事实来源。配置集中而非散落(plan/01 B.7)。
-//! Static and environment-derived configuration for the desktop shell.
-//!
-//! Keeping configuration in one place means the host binding, dev URL, and
-//! trusted-root resolution have a single source of truth that both the sidecar
-//! launcher and the security layer read from.
 
 use std::env;
 use std::path::PathBuf;
 
 use crate::error::{DesktopError, DesktopResult};
 
-/// Loopback host the bundled Node host binds to.
+/// 打包 Node host 绑定的回环地址。
 pub const HOST: &str = "127.0.0.1";
-/// Port the bundled Node host listens on (kept in sync with `tauri.conf.json`).
+/// 打包 Node host 监听端口,需与 tauri.conf.json 保持一致。
 pub const PORT: &str = "3017";
-/// Fully-qualified local URL of the host, used by the webview and status calls.
+/// host 完整本地 URL,供 webview 与状态命令使用。
 pub const HOST_URL: &str = "http://127.0.0.1:3017";
 
-/// Resolve the trusted workspace root the host is allowed to operate within.
-///
-/// Resolution order (first match wins):
-/// 1. `KCW_TRUSTED_ROOT` — explicit override.
-/// 2. `KCW_REPO_ROOT` — repo checkout root (dev convenience).
-/// 3. The user's home directory (`USERPROFILE`/`HOME`).
-/// 4. The process current directory (last resort).
-///
-/// Note: an *installed* app is usually launched with a current directory that
-/// is the launcher's cwd (often a non-writable system path), so falling back to
-/// the home directory guarantees the host can always create its `.AgentCowork`
-/// state (config/auth/runs). The per-request workspace the user picks is passed
-/// separately on each `/api` call; this value is only the host's own home.
+/// 是否已配置正式的在线更新发布源。tauri.conf 的 updater endpoint 仍是占位域名
+/// (updates.agent-cowork.local)时保持 false:在线检查/安装直接给"未配置"清晰提示,
+/// 而非让用户点"检查更新"后得到一串 DNS/网络裸错。接好正式发布源后改为 true。
+pub const UPDATES_CONFIGURED: bool = false;
+
+/// 解析 host 允许操作的可信根。顺序:KCW_TRUSTED_ROOT → KCW_REPO_ROOT → 用户 home → 当前目录。
+/// 安装版常从不可写系统目录启动,所以优先退回 home,保证 host 能创建自己的 .AgentCowork 状态。
+/// 用户每次选择的工作区会随 /api 请求另传;这里仅是 host 自身状态根。
 pub fn trusted_root() -> DesktopResult<PathBuf> {
     if let Ok(root) = env::var("KCW_TRUSTED_ROOT") {
         if !root.is_empty() {

@@ -69,7 +69,11 @@ export function configureHostScheduler({
   );
   const defaultScheduleExecutor = async (record: ScheduleRecordLike) => {
     const payload = schedulePayload(record.payload);
-    if (!payload.recipeId) return { runId: null, note: `scheduler-noop:${record.id}` };
+    if (!payload.recipeId) {
+      // 不静默 no-op:prompt-only 定时任务没有可执行动作,抛清晰错误,由 Scheduler 记为
+      // failed(而非假"completed"),用户才能在历史里看到它并没真正执行。
+      throw new Error(`定时任务 ${record.id} 未绑定可执行动作(缺 recipeId),无法自动执行;请改为绑定一个配方/动作再设定。`);
+    }
     const result = runRecipe(omitUndefined({
       recipeId: String(payload.recipeId),
       trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),

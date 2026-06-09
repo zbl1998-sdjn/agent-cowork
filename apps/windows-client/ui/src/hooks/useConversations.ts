@@ -56,7 +56,7 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
     const t = setTimeout(() => {
       try {
         localStorage.setItem(CONV_KEY, JSON.stringify(conversations.slice(0, 50).map((c) => compactConversationForStorage(c, { messageLimit: 60 }))));
-      } catch { /* ignore quota */ }
+      } catch { /* 本地配额不足时跳过缓存写入 */ }
       if (user) {
         const active = conversations.find((c) => c.id === activeConvId);
         if (active && active.messages.length > 0) {
@@ -82,7 +82,7 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
     void (async () => {
       const remote = await listStoredConversations();
       if (remote.length) {
-        const convs: Conversation[] = remote.map((c) => ({
+        const remoteConvs: Conversation[] = remote.map((c) => ({
           id: c.id,
           title: c.title || '新对话',
           pinned: c.pinned,
@@ -90,11 +90,16 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
           activeBranchId: c.activeBranchId,
           branches: c.branches as Conversation['branches'],
         }));
-        setConversations(convs);
-        const first = convs[0];
-        if (!first) return;
-        setActiveConvId(first.id);
-        setMessages(activeConversationMessages(first));
+        // 合并而非覆盖:按 id 去重并集,本地独有会话(未同步/他端建的)保留,同 id 取消息更多者;
+        // 避免登录后远端静默顶掉本地历史。也不强切当前 active 会话(保持用户正在看的那个)。
+        setConversations((local) => {
+          const byId = new Map<string, Conversation>(local.map((c) => [c.id, c]));
+          for (const r of remoteConvs) {
+            const existing = byId.get(r.id);
+            if (!existing || r.messages.length >= existing.messages.length) byId.set(r.id, r);
+          }
+          return [...byId.values()];
+        });
       }
     })();
   }, [user, setMessages]);
