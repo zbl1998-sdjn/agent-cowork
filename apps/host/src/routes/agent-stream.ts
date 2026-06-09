@@ -18,6 +18,7 @@ import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
+import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
@@ -156,7 +157,9 @@ export async function streamAgentChat({
     });
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
-    const memory = loadLayeredMemory(omitUndefined({ trustedRoot, userHome }));
+    // 读缝:MASE 作为记忆后端——用本轮输入召回相关历史事实,注入会话记忆层。
+    const maseSessionMemory = await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''));
+    const memory = loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }));
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
@@ -229,6 +232,12 @@ export async function streamAgentChat({
       outcome,
       events,
     });
+    // 写缝:MASE 作为记忆后端——把成功一轮的「用户输入+助手回答」写回长期记忆。
+    // 用稳定的会话 thread(按租户/用户)而非每轮变化的 runId,timeline 才能按"一段对话"归组。
+    if (status === 'succeeded' && outcome.text) {
+      const maseThread = `cowork:${String(requestContext.tenantId ?? 'default')}:${String(requestContext.userId ?? 'default')}`;
+      await maseRememberTurn(toolRegistry, String(body.prompt || ''), outcome.text, maseThread);
+    }
     response.end();
   }
 }

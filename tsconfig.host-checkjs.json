@@ -85,6 +85,7 @@
     "apps/host/src/kimi/safety/untrusted-content.ts",
     "apps/host/src/kimi/system-prompt.ts",
     "apps/host/src/memory/file-memory-store.ts",
+    "apps/host/src/memory/mase-bridge.ts",
     "apps/host/src/memory/memory-audit.ts",
     "apps/host/src/memory/memory-constants.ts",
     "apps/host/src/memory/memory-layers.ts",
