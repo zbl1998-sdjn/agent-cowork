@@ -10,12 +10,14 @@ const MAX_OBJECT_DEPTH = 4;
 const MAX_ARRAY_ITEMS = 25;
 
 /**
+ * 判断值是否是可读取字段的普通对象。
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
+ * 从对象字段安全取子对象;缺失或类型不符时返回空对象。
  */
 function objectAt(source: Record<string, unknown>, key: string): Record<string, unknown> {
   const value = source[key];
@@ -23,12 +25,14 @@ function objectAt(source: Record<string, unknown>, key: string): Record<string, 
 }
 
 /**
+ * 把可选值转成字符串,null/undefined 统一成空串。
  */
 function text(value: unknown): string {
   return value == null ? '' : String(value);
 }
 
 /**
+ * 取非空字符串;空白输入返回 null,便于归因字段保持稀疏。
  */
 function nullableText(value: unknown): string | null {
   const valueText = text(value).trim();
@@ -36,12 +40,14 @@ function nullableText(value: unknown): string | null {
 }
 
 /**
+ * 对原始 prompt 做哈希归因,既能关联同输入,又不落明文。
  */
 function sha256(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 /**
+ * 递归清洗配置快照:限深/限数组,敏感键直接抹除,普通文本也走 redaction。
  */
 function sanitizeConfigValue(value: unknown, depth = 0): unknown {
   if (value === undefined) return undefined;
@@ -60,6 +66,7 @@ function sanitizeConfigValue(value: unknown, depth = 0): unknown {
 }
 
 /**
+ * 从 run 记录里提取并清洗 configSnapshot。
  */
 function configSnapshot(record: Record<string, unknown>): Record<string, unknown> {
   const snapshot = objectAt(record, 'configSnapshot');
@@ -72,6 +79,7 @@ function inputPrompt(record: Record<string, unknown>): string {
 }
 
 /**
+ * 从顶层或 configSnapshot 里取模型 baseUrl,只保留非空文本。
  */
 function modelBaseUrl(record: Record<string, unknown>): string | null {
   const config = objectAt(record, 'configSnapshot');
@@ -79,6 +87,7 @@ function modelBaseUrl(record: Record<string, unknown>): string | null {
 }
 
 /**
+ * 写入 run 记录的归因结构;只存脱敏配置和 prompt 哈希,不存原始 prompt。
  */
 export type RunAttribution = {
   schemaVersion: 1;
@@ -111,6 +120,7 @@ export function buildRunAttribution(record: unknown): RunAttribution {
 }
 
 /**
+ * 在原 run 记录上追加 attribution 字段,保持调用方原字段不变。
  */
 export function withRunAttribution<T extends Record<string, unknown>>(record: T): T & { attribution: RunAttribution } {
   return {

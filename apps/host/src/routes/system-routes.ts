@@ -109,6 +109,14 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
   }
 
   if (request.method === 'GET' && pathname === '/metrics') {
+    // 收口:运维指标默认不暴露,需显式设置 KCW_METRICS_ENABLED=true 才开启。这样既能在
+    // 需要时供 Prometheus 抓取(像 /health 一样豁免鉴权),默认又不向任何本地调用方匿名
+    // 泄露运行指标(进程内存、并发、熔断器等)。
+    if (process.env.KCW_METRICS_ENABLED !== 'true') {
+      response.writeHead(404, SECURITY_HEADERS);
+      response.end();
+      return true;
+    }
     const c = state.agentConcurrency.stats();
     const rl = state.rateLimiter ? state.rateLimiter.stats() : { tenants: 0 };
     const breakers = safeModelBreakerStats();

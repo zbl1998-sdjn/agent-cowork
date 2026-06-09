@@ -46,8 +46,7 @@ function operationContentBuffer(op: FileOperation): Buffer {
 }
 
 function previewWrite(op: FileOperation, trustedRoot: string): OperationPreview {
-  // Create-aware: a write target may not exist yet, so resolve the real parent
-  // (defeats junction/symlink escape).
+  // 写目标可能尚不存在,因此校验其真实父目录,防止 junction/symlink 越界。
   const target = assertTrustedPathForCreate(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
   const content = operationContentBuffer(op);
   const overwrite = op.overwrite === true;

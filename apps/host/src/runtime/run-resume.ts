@@ -21,12 +21,14 @@ export type RunCheckpointerLike = { load(runId: string): unknown };
 export type RunResumerOptions = { root?: string; checkpointer?: RunCheckpointerLike };
 
 /**
+ * 用 JSON 序列化做简单深拷贝,确保续跑状态不会共享检查点对象引用。
  */
 function jsonClone(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
 }
 
 /**
+ * 把未知值规整成普通对象,让检查点字段读取保持空值安全。
  */
 function objectOrEmpty(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -45,6 +47,7 @@ function usageOrZero(value: unknown): ResumeUsage {
 }
 
 /**
+ * 从原始检查点恢复可续跑状态,并对数组/metadata 做深拷贝隔离。
  */
 export function resumeStateFromCheckpoint(checkpoint: unknown): ResumeState {
   const record = objectOrEmpty(checkpoint);

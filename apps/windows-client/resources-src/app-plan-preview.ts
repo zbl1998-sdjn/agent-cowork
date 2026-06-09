@@ -1,4 +1,4 @@
-// Static file:// mode has its own branch so the real Host planning path stays readable.
+// 静态 file:// 预览独立成分支,让真实 Host 规划路径保持清晰。
 (function () {
   function renderStaticPlanPreview({
     prompt,

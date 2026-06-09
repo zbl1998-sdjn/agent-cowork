@@ -4,19 +4,10 @@
 // 职责:保护调用方免受不稳定/慢依赖(如上游模型 API)拖累——明显不健康时快速失败,冷却后再试探恢复。
 //       状态机:closed(累计失败)→ open(短路拒绝,冷却中)→ half-open(放行少量试探,成功则闭合、失败再开)。
 //       是韧性栈「别再猛敲坏后端」的一半,配合 resilience.js 的超时/重试/降级。依赖:无。导出:熔断器。
-//
-// Circuit breaker — protects callers from a flaky/slow dependency (e.g. the
-// upstream model API) by failing fast once it is clearly unhealthy, then probing
-// for recovery. This is the "stop hammering a broken backend" half of the
-// resilience stack; pair it with timeout/retry/fallback (see resilience.js).
-//
-// State machine:
-//   closed     normal operation; consecutive failures are counted.
-//              >= failureThreshold failures  ->  open.
-//   open       short-circuit: every call is rejected immediately (OpenCircuitError)
-//              for cooldownMs, so we stop piling load onto a dead dependency.
-//   half-open  after the cooldown, allow up to halfOpenMax trial calls. One
-//              success closes the circuit; any failure re-opens it.
+// 状态细节:
+//   closed     正常执行,累计连续失败;达到 failureThreshold 后转 open。
+//   open       冷却期内所有调用立即抛 OpenCircuitError,不再给坏依赖叠加压力。
+//   half-open  冷却结束后只放行 halfOpenMax 个试探调用;成功则闭合,失败则重新打开。
 
 export type CircuitState = 'closed' | 'open' | 'half-open';
 export type CircuitBreakerOptions = {
@@ -75,8 +66,8 @@ export class CircuitBreaker {
     return this._state;
   }
 
-  // Lazily transition open -> half-open once the cooldown has elapsed. Done on
-  // read so we don't need a timer (and stay deterministic under an injected clock).
+  // 惰性执行 open -> half-open:读取状态/判断请求时才检查冷却是否结束。
+  // 这样不需要定时器,注入时钟的单测也能保持确定性。
   _maybeHalfOpen(): void {
     if (this._state === 'open' && this._now() - this._openedAt >= this.cooldownMs) {
       this._state = 'half-open';
@@ -88,7 +79,7 @@ export class CircuitBreaker {
     this._maybeHalfOpen();
     if (this._state === 'closed') return true;
     if (this._state === 'open') return false;
-    return this._halfOpenInFlight < this.halfOpenMax; // half-open: limited trials
+    return this._halfOpenInFlight < this.halfOpenMax; // half-open:只允许有限试探。
   }
 
   onSuccess(): void {
@@ -100,7 +91,7 @@ export class CircuitBreaker {
 
   onFailure(): void {
     if (this._state === 'half-open') {
-      this._open(); // a trial failed -> straight back to open
+      this._open(); // 试探失败直接回到 open。
       return;
     }
     this._failures += 1;
@@ -115,7 +106,7 @@ export class CircuitBreaker {
     this._trips += 1;
   }
 
-  // Wrap an async call. Throws OpenCircuitError immediately when open.
+  // 包裹异步/同步调用;熔断 open 时立即抛 OpenCircuitError。
   async run<T>(fn: () => Promise<T> | T): Promise<T> {
     if (!this.canRequest()) throw new OpenCircuitError(this.name);
     if (this._state === 'half-open') this._halfOpenInFlight += 1;

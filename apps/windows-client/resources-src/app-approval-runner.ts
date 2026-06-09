@@ -1,5 +1,4 @@
-// Classic-script approval runner. It owns the apply/preview-mode execution path
-// while app.js keeps only orchestration and event binding.
+// classic-script 审批执行器:负责真实 apply 与静态预览路径;app.js 只保留编排和事件绑定。
 (function () {
   function createApprovalRunner({
     state,
@@ -112,7 +111,7 @@
         "执行完成",
       );
       await loadArtifactCatalog().catch(() => {
-        // Artifact catalog refresh is best-effort after apply.
+        // apply 后刷新 Artifact 目录是尽力操作,失败不影响已执行结果。
       });
       setStatus("已在本机执行");
     }

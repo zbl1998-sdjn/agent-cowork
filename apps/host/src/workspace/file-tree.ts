@@ -25,8 +25,7 @@ export function listWorkspaceTree(trustedRoot: string, options: WorkspaceTreeOpt
   const root = assertTrustedPath(path.resolve(trustedRoot), trustedRoot);
   const includeFiles = options.includeFiles !== false;
   const includeDirs = options.includeDirectories !== false;
-  // Bound the traversal so a huge/deep workspace can't exhaust memory or hang the
-  // UI (the listing is unbounded otherwise). Caller-overridable, hard-capped.
+  // 遍历必须有深度/条数上限,否则超大工作区会耗尽内存或卡住 UI。
   const maxDepth = Math.min(Math.max(1, Number(options.maxDepth ?? 8)), 20);
   const maxEntries = Math.min(Math.max(1, Number(options.maxEntries ?? 5000)), 20000);
   const results: WorkspaceTreeEntry[] = [];
@@ -83,7 +82,7 @@ export function listWorkspaceTree(trustedRoot: string, options: WorkspaceTreeOpt
           mtimeMs: fileStat.mtimeMs,
         });
       } catch {
-        // Skip unreadable files in tree listing to keep host resilient.
+        // 单个文件不可读时跳过,让整棵树列表保持可用。
       }
     }
   }

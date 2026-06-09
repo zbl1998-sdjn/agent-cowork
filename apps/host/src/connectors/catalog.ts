@@ -3,11 +3,6 @@
 // 职责:精选的 MCP 连接器清单 + 关键词推荐(类比「建议连接器」)。每项含命令/安装模板与可选 OAuth
 //       授权信息;builtin:true 表示该能力 host 已内置。
 // 依赖:无。导出:连接器目录与按关键词建议的函数。
-//
-// Connector catalog + keyword suggest (the Claude Cowork "suggest connectors"
-// analog). A curated list of MCP connectors with command/install templates;
-// builtin:true means the capability already ships in this host.
-
 export type OAuthPermissionDescriptor = {
   id: string;
   label: string;

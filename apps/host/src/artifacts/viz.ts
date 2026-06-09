@@ -5,17 +5,6 @@
 // 依赖:仅标准库与 cdnjs 上的两个图表库;不依赖本仓其他模块。
 // 导出:renderViz(渲染单页)、常量 VIZ_KINDS(支持的可视化种类清单)
 
-// Inline visualization renderer (the show_widget analog).
-//
-// renderViz(spec) -> a self-contained HTML document string for one of:
-//   - chart  : kind bar | line | pie | doughnut  (Chart.js from cdnjs)
-//   - mermaid: a diagram definition               (Mermaid from cdnjs)
-//   - table  : columns + rows                     (inline HTML, no JS)
-//
-// All user-supplied text is HTML-escaped, and all data injected into <script>
-// is encoded so it cannot break out of the script context (no `</script>`,
-// no `<!--`, no U+2028/2029). Only cdnjs is used for the two chart libs.
-
 type HttpError = Error & { statusCode?: number };
 export type VizSpec = {
   kind?: string;

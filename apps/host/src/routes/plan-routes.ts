@@ -27,10 +27,7 @@ const planBodySchema = z.preprocess(
   }),
 );
 
-// Plan mode route: propose a plan (no execution). The client approves the steps
-// and then POSTs them to /api/subagent/run to execute.
-//
-//   POST /api/plan  { goal } -> { goal, steps:[{tool,args,rationale}], executable }
+// 计划模式只生成待审批计划,不执行;客户端批准后再 POST 到 /api/subagent/run。
 export async function handlePlanRoutes({
   request,
   response,

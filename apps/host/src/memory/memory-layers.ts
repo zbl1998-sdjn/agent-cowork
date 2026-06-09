@@ -8,14 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// Five-layer memory system (modeled on Claude Code's CLAUDE.md hierarchy):
-//   1. enterprise — org/managed policy
-//   2. user       — ~/.AgentCowork/MEMORY.md
-//   3. project    — <root>/.AgentCowork/MEMORY.md
-//   4. local      — <root>/.AgentCowork/MEMORY.local.md
-//   5. session    — ephemeral notes for the current run
-// Layers are concatenated lowest→highest precedence so later layers refine
-// earlier ones; the combined block is injected into the agent's system prompt.
+// 五层按低→高优先级拼接:enterprise/user/project/local/session;越后的层可以修正前层。
+// 合并后的块注入 agent system prompt,同时保留每层来源与字节数便于 UI 展示。
 
 export type LayerName = 'enterprise' | 'user' | 'project' | 'local' | 'session';
 export type LayeredMemoryOptions = {
@@ -50,7 +44,7 @@ function readIfFile(filePath: string | null | undefined, maxBytes: number): stri
       return text.length > maxBytes ? text.slice(0, maxBytes) : text;
     }
   } catch {
-    // unreadable layer is simply absent
+    // 不可读层按不存在处理,避免记忆文件损坏阻断运行。
   }
   return '';
 }

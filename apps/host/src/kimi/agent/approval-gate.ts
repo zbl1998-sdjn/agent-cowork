@@ -106,7 +106,7 @@ export function ensureExitPlanModeTool(agentTools: AgentTool[], planMode: boolea
 export function makeAudit(auditBus: AuditBus | null | undefined, context: RequestContext = {}): AuditFn {
   return (kind, extra = {}) => {
     if (!auditBus) return;
-    try { auditBus.publish({ kind, ...context, ...extra }); } catch { /* swallow */ }
+    try { auditBus.publish({ kind, ...context, ...extra }); } catch { /* 审计失败不能打断工具主循环 */ }
   };
 }
 

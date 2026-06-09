@@ -3,13 +3,8 @@
 // 职责:持有请求 id 计数器与待决请求表,但不关心字节如何传输——调用方注入 send(message),并把入站
 //       消息喂回 handleMessage(message)。协议逻辑因此保持纯净、无需真实 MCP 服务器即可单测。
 // 依赖:无。导出:JsonRpcError / JsonRpcClient。
-// Minimal JSON-RPC 2.0 client core (transport-agnostic).
-//
-// The client owns the request-id counter and the pending-request map. It does
-// NOT know how bytes move: callers inject a `send(message)` function (a stdio
-// pipe, a WebSocket, an in-memory stub in tests) and feed inbound messages back
-// via `handleMessage(message)`. That keeps the protocol logic pure and unit
-// testable without spawning a real MCP server.
+// JSON-RPC 内核只管理请求 id 与 pending 表,不关心字节如何移动。
+// 调用方注入 send(message) 并把入站消息喂回 handleMessage,协议逻辑因此可脱离真实 MCP 服务器单测。
 
 export type JsonRpcWireError = { message?: string; code?: unknown; data?: unknown };
 export type JsonRpcMessage = {
@@ -55,7 +50,7 @@ export class JsonRpcClient {
     this._send = send;
     this._timeoutMs = timeoutMs;
     this._nextId = 1;
-    this._pending = new Map(); // id -> { resolve, reject, timer }
+    this._pending = new Map(); // id -> { resolve, reject, timer }。
     this._notificationHandlers = new Set();
   }
 
@@ -98,7 +93,7 @@ export class JsonRpcClient {
       return;
     }
     const rpcMessage = message as JsonRpcMessage;
-    // A response carries an id we issued.
+    // 响应会携带我们发出的 id。
     if (Object.prototype.hasOwnProperty.call(rpcMessage, 'id') && typeof rpcMessage.id === 'number' && this._pending.has(rpcMessage.id)) {
       const entry = this._pending.get(rpcMessage.id);
       if (!entry) {
@@ -113,13 +108,13 @@ export class JsonRpcClient {
       }
       return;
     }
-    // Otherwise it is a server-initiated notification (no matching id).
+    // 否则视为服务端主动通知(没有匹配的 pending id)。
     if (rpcMessage.method) {
       for (const handler of this._notificationHandlers) {
         try {
           handler(rpcMessage.method, rpcMessage.params);
         } catch {
-          // a misbehaving handler must not break the dispatch loop
+          // 单个通知处理器异常不能破坏分发循环。
         }
       }
     }

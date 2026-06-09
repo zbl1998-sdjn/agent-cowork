@@ -53,9 +53,8 @@ describe('SchedulesPanel state views', () => {
     expect(html).toContain('取消');
   });
 
-  // The white-collar copy wraps cancellation in window.confirm so a misclick
-  // doesn't silently delete a daily briefing. Tests run in the default node env
-  // where `window` is undefined, so stub it via vi.stubGlobal (no jsdom dep).
+  // 取消操作经过 window.confirm 防误触;默认 node 测试环境没有 window,
+  // 因此用 vi.stubGlobal 打桩,不引入 jsdom 依赖。
   function withConfirm<T>(result: boolean, run: (confirmFn: ReturnType<typeof vi.fn>) => T): T {
     const confirmFn = vi.fn(() => result);
     vi.stubGlobal('window', { confirm: confirmFn });

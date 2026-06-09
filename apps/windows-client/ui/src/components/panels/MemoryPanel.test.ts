@@ -8,7 +8,7 @@ describe('MemoryPanel logic', () => {
       key: 'FE',
       value: '前端体验验收',
       evidence: '用户确认',
-    // The user-facing type label was softened: '术语' → '名词解释'.
+    // 面向用户的类型文案从"术语"柔化为"名词解释"。
     })).toBe('名词解释 · FE: 前端体验验收');
   });
 });

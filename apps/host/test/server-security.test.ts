@@ -73,6 +73,23 @@ async function jsonRequest(
   return { status: response.status, body: recordValue(parsed, `${method} ${route} response`), headers: response.headers };
 }
 
+test('every response carries a Content-Security-Policy header', async () => {
+  const trustedRoot = tempRoot();
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/health`);
+    const csp = res.headers.get('content-security-policy');
+    assert.ok(csp, 'Content-Security-Policy header should be present');
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /object-src 'none'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /base-uri 'self'/);
+  } finally {
+    await close(server);
+  }
+});
+
 test('API rejects cross-origin mutating requests and text/plain JSON bodies', async () => {
   const trustedRoot = tempRoot();
   const target = path.join(trustedRoot, 'csrf.txt');

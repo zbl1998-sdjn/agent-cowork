@@ -1,5 +1,4 @@
-// Classic-script workbench renderer. It keeps navigation and side-panel DOM
-// updates separate from app.js orchestration.
+// classic-script 工作台渲染器:把导航与侧栏 DOM 更新从 app.js 编排里拆出。
 (function () {
     function createWorkbenchRenderer({ state, composer, placeholders, statusText, runChip, workbenchTitle, workbenchCopy, interactionSubtitle, interactionItems, workspaceMeta, fileList, operationList, recipeSummary, recipeList, basename, setArtifact, loadArtifactCatalog, }) {
         function setStatus(text) {

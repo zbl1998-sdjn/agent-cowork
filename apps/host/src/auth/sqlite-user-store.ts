@@ -33,15 +33,9 @@ type AuthDatabase = {
 };
 type SqliteUserStoreOptions = { dbPath?: string };
 
-// SQLite-backed user store. Mirrors createUserStore()'s interface exactly, but
-// persists registered users + sessions + guest tenants across host restarts so
-// a signed-in user (or a guest with local data) survives a relaunch.
-//
-// Tables are created idempotently on its own DB handle (no migration ordering
-// coupling with state.sqlite). If node:sqlite is unavailable or the DB can't be
-// opened, we degrade gracefully to the in-memory store — login still works for
-// the session, it just won't persist (matching the prior behaviour rather than
-// hard-failing the whole host).
+// 本适配器与 createUserStore() 暴露完全相同接口,但把注册用户、会话和访客租户持久化到 SQLite。
+// 表使用独立 DB 句柄幂等创建,不耦合 state.sqlite 的迁移顺序。
+// 若 node:sqlite 不可用或打开失败,优雅降级到内存存储:本次会话仍可登录,只是不会跨重启保留。
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS auth_users (
@@ -68,7 +62,7 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
     db = openSqliteDatabase(dbPath as string) as AuthDatabase;
     db.exec(SCHEMA);
   } catch (err) {
-    // Graceful degradation: keep the host usable even without persistence.
+    // 持久化不可用时仍保持 host 可用,退回本进程内存会话。
     const error = (err || {}) as { message?: string };
     console.error('[auth] sqlite user store unavailable, falling back to in-memory:', error.message);
     return createUserStore();
@@ -156,7 +150,7 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
       return row ? Number(row.n) : 0;
     },
     close: () => {
-      try { if (db.close) db.close(); } catch { /* already closed */ }
+      try { if (db.close) db.close(); } catch { /* 已关闭 */ }
     },
   };
 }

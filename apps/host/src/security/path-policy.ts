@@ -40,14 +40,14 @@ export function canonicalizePath(input: string): string {
   try {
     return realpath(resolved);
   } catch {
-    // Resolve the nearest existing ancestor so Windows 8.3 names and junctions
-    // in the prefix are canonicalized for not-yet-created paths.
+    // 路径尚不存在时,向上找到最近已存在祖先;这样前缀里的 Windows 8.3 短名、
+    // junction/symlink 仍会被规范化,再把缺失段拼回去。
     let cur = resolved;
     const missing: string[] = [];
     let guard = 0;
     while (guard < 4096) {
       const parent = path.dirname(cur);
-      if (parent === cur) break; // reached the filesystem root
+      if (parent === cur) break; // 已走到文件系统根。
       missing.unshift(path.basename(cur));
       cur = parent;
       guard += 1;
@@ -55,7 +55,7 @@ export function canonicalizePath(input: string): string {
         const realAncestor = realpath(cur);
         return path.join(realAncestor, ...missing);
       } catch {
-        // keep walking up to the nearest existing ancestor
+        // 继续向上找最近的已存在祖先。
       }
     }
     return resolved;
@@ -83,14 +83,13 @@ export function resolveWithinRoot(candidatePath: string, trustedRoot: string): s
 }
 
 // 判断路径是否「敏感」:文件名/扩展名命中黑名单,或路径段命中敏感目录。
-// `relativeTo` scopes directory-segment checks below the trusted root, while
-// filename/extension checks still apply to the target itself.
+// `relativeTo` 只收窄「目录段」检查范围到 trusted root 之下;文件名/扩展名仍始终检查目标本身。
 export function isSensitivePath(inputPath: string, relativeTo: string | null = null): boolean {
   const normalized = normalizeForCompare(inputPath);
   const lowerBase = path.basename(normalized).toLowerCase();
   const lowerExt = path.extname(lowerBase).toLowerCase();
 
-  // Target filename / extension — always checked.
+  // 目标文件名/扩展名总是检查,即使 relativeTo 把目录段范围收窄。
   if (lowerBase === 'id_rsa' || lowerBase.startsWith('id_rsa')) {
     return true;
   }
@@ -101,12 +100,11 @@ export function isSensitivePath(inputPath: string, relativeTo: string | null = n
     return true;
   }
 
-  // Scope the directory-segment checks to below the trusted root when provided.
+  // 给定 trusted root 时,目录段敏感性只看根以内的相对段。
   const segments = segmentsBelowRoot(normalized, relativeTo);
 
   for (const segment of segments) {
-    // Directory sensitivity is case-insensitive; containment stays platform
-    // sensitive via normalizeForCompare.
+    // 敏感目录名大小写不敏感;路径包含关系仍由 normalizeForCompare 保持平台语义。
     const seg = segment.toLowerCase();
     if (SENSITIVE_SEGMENTS.has(seg)) {
       return true;
@@ -137,12 +135,10 @@ export function isWorkspaceIgnoredPath(inputPath: string, relativeTo: string | n
 /** 断言为「可读工作区路径」:先过可信根校验,再排除被忽略/敏感路径;违反即抛错。 */
 export function assertReadableWorkspacePath(candidatePath: string, trustedRoot: string): string {
   const safe = assertTrustedPath(candidatePath, trustedRoot);
-  // `safe` is already realpath-canonicalized; canonicalize the root too so the
-  // "segments below root" scoping in isWorkspaceIgnoredPath actually matches.
-  // Without this, a non-canonical root (8.3 short name like ADMINI~1, or a
-  // symlink/junction) breaks the prefix match, the segment/sensitive checks
-  // fall back to whole-path inspection, and a legitimate workspace that merely
-  // lives under AppData/Temp has every read wrongly blocked.
+  // `safe` 已经 realpath 规范化;root 也必须规范化,否则 isWorkspaceIgnoredPath 的
+  // “root 下方路径段” 范围判断会匹配不上。
+  // 若 root 仍是 8.3 短名(如 ADMINI~1)或 symlink/junction,前缀匹配会失败,
+  // 段/敏感检查会退回整条路径检查,导致合法工作区只要位于 AppData/Temp 下就被误封。
   const canonicalRoot = canonicalizePath(trustedRoot);
   if (isWorkspaceIgnoredPath(safe, canonicalRoot)) {
     throw new Error(`Workspace ignored or sensitive path blocked by policy: ${candidatePath}`);
@@ -180,13 +176,7 @@ export function assertTrustedPath(candidatePath: string, trustedRoot: string): s
 // 写入专用变体:目标文件「可能尚不存在」。普通 assertTrustedPath 对不存在路径
 // 调 realpath 不会解析 junction,会让 `根/<指向外部的junction>/新文件` 漏过;这里
 // 改为向上找到最近的「已存在祖先」并对其规范化,再要求真实父目录落在真实根内。
-// Create-aware variant for WRITE targets that may not exist yet. The plain
-// assertTrustedPath() canonicalizes the candidate, but realpath() of a
-// non-existent path returns the path unresolved — so `root/<junction-to-outside>/
-// new.txt` slipped through (the file doesn't exist, the junction isn't resolved).
-// Here we walk up to the nearest EXISTING ancestor and canonicalize THAT,
-// resolving any junction/symlink, then require the real parent to live inside the
-// real root. Returns the safe absolute path (real parent + missing segments).
+// 返回值是「真实父目录 + 缺失段」拼出的安全绝对路径。
 export function assertTrustedPathForCreate(candidatePath: string, trustedRoot: string): string {
   const candidate = resolveWithinRoot(candidatePath, trustedRoot);
   const rootReal = canonicalizePath(trustedRoot);

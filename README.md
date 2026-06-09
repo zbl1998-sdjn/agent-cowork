@@ -33,6 +33,8 @@ cd "C:\Users\Administrator\Desktop\agent cowork"
 npm run demo:mvp
 ```
 
+面试展示建议先看 [docs/面试演示配置说明.md](docs/面试演示配置说明.md):里面按架构讲法、`.env.example` 配置项、演示命令和验收口径整理了可直接讲的材料。真实 API key 只写本地 `.env`,不要提交。
+
 `npm run demo:mvp` 是当前 Web/Host MVP 的一键演示验收入口：如果没有健康的 MVP 运行态，它会在后台启动 `start:mvp` 并打开页面；随后运行 live 操作测试、默认验证、Windows readiness 只读检查和总审计，最后写出 `build/mvp-demo-report.json`。
 
 手动拆分执行时，建议按这个顺序：

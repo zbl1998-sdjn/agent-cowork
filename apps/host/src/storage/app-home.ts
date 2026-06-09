@@ -26,7 +26,7 @@ function resolveDefaultHome(): string {
       fs.mkdirSync(candidate, { recursive: true });
       return candidate;
     } catch {
-      // try next fallback
+      // 当前候选不可写时继续尝试下一个回退目录。
     }
   }
 

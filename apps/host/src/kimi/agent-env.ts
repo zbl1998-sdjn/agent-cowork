@@ -6,12 +6,6 @@
 // 依赖:仅标准库(读 process.platform / process.env / globalThis)。
 // 导出:labelOs(OS 名映射)、resolveAppVersion(应用版本兜底解析)、
 //       resolveAgentEnvFacts(打包全部环境事实)。
-// Single source of truth for the "env facts" that buildSystemPrompt's <env>
-// block needs: today's date, working directory, OS label, app version, the
-// current provider/model. Kept outside system-prompt.js so system-prompt.js
-// stays a pure pretty-printer with no I/O — this module does the (also pure
-// but inputs-from-environment) resolution.
-
 import type { EnvFacts } from './system-prompt.js';
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -30,10 +24,6 @@ type AgentEnvOptions = {
 };
 
 /**
- * Map a Node.js `process.platform` token to a human-friendly OS name.
- * Unknown platforms pass through as-is so the prompt still says something
- * instead of an empty string.
- *
  * 把 Node 的 process.platform 标识映射成人类可读的操作系统名;未知平台原样返回。
  */
 export function labelOs(platform: string): string {
@@ -42,12 +32,6 @@ export function labelOs(platform: string): string {
 }
 
 /**
- * Best-effort lookup of the host app version. We read it from
- * `process.env.npm_package_version` when running under npm, and otherwise
- * fall back to a build-time constant the SEA wrapper bakes in via
- * `globalThis.AGENT_COWORK_VERSION`. As a last resort we return 'dev' so
- * the prompt always shows something concrete.
- *
  * 尽力解析 host 应用版本号:npm 环境变量 → SEA 内置全局常量 → 兜底 'dev'。
  */
 export function resolveAppVersion(): string {
@@ -61,14 +45,8 @@ export function resolveAppVersion(): string {
 }
 
 /**
- * Bundle the runtime environment facts the agent's system prompt needs. Pure
- * given its inputs + the current process.platform / process.env, so callers
- * can override anything for testing by passing it explicitly.
- *
- * `kimiConfig` is typed as `unknown` because the agent loop passes its own
- * narrower ModelConfig — we just read provider/model defensively.
- *
  * 把系统提示词所需的运行环境事实打包成一个对象;给定输入即纯函数,测试可逐项覆盖。
+ * `kimiConfig` 以 unknown 接入,因为 Agent 循环会传入更窄的 ModelConfig;这里只防御式读取 provider/model。
  */
 export function resolveAgentEnvFacts({ trustedRoot, kimiConfig, now, platform, appVersion }: AgentEnvOptions = {}): AgentEnvFacts {
   const safeRoot = typeof trustedRoot === 'string' ? trustedRoot : '';

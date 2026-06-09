@@ -8,6 +8,7 @@ import {
 
 describe('usage display helpers', () => {
   it('formats token counts, durations, and local estimated costs', () => {
+    // 这些格式是 UI 直接展示给用户的透明度文案,需要保持简洁且稳定。
     expect(formatTokenCount(12345.2)).toBe('12,345 tokens');
     expect(formatDurationMs(950)).toBe('950 ms');
     expect(formatDurationMs(1250)).toBe('1.3 s');
@@ -16,6 +17,7 @@ describe('usage display helpers', () => {
   });
 
   it('builds stable rows for the backend transparency contract', () => {
+    // 后端返回 usage/cost/duration/disclosure 后,前端必须生成固定顺序的展示行。
     const rows = buildUsageDisplayRows({
       model: 'local-test',
       tokens: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },

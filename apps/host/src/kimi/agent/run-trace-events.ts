@@ -12,7 +12,7 @@ function appendRunTrace(runTrace: RunTraceLike | null | undefined, event: Record
   try {
     runTrace.append(event);
   } catch {
-    // Trace collection is diagnostic only; never break the agent loop.
+    // trace 只服务诊断,采集失败不能打断 Agent 主循环。
   }
 }
 

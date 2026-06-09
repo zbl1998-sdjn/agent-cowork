@@ -3,23 +3,7 @@
 // 职责:把 Bing SERP 的 HTML(li.b_algo 区块)解析成 { title, url, snippet }[]。
 //       Bing 是国内默认兜底(DDG 常连不通)。纯函数、确定性;布局不匹配返回 []。
 // 依赖:无。导出:parseBingResults。
-//
-// Parser for Bing's HTML search results (https://www.bing.com/search?q=...).
-//
-// Bing is the practical default for Chinese users — duckduckgo.com is
-// frequently unreachable from mainland China (IPv6 / Great-Firewall reasons),
-// so DDG fails connect-timeout before its first byte. Bing's SERP HTML is
-// stable enough for MVP scraping, no API key required.
-//
-// Each result is rendered as:
-//   <li class="b_algo">
-//     <h2><a href="URL">TITLE</a></h2>
-//     <div class="b_caption"><p>SNIPPET</p></div>
-//   </li>
-//
-// We extract by finding every <li class="b_algo"> block, then within it the
-// first <a href="..."> for the URL/title and the first b_caption <p> for the
-// snippet. Pure function, deterministic, easy to test against fixtures.
+// 解析策略:逐个 b_algo 区块取首个链接作为标题/URL,再取 b_caption 摘要;不匹配时返回空列表。
 
 const ALGO_BLOCK_RE = /<li[^>]*\bclass=["'][^"']*\bb_algo\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 const FIRST_ANCHOR_RE = /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
@@ -30,8 +14,7 @@ const WHITESPACE_RE = /\s+/g;
 export type ParsedResult = { title: string; url: string; snippet: string };
 
 /**
- * Strip HTML tags + decode common entities + collapse whitespace.
- *
+ * 去标签、解码常见 HTML 实体并折叠空白。
  */
 function clean(raw: string): string {
   if (!raw) return '';
@@ -48,10 +31,6 @@ function clean(raw: string): string {
 }
 
 /**
- * Extract up to `limit` results from a Bing SERP HTML page. Returns []
- * if the layout doesn't match — callers should treat as "no results"
- * rather than crashing.
- *
  * 从 Bing SERP 提取至多 limit 条结果(逐 b_algo 区块取首链 + b_caption 摘要)。
  */
 export function parseBingResults(html: unknown, limit = 8): ParsedResult[] {

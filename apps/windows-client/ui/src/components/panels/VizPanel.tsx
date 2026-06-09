@@ -12,8 +12,7 @@ interface VizPanelProps {
   trustedRoot: string;
 }
 
-// Concrete spec templates so users can click → tweak → render, instead of staring
-// at a single JSON example and having to invent the schema.
+// 具体 viz 模板:用户可点击、微调、渲染,不用面对单一 JSON 示例再凭空猜 schema。
 export const VIZ_SAMPLES = {
   bar: JSON.stringify({ title: '季度收入', kind: 'bar', data: { labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [12, 19, 8, 15] } }, null, 2),
   line: JSON.stringify({ title: '月度访问', kind: 'line', data: { labels: ['1月', '2月', '3月', '4月', '5月', '6月'], values: [320, 480, 510, 620, 580, 700] } }, null, 2),
@@ -38,9 +37,8 @@ export interface JsonValidation {
   column?: number | undefined;
 }
 
-// Pure helper: returns {ok} or a friendly error with line/column when possible.
-// JSON.parse only gives `at position N`; we map that back to line/column ourselves
-// so the inline hint can say "第 3 行第 12 列" instead of a raw char offset.
+// 纯校验函数:返回 {ok} 或带行列号的友好错误。JSON.parse 只给 "position N",
+// 这里把字符偏移反算成行/列,让行内提示能显示"第 3 行第 12 列"。
 export function validateJsonSpec(text: string): JsonValidation {
   if (!text.trim()) return { ok: false, message: '请粘贴 JSON 或选择一个模板' };
   try {
@@ -76,8 +74,7 @@ export function VizTemplateButtons({ onPick }: { onPick: (key: keyof typeof VIZ_
   );
 }
 
-// Build a viz spec from plain form fields. Supports the 5 templates so a user
-// who can't write JSON can still get a chart by filling Title + Labels + Values.
+// 从普通表单字段生成 viz spec;覆盖 5 类模板,不会写 JSON 的用户也能填标题/标签/数值出图。
 export function specFromForm(args: {
   kind: keyof typeof VIZ_SAMPLES;
   title: string;
@@ -159,7 +156,7 @@ export function VizPanelActions({
   );
 }
 
-// Render a viz spec to a live, refreshable artifact and preview it inline.
+// 将 viz spec 渲染成可刷新的活页制品,并在面板内联预览。
 export function VizPanel({ trustedRoot }: VizPanelProps) {
   const [specText, setSpecText] = useState(VIZ_SAMPLES.bar);
   const [srcDoc, setSrcDoc] = useState('');

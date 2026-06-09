@@ -16,7 +16,7 @@ export function clip(text: unknown, max = 8000): string {
 
 /** 把最小化 glob 模式(** / * / ?)编译成锚定的正则,用于文件名匹配。 */
 export function globToRegExp(pattern: unknown): RegExp {
-  // Minimal glob: ** -> any path, * -> any segment chars, ? -> one char.
+  // 最小 glob 语义:** 匹配任意路径,* 匹配单段任意字符,? 匹配单个字符。
   let re = '';
   const p = String(pattern).replace(/\\/g, '/');
   for (let i = 0; i < p.length; i += 1) {

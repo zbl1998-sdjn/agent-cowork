@@ -21,13 +21,10 @@ type SkillRouteOptions = {
   skillRegistry?: SkillRegistryLike | null;
 };
 
-// Skill routes: list skills + toggle enable/disable.
-//
-//   GET  /api/skills              -> manifest + enabled state for every skill
-//   POST /api/skills/:id/toggle   -> { enabled?: bool } (omit to flip), returns the skill
-//
-// Toggling is a settings change (idempotent by value), so it does not require an
-// Idempotency-Key.
+// 技能路由清单:
+//   GET  /api/skills              -> 返回每个技能的 manifest 与启用状态
+//   POST /api/skills/:id/toggle   -> { enabled?: bool };省略 enabled 时取反并返回技能
+// 开关技能属于设置变更,按目标值幂等,所以不要求 Idempotency-Key。
 
 const TOGGLE_RE = /^\/api\/skills\/([a-zA-Z0-9_-]+)\/toggle$/;
 

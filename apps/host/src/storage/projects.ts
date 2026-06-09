@@ -4,14 +4,6 @@
 //       的归属(各自至多属一个项目),删项目时清掉其成员关系并给出计数统计。
 // 依赖:仅标准库。后端:纯内存(将来可由文件/sqlite/pg 持久化适配包装)。
 // 导出:createProjectStore(工厂,返回实现 ProjectStore 接口的对象)。
-//
-// Project workspace store (05-B4).
-//
-// Organizes conversations and artifacts into projects. Pure in-memory core with
-// a clean interface; a persistence adapter (file/sqlite/pg) can wrap it later,
-// mirroring the conversation/memory store pattern. Layer L1 (storage), no
-// upward imports, fully testable. A conversation/artifact belongs to at most
-// one project; removing a project clears its memberships.
 export type ProjectRecord = {
   id: string;
   name: string;

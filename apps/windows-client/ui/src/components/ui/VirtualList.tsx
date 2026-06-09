@@ -7,9 +7,9 @@ import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
 
 export interface VirtualListProps<T> {
   items: T[];
-  /** Estimated/fixed row height in px. */
+  /** 估算或固定的行高(px)。 */
   itemHeight: number;
-  /** Viewport height in px. */
+  /** 视口高度(px)。 */
   height: number;
   overscan?: number;
   renderItem: (item: T, index: number) => ReactNode;

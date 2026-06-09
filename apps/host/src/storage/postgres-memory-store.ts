@@ -4,10 +4,6 @@
 //       渲染主记忆文本与 system 注入块,做 key/value/scope 清洗、UTF-8 字节封顶。
 // 依赖:仅标准库(crypto);pg 运行时按需 import。后端:PostgreSQL(memory_facts/notes 表)。
 // 导出:PostgresMemoryStore(类) · createPostgresMemoryStore(工厂)。
-//
-// PostgreSQL adapter for cross-session memory (facts + notes) — multi-instance
-// mirror of SqliteMemoryStore. Async; `pg` lazily/optionally imported. Tenant
-// -scoped. Tests inject a mock pool.
 import crypto from 'node:crypto';
 
 export type MemoryScope = 'project' | 'user' | 'session';

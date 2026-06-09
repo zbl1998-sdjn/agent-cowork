@@ -53,7 +53,7 @@ function safeUpsertRunIndex(
   try {
     runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
   } catch {
-    // Index failures must never break the request path.
+    // 索引失败不应打断请求主路径。
   }
 }
 

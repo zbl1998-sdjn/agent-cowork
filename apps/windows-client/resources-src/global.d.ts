@@ -1,6 +1,5 @@
-// Shared ambient surface for the legacy classic-script resource bundle.
-// The files in this folder compile to global browser scripts, so cross-file
-// contracts intentionally live on window until this resource path is retired.
+// legacy classic-script 资源包的共享全局类型面。
+// 本目录编译为全局浏览器脚本,在资源路径退役前跨文件契约有意挂在 window 上。
 type AgentCoworkJson = Record<string, any>;
 
 interface Error {

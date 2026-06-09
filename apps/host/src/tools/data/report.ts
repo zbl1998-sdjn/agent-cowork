@@ -28,6 +28,7 @@ export type DataAnalysis = {
 };
 
 /**
+ * 宽松解析数值单元格,允许千分位逗号,失败返回 null。
  */
 function numberValue(value: unknown): number | null {
   if (value === '') return null;
@@ -38,24 +39,28 @@ function numberValue(value: unknown): number | null {
 }
 
 /**
+ * 按归一化列名查找表头位置,让剖析结果和原始表格行能重新对齐。
  */
 function columnIndex(headers: string[], name: string): number {
   return headers.findIndex((header) => String(header).trim() === String(name).trim());
 }
 
 /**
+ * 取第一列数值列作为默认度量轴。
  */
 function firstNumericColumn(profile: DataProfile): DataColumnProfile | null {
   return profile.columns.find((column) => column.type === 'number') || null;
 }
 
 /**
+ * 取可聚合的文本列作为默认分类轴,避免唯一值过多导致图表不可读。
  */
 function firstCategoryColumn(profile: DataProfile): DataColumnProfile | null {
   return profile.columns.find((column) => column.type === 'text' && column.unique > 1 && column.unique <= 50) || null;
 }
 
 /**
+ * 按分类列汇总数值列并生成柱状图数据;最多保留头部点位以控制 UI 负载。
  */
 function buildBarChart(profile: DataProfile, table: DataTable): DataChart | null {
   const category = firstCategoryColumn(profile);
@@ -88,6 +93,7 @@ function buildBarChart(profile: DataProfile, table: DataTable): DataChart | null
 }
 
 /**
+ * 按日期列顺序抽取数值点生成折线图数据;遇到不可解析点则跳过。
  */
 function buildLineChart(profile: DataProfile, table: DataTable): DataChart | null {
   const date = profile.columns.find((column) => column.type === 'date');
@@ -127,6 +133,7 @@ function buildChart(profile: DataProfile, table: DataTable): DataChart | null {
 }
 
 /**
+ * 从 profile 中提炼报告要点,图表存在时同时说明推荐图形。
  */
 function buildInsights(profile: DataProfile, chart: DataChart | null): string[] {
   const numericColumns = profile.columns.filter((column) => column.type === 'number');
@@ -145,6 +152,7 @@ function buildInsights(profile: DataProfile, chart: DataChart | null): string[] 
 }
 
 /**
+ * 把列画像转成 Markdown 表格,供报告草稿直接嵌入。
  */
 function markdownTable(profile: DataProfile): string {
   const lines = [
@@ -161,6 +169,7 @@ function markdownTable(profile: DataProfile): string {
 }
 
 /**
+ * 拼装最终 Markdown 报告;保持纯字符串生成,不写磁盘。
  */
 function buildReportMarkdown(profile: DataProfile, chart: DataChart | null, insights: string[]): string {
   const chartLines = chart

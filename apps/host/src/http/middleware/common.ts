@@ -37,12 +37,29 @@ export type RequestMiddlewareOptions = {
   validateHost?: boolean;
 };
 
+// 内容安全策略(CSP):本地 sidecar 直接服务已构建的 SPA。脚本仅同源(禁内联/eval,
+// 收敛 XSS 执行面);允许内联样式(前端运行时注入样式)与 data:/blob: 图片、data: 字体;
+// 连接限同源(同源 API / SSE);禁用插件对象、限制 base-uri、禁止被任意页面 iframe 嵌套。
+// Tauri 桌面端有独立 CSP(tauri.conf.json),不受此 HTTP 响应头影响。
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 export const SECURITY_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
+  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
 });
 
 const PUBLIC_API_ROUTES = [
@@ -65,9 +82,8 @@ export function applyRequestMiddleware({
   requireAuth,
   validateHost,
 }: RequestMiddlewareOptions): boolean {
-  // Anti-DNS-rebinding: reject requests whose Host header isn't the loopback host
-  // or the tauri webview. Runs first and for ALL methods/paths (GET included),
-  // since the Origin check below only covers state-changing /api/* requests.
+  // 防 DNS rebinding:Host 必须是回环 host 或 Tauri webview;该检查先于所有路径/方法执行。
+  // Origin 校验只覆盖会改状态的 /api/* 请求,所以 GET 也必须过 Host 闸门。
   if (validateHost !== false && !isAllowedHost(headerValue(request, 'host'))) {
     sendJson(response, 403, { error: 'Host not allowed' });
     return true;

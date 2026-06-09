@@ -1,36 +1,26 @@
 //! 桌面外壳错误处理(error)——所有可失败操作返回 DesktopResult;错误类型小而可序列化,以便跨 Tauri IPC 边界传给 webview。
-//! Error handling for the Agent Cowork desktop shell.
-//!
-//! Every fallible operation in the shell returns [`DesktopResult`]. The error
-//! type is intentionally small and serialisable so it can cross the Tauri IPC
-//! boundary into the webview as a plain message, while still carrying enough
-//! structure (variants) for Rust-side matching and logging.
+//! 变体对应 sidecar、路径、锁、IO、更新等失败域;新增失败域应加变体,不要在调用点裸传 String。
 
 use std::fmt;
 
-/// A typed error for desktop-shell operations.
-///
-/// Variants map to the distinct failure domains of the shell. Adding a new
-/// failure mode means adding a variant here rather than threading bare
-/// `String`s through the call sites.
+/// 桌面外壳操作的类型化错误。
 #[derive(Debug)]
 pub enum DesktopError {
-    /// The Node host sidecar could not be created, started, or stopped.
+    /// Node host sidecar 创建、启动或停止失败。
     Sidecar(String),
-    /// A requested path was invalid or escaped the trusted root.
+    /// 请求路径无效或逃出可信根。
     Path(String),
-    /// A shared lock (e.g. the sidecar handle) was poisoned.
+    /// 共享锁(如 sidecar 句柄锁)已中毒。
     Lock(&'static str),
-    /// An underlying I/O or platform call failed.
+    /// 底层 I/O 或平台调用失败。
     Io(String),
-    /// The desktop updater failed to check, download, or install.
+    /// 桌面更新检查、下载或安装失败。
     Update(String),
 }
 
 impl DesktopError {
     /// 稳定的错误「类别」短字符串,供日志/指标打标使用;有意保留的公共诊断 API,暂未在内部调用。
-    /// Short, stable category string. Useful for logging / metrics tags.
-    #[allow(dead_code)] // intentionally-public diagnostic helper kept for logging/metrics tags
+    #[allow(dead_code)] // 有意保留的诊断辅助,供后续日志/指标打标。
     pub fn kind(&self) -> &'static str {
         match self {
             DesktopError::Sidecar(_) => "sidecar",
@@ -62,9 +52,7 @@ impl From<std::io::Error> for DesktopError {
     }
 }
 
-/// Tauri commands require their error type to be `Serialize`. We flatten the
-/// error into a single human-readable message string for the webview, so the
-/// frontend never has to know about Rust enum shapes.
+/// Tauri command 要求错误可 Serialize;这里压平成可读字符串,让前端不需要理解 Rust enum 形状。
 impl serde::Serialize for DesktopError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -74,5 +62,5 @@ impl serde::Serialize for DesktopError {
     }
 }
 
-/// Convenience alias for shell results.
+/// 桌面外壳结果类型别名。
 pub type DesktopResult<T> = Result<T, DesktopError>;

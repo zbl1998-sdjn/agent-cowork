@@ -91,7 +91,7 @@ export function searchWorkspaceIndex({
       });
       indexedFiles += 1;
     } catch {
-      // A single unreadable or unparsable file must not break workspace search.
+      // 单个文件不可读或不可解析时跳过,不能拖垮整个工作区检索。
     }
   }
 

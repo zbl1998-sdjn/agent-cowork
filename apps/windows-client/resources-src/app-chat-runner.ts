@@ -1,5 +1,4 @@
-// Classic-script chat runner. It owns the plain conversation flow; app.js only
-// decides whether a prompt should go to chat or cowork planning.
+// classic-script 对话运行器:负责普通聊天流程;app.js 只判断 prompt 走聊天还是协作规划。
 (function () {
   function createChatRunner({
     state,

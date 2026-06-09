@@ -24,16 +24,8 @@ import type {
   FileOperationApprovalStore,
 } from '../runtime/file-operation-approvals.js';
 
-// Inline-viz + live-artifact routes.
-//
-//   POST /api/viz/render          -> render a viz to HTML (show_widget); when
-//                                    persist!=false, also save a live page +
-//                                    manifest (create_artifact)
-//   GET  /api/artifacts/data/:id  -> the live page's data endpoint (fresh viz)
-//   GET  /api/artifacts/live/:id  -> serve a saved live page (text/html)
-//
-// POST is idempotent (replays through the shared cache); the live page's Refresh
-// button calls the data endpoint, so a saved artifact stays current.
+// 内联可视化与 live artifact 路由:渲染预览、经审批持久化 HTML/manifest,并提供数据刷新与页面读取端点。
+// POST 通过共享缓存保持幂等;已保存页面的刷新按钮再走 data 端点拿最新数据。
 
 const DATA_PREFIX = '/api/artifacts/data/';
 const LIVE_PREFIX = '/api/artifacts/live/';

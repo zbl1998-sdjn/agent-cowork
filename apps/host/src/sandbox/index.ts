@@ -5,13 +5,6 @@
 //       也是多沙箱后端可扩展的关键(新增后端=加一个适配器,不改调用方)。
 // 依赖:同目录 local-sandbox / vm-sandbox / wsl-docker-runner / sandbox-spec。
 // 导出:createSandbox + DEFAULT_ALLOW_TOOLS,并转出 normalizeSandboxSpec/SANDBOX_DEFAULTS/createWslDockerRunner。
-//
-// Sandbox factory + shared limits.
-//
-// createSandbox selects an adapter by backend. Both adapters implement the
-// same exec(spec, ctx) contract, so callers (and the route) are
-// backend-agnostic -- the Ports & Adapters seam for code/tool execution.
-
 import { LocalSubprocessSandbox } from './local-sandbox.js';
 import { VmSandbox } from './vm-sandbox.js';
 import { createWslDockerRunner } from './wsl-docker-runner.js';
@@ -23,8 +16,7 @@ import type { VmRunner } from './vm-sandbox.js';
 export { normalizeSandboxSpec, SANDBOX_DEFAULTS };
 export { createWslDockerRunner };
 
-// Conservative default tool allowlist: enough for "run this Python/Node to
-// clean data" without exposing arbitrary host binaries. Extend via config.
+// 保守默认工具 allowlist:足够运行 Python/Node 数据清理,但不暴露任意宿主二进制;需要时经配置扩展。
 export const DEFAULT_ALLOW_TOOLS = Object.freeze([
   'node',
   'python',
@@ -53,9 +45,8 @@ export function createSandbox(options: SandboxOptions = {}): LocalSubprocessSand
 
   if (VM_BACKENDS.has(backend)) {
     const vmBackend = backend === 'vm' ? (options.vmBackend || 'docker') : backend;
-    // A VM backend counts as "provisioned" only once we can actually run it:
-    // an explicit runner, or enough config to build one (docker image / wsl).
-    // Without that, VmSandbox fails fast (501) instead of pretending.
+    // VM 后端只有在能真正运行时才算 provisioned:显式 runner,或足够构造 runner 的配置(docker image / wsl)。
+    // 否则 VmSandbox 快速 501 失败,不假装已隔离。
     let runner = options.runner || null;
     if (!runner) {
       const canProvision =

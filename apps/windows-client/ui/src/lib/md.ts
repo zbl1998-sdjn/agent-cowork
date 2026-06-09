@@ -2,24 +2,16 @@
 // ---------------------------------------------------------------------------
 // 职责:零依赖的轻量 Markdown 渲染器。先转义 HTML、再套用少量行内/块级变换,从源头保证 XSS 安全。
 // 依赖:无。导出:Markdown→安全 HTML 渲染函数。
-// Tiny, dependency-free Markdown renderer. HTML is escaped FIRST, then a small
-// set of inline/block transforms are applied, so the output is XSS-safe by
-// construction (no raw user HTML survives). Covers the common chat cases:
-// headings, bold/italic, inline + fenced code (with a language label, copy
-// button, and light comment/string highlighting), links, and unordered lists.
-
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Escape a value destined for an HTML attribute (adds quote escaping on top of
-// escapeHtml, so a URL can never break out of the href="" and inject onclick=…).
+// 转义 HTML 属性值;在 escapeHtml 基础上额外转义引号,避免 URL 逃出 href 注入事件属性。
 function escapeAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Allow only http/https links; anything else (javascript:, data:, file:, …) is
-// rejected. `raw` has already been HTML-escaped by the caller.
+// 仅允许 http/https 链接;其它协议(javascript/data/file 等)直接拒绝。
 function sanitizeUrl(raw: string): string | null {
   try {
     const u = new URL(raw.trim());
@@ -34,9 +26,8 @@ function inline(text: string): string {
   out = out.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  // Links: the URL char class excludes whitespace, ), quotes and angle brackets
-  // so it cannot break out of the attribute; sanitizeUrl then enforces http/https.
-  // Unsafe/non-matching links are left as their literal markdown text.
+  // 链接正则排除空白、右括号、引号与尖括号,再由 sanitizeUrl 限定 http/https。
+  // 不安全或不匹配的链接保留为原始 Markdown 文本。
   out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"'<>]+)\)/g, (_m: string, label: string, url: string) => {
     const safe = sanitizeUrl(url);
     if (!safe) return _m;
@@ -45,9 +36,7 @@ function inline(text: string): string {
   return out;
 }
 
-// Single-pass highlight of comments + strings (no nesting because each match is
-// consumed once). Operates on already HTML-escaped text, so it never breaks the
-// &amp;/&lt;/&gt; entities.
+// 单遍高亮注释与字符串;输入已完成 HTML 转义,不会破坏 &amp;/&lt;/&gt; 实体。
 function highlightCode(escaped: string): string {
   return escaped.replace(
     /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*|"[^"\n]*"|'[^'\n]*'|`[^`\n]*`)/g,
@@ -114,9 +103,7 @@ export function renderMarkdown(src: string): string {
   return html;
 }
 
-// Split assistant text into Markdown segments and inline-viz blocks. A fenced
-// block ```chart / ```viz (JSON viz spec) or ```mermaid is pulled out so the UI
-// can render it as a live chart inline in the conversation (show_widget feel).
+// 把助手文本拆成 Markdown 段与 inline-viz 段;chart/viz/mermaid 围栏会被前端内联渲染成图表。
 export interface MdSegment {
   type: 'md' | 'viz';
   text?: string;
@@ -150,9 +137,7 @@ export function splitVizBlocks(src: string): MdSegment[] {
   return segments.length ? segments : [{ type: 'md', text }];
 }
 
-// Pull an optional ```suggestions fenced block out of the assistant text and
-// return the cleaned text plus the follow-up actions (one per line). The UI
-// renders these as clickable chips — the Claude Cowork "suggested next steps".
+// 抽取可选 suggestions 围栏,返回清理后的正文与逐行后续动作;UI 会渲染成可点击建议 chip。
 export function extractSuggestions(src: string): { text: string; suggestions: string[] } {
   const text = String(src ?? '');
   const re = /```suggestions\n([\s\S]*?)```/;

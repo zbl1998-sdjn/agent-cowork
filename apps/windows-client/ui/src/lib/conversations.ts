@@ -14,14 +14,14 @@ export function isImagePath(p: string): boolean {
   return IMAGE_RE.test(String(p || ''));
 }
 
-// Derive a conversation title from its first user message (clamped), else fallback.
+// 用首条用户消息推断会话标题(截断到短标题),没有内容时用 fallback。
 export function convTitle(msgs: ConvMessageLike[], fallback: string): string {
   const firstUser = msgs.find((m) => m.role === 'user');
   const t = firstUser && firstUser.text ? firstUser.text.trim() : '';
   return t ? t.slice(0, 24) : (fallback || '新对话');
 }
 
-// Render a conversation to portable Markdown (assistant ```suggestions blocks stripped).
+// 把会话导出成可移植 Markdown,并剥掉助手消息里的 ```suggestions 内部块。
 export function conversationToMarkdown(c: ConvLike): string {
   const lines: string[] = [`# ${c.title || '对话'}`, ''];
   for (const m of c.messages) {

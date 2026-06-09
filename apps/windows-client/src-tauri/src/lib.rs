@@ -4,16 +4,6 @@
 //! sidecar、向 webview 暴露一小撮带类型的 IPC 命令;真正的业务逻辑都在 host(Node)里。各模块职责单一:
 //! error(IPC 错误)/ config(绑定与可信根)/ security(路径围栏)/ sidecar(host 生命周期)/
 //! commands(薄命令层)/ updater(自动更新)。绝不把业务塞进外壳。
-//!
-//! This crate is intentionally thin: it owns the application window, manages
-//! the bundled Node host sidecar lifecycle, and exposes a small, typed IPC
-//! surface to the webview. All real logic lives in focused modules:
-//!
-//! - [`error`]    typed, serialisable errors crossing the IPC boundary
-//! - [`config`]   host binding + trusted-root resolution (single source)
-//! - [`security`] trusted-path enforcement shared by every fs-touching command
-//! - [`sidecar`]  Node host start/stop/status + graceful shutdown
-//! - [`commands`] thin `#[tauri::command]` wrappers delegating to the above
 
 mod commands;
 mod config;
@@ -27,12 +17,7 @@ use tauri::Manager;
 use sidecar::HostSidecar;
 
 /// 构建并运行桌面应用:注册插件与 IPC 命令、在 setup 钩子里原生拉起 Node host、退出时停止 sidecar(避免遗留孤儿进程)。
-/// Build and run the desktop application.
-///
-/// The Node host is started natively in the `setup` hook so a packaged build
-/// always brings it up at launch (the webview's `start_node_host` invoke is
-/// only a best-effort fallback). On exit we stop the sidecar so closing the
-/// window never leaves an orphaned Node process behind.
+/// setup 钩子原生启动 Node host,让安装版启动时一定拉起 host;webview 的 start_node_host 只是兜底。
 pub fn run() {
     tauri::Builder::default()
         .manage(HostSidecar::default())

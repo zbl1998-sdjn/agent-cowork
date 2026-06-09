@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// 读取文本文件时必须同时返回内容和哈希,让上层能校验文件快照没有被静默篡改。
 func TestReadTextFileAndHash(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "note.md")
@@ -24,6 +25,7 @@ func TestReadTextFileAndHash(t *testing.T) {
 	}
 }
 
+// .env 等敏感文件即使位于 trusted root 内也不能被本地 agent 直接读取。
 func TestReadTextFileRejectsSensitive(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, ".env")
@@ -35,6 +37,7 @@ func TestReadTextFileRejectsSensitive(t *testing.T) {
 	}
 }
 
+// 文件列表应跳过 .git 这类噪声/敏感目录,避免把仓库内部状态暴露给工具调用。
 func TestListFilesSkipsNoisyDirectories(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0o700); err != nil {

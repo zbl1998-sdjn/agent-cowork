@@ -45,6 +45,7 @@ function timestampPart(ms: number): string {
 }
 
 /**
+ * 生成带 run_ 前缀的类 ULID 标识:时间前缀可排序,随机后缀降低碰撞概率。
  */
 export function createUlid(now = Date.now(), { randomBytes = crypto.randomBytes }: CreateUlidOptions = {}): string {
   const rand = randomBytes(16);

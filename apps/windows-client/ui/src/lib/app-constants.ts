@@ -28,7 +28,7 @@ export function loadConversations(): Conversation[] {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr) && arr.length) return arr as Conversation[];
     }
-  } catch { /* ignore corrupt storage */ }
+  } catch { /* 本地存储损坏时忽略并回到新会话 */ }
   return [{ id: INITIAL_CONV, title: '新对话', messages: [] }];
 }
 

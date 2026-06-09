@@ -4,16 +4,6 @@
 //       水合到内存 Map,list/get 走内存,save/remove 写内存并异步写穿 PG。
 // 依赖:同层 postgres-schedule-store(L1)。后端:PostgreSQL(经其适配)。
 // 导出:CachedPostgresScheduleStore(类) · createCachedPostgresScheduleStore(工厂)。
-//
-// Sync-facade over the async PostgresScheduleStore.
-//
-// The Scheduler runtime reads/writes its store synchronously (list().filter(),
-// get(), save()), so it can't await a Postgres pool directly. This facade keeps
-// an in-memory mirror that hydrates from Postgres on startup and is written
-// through on every save/remove — giving the sync Scheduler PG durability without
-// an async refactor. On a single instance PG is the source of truth across
-// restarts; multi-instance schedule firing additionally needs a distributed
-// lock (out of scope here).
 import { PostgresScheduleStore } from './postgres-schedule-store.js';
 import type { PgPool, ScheduleListOptions, ScheduleRecord } from './postgres-schedule-store.js';
 
@@ -38,7 +28,7 @@ export class CachedPostgresScheduleStore {
 
   constructor({ pool = null, connectionString = null, pg = null }: CachedPostgresScheduleStoreOptions = {}) {
     this._pg = pg || new PostgresScheduleStore({ pool, connectionString });
-    this._cache = new Map(); // id -> record
+    this._cache = new Map(); // id -> record。
     this._hydrated = false;
     this._hydrating = null;
     void this.hydrate();
@@ -50,7 +40,7 @@ export class CachedPostgresScheduleStore {
     if (this._hydrating) return this._hydrating;
     this._hydrating = Promise.resolve(this._pg.list({}))
       .then((rows) => { for (const r of rows || []) this._cache.set(r.id, r); this._hydrated = true; })
-      .catch(() => { /* best-effort; serve from cache */ })
+      .catch(() => { /* 尽力水合,失败时继续用当前缓存服务 */ })
       .finally(() => { this._hydrating = null; });
     return this._hydrating;
   }
@@ -71,7 +61,7 @@ export class CachedPostgresScheduleStore {
   /** 写缓存并异步写穿 PG(失败靠下次 save 重试);同步返回入参记录。 */
   save(record: ScheduleRecord): ScheduleRecord {
     this._cache.set(record.id, record);
-    Promise.resolve(this._pg.save(record)).catch(() => undefined); // cache holds it; PG retried on next save
+    Promise.resolve(this._pg.save(record)).catch(() => undefined); // 缓存已持有记录,PG 写入下次 save 再重试。
     return record;
   }
 

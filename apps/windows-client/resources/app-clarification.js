@@ -1,4 +1,4 @@
-// Clarification UI is separate from plan generation, but receives a callback.
+// 澄清 UI 与计划生成解耦,只通过回调把用户选择交回规划流程。
 (function () {
     function createClarificationController({ state, composer, clarifyPanel, clarifyOptions, renderRecipes, setStatus, setArtifact, renderInteraction, appendUserMessage, appendAssistantMessage, addClarificationCard, generatePlan, }) {
         function showClarification(prompt) {

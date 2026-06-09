@@ -19,8 +19,7 @@ export interface RuntimeDependency {
   detail?: string;
   source?: string;
   version?: string;
-  // Catalog may provide a vendor download page so the UI can offer a one-click
-  // "open in browser" install path for the user instead of just stating "missing".
+  // 目录可能提供厂商下载页,UI 可给用户"打开浏览器安装"入口,而不只是显示缺失。
   sourceUrl?: string | null;
 }
 

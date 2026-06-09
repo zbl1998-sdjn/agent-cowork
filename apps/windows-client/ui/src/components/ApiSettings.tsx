@@ -55,7 +55,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
         setModel(info.model || '');
         setHasKey(Boolean(info.hasKey));
       } catch {
-        /* host not ready */
+        /* host 未就绪时保持空表单 */
       } finally {
         setLoading(false);
       }

@@ -77,8 +77,7 @@ export async function runCode({
     safeRoot,
   );
 
-  // Validate the requested tool *before* applying local runtime preferences:
-  // bundled Python must not widen the caller's allowlist.
+  // 先校验用户请求的工具,再套本地运行时偏好;内置 Python 不能扩大调用方 allowlist。
   let requestedSpec: SandboxSpec;
   try {
     requestedSpec = normalizeSandboxSpec(
@@ -91,8 +90,7 @@ export async function runCode({
 
   const localRuntime = resolveLocalRuntimeTool(toolName, sandbox, runtimeEnv, nodeExecPath);
 
-  // Validate the spec *before* writing anything: an unknown tool or a budget
-  // violation should 400 without leaving a stray script behind.
+  // 写盘前先校验最终 spec;未知工具或预算违规应直接 400,不留下残脚本。
   let spec: SandboxSpec;
   try {
     if (localRuntime) {
@@ -147,7 +145,7 @@ export async function runCode({
       try {
         runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, context), context);
       } catch {
-        // index failures never break the run
+        // 索引失败不影响 run 结果落盘。
       }
     }
     return runPath;

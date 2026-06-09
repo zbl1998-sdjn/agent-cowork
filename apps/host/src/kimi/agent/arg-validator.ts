@@ -30,6 +30,7 @@ function normalizeTypes(expected: unknown): string[] {
 }
 
 /**
+ * 校验一个值是否匹配 JSON Schema 的基础 type 子集。
  */
 function matchesType(type: string, value: unknown): boolean {
   if (type === 'array') return Array.isArray(value);
@@ -43,6 +44,7 @@ function matchesType(type: string, value: unknown): boolean {
 }
 
 /**
+ * 递归校验任意 schema 节点,把错误追加到 errors 中而不是抛异常。
  */
 function validateValue(schema: JsonSchemaLike, value: unknown, path: string, errors: string[]): void {
   if (!isRecord(schema)) return;
@@ -67,6 +69,7 @@ function validateValue(schema: JsonSchemaLike, value: unknown, path: string, err
 }
 
 /**
+ * 校验 object 节点的 required/properties/additionalProperties 约束。
  */
 function validateObject(schema: JsonSchemaLike, value: Record<string, unknown>, path: string, errors: string[]): void {
   const required = Array.isArray(schema.required) ? schema.required : [];

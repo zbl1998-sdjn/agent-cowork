@@ -13,8 +13,7 @@ import { omitUndefined } from '../util/object.js';
 import type { RunAgentChatOptions } from './agent/tool-loop.js';
 import type { AgentDeps, BuildToolsetOptions } from './agent/toolset-builder.js';
 
-// Compatibility facade: existing callers keep importing from kimi/agent-runner.js
-// while the implementation lives in small agent/* modules.
+// 兼容门面:既有调用方继续从 kimi/agent-runner.js 导入,实现则已经拆进 agent/* 小模块。
 export { defaultAgentModelCall };
 export { runAgentChat };
 export {

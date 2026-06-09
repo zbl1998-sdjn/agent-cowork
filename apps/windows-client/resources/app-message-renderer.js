@@ -1,5 +1,4 @@
-// Classic-script message renderer. It owns conversation DOM writes while
-// app.js stays responsible for orchestration and host calls.
+// classic-script 消息渲染器:负责对话 DOM 写入;app.js 继续只管编排与 host 调用。
 (function () {
     function createMessageRenderer({ state, composer, chatOutput, chatOutputText, conversationTimeline, conversationEmpty, messageStatusClass, basename, compactText, }) {
         function showChatResponse(message) {

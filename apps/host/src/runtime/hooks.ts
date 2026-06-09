@@ -8,12 +8,6 @@ import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { omitUndefined } from '../util/object.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 
-// Hook engine (Claude Code / Kimi CLI style). Hooks fire on agent events:
-//   - pre_tool  : before a tool runs; a hook may BLOCK it ({ block:true, reason })
-//   - post_tool : after a tool runs (observe / log)
-// Hooks match by tool name (regex string, or '*' for all). Handlers are async
-// functions; loadHooksConfig builds shell-command hooks from .AgentCowork/hooks.json.
-
 export type HookEvent = 'pre_tool' | 'post_tool' | string;
 export type HookPayload = { name?: unknown; [key: string]: unknown };
 export type HookResult = { block?: boolean; reason?: string; error?: string; ok?: boolean; [key: string]: unknown };
@@ -40,11 +34,13 @@ export type LoadHooksOptions = {
   configPath?: string;
 };
 
+// 工具名匹配接受正则或 * 通配;正则写错时回退到字面量比较,避免配置错误击穿钩子引擎。
 function toolMatches(hook: { tool?: string }, name: unknown): boolean {
   if (!hook.tool || hook.tool === '*') return true;
   try { return new RegExp(hook.tool).test(String(name || '')); } catch { return hook.tool === name; }
 }
 
+// 创建纯内存钩子引擎;执行阶段只聚合结果,不负责读取文件或直接访问 shell。
 export function createHookEngine({ hooks = [] }: HookEngineOptions = {}): HookEngine {
   const list = Array.isArray(hooks) ? hooks : [];
   return {
@@ -69,9 +65,9 @@ export function createHookEngine({ hooks = [] }: HookEngineOptions = {}): HookEn
   };
 }
 
-// Build a hook engine from <root>/.AgentCowork/hooks.json. Each entry:
+// 从 <root>/.AgentCowork/hooks.json 构建钩子:
 //   { "event": "pre_tool"|"post_tool", "tool": "Shell|Write", "command": "<shell cmd>" }
-// A pre_tool hook whose command exits non-zero BLOCKS the tool.
+// pre_tool 命令非零退出即阻断工具调用;命令必须先经 sandbox 规格化,不能绕过安全边界。
 export function loadHooksConfig({ trustedRoot, sandbox, sandboxLimits, configPath }: LoadHooksOptions = {}): HookEngine {
   const file = configPath || (trustedRoot ? path.join(trustedRoot, '.AgentCowork', 'hooks.json') : null);
   let raw: RawHook[] = [];

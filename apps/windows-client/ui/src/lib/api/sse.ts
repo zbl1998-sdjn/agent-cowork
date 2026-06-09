@@ -28,7 +28,7 @@ export async function streamSse(response: Response, onFrame: (type: string, data
         const parsed = dataMatch?.[1] ? JSON.parse(dataMatch[1]) : {};
         if (parsed && typeof parsed === 'object') data = parsed as SsePayload;
       } catch {
-        /* ignore malformed frame */
+        /* 畸形帧忽略,继续读后续 SSE */
       }
       onFrame(eventType.trim(), data);
     }

@@ -4,13 +4,6 @@
 //       输出字节上限。集中在此,保证各后端的安全行为一致。
 // 亮点:CappedBuffer 在「写入时」即限内存(超额只计数不保留),避免高产出命令在超时前耗尽堆。
 // 依赖:无。导出:createCappedBuffer / runConstrainedChild。
-//
-// Shared constrained child-process runner.
-//
-// Both the local subprocess adapter and the VM (WSL/Docker) runner spawn a
-// child the same way: no shell, argv array, hard timeout (SIGKILL), and an
-// output byte cap. Centralising it here keeps that safety behaviour in one
-// place and identical across backends.
 
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
 
@@ -52,32 +45,17 @@ export type RunChildResult = {
   durationMs: number;
 };
 
-/**
- * A streaming, memory-bounded sink for a child stdout/stderr stream.
- *
- * The previous implementation buffered EVERY chunk into an array and only
- * truncated after the process closed — so a high-output command (`yes`,
- * `cat hugefile`, a chatty build) could exhaust the heap long before the
- * timeout fired, defeating the point of `maxOutputBytes`.
- *
- * This sink instead caps retained memory at `maxBytes` on ingestion: chunks
- * past the cap are counted (so we still know output was truncated and how many
- * bytes were produced) but discarded. We keep consuming `data` events so the
- * child's pipe drains and a *bounded* command can still finish naturally with a
- * real exit code; an *unbounded* producer is bounded in time by the SIGKILL
- * timeout. Either way memory stays O(maxBytes).
- */
 /** 造一个「写入即限内存」的输出缓冲:超过 maxBytes 的分块只计数不保留,内存恒为 O(maxBytes)。 */
 export function createCappedBuffer(maxBytes: number): CappedBuffer {
   const cap = Math.max(1, Number(maxBytes) || DEFAULT_MAX_OUTPUT_BYTES);
   const parts: Buffer[] = [];
-  let stored = 0; // bytes actually retained (<= cap)
-  let total = 0;  // bytes seen (pre-truncation)
+  let stored = 0; // 实际保留的字节数(<= cap)。
+  let total = 0;  // 已见总字节数(截断前)。
   return {
     push(chunk) {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
       total += buf.length;
-      if (stored >= cap) return; // already full — count only
+      if (stored >= cap) return; // 缓冲已满,之后只计数不保留。
       if (stored + buf.length <= cap) {
         parts.push(buf);
         stored += buf.length;
@@ -92,11 +70,7 @@ export function createCappedBuffer(maxBytes: number): CappedBuffer {
   };
 }
 
-/**
- * 在资源限制下运行子进程:无 shell、限时(到点 SIGKILL)、stdout/stderr 各自限额,返回结构化结果。
- * Run a child process under resource limits.
- *
- */
+/** 在资源限制下运行子进程:无 shell、限时(到点 SIGKILL)、stdout/stderr 各自限额,返回结构化结果。 */
 export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }: RunChildOptions): Promise<RunChildResult> {
   const startedAt = Date.now();
   const child = spawn(command, args, {

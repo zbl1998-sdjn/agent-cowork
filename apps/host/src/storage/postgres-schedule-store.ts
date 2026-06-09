@@ -4,10 +4,6 @@
 //       提供 list(可按租户/用户过滤、按 nextFireAt 排序)/get/save/remove,整记录存 schedule_json。
 // 依赖:无(仅 pg 运行时按需 import)。后端:PostgreSQL(表名经 safePgIdentifier 校验)。
 // 导出:PostgresScheduleStore(类) · createPostgresScheduleStore(工厂)。
-//
-// PostgreSQL adapter for scheduled tasks — the multi-instance backend mirror of
-// SqliteScheduleStore. Async (pg is promise-based); `pg` is lazily/optionally
-// imported. Tests inject a mock pool.
 export type ScheduleRecord = {
   id: string;
   tenantId?: unknown;

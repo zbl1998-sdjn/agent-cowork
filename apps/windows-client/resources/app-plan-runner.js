@@ -1,4 +1,4 @@
-// Cowork planning owns the full preview flow; app.js only wires dependencies.
+// 协作规划器负责完整预览流程;app.js 只负责依赖注入。
 (function () {
     function createPlanRunner({ state, composer, approveButton, chatOutput, postJson, idempotencyKey, uniqueStamp, joinWin, compactText, shortRunId, setView, setStatus, setArtifact, setRunChip, renderInteraction, renderOperations, shouldClarify, showClarification, hideClarification, shouldUseCowork, maybeSelectRecipe, activeFiles, textCandidate, readCandidateSummary, tryKimiApiPlan, runRecipePlan, sendChatMessage, refreshRunCards, appendUserMessage, appendAssistantMessage, addProgressLines, addPreviewCard, addSourcesFooter, addApprovalActions, setMessageStatus, }) {
         const { renderStaticPlanPreview } = window.AgentCoworkPlanPreview;

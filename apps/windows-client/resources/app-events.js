@@ -1,4 +1,4 @@
-// Event binding is isolated from controller construction to keep app.js readable.
+// 事件绑定独立于控制器构造,让 app.js 保持可读。
 (function () {
     function bindAppEvents({ state, composer, uploadInput, folderInput, approveButton, sendButton, runRefreshButton, artifactRefreshButton, chatOutput, setView, setStatus, setArtifact, showChatResponse, appendAssistantMessage, resetInteraction, uploadSelectedFiles, handleComposerSend, approvePlan, refreshRunCards, loadArtifactCatalog, composerPopoverHandleKey, }) {
         document.querySelectorAll(".mode-tab").forEach((item) => {

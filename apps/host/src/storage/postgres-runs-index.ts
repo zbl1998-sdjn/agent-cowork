@@ -4,10 +4,6 @@
 //       附带 withSafeWrites 包装,让 fire-and-forget 的写不会冒出 unhandledRejection。
 // 依赖:无(仅 pg 运行时按需 import)。后端:PostgreSQL(表名经 safePgIdentifier 校验)。
 // 导出:PostgresRunsIndex(类) · createPostgresRunsIndex(工厂) · withSafeWrites(写包装)。
-//
-// PostgreSQL adapter for the runs index. Async methods stay await-compatible
-// with sync file/sqlite adapters. `pg` is optional and lazily imported; tests
-// inject a mock pool.
 import type {
   AsyncRunsIndex,
   PgPool,
@@ -187,9 +183,6 @@ export function createPostgresRunsIndex(options: PostgresRunsIndexOptions = {}):
   return new PostgresRunsIndex(options);
 }
 
-// Wrap an async index so unawaited write calls (upsert/remove are fire-and-forget
-// at ~8 call sites) never surface as unhandledRejection, while awaited callers
-// still receive the resolved value. Reads stay plain (route handlers await them).
 /** 包装异步索引,使 upsert/remove 的 fire-and-forget 写吞掉 rejection,读方法原样透传。 */
 export function withSafeWrites(index: AsyncRunsIndex): AsyncRunsIndex {
   const close = index.close;

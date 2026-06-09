@@ -7,11 +7,7 @@ import { sendJson, withJsonBody, headerValue } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { Identity, SessionIdentity } from '../auth/user-store.js';
 
-// Local auth routes.
-//   POST /api/auth/register { username, password } -> { userId, token }
-//   POST /api/auth/login    { username, password } -> { userId, token }
-//   GET  /api/auth/me       (Bearer token)         -> { userId, tenantId } or 401
-//   POST /api/auth/logout   (Bearer token)         -> { ok }
+// 本地鉴权路由只暴露注册、登录、访客、当前会话和登出;所有 token 都交由 authStore 解析。
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteError = Error & { statusCode?: number };
@@ -76,8 +72,7 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   }
 
   if (request.method === 'POST' && pathname === '/api/auth/guest') {
-    // Local "skip login": mint an isolated guest identity + token so the gate
-    // still applies (no anonymous unauthenticated access to the API).
+    // 「跳过登录」仍签发隔离访客身份与 token,避免出现真正未鉴权 API 访问。
     try {
       sendJson(response, 200, authStore.createGuest());
     } catch (err) {

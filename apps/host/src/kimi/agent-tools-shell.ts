@@ -37,7 +37,7 @@ export function createShellTool({ root, sandbox, sandboxLimits, context }: Shell
         const shellSpec = isWindows
           ? { tool: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', command] }
           : { tool: 'sh', args: ['-c', command] };
-        // Permit only the wrapper shell for this already approval-gated local backend path.
+        // 本地后端已经逐条审批,这里只额外允许 wrapper shell,不放宽其它工具。
         const limits = { ...sandboxLimits, allowTools: [...(sandboxLimits?.allowTools || []), shellSpec.tool] };
         spec = normalizeSandboxSpec(shellSpec, limits);
       } else {

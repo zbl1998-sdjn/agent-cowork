@@ -60,7 +60,7 @@ export function Button({
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Required accessible label for the icon-only button. */
+  /** 图标按钮必须提供的无障碍标签。 */
   label: string;
   size?: ButtonSize;
   children?: ReactNode;

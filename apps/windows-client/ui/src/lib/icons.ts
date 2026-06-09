@@ -6,21 +6,21 @@
 // 导出:ICONS、IconKey。条目宜少,超 30 项应改用真正的图标字体。
 
 export const ICONS = Object.freeze({
-  /** Folder / workspace chip. */
+  /** 文件夹 / 工作区胶囊图标。 */
   FOLDER: '📁',
-  /** App package / installer reveal. */
+  /** 应用包 / 安装器展示图标。 */
   PACKAGE: '📦',
-  /** Download a missing runtime / dependency. */
+  /** 下载缺失运行时或依赖的图标。 */
   DOWNLOAD: '📥',
-  /** Pinned conversation marker. */
+  /** 置顶会话标记。 */
   PIN: '📌',
-  /** Settings cog. Forces the U+FE0F variant for full-colour rendering. */
+  /** 设置齿轮;强制 U+FE0F 变体以获得全彩图标渲染。 */
   SETTINGS: '⚙️',
-  /** Composer "insert a recipe / template" trigger. */
+  /** 输入框"插入配方/模板"触发器。 */
   TEMPLATE: '📝',
-  /** Composer "attach / reference a file" trigger. */
+  /** 输入框"附加/引用文件"触发器。 */
   PAPERCLIP: '📎',
-  /** Composer "browse previous runs" trigger. */
+  /** 输入框"浏览历史运行"触发器。 */
   HISTORY: '🕘',
 } as const);
 

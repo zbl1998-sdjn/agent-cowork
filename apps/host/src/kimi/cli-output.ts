@@ -16,7 +16,7 @@ export function decodeCliOutput(chunks: Buffer[]): string {
       try {
         return new TextDecoder('gb18030').decode(buffer);
       } catch {
-        // Fall through to Node's replacement decoder.
+        // 继续退回 Node 的替换式 UTF-8 解码器。
       }
     }
     return buffer.toString('utf8');

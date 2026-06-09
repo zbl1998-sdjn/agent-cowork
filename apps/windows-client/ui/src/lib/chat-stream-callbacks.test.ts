@@ -89,9 +89,8 @@ describe('buildChatStreamCallbacks', () => {
   });
 
   it('onApprovalRequest in YOLO mode auto-approves without parking the request', () => {
-    // The hook fires respondApproval via a fire-and-forget void. We just assert
-    // that no approval pile-up happens on the message — the API client call is
-    // tested separately.
+    // hook 通过 fire-and-forget 的 void 调用 respondApproval;这里仅断言消息上不会堆积审批,
+    // API 客户端调用由独立测试覆盖。
     const { cb, getState } = makeHarness('yolo');
     cb.onApprovalRequest?.('appr-1', 'Bash', undefined);
     expect(getState().approval).toBeUndefined();

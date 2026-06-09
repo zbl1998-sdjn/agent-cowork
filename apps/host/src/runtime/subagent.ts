@@ -9,13 +9,6 @@ import { omitUndefined } from '../util/object.js';
 import { createRunId, writeRunRecord } from './run-store.js';
 import { summariseRunForIndex } from './runs-index.js';
 
-// Sub-agent orchestrator: execute a fixed plan (a sequence of tool calls)
-// through the ToolRegistry, recording one `subagent-run` with an event timeline
-// shaped exactly like a recipe/sandbox run, so the history + timeline UIs work
-// unchanged. This is the "execute" half of plan-then-execute; the plan itself is
-// just an array of { tool, args, note } steps decided upstream (by a planner,
-// the model, or the UI).
-
 export const DEFAULT_CONTEXT_BUDGET_BYTES = 32 * 1024;
 export const DEFAULT_MAX_STEPS = 20;
 

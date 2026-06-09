@@ -1,28 +1,18 @@
 //! 路径安全(security)——凡触碰文件系统的命令共用:强制「解析后的路径必须落在可信根内」。
 //! 与 host 的 path-policy 镜像对应,使外壳侧 open_path 等也守同一围栏(plan/01 D.12 路径 jail)。
-//! Path-safety helpers shared by every command that touches the filesystem.
-//!
-//! The single invariant enforced here: a resolved path must live inside the
-//! trusted root. This mirrors the host's `path-policy` so the desktop shell
-//! cannot be used to reach files outside the user's selected workspace.
 
 use std::path::{Component, Path, PathBuf};
 
 use crate::error::{DesktopError, DesktopResult};
 
-/// Canonicalise a path that is expected to already exist, mapping failures to
-/// a descriptive [`DesktopError::Path`].
+/// 规范化一个预期已存在的路径;失败时转成可读的 DesktopError::Path。
 pub fn canonicalize_existing(path: &Path) -> DesktopResult<PathBuf> {
     path.canonicalize().map_err(|error| {
         DesktopError::Path(format!("failed to resolve {}: {error}", path.display()))
     })
 }
 
-/// Resolve `requested` (absolute, or relative to `root`) and assert the result
-/// stays within the canonicalised trusted `root`.
-///
-/// Returns the canonical path on success, or [`DesktopError::Path`] if the
-/// path escapes the root.
+/// 解析 requested(绝对路径或相对 root),并断言规范化后的结果仍在可信 root 内。
 pub fn assert_trusted_path(root: &Path, requested: &str) -> DesktopResult<PathBuf> {
     let root = canonicalize_existing(root)?;
     let candidate = PathBuf::from(requested);
@@ -98,10 +88,8 @@ fn is_artifact_path(root: &Path, safe: &Path) -> bool {
     safe == artifact_root || safe.starts_with(artifact_root)
 }
 
-/// Resolve a path for OS opening. This is stricter than [`assert_trusted_path`]:
-/// renderer IPC may ask to open a path, but it must not use that command as a
-/// side door into hidden workspace state or secret-like files. Saved artifacts
-/// remain openable because the product exposes an explicit artifact panel.
+/// 解析可由系统打开的路径;比 assert_trusted_path 更严格,避免 renderer IPC 借 open_path 打开隐藏状态或密钥文件。
+/// 已保存 artifact 仍可打开,因为产品有显式产物面板入口。
 pub fn assert_openable_path(root: &Path, requested: &str) -> DesktopResult<PathBuf> {
     let root = canonicalize_existing(root)?;
     let safe = assert_trusted_path(&root, requested)?;

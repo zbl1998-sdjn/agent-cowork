@@ -1,5 +1,4 @@
-// Classic-script data sources for the composer popover. It keeps search and
-// item-mapping logic out of the popover UI controller.
+// classic-script 输入框弹窗数据源:把搜索与候选映射逻辑从弹窗 UI 控制器中拆出。
 (function () {
     function createComposerSources({ state, searchLocalFiles, getJson, compactText, runStatusText, runTypeText, shortRunId, }) {
         function templateItems(query) {

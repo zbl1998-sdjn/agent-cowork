@@ -70,7 +70,7 @@ export function searchWorkspace(options: SearchOptions = {}): { query: string; r
           excerpt = extracted.content.slice(Math.max(0, index - 60), index + query.length + 100).replace(/\s+/g, ' ').trim();
         }
       } catch {
-        // Search should stay resilient when one document cannot be parsed.
+        // 单个文档无法解析时跳过,搜索整体仍需可用。
       }
     }
     if (nameHit || contentHit) {

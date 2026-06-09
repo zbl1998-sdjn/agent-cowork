@@ -8,11 +8,8 @@ import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 export function defaultHostBase(): string {
   if (typeof window !== 'undefined') {
     const { origin, port, protocol, hostname } = window.location;
-    // The packaged desktop webview serves the UI from the `tauri.localhost`
-    // custom protocol (and `tauri://` on some platforms); dev serves it from Vite
-    // on :5173. NONE of these is the Node host — calling them returns index.html
-    // and breaks JSON parsing. Only trust the page origin when the host itself
-    // served the page over http(s) (e.g. UI mounted behind the host).
+    // 打包桌面 WebView 来自 tauri.localhost/tauri:,开发态来自 Vite :5173;这些都不是 Node host。
+    // 只有页面本身由 host 通过 http(s) 托管时才信任 origin,否则回退 127.0.0.1:3017。
     const servedByTauri = protocol === 'tauri:' || hostname === 'tauri.localhost' || hostname === 'tauri';
     if ((protocol === 'http:' || protocol === 'https:') && port !== '5173' && !servedByTauri) {
       return origin;
@@ -29,8 +26,7 @@ export function resolveUrl(route: string): string {
   return `${HOST_BASE}${route.startsWith('/') ? '' : '/'}${route}`;
 }
 
-// We ship with withGlobalTauri:false, so desktop detection uses the Tauri 2
-// internals channel that @tauri-apps/api talks to instead of window.__TAURI__.
+// withGlobalTauri:false 下没有 window.__TAURI__,桌面检测要看 Tauri 2 internals 通道。
 export function isDesktop(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -53,7 +49,7 @@ async function probeHealth(): Promise<boolean> {
 
 export async function ensureHost(attempts = 40, intervalMs = 250): Promise<boolean> {
   if (isDesktop()) {
-    void invokeDesktop('start_node_host').catch(() => { /* host autostarted in setup; probe decides */ });
+    void invokeDesktop('start_node_host').catch(() => { /* setup 已尝试自启 host,最终以健康探测为准 */ });
   }
   for (let i = 0; i < attempts; i += 1) {
     if (await probeHealth()) return true;
@@ -84,7 +80,7 @@ export function setAuthToken(token: string | null): void {
     if (authToken) globalThis.localStorage?.setItem(AUTH_TOKEN_KEY, authToken);
     else globalThis.localStorage?.removeItem(AUTH_TOKEN_KEY);
   } catch {
-    /* storage unavailable (tests/SSR) -> in-memory only */
+    /* 测试/SSR 下 storage 可能不可用,此时仅保留内存 token */
   }
 }
 

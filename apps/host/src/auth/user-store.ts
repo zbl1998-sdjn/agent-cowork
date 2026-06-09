@@ -33,24 +33,17 @@ export type UserStore = {
   count(): number;
 };
 
-// Local user store + sessions for desktop login. Passwords are salted and
-// hashed with scrypt; sessions are opaque bearer tokens mapped to a
-// user/tenant. This module ships two interchangeable adapters that expose the
-// SAME interface (ports & adapters):
-//   - createUserStore()        — in-memory (default for tests / ephemeral hosts)
-//   - createSqliteUserStore()  — persisted across restarts (see ./sqlite-user-store.js)
-// The data layer is already tenant/user-scoped, so login just decides which
-// identity a request runs as. Shared credential/identity helpers live here so
-// both adapters hash and validate identically.
+// 登录层只决定请求以哪个 tenant/user 身份运行;下游数据层已经按该身份隔离。
+// 这里保留内存与 SQLite 两个可互换适配器,并集中哈希/校验助手以保证行为一致。
 
 const USERNAME_RE = /^[a-z0-9_.-]{3,40}$/;
 
-/** scrypt(password, salt) -> hex. Both adapters must share this to keep parity. */
+/** 用 scrypt(password,salt) 生成十六进制哈希;两个适配器必须共用以保持兼容。 */
 export function hashPassword(password: unknown, salt: string): string {
   return crypto.scryptSync(String(password), salt, 32).toString('hex');
 }
 
-/** Normalise + validate a username. Throws a 4xx-tagged Error on failure. */
+/** 规整并校验用户名;失败时抛带 4xx statusCode 的错误。 */
 export function normaliseUsername(username: unknown): string {
   const name = String(username || '').trim().toLowerCase();
   if (!name || !USERNAME_RE.test(name)) {
@@ -61,7 +54,7 @@ export function normaliseUsername(username: unknown): string {
   return name;
 }
 
-/** Validate a password length policy. Throws a 4xx-tagged Error on failure. */
+/** 校验密码长度策略;失败时抛带 4xx statusCode 的错误。 */
 export function assertValidPassword(password: unknown): void {
   if (!password || String(password).length < 6) {
     const err = new Error('password must be at least 6 characters') as AuthError;
@@ -70,7 +63,7 @@ export function assertValidPassword(password: unknown): void {
   }
 }
 
-/** Mint a fresh user identity (ids + salt + hash) for a registration. */
+/** 为注册请求生成新用户记录(id、salt、hash)。 */
 export function newUserRecord(username: unknown, password: unknown): UserRecord {
   const name = normaliseUsername(username);
   assertValidPassword(password);
@@ -80,7 +73,7 @@ export function newUserRecord(username: unknown, password: unknown): UserRecord 
   return { username: name, userId, tenantId, salt, hash: hashPassword(password, salt) };
 }
 
-/** Constant-time comparison of a candidate password against a stored record. */
+/** 用恒定时间比较候选密码与存储哈希,避免时序侧信道。 */
 export function passwordMatches(record: { salt: string; hash: string } | null | undefined, password: unknown): boolean {
   if (!record) return false;
   const candidate = hashPassword(password, record.salt);
@@ -89,13 +82,13 @@ export function passwordMatches(record: { salt: string; hash: string } | null | 
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Mint an anonymous guest identity (isolated tenant). */
+/** 生成匿名访客身份,并为其分配独立 tenant。 */
 export function newGuestIdentity(): Identity {
   const userId = `guest_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   return { username: userId, userId, tenantId: `tenant_${userId}`, guest: true };
 }
 
-/** Opaque bearer session token. */
+/** 生成不透明 bearer 会话 token。 */
 export function newSessionToken(): string {
   return crypto.randomBytes(24).toString('hex');
 }
@@ -150,10 +143,8 @@ export function createUserStore(): UserStore {
     return sessions.delete(String(token || ''));
   }
 
-  // Anonymous local guest: mints an isolated identity + session so the desktop's
-  // "skip login" path still passes the auth gate (and gets its own tenant, so
-  // guest data never mixes with a registered user's). No credentials required —
-  // this is acceptable only because the host is loopback-only + CORS-restricted.
+  // 本地访客用于「跳过登录」:仍然签发隔离身份和会话,让鉴权门保持开启且不混入注册用户数据。
+  // 免凭据只在 host 限回环 + CORS 受限的桌面场景下可接受。
   function createGuest(): SessionIdentity {
     const identity = newGuestIdentity();
     return { ...identity, token: createSession(identity) };

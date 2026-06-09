@@ -15,8 +15,7 @@ interface MemoryPanelProps {
   trustedRoot: string;
 }
 
-// Friendlier labels for the three "kinds" of memory entries. The underlying
-// types stay as 'term' / 'project' / 'preference' so the API contract is intact.
+// 记忆条目三类的用户友好文案;底层仍保持 term/project/preference,不破坏 API 契约。
 const TYPE_LABEL: Record<MemoryProfileType, string> = {
   term: '名词解释',
   project: '项目',
@@ -29,8 +28,7 @@ const TYPE_PLACEHOLDER: Record<MemoryProfileType, { key: string; value: string }
   preference: { key: '例如:邮件语气', value: '例如:简洁、不寒暄、第一句直接讲事情。' },
 };
 
-// Kept for backward compatibility with imports / tests. The visible UI no longer
-// renders this as `<code>` — it composes prose instead.
+// 保留给既有导入和测试兼容;可见 UI 已不再渲染成 `<code>`,而是组合成自然语言。
 export function formatProfileEntry(entry: MemoryProfileEntry): string {
   return `${TYPE_LABEL[entry.type] || entry.type} · ${entry.key}: ${entry.value}`;
 }

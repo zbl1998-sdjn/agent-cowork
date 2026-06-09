@@ -72,8 +72,7 @@ export async function runCommand(input: CommandInput = {}): Promise<CommandResul
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  // Stream into memory-bounded sinks so a high-output command can never grow
-  // the heap past the cap before the timeout fires (see createCappedBuffer).
+  // stdout/stderr 写入有界缓冲,防止高输出命令在超时前撑爆堆内存。
   const out = createCappedBuffer(maxOutputBytes);
   const err = createCappedBuffer(maxOutputBytes);
   let timedOut = false;

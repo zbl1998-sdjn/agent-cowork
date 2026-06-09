@@ -25,7 +25,7 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
   if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');
   const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   const within = (rel: unknown): string => assertTrustedPath(path.join(root, String(rel || '')), root);
-  // Create-aware variant for write targets that may not exist yet (defeats junction/symlink escapes).
+  // 面向新建目标的路径校验:目标可能尚不存在,仍需防 junction/symlink 逃逸。
   const withinForCreate = (rel: unknown): string => assertTrustedPathForCreate(path.join(root, String(rel || '')), root);
 
   const gitStatusTool = createGitStatusTool();

@@ -4,16 +4,6 @@
 //       每 run 一个有界环形缓冲,支持断线/迟到的 SSE 客户端用 Last-Event-ID 重放近期事件。
 // 可扩展:这是 EventBus 端口的 A 阶段适配器,B 阶段可换 NATS/Redis 而 publish/subscribe/replay 契约不变。
 // 依赖:无。导出:运行事件总线工厂与 SSE 辅助。
-// In-process event bus for run timelines + SSE helpers. Zero-dep.
-//
-// Each run has a monotonic seq counter. Events carry { seq, ts, type, ...payload }.
-// A bounded ring buffer per run lets a late or reconnecting SSE client replay
-// recent events via Last-Event-ID. Persisted events[] on the run record cover
-// replay across restarts.
-//
-// Scale-readiness note: this is the Phase A adapter for the EventBus port.
-// Phase B swaps to NATS/Redis pub-sub; the publish/subscribe/replay surface and
-// the seq-as-Last-Event-ID contract stay the same.
 
 const DEFAULT_BUFFER = 500;
 
@@ -31,9 +21,9 @@ export class RunEventBus {
 
   constructor({ bufferSize = DEFAULT_BUFFER }: RunEventBusOptions = {}) {
     this.bufferSize = Math.max(10, Number(bufferSize) || DEFAULT_BUFFER);
-    this.subscribers = new Map(); // runId -> Set<handler>
-    this.buffers = new Map(); // runId -> [{seq, ts, type, ...}]
-    this.seq = new Map(); // runId -> number
+    this.subscribers = new Map(); // runId 到订阅回调集合。
+    this.buffers = new Map(); // runId 到近期事件环形缓冲。
+    this.seq = new Map(); // runId 到当前最大 seq。
   }
 
   private _nextSeq(runId: string): number {
@@ -70,15 +60,14 @@ export class RunEventBus {
         try {
           handler(enriched);
         } catch {
-          // a broken subscriber must never break the publisher
+          // 单个订阅者异常不能影响发布者与其他订阅者。
         }
       }
     }
     return enriched;
   }
 
-  // Seed the bus from persisted events (e.g. on SSE connect after restart)
-  // so subsequent live events keep a monotonic seq above the persisted max.
+  // 用已持久化事件播种 seq,保证重启后新 live 事件仍单调递增。
   seed(runId: string, events: RunEventSeedInput[] = []): void {
     if (!Array.isArray(events) || events.length === 0) {
       return;
@@ -122,8 +111,7 @@ export class RunEventBus {
   }
 }
 
-// Format a single SSE frame. `id:` carries the seq so the browser's
-// EventSource sends it back as Last-Event-ID on reconnect.
+// 格式化单帧 SSE;id 携带 seq,浏览器重连时会作为 Last-Event-ID 回传。
 export function formatSseFrame(event: { seq?: unknown; type?: unknown; [key: string]: unknown }): string {
   const lines: string[] = [];
   if (event.seq != null) {

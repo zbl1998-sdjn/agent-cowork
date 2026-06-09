@@ -1,5 +1,4 @@
-// Classic-script file upload flow. It owns browser File handling and Host
-// import calls; app.js keeps only the user event binding.
+// classic-script 文件上传流程:负责浏览器 File 处理与 Host import 调用;app.js 只保留用户事件绑定。
 (function () {
   function createFileUploadController({
     state,

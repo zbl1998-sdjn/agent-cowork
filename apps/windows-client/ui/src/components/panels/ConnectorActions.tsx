@@ -29,8 +29,7 @@ export function ConnectorOAuthAction({
   onComplete: () => void;
   onRevoke: () => void;
 }) {
-  // Labels avoid "OAuth" wherever possible — non-technical users see "网页授权"
-  // instead. The 4-state machine (待审批 → 审批 → 开始 → 完成) stays intact.
+  // 文案尽量不用 "OAuth",面向非技术用户显示"网页授权";四态机(待审批→审批→开始→完成)保持不变。
   const label = busy
     ? (connected ? '撤销中…' : hasSession ? '确认中…' : approved ? '授权中…' : '审批中…')
     : connected ? '撤销授权' : missingConfig ? '待配置 网页授权' : hasSession ? '完成授权' : approved ? '去登录授权' : '审批权限';

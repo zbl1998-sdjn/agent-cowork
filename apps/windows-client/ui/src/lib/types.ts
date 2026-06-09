@@ -2,7 +2,6 @@
 // ---------------------------------------------------------------------------
 // 职责:UI 全局共享的领域类型定义(运行记录、事件、审批、待办、文件操作、来源引用等),与 host 的 run/event
 //       形状对齐。是跨单元契约在前端的「类型事实来源」(plan/00:类型只在 lib/types)。
-// Shared domain types for the UI, aligned with the host's run/event shapes.
 
 export type RunStatus = 'pending' | 'planning' | 'awaiting_approval' | 'applying' | 'done' | 'failed' | 'cancelled';
 export type MessageRole = 'user' | 'assistant';
@@ -55,7 +54,7 @@ export interface SubtaskGroupItem {
   error?: string | undefined;
 }
 
-// SSE event payloads emitted by the host run bus.
+// host run bus 发出的 SSE 事件载荷。
 export interface RunEvent {
   seq: number;
   ts: string;

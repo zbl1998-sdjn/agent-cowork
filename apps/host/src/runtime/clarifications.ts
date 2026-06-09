@@ -4,13 +4,6 @@
 //       这是「结构化澄清」背后的待决登记(带 TTL)。依赖:node:crypto。导出:澄清登记表。
 import crypto from 'node:crypto';
 
-// AskUserQuestion / clarification protocol.
-//
-// A turn that needs disambiguation creates a pending question with a few
-// labelled options; the UI renders them and posts back an answer. This is the
-// transport primitive behind the Claude Cowork "structured clarification"
-// pattern — the producer (model / recipe / plan) decides when to ask.
-
 export type ClarificationOption = { label: string; description: string };
 type ClarificationEntry = {
   id: string;
@@ -31,6 +24,7 @@ export type ClarificationStore = {
 };
 
 /**
+ * 创建带 TTL 的澄清登记表;生产方只登记问题,UI 负责展示并回填答案。
  */
 export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: number } = {}): ClarificationStore {
   const map = new Map<string, ClarificationEntry>();
@@ -48,6 +42,7 @@ export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: n
   }
 
   /**
+   * 标准化选项并限制最多 8 个,避免模型输出过长导致 UI 难以扫描。
    */
   function normalizeOptions(options: unknown): ClarificationOption[] {
     return (Array.isArray(options) ? options : [])

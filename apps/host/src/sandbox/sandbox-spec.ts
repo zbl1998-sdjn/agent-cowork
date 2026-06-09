@@ -4,15 +4,6 @@
 //       数组、限定在可信根内的 cwd、必填时间预算、env 白名单、显式网络开关(默认关)。
 //       配合 spawn 层 shell:false,argv 无法注入 shell 语法,故校验聚焦工具名与资源上限。
 // 导出:normalizeSandboxSpec(校验+补默认) / SANDBOX_DEFAULTS(默认值常量)。
-//
-// Structured execution spec for the sandbox.
-//
-// The sandbox never accepts a raw shell string. Callers describe *what* to run
-// as structured data: a tool name (resolved on PATH / inside the VM image),
-// an argv array, an optional cwd jailed to the trusted root, a required time
-// budget, an env allowlist, and an explicit network flag (default off). With
-// `shell: false` at the spawn layer, argv values cannot inject shell syntax,
-// so validation focuses on the tool name and the resource bounds.
 
 const MAX_ARGS = 64;
 const MAX_ARG_LENGTH = 8192;
@@ -90,14 +81,10 @@ function cleanEnv(env: unknown, allowEnv?: readonly string[]): Record<string, st
   return out;
 }
 
-/**
- * 校验并归一化原始 spec 为安全、补齐默认值的执行规格(工具白名单、参数上限、超时夹取、env 白名单)。
- * Validate + normalise a raw spec into a safe, fully-defaulted spec.
- *
- */
+/** 校验并归一化原始 spec 为安全、补齐默认值的执行规格(工具白名单、参数上限、超时夹取、env 白名单)。 */
 export function normalizeSandboxSpec(input: RawSandboxSpec, limits: SandboxLimits = {}): SandboxSpec {
   const spec = input || {};
-  const allowTools = limits.allowTools || null; // null => any TOOL_RE-valid name
+  const allowTools = limits.allowTools || null; // null 表示允许任意符合 TOOL_RE 的裸命令名。
   const maxTimeoutMs = Math.min(Number(limits.maxTimeoutMs) || MAX_TIMEOUT_MS, MAX_TIMEOUT_MS);
   const maxOutputBytes = Number(limits.defaultMaxOutputBytes) || DEFAULT_MAX_OUTPUT_BYTES;
 
@@ -132,7 +119,7 @@ export function normalizeSandboxSpec(input: RawSandboxSpec, limits: SandboxLimit
     throw fail('cwd contains a NUL byte');
   }
 
-  const network = spec.network === true; // default off
+  const network = spec.network === true; // 默认关网。
   const env = cleanEnv(spec.env, limits.allowEnv);
 
   return { tool, args, cwd, timeoutMs, network, env, maxOutputBytes };

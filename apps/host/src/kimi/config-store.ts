@@ -48,7 +48,7 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord)
     if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
     target.configured = Boolean(target.apiKey);
   } catch {
-    // Corrupt config file -> ignore and fall back to env-derived config.
+    // 配置文件损坏时忽略磁盘内容,回退到环境变量派生的配置。
   }
 }
 

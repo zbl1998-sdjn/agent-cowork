@@ -3,47 +3,34 @@
 // 职责:在「写日志 / 返回错误体 / 落审计证据」之前,把密钥与敏感文件路径从文本中
 //       抹掉。这是纵深防御的「最后一道网」——调用方仍应首先避免打印密钥。
 // 依赖:无(纯正则)。导出:redactText(单值) / redactValue(递归对象/数组)。
-// 设计要点见下方英文注释(为什么用全局正则、为什么保留 label 只抹 value)。
+// 设计要点:
+//   * 调用方仍应首先避免打印密钥;这里是「万一漏出也要兜住」的后备网。
+//   * 规则有意偏宽且全部全局应用。日志被多抹一点是可接受的,密钥漏出不可接受;
+//     因此所有模式都带 `g`,每个命中都会被替换,不能只处理第一处。
+//   * `label = value` 形式保留 label、只抹 value:日志仍能看出「这里出现过 api key」,
+//     但不会把真实值写出去。
+//   * 顺序很重要:先处理赋值形式以保留 label,再处理裸 token 与路径兜底。
 //
-// Secret/PII redaction — a defense-in-depth net that scrubs secrets and
-// sensitive filesystem paths out of any text before it is logged, returned in an
-// error body, or written to audit/evidence files.
-//
-// Design intent:
-//   * Callers should still avoid logging secrets in the first place. This is the
-//     "if one slips through, mask it" backstop.
-//   * Patterns are deliberately BROAD and applied GLOBALLY. Over-masking a log
-//     line is harmless; leaking a key is not. So every pattern uses the `g` flag
-//     and we mask *every* occurrence, not just the first (the previous version
-//     used non-global regexes and only masked the first hit — a real gap).
-//   * For `label = value` secrets we keep the label (so a log stays debuggable —
-//     you can see *that* an api key was present) but replace the value. The old
-//     version replaced the *keyword* itself and left the value in clear text.
-//
-// Order matters: assignments first (so we keep labels), then known token shapes
-// and paths as a catch-all for anything not in `label=value` form (e.g. a bare
-// `sk-...` or a JWT embedded in a URL).
-
-// 1) `label: value` / `label=value` secrets — mask the VALUE, keep the label.
-//    Covers api_key, api_token, access/refresh_token, client_secret, secret,
-//    password. The value runs until whitespace/quote/comma/semicolon/paren.
+// 1) `label: value` / `label=value` 密钥:保留 label、替换 value。
+//    覆盖 api_key/api_token/access_token/refresh_token/client_secret/secret/password 等;
+//    value 截止到空白、引号、逗号、分号或右括号。
 const ASSIGNMENT_RE = /\b((?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd)\s*[:=]\s*)"?[^\s"',;)]+/gi;
-//    Authorization headers and bare bearer tokens.
+//    Authorization 头与裸 bearer token 也按同一原则只保留结构、不保留密钥。
 const AUTH_HEADER_RE = /\b(authorization\s*:\s*bearer\s+)[A-Za-z0-9._-]+/gi;
 const BEARER_RE = /\bbearer\s+[A-Za-z0-9._-]{8,}/gi;
 
-// 2) High-signal token shapes, masked wherever they appear (no label needed).
+// 2) 高置信 token 形状:即使没有 label,出现在任意位置也直接抹掉。
 const SENSITIVE_TOKENS: readonly RegExp[] = [
-  // OpenAI/Moonshot-style API keys: `sk-` followed by a long key body.
+  // OpenAI/Moonshot 风格 API key:`sk-` 加较长 key body。
   /\bsk-[A-Za-z0-9][A-Za-z0-9._-]{9,}\b/g,
-  // JWT: three base64url segments separated by dots.
+  // JWT:三个 base64url 段用点分隔。
   /\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
-  // Two long dotted opaque segments (covers some session/token formats).
+  // 两段长 opaque token,覆盖部分 session/token 格式。
   /\b[A-Za-z0-9]{20,}\.[A-Za-z0-9]{20,}\b/g,
 ];
 
-// 3) Sensitive filesystem paths: home credential stores, ssh keys, Windows
-//    AppData (which can hold tokens/cookies). Masked so logs don't leak layout.
+// 3) 敏感文件系统路径:凭据目录、SSH key、Windows AppData(可能含 token/cookie)。
+//    抹路径是为了日志不泄漏本机目录结构和凭据位置。
 const SENSITIVE_PATHS: readonly RegExp[] = [
   /(?:^|[\\/])\.kimi[\\/]credentials(?:[\\/][^\s]*)?/gi,
   /(?:^|[\\/])\.ssh(?:[\\/][^\s]*)?/gi,

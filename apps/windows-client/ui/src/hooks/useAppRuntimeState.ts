@@ -97,18 +97,18 @@ export function useAppRuntimeState() {
           const guest = await guestLogin();
           if (guest) setUser(guest);
         }
-      } catch { /* host not ready -> stay on gate */ }
+      } catch { /* host 未就绪时停留在登录门面 */ }
       finally { setAuthReady(true); }
     })();
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('kcw.theme', theme); } catch { /* ignore */ }
+    try { localStorage.setItem('kcw.theme', theme); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [theme]);
 
   useEffect(() => {
-    try { localStorage.setItem(AUTO_CLARIFY_KEY, autoClarify ? '1' : '0'); } catch { /* ignore */ }
+    try { localStorage.setItem(AUTO_CLARIFY_KEY, autoClarify ? '1' : '0'); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [autoClarify]);
 
   useEffect(() => {
@@ -125,29 +125,29 @@ export function useAppRuntimeState() {
       try {
         const workspace = await getJson<WorkspaceInfo>('/api/workspace');
         setTrustedRoot(workspace.trustedRoot);
-      } catch { /* host not ready */ }
+      } catch { /* host 未就绪时先留空工作区 */ }
       try {
         const response = await getJson<{ recipes: Recipe[] }>('/api/recipes');
         setRecipes(response.recipes || []);
-      } catch { /* ignore */ }
+      } catch { /* 配方加载失败不阻断主界面 */ }
       try {
         const index = await getJson<{ runs: RunSummary[] }>('/api/runs/index');
         setHistory(historyRunsFromIndex(index.runs || []));
-      } catch { /* ignore */ }
+      } catch { /* 运行历史加载失败不阻断主界面 */ }
       try {
         applyKimiInfo(await getKimiInfo());
-      } catch { /* ignore */ }
+      } catch { /* 模型配置加载失败不阻断主界面 */ }
     })();
   }, [applyKimiInfo, user]);
 
   const doLogout = useCallback(async () => {
-    try { await apiLogout(); } catch { /* best-effort */ }
-    try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
+    try { await apiLogout(); } catch { /* 登出尽力而为,本地仍会清掉身份 */ }
+    try { localStorage.removeItem(GUEST_KEY); } catch { /* 本地存储不可用时忽略 */ }
     setUser(null);
   }, []);
 
   const completeOnboarding = useCallback(() => {
-    try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* ignore */ }
+    try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* 本地存储不可用时忽略 */ }
     setOnboardingOpen(false);
   }, []);
 
@@ -167,7 +167,7 @@ export function useAppRuntimeState() {
   }, [completeOnboarding, openSettings]);
 
   const continueAsGuest = useCallback(() => {
-    try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* ignore */ }
+    try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* 本地存储不可用时忽略 */ }
     void (async () => {
       const guest = await guestLogin();
       if (guest) setUser(guest);

@@ -1,4 +1,4 @@
-// Cowork planning owns the full preview flow; app.js only wires dependencies.
+// 协作规划器负责完整预览流程;app.js 只负责依赖注入。
 (function () {
   function createPlanRunner({
     state,

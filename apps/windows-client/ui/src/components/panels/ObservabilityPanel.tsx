@@ -94,9 +94,7 @@ export function ObservabilityPanel() {
   const [loading, setLoading] = useState(false);
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState('');
-  // Expert view shows the four engineering-oriented sections (tool reason,
-  // attribution, config, sources). Default off so the regular user just sees
-  // the high-level cards + 工具/耗时.
+  // 专家视图展示工具原因、归因、配置、来源四组工程字段;默认关闭,普通用户只看概要卡片与工具/耗时。
   const [expert, setExpert] = useState(false);
 
   const loadRuns = useCallback(async () => {

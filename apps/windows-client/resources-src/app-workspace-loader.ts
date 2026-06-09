@@ -1,4 +1,4 @@
-// Workspace loading owns Host API reads; rendering callbacks stay injected.
+// 工作区加载器负责 Host API 读取;具体渲染仍通过回调注入。
 (function () {
   function createWorkspaceLoader({
     state,

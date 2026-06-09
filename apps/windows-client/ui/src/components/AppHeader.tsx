@@ -9,9 +9,8 @@ import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
-// Reveal the latest installer (target/release/bundle/{nsis,msi}/) in Explorer
-// so users can grab/share the .exe/.msi. Wrapped here so the click handler in
-// AppHeaderActions stays a thin one-liner.
+// 在 Explorer 中显示最新安装包目录(target/release/bundle/{nsis,msi}/),方便用户取 .exe/.msi。
+// 封装在这里后,AppHeaderActions 的点击处理保持一行薄调用。
 async function revealInstaller(): Promise<void> {
   if (!isDesktop()) { window.alert('请在桌面端使用'); return; }
   try {

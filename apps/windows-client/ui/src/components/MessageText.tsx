@@ -7,8 +7,7 @@ import { renderMarkdown, splitVizBlocks } from '../lib/md';
 import { InlineViz } from './InlineViz';
 import type { VizSpec } from '../lib/api';
 
-// Delegate clicks on fenced-code "复制" buttons (rendered as raw HTML by
-// renderMarkdown) to copy the adjacent code text.
+// 代理 fenced-code 里由 renderMarkdown 渲出的"复制"按钮点击,复制相邻代码文本。
 function onCodeCopy(e: MouseEvent<HTMLDivElement>) {
   const btn = (e.target as HTMLElement).closest('.code-copy');
   if (!btn) return;
@@ -19,7 +18,7 @@ function onCodeCopy(e: MouseEvent<HTMLDivElement>) {
     const prev = btn.textContent;
     btn.textContent = '已复制';
     setTimeout(() => { btn.textContent = prev || '复制'; }, 1200);
-  } catch { /* clipboard unavailable */ }
+  } catch { /* 剪贴板不可用时静默降级 */ }
 }
 
 export function MessageText({ text, trustedRoot }: { text: string; trustedRoot?: string | undefined }) {

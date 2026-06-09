@@ -30,11 +30,9 @@ export function humanizeScheduleStatus(status: ScheduleStatusLike): string {
   return STATUS_MAP[key] || String(status);
 }
 
-// Minimal cron parser. We only friendly-print the common shapes; anything
-// fancier just falls through to the raw expression so power users still see
-// the truth instead of a lie.
+// 最小 cron 解析器:只把常见形态翻成人话;更复杂的表达式原样返回,避免编出不准确解释。
 //
-// Supported (5-field "minute hour dom month dow"):
+// 支持的 5 字段格式("minute hour dom month dow"):
 //   "0 9 * * *"        → 每天 09:00
 //   "30 14 * * *"      → 每天 14:30
 //   "0 9 * * 1"        → 每周一 09:00
@@ -50,7 +48,7 @@ export function humanizeCron(cron: string): string {
   const [min, hour, dom, mon, dow] = parts;
   if (!min || !hour || !dom || !mon || !dow) return raw;
 
-  // Every-N-minute shorthand: "*/N * * * *"
+  // 每 N 分钟的简写:"*/N * * * *"。
   const everyN = /^\*\/(\d+)$/.exec(min);
   const everyNMinutes = everyN?.[1];
   if (everyNMinutes && hour === '*' && dom === '*' && mon === '*' && dow === '*') {
@@ -92,10 +90,10 @@ function startOfLocalDay(d: Date): Date {
 }
 
 /**
- * Format a fire-at timestamp as "today HH:MM" / "tomorrow HH:MM" /
- * "this Wednesday HH:MM" / fallback "May 30 09:00", using local clock.
+ * 用本地时钟把触发时间格式化为"今天 HH:MM"、"明天 HH:MM"、"周三 HH:MM",
+ * 更远日期则兜底成"5 月 30 日 09:00"。
  *
- * `now` is injectable so the unit test is deterministic.
+ * `now` 可注入,让单测不依赖真实系统时间。
  */
 export function humanizeFireAt(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return '';
@@ -114,9 +112,8 @@ export function humanizeFireAt(iso: string | null | undefined, now: Date = new D
 }
 
 /**
- * One-line summary of WHEN a schedule fires. Prefers explicit `cronHuman` from
- * the backend, then folds cron expression into friendly phrasing, then falls
- * back to one-off fireAt formatting.
+ * 生成计划任务"何时触发"的一行摘要:优先使用后端给的 cronHuman,其次把 cron
+ * 表达式人话化,最后回退到一次性 fireAt。
  */
 export function humanizeScheduleWhen(item: HumanizableSchedule, now: Date = new Date()): string {
   if (item.cronHuman && item.cronHuman.trim()) return item.cronHuman.trim();
@@ -126,7 +123,7 @@ export function humanizeScheduleWhen(item: HumanizableSchedule, now: Date = new 
 }
 
 /**
- * Combine WHEN + next-fire into one row, e.g. "每天 09:00 · 下次 今天 09:00".
+ * 合并触发规则与下次触发时间,例如"每天 09:00 · 下次 今天 09:00"。
  */
 export function humanizeScheduleLine(item: HumanizableSchedule, now: Date = new Date()): string {
   const when = humanizeScheduleWhen(item, now);
