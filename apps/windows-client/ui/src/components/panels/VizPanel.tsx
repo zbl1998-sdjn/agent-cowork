@@ -4,6 +4,7 @@
 // 依赖:lib/api(renderViz/liveArtifactUrl/fetchArtifactHtml)+ LiveArtifactView、ui/Button、ui/StateViews。导出:VizPanel 等。
 import { useMemo, useState } from 'react';
 import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../../lib/api';
+import { joinWorkspacePath } from '../../lib/app-logic';
 import { LiveArtifactView } from '../LiveArtifactView';
 import { Button } from '../ui/Button';
 import { ErrorState } from '../ui/StateViews';
@@ -187,7 +188,7 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
         setViewUrl('');
       }
       setDataUrl(res.dataUrl || '');
-      setFilePath(res.relativePath ? `${trustedRoot}/${res.relativePath}` : '');
+      setFilePath(res.relativePath ? joinWorkspacePath(trustedRoot, res.relativePath) : '');
     } catch (e) {
       setError((e as Error).message);
     } finally {

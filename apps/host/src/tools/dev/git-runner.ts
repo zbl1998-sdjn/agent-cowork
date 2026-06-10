@@ -55,7 +55,10 @@ export function resolveWorkspace(trustedRoot: unknown, workspace: unknown = '.')
 
 export function resolveGitPath(root: string, workspace: string, relPath: unknown): string | null {
   if (!relPath) return null;
-  const full = assertTrustedPathForCreate(path.join(workspace, String(relPath)), root);
+  // 模型可能给「root 内的绝对路径」:绝对路径直接交给 policy(join 会双拼成 <ws>\C:\...),
+  // 相对路径仍锚定到 workspace(不是 root——workspace 可为 root 下子目录)。
+  const text = String(relPath);
+  const full = assertTrustedPathForCreate(path.isAbsolute(text) ? text : path.join(workspace, text), root);
   return path.relative(workspace, full).replace(/\\/g, '/');
 }
 
