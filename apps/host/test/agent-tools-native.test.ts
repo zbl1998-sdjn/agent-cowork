@@ -80,8 +80,8 @@ test('Write accepts an absolute path that is already inside the workspace (no do
   const res = parseWriteResult(await write.handler({ path: absInside, content: 'hi' }));
   assert.equal(res.ok, true);
   assert.equal(fs.readFileSync(path.join(root, 'report.md'), 'utf8'), 'hi');
-  // 必须没有产生双拼的影子目录。
-  assert.equal(fs.existsSync(path.join(root, path.parse(root).root.replace(/[\\/]/g, ''))), false);
+  // 必须没有产生双拼的影子目录:root 顶层应当只有这一个文件(平台无关断言)。
+  assert.deepEqual(fs.readdirSync(root).sort(), ['report.md']);
 
   // 绝对但在 root 之外仍须被拒(安全边界不能因此松动)。
   const outside = path.join(path.parse(root).root, 'Windows', 'escape.md');
