@@ -7,6 +7,7 @@ import {
   activeConversationMessages,
   compactConversationForStorage,
   forkConversationBeforeMessage,
+  shouldApplyHydratedMessages,
   switchConversationBranch,
   updateActiveConversationMessages,
 } from '../lib/conversation-branches';
@@ -40,6 +41,10 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
 
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConvId, setActiveConvId] = useState<string>(initialConversations[0]?.id || nextConvId());
+  // 供异步补水回调读取「最新」active 会话:闭包里的 activeConvId 是发起时的旧值,
+  // 迟到结果必须对照当前值判断是否还该落地(防串话,见 shouldApplyHydratedMessages)。
+  const activeConvIdRef = useRef(activeConvId);
+  activeConvIdRef.current = activeConvId;
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [convSearch, setConvSearch] = useState('');
@@ -135,8 +140,15 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
           : null;
         if (hydrated && activeConversationMessages(hydrated).length) {
           const activeMessages = activeConversationMessages(hydrated);
-          setMessages((cur) => (cur.length === 0 ? activeMessages : cur));
+          // 列表缓存回写到「请求的那个会话」总是安全的;但当前视图(messages)只在
+          // 用户仍停留在该会话且视图为空时才落地,否则迟到补水会把旧会话内容
+          // 灌进用户已新建/切换的会话(串话+被回写 effect 持久化)。
           setConversations((cs) => cs.map((x) => (x.id === id ? hydrated : x)));
+          setMessages((cur) => (
+            shouldApplyHydratedMessages({ requestedId: id, activeConvId: activeConvIdRef.current, currentMessageCount: cur.length })
+              ? activeMessages
+              : cur
+          ));
         }
       })();
     }
