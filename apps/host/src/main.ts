@@ -10,6 +10,7 @@ import type { McpServerSpec } from './mcp/connect.js';
 import { getSessionPath } from './storage/app-home.js';
 import { JsonlWriter } from './storage/jsonl-writer.js';
 import { omitUndefined } from './util/object.js';
+import { startParentWatchdog } from './util/parent-watchdog.js';
 
 const envSchema = z.object({
   HOST: z.string().trim().min(1).catch('127.0.0.1'),
@@ -23,6 +24,7 @@ const envSchema = z.object({
   KIMI_API_MAX_TOKENS: z.coerce.number().int().positive().catch(2048),
   KIMI_MODEL: z.string().optional(),
   KCW_TRUST_IDENTITY_HEADERS: z.string().optional(),
+  KCW_PARENT_PID: z.coerce.number().int().positive().optional().catch(undefined),
   MASE_MCP_ENABLED: z.string().optional(),
   MASE_REPO: z.string().optional(),
   MASE_CONFIG_PATH: z.string().optional(),
@@ -124,3 +126,18 @@ function gracefulExit() {
 }
 process.once('SIGINT', gracefulExit);
 process.once('SIGTERM', gracefulExit);
+
+// 父进程看门狗:作为桌面外壳的 sidecar 启动时(外壳传 KCW_PARENT_PID),父进程
+// 消失(强杀/崩溃/关窗未及清理)即优雅退出,杜绝孤儿 host 常驻占 3017;
+// 优雅停机卡住时 5s 兜底硬退。独立启动(npm start / start:mvp)不传该变量,不受影响。
+if (env.KCW_PARENT_PID) {
+  startParentWatchdog({
+    parentPid: env.KCW_PARENT_PID,
+    onParentGone: () => {
+      console.error(`[host] parent process ${env.KCW_PARENT_PID} is gone; shutting down to avoid an orphaned sidecar.`);
+      const hardExit: ReturnType<typeof setTimeout> = setTimeout(() => process.exit(0), 5000);
+      (hardExit as unknown as { unref?: () => void }).unref?.();
+      gracefulExit();
+    },
+  });
+}

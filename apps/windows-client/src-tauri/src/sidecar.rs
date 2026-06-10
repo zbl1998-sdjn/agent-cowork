@@ -136,7 +136,10 @@ impl HostSidecar {
             .env("HOST", HOST)
             .env("PORT", PORT)
             .env("TRUSTED_ROOT", trusted_root)
-            .env("KCW_TAURI", "1");
+            .env("KCW_TAURI", "1")
+            // host 侧 parent-watchdog 依赖此变量:外壳进程消失(强杀/崩溃/关窗未及
+            // kill)时 host 自行优雅退出,杜绝孤儿 sidecar 常驻占 3017。
+            .env("KCW_PARENT_PID", std::process::id().to_string());
         configure_embedded_python_env(&mut command, app);
         // Windows 上后台 host 不应弹出控制台窗口。
         #[cfg(windows)]
