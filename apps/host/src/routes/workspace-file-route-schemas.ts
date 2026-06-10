@@ -69,7 +69,8 @@ export const extractBodySchema = objectBodySchema.pipe(z.object({
 
 export const searchBodySchema = objectBodySchema.pipe(z.object({
   trustedRoot: optionalTrustedRootSchema,
-  query: z.string().trim().min(1, 'query is required'),
+  // 允许空 query:UI 的「引用文件」按钮插入裸 @ 时 query 为空,此时按"列出最近文件"处理(见 searchWorkspace)。
+  query: z.string().trim().optional(),
   maxResults: positiveIntegerSchema,
   includeContent: z.boolean().optional(),
   maxContentBytes: positiveIntegerSchema,

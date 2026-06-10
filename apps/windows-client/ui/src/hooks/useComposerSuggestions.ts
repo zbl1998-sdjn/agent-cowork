@@ -4,7 +4,7 @@
 //       依赖:lib/composer-trigger 纯逻辑 + 起步建议数据源。
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
+import { MENTION_SEARCH_DEBOUNCE_MS } from '../lib/composer-logic';
 import {
   buildHistorySuggestionItems,
   buildMentionSuggestionItems,
@@ -130,7 +130,8 @@ export function useComposerSuggestions(opts: UseComposerSuggestionsOptions): Use
     if (trigger?.mode === 'mention') {
       setMode('mention');
       setTriggerStart(trigger.triggerStart);
-      if (shouldDebounceMentionSearch(trigger.query)) scheduleMentions(trigger.query); else close();
+      // 空 query(刚点「引用文件」插入裸 @)也要弹菜单并列出最近文件,而不是 close()。
+      scheduleMentions(trigger.query);
       return;
     }
     close();

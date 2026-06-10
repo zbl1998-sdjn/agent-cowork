@@ -41,9 +41,6 @@ export function searchWorkspace(options: SearchOptions = {}): { query: string; r
     throw new Error('trustedRoot is required');
   }
   const query = String(options.query || '').trim().toLowerCase();
-  if (!query) {
-    throw new Error('query is required');
-  }
   const maxResults = Math.min(Math.max(Number(options.maxResults || 20), 1), 100);
   const includeContent = options.includeContent === true;
   const maxContentBytes = cap(options.maxContentBytes, DEFAULT_MAX_CONTENT_BYTES, 1024, DEFAULT_MAX_CONTENT_BYTES);
@@ -51,6 +48,24 @@ export function searchWorkspace(options: SearchOptions = {}): { query: string; r
     includeFiles: true,
     includeDirectories: false,
   }).filter((entry): entry is WorkspaceFileEntry => entry.kind === 'file');
+
+  // 空 query:当「引用文件」选择器用——返回最近修改的前 N 个文件,而不是报错。
+  // 这样 UI 里点一下「引用文件」按钮(插入裸 @)就能直接弹出文件列表来挑,再继续输入即转为关键词过滤。
+  if (!query) {
+    const recent = [...files]
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(0, maxResults)
+      .map((file) => ({
+        path: file.path,
+        fullPath: file.fullPath,
+        size: file.size,
+        mtimeMs: file.mtimeMs,
+        match: 'name' as const,
+        excerpt: '',
+        extension: path.extname(file.path).toLowerCase(),
+      }));
+    return { query, results: recent };
+  }
 
   const results: SearchResult[] = [];
   for (const file of files) {
