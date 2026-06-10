@@ -24,9 +24,12 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
   const { trustedRoot, sandbox, sandboxLimits } = ctx;
   if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');
   const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
-  const within = (rel: unknown): string => assertTrustedPath(path.join(root, String(rel || '')), root);
+  // 不要 path.join(root, rel):rel 可能是「root 内的绝对路径」(模型常这么给),
+  // path.join 会把它当相对段拼成 <root>\<root>\… → mkdir ENOENT。assert* 内部已用
+  // resolveWithinRoot 正确处理绝对/相对,并由 isInside 守住越界,故直接传原值。
+  const within = (rel: unknown): string => assertTrustedPath(String(rel || ''), root);
   // 面向新建目标的路径校验:目标可能尚不存在,仍需防 junction/symlink 逃逸。
-  const withinForCreate = (rel: unknown): string => assertTrustedPathForCreate(path.join(root, String(rel || '')), root);
+  const withinForCreate = (rel: unknown): string => assertTrustedPathForCreate(String(rel || ''), root);
 
   const gitStatusTool = createGitStatusTool();
   const gitDiffTool = createGitDiffTool();
