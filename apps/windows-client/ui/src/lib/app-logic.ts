@@ -167,3 +167,14 @@ export function hasSessionModelAccess(config?: ModelRunConfig): boolean {
   const provider = typeof config.provider === 'string' ? config.provider.trim().toLowerCase() : '';
   return provider === 'openai/local' || provider === 'local-openai';
 }
+
+// 把工具/事件回显的文件路径解析为可预览/可打开的完整路径。
+// file_written 回显的是模型传给 Write 的原始 path:相对路径锚到工作区根;
+// 绝对路径(盘符/根斜杠/UNC)原样保留——直接 `${root}/${fp}` 会把绝对路径双拼成
+// `<root>/C:/...`,预览与「在系统中打开」都会 file not found。
+export function joinWorkspacePath(trustedRoot: string, filePath: string): string {
+  const fp = String(filePath || '').trim();
+  if (!fp) return trustedRoot;
+  const isAbsolute = /^[A-Za-z]:[\\/]/.test(fp) || fp.startsWith('/') || fp.startsWith('\\');
+  return isAbsolute ? fp : `${trustedRoot}/${fp}`;
+}

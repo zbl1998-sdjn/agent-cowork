@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAgentChatStreamOptions,
   hasSessionModelAccess,
+  joinWorkspacePath,
   mergeTodoUpdate,
   progressStatusFromIcon,
   reconcileChatEnabled,
@@ -23,6 +24,28 @@ function baseMessage(overrides: Partial<AssistantRunState> = {}): AssistantRunSt
 function event(partial: Partial<RunEvent> & Pick<RunEvent, 'type'>): RunEvent {
   return { seq: 1, ts: '2026-05-24T00:00:00.000Z', ...partial };
 }
+
+describe('joinWorkspacePath', () => {
+  const root = 'C:\\Users\\Administrator';
+
+  it('joins a relative path under the workspace root', () => {
+    expect(joinWorkspacePath(root, '报告.md')).toBe('C:\\Users\\Administrator/报告.md');
+    expect(joinWorkspacePath(root, 'sub/notes.txt')).toBe('C:\\Users\\Administrator/sub/notes.txt');
+  });
+
+  it('keeps absolute paths as-is instead of double-joining (file_written may echo absolute model input)', () => {
+    // 产物卡曾把绝对路径拼成 <root>/C:/... → 预览/系统打开报 file not found。
+    expect(joinWorkspacePath(root, 'C:/Users/Administrator/abspath-verify.md')).toBe('C:/Users/Administrator/abspath-verify.md');
+    expect(joinWorkspacePath(root, 'C:\\Users\\Administrator\\x.md')).toBe('C:\\Users\\Administrator\\x.md');
+    expect(joinWorkspacePath(root, '/tmp/a.md')).toBe('/tmp/a.md');
+    expect(joinWorkspacePath(root, '\\\\server\\share\\a.md')).toBe('\\\\server\\share\\a.md');
+  });
+
+  it('handles empty/blank input by returning the root', () => {
+    expect(joinWorkspacePath(root, '')).toBe(root);
+    expect(joinWorkspacePath(root, '  ')).toBe(root);
+  });
+});
 
 describe('progressStatusFromIcon', () => {
   it('maps host progress icons to UI statuses', () => {

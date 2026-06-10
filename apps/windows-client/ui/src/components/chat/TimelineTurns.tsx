@@ -1,6 +1,7 @@
 // TimelineTurns(UI · components/chat):把一个「回合」(用户消息 + 助手响应/工具调用/进度)渲染成一组气泡;memo 优化。
 import { memo, type CSSProperties } from 'react';
 import { answerQuestion, openPath, respondApproval } from '../../lib/api';
+import { joinWorkspacePath } from '../../lib/app-logic';
 import type { AssistantMessage, UserMessage } from '../../lib/app-types';
 import { extractSuggestions } from '../../lib/md';
 import { ApprovalActions } from '../ApprovalActions';
@@ -153,7 +154,7 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
       {message.text && <AssistantText message={message} streamingId={streamingId} trustedRoot={trustedRoot} onQuickSend={onQuickSend} />}
       {message.recipeDraft && <RecipeDraftCard draft={message.recipeDraft} />}
       {message.recipeCaptureStatus === 'failed' && message.recipeCaptureError && <div className="panel-error">{message.recipeCaptureError}</div>}
-      {message.files && message.files.length > 0 && <div className="file-cards">{message.files.map((fp, i) => <ArtifactCard key={`${fp}-${i}`} file={{ path: `${trustedRoot}/${fp}`, relativePath: fp }} metadata={fp} onOpen={onOpenOrPreview} />)}</div>}
+      {message.files && message.files.length > 0 && <div className="file-cards">{message.files.map((fp, i) => <ArtifactCard key={`${fp}-${i}`} file={{ path: joinWorkspacePath(trustedRoot, fp), relativePath: fp }} metadata={fp} onOpen={onOpenOrPreview} />)}</div>}
       {message.operations.length > 0 && <PreviewCard operations={message.operations} />}
       {message.operations.length > 0 && <ApprovalActions runId={message.runId || ''} operations={message.operations} approvalState={message.approvalState} onApprove={() => onHandleApprove(message)} onReject={() => onPatchAssistant(message.id, (m) => ({ ...m, approvalState: 'rejected' }))} />}
       <SourcesFooter sources={message.sources} />
