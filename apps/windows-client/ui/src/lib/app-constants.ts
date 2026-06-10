@@ -11,15 +11,22 @@ export const STARTERS = [
   '帮我起草一封邮件草稿',
 ];
 
-let convSeq = 0;
-export const nextConvId = () => 'c' + (convSeq += 1);
-let branchSeq = 0;
-export const nextBranchId = () => 'b' + (branchSeq += 1);
+// id 必须跨「页面加载」全局唯一,不能用加载内自增(c1/c2、m1/m2):
+// conversationId 进 MASE 记忆线程(thread_id 含它)并持久化——撞 id 会让不同时期的
+// 窗口共享同一记忆线程(别的对话的内容串进来);messageId 持久化在会话消息里——
+// reload 后撞 id 会让 patchAssistant/React key 同时命中历史消息(回复被覆盖/双渲染)。
+// 形如 <epoch36>-<seq><rand>:时间戳保跨加载唯一,序号+随机保同毫秒内唯一。
+let idSeq = 0;
+function uniqueId(prefix: string): string {
+  idSeq += 1;
+  return `${prefix}${Date.now().toString(36)}-${idSeq.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+export const nextConvId = () => uniqueId('c');
+export const nextBranchId = () => uniqueId('b');
 export const INITIAL_CONV = nextConvId();
 export const PREVIEWABLE_RE = /\.(png|jpe?g|gif|webp|bmp|svg|md|markdown|txt|text|log|csv|tsv|json|yaml|yml|xml|html?|pdf)$/i;
 
-let messageSeq = 0;
-export const nextMessageId = () => `m${(messageSeq += 1)}`;
+export const nextMessageId = () => uniqueId('m');
 
 export function loadConversations(): Conversation[] {
   try {
