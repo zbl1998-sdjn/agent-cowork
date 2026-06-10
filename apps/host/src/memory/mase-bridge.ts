@@ -134,6 +134,10 @@ async function recallSessionMemoryInner(
   topK = 5,
 ): Promise<string> {
   const blocks: string[] = [];
+  // 本会话时间线内容的归一化集合,供 ③ 相关历史去重——避免同一句既出现在
+  // 【最近对话】又出现在跨会话的【相关历史】里,造成"本窗口/别的会话"归属混淆。
+  const timelineNorm = new Set<string>();
+  const normForDedup = (s: string): string => s.replace(/\s+/g, '').toLowerCase();
 
   // ① 最近对话时间线(本线程、按时序)——给模型真正的对话连续性;
   //    "我第一句说了啥 / 刚才聊了啥 / 接着上文"这类问题只能靠它(BM25 片段无序,答不了)。
@@ -143,12 +147,17 @@ async function recallSessionMemoryInner(
       if (turns.length) {
         const lines = turns.map((turn) => {
           const who = turn.role === 'assistant' ? '助手' : '用户';
+          timelineNorm.add(normForDedup(turn.content));
           const body = turn.content.length > TIMELINE_CONTENT_MAX
             ? `${turn.content.slice(0, TIMELINE_CONTENT_MAX)}…`
             : turn.content;
           return `${who}: ${body.replace(/\s+/g, ' ')}`;
         });
-        blocks.push(['【最近对话】(本会话按时间先后、最早在前;回答“第一句/刚才/继续上文”以此为准):', ...lines].join('\n'));
+        blocks.push([
+          '【最近对话】(就是当前这个对话窗口、按时间先后、最早在前):',
+          ...lines,
+          '↑ 凡涉及“本窗口/这次对话/第一句/刚才/继续上文”的问题,只依据上面这段【最近对话】回答,不要用下面的【相关历史】。',
+        ].join('\n'));
       }
     } catch {
       // 时间线取不到不影响后续的事实/召回。
@@ -176,6 +185,7 @@ async function recallSessionMemoryInner(
     try {
       const result = await registry.call(RECALL_TOOL, { query: segmentForRecall(trimmedQuery) || trimmedQuery, top_k: topK });
       const hits: string[] = [];
+      const seenHits = new Set<string>();
       for (const text of mcpTextItems(result)) {
         let hit = text;
         try {
@@ -185,10 +195,19 @@ async function recallSessionMemoryInner(
           // 非 JSON 文本原样保留。
         }
         const normalized = hit.trim();
-        if (normalized) hits.push(normalized);
+        if (!normalized) continue;
+        const key = normForDedup(normalized);
+        // 跨会话 BM25 召回不带 thread 过滤,可能命中本会话时间线里已有的话;去掉这些重复,
+        // 让【相关历史】只承载"别处/历史会话"的内容,不与【最近对话】抢"本窗口"的归属。
+        if (timelineNorm.has(key) || seenHits.has(key)) continue;
+        seenHits.add(key);
+        hits.push(normalized);
       }
       if (hits.length) {
-        blocks.push(['【相关历史】(供参考,不要据此编造未提及的信息):', ...hits.map((hit) => `- ${hit}`)].join('\n'));
+        blocks.push([
+          '【相关历史】(可能来自**其它/历史对话窗口**,不代表本次对话;仅供事实参考,回答“本窗口/第一句/刚才”等问题时不要采用):',
+          ...hits.map((hit) => `- ${hit}`),
+        ].join('\n'));
       }
     } catch {
       // 召回失败不影响已取到的当前事实。
