@@ -142,7 +142,7 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
   const continueRun = resumeRunId ? () => onResumeRun(resumeRunId) : () => onQuickSend('继续');
   return (
     <MessageBubble role="assistant" status="" runId={message.runId}>
-      {(message.status === 'thinking' || message.status === 'streaming') && !message.text && <div className="turn-status">{message.reasoning ? '思考中' : '正在响应'}<span className="typing-dots" aria-hidden="true"><i /><i /><i /></span></div>}
+      {(message.status === 'thinking' || message.status === 'streaming') && !message.text && <div className="turn-status" role="status" aria-live="polite" aria-atomic="true">{message.reasoning ? '思考中' : '正在响应'}<span className="typing-dots" aria-hidden="true"><i /><i /><i /></span></div>}
       {message.reasoning && <details className="reasoning" open={!message.text}><summary>思考过程</summary><div className="reasoning-body">{message.reasoning}</div></details>}
       {message.todos && message.todos.length > 0 && <TodoList items={message.todos} />}
       {message.subtasks && message.subtasks.length > 0 && <SubtaskGroups items={message.subtasks} />}

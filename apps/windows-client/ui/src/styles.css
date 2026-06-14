@@ -5,6 +5,10 @@
   --muted: #71716d;
   --border: #e2e2df;
   --accent: #ff4f42;
+  --primary-action-bg: #b5482f;
+  --primary-action-bg-hover: #a6402a;
+  --send-button-bg: #b5482f;
+  --send-button-bg-hover: #a6402a;
   --shadow: 0 18px 42px rgba(27, 28, 30, 0.09), 0 2px 8px rgba(27, 28, 30, 0.04);
   color-scheme: light;
 }
@@ -117,7 +121,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .composer { position: relative; border: 1px solid #cfcfca; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); padding: 14px 16px; }
 .composer textarea { width: 100%; border: none; outline: none; resize: none; min-height: 48px; font: inherit; font-size: 14px; background: transparent; }
 .composer-footer { display: flex; justify-content: flex-end; }
-.composer .send-button { background: var(--accent); color: #fff; border: none; border-radius: 18px; padding: 7px 16px; }
+.composer .send-button { background: var(--send-button-bg); color: #fff; border: none; border-radius: 18px; padding: 7px 16px; }
 
 .composer-popover { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 8px); background: var(--surface); border: 1px solid #d8d8d2; border-radius: 14px; box-shadow: var(--shadow); padding: 6px; max-height: 320px; overflow-y: auto; }
 .popover-header { font-size: 11px; color: #8a8a82; padding: 6px 10px 4px; }
@@ -158,7 +162,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .tool-list li { background: #fff; border: 1px solid #d9ded5; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
 .tool-list li.is-selected { border-color: #c96442; }
 .tool-list li code { font-size: 13px; font-weight: 600; }
-.tool-list li .tool-src { float: right; font-size: 11px; color: #8a8f84; }
+.tool-list li .tool-src { float: right; font-size: 11px; color: #6b6f66; }
 .tool-list li p { margin: 6px 0 0; font-size: 12px; color: #6b6f66; }
 .panel-empty { color: #8a8f84; font-size: 13px; }
 .panel-call { display: flex; flex-direction: column; gap: 8px; }
@@ -467,7 +471,7 @@ body { font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, "PingFa
 
 /* ---- 深色模式 ---- */
 [data-theme="dark"] {
-  --bg: #1a1a18; --surface: #232320; --text: #ececea; --muted: #9a9a92; --border: #38382f; --accent: #ff6a4d;
+  --bg: #1a1a18; --surface: #232320; --text: #ececea; --muted: #9a9a92; --border: #38382f; --accent: #ff6a4d; --primary-action-bg: #b5482f; --primary-action-bg-hover: #a6402a; --send-button-bg: #b5482f; --send-button-bg-hover: #a6402a;
   --shadow: 0 18px 42px rgba(0,0,0,0.5); color-scheme: dark;
 }
 [data-theme="dark"] .app-header { background: #1f1f1c; }
@@ -522,7 +526,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 .composer { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
 .composer:focus-within { border-color: #c0846f; box-shadow: 0 22px 50px rgba(27,28,30,0.14); }
 .composer .send-button { transition: transform 0.12s ease, filter 0.15s ease; }
-.composer .send-button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.composer .send-button:hover { --send-button-bg: var(--send-button-bg-hover); transform: translateY(-1px); filter: none; }
 .composer .send-button:active { transform: translateY(0); }
 
 /* 空状态首屏 */
@@ -1073,7 +1077,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:fo
 
 /* 面板简介:每个侧栏用一句中文说明用途 */
 .panel-intro { margin: 4px 0 12px; font-size: 12.5px; color: #4a4e46; line-height: 1.55; }
-.panel-intro em { font-style: normal; color: #c96442; background: #fff3ee; padding: 0 4px; border-radius: 4px; }
+.panel-intro em { font-style: normal; color: #9a3d2c; background: #fff3ee; padding: 0 4px; border-radius: 4px; }
 [data-theme="dark"] .panel-intro { color: #b8bcb1; }
 [data-theme="dark"] .panel-intro em { color: #ff9b78; background: rgba(201,100,66,.18); }
 .panel-intro--inline { margin: 6px 0 10px; font-size: 12px; }
