@@ -11,8 +11,8 @@ import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
 import { ComposerTriggers } from './ComposerTriggers';
 import type { ComposerProps } from './composer-types';
-// AppComposerDock + Composer.test import ComposerMeta from this module; the
-// types live in composer-types but we re-export them here so import paths stay stable.
+// AppComposerDock 与 Composer.test 仍从本模块导入 ComposerMeta;类型实际在 composer-types,
+// 这里再导出以保持旧 import path 稳定。
 export type { ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe } from './composer-types';
 export type { ThinkingLevel } from './ComposerFooter';
 

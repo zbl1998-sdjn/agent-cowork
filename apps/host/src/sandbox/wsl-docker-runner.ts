@@ -4,22 +4,6 @@
 //       受约束子进程执行。注入进 VmSandbox,使适配器保持纯净、本模块可用 fake spawn 单测。
 //       docker:--network=none 是真断网保证;wsl 默认共享宿主网络,故只报 networkIsolated:false 并告警。
 // 依赖:node:child_process + 同层 exec-child。导出:createWslDockerRunner。
-//
-// Real spawn-based runner for the VM sandbox backends.
-//
-// Turns a normalised SandboxSpec into a concrete, isolated command line and
-// runs it through the shared constrained-child executor. Injected into
-// `VmSandbox` so the adapter stays pure and this stays unit-testable with a
-// fake spawn.
-//
-//   docker : docker run --rm --network=none -v <root>:/work -w /work \
-//            [-e K=V ...] <image> <tool> <args...>
-//   wsl    : wsl.exe [-d <distro>] -- <tool> <args...>
-//
-// Network: docker maps `network:false` -> `--network=none` (a real guarantee).
-// wsl shares the host network unless the distro is configured otherwise, so we
-// report `networkIsolated:false` and warn — never claim a guarantee we cannot
-// keep.
 import childProcess from 'node:child_process';
 import { runConstrainedChild } from './exec-child.js';
 import type { RunChildResult, SpawnLike } from './exec-child.js';
@@ -83,11 +67,7 @@ function buildArgv(
   throw error;
 }
 
-/**
- * 创建可注入 VmSandbox({ runner }) 的执行器:按后端拼命令行并经受约束子进程运行,回传结果+网络隔离实情。
- * Create a runner suitable for `VmSandbox({ runner })`.
- *
- */
+/** 创建可注入 VmSandbox({ runner }) 的执行器:按后端拼命令行并经受约束子进程运行,回传结果+网络隔离实情。 */
 export function createWslDockerRunner(options: WslDockerRunnerOptions = {}): WslDockerRunner {
   const backend = String(options.backend || 'docker').toLowerCase();
   const image = options.image || null;
@@ -110,8 +90,7 @@ export function createWslDockerRunner(options: WslDockerRunnerOptions = {}): Wsl
       spawn,
       command: argv[0] ?? '',
       args: argv.slice(1),
-      // The container/distro provides the real cwd (/work); on the host side we
-      // launch the wrapper from the mounted root.
+      // 容器/发行版内部提供真实 cwd(/work);宿主侧从挂载根启动 wrapper。
       cwd: ctx.trustedRoot,
       env: {
         ...(process.env.PATH ? { PATH: process.env.PATH } : {}),

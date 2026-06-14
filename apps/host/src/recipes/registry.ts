@@ -27,6 +27,8 @@ export type Recipe = {
   description: string;
   output: string;
   riskLevel: string;
+  /** 是否必须有可用来源材料才允许产出:true 时 0 可用来源会被 run-recipe 422 熔断(grounded 原则,防空壳交付物)。 */
+  requiresSources?: boolean;
   custom?: boolean;
   [key: string]: unknown;
 };
@@ -39,23 +41,26 @@ export type BuildRecipeOptions = {
   recipe?: Recipe | null;
 };
 
-const RECIPE_ROWS: [string, string, string, string, string][] = [
-  ['meeting-actions', '会议纪要转行动项', '从会议记录中提取结论、负责人、截止时间和待办清单。', 'Markdown + XLSX', 'safe-write'],
-  ['excel-cleaning', '表格清洗', '读取 CSV/XLSX，去空行、标记重复和缺失字段，生成清洗结果。', 'Markdown + XLSX', 'safe-write'],
-  ['reimbursement', '报销材料整理', '汇总发票、金额、供应商和缺失材料，生成报销清单。', 'CSV + Markdown', 'safe-write'],
-  ['folder-organize', '文件夹整理', '按类型和主题生成整理建议，默认只写计划不移动原文件。', 'Markdown', 'preview-only'],
-  ['contract-summary', '合同摘要', '提取合同主体、付款、续约、风险点和待确认事项。', 'Markdown', 'safe-write'],
-  ['feedback-clusters', '反馈聚类', '把用户反馈按主题、严重度和建议动作聚合。', 'Markdown', 'safe-write'],
-  ['summary-report', '总结报告', '把本地材料整理成结构化周报、项目总结或管理摘要。', 'Markdown + DOCX + PPTX + PDF', 'safe-write'],
-  ['email-draft', '邮件草稿', '基于本地上下文生成中文商务邮件草稿和附件清单。', 'Markdown', 'safe-write'],
+// 第六列 requiresSources:转换型配方(从既有材料提取/加工)必须有真实来源;
+// 生成型配方(folder-organize 看工作区、email-draft 可凭指令起草)允许无引用文件。
+const RECIPE_ROWS: [string, string, string, string, string, boolean][] = [
+  ['meeting-actions', '会议纪要转行动项', '从会议记录中提取结论、负责人、截止时间和待办清单。', 'Markdown + XLSX', 'safe-write', true],
+  ['excel-cleaning', '表格清洗', '读取 CSV/XLSX，去空行、标记重复和缺失字段，生成清洗结果。', 'Markdown + XLSX', 'safe-write', true],
+  ['reimbursement', '报销材料整理', '汇总发票、金额、供应商和缺失材料，生成报销清单。', 'CSV + Markdown', 'safe-write', true],
+  ['folder-organize', '文件夹整理', '按类型和主题生成整理建议，默认只写计划不移动原文件。', 'Markdown', 'preview-only', false],
+  ['contract-summary', '合同摘要', '提取合同主体、付款、续约、风险点和待确认事项。', 'Markdown', 'safe-write', true],
+  ['feedback-clusters', '反馈聚类', '把用户反馈按主题、严重度和建议动作聚合。', 'Markdown', 'safe-write', true],
+  ['summary-report', '总结报告', '把本地材料整理成结构化周报、项目总结或管理摘要。', 'Markdown + DOCX + PPTX + PDF', 'safe-write', true],
+  ['email-draft', '邮件草稿', '基于本地上下文生成中文商务邮件草稿和附件清单。', 'Markdown', 'safe-write', false],
 ];
 
-const RECIPES: Recipe[] = RECIPE_ROWS.map(([id, name, description, output, riskLevel]) => ({
+const RECIPES: Recipe[] = RECIPE_ROWS.map(([id, name, description, output, riskLevel, requiresSources]) => ({
   id,
   name,
   description,
   output,
   riskLevel,
+  requiresSources,
 }));
 
 function genericMarkdown(recipe: Recipe, prompt: unknown, sources: SourceLike[]): string {

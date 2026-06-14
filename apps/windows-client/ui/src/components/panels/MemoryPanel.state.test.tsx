@@ -23,7 +23,7 @@ describe('MemoryPanel state views', () => {
   it('renders the reusable empty state when there are no memories', () => {
     const html = renderToStaticMarkup(<MemoryPanel trustedRoot="C:/work" />);
 
-    // Copy was rewritten for non-technical users.
+    // 文案已改成面向非技术用户的说法。
     expect(html).toContain('还没记下任何东西');
     expect(html).toContain('Kimi');
     expect(html).toContain('state-view--empty');
@@ -59,7 +59,7 @@ describe('MemoryPanel state views', () => {
     const html = renderToStaticMarkup(<MemoryPanelSaveAction busy disabled onLearn={onLearn} />);
     const buttons = collectByType(MemoryPanelSaveAction({ busy: false, disabled: false, onLearn }), Button);
 
-    // Promoted to a primary CTA with friendlier label.
+    // 保存动作提升为主按钮,并使用更友好的标签。
     expect(html).toContain('ui-btn ui-btn--primary');
     expect(html).toContain('记着…');
     expect(html).toContain('disabled=""');

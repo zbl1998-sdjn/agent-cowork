@@ -1,5 +1,4 @@
-// Classic-script task context helpers. These functions keep prompt routing,
-// recipe inference, and safe file-summary reads out of the app.js entrypoint.
+// classic-script 任务上下文助手:把 prompt 路由、配方推断与安全文件摘要读取从 app.js 入口中拆出。
 (function () {
     function createTaskContext({ state, postJson, selectedRecipe, renderRecipes }) {
         function textCandidate(files) {

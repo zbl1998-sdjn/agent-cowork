@@ -4,6 +4,8 @@ import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md';
 
+export const PRIMARY_ACTION_BACKGROUND = '#b5482f';
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -29,7 +31,7 @@ const sizeStyles: Record<ButtonSize, CSSProperties> = {
 };
 
 const variantStyles: Record<ButtonVariant, CSSProperties> = {
-  primary: { background: 'var(--accent, #2563eb)', color: '#fff', borderColor: 'var(--accent, #2563eb)' },
+  primary: { background: `var(--primary-action-bg, ${PRIMARY_ACTION_BACKGROUND})`, color: '#fff', borderColor: `var(--primary-action-bg, ${PRIMARY_ACTION_BACKGROUND})` },
   secondary: { background: 'var(--surface, #fff)', color: 'var(--fg, #374151)', borderColor: 'var(--border, #d1d5db)' },
   ghost: { background: 'transparent', color: 'var(--fg, #374151)' },
   danger: { background: 'var(--danger, #b91c1c)', color: '#fff', borderColor: 'var(--danger, #b91c1c)' },
@@ -60,7 +62,7 @@ export function Button({
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Required accessible label for the icon-only button. */
+  /** 图标按钮必须提供的无障碍标签。 */
   label: string;
   size?: ButtonSize;
   children?: ReactNode;

@@ -39,7 +39,7 @@ export function subscribeRunEvents(runId: string, onEvent: (event: RunEvent) => 
         if (RUN_EVENT_TYPES.has(type)) onEvent({ type, ...data } as RunEvent);
       });
     } catch {
-      /* aborted or host unreachable */
+      /* 订阅被取消或 host 暂不可达 */
     }
   })();
   return () => controller.abort();

@@ -386,7 +386,8 @@ try {
         value = "sidecar write chain persisted"
     }
     $runHeaders = @{ authorization = "Bearer $($guest.token)"; "idempotency-key" = "installed-sqlite-run" }
-    $recipeRun = Invoke-Json -Uri "$baseUrl/api/recipes/meeting-actions/run" -Method POST -Headers $runHeaders -Body @{
+    # 持久化 smoke 用不需来源的配方(folder-organize):meeting-actions 等转换型配方要求来源材料,空 files 会被 422 熔断。
+    $recipeRun = Invoke-Json -Uri "$baseUrl/api/recipes/folder-organize/run" -Method POST -Headers $runHeaders -Body @{
         prompt = "安装版 SQLite smoke"
         files = @()
     }

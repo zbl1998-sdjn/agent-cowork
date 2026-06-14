@@ -1,5 +1,15 @@
 // ComposerActions(UI · components):输入框动作区——发送/停止按钮与工具开关(联网、沙箱等)。纯展示+回调。
+import type { CSSProperties } from 'react';
+
 import { Button } from './ui/Button';
+
+export const SEND_BUTTON_BACKGROUND = '#b5482f';
+
+export const SEND_BUTTON_STYLE: CSSProperties = {
+  background: `var(--send-button-bg, ${SEND_BUTTON_BACKGROUND})`,
+  borderColor: `var(--send-button-bg, ${SEND_BUTTON_BACKGROUND})`,
+  color: '#fff',
+};
 
 export function ComposerToolActions({
   listening,
@@ -29,7 +39,7 @@ export function ComposerToolActions({
 
 export function ComposerSendAction({ refining, onSend }: { refining: boolean; onSend: () => void }) {
   return (
-    <Button variant="primary" className="send-button" disabled={refining} onClick={onSend}>
+    <Button variant="primary" className="send-button" style={SEND_BUTTON_STYLE} disabled={refining} onClick={onSend}>
       发送
     </Button>
   );

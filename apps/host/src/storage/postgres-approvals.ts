@@ -5,19 +5,6 @@
 //       request() 保持同步(本地生成 id + fire-and-forget INSERT),不需改造 agent 循环。
 // 依赖:仅标准库(crypto);pg 运行时按需 import。后端:PostgreSQL。
 // 导出:PostgresApprovalStore(类) · createPostgresApprovalStore(工厂)。
-//
-// Cross-instance approval store backed by PostgreSQL + LISTEN/NOTIFY.
-//
-// The in-memory registry only works within one process. To run the host behind
-// a load balancer (P2), a pending approval requested on instance A must be
-// resolvable by a POST that lands on instance B. This store persists pending
-// requests in a table and uses LISTEN/NOTIFY as the cross-instance pub/sub: the
-// resolving instance UPDATEs the row + NOTIFY; every instance LISTENs and, if it
-// holds the awaiting promise locally, resolves it.
-//
-// `request()` stays SYNCHRONOUS (id generated locally, INSERT fire-and-forget),
-// so the agent loop's call sites need no async migration; only resolve/respond/
-// cancelByRun/pendingCount are async (called from the HTTP route, which awaits).
 import crypto from 'node:crypto';
 
 type PgNotification = { payload?: string | null };
@@ -81,14 +68,13 @@ export class PostgresApprovalStore {
   private _started: boolean;
 
   constructor({ client = null, pool = null, connectionString = null, channel = 'kcw_approvals', generateId = defaultId, pg = null }: PostgresApprovalStoreOptions = {}) {
-    // `client` is the dedicated LISTEN connection; `pool` runs queries. In tests
-    // a single mock object can serve as both.
+    // client 是专用 LISTEN 连接,pool 负责查询;测试里可用同一个 mock 同时扮演两者。
     this._client = client;
     this._pool = pool || client;
     this._connectionString = connectionString;
     this._pg = pg;
     this._channel = safePgIdentifier(channel);
-    this._local = new Map(); // id -> { resolve, meta } for promises awaited on THIS instance
+    this._local = new Map(); // id -> { resolve, meta },仅保存本实例正在等待的 promise。
     this._generateId = generateId;
     this._started = false;
   }
@@ -141,8 +127,7 @@ export class PostgresApprovalStore {
     let resolve: ApprovalResolve = () => undefined;
     const promise = new Promise<unknown>((r) => { resolve = r; });
     this._local.set(id, { resolve, meta });
-    // Persist so another instance can resolve it; fire-and-forget (id is already
-    // known, so the local resolver works regardless of insert latency).
+    // 持久化后其它实例也能解析;INSERT fire-and-forget,本地已知 id 不受写入延迟影响。
     Promise.resolve(this._getPool()).then((pool) => pool.query(
       `INSERT INTO pending_approvals (id, run_id, tenant_id, kind, status, created_at)
        VALUES ($1, $2, $3, $4, 'pending', NOW())`,
@@ -167,7 +152,7 @@ export class PostgresApprovalStore {
     if (rowMatched) {
       await pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
     }
-    // Local fast-path (same instance also awaiting).
+    // 本地快路径:发起审批的同一实例也在等待。
     const local = this._local.get(id);
     const localMatched = !!(local && sameTenant(local.meta, context));
     if (localMatched) { this._local.delete(id); local.resolve(decision); }
@@ -221,8 +206,6 @@ export class PostgresApprovalStore {
     return Number((row && row.count) || 0);
   }
 
-  // Expire abandoned pending rows (cron-style sweep) so the table never grows
-  // unbounded; locally resolves any matching awaiter with 'reject'.
   /** 清理超 TTL 的遗留 pending 行(置 expired),并本地以 reject 唤醒对应 awaiter。 */
   async prune(ttlMs = 15 * 60 * 1000): Promise<number> {
     const pool = await this._getPool();

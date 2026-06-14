@@ -101,7 +101,7 @@ export async function runKimiApiChatStream({
       headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
-        // Prepend env/date grounding so simple chat answers time-sensitive questions correctly.
+        // 简单 chat 也前置 env/date grounding,确保时间敏感问题按真实环境回答。
         messages: systemMessage
           ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
           : [{ role: 'user', content: apiPrompt }],

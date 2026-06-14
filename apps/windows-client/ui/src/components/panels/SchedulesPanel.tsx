@@ -21,15 +21,13 @@ export function SchedulesPanelStateViews({ error, onRetry }: { error: string; on
   );
 }
 
-// One row per scheduled task. The label, status chip and time line all go
-// through the humanize-* helpers so non-technical users see "每天 09:00 · 下次
-// 今天 09:00 · 运行中" instead of raw cron + ISO timestamps.
+// 每个定时任务一行;名称、状态徽标和时间线都走 humanize-* 辅助函数,
+// 让非技术用户看到"每天 09:00 · 下次 今天 09:00 · 运行中",而不是原始 cron/ISO 时间。
 export function SchedulePanelItem({ item, onCancel }: { item: ScheduleItem; onCancel: (id: string) => void }) {
   const when = humanizeScheduleLine(item);
   const status = humanizeScheduleStatus(item.status);
   const askCancel = () => {
-    // Tiny confirm step so a misclick on a long-running schedule (e.g. daily
-    // briefing the user actually relies on) doesn't silently nuke it.
+    // 轻量二次确认:避免误点把用户依赖的长期任务直接删掉。
     const friendlyName = item.name || '这个任务';
     if (window.confirm(`确定要删掉「${friendlyName}」吗?之后想再开,需要重新让 Kimi 安排一次。`)) {
       onCancel(item.id);
@@ -47,8 +45,7 @@ export function SchedulePanelItem({ item, onCancel }: { item: ScheduleItem; onCa
   );
 }
 
-// Lists scheduled tasks the agent (or user) created via the host scheduler, with
-// one-click cancel. Mirrors Claude Cowork's "schedule this each morning" surface.
+// 列出 Agent 或用户经 host 调度器创建的定时任务,并提供一键取消入口。
 export function SchedulesPanel() {
   const [items, setItems] = useState<ScheduleItem[]>([]);
   const [error, setError] = useState('');

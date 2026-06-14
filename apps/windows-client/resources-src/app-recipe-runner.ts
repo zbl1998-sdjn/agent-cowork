@@ -1,5 +1,4 @@
-// Classic-script recipe runner. It owns template execution and preview setup;
-// app.js only decides when a prompt should enter this path.
+// classic-script 配方运行器:负责模板执行与预览准备;app.js 只判断 prompt 何时进入该路径。
 (function () {
   function createRecipeRunner({
     state,
@@ -85,8 +84,7 @@
       const firstOutput = preview.operations[0]?.path?.replace(state.workspace, ".") || ".AgentCowork/artifacts";
       setArtifact(`${recipe.name} 已生成 ${preview.operations.length} 个操作；来源：${sourceCopy}${sourceExcerpt ? `；摘要：${sourceExcerpt}` : ""}`, firstOutput);
       setRunChip(`模板任务 · ${shortRunId(result.runId)}`, "ready");
-      // Prefer the authoritative SSE timeline; fall back to a synchronous summary
-      // when EventSource is unavailable (older webview).
+      // 优先采用权威 SSE 时间线;旧 WebView 无法订阅时退回同步摘要。
       const streamed = subscribeRunEvents(message, result.runId, { state, scrollConversationToEnd });
       if (!streamed) {
         addProgressLines(message, [

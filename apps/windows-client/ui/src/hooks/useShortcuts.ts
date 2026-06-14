@@ -3,11 +3,9 @@
 // 职责:注册全局键盘快捷键(发送、新建会话、聚焦输入、停止等)并在卸载时清理,集中管理避免散落各组件。依赖:无。
 import { useEffect } from 'react';
 
-// Keyboard shortcut registry (05-B2 frontend foundation).
-// The matching core (parseBinding / matchShortcut) is pure and fully testable
-// without a DOM. `useShortcuts` is a thin hook that binds a map of
-// "binding -> handler" to keydown. Bindings look like "ctrl+k", "mod+shift+p",
-// "escape". "mod" matches Ctrl on Windows/Linux and Cmd on macOS.
+// 快捷键注册表:parseBinding/matchShortcut 是无 DOM 的纯核心,可完整单测。
+// useShortcuts 只是把 "binding -> handler" 映射绑定到 keydown;binding 形如
+// "ctrl+k"、"mod+shift+p"、"escape";"mod" 在 Windows/Linux 上匹配 Ctrl,在 macOS 上匹配 Cmd。
 
 export interface ShortcutEvent {
   key: string;
@@ -54,7 +52,7 @@ export function matchShortcut(event: ShortcutEvent, binding: string): boolean {
   if (b.alt !== alt) return false;
 
   if (b.mod) {
-    // "mod" accepts either Ctrl (Win/Linux) or Cmd (macOS).
+    // "mod" 跨平台匹配 Ctrl(Win/Linux)或 Cmd(macOS)。
     return ctrl || meta;
   }
   return b.ctrl === ctrl && b.meta === meta;

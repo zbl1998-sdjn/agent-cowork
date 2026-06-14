@@ -2,6 +2,7 @@ package domain
 
 import "testing"
 
+// 领域 ID 使用固定 26 位 ULID 形状,保证未来按字符串排序时仍具备时间局部性。
 func TestNewIDProducesSortableULIDShape(t *testing.T) {
 	first := MustNewID()
 	second := MustNewID()
@@ -16,6 +17,7 @@ func TestNewIDProducesSortableULIDShape(t *testing.T) {
 	}
 }
 
+// BaseEntity 必须携带租户、用户、trace 与版本字段,这是多租户审计和乐观演进的基础。
 func TestBaseEntityCarriesScaleFields(t *testing.T) {
 	tenantID := MustNewID()
 	userID := MustNewID()

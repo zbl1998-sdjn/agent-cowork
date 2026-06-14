@@ -38,6 +38,7 @@ export type DataProfile = {
 export { readDataTable } from './table.js';
 
 /**
+ * 宽松解析数值单元格;带逗号的金额/计数会先去逗号再判断。
  */
 function numberValue(value: unknown): number | null {
   if (value === '') return null;
@@ -48,6 +49,7 @@ function numberValue(value: unknown): number | null {
 }
 
 /**
+ * 只接受明显的 YYYY-MM-DD / YYYY/MM/DD 日期形态,避免普通数字被误判为日期。
  */
 function dateValue(value: unknown): number | null {
   if (!value || !/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(String(value))) return null;
@@ -56,6 +58,7 @@ function dateValue(value: unknown): number | null {
 }
 
 /**
+ * 根据非空样本的命中数量推断列类型;混合列保留为 mixed。
  */
 function inferType(values: string[], numericCount: number, dateCount: number, booleanCount: number): string {
   const filled = values.length;
@@ -68,6 +71,7 @@ function inferType(values: string[], numericCount: number, dateCount: number, bo
 }
 
 /**
+ * 生成单列画像:类型、缺失、去重、样本、高频值以及可选数值摘要。
  */
 function profileColumn(rows: string[][], headers: string[], index: number): DataColumnProfile {
   const counts = new Map<string, number>();
@@ -123,6 +127,7 @@ function profileColumn(rows: string[][], headers: string[], index: number): Data
 }
 
 /**
+ * 根据列类型给出最多 3 个图表建议,只做启发式排序。
  */
 function chartSuggestions(columns: DataColumnProfile[]): DataChartSuggestion[] {
   const textLike = columns.find((column) => column.type === 'text' && column.unique > 1 && column.unique <= 50);
@@ -142,6 +147,7 @@ function chartSuggestions(columns: DataColumnProfile[]): DataChartSuggestion[] {
 }
 
 /**
+ * 生成人类可读的小结文本,供 profile 结果和后续报告复用。
  */
 function buildReport({
   name,

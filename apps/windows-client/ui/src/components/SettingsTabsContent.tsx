@@ -6,8 +6,7 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
 import type { SettingsTab } from './settings-types';
 
-// Lazy-load the heavy runtime / updates sub-panels so opening Settings on the
-// account tab doesn't drag their bundles in. Mirrors the original Settings.tsx.
+// 懒加载较重的运行时/更新子面板,避免打开账户标签时把这些 bundle 一起拖进来。
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((m) => ({ default: m.RuntimeDependenciesPanel })));
 const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((m) => ({ default: m.UpdatePanel })));
 
@@ -18,9 +17,8 @@ const MODEL_PROVIDERS = [
   { value: 'openai/local', label: '本机 / 自建(高级)' },
 ];
 
-// Commonly used Kimi models. Free-form input still allowed so the user can
-// paste any model id their provider exposes — the datalist is just a quick
-// pick to spare non-technical users from typing "kimi-k2-0905-preview".
+// 常用 Kimi 模型列表;输入框仍允许自由填写 provider 暴露的任意模型 id。
+// datalist 只是给非技术用户一个快捷选择。
 const COMMON_KIMI_MODELS = [
   'kimi-k2-0905-preview',
   'kimi-latest',
@@ -81,10 +79,8 @@ export interface SettingsTabsContentProps {
   savedTip: string;
 }
 
-// Pure presentational body of the settings modal — one branch per tab,
-// followed by the shared error/saved-tip strip. Extracted from Settings.tsx
-// so the parent stays under the file-size soft limit and so each tab body
-// is easy to find / iterate on without scrolling past the state plumbing.
+// 设置模态框的纯展示正文:每个标签一个分支,尾部共享错误/保存提示。
+// 从 Settings.tsx 拆出后,父组件控制状态,这里专注标签内容迭代。
 export function SettingsTabsContent(props: SettingsTabsContentProps) {
   const {
     tab,

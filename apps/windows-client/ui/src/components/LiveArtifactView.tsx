@@ -165,10 +165,8 @@ export function LiveArtifactView({
   const onCopyData = async () => { if (await copyToClipboard(dataUrl)) flashCopied('data'); };
   const onDownloadHtml = () => downloadHtml(srcDoc);
 
-  // CSS-only zoom: outer wrapper bounds the viewport; the inner box reserves
-  // `100% * zoom` so the wrapper scrolls when zoom > 1; the iframe is sized
-  // `100% / zoom` then scaled, so at zoom=1 nothing changes — exact math, no
-  // empty space at <1, scrollbars at >1, content untouched.
+  // 纯 CSS 缩放:外层限定视口,内层预留 `100% * zoom`;zoom > 1 时由外层滚动。
+  // iframe 自身设为 `100% / zoom` 再 scale,因此 100% 时不变、缩小时不留空、放大时有滚动条。
   const innerPct = `${(zoom * 100).toFixed(2)}%`;
   const framePct = `${(100 / zoom).toFixed(4)}%`;
 

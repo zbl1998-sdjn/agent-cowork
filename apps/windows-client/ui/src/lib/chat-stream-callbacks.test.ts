@@ -66,12 +66,40 @@ describe('buildChatStreamCallbacks', () => {
     expect(getState().usage?.total_tokens).toBe(42);
   });
 
+  it('onDone marks leftover plan todos done so the checklist does not stay stuck at 待处理', () => {
+    const { cb, getState } = makeHarness('plan');
+    cb.onTodoSnapshot?.([
+      { id: 'plan-1', text: '提取合同要点', status: 'pending', kind: 'plan' },
+      { id: 'plan-2', text: '汇总发票数据', status: 'pending', kind: 'plan' },
+      { id: 'tool-1-Write', text: '调用 Write', status: 'done', kind: 'tool' },
+    ]);
+    cb.onDone?.({ text: '完成。' });
+    const todos = getState().todos!;
+    expect(todos.find((t) => t.id === 'plan-1')!.status).toBe('done');
+    expect(todos.find((t) => t.id === 'plan-2')!.status).toBe('done');
+    expect(todos.find((t) => t.id === 'tool-1-Write')!.status).toBe('done');
+  });
+
   it('onCancelled uses friendly fallback text when no body was streamed', () => {
     const { cb, getState, setStreamingId } = makeHarness();
     cb.onCancelled?.({ text: '' });
     expect(setStreamingId).toHaveBeenCalledWith(null);
     expect(getState().status).toBe('cancelled');
     expect(getState().text).toContain('已取消本轮运行');
+  });
+
+  it('onCancelled clears parked approval/plan/question and marks running tools cancelled', () => {
+    const { cb, getState } = makeHarness('execute');
+    cb.onToolCall?.('Shell', { command: 'dir' });
+    cb.onApprovalRequest?.('appr-9', 'Shell', undefined);
+    cb.onPlanProposed?.('plan-1', '步骤一');
+    cb.onQuestion?.('q-1', '继续吗?', []);
+    cb.onCancelled?.({ text: '' });
+    const state = getState();
+    expect(state.approval).toBeUndefined();
+    expect(state.plan).toBeUndefined();
+    expect(state.question).toBeUndefined();
+    expect(state.tools?.[0]?.status).toBe('cancelled');
   });
 
   it('onError marks the message failed with the raw error string', () => {
@@ -89,9 +117,8 @@ describe('buildChatStreamCallbacks', () => {
   });
 
   it('onApprovalRequest in YOLO mode auto-approves without parking the request', () => {
-    // The hook fires respondApproval via a fire-and-forget void. We just assert
-    // that no approval pile-up happens on the message — the API client call is
-    // tested separately.
+    // hook 通过 fire-and-forget 的 void 调用 respondApproval;这里仅断言消息上不会堆积审批,
+    // API 客户端调用由独立测试覆盖。
     const { cb, getState } = makeHarness('yolo');
     cb.onApprovalRequest?.('appr-1', 'Bash', undefined);
     expect(getState().approval).toBeUndefined();

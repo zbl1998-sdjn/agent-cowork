@@ -1,5 +1,4 @@
-// Classic-script Kimi runner. It owns API calls and degradation messages while
-// app.js keeps the surrounding conversation/workbench orchestration.
+// classic-script Kimi 运行器:负责 API 调用与降级文案;app.js 负责外围对话/工作台编排。
 (function () {
     function createKimiRunner({ state, postJson, setRunChip, setStatus, shortRunId }) {
         async function tryKimiApiPlan(prompt, summary) {

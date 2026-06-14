@@ -59,7 +59,7 @@ function runKimiCliText({
     throw new Error('argsBuilder is required');
   }
 
-  // Use a temp work-dir so Kimi CLI does not resume a previous session.
+  // 使用临时工作目录,避免 Kimi CLI 续接上一轮会话状态。
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-kimi-'));
   const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, memory, maxSteps, model });
 

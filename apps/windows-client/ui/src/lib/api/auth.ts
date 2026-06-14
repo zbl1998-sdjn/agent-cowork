@@ -47,7 +47,7 @@ export async function logout(): Promise<void> {
   try {
     await postJson('/api/auth/logout', {});
   } catch {
-    /* best-effort: clear locally regardless */
+    /* 登出尽力而为;无论远端是否成功都清理本地 token */
   }
   setAuthToken(null);
 }

@@ -113,6 +113,6 @@ export function recordAgentRun(options: unknown): void {
     const runPath = writeRunRecord(runStoreRoot, record);
     runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
   } catch {
-    // Recording is diagnostic; never break the response on record/index failure.
+    // 记录仅用于诊断;run 记录或索引失败不能打断主响应。
   }
 }

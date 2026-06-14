@@ -3,14 +3,6 @@
 // 职责:受控地抓取一个 http(s) 网址,返回「限长」文本体(供联网研究)。校验协议、
 //       施加超时与字节上限,默认通过 ssrf-guard 拦截内网/回环/私网地址,并对每一跳
 //       重定向重新校验(防 302 跳转绕过)。依赖:同层 ssrf-guard。导出:webFetch。
-//
-// web.fetch — a deliberate outbound HTTP tool for "research" tasks.
-//
-// Unlike the sandbox (network off by default), this is an explicit networked
-// capability: callers ask for a URL and get back a size-capped text body. It
-// validates the scheme, enforces a timeout and byte cap, and (by default) blocks
-// internal/loopback/private hosts — resolving names to real IPs and re-checking
-// every redirect hop so a 302 → internal address can't bypass the guard.
 import { assertPublicHost } from './ssrf-guard.js';
 import { parseWebFetchOptions } from './web-tool-inputs.js';
 import { omitUndefined } from '../util/object.js';
@@ -77,8 +69,7 @@ export async function webFetch(options: WebFetchOptions = {}): Promise<WebFetchR
   const timer = setTimeout(() => controller.abort(), budget);
   let response: WebFetchResponse | undefined;
   try {
-    // Follow redirects manually so each hop's host is re-validated by the SSRF
-    // guard — `redirect: 'follow'` would silently chase a 302 to an internal IP.
+    // 手动跟随重定向,确保每一跳都重新过 SSRF 校验;redirect:follow 会静默追到内网地址。
     for (let hop = 0; ; hop += 1) {
       response = await fetchImpl(parsed.href, { signal: controller.signal, redirect: 'manual' });
       const status = Number(response.status) || 0;
@@ -100,9 +91,9 @@ export async function webFetch(options: WebFetchOptions = {}): Promise<WebFetchR
       if (!allowInternal) {
         await assertPublicHost(next.hostname, omitUndefined({ lookupImpl }));
       }
-      // Free the redirect response's socket before chasing the next hop.
+      // 追下一跳前释放当前重定向响应的 socket。
       if (typeof response.arrayBuffer === 'function') {
-        try { await response.arrayBuffer(); } catch { /* ignore */ }
+        try { await response.arrayBuffer(); } catch { /* body 读取失败时仍按 HTTP 错误返回 */ }
       }
       parsed = next;
     }

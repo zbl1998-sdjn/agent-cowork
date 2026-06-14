@@ -3,18 +3,6 @@
 // 职责:按租户的 HTTP 限流(令牌桶):每租户一个以 ratePerSec 回填、上限 burst 的桶,取不到令牌即拒绝并给
 //       Retry-After。允许短时突发(体验好)同时约束持续速率(防洪)。与 concurrency.js(限并发流数)互补。
 // 可扩展:状态在进程内,多实例可换共享存储(Redis)。依赖:无。导出:限流器工厂。
-//
-// Per-tenant HTTP rate limiter (gap #1). concurrency.js caps how many agent
-// streams run *at once*; this caps how many requests a tenant may make *per
-// second*, which is the missing protection against request floods / abusive
-// clients at the HTTP layer.
-//
-// Algorithm: token bucket. Each tenant gets a bucket that refills at `ratePerSec`
-// up to `burst`. A request takes one token; if the bucket is empty the request is
-// rejected with a Retry-After hint. Token buckets allow short bursts (good UX)
-// while bounding the sustained rate (good protection). State is in-process — a
-// multi-instance deployment would back this with a shared store (Redis), same as
-// the concurrency limiter (see docs/01-scalability).
 
 type RateBucket = { tokens: number; last: number };
 export type RateLimitOptions = {
@@ -43,19 +31,19 @@ export function createRateLimiter({
     bucket.last = t;
   }
 
-  // Evict an idle (full) bucket when the map grows too large, so a flood of
-  // distinct tenant ids can't grow memory without bound.
+  // 租户桶过多时优先淘汰已满的空闲桶,防止大量伪 tenantId 撑爆内存。
   function evictIfNeeded(): void {
     if (buckets.size <= maxTenants) return;
     for (const [key, b] of buckets) {
       if (b.tokens >= burst) { buckets.delete(key); return; }
     }
-    // Fallback: drop the oldest-touched bucket.
+    // 没有空闲桶时退而求其次淘汰最久未触碰的桶。
     const oldest = [...buckets.entries()].sort((a, b) => a[1].last - b[1].last)[0];
     if (oldest) buckets.delete(oldest[0]);
   }
 
   /**
+   * 尝试消耗令牌并返回允许/拒绝决策;拒绝时带 Retry-After 秒数。
    */
   function take(tenantId = 'tenant_local', cost = 1): RateLimitDecision {
     const t = now();

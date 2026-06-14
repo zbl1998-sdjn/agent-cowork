@@ -170,16 +170,14 @@ export function openSqliteDatabase(dbPath: string): SqliteDatabase {
   ensureDirSync(path.dirname(dbPath));
   const Database = loadDatabaseSync();
   const db = new Database(dbPath);
-  // foreign_keys: integrity. WAL: concurrent readers + a single writer don't
-  // block each other (much better under load). busy_timeout: wait instead of
-  // immediately throwing SQLITE_BUSY when another connection holds the lock.
+  // foreign_keys 保证引用完整性;WAL 让读者与单写者更少互相阻塞;busy_timeout 避免锁被占用时立刻 SQLITE_BUSY。
   db.exec('PRAGMA foreign_keys = ON');
   try {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA busy_timeout = 5000');
     db.exec('PRAGMA synchronous = NORMAL');
   } catch {
-    // Some VFS/backends don't support WAL — degrade gracefully to defaults.
+    // 某些 VFS/后端不支持 WAL,此时优雅降级为默认日志模式。
   }
   return db;
 }
@@ -220,7 +218,7 @@ export function migrateSqliteDatabase(
       try {
         db.exec('ROLLBACK');
       } catch {
-        // ignore rollback failure; original error is more useful
+        // 回滚失败信息不如原始迁移错误有用,这里忽略。
       }
       throw err;
     }

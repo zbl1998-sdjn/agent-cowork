@@ -66,7 +66,7 @@ type LiveArtifactManifest = {
 /** 构建一份实时制品:规格化 spec → 试渲染校验 → 写出活页 HTML 与 manifest,返回落盘路径与 dataUrl。 */
 export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource }: BuildLiveArtifactOptions): BuiltLiveArtifact {
   const spec = normalizeLiveArtifactSpec(omitUndefined({ id, title, viz, dataUrl, dataSource }));
-  // Validate the viz spec by rendering it once (throws 400 on bad kind/data).
+  // 先渲染一次校验 viz 规格;类型或数据不合法会抛 400。
   renderViz(spec.viz);
   if (spec.dataSource?.type === 'file-json') {
     resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });

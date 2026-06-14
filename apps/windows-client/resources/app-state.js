@@ -1,4 +1,4 @@
-// Classic-script state defaults live here so app.js stays a thin composition root.
+// 传统 script 的默认状态集中在这里,让 app.js 保持薄编排根。
 (function () {
     const placeholders = {
         chat: "今天想让 Kimi 做什么？",

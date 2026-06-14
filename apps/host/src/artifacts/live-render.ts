@@ -51,8 +51,7 @@ function libTag(kind: unknown): string {
   return '';
 }
 
-// The client-side renderer shared by the snapshot + every refresh. Builds the
-// DOM with text nodes / Chart.js so artifact data is never injected as HTML.
+// 客户端渲染器由快照与每次刷新共用;只用文本节点/Chart.js 构建 DOM,制品数据绝不当 HTML 注入。
 const CLIENT_RENDERER = `
         var chart = null;
         function clearRoot(root) { while (root.firstChild) { root.removeChild(root.firstChild); } if (chart) { chart.destroy(); chart = null; } }

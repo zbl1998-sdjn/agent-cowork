@@ -70,6 +70,18 @@ export function activeConversationMessages(conversation: Conversation): Message[
   return branches.find((branch) => branch.id === activeBranchId)?.messages || conversation.messages || [];
 }
 
+// 异步补水(切会话后从 host 拉全文)落地前的守卫:迟到的结果只在
+// 「用户仍停留在当初请求的那个会话、且当前视图还是空」时才允许写入视图。
+// 否则(已新建/切到别的会话、或期间已产生消息)直接丢弃——迟到补水一旦写入,
+// 会把旧会话消息灌进当前会话,并被回写 effect 持久化成串话数据。
+export function shouldApplyHydratedMessages({ requestedId, activeConvId, currentMessageCount }: {
+  requestedId: string;
+  activeConvId: string;
+  currentMessageCount: number;
+}): boolean {
+  return requestedId === activeConvId && currentMessageCount === 0;
+}
+
 export function updateActiveConversationMessages(conversation: Conversation, messages: Message[]): Conversation {
   const { activeBranchId, branches } = normalizeConversationBranches(conversation);
   const nextBranches = branches.map((branch) => (

@@ -57,11 +57,13 @@ test('runRecipe produces operations, run record, events, and indexes the run', (
   const runsIndex = new RunsIndex({ indexRoot: path.join(trustedRoot, '.AgentCowork', 'index') });
 
   const recipeId = firstRecipeId();
+  const sourcePath = path.join(trustedRoot, 'meeting.md');
+  fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同，负责人张三，本周五截止\n', 'utf8');
   const result = runRecipe({
     recipeId,
     trustedRoot,
     prompt: '测试运行',
-    files: [],
+    files: [sourcePath],
     context: { tenantId: 'tenant_alice', userId: 'user_alice', traceId: 'trace_1' },
     runStoreRoot,
     runEvents,
@@ -111,13 +113,46 @@ test('runRecipe throws 404 for unknown recipe', () => {
   );
 });
 
+test('runRecipe blocks source-dependent recipes when no usable sources (422 grounded guard)', () => {
+  const trustedRoot = tempRoot();
+  const runStoreRoot = path.join(trustedRoot, '.AgentCowork', 'runs');
+
+  // 转换型配方:0 来源必须熔断,且失败 run 仍要落盘(可审计)。
+  assert.throws(
+    () => runRecipe({ recipeId: 'meeting-actions', trustedRoot, prompt: '把会议纪要整理', files: [], runStoreRoot }),
+    (err: unknown) => {
+      const error = err as Error & { statusCode?: number; payload?: { runId?: string } };
+      assert.equal(error.statusCode, 422);
+      assert.match(error.message, /引用文件/);
+      assert.ok(error.payload?.runId, 'failed run is still recorded with a runId');
+      return true;
+    },
+  );
+  assert.ok(fs.readdirSync(runStoreRoot).length >= 1, 'failed run record written to run store');
+
+  // 引用了文件但全部不可读(空文件):同样视为 0 可用来源,熔断。
+  const emptyPath = path.join(trustedRoot, 'empty.md');
+  fs.writeFileSync(emptyPath, '   \n', 'utf8');
+  assert.throws(
+    () => runRecipe({ recipeId: 'meeting-actions', trustedRoot, prompt: 'x', files: [emptyPath], runStoreRoot }),
+    /可用 0 个/,
+  );
+
+  // 生成型配方(email-draft)不依赖来源,0 来源仍可运行——对照组。
+  const ok = runRecipe({ recipeId: 'email-draft', trustedRoot, prompt: '草拟一封跟进邮件', files: [], runStoreRoot });
+  assert.equal(ok.ok, true);
+});
+
 test('runRecipe works without runEvents/runsIndex (events still numbered locally)', () => {
   const trustedRoot = tempRoot();
   const recipeId = firstRecipeId();
+  const sourcePath = path.join(trustedRoot, 'meeting.md');
+  fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同\n', 'utf8');
   const result = runRecipe({
     recipeId,
     trustedRoot,
     prompt: 'no deps',
+    files: [sourcePath],
     runStoreRoot: path.join(trustedRoot, '.AgentCowork', 'runs'),
   });
   assert.equal(result.ok, true);

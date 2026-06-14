@@ -54,7 +54,7 @@ export function RuntimeDependenciesPanelView({
           {status === 'loading' ? '检测中…' : '刷新'}
         </Button>
       </div>
-      <p className="panel-intro panel-intro--inline">Kimi 用到的本地组件。<strong>核心异常</strong>必须装上才能正常用;<strong>可选待补</strong>装上能解锁更多能力(数据分析、浏览器自动化、字体等)。缺失项右边会出现「📥 下载安装」按钮。</p>
+      <p className="panel-intro panel-intro--inline">Kimi 用到的本地组件。<strong>核心异常</strong>必须装上才能正常用;<strong>可选待补</strong>装上能解锁更多能力(数据分析、浏览器自动化、字体等)。缺失项右边会出现「📥 打开下载页」按钮(在浏览器打开官方下载页,下载安装由你手动完成)。</p>
 
       {status === 'loading' && !vm && <div className="modal-loading">正在读取依赖状态…</div>}
       {error && <div className="auth-error" role="alert">{error}</div>}
@@ -114,7 +114,7 @@ export function RuntimeDependenciesPanelView({
                               onClick={() => { if (item.sourceUrl) window.open(item.sourceUrl, '_blank'); }}
                               title={`在浏览器里打开下载页:${item.sourceUrl}`}
                             >
-                              {`${ICONS.DOWNLOAD} 下载安装`}
+                              {`${ICONS.DOWNLOAD} 打开下载页`}
                             </Button>
                           )}
                         </div>
@@ -127,7 +127,7 @@ export function RuntimeDependenciesPanelView({
           </div>
 
           <p className="modal-note">
-            缺失/降级项右边的「📥 下载安装」按钮会在浏览器里打开对应组件的下载页;清理/更新按钮预览计划后,你确认才会执行。
+            缺失/降级项右边的「📥 打开下载页」按钮会在浏览器里打开对应组件的官方下载页(下载安装需你手动完成);清理/更新按钮预览计划后,你确认才会执行。
           </p>
         </>
       )}

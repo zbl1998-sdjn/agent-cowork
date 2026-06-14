@@ -12,10 +12,8 @@ import { buildEnvBlock } from './system-prompt.js';
 import { resolveAgentEnvFacts } from './agent-env.js';
 import type { RequestContext } from '../http/middleware/common.js';
 
-// SSE streaming chat with cancellation support: opens text/event-stream, emits
-// `start`, a `token` frame per delta, then `done` (or `cancelled`/`error`), and
-// records a kimi-chat run. The model call is an injectable streamRunner; an
-// optional cancellation registry lets POST /api/runs/:id/cancel interrupt it.
+// SSE 简单聊天支持取消:打开 text/event-stream,按 delta 发送 token,最后发 done/cancelled/error。
+// 模型调用由可注入 streamRunner 提供;可选 cancellation registry 让 /api/runs/:id/cancel 中断流。
 
 type StreamResponse = {
   write(chunk?: string | Buffer): unknown;
@@ -128,15 +126,12 @@ export async function streamChat({
     try {
       runsIndex.upsert(summariseRunForIndex({ ...base, runPath }, requestContext), requestContext);
     } catch {
-      // index failure must not break the stream
+      // 索引失败不能打断 SSE 流。
     }
     return String(runPath);
   };
 
-  // Stamp a system message with today's real-world date / cwd / OS / model so
-  // chat mode (the simple non-agent endpoint) also gets the env-block grounding
-  // that agent mode picks up via buildSystemPrompt. Without this, "今天几号"
-  // would fall back to the model's training cutoff (Kimi K2: 2024-end).
+  // 简单 chat 端点也注入今天日期/cwd/OS/model 的 env 块,避免「今天几号」落回模型训练截止时间。
   const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
   const systemMessage = buildEnvBlock(envFacts).join('\n');
 

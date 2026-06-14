@@ -46,8 +46,7 @@ function cleanPathPart(part: unknown): string {
   return value;
 }
 
-// Active-content extensions that could execute or run script if later opened by
-// the user from the workspace. Uploads are data, not programs — reject these.
+// 会执行代码或脚本的活动内容扩展名;上传入口只接收数据文件,不接收可执行程序。
 const BLOCKED_UPLOAD_EXTENSIONS = new Set([
   '.exe', '.com', '.scr', '.msi', '.bat', '.cmd', '.ps1', '.psm1', '.vbs', '.vbe',
   '.js', '.jse', '.wsf', '.wsh', '.hta', '.jar', '.lnk', '.reg', '.dll', '.sh',

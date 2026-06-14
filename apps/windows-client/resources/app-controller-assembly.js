@@ -1,10 +1,17 @@
-// Controller assembly documents the browser resource dependency graph in one place.
+// 浏览器资源层的控制器装配根(resources · UI 运行时组装)
+// ---------------------------------------------------------------------------
+// 职责:把拆分后的历史记录、工作区、审批、澄清、上传、配方、聊天、输入框弹层、
+//   计划执行与事件绑定控制器集中连线。这里只做依赖注入和启动顺序编排,不承载
+//   业务逻辑,从而让每个控制器继续保持单一职责。
 (function () {
     function startApp({ state, elements: dom, services: svc, utils: u, api, runEvents }) {
+        // planRunner 与 clarificationController 彼此需要回调,先放占位对象打断
+        // 装配期循环依赖;真正方法会在对应控制器创建后覆盖。
         let planRunner = {};
         let clarificationController = {};
         const generatePlan = (options) => planRunner.generatePlan(options);
         const hideClarification = () => clarificationController.hideClarification();
+        // 历史运行记录是多数工作流的刷新来源,先创建以便后续控制器复用 refresh/select。
         const history = window.AgentCoworkRunHistory.createRunHistoryController({
             state,
             composer: dom.composer,
@@ -26,6 +33,7 @@
             runTypeText: u.runTypeText,
             shortRunId: u.shortRunId,
         });
+        // 工作区加载器持有文件树、配方列表与 artifact 目录刷新能力,属于 UI 到 host 的读写边界。
         const workspace = window.AgentCoworkWorkspaceLoader.createWorkspaceLoader({
             state,
             getJson: api.getJson,
@@ -40,6 +48,7 @@
             refreshRunCards: history.refreshRunCards,
             loadArtifactCatalog: svc.loadArtifactCatalog,
         });
+        // 审批控制器只接收已注入的计划生成与 UI 渲染函数,避免直接耦合计划执行器内部实现。
         const { approvePlan } = window.AgentCoworkApprovalRunner.createApprovalRunner({
             state,
             approveButton: dom.approveButton,
@@ -57,6 +66,7 @@
             addArtifactCard: svc.addArtifactCard,
             loadArtifactCatalog: svc.loadArtifactCatalog,
         });
+        // 消息动作是时间线卡片上的轻量命令层,负责把用户选择转回澄清/计划/审批工作流。
         const actions = window.AgentCoworkMessageActions.createMessageActions({
             state,
             composer: dom.composer,
@@ -71,6 +81,7 @@
             appendUserMessage: svc.appendUserMessage,
             scrollConversationToEnd: svc.scrollConversationToEnd,
         });
+        // 澄清控制器在创建后回填到占位对象,这样计划执行器可安全调用 show/hide。
         clarificationController = window.AgentCoworkClarification.createClarificationController({
             state,
             composer: dom.composer,
@@ -85,6 +96,7 @@
             addClarificationCard: actions.addClarificationCard,
             generatePlan,
         });
+        // 上传控制器只通过 host API 写入工作区,完成后刷新工作区树与 artifact 目录。
         const upload = window.AgentCoworkFileUpload.createFileUploadController({
             state,
             composer: dom.composer,
@@ -98,6 +110,7 @@
             addArtifactCard: svc.addArtifactCard,
             renderInteraction: svc.renderInteraction,
         });
+        // 配方运行器复用审批动作和 SSE 事件订阅,保证配方计划与普通计划走同一进度表达。
         const { runRecipePlan } = window.AgentCoworkRecipeRunner.createRecipeRunner({
             state,
             approveButton: dom.approveButton,
@@ -122,6 +135,7 @@
             setStatus: svc.setStatus,
             shortRunId: u.shortRunId,
         });
+        // 聊天运行器是非计划型对话路径,仍复用 run cards 与消息渲染,保证历史记录一致。
         const { sendChatMessage } = window.AgentCoworkChatRunner.createChatRunner({
             state,
             textCandidate: svc.textCandidate,
@@ -139,6 +153,7 @@
             setStatus: svc.setStatus,
             shortRunId: u.shortRunId,
         });
+        // 输入框弹层需要跨工作区文件、配方和历史运行记录做候选提示,因此放在共享装配层连线。
         const popover = window.AgentCoworkComposerPopover.createComposerPopover({
             state,
             composer: dom.composer,
@@ -155,6 +170,7 @@
             runTypeText: u.runTypeText,
             shortRunId: u.shortRunId,
         });
+        // 计划执行器是核心编排器:它只消费上方注入的能力,不直接创建其他控制器。
         planRunner = window.AgentCoworkPlanRunner.createPlanRunner({
             state,
             composer: dom.composer,
@@ -192,6 +208,7 @@
             addApprovalActions: actions.addApprovalActions,
             setMessageStatus: svc.setMessageStatus,
         });
+        // 事件绑定必须在所有控制器完成装配后执行,否则按钮回调会引用尚未初始化的能力。
         window.AgentCoworkAppEvents.bindAppEvents({
             state,
             composer: dom.composer,
@@ -215,6 +232,7 @@
             loadArtifactCatalog: svc.loadArtifactCatalog,
             composerPopoverHandleKey: popover.handleKey,
         });
+        // 最后启动首屏加载:初始化视图、读取工作区、渲染历史卡片。
         window.AgentCoworkAppEvents.bootstrapApp({
             setView: svc.setView,
             resetInteraction: svc.resetInteraction,

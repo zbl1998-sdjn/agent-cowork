@@ -17,3 +17,18 @@
 process.env.KCW_REQUIRE_AUTH = 'false';
 process.env.KCW_TRUST_IDENTITY_HEADERS = 'true';
 process.env.KCW_AUTH_PERSIST = 'false';
+
+//  - 清空模型/记忆相关 env:HOST 套件断言的是 createServer 的「默认」配置
+//    (如 baseUrl=DEFAULT_BASE_URL=api.moonshot.ai/v1)。开发/演示 shell 里若设了
+//    KIMI_BASE_URL=...moonshot.cn 之类、或用 `--env-file=.env`/`demo:mvp` 继承进来,
+//    会渗入默认值导致 server.test.ts 等误挂。门禁必须与开发者 shell 解耦。
+//    需要这些值的用例都显式传 config/env,不依赖 process.env。
+for (const key of [
+  'KIMI_API_KEY', 'KIMI_BASE_URL', 'KIMI_MODEL', 'KIMI_MODEL_FALLBACKS',
+  'MOONSHOT_API_KEY', 'MOONSHOT_BASE_URL',
+  'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'CLAUDE_API_KEY', 'CLAUDE_MODEL',
+  'KCW_MODEL_FALLBACKS',
+  'MASE_MCP_ENABLED', 'MASE_REPO', 'MASE_CONFIG_PATH', 'MASE_MEMORY_DIR',
+]) {
+  Reflect.deleteProperty(process.env, key);
+}

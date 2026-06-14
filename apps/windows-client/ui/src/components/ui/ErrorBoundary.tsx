@@ -4,11 +4,11 @@ import { ErrorState } from './StateViews';
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
-  /** Human label for the region, shown in the default fallback title. */
+  /** 区域的人类可读标签,用于默认兜底标题。 */
   label?: string;
-  /** Custom fallback; receives the error and a reset callback. */
+  /** 自定义兜底渲染,接收错误对象与重置回调。 */
   fallback?: (error: Error, reset: () => void) => ReactNode;
-  /** Called once when an error is caught (e.g. for logging). */
+  /** 捕获错误时调用一次,常用于日志。 */
   onError?: (error: Error, info: ErrorInfo) => void;
 }
 

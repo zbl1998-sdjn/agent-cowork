@@ -7,6 +7,7 @@ import {
   activeConversationMessages,
   compactConversationForStorage,
   forkConversationBeforeMessage,
+  shouldApplyHydratedMessages,
   switchConversationBranch,
   updateActiveConversationMessages,
 } from '../lib/conversation-branches';
@@ -40,6 +41,10 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
 
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConvId, setActiveConvId] = useState<string>(initialConversations[0]?.id || nextConvId());
+  // 供异步补水回调读取「最新」active 会话:闭包里的 activeConvId 是发起时的旧值,
+  // 迟到结果必须对照当前值判断是否还该落地(防串话,见 shouldApplyHydratedMessages)。
+  const activeConvIdRef = useRef(activeConvId);
+  activeConvIdRef.current = activeConvId;
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [convSearch, setConvSearch] = useState('');
@@ -56,7 +61,7 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
     const t = setTimeout(() => {
       try {
         localStorage.setItem(CONV_KEY, JSON.stringify(conversations.slice(0, 50).map((c) => compactConversationForStorage(c, { messageLimit: 60 }))));
-      } catch { /* ignore quota */ }
+      } catch { /* 本地配额不足时跳过缓存写入 */ }
       if (user) {
         const active = conversations.find((c) => c.id === activeConvId);
         if (active && active.messages.length > 0) {
@@ -82,7 +87,7 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
     void (async () => {
       const remote = await listStoredConversations();
       if (remote.length) {
-        const convs: Conversation[] = remote.map((c) => ({
+        const remoteConvs: Conversation[] = remote.map((c) => ({
           id: c.id,
           title: c.title || '新对话',
           pinned: c.pinned,
@@ -90,11 +95,16 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
           activeBranchId: c.activeBranchId,
           branches: c.branches as Conversation['branches'],
         }));
-        setConversations(convs);
-        const first = convs[0];
-        if (!first) return;
-        setActiveConvId(first.id);
-        setMessages(activeConversationMessages(first));
+        // 合并而非覆盖:按 id 去重并集,本地独有会话(未同步/他端建的)保留,同 id 取消息更多者;
+        // 避免登录后远端静默顶掉本地历史。也不强切当前 active 会话(保持用户正在看的那个)。
+        setConversations((local) => {
+          const byId = new Map<string, Conversation>(local.map((c) => [c.id, c]));
+          for (const r of remoteConvs) {
+            const existing = byId.get(r.id);
+            if (!existing || r.messages.length >= existing.messages.length) byId.set(r.id, r);
+          }
+          return [...byId.values()];
+        });
       }
     })();
   }, [user, setMessages]);
@@ -130,8 +140,15 @@ export function useConversations({ messages, setMessages, setSelectedRecipe, str
           : null;
         if (hydrated && activeConversationMessages(hydrated).length) {
           const activeMessages = activeConversationMessages(hydrated);
-          setMessages((cur) => (cur.length === 0 ? activeMessages : cur));
+          // 列表缓存回写到「请求的那个会话」总是安全的;但当前视图(messages)只在
+          // 用户仍停留在该会话且视图为空时才落地,否则迟到补水会把旧会话内容
+          // 灌进用户已新建/切换的会话(串话+被回写 effect 持久化)。
           setConversations((cs) => cs.map((x) => (x.id === id ? hydrated : x)));
+          setMessages((cur) => (
+            shouldApplyHydratedMessages({ requestedId: id, activeConvId: activeConvIdRef.current, currentMessageCount: cur.length })
+              ? activeMessages
+              : cur
+          ));
         }
       })();
     }

@@ -7,8 +7,7 @@ import { getJson, isDesktop } from '../lib/api';
 import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
 
-// Tauri's native folder picker. Imported dynamically so the bundle still builds
-// in the browser (vite dev / vitest) where the plugin isn't reachable.
+// Tauri 原生目录选择器动态导入;浏览器/Vitest 环境拿不到插件时 bundle 仍可构建。
 async function pickDirectory(defaultPath?: string): Promise<string | null> {
   if (!isDesktop()) return null;
   try {
@@ -42,18 +41,18 @@ function persistRecents(items: string[]) {
   try {
     globalThis.localStorage?.setItem(RECENT_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
   } catch {
-    /* storage unavailable — keep in-memory only */
+    /* storage 不可用时仅保留内存最近列表 */
   }
 }
 
-// Pure helper: place `next` at the head and dedupe, capped at MAX_RECENT.
+// 纯辅助:把 next 放到列表头部并去重,最多保留 MAX_RECENT 项。
 export function pushRecentWorkspace(list: readonly string[], next: string): string[] {
   const cleaned = next.trim();
   if (!cleaned) return [...list];
   return [cleaned, ...list.filter((value) => value !== cleaned)].slice(0, MAX_RECENT);
 }
 
-// Pure helper: collapse a long path so it fits in the header chip.
+// 纯辅助:把长路径折叠到顶部 chip 能容纳的长度。
 export function abbreviatePath(value: string, max = 36): string {
   const path = (value || '').trim();
   if (path.length <= max) return path;
@@ -93,10 +92,8 @@ export function WorkspaceSwitcher({ current, onSwitch }: WorkspaceSwitcherProps)
   const apply = async (next: string) => {
     const cleaned = next.trim();
     if (!cleaned || cleaned === current) { setOpen(false); return; }
-    // Preflight: ask the host to load projects for the new root. The host's
-    // path-policy will reject anything outside its configured trusted root with
-    // a 4xx — surface the error inline instead of letting the user "switch" to
-    // a path that silently breaks every panel.
+    // 预检:让 host 以新根加载项目;host path-policy 会用 4xx 拒绝受信范围外路径。
+    // 这里内联展示错误,避免用户切到一个会让所有面板静默失败的目录。
     setValidating(true);
     setValidateError('');
     try {

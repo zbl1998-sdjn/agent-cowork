@@ -3,13 +3,6 @@
 // 职责:把表格数据转成描述性统计(计数/缺失/去重/类型推断,数值列另算 min/max/mean/median/总体
 //       stddev,非数值列取 Top 值)。补充 profile.js,服务于数据分析闭环。纯函数、无上行依赖、可测。
 // 导出:computeColumnStats(单列) / describeRows(整表)。
-//
-// Column / dataset descriptive statistics (05-A4).
-//
-// Pure helpers that turn tabular data into descriptive stats for the data
-// analysis closure (profile -> stats -> chart -> report). Complements
-// profile.js. Layer L1 (tools), no upward imports, deterministic & testable.
-// stddev is the population standard deviation.
 
 export type ColumnStatsType = 'empty' | 'number' | 'boolean' | 'string';
 export type ColumnNumericStats = { min: number; max: number; sum: number; mean: number; median: number; stddev: number };
@@ -25,18 +18,21 @@ export type ColumnStats = {
 export type RowStats = { rowCount: number; columns: Record<string, ColumnStats> };
 
 /**
+ * 判断值是否是可按列名读取的普通对象行。
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
+ * 统一空值语义:空字符串与 null/undefined 都计入缺失。
  */
 function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || value === '';
 }
 
 /**
+ * 尝试把单元格转成有限数字;布尔值不自动当作 0/1,避免污染类型推断。
  */
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -57,6 +53,7 @@ function toNumber(value: unknown): number | null {
 }
 
 /**
+ * 判断单元格是否像布尔值,用于整列类型推断。
  */
 function isBooleanish(value: unknown): boolean {
   if (typeof value === 'boolean') {

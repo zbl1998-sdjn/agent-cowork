@@ -17,7 +17,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
       <Button
         variant="secondary"
         className="composer-trigger-btn"
-        onClick={() => onTrigger('/')}
+        onMouseDown={(e) => { e.preventDefault(); onTrigger('/'); }}
         title="插入「/」从模板或命令里挑一个"
       >
         {`${ICONS.TEMPLATE} 模板`}
@@ -25,7 +25,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
       <Button
         variant="secondary"
         className="composer-trigger-btn"
-        onClick={() => onTrigger('@')}
+        onMouseDown={(e) => { e.preventDefault(); onTrigger('@'); }}
         title="插入「@」搜索并引用工作区里的文件"
       >
         {`${ICONS.PAPERCLIP} 引用文件`}
@@ -33,7 +33,7 @@ export function ComposerTriggers({ onTrigger }: ComposerTriggersProps) {
       <Button
         variant="secondary"
         className="composer-trigger-btn"
-        onClick={() => onTrigger('#')}
+        onMouseDown={(e) => { e.preventDefault(); onTrigger('#'); }}
         title="插入「#」翻最近的对话"
       >
         {`${ICONS.HISTORY} 历史`}

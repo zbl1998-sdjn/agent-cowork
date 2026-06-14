@@ -8,6 +8,7 @@ import (
 	"kimi-cowork/apps/local-agent/internal/journal"
 )
 
+// 本地 agent 的批量文件操作默认不允许删除,防止模型计划把破坏性动作伪装成普通补丁。
 func TestApplyOperationsForbidsDelete(t *testing.T) {
 	err := ApplyOperations([]FileOperation{{ID: "op1", Type: "delete", From: "a.txt"}}, ApplyOptions{TrustedRoot: t.TempDir()})
 	if err == nil {
@@ -15,6 +16,7 @@ func TestApplyOperationsForbidsDelete(t *testing.T) {
 	}
 }
 
+// 写入操作不能覆盖既有文件,要求调用方显式走更高层审批/备份路径处理覆盖语义。
 func TestApplyOperationsForbidsOverwrite(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "a.txt")
@@ -27,6 +29,7 @@ func TestApplyOperationsForbidsOverwrite(t *testing.T) {
 	}
 }
 
+// 成功写入必须留下 jsonl 审计记录,后续验收和回滚都依赖这条持久证据。
 func TestApplyOperationsWritesJournal(t *testing.T) {
 	root := t.TempDir()
 	journalPath := filepath.Join(root, "audit", "ops.jsonl")

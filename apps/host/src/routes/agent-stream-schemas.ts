@@ -16,6 +16,7 @@ const requestBudgetSchema = z.object({
 
 export const agentStreamBodySchema = z.object({
   prompt: z.string().optional(),
+  conversationId: z.string().optional(),
   resumeRunId: z.string().optional(),
   runSeed: z.union([z.string(), z.number(), z.literal(true)]).optional(),
   seed: z.union([z.string(), z.number(), z.literal(true)]).optional(),

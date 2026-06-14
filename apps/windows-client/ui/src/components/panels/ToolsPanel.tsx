@@ -58,9 +58,7 @@ export function ToolsPanelPlanActions({ onRun, onClear }: { onRun: () => void; o
   );
 }
 
-// Tool discovery + ad-hoc invocation + a sub-agent plan builder. Mirrors the
-// host's lazy ToolSearch: search by keyword, pick a tool, call it directly, or
-// stack several calls into a plan and run them as one sub-agent.
+// 工具发现、临时调用和子任务计划构建器:按关键词搜索、选工具直调,或把多次调用堆成计划交给子 Agent。
 export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
   const [query, setQuery] = useState('');
   const [tools, setTools] = useState<ToolDescriptor[]>([]);

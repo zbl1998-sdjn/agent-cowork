@@ -110,6 +110,15 @@ function renderTimelineWith(overrides: Partial<Parameters<typeof Timeline>[0]> =
 }
 
 describe('Timeline', () => {
+  it('exposes the conversation timeline as a polite live log', () => {
+    const html = renderTimelineWith();
+
+    expect(html).toContain('role="log"');
+    expect(html).toContain('aria-label="对话时间线"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('aria-relevant="additions text"');
+  });
+
   it('shows continue actions for cancelled and failed assistant turns', () => {
     const cancelled = renderTimeline(baseAssistant);
     const failed = renderTimeline({ ...baseAssistant, id: 'a2', status: 'failed', text: '执行失败。' });
@@ -118,6 +127,21 @@ describe('Timeline', () => {
     expect(cancelled).toContain('>继续</button>');
     expect(failed).toContain('执行失败。');
     expect(failed).toContain('>继续</button>');
+  });
+
+  it('announces active assistant run status through a status live region', () => {
+    const html = renderTimeline({
+      ...baseAssistant,
+      id: 'assistant-streaming',
+      status: 'streaming',
+      text: undefined,
+    });
+
+    expect(html).toContain('正在响应');
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('aria-atomic="true"');
+    expect(html).toContain('typing-dots');
   });
 
   it('resolves continue actions to resume run ids when a checkpoint run exists', () => {

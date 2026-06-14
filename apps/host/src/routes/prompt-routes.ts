@@ -55,8 +55,7 @@ const promptRefineBodySchema = z.preprocess(
       .min(1, 'prompt is required')
       .max(MAX_PROMPT_LENGTH, 'prompt is too long'),
     trustedRoot: z.unknown().optional(),
-    // Context is optional user metadata. Keep it tolerant while preventing
-    // arrays/scalars from leaking numeric keys into the refiner context.
+    // context 是可选用户元数据;边界保持宽容,但拒绝数组/标量把数字键泄漏进 refiner。
     context: z.preprocess(objectOrEmpty, recordSchema),
   }).loose(),
 );

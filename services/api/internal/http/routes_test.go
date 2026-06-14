@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// 健康检查要同时证明服务身份与 trace header 存在,这是上游探活和链路追踪的最小契约。
 func TestHealth(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -26,6 +27,7 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+// 创建任务是有副作用的入口,必须带 idempotency-key 才能防止客户端重试造成重复任务。
 func TestV1PostRequiresIdempotencyKey(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/tasks", nil)
 	rec := httptest.NewRecorder()
@@ -35,6 +37,7 @@ func TestV1PostRequiresIdempotencyKey(t *testing.T) {
 	}
 }
 
+// v1 任务入口需要透传 tenant/user/trace,确保后续服务层可以按租户隔离并串起审计链路。
 func TestV1PostCarriesScaleContext(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/tasks", nil)
 	req.Header.Set("idempotency-key", "idem-1")

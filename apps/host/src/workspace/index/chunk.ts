@@ -28,12 +28,14 @@ type MakeChunkInput = {
 };
 
 /**
+ * 返回字符串的 UTF-8 字节数,用于按传输/存储体积切块而不是按字符数误判。
  */
 function byteLength(value: string): number {
   return Buffer.byteLength(value, 'utf8');
 }
 
 /**
+ * 从字符串头部取出不超过 maxBytes 的片段;单个字符超限时仍返回该字符以保证游标前进。
  */
 function takeByByteLimit(value: string, maxBytes: number): string {
   let out = '';
@@ -46,6 +48,7 @@ function takeByByteLimit(value: string, maxBytes: number): string {
 }
 
 /**
+ * 把超长单行拆成多个字节有界片段,避免一行大文本撑爆检索块。
  */
 function splitOversizedLine(line: string, maxBytes: number): string[] {
   const parts: string[] = [];
@@ -59,6 +62,7 @@ function splitOversizedLine(line: string, maxBytes: number): string[] {
 }
 
 /**
+ * 组装检索块并把源路径、行号区间和序号编码进稳定 id。
  */
 function makeChunk({ sourcePath, lines, startLine, endLine, ordinal }: MakeChunkInput): WorkspaceChunk {
   const text = lines.join('\n');
@@ -95,6 +99,7 @@ export function chunkText({
   let ordinal = 0;
 
   /**
+   * 把当前累积行刷成块;调用方负责在刷出后更新下一块起始行。
    */
   function flush(endLine: number): void {
     if (!current.length) return;

@@ -4,6 +4,7 @@ Use this checklist for every milestone release.
 
 ## Before Release
 
+- [ ] `docs/面试演示与上线预备验收标准.md` has been applied: P0/P1 are zero, no one-vote veto item remains, and any P2/P3 deferral is recorded with evidence.
 - [ ] Version is valid SemVer and has a matching `CHANGELOG.md` entry.
 - [ ] Q4: `npm run ci` passes locally.
 - [ ] Q6: `npm run smoke:e2e` writes a JSON report under `reports/e2e-smoke/`.

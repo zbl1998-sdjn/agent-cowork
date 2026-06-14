@@ -1,5 +1,4 @@
-// Classic-script run history controller. It owns task-card rendering and
-// historical run replay while app.js remains the orchestration layer.
+// classic-script 运行历史控制器:负责任务卡渲染与历史回放,app.js 继续作为编排层。
 (function () {
   function normalizeRun(run: any) {
     const value = run && typeof run === "object" ? run : {};

@@ -122,8 +122,7 @@ export async function handleConversationRoutes({
       sendJson(response, 200, { conversations, context: requestContext });
       return true;
     }
-    // Paginated + searched summaries stay in the storage layer so tenant/user
-    // scoping and future backends keep one contract.
+    // 分页与搜索摘要留在存储层,这样租户/用户隔离和未来后端都共享同一契约。
     if (typeof conversationStore.query === 'function') {
       const offset = Math.max(query.offset || 0, 0);
       const { items, total } = await conversationStore.query(safeRoot, requestContext, {

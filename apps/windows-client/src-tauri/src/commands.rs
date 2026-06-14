@@ -1,11 +1,5 @@
 //! 薄命令层(commands)——#[tauri::command] 包装:解析共享状态/配置后委派给 sidecar/security/updater 等领域模块。
 //! 命令故意保持极薄,新增原生能力 = 新模块 + 一个薄 command,不往这里堆逻辑(plan/00 外壳准则)。
-//! Thin Tauri command layer.
-//!
-//! Commands are deliberately tiny: they resolve shared state / config and
-//! delegate to the domain modules (`sidecar`, `security`). Keeping them thin
-//! keeps the IPC surface easy to read and the real logic unit-testable in its
-//! own modules.
 
 use tauri::{AppHandle, State};
 
@@ -15,26 +9,26 @@ use crate::security;
 use crate::sidecar::{HostSidecar, HostStatus};
 use crate::updater::{self, DesktopUpdateInstallResult, DesktopUpdateStatus};
 
-/// Report whether the host sidecar is running and at what URL.
+/// 返回 host sidecar 是否运行以及其本地 URL。
 #[tauri::command]
 pub fn host_status(state: State<'_, HostSidecar>) -> DesktopResult<HostStatus> {
     state.status()
 }
 
-/// Start the bundled Node host sidecar (idempotent).
+/// 启动打包的 Node host sidecar(幂等)。
 #[tauri::command]
 pub fn start_node_host(app: AppHandle, state: State<'_, HostSidecar>) -> DesktopResult<HostStatus> {
     let root = config::trusted_root()?;
     state.start(&app, &root.to_string_lossy())
 }
 
-/// Stop the bundled Node host sidecar (idempotent).
+/// 停止打包的 Node host sidecar(幂等)。
 #[tauri::command]
 pub fn stop_node_host(app: AppHandle, state: State<'_, HostSidecar>) -> DesktopResult<HostStatus> {
     state.stop(&app)
 }
 
-/// Open a path with the OS default handler, but only inside the trusted root.
+/// 用系统默认程序打开路径,但必须先通过可信根与敏感路径校验。
 #[tauri::command]
 pub fn open_path(app: AppHandle, path: String) -> DesktopResult<()> {
     use tauri_plugin_opener::OpenerExt;
@@ -56,10 +50,8 @@ pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpda
     updater::install_desktop_update(app).await
 }
 
-/// Find the most recent installer next to the running executable (Tauri puts
-/// bundles under `target/release/bundle/{nsis,msi}/`) and reveal its folder in
-/// Explorer so the user can copy/share the installer. Returns the path that was
-/// found. Errors when no bundle has been built yet.
+/// 查找当前 exe 旁最新的安装包(Tauri 放在 target/release/bundle/{nsis,msi}/),并在 Explorer 中打开其目录。
+/// 返回找到的安装包路径;尚未构建安装包时返回错误。
 #[tauri::command]
 pub fn reveal_bundled_installer(app: AppHandle) -> DesktopResult<String> {
     use std::path::PathBuf;
@@ -106,7 +98,7 @@ pub fn reveal_bundled_installer(app: AppHandle) -> DesktopResult<String> {
         )
     })?;
 
-    // Open Explorer at the containing folder; the user can drag the .exe/.msi.
+    // 在 Explorer 中打开所在文件夹,用户可直接拖拽 .exe/.msi。
     let folder = installer
         .parent()
         .ok_or_else(|| crate::error::DesktopError::Io("安装包路径异常".into()))?;

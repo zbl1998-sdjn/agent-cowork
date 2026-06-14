@@ -73,6 +73,23 @@ async function jsonRequest(
   return { status: response.status, body: recordValue(parsed, `${method} ${route} response`), headers: response.headers };
 }
 
+test('every response carries a Content-Security-Policy header', async () => {
+  const trustedRoot = tempRoot();
+  const server = createSecurityServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/health`);
+    const csp = res.headers.get('content-security-policy');
+    assert.ok(csp, 'Content-Security-Policy header should be present');
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /object-src 'none'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /base-uri 'self'/);
+  } finally {
+    await close(server);
+  }
+});
+
 test('API rejects cross-origin mutating requests and text/plain JSON bodies', async () => {
   const trustedRoot = tempRoot();
   const target = path.join(trustedRoot, 'csrf.txt');
@@ -243,7 +260,7 @@ test('run detail, task list, run list, and SSE history are tenant scoped', async
   const server = createSecurityServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
-    const run = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const run = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: {
         'x-tenant-id': 'tenant_a',
@@ -294,7 +311,7 @@ test('critical writes require Idempotency-Key and reject same key with different
   });
   const base = await bind(server);
   try {
-    const recipeMissing = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const recipeMissing = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       body: { prompt: 'missing key', files: [] },
     });
@@ -331,14 +348,14 @@ test('critical writes require Idempotency-Key and reject same key with different
     const deleteMissing = await jsonRequest(base, `/api/schedules/${scheduleId}`, { method: 'DELETE' });
     assert.equal(deleteMissing.status, 428);
 
-    const first = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const first = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { 'idempotency-key': 'same-key' },
       body: { prompt: 'first body', files: [] },
     });
     assert.equal(first.status, 200);
 
-    const replay = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const replay = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { 'idempotency-key': 'same-key' },
       body: { prompt: 'first body', files: [] },
@@ -347,7 +364,7 @@ test('critical writes require Idempotency-Key and reject same key with different
     assert.equal(replay.body.idempotentReplay, true);
     assert.equal(replay.body.runId, first.body.runId);
 
-    const mismatch = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
+    const mismatch = await jsonRequest(base, '/api/recipes/email-draft/run', {
       method: 'POST',
       headers: { 'idempotency-key': 'same-key' },
       body: { prompt: 'different body', files: [] },

@@ -81,7 +81,7 @@ export function createServer(config: ServerConfig = {}): HostServer {
         const errorText = err instanceof Error ? (err.stack || err.message) : String(err);
         console.error('[host] unhandled request error:', redactText(errorText));
       } catch {
-        /* ignore */
+        /* 日志写出失败时仍返回 500 */
       }
       sendJson(response, 500, { error: 'internal server error' });
     }
@@ -106,27 +106,27 @@ export function createServer(config: ServerConfig = {}): HostServer {
   server.isDraining = () => state.draining;
   server.shutdown = async ({ timeoutMs = 10000 } = {}) => {
     state.draining = true;
-    try { state.cancellation.cancelAll('shutdown'); } catch { /* ignore */ }
-    try { state.approvalRegistry.cancelAll?.('reject'); } catch { /* ignore */ }
-    try { server.closeMcp(); } catch { /* ignore */ }
+    try { state.cancellation.cancelAll('shutdown'); } catch { /* 停机取消失败时继续收尾 */ }
+    try { state.approvalRegistry.cancelAll?.('reject'); } catch { /* 审批取消失败时继续收尾 */ }
+    try { server.closeMcp(); } catch { /* MCP 关闭失败时继续收尾 */ }
     try {
       if (state.activeScheduler && typeof state.activeScheduler.stop === 'function') state.activeScheduler.stop();
     } catch {
-      /* ignore */
+      /* 调度器停止失败时继续关闭 HTTP */
     }
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, timeoutMs);
       try {
         if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
       } catch {
-        /* ignore */
+        /* closeAllConnections 不可用或失败时交给 server.close */
       }
       server.close(() => { clearTimeout(timer); resolve(); });
     });
   };
 
   if (Array.isArray(config.mcpServers) && config.mcpServers.length > 0 && config.connectMcpOnStart !== false) {
-    server.connectMcpServers(config.mcpServers).catch(() => { /* a broken connector must not crash startup */ });
+    server.connectMcpServers(config.mcpServers).catch(() => { /* 连接器损坏不能拖垮 host 启动 */ });
   }
 
   return server;

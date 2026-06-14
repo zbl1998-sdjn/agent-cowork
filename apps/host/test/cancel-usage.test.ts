@@ -68,6 +68,31 @@ async function readRest(reader: ReadableStreamDefaultReader<Uint8Array>, all = '
   return all;
 }
 
+async function readUntilApprovalRequest(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<{ all: string; runId: string; approvalId: string }> {
+  const dec = new TextDecoder();
+  let all = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    all += dec.decode(value, { stream: true });
+    const startMatch = /event: start\r?\ndata: (\{.*\})/.exec(all);
+    const approvalMatch = /event: approval_request\r?\ndata: (\{.*\})/.exec(all);
+    if (startMatch && approvalMatch) {
+      const startFrame = startMatch[1];
+      const approvalFrame = approvalMatch[1];
+      assert.ok(startFrame && approvalFrame, 'start and approval_request frames should include JSON payloads');
+      return {
+        all,
+        runId: stringField(recordValue(JSON.parse(startFrame), 'start frame'), 'runId'),
+        approvalId: stringField(recordValue(JSON.parse(approvalFrame), 'approval_request frame'), 'id'),
+      };
+    }
+  }
+  throw new Error(`stream ended before approval_request frame: ${all}`);
+}
+
 async function waitForFileContent(file: string, expected: string, timeoutMs = 1000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -158,6 +183,47 @@ test('E2E /api/agent/chat/stream: POST /api/runs/:id/cancel stops the run with a
     assert.equal(booleanField(cancelBody, 'cancelled'), true);
     const all = await readRest(reader, start.all);
     assert.match(all, /event: cancelled/);
+  } finally {
+    await close(server);
+  }
+});
+
+test('E2E /api/agent/chat/stream: POST /api/runs/:id/cancel revokes pending approvals so a late approve cannot execute the tool', async () => {
+  const root = tmp();
+  const target = path.join(root, 'late-approve.txt');
+  const agentModelCall: ModelCall = async () => ({
+    content: '',
+    tool_calls: [{ id: 'w1', function: { name: 'Write', arguments: JSON.stringify({ path: 'late-approve.txt', content: 'leaked' }) } }],
+  });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'write a file' }),
+    });
+    const reader = readableBody(res, 'agent stream response').getReader();
+    const pendingRun = await readUntilApprovalRequest(reader);
+    const cx = await fetch(`${base}/api/runs/${pendingRun.runId}/cancel`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(booleanField(recordValue(await cx.json(), 'cancel response'), 'cancelled'), true);
+    const all = await readRest(reader, pendingRun.all);
+    assert.match(all, /event: cancelled/);
+
+    const late = await fetch(`${base}/api/approvals/${pendingRun.approvalId}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'once' }),
+    });
+    const lateBody = recordValue(await late.json(), 'late approval response');
+    assert.equal(late.status, 404, 'late approve on a cancelled run must be rejected');
+    assert.equal(booleanField(lateBody, 'ok'), false);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(fs.existsSync(target), false, 'tool must not execute after the run was cancelled');
   } finally {
     await close(server);
   }

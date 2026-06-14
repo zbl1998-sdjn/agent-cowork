@@ -69,8 +69,7 @@ function connectedServers(toolRegistry?: ToolRegistryLike | null): string[] {
   return toolRegistry && typeof toolRegistry.mcpServers === 'function' ? toolRegistry.mcpServers() : [];
 }
 
-// SECURITY: never spawn a client-supplied command. Request bodies may only
-// select a host-defined id; command/args stay fully controlled by this allowlist.
+// 安全边界:绝不执行客户端传入的命令;请求体只能选择 host 内置 id,command/args 完全由 allowlist 控制。
 function buildConnectorSpec(
   id: unknown,
   { fsServerPath, fsServerRunnerPath, trustedRoot }: { fsServerPath?: string; fsServerRunnerPath?: string; trustedRoot: string },

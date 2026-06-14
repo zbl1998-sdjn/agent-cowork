@@ -5,10 +5,28 @@ import {
   compareConversationBranches,
   conversationBranchOptions,
   forkConversationBeforeMessage,
+  shouldApplyHydratedMessages,
   switchConversationBranch,
   updateActiveConversationMessages,
 } from './conversation-branches';
 import type { Conversation } from './app-types';
+
+// 切会话触发的异步补水(getStoredConversation)可能在用户已「新建对话/再切走」之后才返回。
+// 迟到结果若不经守卫直接 setMessages,会把旧会话消息灌进当前(空)会话视图,
+// 并被「messages→active 会话」回写 effect 持久化成数据污染(实测截图:新建会话出现旧会话内容)。
+describe('shouldApplyHydratedMessages', () => {
+  it('applies only when the requested conversation is still active and the view is empty', () => {
+    expect(shouldApplyHydratedMessages({ requestedId: 'c-old', activeConvId: 'c-old', currentMessageCount: 0 })).toBe(true);
+  });
+
+  it('rejects when the user has already switched to a new conversation (late hydration)', () => {
+    expect(shouldApplyHydratedMessages({ requestedId: 'c-old', activeConvId: 'c-new', currentMessageCount: 0 })).toBe(false);
+  });
+
+  it('rejects when the view already has messages (user typed meanwhile)', () => {
+    expect(shouldApplyHydratedMessages({ requestedId: 'c-old', activeConvId: 'c-old', currentMessageCount: 2 })).toBe(false);
+  });
+});
 
 function baseConversation(): Conversation {
   return {

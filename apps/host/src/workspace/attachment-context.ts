@@ -31,11 +31,6 @@ export type AttachmentContextOptions = {
   excerptBytes?: number;
 };
 
-// Multimodal attachment pipeline: classify uploaded files and extract usable
-// context. Text/PDF/DOCX are extracted to text (works today); images are
-// carried as references for a vision-capable model. Lets the chat/recipe layer
-// turn attachments into prompt context.
-
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
 
 /** 把附件列表加工成 { items, counts }:图片记为引用,文档抽取摘录,失败项标 error(不中断)。 */

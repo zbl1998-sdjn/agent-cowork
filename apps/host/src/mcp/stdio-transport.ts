@@ -7,13 +7,8 @@ import childProcess from 'node:child_process';
 import type { ChildProcessLike } from 'node:child_process';
 import type { JsonRpcMessage } from './json-rpc.js';
 
-// Stdio transport for an MCP server child process.
-//
-// MCP-over-stdio frames each JSON-RPC message as a single line of UTF-8 JSON
-// terminated by '\n'. This transport spawns the server, writes outbound
-// messages to its stdin, and parses inbound lines from its stdout, handing each
-// parsed object to the registered message handler. `spawn` is injectable so the
-// whole MCP stack is unit-testable with a fake child.
+// stdio 传输只负责「行分帧」和子进程管道:写 stdin、读 stdout、逐行 JSON.parse 后交回上层。
+// spawn 可注入,让完整 MCP 栈能用 fake child 单测。
 
 type ChildWithPipes = ChildProcessLike & { stdin: NonNullable<ChildProcessLike['stdin']> };
 export type SpawnFn = (command: string, args?: readonly string[], options?: Record<string, unknown>) => ChildProcessLike;
@@ -82,7 +77,7 @@ export class StdioTransport {
         try {
           handler({ code, signal });
         } catch {
-          // ignore
+          // 关闭回调失败不影响其它回调。
         }
       }
     });
@@ -122,7 +117,7 @@ export class StdioTransport {
       try {
         this._child.kill('SIGTERM');
       } catch {
-        // ignore
+        // 进程可能已经退出,忽略关闭竞态。
       }
       this._child = null;
     }

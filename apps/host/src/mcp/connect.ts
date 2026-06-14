@@ -8,15 +8,8 @@ import { omitUndefined } from '../util/object.js';
 import { StdioTransport, type SpawnFn } from './stdio-transport.js';
 import { McpClient } from './mcp-client.js';
 
-// Connect a list of MCP server specs and import their tools into a registry.
-//
-// Each spec is { name, command, args?, env?, cwd?, timeoutMs? }. We spawn the
-// server over stdio, run the initialize handshake, and namespace its tools as
-// `mcp__<name>__<tool>` in the registry. A single server failing to connect is
-// recorded in `errors` but never aborts the others, so one broken connector
-// can't take down the whole host.
-//
-// Returns { clients: [{ name, client }], errors: [{ name, error }], toolCount }.
+// 每条 spec 描述一个 stdio MCP 服务器;连接成功后把工具以 mcp__<name>__<tool> 命名空间导入注册表。
+// 单个连接器失败只写入 errors,不阻断其它连接器,避免坏连接器拖垮整个 host。
 
 export type McpServerSpec = {
   name?: string;
@@ -81,7 +74,7 @@ export function closeMcpClients(clients: Array<ConnectedMcpClient | McpClient> =
       const client = entry instanceof McpClient ? entry : entry.client;
       client.close();
     } catch {
-      // ignore
+      // 关闭连接器是 best-effort,不让一个失败影响其它客户端。
     }
   }
 }

@@ -169,7 +169,15 @@ export function Timeline({
   });
   return (
     <>
-      <main className="timeline" role="log" ref={timelineRef} onScroll={onTimelineScroll}>
+      <main
+        className="timeline"
+        role="log"
+        aria-label="对话时间线"
+        aria-live="polite"
+        aria-relevant="additions text"
+        ref={timelineRef}
+        onScroll={onTimelineScroll}
+      >
         {empty && (
           <div className="empty-state">
             <strong>Agent Cowork</strong>

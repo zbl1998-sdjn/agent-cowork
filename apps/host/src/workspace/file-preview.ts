@@ -7,11 +7,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { assertReadableWorkspacePath } from '../security/path-policy.js';
 
-// Safe, bounded file preview for the UI: images/PDF come back as base64 data the
-// client can render via a data: URL (the desktop CSP allows img-src data:), and
-// text/markdown comes back as UTF-8. Everything is constrained to the trusted
-// root by assertTrustedPath, and a byte cap stops huge files from being loaded.
-
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const HARD_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -129,7 +124,7 @@ export function readFilePreview(filePath: string, { trustedRoot, maxBytes = DEFA
   const name = path.basename(safe);
 
   if (ext === '.svg') {
-    // SVG renders as text/markup; hand it back as text so the client can decide.
+    // SVG 仍按图片 data URL 返回,但入口已受路径与大小限制保护。
     return { kind: 'image', mime: 'image/svg+xml', name, size, base64: fs.readFileSync(safe).toString('base64') };
   }
   if (IMAGE_MIME[ext]) {

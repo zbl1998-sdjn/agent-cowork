@@ -3,11 +3,9 @@
 // 职责:简单的列表虚拟化——只渲染可视区附近的条目,长会话/长列表也保持流畅。依赖:无。
 import { useCallback, useMemo, useState } from 'react';
 
-// Lightweight, zero-dependency list virtualization (FE-5).
-// `computeVirtualWindow` is the pure core: given scroll geometry it returns the
-// slice of items to render plus the spacer offsets. Kept pure so the windowing
-// math is fully unit-testable without a DOM. `useVirtualWindow` is a thin hook
-// that tracks scrollTop and derives the window.
+// 轻量零依赖列表虚拟化(FE-5)。computeVirtualWindow 是纯核心:输入滚动几何,
+// 返回应渲染的条目范围和占位偏移;保持纯函数便于脱离 DOM 单测。useVirtualWindow
+// 只是跟踪 scrollTop 并派生窗口。
 
 export interface VirtualWindowInput {
   scrollTop: number;
@@ -18,15 +16,15 @@ export interface VirtualWindowInput {
 }
 
 export interface VirtualWindow {
-  /** First item index to render. */
+  /** 首个需要渲染的条目索引。 */
   startIndex: number;
-  /** Last item index to render (inclusive); -1 when empty. */
+  /** 最后一个需要渲染的条目索引(含端点);空列表为 -1。 */
   endIndex: number;
-  /** Spacer height (px) before the first rendered item. */
+  /** 首个渲染条目前方的占位高度(px)。 */
   offsetTop: number;
-  /** Full scrollable height (px). */
+  /** 完整可滚动高度(px)。 */
   totalHeight: number;
-  /** Number of items in the window. */
+  /** 当前窗口内的条目数量。 */
   visibleCount: number;
 }
 

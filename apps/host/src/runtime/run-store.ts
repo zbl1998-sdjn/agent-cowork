@@ -1,4 +1,3 @@
-//
 // 运行记录存储(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
 // 职责:生成 runId 并把每次「运行」(agent/recipe/sandbox)的完整记录落盘为 JSON——含输入、状态、
@@ -124,7 +123,7 @@ export function listRunRecords(
         path: fullPath,
       });
     } catch {
-      // Ignore malformed run records; listing should remain best-effort.
+      // 单条 run 记录损坏时跳过,列表接口保持尽力可用。
     }
   }
   return records

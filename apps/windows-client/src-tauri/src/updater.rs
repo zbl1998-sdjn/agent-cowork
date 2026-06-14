@@ -1,10 +1,10 @@
 //! 桌面自动更新(updater)——基于 Tauri updater 插件的检查更新/安装更新命令,供 commands 层调用、UI 触发。
-//! Desktop auto-update commands backed by the Tauri updater plugin.
 
 use serde::Serialize;
 use tauri::AppHandle;
 use tauri_plugin_updater::UpdaterExt;
 
+use crate::config;
 use crate::error::{DesktopError, DesktopResult};
 
 #[derive(Serialize)]
@@ -30,6 +30,12 @@ fn update_error(error: tauri_plugin_updater::Error) -> DesktopError {
 }
 
 pub async fn check_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdateStatus> {
+    if !config::UPDATES_CONFIGURED {
+        // 更新发布源仍是占位域名:给出明确"未配置"提示,而非让在线检查抛 DNS/网络裸错。
+        return Err(DesktopError::Update(
+            "更新服务尚未配置正式发布源,暂无法在线检查更新。".into(),
+        ));
+    }
     let current_version = app.package_info().version.to_string();
     let update = app.updater().map_err(update_error)?.check().await.map_err(update_error)?;
     Ok(match update {
@@ -51,6 +57,11 @@ pub async fn check_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdate
 }
 
 pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdateInstallResult> {
+    if !config::UPDATES_CONFIGURED {
+        return Err(DesktopError::Update(
+            "更新服务尚未配置正式发布源,暂无法在线安装更新。".into(),
+        ));
+    }
     let current_version = app.package_info().version.to_string();
     let update = app.updater().map_err(update_error)?.check().await.map_err(update_error)?;
     let Some(update) = update else {

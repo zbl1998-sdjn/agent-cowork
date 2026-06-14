@@ -102,10 +102,8 @@ function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
   const rows: ObservabilityRow[] = [];
   for (const event of (record.events || [])) {
     const source = event as Record<string, unknown>;
-    // Current event shape from agent-stream: { type:'tool_call', name, args }.
-    // No explicit reason field, so when none of the optional reason aliases is
-    // present we summarise the args instead — at least the user sees WHAT was
-    // called, not just a row that says "原因未记录".
+    // agent-stream 当前事件形状为 { type:'tool_call', name, args };没有显式 reason 时,
+    // 用参数摘要兜底,至少让用户知道调用了什么,而不是只看到"原因未记录"。
     if (text(source.type) === 'tool_call') {
       const name = text(source.name || source.tool);
       if (!name) continue;
@@ -115,9 +113,8 @@ function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
       rows.push({ label: name, value: reason });
       continue;
     }
-    // Current RunTrace shape: { kind:'tool_decision', step, modelMessage:{ content, tool_calls:[{function:{name,arguments}}] } }
-    // The reason is the assistant's text BEFORE calling the tool (modelMessage.content),
-    // and one row per tool call so the panel groups by tool name.
+    // RunTrace 当前形状为 { kind:'tool_decision', step, modelMessage:{ content, tool_calls:[...] } };
+    // 工具调用前的助手文本(modelMessage.content)就是原因,每个工具调用单独出一行便于按工具名分组。
     if (text(source.kind) === 'tool_decision') {
       const modelMessage = source.modelMessage as Record<string, unknown> | null | undefined;
       if (!modelMessage || typeof modelMessage !== 'object') continue;
@@ -140,9 +137,8 @@ function toolReasonRowsFromRecord(record: RunRecord): ObservabilityRow[] {
   });
 }
 
-// Tokens may sit at metrics.tokens (preferred) OR — when the host only records
-// the agent outcome — under result.usage (OpenAI-compatible {prompt_tokens,
-// completion_tokens, total_tokens}). Read both so the card stops saying '—'.
+// token 优先取 metrics.tokens;若 host 只记录了 Agent 结果,则兼容读取 result.usage
+// (OpenAI 兼容字段 prompt_tokens/completion_tokens/total_tokens),避免用量卡片空白。
 function resolveTokensFromRecord(record: RunRecord): Record<string, unknown> {
   const metrics = (record.metrics || {}) as Record<string, unknown>;
   const fromMetrics = metrics.tokens as Record<string, unknown> | undefined;

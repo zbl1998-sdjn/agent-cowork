@@ -1,15 +1,8 @@
-//
 // 后台长任务登记表(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
 // 职责:跟踪长时间运行的任务,使 UI 能显示进度、外壳能在完成时弹通知。纯内存、无外部依赖——真正的系统
 //       通知经 onComplete 订阅者接入,从而保持分层干净(L2,无上行依赖)且完全可测。
 // 依赖:无。导出:后台任务登记表工厂。
-// Background long-task registry (05-B6).
-//
-// Tracks long-running tasks so the UI can show progress and the shell can fire
-// a completion notification when one finishes. Pure, in-memory, no external
-// deps — the actual OS notification plugs in via `onComplete` subscribers, so
-// this stays layer-clean (L2 runtime, no upward imports) and fully testable.
 
 export type BackgroundTaskStatus = 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -45,6 +38,7 @@ export type BackgroundTaskStore = {
   onComplete(cb: BackgroundTaskSubscriber): () => boolean | undefined;
 };
 
+// 终态集合单独维护,让 pendingCount/list 的状态判断保持一致。
 const TERMINAL = new Set<BackgroundTaskStatus>(['done', 'failed', 'cancelled']);
 const STATUSES = new Set<BackgroundTaskStatus>(['running', ...TERMINAL]);
 
@@ -59,11 +53,11 @@ export function createBackgroundTasks({
   function notifyComplete(task: BackgroundTask): void {
     const snap = snapshot(task);
     for (const cb of completeSubscribers) {
-      // A subscriber error must never break task completion.
+      // 订阅者异常不能影响任务落终态,否则通知插件会拖垮核心状态机。
       try {
         cb(snap);
       } catch {
-        /* ignore */
+        /* 后台任务错误已记录,这里不再向外抛 */
       }
     }
   }

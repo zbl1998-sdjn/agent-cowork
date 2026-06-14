@@ -36,6 +36,7 @@ function cleanText(value: unknown): string {
 }
 
 /**
+ * 执行一次短超时后端探测,把异常、非零退出和标准输出统一折叠为可展示 detail。
  */
 function runProbe(
   spawnSync: SpawnSyncLike,
@@ -142,6 +143,7 @@ function fallbackReason(backends: StartupBackends): string {
 }
 
 /**
+ * 显式指定后端时直接尊重用户选择,只把隔离能力和探测结果诚实写进 info。
  */
 function explicitStartup({
   requestedBackend,

@@ -765,10 +765,19 @@ test('workspace file routes reject malformed request bodies', async () => {
     });
     assert.equal(upload.status, 400);
 
-    const search = await fetch(`${baseUrl}/api/files/search`, {
+    // 空 query 已是合法输入(裸 @ 列最近文件,见 searchBodySchema 注释);畸形校验改用非字符串 query。
+    const emptyQuerySearch = await fetch(`${baseUrl}/api/files/search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ trustedRoot, query: '' }),
+    });
+    assert.equal(emptyQuerySearch.status, 200);
+    assert.ok(Array.isArray(recordValue(await emptyQuerySearch.json(), 'empty query search').results), 'empty query lists recent files');
+
+    const search = await fetch(`${baseUrl}/api/files/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ trustedRoot, query: 123 }),
     });
     assert.equal(search.status, 400);
 

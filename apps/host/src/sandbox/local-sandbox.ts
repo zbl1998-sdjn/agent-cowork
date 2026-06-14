@@ -12,20 +12,7 @@ import { runConstrainedChild } from './exec-child.js';
 import type { RunChildResult, SpawnLike } from './exec-child.js';
 import type { SandboxSpec } from './sandbox-spec.js';
 
-// Local subprocess sandbox adapter.
-//
-// Runs a normalised SandboxSpec as a constrained child process on the host:
-//   - no shell (argv array; spec values cannot inject shell syntax)
-//   - cwd jailed to the trusted root
-//   - sanitised environment (only the spec's allowlisted env is passed)
-//   - hard timeout (SIGKILL) + output byte cap  (see exec-child.js)
-//
-// Honesty note: a plain host subprocess CANNOT enforce network isolation. This
-// adapter therefore always reports `networkIsolated: false` and surfaces a
-// warning when `network` was requested off. True isolation is the job of the
-// VM adapter (WSL2/Docker), which shares the same `exec(spec, ctx)` interface.
-
-export type SandboxExecContext = { trustedRoot?: string; context?: Record<string, unknown> };
+export type SandboxExecContext = { trustedRoot?: string; context?: Record<string, unknown>; signal?: AbortSignal | null };
 export type SandboxExecResult = RunChildResult & {
   backend: string;
   networkIsolated: boolean;
@@ -73,6 +60,7 @@ export class LocalSubprocessSandbox {
       env,
       timeoutMs: spec.timeoutMs,
       maxOutputBytes: spec.maxOutputBytes,
+      abortSignal: ctx.signal ?? null,
     });
 
     return {

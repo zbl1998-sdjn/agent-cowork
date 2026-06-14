@@ -3,14 +3,8 @@
 // 职责:本地与 VM(WSL/Docker)后端共用的子进程启动方式——无 shell、argv 数组、硬超时(SIGKILL)、
 //       输出字节上限。集中在此,保证各后端的安全行为一致。
 // 亮点:CappedBuffer 在「写入时」即限内存(超额只计数不保留),避免高产出命令在超时前耗尽堆。
-// 依赖:无。导出:createCappedBuffer / runConstrainedChild。
-//
-// Shared constrained child-process runner.
-//
-// Both the local subprocess adapter and the VM (WSL/Docker) runner spawn a
-// child the same way: no shell, argv array, hard timeout (SIGKILL), and an
-// output byte cap. Centralising it here keeps that safety behaviour in one
-// place and identical across backends.
+// 依赖:node:child_process(仅 Windows 下 taskkill 终止进程树)。导出:createCappedBuffer / runConstrainedChild。
+import childProcess from 'node:child_process';
 
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
 
@@ -18,6 +12,7 @@ export type StreamLike = {
   on(event: 'data', listener: (chunk: unknown) => void): unknown;
 };
 export type ChildLike = {
+  pid?: number;
   stdout: StreamLike;
   stderr: StreamLike;
   kill(signal?: string): void;
@@ -39,6 +34,7 @@ export type RunChildOptions = {
   env: Record<string, string>;
   timeoutMs: number;
   maxOutputBytes: number;
+  abortSignal?: AbortSignal | null;
 };
 export type RunChildResult = {
   exitCode: number;
@@ -52,32 +48,17 @@ export type RunChildResult = {
   durationMs: number;
 };
 
-/**
- * A streaming, memory-bounded sink for a child stdout/stderr stream.
- *
- * The previous implementation buffered EVERY chunk into an array and only
- * truncated after the process closed — so a high-output command (`yes`,
- * `cat hugefile`, a chatty build) could exhaust the heap long before the
- * timeout fired, defeating the point of `maxOutputBytes`.
- *
- * This sink instead caps retained memory at `maxBytes` on ingestion: chunks
- * past the cap are counted (so we still know output was truncated and how many
- * bytes were produced) but discarded. We keep consuming `data` events so the
- * child's pipe drains and a *bounded* command can still finish naturally with a
- * real exit code; an *unbounded* producer is bounded in time by the SIGKILL
- * timeout. Either way memory stays O(maxBytes).
- */
 /** 造一个「写入即限内存」的输出缓冲:超过 maxBytes 的分块只计数不保留,内存恒为 O(maxBytes)。 */
 export function createCappedBuffer(maxBytes: number): CappedBuffer {
   const cap = Math.max(1, Number(maxBytes) || DEFAULT_MAX_OUTPUT_BYTES);
   const parts: Buffer[] = [];
-  let stored = 0; // bytes actually retained (<= cap)
-  let total = 0;  // bytes seen (pre-truncation)
+  let stored = 0; // 实际保留的字节数(<= cap)。
+  let total = 0;  // 已见总字节数(截断前)。
   return {
     push(chunk) {
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
       total += buf.length;
-      if (stored >= cap) return; // already full — count only
+      if (stored >= cap) return; // 缓冲已满,之后只计数不保留。
       if (stored + buf.length <= cap) {
         parts.push(buf);
         stored += buf.length;
@@ -93,11 +74,24 @@ export function createCappedBuffer(maxBytes: number): CappedBuffer {
 }
 
 /**
- * 在资源限制下运行子进程:无 shell、限时(到点 SIGKILL)、stdout/stderr 各自限额,返回结构化结果。
- * Run a child process under resource limits.
- *
+ * 杀「整棵进程树」。Windows 关键:本地 Shell 是 `powershell.exe -Command "<cmd>"`,
+ * child.kill 只终止 powershell 壳,长命令(如 ping)是其孙进程会成孤儿继续跑、
+ * 其继承的 stdout/stderr 管道不关 → 'close' 迟迟不触发 → 取消对在跑 shell 无效。
+ * 故 Windows 用 `taskkill /PID <pid> /T /F` 连子孙一起终止;其余平台回退 child.kill。
  */
-export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes }: RunChildOptions): Promise<RunChildResult> {
+function killProcessTree(child: ChildLike): void {
+  const pid = child.pid;
+  if (process.platform === 'win32' && pid) {
+    try {
+      childProcess.spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+      return;
+    } catch { /* 回退到直接 kill */ }
+  }
+  try { child.kill('SIGKILL'); } catch { /* 进程可能已退出 */ }
+}
+
+/** 在资源限制下运行子进程:无 shell、限时(到点杀整棵进程树)、stdout/stderr 各自限额,返回结构化结果。 */
+export async function runConstrainedChild({ spawn, command, args, cwd, env, timeoutMs, maxOutputBytes, abortSignal }: RunChildOptions): Promise<RunChildResult> {
   const startedAt = Date.now();
   const child = spawn(command, args, {
     cwd,
@@ -116,8 +110,15 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
 
   const timer = setTimeout(() => {
     timedOut = true;
-    child.kill('SIGKILL');
+    killProcessTree(child);
   }, timeoutMs);
+
+  // 取消/超时信号到达即杀整棵进程树——治"UI 已停止后 shell 仍在跑/写文件"(Windows 须连 shell 壳的子孙一起杀)。
+  const onAbort = () => killProcessTree(child);
+  if (abortSignal) {
+    if (abortSignal.aborted) onAbort();
+    else abortSignal.addEventListener('abort', onAbort, { once: true });
+  }
 
   const closed: Promise<{ code: number | null; signal: string | null }> = new Promise((resolve, reject) => {
     child.on('error', (err2) => reject(err2));
@@ -139,5 +140,6 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
     };
   } finally {
     clearTimeout(timer);
+    if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
   }
 }

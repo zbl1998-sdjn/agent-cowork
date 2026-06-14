@@ -101,10 +101,9 @@ export function createRequestContext(request: HttpRequestLike): RequestContext {
   const traceId = stableHeader(headerValue(request, 'x-trace-id'), `trace_${crypto.randomUUID()}`);
   return {
     traceId,
-    // SECURITY: tenant/user are NOT read from client headers (those are
-    // spoofable — trusting them let any caller impersonate any tenant). They
-    // start as the local identity and are overwritten ONLY by a verified
-    // session/JWT in the request entry. `authenticated` then gates /api/*.
+    // 安全边界:tenant/user 不从客户端 header 读取,因为 header 可伪造,信任它会允许
+    // 任意调用方冒充任意租户。这里先落到本地身份,只允许请求入口处通过已验证
+    // session/JWT 覆写;`authenticated` 再作为 /api/* 的访问闸门。
     tenantId: 'tenant_local',
     userId: 'user_local',
     authenticated: false,
@@ -153,16 +152,13 @@ export function readJsonBody(request: HttpRequestLike, { maxBytes = 1024 * 1024 
       totalBytes += buffer.length;
       if (totalBytes > maxBytes) {
         rejected = true;
-        // DoS guard: refuse oversized bodies. Pause (don't destroy yet) so the
-        // caller can send a clear 413 response FIRST — Node then closes the
-        // socket once the response finishes with the body still unread, instead
-        // of the client seeing a bare connection reset.
+        // DoS 防护:拒绝超大 body。这里先暂停/标记拒绝,不要直接 destroy socket;
+        // 调用方能先发出清晰的 413,随后 Node 在响应结束时关闭未读完的连接。
+        // 这样客户端看到的是明确状态码,不是裸连接重置。
         const err = new Error(`Request body too large; max ${maxBytes} bytes`) as HttpError;
         err.statusCode = 413;
-        // Drain & DISCARD the rest (don't buffer it) so the caller can send a
-        // clean 413 and the connection closes normally — the client gets a real
-        // status code instead of a connection reset. Subsequent chunks hit the
-        // `rejected` guard above and are dropped, so memory stays bounded.
+        // 继续 drain 并丢弃后续数据(不再入内存),保证响应能正常完成且内存保持有界。
+        // 后续 chunk 会命中上面的 `rejected` guard 直接返回。
         if (typeof request.resume === 'function') request.resume();
         reject(err);
         return;
@@ -206,7 +202,7 @@ export async function withJsonBody(
   try {
     body = await readJsonBody(request, options);
   } catch (err) {
-    // 413 for oversized bodies, 400 for malformed JSON.
+    // 超大 body 返回 413,JSON 格式错误返回 400。
     const httpErr = err as Partial<HttpError>;
     sendJson(response, httpErr.statusCode || 400, { error: `Invalid JSON body: ${httpErr.message}` });
     return;

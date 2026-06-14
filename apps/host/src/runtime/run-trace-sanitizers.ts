@@ -7,12 +7,14 @@ import { redactText } from '../security/redaction.js';
 const SECRET_KEY_RE = /(?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|secret|password|passwd|authorization)/i;
 
 /**
+ * 判断值是否是可递归遍历的普通对象。
  */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
+ * 把可选值转成非空文本;空值返回 undefined 便于后续省略字段。
  */
 export function nonEmptyText(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -21,6 +23,7 @@ export function nonEmptyText(value: unknown): string | undefined {
 }
 
 /**
+ * 对 trace 文本脱敏并按字符上限裁剪,同时返回是否发生截断。
  */
 export function sanitizeText(text: string, maxChars: number): { value: string; truncated: boolean } {
   const redacted = redactText(text) || '';
@@ -34,6 +37,7 @@ export function sanitizeText(text: string, maxChars: number): { value: string; t
 }
 
 /**
+ * 递归清洗 trace 值:敏感键抹除、文本脱敏裁剪、函数/undefined 省略。
  */
 export function sanitizeValue(value: unknown, options: { maxTextChars: number; key?: string }): { value: unknown; truncated: boolean } {
   const { maxTextChars, key = '' } = options;
@@ -73,6 +77,7 @@ export function sanitizeValue(value: unknown, options: { maxTextChars: number; k
 }
 
 /**
+ * 尝试把字符串解析成 JSON;失败时保留原值,供后续以 raw 形式记录。
  */
 export function parseMaybeJson(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -84,6 +89,7 @@ export function parseMaybeJson(value: unknown): unknown {
 }
 
 /**
+ * 解析并清洗工具参数;非对象参数统一包进 raw,避免 trace 结构漂移。
  */
 export function parseToolArgs(value: unknown, maxTextChars: number): Record<string, unknown> {
   const parsed = parseMaybeJson(value === undefined ? {} : value);
@@ -95,6 +101,7 @@ export function parseToolArgs(value: unknown, maxTextChars: number): Record<stri
 }
 
 /**
+ * 归一化单次工具调用,兼容 OpenAI tool_call 与本地简化字段。
  */
 export function normalizeToolCall(call: unknown, maxTextChars: number): { callId: string | undefined; tool: string; args: Record<string, unknown> } {
   const source = isRecord(call) ? call : {};
@@ -108,6 +115,7 @@ export function normalizeToolCall(call: unknown, maxTextChars: number): { callId
 }
 
 /**
+ * 归一化工具定义列表,只保留名称、描述和参数 schema 的安全快照。
  */
 export function normalizeTools(tools: unknown, maxTextChars: number): unknown[] {
   if (!Array.isArray(tools)) return [];

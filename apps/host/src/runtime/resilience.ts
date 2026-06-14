@@ -2,11 +2,6 @@
 // ---------------------------------------------------------------------------
 // 职责:超时、带退避的重试、分层降级链。与熔断器(circuit-breaker.js)一起实现优雅降级:调用限时、
 //       瞬时故障重试若干次、最终经 fallback 层降级而非硬失败。依赖:无。导出:TimeoutError + withTimeout/retry/fallback。
-//
-// Resilience helpers — timeout, retry-with-backoff, and a layered fallback chain.
-// Together with the circuit breaker (circuit-breaker.js) these implement graceful
-// degradation: a call is bounded in time, retried a few times for transient
-// faults, and finally degraded through fallback layers instead of hard-failing.
 
 export class TimeoutError extends Error {
   readonly code = 'ETIMEDOUT';
@@ -17,9 +12,7 @@ export class TimeoutError extends Error {
   }
 }
 
-// Reject if `promise` doesn't settle within `ms`. The underlying work isn't
-// cancelled (pass an AbortSignal to the worker if you need that); this just stops
-// the caller from waiting forever.
+// 如果 promise 在 ms 内没有 settle,立即拒绝调用方等待;底层任务是否取消由调用方传入 AbortSignal 决定。
 export function withTimeout<T>(promise: Promise<T> | T, ms: number, label?: string): Promise<T> {
   if (!Number.isFinite(ms) || ms <= 0) return Promise.resolve(promise);
   return new Promise((resolve, reject) => {
@@ -33,9 +26,7 @@ export function withTimeout<T>(promise: Promise<T> | T, ms: number, label?: stri
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Retry `fn` with exponential backoff + jitter. `shouldRetry(err, attempt)` lets
-// callers skip retries for non-transient errors (e.g. 4xx, auth). `sleep` is
-// injectable so tests run instantly.
+// 指数退避 + jitter 重试;shouldRetry 用于跳过非瞬时错误,sleep 可注入以保证测试不等待真实时间。
 export type RetryOptions = {
   retries?: number;
   baseDelayMs?: number;
@@ -72,9 +63,7 @@ export async function withRetry<T>(
   }
 }
 
-// Try each layer in order; return the first success. This is the "3-layer
-// fallback" primitive: e.g. [primaryModel, degradedModel, deterministicFallback].
-// Throws FallbackExhaustedError (with .errors) only if every layer fails.
+// 按顺序尝试降级层,返回第一个成功结果;只有所有层失败时才抛出带 errors 的 FallbackExhaustedError。
 export type FallbackExhaustedError = Error & { code?: string; errors?: unknown[] };
 
 export async function fallbackChain<T>(
@@ -90,7 +79,7 @@ export async function fallbackChain<T>(
     } catch (err) {
       errors.push(err);
       if (typeof onLayerError === 'function') {
-        try { onLayerError(err, i); } catch { /* observer must not break the chain */ }
+        try { onLayerError(err, i); } catch { /* 观察者异常不能中断降级链。 */ }
       }
     }
   }

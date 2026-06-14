@@ -70,6 +70,29 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
   await assert.rejects(() => byName('Write').handler({ path: '../escape.txt', content: 'x' }), /escaped|Sensitive|outside/i);
 });
 
+test('Write accepts an absolute path that is already inside the workspace (no double-join)', async () => {
+  const root = tempRoot('kcw-agent-');
+  const write = agentTool(createAgentTools({ trustedRoot: root }), 'Write');
+
+  // 模型常给「工作区根目录下的绝对路径」(如 <root>\report.md)。早先 within 用
+  // path.join(root, absPath) 会拼成 <root>\<root>\report.md → mkdir ENOENT。
+  const absInside = path.join(root, 'report.md');
+  const res = parseWriteResult(await write.handler({ path: absInside, content: 'hi' }));
+  assert.equal(res.ok, true);
+  assert.equal(fs.readFileSync(path.join(root, 'report.md'), 'utf8'), 'hi');
+  // 必须没有产生双拼的影子目录:root 顶层应当只有这一个文件(平台无关断言)。
+  assert.deepEqual(fs.readdirSync(root).sort(), ['report.md']);
+
+  // 绝对但在 root 之外仍须被拒(安全边界不能因此松动)。
+  const outside = path.join(path.parse(root).root, 'Windows', 'escape.md');
+  await assert.rejects(() => Promise.resolve(write.handler({ path: outside, content: 'x' })), /trusted root|escaped/i);
+
+  // Read 绝对路径同样不应双拼。
+  const read = agentTool(createAgentTools({ trustedRoot: root }), 'Read');
+  const readBack = parseReadResult(await read.handler({ path: absInside }));
+  assert.equal(readBack.content, 'hi');
+});
+
 test('Edit replaces a string in a workspace file', async () => {
   const root = tempRoot('kcw-agent-');
   fs.writeFileSync(path.join(root, 'c.txt'), 'foo bar foo', 'utf8');

@@ -1,5 +1,4 @@
-// Classic-script Artifact controller. It keeps host-facing catalog reads behind
-// one small factory so app.js can keep shrinking without changing load mode.
+// classic-script Artifact 控制器:把面向 host 的目录读取封装到小工厂里,让 app.js 继续瘦身。
 (function () {
   function normalizeArtifact(item: any) {
     if (!item || typeof item !== "object") {

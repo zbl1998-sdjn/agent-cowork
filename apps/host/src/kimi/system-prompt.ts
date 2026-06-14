@@ -4,10 +4,6 @@
 //       模式规则 + skills/记忆注入 + 内联图表/建议提示;纯函数无 I/O,易单测。
 // 依赖:仅标准库(Date 等)。
 // 导出:SYSTEM_PROMPT_VERSION、buildEnvBlock、buildSystemPrompt。
-// Builds the agent's system prompt: capability framing + plan-mode rules +
-// skills/memory injection + inline-viz/suggestions hints. Pure (no I/O), so it
-// is trivially unit-testable and kept out of the agent loop module.
-
 export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v2';
 
 const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
@@ -23,16 +19,7 @@ type SystemPromptOptions = {
   env?: EnvFacts;
 };
 
-/**
- * Render the env block that pins the model to real-world facts: today's date,
- * working directory, OS, app version, current model. Without this block the
- * model answers "what year is it?" from its training cutoff (Kimi K2: ~2024-end).
- * Designed to live at the very TOP of the system prompt so it survives any
- * context-window compaction.
- *
- * 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,
- * 放在系统提示词最顶部,避免模型凭训练截止时间猜测「今天/最近」。
- */
+/** 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,放在系统提示词最顶部。 */
 export function buildEnvBlock({
   now = new Date(),
   trustedRoot = '',
@@ -75,13 +62,8 @@ export function buildSystemPrompt({
     '你可以调用提供的工具来读写工作区文件、运行命令、抓取网页、调用已连接的外部连接器(MCP)，真正完成用户的任务，而不只是给建议。',
     '文件工具：Read 读文件、Glob 找文件、Grep 搜内容、Write 写文件、Edit 精确替换；需要跑命令用 Shell；需要联网搜索"今天/最近/最新"信息(新闻、文档版本、价格、是否还活着)用 WebSearch,知道具体网址用 web.fetch；外部能力用 mcp__ 开头的工具。所有文件操作限定在工作区内。',
     '开发工具：GitStatus/GitDiff/GitLog 是只读 git 工具；GitCommit 会创建提交，属于高风险变更，必须等待用户审批，不能静默提交。',
-    // Windows-awareness + balanced tool guidance. Steer file *inspection* to the
-    // native Read/Glob/Grep (faster, no approval) and away from broken Linux
-    // shell commands — but DON'T discourage Shell overall: for tasks that need to
-    // run commands/scripts/builds/git, the model should proactively use Shell
-    // (it really executes on the box now), using Windows/PowerShell-compatible
-    // commands. Earlier over-restriction made the model refuse to run commands
-    // unless explicitly told to.
+    // Windows 工具分寸:查看文件优先 Read/Glob/Grep;真正执行命令/脚本/build/git 时应主动用 Shell。
+    // 这里强调 PowerShell 写法,避免模型生成 Linux-only 命令。
     '【运行环境】你在 Windows 上运行；要执行命令时用 Windows/PowerShell 能识别的写法(如 Get-ChildItem、dir、type、git、npm、node、python，而不是 ls/find/cat/head 这类 Linux 命令)。',
     '【主动动手完成任务】该用工具就直接用，不要只给建议、也不要等用户点名让你用某个工具：读文件/找文件/搜内容用 Read/Glob/Grep；要运行命令、跑脚本、构建、git 操作、查系统信息、处理数据等，就主动用 Shell(它在本机真实执行，会请用户逐条确认)；联网用 WebFetch；外部能力用 mcp__ 工具。',
     '【两点分寸】① 只有"查看/搜索文件"这种场景优先用 Read/Glob/Grep，而不是用 Shell 跑 ls/cat/grep——前者更快且无需批准；凡是真要执行命令/脚本/程序的任务，该用 Shell 就大胆用，别畏手畏脚。② 别用 `**/*` 暴力遍历很大的目录(先用更精确的 Glob 或限定子目录/扩展名)，也别为同一件事反复换不同工具来回试探。',

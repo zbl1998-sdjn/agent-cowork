@@ -84,6 +84,11 @@ test('git read-only tools are jailed and expose status/diff/log output', async (
     () => createGitDiffTool().handler({ path: '../outside.txt' }, { trustedRoot: root }),
     /escaped|outside|Sensitive/i,
   );
+
+  // 模型常给「root 内的绝对路径」:resolveGitPath 不应把它再 join 一次(双拼成 <ws>\C:\...)。
+  const absDiff = gitRunResult(await createGitDiffTool().handler({ path: path.join(root, 'a.txt'), context: 1 }, { trustedRoot: root }));
+  assert.equal(absDiff.ok, true);
+  assert.match(absDiff.stdout, /\+two/);
 });
 
 test('git tools reject unknown input keys before command execution', async () => {

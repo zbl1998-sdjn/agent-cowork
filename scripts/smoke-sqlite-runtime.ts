@@ -181,7 +181,8 @@ async function main(): Promise<void> {
     });
     assert(fact.status === 200, `memory fact failed: ${JSON.stringify(fact.body)}`);
 
-    const run = await requestJson(baseUrl, '/api/recipes/meeting-actions/run', {
+    // 持久化 smoke 用不需来源的配方(folder-organize):meeting-actions 等转换型配方要求来源材料,空 files 会被 422 熔断。
+    const run = await requestJson(baseUrl, '/api/recipes/folder-organize/run', {
       method: 'POST',
       token,
       idempotencyKey: 'sqlite-runtime-run',

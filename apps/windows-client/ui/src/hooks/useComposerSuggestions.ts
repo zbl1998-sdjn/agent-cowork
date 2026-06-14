@@ -4,7 +4,7 @@
 //       依赖:lib/composer-trigger 纯逻辑 + 起步建议数据源。
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { MENTION_SEARCH_DEBOUNCE_MS, shouldDebounceMentionSearch } from '../lib/composer-logic';
+import { MENTION_SEARCH_DEBOUNCE_MS } from '../lib/composer-logic';
 import {
   buildHistorySuggestionItems,
   buildMentionSuggestionItems,
@@ -17,25 +17,25 @@ import type { ComposerTriggerChar } from '../components/ComposerTriggers';
 import type { FileHit, HistoryRun, Recipe } from '../components/composer-types';
 
 export interface UseComposerSuggestionsOptions {
-  /** Current textarea value (controlled). */
+  /** 当前受控 textarea 值。 */
   value: string;
-  /** Controlled setter for the textarea value. */
+  /** textarea 的受控 setter。 */
   setValue: (next: string) => void;
-  /** Reference to the underlying textarea — needed to read caret + focus. */
+  /** 底层 textarea 引用,用于读取光标与恢复焦点。 */
   textareaRef: RefObject<HTMLTextAreaElement>;
-  /** Async search for @-mentions; returns up to N file hits. */
+  /** @ 提及的异步搜索,返回最多 N 个文件命中。 */
   searchFiles: (query: string) => Promise<FileHit[]>;
-  /** Recipes catalogue for /-template suggestions. */
+  /** / 模板建议使用的配方目录。 */
   recipes: Recipe[];
-  /** Previous runs catalogue for #-history suggestions. */
+  /** # 历史建议使用的历史运行目录。 */
   historyRuns: HistoryRun[];
-  /** Slash-commands surfaced alongside templates. */
+  /** 与模板一起展示的斜杠命令。 */
   slashCommands: Array<{ id: string; label: string; run: () => void }>;
-  /** Notified when the user picks a template recipe. */
+  /** 用户选择模板配方时通知父层。 */
   onPickTemplate?: ((recipe: Recipe) => void) | undefined;
-  /** Notified when the user picks a previous run. */
+  /** 用户选择历史运行时通知父层。 */
   onPickHistory?: ((run: HistoryRun) => void) | undefined;
-  /** From useComposerRefine — lets it reset its "the prompt changed" flag. */
+  /** 来自 useComposerRefine,用于重置「提示词已变化」标记。 */
   markChanged: (next: string) => void;
 }
 
@@ -49,10 +49,8 @@ export interface UseComposerSuggestionsResult {
   insertTrigger: (char: ComposerTriggerChar) => void;
 }
 
-// Owns the textarea-suggestion state machine (mode / items / active / trigger
-// position) plus the imperative onChange/insertTrigger/close glue. Extracted
-// from Composer.tsx so the parent file stays under the file-size soft limit
-// and so the suggestion logic can be exercised independently.
+// 管理 textarea 建议弹窗状态机(mode/items/active/triggerStart)与 onChange/insertTrigger/close 胶水。
+// 从 Composer.tsx 拆出后,父文件保持在体量门限内,建议逻辑也能独立测试。
 export function useComposerSuggestions(opts: UseComposerSuggestionsOptions): UseComposerSuggestionsResult {
   const {
     value, setValue, textareaRef,
@@ -132,16 +130,14 @@ export function useComposerSuggestions(opts: UseComposerSuggestionsOptions): Use
     if (trigger?.mode === 'mention') {
       setMode('mention');
       setTriggerStart(trigger.triggerStart);
-      if (shouldDebounceMentionSearch(trigger.query)) scheduleMentions(trigger.query); else close();
+      // 空 query(刚点「引用文件」插入裸 @)也要弹菜单并列出最近文件,而不是 close()。
+      scheduleMentions(trigger.query);
       return;
     }
     close();
   }
 
-  // Visual replacement for the cryptic /-@-# slash triggers. The user clicks
-  // a button and we insert the trigger character (with a leading space if the
-  // caret isn't already at a word boundary), refocus, then call onChange so the
-  // existing trigger-detection logic surfaces the right suggestion popup.
+  // 给 /、@、# 触发符提供可视化按钮:插入触发字符、恢复焦点,再复用 onChange 的检测逻辑弹出建议。
   function insertTrigger(char: ComposerTriggerChar) {
     const el = textareaRef.current;
     const caret = el?.selectionStart ?? value.length;

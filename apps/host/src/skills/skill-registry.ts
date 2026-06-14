@@ -5,12 +5,6 @@
 // 依赖:同层 recipes/registry。导出:createSkillRegistry。
 import { listRecipes } from '../recipes/registry.js';
 
-// Skill registry: turns the recipe catalog into installable/toggleable "skills"
-// with a manifest (trigger keywords, permissions, output types) and an
-// enabled/disabled state. This is the seam toward a real skill/plugin system
-// (the Claude Cowork skills + marketplace direction) without changing how
-// recipes execute.
-
 type HttpError = Error & { statusCode?: number };
 
 export type RecipeDescriptor = {

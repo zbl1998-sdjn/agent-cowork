@@ -5,14 +5,6 @@
 // 依赖:runtime/run-events(L2,架构基线已显式豁免:本总线适配 runtime 的事件形状)。
 //       pg 运行时按需 import。后端:PostgreSQL(NOTIFY 通道)。
 // 导出:PostgresEventBus(类) · createPostgresEventBus(工厂)。
-//
-// Cross-instance run-event pub/sub backed by PostgreSQL LISTEN/NOTIFY.
-//
-// Keeps the RunEventBus surface (publish / subscribe / replay / subscriberCount)
-// so it is a drop-in for multi-instance SSE: an event produced on instance A is
-// NOTIFY'd and re-injected into every instance's LOCAL bus, so an SSE client
-// connected to instance B receives it. Delivery goes through NOTIFY only (the
-// publisher receives its own NOTIFY too), guaranteeing single local delivery.
 import { RunEventBus } from '../runtime/run-events.js';
 import type { RunEvent, RunEventHandler, RunEventPublishInput } from '../runtime/run-events.js';
 
@@ -109,15 +101,13 @@ export class PostgresEventBus {
       try { data = JSON.parse(msg.payload); } catch { return; }
       if (data && typeof data === 'object' && 'runId' in data && 'event' in data) {
         const remote = data as { runId?: unknown; event?: RunEventPublishInput };
-        // Re-inject the remote event into the local bus -> local subscribers + replay ring.
-        try { this._local.publish(String(remote.runId), remote.event as RunEventPublishInput); } catch { /* ignore */ }
+        // 把远端事件重新注入本地总线,让本地订阅者与 replay ring 都收到。
+        try { this._local.publish(String(remote.runId), remote.event as RunEventPublishInput); } catch { /* 忽略坏事件 */ }
       }
     });
     await client.query(`LISTEN ${this._channel}`);
   }
 
-  // Fan out via NOTIFY only; the publisher's own LISTEN connection delivers it
-  // back locally, so subscribers (here or on any instance) receive it exactly once.
   /** 仅通过 NOTIFY 扇出事件(本地由自身 LISTEN 连接收回投递)。 */
   async publish(runId: string, event: RunEventPublishInput): Promise<void> {
     if (!runId) throw new Error('PostgresEventBus.publish: runId required');
@@ -126,8 +116,7 @@ export class PostgresEventBus {
       const client = await this._getClient();
       await (this._pool || client).query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ runId, event })]);
     } catch {
-      // Preserve the in-memory bus contract: transient NOTIFY failures do not
-      // break the caller's run loop; health checks own surfacing PG outages.
+      // 保持内存总线契约:瞬时 NOTIFY 失败不打断运行循环,PG 故障由健康检查暴露。
     }
   }
 

@@ -26,7 +26,7 @@ describe('Composer', () => {
     expect(html).toContain('value="anthropic"');
     expect(html).toContain('value="openai/local"');
     expect(html).toContain('title="本轮模型"');
-    // Base URL / API Key moved to Settings — credentials must not live in the composer.
+    // Base URL / API Key 已移到 Settings;凭据绝不能出现在输入框组件里。
     expect(html).not.toContain('title="本轮 Base URL"');
     expect(html).not.toContain('placeholder="本轮 API Key"');
     expect(html).not.toContain('type="password"');

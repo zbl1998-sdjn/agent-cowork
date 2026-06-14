@@ -40,8 +40,7 @@ export function buildContextBundle(input: ContextBundleInput): ContextBundle {
   const trustedRoot = input.root ?? input.trustedRoot;
   const paths = input.paths ?? [];
   const maxTextSize = input.maxTextSize ?? 256 * 1024;
-  // Global budget across all bundled files (not just per-file) so a big directory
-  // can't blow up the model context window or host memory.
+  // 全局预算覆盖所有打包文件,防止大目录撑爆模型上下文或 host 内存。
   const maxTotalBytes = input.maxTotalBytes ?? 4 * 1024 * 1024;
   const maxFiles = input.maxFiles ?? 200;
   const fsStat = input.fsStatFn || ((candidate: string) => fs.statSync(candidate));
@@ -72,7 +71,7 @@ export function buildContextBundle(input: ContextBundleInput): ContextBundle {
     const isFile = stats ? stats.isFile() : false;
 
     if (!isDirectory && !isFile) {
-      // For compatibility in tests/CLI usage, attempt direct read and mark skip on failure.
+      // 兼容测试/CLI 场景:非普通文件也尝试直接读,失败再记入 skipped。
       fileTargets.add(resolved);
       continue;
     }

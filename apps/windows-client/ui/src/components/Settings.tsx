@@ -7,8 +7,7 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsTabsContent, type SettingsPersistPayload } from './SettingsTabsContent';
 import type { SettingsTab } from './settings-types';
 
-// Re-exported so existing callers (App.tsx, Settings.test.tsx) keep their
-// import paths working unchanged (we just rehomed the type to settings-types).
+// 再导出 SettingsTab,让 App.tsx/Settings.test.tsx 的旧 import path 不变。
 export type { SettingsTab } from './settings-types';
 
 const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
@@ -35,12 +34,9 @@ interface SettingsProps {
   onSaved: (info: KimiInfo) => void;
 }
 
-// Unified settings center (kimi.exe style): account / appearance / model / API /
-// self-check tabs in one modal. The API key is shown only as a `hasKey` flag and
-// never echoed back; saving an empty key keeps the existing one.
-//
-// Modal frame + state + persistence live here; per-tab body markup lives in
-// SettingsTabsContent so each file stays under the file-size soft limit.
+// 统一设置中心:账户/外观/模型/API/健康检查在一个模态框里。
+// API key 只展示 hasKey 标记,绝不回显;保存空 key 会保留原 key。
+// 模态框状态与持久化留在此处,各标签正文放进 SettingsTabsContent 以控制文件体量。
 export function Settings({ initialTab = 'account', username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [apiKey, setApiKey] = useState('');
@@ -65,7 +61,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
         setModel(info.model || '');
         setHasKey(Boolean(info.hasKey));
       } catch {
-        /* host not ready */
+        /* host 未就绪时保持默认值 */
       } finally {
         setLoading(false);
       }
@@ -82,7 +78,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
     setTab(initialTab);
   }, [initialTab]);
 
-  // Load (or refresh) the self-check whenever its tab is opened.
+  // 打开健康检查标签时加载或刷新 self-check。
   const loadSelfCheck = () => {
     setScLoading(true); setScError('');
     getSelfCheck()

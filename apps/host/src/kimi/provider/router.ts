@@ -7,14 +7,6 @@
 // 依赖:仅标准库(不向上引用,layer-clean)。
 // 导出:orderProviderChain、runWithFallback、createProviderRouter。
 
-// Provider routing + fallback chain (P3-B).
-//
-// Pure orchestration over an ordered provider chain: try the primary, fall
-// through to the next on failure, and (optionally) deprioritize providers whose
-// circuit-breaker is open so a known-down provider is tried last instead of
-// first. Decoupled from concrete providers — the caller injects a per-provider
-// runner — so this stays pure, layer-clean (L1, no upward imports) and testable.
-
 import { omitUndefined } from '../../util/object.js';
 
 export type ProviderCandidate = string | Record<string, unknown>;
@@ -77,8 +69,7 @@ export function orderProviderChain(chain: unknown[] | null | undefined, { isOpen
   if (typeof isOpen !== 'function') {
     return unique;
   }
-  // Circuit-closed providers first (original order); open ones last, still
-  // attempted as a last resort rather than dropped.
+  // 熔断闭合的提供商按原顺序在前;开路者降到最后,仍作为最终兜底而非直接丢弃。
   const available = unique.filter((name) => !isOpen(name));
   const downed = unique.filter((name) => isOpen(name));
   return [...available, ...downed];

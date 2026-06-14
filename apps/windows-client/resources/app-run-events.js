@@ -30,9 +30,7 @@
         }
         return false;
     }
-    // Resolve an auth token if the host shipped one into this page. The legacy
-    // browser UI predates auth, so this is best-effort: with auth ON the call may
-    // still 401, in which case we fail once and degrade (no infinite retry).
+    // 若 host 把 auth token 注入页面则尽力读取;旧版浏览器 UI 早于鉴权,401 时只失败一次并降级。
     function resolveAuthToken() {
         try {
             return (window.AgentCoworkApi?.authToken ||
@@ -44,9 +42,8 @@
             return null;
         }
     }
-    // SSE over fetch (not EventSource): EventSource cannot send an Authorization
-    // header, so under the auth gate it 401s and retries forever. fetch lets us
-    // attach the bearer token and abort cleanly. Returns a handle with close().
+    // 用 fetch 跑 SSE 而不是 EventSource:后者不能带 Authorization,鉴权开启时会 401 并无限重试。
+    // fetch 可附带 bearer token 且能干净 abort,这里返回带 close() 的句柄。
     function subscribeRunEvents(message, runId, options = {}) {
         const state = options.state || window.agentCowork;
         const scrollConversationToEnd = options.scrollConversationToEnd || window.scrollConversationToEnd || function () { };
@@ -73,7 +70,7 @@
         const handle = { close: () => { closed = true; try {
                 controller.abort();
             }
-            catch { /* ignore */ } if (state.activeEventSource === handle)
+            catch { /* 忽略关闭竞态 */ } if (state.activeEventSource === handle)
                 state.activeEventSource = null; } };
         state.activeEventSource = handle;
         const dispatch = (type, payload) => {
@@ -102,8 +99,7 @@
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = "";
-                // Parse SSE frames: blocks separated by a blank line, each with optional
-                // `event:` and one or more `data:` lines.
+                // 解析 SSE 帧:空行分隔 block,每个 block 可带 event 与多行 data。
                 for (;;) {
                     const { value, done } = await reader.read();
                     if (done || closed)

@@ -92,7 +92,7 @@ function parseProfile(body: unknown): UserProfileData {
       return { version: 1, entries: parsed.entries.filter(isStoredEntry) };
     }
   } catch {
-    // Corrupt profile notes degrade to an empty editable profile.
+    // 画像笔记损坏时降级为空画像,让用户仍能重新编辑保存。
   }
   return emptyProfile();
 }

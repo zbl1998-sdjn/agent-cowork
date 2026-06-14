@@ -7,12 +7,6 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { ClarificationStore } from '../runtime/clarifications.js';
 
-// Clarification (AskUserQuestion) routes.
-//
-//   POST /api/clarify              { question, options } -> pending clarification
-//   GET  /api/clarify/:id          -> the clarification
-//   POST /api/clarify/:id/answer   { value } -> answered clarification
-
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteError = Error & { statusCode?: number };
 type ClarifyRouteOptions = {
@@ -35,8 +29,7 @@ const createClarificationBodySchema = z.preprocess(
       .trim()
       .min(1, 'clarification question is required')
       .max(MAX_QUESTION_LENGTH, 'clarification question too long'),
-    // Keep the route boundary tolerant: the runtime store already normalizes
-    // option shape, while this caps fan-out before values enter the registry.
+    // 路由边界保持宽容:运行时存储会规整 option 形状,这里先限制 fan-out 防止登记表膨胀。
     options: z.preprocess(
       (value) => (Array.isArray(value) ? value.slice(0, MAX_OPTION_COUNT) : []),
       z.array(z.unknown()).optional(),

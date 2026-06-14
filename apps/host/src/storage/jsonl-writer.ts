@@ -12,10 +12,8 @@ export type JsonlWriterOptions = {
   maxFiles?: unknown;
 };
 
-// Append-only JSONL writer with size-based rotation. Audit/event logs grow
-// without bound otherwise; here, once the file would exceed `maxBytes` we shift
-// `file -> file.1 -> file.2 ...` (dropping the oldest beyond `maxFiles`) and
-// start a fresh file. Defaults are overridable via env for ops tuning.
+// 审计/事件日志会持续增长,因此写入前按大小轮转:当前文件进入 .1,旧代后移,超出 maxFiles 的最旧代丢弃。
+// 默认阈值可通过环境变量调优。
 const DEFAULT_MAX_BYTES = Number(process.env.KCW_LOG_MAX_BYTES || 8 * 1024 * 1024);
 const DEFAULT_MAX_FILES = Math.max(1, Number(process.env.KCW_LOG_MAX_FILES || 3));
 
@@ -33,18 +31,16 @@ export class JsonlWriter {
 
   _rotateIfNeeded(incomingBytes: number): void {
     let size = 0;
-    try { size = fs.statSync(this.filePath).size; } catch { return; } // not created yet
+    try { size = fs.statSync(this.filePath).size; } catch { return; } // 文件尚未创建。
     if (size + incomingBytes <= this.maxBytes) return;
-    // Shift older generations (.N-1 -> .N), then copy current -> .1 and truncate
-    // it. We copy+truncate rather than rename because on Windows rename can't
-    // overwrite and its delete is async (rename-after-delete races); copyFileSync
-    // overwrites cleanly and is deterministic.
+    // 先移动旧代(.N-1 -> .N),再复制当前文件为 .1 并截断。
+    // Windows rename 覆盖/删除存在竞态,copy+truncate 更确定。
     for (let i = this.maxFiles - 1; i >= 1; i -= 1) {
       const src = i === 1 ? this.filePath : `${this.filePath}.${i - 1}`;
       const dst = `${this.filePath}.${i}`;
-      try { if (fs.existsSync(src)) fs.copyFileSync(src, dst); } catch { /* best-effort */ }
+      try { if (fs.existsSync(src)) fs.copyFileSync(src, dst); } catch { /* 尽力轮转 */ }
     }
-    try { fs.writeFileSync(this.filePath, ''); } catch { /* best-effort */ }
+    try { fs.writeFileSync(this.filePath, ''); } catch { /* 尽力轮转 */ }
   }
 
   /**

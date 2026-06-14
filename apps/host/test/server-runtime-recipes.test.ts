@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
 import {
@@ -12,6 +14,13 @@ import {
   stringField,
   tempRoot,
 } from './helpers/host-http.js';
+
+// meeting-actions 是转换型配方(requiresSources):测试运行前先在工作区铺一份会议纪要来源。
+function seedMeetingNotes(trustedRoot: string): string {
+  const sourcePath = path.join(trustedRoot, 'meeting-notes.md');
+  fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同\n- 汇总发票和付款周期\n', 'utf8');
+  return sourcePath;
+}
 
 test('runs index: recipe-run upserts a tenant-scoped record', async () => {
   const trustedRoot = tempRoot();
@@ -27,7 +36,7 @@ test('runs index: recipe-run upserts a tenant-scoped record', async () => {
     const recipeRun = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
       headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'index-run' },
-      body: { prompt: '把会议纪要整理', files: [] },
+      body: { prompt: '把会议纪要整理', files: [seedMeetingNotes(trustedRoot)] },
     });
     assert.equal(recipeRun.status, 200);
     assert.ok(stringField(recipeRun.body, 'runId', 'recipe run id'));
@@ -70,7 +79,7 @@ test('recipe capture route returns a tenant-scoped redacted draft', async () => 
         'x-user-id': 'user_alice',
         'idempotency-key': 'capture-run-source',
       },
-      body: { prompt: `把会议纪要整理 api_key=${secret}`, files: [] },
+      body: { prompt: `把会议纪要整理 api_key=${secret}`, files: [seedMeetingNotes(trustedRoot)] },
     });
     assert.equal(recipeRun.status, 200);
     const recipeRunId = stringField(recipeRun.body, 'runId', 'captured source run id');
@@ -202,10 +211,11 @@ test('recipe run endpoint replays duplicate idempotency key without creating a s
       'x-user-id': 'user_alice',
       'idempotency-key': 'recipe-run-once',
     };
+    const sourceFiles = [seedMeetingNotes(trustedRoot)];
     const first = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
       headers,
-      body: { prompt: '把会议纪要整理', files: [] },
+      body: { prompt: '把会议纪要整理', files: sourceFiles },
     });
     assert.equal(first.status, 200);
     const firstRunId = stringField(first.body, 'runId', 'first recipe run id');
@@ -215,7 +225,7 @@ test('recipe run endpoint replays duplicate idempotency key without creating a s
     const second = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
       headers,
-      body: { prompt: '把会议纪要整理', files: [] },
+      body: { prompt: '把会议纪要整理', files: sourceFiles },
     });
     assert.equal(second.status, 200);
     assert.equal(second.body.idempotentReplay, true);

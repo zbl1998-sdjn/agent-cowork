@@ -4,19 +4,6 @@
 //       DDG lite;auto 模式先短超时探 DDG、不可达再回退 Bing(照顾国内网络),也可切 Bing/Tavily。
 // 提供商契约:search(query,{maxResults,fetchImpl,lookupImpl}) → { title, url, snippet }[]。
 // 依赖:同层 ssrf-guard + search-providers/{ddg,bing} 解析器。导出:webSearch。
-//
-// web.search — a search-engine wrapper for "research" tasks.
-//
-// The model has WebFetch (give me a URL, I'll fetch it) but no way to discover
-// URLs in the first place — so "search AI news" can't work without this.
-// MVP defaults to DuckDuckGo's lite HTML endpoint (zero config, zero key,
-// reasonable Chinese coverage). Settings can later swap the provider to Bing
-// or Tavily via apiKey + baseUrl, but the default has to JUST WORK out of the
-// box for users without any API key.
-//
-// Provider contract:
-//   async function search(query, { maxResults, fetchImpl, lookupImpl }) -> Result[]
-// where Result = { title, url, snippet }
 import { assertPublicHost } from './ssrf-guard.js';
 import { parseDdgLiteResults } from './search-providers/ddg.js';
 import { parseBingResults } from './search-providers/bing.js';
@@ -27,7 +14,7 @@ import type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchRes
 export type { WebSearchError, WebSearchFetchLike, WebSearchOptions, WebSearchResponseLike } from './web-tool-inputs.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
-const DDG_PROBE_TIMEOUT_MS = 5_000; // fail-fast on DDG so the auto-fallback to Bing doesn't make the user wait the full 12s
+const DDG_PROBE_TIMEOUT_MS = 5_000; // DDG 探测快失败,auto 回退 Bing 时避免让用户等满 12 秒。
 const DEFAULT_MAX_RESULTS = 8;
 const RESULT_HARD_CAP = 20;
 
@@ -63,7 +50,6 @@ function safeMaxResults(value: unknown): number {
 
 /**
  * 按所选提供商执行搜索(ddg/bing/auto/其他),返回归一化结果列表;query 与 maxResults 先做安全裁剪。
- * Run a search against the chosen provider. Returns a normalized result list.
  */
 export async function webSearch(options: WebSearchOptions = {}): Promise<WebSearchResponse> {
   const parsed = parseWebSearchOptions(options);
@@ -88,19 +74,17 @@ export async function webSearch(options: WebSearchOptions = {}): Promise<WebSear
   if (providerName === 'bing') return searchViaBing(baseArgs);
 
   if (providerName === 'auto') {
-    // Try DDG with a short timeout first (DDG often connect-times-out from
-    // mainland China — wait 5s max, not the full 12s, before falling back).
+    // auto 先用短超时试 DDG;国内网络经常连不上,5 秒后回退 Bing。
     try {
       const ddg = await searchViaDdg({ ...baseArgs, timeoutMs: DDG_PROBE_TIMEOUT_MS });
       if (ddg.ok && ddg.results.length > 0) return ddg;
     } catch {
-      // DDG unreachable — fall through to Bing.
+      // DDG 不可达则继续走 Bing 兜底。
     }
     return searchViaBing(baseArgs);
   }
 
-  // Tavily / other paid providers stubbed — they require an API key from
-  // Settings and will land in a follow-up commit.
+  // Tavily 等付费提供商需要 Settings 中的 API key,当前先显式返回未配置。
   return {
     ok: false,
     provider: providerName,
@@ -114,15 +98,11 @@ export async function webSearch(options: WebSearchOptions = {}): Promise<WebSear
  * 经 DuckDuckGo lite 端点搜索(精简 HTML,易解析);对搜索主机本身做 SSRF 校验。
  */
 async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }: ProviderArgs): Promise<WebSearchResponse> {
-  // lite endpoint returns a strip-down HTML that's far easier to parse than the
-  // standard SERP page. Stable enough for MVP; if it ever changes we'll get a
-  // visible "0 results" instead of a silent crash.
+  // lite 端点返回精简 HTML,比标准 SERP 更容易解析;版式变化时会显式得到 0 结果而不是静默崩溃。
   const url = new URL('https://lite.duckduckgo.com/lite/');
   url.searchParams.set('q', query);
   if (!allowInternal) {
-    // Best-effort SSRF check on the search host itself (lite.duckduckgo.com).
-    // The fetched RESULT urls are returned to the caller untouched — it's up
-    // to whoever fetches them next to re-check.
+    // 对搜索主机本身做 SSRF 校验;返回的结果 URL 不在此处抓取,后续 fetch 时会再校验。
     await assertPublicHost(url.hostname, omitUndefined({ lookupImpl }));
   }
   const controller = new AbortController();
@@ -131,8 +111,7 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
   try {
     response = await fetchImpl(url.toString(), {
       headers: {
-        // DDG lite returns plain HTML for text-mode clients; using a real
-        // browser UA also avoids occasional empty-body responses.
+        // DDG lite 面向文本客户端返回 HTML;真实浏览器 UA 还能减少偶发空响应。
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
         accept: 'text/html,application/xhtml+xml',
         'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -166,8 +145,6 @@ async function searchViaDdg({ query, maxResults, fetchImpl, lookupImpl, allowInt
 
 /**
  * 经 Bing HTML 结果页搜索——给无法访问 DDG(如国内网络)的用户兜底;公开、免密钥。
- * Bing HTML SERP — practical fallback for users who can't reach DDG
- * (mainland China etc.). Public, key-free, mostly stable HTML.
  */
 async function searchViaBing({ query, maxResults, fetchImpl, lookupImpl, allowInternal, timeoutMs }: ProviderArgs): Promise<WebSearchResponse> {
   const url = new URL('https://www.bing.com/search');

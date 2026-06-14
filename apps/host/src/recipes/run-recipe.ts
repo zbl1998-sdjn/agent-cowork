@@ -16,17 +16,8 @@ import type { FileOperationInput } from '../workspace/file-operations.js';
 import type { RunRecord } from '../runtime/run-store.js';
 import type { RecipeError, RecipeSource, RunRecipeOptions, RunRecipeResult } from './run-recipe-types.js';
 
-// Single source of truth for executing a recipe. Used by both the HTTP route
-// (POST /api/recipes/:id/run) and the scheduler executor, so a scheduled run
-// produces the same approvable artifacts + run record + event timeline as a
-// manual run.
-//
-// Side effects:
-//   - writes a run record (with embedded events[]) via writeRunRecord
-//   - upserts into runsIndex (if provided)
-//   - publishes a timeline of events to runEvents (if provided)
-//
-// Returns { ok, runId, runPath, recipe, sources, operations, events }.
+// runRecipe 是配方执行的唯一入口:HTTP 手动运行与调度器复用同一路径,确保产物、run 记录和事件时间线一致。
+// 副作用集中在写 run 记录、可选更新 runsIndex、可选发布 runEvents;返回执行摘要与可审批操作。
 
 function bytesOf(sources: RecipeSource[]): number {
   return sources.reduce((sum, source) => sum + (Number(source.size) || 0), 0);
@@ -153,6 +144,18 @@ export function runRecipe({
 
   let operations: FileOperationInput[];
   try {
+    // 来源熔断(grounded 原则):转换型配方在 0 个可用来源时拒绝产出空壳交付物,
+    // 与 MASE「检索不到就明说」同一哲学——没有原料不开工,失败也走统一 run 记录。
+    if (recipe.requiresSources) {
+      const usableSources = sources.filter((source) => !source.error && (source.content || '').trim().length > 0);
+      if (usableSources.length === 0) {
+        const guardError: RecipeError = new Error(
+          `配方「${recipe.name}」需要来源材料:请先用「引用文件」选择要处理的文件再运行(本次引用 ${sources.length} 个,可用 0 个)。`,
+        );
+        guardError.statusCode = 422;
+        throw guardError;
+      }
+    }
     operations = buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
   } catch (err) {
     const error = recipeError(err);
@@ -172,7 +175,7 @@ export function runRecipe({
       try {
         runsIndex.upsert(summariseRunForIndex({ ...failRecord, runPath }, context), context);
       } catch {
-        // index failures never break the run
+        // 索引失败不能反过来打断已经失败记录的落盘。
       }
     }
     error.payload = { runId, runPath };
@@ -229,7 +232,7 @@ export function runRecipe({
     try {
       runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, context), context);
     } catch {
-      // index failures never break the run
+      // 索引失败不影响配方主结果;run 记录已经是事实来源。
     }
   }
 

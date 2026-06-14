@@ -4,7 +4,7 @@
 // 对未命中映射的原始信息做截断兜底,任何输入都不崩溃。呼应 host「错误可读/永不空交代」原则。
 // 被 App.tsx、各面板(Memory/Observability/Projects 等)使用。导出:humanizeError、FriendlyErrorOptions。
 export type FriendlyErrorOptions = {
-  /** Optional verb fragment, e.g. "保存". Shown when no specific mapping fires. */
+  /** 可选动作动词,如"保存";未命中特定映射时用于补齐"保存失败"这类语境。 */
   action?: string;
 };
 
@@ -49,12 +49,10 @@ function rawMessage(err: unknown): string {
 }
 
 /**
- * Turn an unknown error into a single Chinese sentence end-users can read.
- * Always returns a non-empty string.
+ * 把未知错误压成终端用户可读的一句中文,并保证始终返回非空字符串。
  *
- * The original technical message is appended in parentheses ONLY when a
- * mapping fired AND it differs meaningfully — so power users can still see
- * what the raw error said without having to open devtools.
+ * 只有在命中映射且原始技术信息确有差异时才附带原文,让高级用户不用开 devtools
+ * 也能看到底层错误。
  */
 export function humanizeError(err: unknown, options: FriendlyErrorOptions = {}): string {
   const raw = rawMessage(err).trim();
@@ -64,9 +62,7 @@ export function humanizeError(err: unknown, options: FriendlyErrorOptions = {}):
   for (const [pattern, hint] of HTTP_HINTS) if (pattern.test(raw)) return hint;
   for (const [pattern, hint] of PARSE_HINTS) if (pattern.test(raw)) return hint;
 
-  // No mapping — surface the raw message but prefix with the action verb if
-  // the caller supplied one. Cap length so a giant stack trace doesn't blow
-  // up the UI.
+  // 未命中映射时展示原始信息;若调用方给了动作动词就加在前面。长度上限防止巨大堆栈撑爆 UI。
   const truncated = raw.length > 200 ? `${raw.slice(0, 198)}…` : raw;
   return options.action ? `${options.action}失败:${truncated}` : truncated;
 }

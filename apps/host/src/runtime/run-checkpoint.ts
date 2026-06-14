@@ -135,7 +135,7 @@ export class RunCheckpointer {
       fs.writeFileSync(tempPath, `${JSON.stringify(checkpoint, null, 2)}\n`, 'utf8');
       fs.renameSync(tempPath, filePath);
     } catch (err) {
-      try { fs.unlinkSync(tempPath); } catch { /* ignore cleanup failure */ }
+      try { fs.unlinkSync(tempPath); } catch { /* 临时文件清理失败时保留原始写入错误 */ }
       throw err;
     }
     return filePath;

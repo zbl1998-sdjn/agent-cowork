@@ -2,14 +2,6 @@
 // ---------------------------------------------------------------------------
 // 职责:计划模式——把自然语言目标转成有序的工具调用清单({ tool, args, rationale })而「不」执行。UI 展示计划、
 //       用户批准后再由 runSubagent 执行。planner 可注入,默认实现可被真·模型 planner 替换。依赖:无(注入式)。
-// Plan mode: propose a structured, approvable plan before executing it.
-//
-// buildPlan turns a natural-language goal into an ordered list of tool calls
-// ({ tool, args, rationale }) WITHOUT running anything. The UI shows the plan,
-// the user approves, and the steps are then executed via runSubagent. The
-// planner is injectable so a real model-backed planner can replace the default
-// heuristic (which simply maps the goal onto the most relevant registered tools
-// via the registry's keyword search).
 
 export type PlanToolHit = { name: string; source?: string };
 export type PlanToolRegistry = { search(goal: string, options: { limit: number }): PlanToolHit[]; has(tool: string): boolean };
@@ -19,6 +11,7 @@ export type PlannerOutput = { goal?: string; steps?: unknown[] };
 export type Planner = (input: { goal: string; registry: PlanToolRegistry; limit: number }) => PlannerOutput | Promise<PlannerOutput>;
 
 /**
+ * 默认启发式 planner:只查 registry,生成待审批步骤,不触发任何工具执行。
  */
 function defaultPlanner({ goal, registry, limit = 3 }: { goal: string; registry: PlanToolRegistry; limit?: number }): { goal: string; steps: PlanStep[] } {
   const hits = registry.search(goal, { limit });
@@ -31,6 +24,7 @@ function defaultPlanner({ goal, registry, limit = 3 }: { goal: string; registry:
 }
 
 /**
+ * 执行边界过滤:只有 registry 中真实存在的工具才能进入可审批计划。
  */
 function isExecutableStep(step: unknown, registry: PlanToolRegistry): step is PlanStep {
   if (!step || typeof step !== 'object') return false;
@@ -39,6 +33,7 @@ function isExecutableStep(step: unknown, registry: PlanToolRegistry): step is Pl
 }
 
 /**
+ * 构建计划的唯一入口:校验目标、调用可注入 planner,并返回可由 runSubagent 执行的步骤子集。
  */
 export async function buildPlan({
   goal,
@@ -62,8 +57,7 @@ export async function buildPlan({
   }
   const plan = await planner({ goal: text, registry, limit });
   const rawSteps = Array.isArray(plan?.steps) ? plan.steps : [];
-  // Keep only steps whose tool actually exists, so an approved plan is always
-  // executable by runSubagent.
+  // 只保留已注册工具,确保用户批准后的计划一定能交给 runSubagent 执行。
   const steps = rawSteps
     .filter((step) => isExecutableStep(step, registry))
     .map((step) => ({

@@ -1,5 +1,4 @@
-// Classic-script message actions. It wires approval/clarification controls to
-// orchestration callbacks injected by app.js.
+// classic-script 消息动作:把审批/澄清控件接到 app.js 注入的编排回调。
 (function () {
   function createMessageActions({
     state,

@@ -5,18 +5,6 @@
 //       session(本次并整轮自动放行该工具)/reject(跳过)。UI POST /api/approvals/:id 解决该 promise。
 // 健壮性:待决项带时间戳并按 TTL 清理、map 有上限;cancelByRun 在流断开时释放该 run 的待决请求,杜绝泄漏/卡死。
 // 依赖:node:crypto。导出:审批登记表工厂。
-// Approval registry for the agent loop (Kimi CLI / Claude Cowork style).
-//
-// When the agent wants to run a mutating tool (Write/Edit/Shell), it asks for
-// approval and awaits a decision: 'once' (run this time), 'session' (run + auto
-// -approve this tool for the rest of the run), or 'reject' (skip). The UI posts
-// the decision to POST /api/approvals/:id, which resolves the pending promise.
-//
-// Concurrency hardening (multi-user readiness): pending entries carry a
-// timestamp and are pruned past a TTL, and the map is capped — so abandoned
-// SSE streams (client closed mid-approval) can never leak unbounded memory or
-// leave the agent loop awaiting forever. `cancelByRun` unblocks a single run's
-// pending requests when its stream disconnects.
 
 import crypto from 'node:crypto';
 
@@ -87,7 +75,8 @@ export function createApprovalRegistry({
   ttlMs = 15 * 60 * 1000,
   maxPending = 10000,
 }: ApprovalRegistryOptions = {}): ApprovalRegistry {
-  const pending = new Map<string, PendingApproval>(); // id -> { resolve, meta, ts }
+  // id -> { resolve, meta, ts };ts 用于 TTL 清理,meta 用于租户/用户/run 作用域校验。
+  const pending = new Map<string, PendingApproval>();
 
   function prune(now = Date.now()): number {
     let n = 0;
@@ -104,8 +93,7 @@ export function createApprovalRegistry({
   return {
     request(meta = {}) {
       prune();
-      // Capacity guard: under sustained load drop the oldest pending request
-      // (resolve 'reject') so the map can never grow without bound.
+      // 容量闸门:持续高负载下丢弃最旧待决项并 resolve 为 reject,保证 map 不会无界增长。
       while (pending.size >= maxPending) {
         const oldest = pending.keys().next().value;
         if (!oldest) break;
@@ -138,9 +126,8 @@ export function createApprovalRegistry({
         return { id, ok: true };
       });
     },
-    // Resolve a pending request with an arbitrary free-form value (used by
-    // AskUserQuestion, where the answer is the chosen option text, not a
-    // fixed approve/reject decision).
+    // 用任意自由值解决待决请求。AskUserQuestion 走这里:答案是用户选择/输入的文本,
+    // 不是固定 approve/reject 决策。
     respond(id, value, context = null) {
       const entry = pending.get(id);
       if (!entry) return false;
@@ -149,8 +136,7 @@ export function createApprovalRegistry({
       entry.resolve(value);
       return true;
     },
-    // Resolve every pending request tagged with a given runId — used when an SSE
-    // stream disconnects so its awaiting agent loop unblocks and exits cleanly.
+    // 释放指定 runId 下全部待决请求;SSE 断开时调用,让等待中的 agent loop 解阻并干净退出。
     cancelByRun(runId, decision = 'reject') {
       if (!runId) return 0;
       let n = 0;

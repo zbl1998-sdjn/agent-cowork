@@ -26,11 +26,8 @@ import type {
   ConversationSummary,
 } from './conversation-types.js';
 
-// Per-user conversation persistence. Each conversation is one JSON document under
-//   <trustedRoot>/.AgentCowork/conversations/<tenantId>/<userId>/<convId>.json
-// so a signed-in user's history follows their account across devices/instances
-// that share the same data root. Guests (tenant_local/user_local) get the same
-// treatment, which keeps the desktop's offline experience intact.
+// 每个对话是一份 JSON 文档,按 tenant/user 分目录;共享数据根时,登录用户的历史可随账号保留。
+// 访客也使用同一路径模型,保证桌面离线体验不退化。
 const ROOT_DIR = '.AgentCowork';
 const CONV_DIR = 'conversations';
 const MAX_BYTES = 1024 * 1024; // hard cap per conversation document
@@ -51,8 +48,7 @@ export type {
 function normaliseSegment(value: unknown, fallback: string): string {
   const text = String(value || '').trim();
   if (!text) return fallback;
-  // Keep only filesystem-safe characters; collapse the rest so a hostile
-  // tenant/user id can never escape the conversations directory.
+  // 只保留文件系统安全字符;恶意 tenant/user id 无法逃出 conversations 目录。
   const safe = text.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 96);
   return safe || fallback;
 }
@@ -104,7 +100,7 @@ export class FileConversationStore {
         const conv = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as ConversationRecord;
         if (conv && conv.id) out.push(mapper(conv));
       } catch {
-        /* skip corrupt document */
+        /* 跳过损坏的对话文档。 */
       }
     }
     out.sort((a, b) => {
@@ -120,7 +116,6 @@ export class FileConversationStore {
     return this._readDir(trustedRoot, context, summarise);
   }
 
-  // Paginated + title-searched summaries: { items, total }.
   /** 按标题搜索 + 分页返回摘要,limit 夹在 1~200。 */
   query(trustedRoot: unknown, context: ConversationContext = {}, { q = '', limit = 30, offset = 0 }: ConversationQueryOptions = {}): ConversationQueryResult {
     const all = this._readDir(trustedRoot, context, summarise);
@@ -172,7 +167,7 @@ export class FileConversationStore {
     });
     let body = JSON.stringify(record);
     if (Buffer.byteLength(body, 'utf8') > MAX_BYTES) {
-      // Trim history further until it fits rather than rejecting the save.
+      // 超限时进一步裁剪历史而不是直接拒绝保存。
       record.messages = record.messages.slice(-50);
       body = JSON.stringify(record);
     }
@@ -191,8 +186,7 @@ export class FileConversationStore {
 
 /** 工厂:返回文件后端对话存储(PG 后端由 server 在 KCW_STORE=postgres 时另选)。 */
 export function createConversationStore({ backend = 'file', now }: ConversationStoreOptions = {}): FileConversationStore {
-  // Postgres adapter (createPostgresConversationStore) mirrors this interface and
-  // is selected by the server when KCW_STORE=postgres.
+  // Postgres 适配器保持同接口,由 server 在 KCW_STORE=postgres 时选择。
   void backend;
   return new FileConversationStore(omitUndefined({ now }));
 }

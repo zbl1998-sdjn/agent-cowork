@@ -5,12 +5,6 @@
 //       默认用 StdioTransport,测试可注入假实现。依赖:同层 json-rpc。导出:McpClient。
 import { JsonRpcClient, type JsonRpcMessage } from './json-rpc.js';
 
-// A small MCP (Model Context Protocol) client over an injected transport.
-//
-// Lifecycle: connect() -> initialize handshake -> listTools()/callTool() -> close().
-// The transport only needs { start(), send(obj), onMessage(cb), onClose(cb),
-// close() }; StdioTransport is the default real one, but tests inject a fake.
-
 const PROTOCOL_VERSION = '2024-11-05';
 
 export type McpTransport = {

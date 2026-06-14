@@ -4,8 +4,6 @@
 //       提供 list/query/listFull/get/save(upsert)/remove;沿用同样的 id/分支/消息清洗。
 // 依赖:仅标准库(crypto/path);pg 运行时按需 import。后端:PostgreSQL(conversations 表)。
 // 导出:PostgresConversationStore(类) · createPostgresConversationStore(工厂)。
-//
-// PostgreSQL adapter for per-user conversation history. Tests inject a mock pool.
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { omitUndefined } from '../util/object.js';

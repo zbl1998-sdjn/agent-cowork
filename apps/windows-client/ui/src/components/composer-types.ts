@@ -3,9 +3,8 @@ import type { ModelRunConfig } from '../lib/api/chat';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import type { ThinkingLevel } from './ComposerFooter';
 
-// Exported separately from Composer so App / Timeline / hooks can import the
-// types without dragging the whole Composer component module into their bundle,
-// and so Composer.tsx itself stays under the file-size soft limit.
+// 从 Composer.tsx 拆出类型,让 App/Timeline/hooks 引用类型时不把整个组件模块拖进 bundle,
+// 同时保持 Composer.tsx 不越过文件体量软门限。
 
 export interface Recipe {
   id: string;

@@ -9,23 +9,18 @@ import type { AssistantMessage, ToolCallItem } from './app-types';
 export type AgentMode = 'plan' | 'execute' | 'yolo';
 
 export interface ChatStreamCallbackDeps {
-  /** ID of the assistant message being streamed into. */
+  /** 正在接收流的 assistant 消息 id。 */
   assistantId: string;
-  /** Imperative patch helper produced by the App-level message store. */
+  /** App 级消息状态提供的命令式 patch 辅助函数。 */
   patchAssistant: (id: string, fn: (m: AssistantMessage) => AssistantMessage) => void;
-  /** Toggles the "is something streaming?" badge / stop button. */
+  /** 控制「正在流式输出」状态与停止按钮。 */
   setStreamingId: (id: string | null) => void;
-  /** Current agent mode — YOLO auto-approves every request as it streams. */
+  /** 当前 Agent 模式;YOLO 会在审批请求流入时自动批准。 */
   mode: AgentMode;
 }
 
-// Pure builder for the 13 SSE event handlers App.tsx hands to agentChatStream.
-// Extracted from App.tsx's handleSend so the file stays under the file-size
-// soft limit, AND so the callback logic is testable without spinning up React.
-//
-// All state mutations route through patchAssistant + setStreamingId; the hook
-// itself is stateless so it can be re-derived on every render without churning
-// the agentChatStream subscription.
+// 纯函数构造 App.tsx 交给 agentChatStream 的 SSE 事件处理器集合。
+// 所有状态改写都经 patchAssistant/setStreamingId,因此可独立测试,也不会把 App 再次撑大。
 export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStreamHandlers {
   const { assistantId, patchAssistant, setStreamingId, mode } = deps;
 
@@ -52,8 +47,7 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
     onTodoUpdate: (todo) => patch((m) => ({ ...m, todos: mergeTodoUpdate(m.todos, todo) })),
 
     onApprovalRequest: (id, name) => {
-      // YOLO mode: auto-approve every request as it streams in (incl. high-risk
-      // tools the host's autoApprove gate leaves for explicit confirmation).
+      // YOLO 模式:审批请求一到达即自动批准;host 仍会保留其自身高风险审批门语义。
       if (mode === 'yolo') { void respondApproval(id, 'once'); return; }
       patch((m) => ({ ...m, approval: { id, name } }));
     },
@@ -93,6 +87,9 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
         ...m,
         status: 'done',
         verifying: false,
+        // 计划清单(kind=plan)是按计划文本逐行生成的、没有逐项完成回调,运行收尾即代表计划已执行,
+        // 把仍 pending 的计划项收敛为 done,避免清单永远停在「待处理」造成困惑。
+        todos: (m.todos || []).map((todo) => (todo.kind === 'plan' && todo.status === 'pending' ? { ...todo, status: 'done' } : todo)),
         text: full.text || m.text || '',
         runId: full.runId || m.runId,
         usage: full.usage || m.usage,
@@ -101,10 +98,16 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
 
     onCancelled: (full) => {
       setStreamingId(null);
+      // 取消即终局:清掉待决审批/计划/提问(host 已吊销,残留按钮点了也只会 404),
+      // 在跑工具一并置为已取消,避免界面停在「运行中 + 可点批准」的假活状态。
       patch((m) => ({
         ...m,
         status: 'cancelled',
         verifying: false,
+        approval: undefined,
+        plan: undefined,
+        question: undefined,
+        tools: (m.tools || []).map((tool) => (tool.status === 'running' ? { ...tool, status: 'cancelled' } : tool)),
         text: full.text || m.text || '已取消本轮运行。可点击继续发起下一轮。',
         runId: full.runId || m.runId,
         usage: full.usage || m.usage,
@@ -118,12 +121,7 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
   };
 }
 
-/**
- * Build the new tools array after a tool finishes. Finds the most recent
- * running entry with the same name and merges in status/result/duration/error.
- * Pure so unit tests can assert the duration + error-extraction logic without
- * touching the SSE plumbing.
- */
+/** 工具结束后更新 tools 数组:找到最近同名 running 项并合入状态/结果/耗时/错误。 */
 export function applyToolResult(
   current: ToolCallItem[] | undefined,
   name: string,
@@ -154,10 +152,7 @@ export function applyToolResult(
   return tools;
 }
 
-/**
- * Friendly wrapper for the catch-arm of handleSend. Centralised so future
- * batches can change the action verb in one place.
- */
+/** handleSend catch 分支的友好错误文案入口,集中 action 动词便于后续统一调整。 */
 export function humanizeChatTurnError(error: unknown): string {
   return humanizeError(error, { action: '本轮对话' });
 }

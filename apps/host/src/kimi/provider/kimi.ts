@@ -65,10 +65,8 @@ export function createKimiProvider(): Provider {
         tool_choice: 'auto',
         max_tokens: kimiConfig.maxTokens || 2048,
         stream: true,
-        // OpenAI-compatible providers only emit `usage` on the final SSE chunk
-        // when `stream_options.include_usage` is set. Without this flag every
-        // run records prompt/completion/total_tokens = 0 — which is what the
-        // Observability panel was correctly showing as empty.
+        // OpenAI 兼容流只有设置 include_usage 才会在最终 SSE chunk 返回 usage。
+        // 否则 run 记录的 token 用量会全为 0,观测面板也会显示为空。
         stream_options: { include_usage: true },
       };
       if (typeof kimiConfig.temperature === 'number' && Number.isFinite(kimiConfig.temperature)) {

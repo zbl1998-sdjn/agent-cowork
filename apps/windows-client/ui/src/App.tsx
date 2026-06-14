@@ -70,9 +70,7 @@ export function App() {
     upsertRecipe,
     user,
   } = useAppRuntimeState();
-  // Workspace switcher: a user-chosen override beats the host's default. Every
-  // call below already passes `trustedRoot` per-request, so the host validates
-  // it via path-policy — the UI just decides what to send.
+  // 工作区切换器:用户手选目录优先于 host 默认目录;每次请求都传 trustedRoot,由 host path-policy 做最终校验。
   const [workspaceOverride, setWorkspaceOverride] = useState<string | null>(null);
   const trustedRoot = workspaceOverride || hostTrustedRoot;
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
@@ -86,7 +84,7 @@ export function App() {
   const { containerRef: timelineRef, isAtBottom, hasNewContent, scrollToBottom } = useStickToBottom(messages, conversations.activeConvId);
 
   const copyText = useCallback((t: string) => {
-    try { void navigator.clipboard.writeText(t); } catch { /* clipboard unavailable */ }
+    try { void navigator.clipboard.writeText(t); } catch { /* 剪贴板在测试/受限 WebView 中可能不可用 */ }
   }, []);
   const searchFiles = useCallback(async (query: string): Promise<FileHit[]> => {
     try {
@@ -133,7 +131,7 @@ export function App() {
         const reconciled = reconcileChatEnabled(chatEnabled, await getKimiInfo());
         enabled = reconciled.enabled;
         if (reconciled.shouldUpdateState) setChatEnabled(true);
-      } catch { /* host unreachable */ }
+      } catch { /* host 不可达时继续走配置兜底 */ }
     }
     if (!enabled) {
       if (recipes[0]) await runRecipeTurn(assistantId, recipes[0].id, text, uploaded);
@@ -153,9 +151,10 @@ export function App() {
         planMode,
         images: uploaded.filter((p) => isImagePath(p)),
         resumeRunId,
+        conversationId: conversations.activeConvId,
       }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
-  }, [autoApprove, chatEnabled, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
+  }, [autoApprove, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
