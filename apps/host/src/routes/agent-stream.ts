@@ -186,7 +186,7 @@ export async function streamAgentChat({
       hooks,
       memoryText: memory.text,
       skills,
-      maxSteps: Math.min(Math.max(Number(body.maxSteps) || 8, 1), 16),
+      maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
       verify: body.verify === true || body.thinking === 'deep',
       approvals,
       autoApprove: body.autoApprove === true,

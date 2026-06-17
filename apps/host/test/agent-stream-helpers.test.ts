@@ -56,7 +56,7 @@ test('agent config snapshot normalizes diagnostics without leaking fallback keys
 
   assert.equal(snapshot.developerMode, true);
   assert.equal(snapshot.verify, true);
-  assert.equal(snapshot.maxSteps, 16);
+  assert.equal(snapshot.maxSteps, 40);
   assert.equal(snapshot.temperature, 0.25);
   const firstFallback = present(snapshot.fallbacks[0], 'first fallback');
   const secondFallback = present(snapshot.fallbacks[1], 'second fallback');
