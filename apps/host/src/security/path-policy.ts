@@ -27,6 +27,19 @@ function normalizeForCompare(p: string): string {
   return isWindows() ? replaced.toLowerCase() : replaced;
 }
 
+/**
+ * Windows 文件名等价归一:把 basename / 路径段收敛到「系统真正打开的有效名」——
+ * 剥掉末尾的点与空格(Win32 打开时忽略),并去掉 NTFS 数据流后缀(`name::$DATA` 即文件本体)。
+ * **仅对 win32 生效**:POSIX 上 `:` 与末尾点/空格是合法且不同的文件名,不能归一(否则会误伤合法文件)。
+ * 用于敏感匹配之前——否则 `.env `(尾空格)、`id_ecdsa.`(尾点)、`credentials.json::$DATA`(ADS)
+ * 这类「等价但不同字面」的写法会绕过下面的精确匹配(realpath 不会剥末尾点/空格)。
+ */
+function win32EffectiveName(base: string): string {
+  if (!isWindows()) return base;
+  const noStream = base.split(':')[0] ?? base;
+  return noStream.replace(/[. ]+$/u, '');
+}
+
 function realpath(p: string): string {
   return fs.realpathSync.native ? fs.realpathSync.native(p) : fs.realpathSync(p);
 }
@@ -86,7 +99,8 @@ export function resolveWithinRoot(candidatePath: string, trustedRoot: string): s
 // `relativeTo` 只收窄「目录段」检查范围到 trusted root 之下;文件名/扩展名仍始终检查目标本身。
 export function isSensitivePath(inputPath: string, relativeTo: string | null = null): boolean {
   const normalized = normalizeForCompare(inputPath);
-  const lowerBase = path.basename(normalized).toLowerCase();
+  // 先把 basename 归一到 Windows 有效名,否则尾空格/尾点/ADS 变体会绕过下面的精确匹配。
+  const lowerBase = win32EffectiveName(path.basename(normalized)).toLowerCase();
   const lowerExt = path.extname(lowerBase).toLowerCase();
 
   // 目标文件名/扩展名总是检查,即使 relativeTo 把目录段范围收窄。
@@ -104,8 +118,8 @@ export function isSensitivePath(inputPath: string, relativeTo: string | null = n
   const segments = segmentsBelowRoot(normalized, relativeTo);
 
   for (const segment of segments) {
-    // 敏感目录名大小写不敏感;路径包含关系仍由 normalizeForCompare 保持平台语义。
-    const seg = segment.toLowerCase();
+    // 敏感目录名大小写不敏感;并对每段做 Windows 有效名归一,防止 `.ssh `/`.aws.` 这类等价目录段绕过。
+    const seg = win32EffectiveName(segment).toLowerCase();
     if (SENSITIVE_SEGMENTS.has(seg)) {
       return true;
     }
