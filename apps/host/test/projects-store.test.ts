@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createProjectStoreResolver } from '../src/runtime/project-stores.js';
 import { createProjectStore } from '../src/storage/projects.js';
 
 test('create makes a project and requires a name', () => {
@@ -65,4 +66,32 @@ test('assigning to / renaming an unknown project throws', () => {
   const store = createProjectStore();
   assert.throws(() => store.assignConversation('proj_404', 'c1'), /unknown project/);
   assert.throws(() => store.rename('proj_404', 'x'), /unknown project/);
+});
+
+test('project store resolver isolates cache by tenant, user, and root', () => {
+  const resolver = createProjectStoreResolver();
+  const alice = resolver.getProjectStore('root-a', { tenantId: 'tenant_a', userId: 'user_a' });
+  alice.create({ name: 'Alice Project' });
+
+  assert.equal(resolver.getProjectStore('root-a', { tenantId: 'tenant_a', userId: 'user_a' }), alice);
+  assert.equal(resolver.getProjectStore('root-a', { tenantId: 'tenant_a', userId: 'user_b' }).list().length, 0);
+  assert.equal(resolver.getProjectStore('root-b', { tenantId: 'tenant_a', userId: 'user_a' }).list().length, 0);
+
+  const local = resolver.getProjectStore('root-local');
+  assert.equal(resolver.getProjectStore('root-local', { tenantId: 'tenant_local', userId: 'user_local' }), local);
+});
+
+test('project store resolver honors an injected factory without mutating cache semantics', () => {
+  const injected = createProjectStore();
+  const calls: Array<{ trustedRoot: string; tenantId?: string | undefined }> = [];
+  const resolver = createProjectStoreResolver({
+    getProjectStore(trustedRoot, context = {}) {
+      calls.push({ trustedRoot, tenantId: context.tenantId });
+      return injected;
+    },
+  });
+
+  assert.equal(resolver.getProjectStore('custom-root', { tenantId: 'tenant_custom' }), injected);
+  assert.deepEqual(calls, [{ trustedRoot: 'custom-root', tenantId: 'tenant_custom' }]);
+  assert.equal(resolver.projectStores.size, 0);
 });

@@ -27,11 +27,23 @@ const MAX_OUTPUT_LENGTH = 256 * 1024;
 type RunTextOptions = PromptOptions & {
   command?: string;
   argsBuilder?: (options: CliArgsOptions) => string[];
+  spawn?: SpawnKimiProcess;
   timeoutMs?: unknown;
   maxSteps?: unknown;
   model?: unknown;
   resultMode?: string;
 };
+type StreamLike = {
+  on(event: 'data', listener: (chunk: unknown) => void): unknown;
+};
+type SpawnedKimiChild = {
+  stdout: StreamLike;
+  stderr: StreamLike;
+  kill(): void;
+  on(event: 'error', listener: (error: Error) => void): unknown;
+  on(event: 'close', listener: (code: number | null) => void): unknown;
+};
+type SpawnKimiProcess = (command: string, args: string[], options: Record<string, unknown>) => SpawnedKimiChild;
 type KimiCliResult = {
   ok: true;
   provider: 'kimi-cli';
@@ -45,6 +57,7 @@ type KimiCliResult = {
 function runKimiCliText({
   command = 'kimi',
   argsBuilder,
+  spawn = childProcess.spawn as SpawnKimiProcess,
   prompt,
   summary,
   mode,
@@ -64,7 +77,17 @@ function runKimiCliText({
   const args = argsBuilder({ trustedRoot: tempDir, prompt, summary, mode, memory, maxSteps, model });
 
   return new Promise<KimiCliResult>((resolve, reject) => {
-    const child = childProcess.spawn(command, args, {
+    let cleaned = false;
+    const cleanupTempDir = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignore cleanup errors
+      }
+    };
+    const child = spawn(command, args, {
       cwd: tempDir,
       env: {
         ...process.env,
@@ -98,6 +121,7 @@ function runKimiCliText({
     });
     child.on('error', (error: Error) => {
       clearTimeout(timeout);
+      cleanupTempDir();
       reject(error);
     });
     child.on('close', (code: number | null) => {
@@ -106,11 +130,7 @@ function runKimiCliText({
       const output = decodeCliOutput(stdout).replace(/\r\n/g, '\n').trim();
       const errorText = decodeCliOutput(stderr).replace(/\r\n/g, '\n').trim();
 
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // ignore cleanup errors
-      }
+      cleanupTempDir();
 
       if (timedOut) {
         reject(new Error(`Kimi CLI timed out after ${timeoutMs}ms`));

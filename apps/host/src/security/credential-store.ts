@@ -222,7 +222,8 @@ export function createCredentialStore({ filePath, protector = createDefaultCrede
         const s = entry.summary || {};
         const matches = !(filter.tenantId && s.tenantId !== filter.tenantId)
           && !(filter.userId && s.userId !== filter.userId)
-          && !(filter.provider && s.provider !== filter.provider);
+          && !(filter.provider && s.provider !== filter.provider)
+          && !(filter.accountId && s.accountId !== filter.accountId);
         if (matches) {
           removed += 1;
         } else {

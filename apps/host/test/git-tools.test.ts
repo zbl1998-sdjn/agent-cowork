@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../src/tools/dev/git.js';
+import { intInRange, resolveGitPath, resolveWorkspace } from '../src/tools/dev/git-runner.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { createAgentApprovalRegistry } from './helpers/approvals.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
@@ -155,4 +156,27 @@ test('GitCommit is high-risk and goes through approval before mutating', async (
   }));
   assert.ok(hasRejectedGitCommitStep(out.steps));
   assert.match(git(root, ['status', '--porcelain=v1']), /\?\? b\.txt/);
+});
+
+test('git runner helpers clamp options and keep workspaces inside the trusted root', () => {
+  const root = tmp();
+  const child = path.join(root, 'child');
+  fs.mkdirSync(child, { recursive: true });
+
+  assert.equal(intInRange('3.9', 1, 0, 5), 3);
+  assert.equal(intInRange('99', 1, 0, 5), 5);
+  assert.equal(intInRange('not-a-number', 2, 0, 5), 2);
+
+  const resolved = resolveWorkspace(root, 'child');
+  assert.equal(resolved.root, path.resolve(root));
+  assert.equal(resolved.workspace, path.resolve(child));
+  assert.throws(() => resolveWorkspace(root, '..'), /outside|escaped|trusted/i);
+
+  assert.equal(resolveGitPath(resolved.root, resolved.workspace, 'src/file.txt'), 'src/file.txt');
+  assert.equal(resolveGitPath(resolved.root, resolved.workspace, path.join(child, 'abs.txt')), 'abs.txt');
+  assert.equal(resolveGitPath(resolved.root, resolved.workspace, ''), null);
+  assert.throws(
+    () => resolveGitPath(resolved.root, resolved.workspace, path.join(root, '..', 'escape.txt')),
+    /outside|escaped|trusted/i,
+  );
 });

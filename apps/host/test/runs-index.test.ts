@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { RunsIndex, createUlid, summariseRunForIndex } from '../src/runtime/runs-index.js';
+import { RunsIndex, SqliteRunsIndex, createRunsIndex, createUlid, summariseRunForIndex } from '../src/runtime/runs-index.js';
+import type { SqliteDatabase, SqliteStatement } from '../src/runtime/runs-index.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-runs-'));
@@ -116,6 +117,24 @@ test('RunsIndex.stats counts by tenant scope', () => {
   assert.equal(t1.byType['recipe-run'], 2);
 });
 
+test('createRunsIndex selects file by default and sqlite only when requested', () => {
+  const root = tempRoot();
+  const fileIndex = createRunsIndex({ indexRoot: root });
+  assert.ok(fileIndex instanceof RunsIndex);
+
+  const statement: SqliteStatement = {
+    get: () => null,
+    run: () => ({ changes: 0 }),
+    all: () => [],
+  };
+  const db: SqliteDatabase = {
+    exec: () => undefined,
+    prepare: () => statement,
+  };
+  const sqliteIndex = createRunsIndex({ backend: 'sqlite', db });
+  assert.ok(sqliteIndex instanceof SqliteRunsIndex);
+});
+
 test('summariseRunForIndex extracts fields from full run JSON', () => {
   const summary = summariseRunForIndex(
     {
@@ -136,6 +155,39 @@ test('summariseRunForIndex extracts fields from full run JSON', () => {
   assert.equal(summary.promptPreview, 'hello world');
   assert.equal(summary.tenantId, 'tenant_x');
   assert.equal(summary.traceId, 'trace_x');
+});
+
+test('summariseRunForIndex applies request context overrides and defensive defaults', () => {
+  const summary = summariseRunForIndex(
+    {
+      id: 'r2',
+      type: 'agent-chat',
+      status: 'failed',
+      mode: 'agent',
+      provider: 'kimi-api',
+      recipeId: 'custom',
+      startedAt: '2026-05-20T00:00:00Z',
+      finishedAt: '2026-05-20T00:00:01Z',
+      durationMs: 1000,
+      input: { prompt: 'x'.repeat(300) },
+      context: { tenantId: 'tenant_record', userId: 'user_record', traceId: 'trace_record' },
+      error: { message: 'boom' },
+      runPath: 'runs/r2.json',
+    },
+    { tenantId: 'tenant_request', userId: 'user_request', traceId: 'trace_request' },
+  );
+  assert.equal(summary.tenantId, 'tenant_request');
+  assert.equal(summary.userId, 'user_request');
+  assert.equal(summary.traceId, 'trace_request');
+  assert.equal(summary.recipeId, 'custom');
+  assert.equal(summary.error, 'boom');
+  assert.equal(summary.runPath, 'runs/r2.json');
+  assert.equal(summary.promptPreview.length, 240);
+
+  const minimal = summariseRunForIndex({ id: 'r3', input: { prompt: 42 } });
+  assert.equal(minimal.promptPreview, '');
+  assert.equal(minimal.runPath, null);
+  assert.throws(() => summariseRunForIndex(null), /runRecord required/);
 });
 
 test('RunsIndex rejects records without an id', () => {

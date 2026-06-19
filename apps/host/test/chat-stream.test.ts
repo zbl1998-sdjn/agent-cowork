@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import { streamChat } from '../src/kimi/chat-stream.js';
 import { closeTestServer } from './helpers/close-server.js';
 import type { HostServer, ServerConfig } from '../src/server.js';
+import type { RequestContext } from '../src/http/middleware/common.js';
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-stream-'));
@@ -20,6 +22,44 @@ function recordValue(value: unknown, label: string): Record<string, unknown> {
 function recordArray(value: unknown, label: string): Array<Record<string, unknown>> {
   assert.ok(Array.isArray(value), `${label} should be an array`);
   return value.map((item, index) => recordValue(item, `${label}[${index}]`));
+}
+
+class CapturingStreamResponse {
+  statusCode = 0;
+  headers: Record<string, string> = {};
+  chunks: string[] = [];
+  ended = false;
+
+  writeHead(statusCode: number, headers?: Record<string, string>): void {
+    this.statusCode = statusCode;
+    this.headers = headers || {};
+  }
+
+  write(chunk?: string | Buffer): void {
+    this.chunks.push(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk || ''));
+  }
+
+  end(chunk?: string | Buffer): void {
+    if (chunk) this.write(chunk);
+    this.ended = true;
+  }
+
+  text(): string {
+    return this.chunks.join('');
+  }
+}
+
+function eventPayload(streamText: string, event: string): Record<string, unknown> {
+  const marker = `event: ${event}\n`;
+  const index = streamText.indexOf(marker);
+  assert.ok(index >= 0, `missing ${event} SSE event`);
+  const dataLine = streamText.slice(index + marker.length).split('\n').find((line) => line.startsWith('data: '));
+  assert.ok(dataLine, `${event} SSE event should include data`);
+  return recordValue(JSON.parse(dataLine.slice('data: '.length)), `${event} payload`);
+}
+
+function streamContext(): RequestContext {
+  return { tenantId: 'tenant_stream', userId: 'user_stream', traceId: 'trace_stream' };
 }
 
 async function bind(server: HostServer): Promise<string> {
@@ -81,4 +121,127 @@ test('POST /api/kimi/chat/stream returns 503 when Kimi API is not configured', a
   } finally {
     await closeTestServer(server);
   }
+});
+
+test('streamChat emits cancelled when the cancellation signal aborts after partial output', async () => {
+  const trustedRoot = tempRoot();
+  const runStoreRoot = path.join(trustedRoot, 'runs');
+  const response = new CapturingStreamResponse();
+  const controller = new AbortController();
+  const doneRuns: string[] = [];
+
+  await streamChat({
+    response,
+    requestContext: streamContext(),
+    body: { prompt: 'cancel me', summary: 'context' },
+    kimiConfig: { provider: 'KIMI-API', model: 'moonshot-v1-8k', temperature: 0 },
+    trustedRoot,
+    runStoreRoot,
+    runsIndex: { upsert: () => undefined },
+    cancellation: {
+      register() {
+        return controller;
+      },
+      done(runId) {
+        doneRuns.push(runId);
+      },
+    },
+    streamRunner: ({ prompt, model, provider, signal, onToken, onReasoning }) => {
+      assert.equal(prompt, 'cancel me');
+      assert.equal(model, 'moonshot-v1-8k');
+      assert.equal(provider, 'kimi-api');
+      assert.equal(signal, controller.signal);
+      onReasoning('thinking');
+      onToken('partial');
+      controller.abort();
+      return { text: 'partial', model, usage: { total_tokens: 3 } };
+    },
+  });
+
+  const text = response.text();
+  const start = eventPayload(text, 'start');
+  const cancelled = eventPayload(text, 'cancelled');
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers['content-type'] || '', /text\/event-stream/);
+  assert.equal(eventPayload(text, 'reasoning').delta, 'thinking');
+  assert.equal(eventPayload(text, 'token').delta, 'partial');
+  assert.equal(cancelled.runId, start.runId);
+  assert.equal(cancelled.text, 'partial');
+  assert.equal(doneRuns[0], start.runId);
+  assert.equal(response.ended, true);
+});
+
+test('streamChat records failures, emits safe errors, and isolates runs index failures', async () => {
+  const trustedRoot = tempRoot();
+  const response = new CapturingStreamResponse();
+  const doneRuns: string[] = [];
+
+  await streamChat({
+    response,
+    requestContext: streamContext(),
+    body: { prompt: 'fail me' },
+    kimiConfig: { provider: '', model: 'fake-model' },
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+    runsIndex: {
+      upsert() {
+        throw new Error('index down');
+      },
+    },
+    cancellation: {
+      register(runId) {
+        doneRuns.push(`registered:${runId}`);
+        return new AbortController();
+      },
+      done(runId) {
+        doneRuns.push(`done:${runId}`);
+      },
+    },
+    streamRunner: ({ systemMessage }) => {
+      assert.match(systemMessage || '', /今天|工作目录|操作系统/);
+      throw 'stream exploded';
+    },
+  });
+
+  const text = response.text();
+  const start = eventPayload(text, 'start');
+  const error = eventPayload(text, 'error');
+  assert.equal(error.error, 'stream exploded');
+  assert.equal(doneRuns[0], `registered:${start.runId}`);
+  assert.equal(doneRuns.at(-1), `done:${start.runId}`);
+  assert.equal(response.ended, true);
+});
+
+test('streamChat treats thrown errors after an abort as cancellation', async () => {
+  const trustedRoot = tempRoot();
+  const response = new CapturingStreamResponse();
+  const controller = new AbortController();
+
+  await streamChat({
+    response,
+    requestContext: streamContext(),
+    body: { prompt: 'abort then throw' },
+    kimiConfig: { model: 'fake-model' },
+    trustedRoot,
+    runStoreRoot: path.join(trustedRoot, 'runs'),
+    runsIndex: { upsert: () => undefined },
+    cancellation: {
+      register() {
+        return controller;
+      },
+      done() {
+        return undefined;
+      },
+    },
+    streamRunner: ({ onToken }) => {
+      onToken('before abort');
+      controller.abort();
+      throw new Error('transport closed');
+    },
+  });
+
+  const text = response.text();
+  assert.equal(eventPayload(text, 'cancelled').text, 'before abort');
+  assert.equal(text.includes('event: error'), false);
+  assert.equal(response.ended, true);
 });

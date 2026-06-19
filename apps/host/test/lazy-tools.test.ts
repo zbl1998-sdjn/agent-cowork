@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { addLazySearchTool, createNoopBudgetGuard, parseToolCall } from '../src/kimi/agent/tool-loop-support.js';
 import type { AgentTool } from '../src/kimi/agent-tools.js';
 import type { ModelCall, ModelCallArgs } from '../src/kimi/agent/model-resilience.js';
 
@@ -65,4 +66,81 @@ test('no search_tools meta-tool when there are no lazy tools (unchanged behavior
   const names = seen.value;
   assert.ok(names);
   assert.ok(!names.includes('search_tools'), 'no meta-tool when nothing lazy');
+});
+
+test('addLazySearchTool ignores malformed lazy tool collections without mutating core tools', () => {
+  const core = [lowTool('Read', () => undefined)];
+  const toolMap = addLazySearchTool(core, null as unknown as AgentTool[]);
+
+  assert.equal(toolMap.has('Read'), true);
+  assert.equal(toolMap.has('search_tools'), false);
+  assert.deepEqual(core.map((tool) => tool.name), ['Read']);
+});
+
+test('addLazySearchTool ranks, activates, and de-duplicates lazy tools on demand', async () => {
+  const core = [lowTool('Read', () => undefined), lowTool('mcp__already__active', () => undefined)];
+  const lazy = [
+    lowTool('mcp__weather__forecast', () => undefined),
+    lowTool('mcp__calendar__list', () => undefined),
+    lowTool('mcp__already__active', () => undefined),
+  ];
+  const toolMap = addLazySearchTool(core, lazy);
+  const search = toolMap.get('search_tools');
+  assert.equal(search?.risk, 'safe');
+  assert.equal(search?.mutating, false);
+  if (typeof search?.handler !== 'function') throw new Error('search_tools handler should be present');
+  const searchHandler = search.handler;
+
+  const first = await searchHandler({ query: 'weather forecast', limit: 1 });
+  assert.deepEqual(first, { activated: [{ name: 'mcp__weather__forecast', description: 'mcp__weather__forecast tool' }] });
+  assert.equal(toolMap.has('mcp__weather__forecast'), true);
+  assert.equal(core.filter((tool) => tool.name === 'mcp__weather__forecast').length, 1);
+
+  const second = await searchHandler({ query: '', limit: 50 });
+  assert.deepEqual(second, { activated: [{ name: 'mcp__calendar__list', description: 'mcp__calendar__list tool' }] });
+  assert.equal(core.filter((tool) => tool.name === 'mcp__already__active').length, 1);
+  assert.equal(core.some((tool) => tool.name === 'mcp__calendar__list'), true);
+});
+
+test('addLazySearchTool clamps empty-query activation to twenty lazy tools', async () => {
+  const core = [lowTool('Read', () => undefined)];
+  const lazy = Array.from({ length: 25 }, (_, index) => lowTool(`mcp__bulk__tool_${String(index + 1).padStart(2, '0')}`, () => undefined));
+  const toolMap = addLazySearchTool(core, lazy);
+  const search = toolMap.get('search_tools');
+  if (typeof search?.handler !== 'function') throw new Error('search_tools handler should be present');
+
+  const result = await search.handler({ query: '', limit: 100 });
+  const activated = (result as { activated?: Array<{ name: string }> }).activated ?? [];
+
+  assert.equal(activated.length, 20);
+  assert.equal(activated[0]?.name, 'mcp__bulk__tool_01');
+  assert.equal(activated.at(-1)?.name, 'mcp__bulk__tool_20');
+  assert.equal(core.length, 22);
+  assert.equal(core.some((tool) => tool.name === 'search_tools'), true);
+  assert.equal(toolMap.has('mcp__bulk__tool_21'), false);
+});
+
+test('parseToolCall tolerates malformed JSON arguments and missing function names', () => {
+  assert.deepEqual(parseToolCall({ function: { name: 'Read', arguments: '{"path":"README.md"}' } }), {
+    name: 'Read',
+    args: { path: 'README.md' },
+  });
+  assert.deepEqual(parseToolCall({ function: { name: 'Read', arguments: '{bad json' } }), {
+    name: 'Read',
+    args: {},
+  });
+  assert.deepEqual(parseToolCall({}), {
+    name: undefined,
+    args: {},
+  });
+});
+
+test('createNoopBudgetGuard never aborts and exposes a stable stop message', () => {
+  const guard = createNoopBudgetGuard();
+  const checked = guard.check();
+  const recorded = guard.recordUsage();
+  assert.equal(checked, recorded);
+  assert.equal(checked.shouldAbort, false);
+  assert.equal(checked.snapshot.model, 'default');
+  assert.match(guard.stopMessage(), /预算保护/);
 });

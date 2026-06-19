@@ -56,6 +56,7 @@ async function runKimiApiText({
   summary,
   mode,
   memory = '',
+  systemMessage = '',
   apiKey,
   baseUrl = DEFAULT_BASE_URL,
   model = DEFAULT_MODEL,
@@ -97,7 +98,9 @@ async function runKimiApiText({
       headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
-        messages: [{ role: 'user', content: apiPrompt }],
+        messages: systemMessage
+          ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
+          : [{ role: 'user', content: apiPrompt }],
         ...(Number.isFinite(numericTemperature) ? { temperature: numericTemperature } : {}),
         max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         stream: false,

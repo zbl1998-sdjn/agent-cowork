@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml/badge.svg)](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
-![Tests](https://img.shields.io/badge/tests-703%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-host%20944%20%2B%20ui%20344-brightgreen)
+![Host Coverage](https://img.shields.io/badge/host%20coverage-94.87%25-brightgreen)
 ![Security](https://img.shields.io/badge/red%20team-no%20high%20severity-success)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -18,8 +19,10 @@
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
 **测试覆盖：**
-- 后端 147 个测试文件（703 个测试用例，702 pass + 1 个显式环境变量 gated Docker 测试跳过），前端 71 个测试文件（276 个测试用例），常规门禁通过
-- 覆盖：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连、安全头、出站 SSRF 守卫与 Host 头白名单等
+- Host：`npm run test:host:coverage:90` 通过（945 tests，944 pass，1 skip，0 fail），Node 内置 test runner + V8 coverage，line 94.87%，branch 78.58%，function 95.73%，`fail-under=90` 已生效；机器可读摘要提交在 `reports/coverage/host-coverage-summary.json`，文本报告和 V8 原始数据本地写入 `reports/coverage/host-coverage-latest.txt` 与 `reports/coverage/host-v8-*`，不依赖 Python/pytest/pytest-cov。
+- UI：`npm run test:ui` 通过（76 个测试文件 / 344 个测试用例）。
+- 仓库门禁：`npm run check` 通过，覆盖架构、secrets、host/root/script/ui 类型、lint、JS/TS 边界、TS project coverage、language service 与 icons。
+- 覆盖面包括：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连与 Last-Event-ID、tenant scope、路径 jail、OAuth 凭证流、沙箱、出站 SSRF 守卫与 Host 头白名单等。
 
 **已知限制：**
 - Host 启动时会探测 Docker/WSL。设置 `KCW_SANDBOX_DOCKER_IMAGE` 指向一个本地已有镜像后，如果 Docker daemon 和镜像都可用，默认选择 Docker VM 后端，并用 `--network=none` 执行 sandbox 工具。
@@ -58,7 +61,7 @@ npm run smoke:ui
 npm run smoke:host
 ```
 
-测试使用 Node 内置 test runner，不需要外部依赖。默认 `npm test` 使用 `--test-isolation=none`，因为当前 Windows sandbox 可能会让隔离测试子进程报 `spawn EPERM`。
+Host 测试使用 Node 内置 test runner；覆盖率用 `npm run test:host:coverage:90` 走 Node/V8 coverage，不依赖 Python/pytest 工具链。Windows sandbox/Defender 可能阻止测试子进程或 esbuild 子进程并报 `spawn EPERM`，这种情况需在正常本机权限上下文重跑同一命令确认真实结果。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
 `npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Agent Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:react-scroll` 会启动临时 Host API，真实加载构建后的 React UI，预置长对话并发送一条流式回复，确认用户翻看历史时不会被新内容拽回底部，且“回到底部”按钮可出现并返回底部；报告和截图写入 `build/react-scroll-smoke-report.json` 与 `build/react-scroll-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。

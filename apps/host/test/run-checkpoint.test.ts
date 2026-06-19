@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { createCheckpointRecorder } from '../src/kimi/agent/checkpoint-state.js';
 import type { AgentTool, ToolArgs } from '../src/kimi/agent/tool-call-executor.js';
 
 type EmittedEvent = {
@@ -77,6 +78,82 @@ test('RunCheckpointer rejects invalid run ids before writing', () => {
     /Invalid run id/,
   );
   assert.equal(fs.existsSync(path.join(root, '..', 'escape.json')), false);
+});
+
+test('createCheckpointRecorder mirrors todos, emits save events, and reports save failures', () => {
+  const events: EmittedEvent[] = [];
+  const saved: Record<string, unknown>[] = [];
+  const sessionApproved = new Set<unknown>(['Write']);
+  const initialTodos = [{ id: 'todo-1', text: 'old', status: 'pending' }];
+  const recorder = createCheckpointRecorder({
+    checkpointer: {
+      save(input) {
+        saved.push(input);
+        return 'checkpoint-file';
+      },
+    },
+    runId: 'run_recorder',
+    usageTotals: { total_tokens: 7 },
+    sessionApproved,
+    steps: [{ tool: 'Write' }],
+    context: { tenantId: 'tenant_a' },
+    initialTodos,
+    getFinalText: () => 'final text',
+    emit: (type, payload) => events.push({ type, payload: isRecord(payload) ? payload : {} }),
+  });
+
+  initialTodos[0] = { id: 'todo-1', text: 'mutated', status: 'done' };
+  recorder.emitTodo('todo_update', { id: 'todo-1', text: 'new', status: 'running' });
+  recorder.emitTodo('todo_update', { id: 'todo-2', text: 'second', status: 'pending' });
+  recorder.emitTodo('todo_update', { text: 'missing id' });
+  recorder.emitTodo('progress', { text: 'visible' });
+  assert.equal(recorder.save('after_tool', 3, [{ role: 'user', content: 'hi' }]), true);
+
+  const checkpoint = saved[0];
+  assert.ok(checkpoint, 'checkpoint payload should be captured');
+  assert.equal(checkpoint.runId, 'run_recorder');
+  assert.equal(checkpoint.step, 3);
+  assert.equal(checkpoint.phase, 'after_tool');
+  assert.deepEqual(checkpoint.messages, [{ role: 'user', content: 'hi' }]);
+  assert.deepEqual(checkpoint.usage, { total_tokens: 7 });
+  assert.equal(checkpoint.approvedTools, sessionApproved);
+  assert.deepEqual(checkpoint.todos, [
+    { id: 'todo-1', text: 'new', status: 'running' },
+    { id: 'todo-2', text: 'second', status: 'pending' },
+  ]);
+  assert.deepEqual(checkpoint.metadata, {
+    context: { tenantId: 'tenant_a' },
+    steps: [{ tool: 'Write' }],
+    finalText: 'final text',
+  });
+  assert.ok(events.some((event) => event.type === 'run_checkpoint_saved' && event.payload.phase === 'after_tool'));
+
+  const failingEvents: EmittedEvent[] = [];
+  const failingRecorder = createCheckpointRecorder({
+    checkpointer: { save: () => { throw new Error('disk full'); } },
+    runId: 'run_failing',
+    usageTotals: {},
+    sessionApproved: new Set(),
+    steps: [],
+    getFinalText: () => '',
+    emit: (type, payload) => failingEvents.push({ type, payload: isRecord(payload) ? payload : {} }),
+  });
+  assert.equal(failingRecorder.save('failed', 1, []), false);
+  assert.deepEqual(failingEvents.at(-1), {
+    type: 'run_checkpoint_error',
+    payload: { runId: 'run_failing', step: 1, phase: 'failed', error: 'disk full' },
+  });
+
+  const disabledRecorder = createCheckpointRecorder({
+    checkpointer: null,
+    runId: 'run_disabled',
+    usageTotals: {},
+    sessionApproved: new Set(),
+    steps: [],
+    getFinalText: () => '',
+    emit: () => undefined,
+  });
+  assert.equal(disabledRecorder.save('noop', 0, []), false);
 });
 
 test('runAgentChat checkpoints messages, usage, approvals and todos after loop progress', async () => {

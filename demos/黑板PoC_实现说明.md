@@ -1,8 +1,8 @@
 # 共享黑板 PoC — 实现说明(完全真实 agent 驱动)
 
 > 记录"多 agent 通过一块共享、受控、可审计的黑板协调"这个底牌是怎么实现的。
-> 对应文件:`blackboard-poc-live.mjs`(完全真实驱动)/ 产出 `blackboard-live.md`(可打开看)。
-> 另有 `blackboard-poc.mjs`(脚本驱动版,值写死,跑得快、用于快速演示)。
+> 对应文件:`blackboard-poc-live.ts`(完全真实驱动)/ 产出 `blackboard-live.md`(可打开看)。
+> 另有 `blackboard-poc.ts`(脚本驱动版,值写死,跑得快、用于快速演示)。
 
 ---
 
@@ -48,8 +48,8 @@
 
 ## 5. 与脚本版的区别
 
-- `blackboard-poc.mjs`:事实值**写死在脚本里**,闸门按剧本落盘。跑得快,适合快速演示文件格式。
-- `blackboard-poc-live.mjs`(本版):事实值**全部从真实 agent 输出解析**。没有剧本成分,每个值都能追到 agent 原话。是更硬的底牌。
+- `blackboard-poc.ts`:事实值**写死在脚本里**,闸门按剧本落盘。跑得快,适合快速演示文件格式。
+- `blackboard-poc-live.ts`(本版):事实值**全部从真实 agent 输出解析**。没有剧本成分,每个值都能追到 agent 原话。是更硬的底牌。
 
 ## 6. 诚实边界(面试别说漏)
 
@@ -60,8 +60,8 @@
 
 ```powershell
 # 先启动 Agent Cowork(host 监听 3017),然后:
-cd "C:\Users\Administrator\Desktop\agent cowork\demos"
-node blackboard-poc-live.mjs
+cd "C:\Users\Administrator\Desktop\agent cowork"
+node .\scripts\run-host-node.mjs .\demos\blackboard-poc-live.ts
 # 跑完打开 blackboard-live.md 看当前事实 + 审计链
 ```
 

@@ -1,14 +1,69 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
+import { handleConversationRoutes } from '../src/routes/conversation-routes.js';
 import { createServer } from '../src/server.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
 import { bind, close, recordArray, recordValue, stringField } from './helpers/host-http.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
 import type { ServerConfig, HostServer } from '../src/server.js';
 
 type JsonRecord = Record<string, unknown>;
+type CapturedResponse = HttpResponseLike & { status: number; body: string; json(): JsonRecord };
+type RequestListener = (...args: unknown[]) => void;
+type SupportedRequestListener = RequestListener | ((chunk: Buffer | string) => void) | (() => void) | ((error: Error) => void);
+
+class FakeJsonRequest implements HttpRequestLike {
+  headers: Record<string, string | string[] | undefined>;
+  method: string;
+  private readonly listeners = new Map<string, RequestListener[]>();
+
+  constructor(method: string, private readonly body?: unknown) {
+    this.method = method;
+    this.headers = body === undefined ? {} : { 'content-type': 'application/json' };
+    void Promise.resolve().then(() => {
+      if (this.body !== undefined) this.emit('data', Buffer.from(JSON.stringify(this.body)));
+      this.emit('end');
+    });
+  }
+
+  on(event: 'data', listener: (chunk: Buffer | string) => void): this;
+  on(event: 'end', listener: () => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+  on(event: string, listener: RequestListener): this;
+  on(event: string, listener: SupportedRequestListener): this {
+    const listeners = this.listeners.get(event) || [];
+    listeners.push(listener as RequestListener);
+    this.listeners.set(event, listeners);
+    return this;
+  }
+
+  resume(): void {
+    // Test request bodies are emitted eagerly; there is nothing to drain.
+  }
+
+  private emit(event: string, ...args: unknown[]): void {
+    for (const listener of this.listeners.get(event) || []) listener(...args);
+  }
+}
+
+function capturedResponse(): CapturedResponse {
+  return {
+    status: 0,
+    body: '',
+    writeHead(statusCode) {
+      this.status = statusCode;
+    },
+    end(chunk = '') {
+      this.body = String(chunk);
+    },
+    json() {
+      return recordValue(JSON.parse(this.body || '{}') as unknown, 'captured response body');
+    },
+  };
+}
 
 async function withServer(config: ServerConfig, fn: (baseUrl: string, server: HostServer) => Promise<void>): Promise<void> {
   const server = createServer(config);
@@ -145,6 +200,148 @@ test('conversation storage preserves branch metadata and active branch', async (
     assert.ok(mainBranch, 'main branch should exist');
     assert.equal(recordArray(mainBranch.messages, 'main branch messages').length, 2);
   });
+});
+
+test('conversation list supports full/query modes and rejects malformed route inputs', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-conv-query');
+  await withServer({ trustedRoot }, async (baseUrl) => {
+    const token = await registerUser(baseUrl, 'erin');
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    for (const item of [
+      { id: 'needle-a', title: 'Needle Alpha', text: 'first' },
+      { id: 'needle-b', title: 'Needle Beta', text: 'second' },
+      { id: 'other', title: 'Other Topic', text: 'third' },
+    ]) {
+      const saved = await fetch(`${baseUrl}/api/conversations/${item.id}`, {
+        method: 'PUT',
+        headers: auth,
+        body: JSON.stringify({ title: item.title, messages: [{ role: 'user', text: item.text }] }),
+      });
+      assert.equal(saved.status, 200);
+    }
+
+    let res = await fetch(`${baseUrl}/api/conversations?full=1&limit=1`, { headers: auth });
+    assert.equal(res.status, 200);
+    let body = await jsonRecord(res, 'full list response');
+    let conversations = recordArray(body.conversations, 'full conversations');
+    assert.equal(conversations.length, 1);
+    assert.equal(recordArray(conversations[0]?.messages, 'full conversation messages').length, 1);
+
+    res = await fetch(`${baseUrl}/api/conversations?q=needle&limit=1&offset=-5`, { headers: auth });
+    assert.equal(res.status, 200);
+    body = await jsonRecord(res, 'query response');
+    conversations = recordArray(body.conversations, 'query conversations');
+    assert.equal(body.total, 2);
+    assert.equal(body.limit, 1);
+    assert.equal(body.offset, 0);
+    assert.equal(conversations.length, 1);
+    assert.match(String(conversations[0]?.title), /Needle/);
+
+    res = await fetch(`${baseUrl}/api/conversations?limit=not-a-number`, { headers: auth });
+    assert.equal(res.status, 400);
+    assert.match(String((await jsonRecord(res, 'bad limit response')).error), /number/i);
+
+    const outsideRoot = encodeURIComponent(path.dirname(trustedRoot));
+    res = await fetch(`${baseUrl}/api/conversations?trustedRoot=${outsideRoot}`, { headers: auth });
+    assert.equal(res.status, 400);
+    assert.match(String((await jsonRecord(res, 'bad root response')).error), /outside|trusted/i);
+
+    res = await fetch(`${baseUrl}/api/conversations/%E0%A4%A`, { headers: auth });
+    assert.equal(res.status, 400);
+    assert.match(String((await jsonRecord(res, 'bad id response')).error), /invalid conversation id/i);
+  });
+});
+
+test('conversation route error paths fail closed for missing records and store failures', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-conv-route-errors');
+  const requestContext = { tenantId: 'tenant-route', userId: 'user-route', traceId: 'trace-route' };
+  const store = {
+    list: () => [],
+    get: (_root: string, id: string) => (id === 'throws' ? Promise.reject(new Error('get failed')) : null),
+    save: () => {
+      throw new Error('save refused');
+    },
+    remove: () => {
+      throw new Error('remove refused');
+    },
+  };
+
+  let response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('GET'),
+    response,
+    pathname: '/api/conversations/missing',
+    requestUrl: new URL('http://local/api/conversations/missing'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), true);
+  assert.equal(response.status, 404);
+  assert.match(String(response.json().error), /not found/i);
+
+  response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('GET'),
+    response,
+    pathname: '/api/conversations/throws',
+    requestUrl: new URL('http://local/api/conversations/throws'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), true);
+  assert.equal(response.status, 400);
+  assert.match(String(response.json().error), /get failed/);
+
+  response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('PUT', { title: 'bad save' }),
+    response,
+    pathname: '/api/conversations/save-fails',
+    requestUrl: new URL('http://local/api/conversations/save-fails'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), true);
+  assert.equal(response.status, 400);
+  assert.match(String(response.json().error), /save refused/);
+
+  response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('PUT', { trustedRoot: path.dirname(trustedRoot), title: 'escaped root' }),
+    response,
+    pathname: '/api/conversations/root-escape',
+    requestUrl: new URL('http://local/api/conversations/root-escape'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), true);
+  assert.equal(response.status, 400);
+  assert.match(String(response.json().error), /outside|trusted/i);
+
+  response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('DELETE'),
+    response,
+    pathname: '/api/conversations/remove-fails',
+    requestUrl: new URL('http://local/api/conversations/remove-fails'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), true);
+  assert.equal(response.status, 400);
+  assert.match(String(response.json().error), /remove refused/);
+
+  response = capturedResponse();
+  assert.equal(await handleConversationRoutes({
+    request: new FakeJsonRequest('POST'),
+    response,
+    pathname: '/api/conversations/remove-fails',
+    requestUrl: new URL('http://local/api/conversations/remove-fails'),
+    requestContext,
+    trustedRootDefault: trustedRoot,
+    conversationStore: store,
+  }), false);
+  assert.equal(response.status, 0);
 });
 
 test('FileConversationStore rejects path-traversal ids and isolates by tenant', () => {

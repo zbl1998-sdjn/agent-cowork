@@ -9,13 +9,21 @@ import {
   readArtifactManifest,
   readLiveArtifactHtml,
   refreshLiveArtifactData,
+  refreshLiveArtifactDataAsync,
   renderLivePage,
 } from '../src/artifacts/live-artifact.js';
+import type { ToolRegistryLike } from '../src/artifacts/live-refresh.js';
 import { recordValue, tempRoot } from './helpers/host-http.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: string) => void;
 
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
+
+function assertHttpError(error: unknown, statusCode: number, message: RegExp): true {
+  assert.equal((error as { statusCode?: unknown }).statusCode, statusCode);
+  assert.match(error instanceof Error ? error.message : String(error), message);
+  return true;
+}
 
 test('buildLiveArtifact writes a live page + manifest with a Refresh hook', () => {
   const root = tempRoot('kcw-art-');
@@ -51,13 +59,26 @@ test('renderLivePage escapes title and script-sensitive data while preserving re
 test('readArtifactManifest / readLiveArtifactHtml reject bad ids and missing artifacts', () => {
   const root = tempRoot('kcw-art-');
   assert.throws(() => readArtifactManifest({ trustedRoot: root, id: '../etc' }), (error: unknown) => {
-    assert.equal((error as { statusCode?: unknown }).statusCode, 400);
-    return true;
+    return assertHttpError(error, 400, /invalid artifact id/);
   });
   assert.throws(() => readLiveArtifactHtml({ trustedRoot: root, id: createArtifactId() }), (error: unknown) => {
-    assert.equal((error as { statusCode?: unknown }).statusCode, 404);
-    return true;
+    return assertHttpError(error, 404, /artifact not found/);
   });
+});
+
+test('readArtifactManifest and readLiveArtifactHtml distinguish missing manifest from existing live html', () => {
+  const root = tempRoot('kcw-art-');
+  assert.throws(() => readArtifactManifest({ trustedRoot: root, id: createArtifactId() }), (error: unknown) => {
+    return assertHttpError(error, 404, /artifact not found/);
+  });
+
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '已生成活页',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['visible']] } },
+  });
+
+  assert.equal(readLiveArtifactHtml({ trustedRoot: root, id: out.id }), fs.readFileSync(out.htmlPath, 'utf8'));
 });
 
 test('refreshLiveArtifactData reads a workspace file-json data source on demand', () => {
@@ -80,6 +101,183 @@ test('refreshLiveArtifactData reads a workspace file-json data source on demand'
   assert.equal(dataSource.type, 'file-json');
   const vizData = recordValue(data.viz.data, 'refreshed viz data');
   assert.deepEqual(vizData.rows, [['after']]);
+});
+
+test('refreshLiveArtifactData returns manifest viz when no data source is configured', () => {
+  const root = tempRoot('kcw-art-');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '静态表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+  });
+
+  const data = refreshLiveArtifactData({ trustedRoot: root, id: out.id, now: new Date('2026-02-03T04:05:06.000Z') });
+
+  assert.equal(data.id, out.id);
+  assert.equal(data.refreshedAt, '2026-02-03T04:05:06.000Z');
+  assert.equal(data.dataSource, undefined);
+  const vizData = recordValue(data.viz.data, 'manifest viz data');
+  assert.deepEqual(vizData.rows, [['initial']]);
+});
+
+test('refreshLiveArtifactData reports file-json source regressions with specific status codes', () => {
+  const root = tempRoot('kcw-art-');
+  const sourceRel = 'data/live-viz.json';
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '动态表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'file-json', path: sourceRel },
+  });
+
+  assert.throws(() => refreshLiveArtifactData({ trustedRoot: root, id: out.id }), (error: unknown) => {
+    return assertHttpError(error, 404, /artifact data source not found/);
+  });
+
+  const sourcePath = path.join(root, sourceRel);
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(sourcePath, '{not json', 'utf8');
+  assert.throws(() => refreshLiveArtifactData({ trustedRoot: root, id: out.id }), (error: unknown) => {
+    return assertHttpError(error, 400, /not valid JSON/);
+  });
+
+  fs.writeFileSync(sourcePath, JSON.stringify(['not', 'an', 'object']), 'utf8');
+  assert.throws(() => refreshLiveArtifactData({ trustedRoot: root, id: out.id }), (error: unknown) => {
+    return assertHttpError(error, 400, /must contain a viz object/);
+  });
+
+  fs.writeFileSync(sourcePath, JSON.stringify({ kind: 'table', data: { columns: ['name'], rows: [['direct']] } }), 'utf8');
+  const data = refreshLiveArtifactData({ trustedRoot: root, id: out.id });
+  const vizData = recordValue(data.viz.data, 'direct source viz data');
+  assert.deepEqual(vizData.rows, [['direct']]);
+});
+
+test('refreshLiveArtifactData requires async refresh for connector-tool data sources', () => {
+  const root = tempRoot('kcw-art-');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '连接器表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: { report: 'daily' } },
+  });
+
+  assert.throws(() => refreshLiveArtifactData({ trustedRoot: root, id: out.id }), (error: unknown) => {
+    return assertHttpError(error, 503, /requires async refresh/);
+  });
+});
+
+test('refreshLiveArtifactDataAsync calls an allowed connector data source with trusted context', async () => {
+  const root = tempRoot('kcw-art-');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '连接器表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: { report: 'daily' } },
+  });
+  const calls: Array<{ name: string; args: Record<string, unknown>; ctx: unknown }> = [];
+  const toolRegistry: ToolRegistryLike = {
+    descriptor(name) {
+      assert.equal(name, 'mcp__demo__read_report');
+      return { source: 'mcp:demo', name, risk: 'low', mutating: false, requiresApproval: false };
+    },
+    call(name, args, ctx) {
+      calls.push({ name, args, ctx });
+      return {
+        viz: { kind: 'table', data: { columns: ['name'], rows: [['from tool']] } },
+      };
+    },
+  };
+
+  const data = await refreshLiveArtifactDataAsync({
+    trustedRoot: root,
+    id: out.id,
+    now: new Date('2026-03-04T05:06:07.000Z'),
+    toolRegistry,
+    context: { requestId: 'req-1' },
+  });
+
+  assert.equal(data.refreshedAt, '2026-03-04T05:06:07.000Z');
+  assert.deepEqual(calls, [{
+    name: 'mcp__demo__read_report',
+    args: { report: 'daily' },
+    ctx: { trustedRoot: root, context: { requestId: 'req-1' } },
+  }]);
+  const vizData = recordValue(data.viz.data, 'connector viz data');
+  assert.deepEqual(vizData.rows, [['from tool']]);
+});
+
+test('refreshLiveArtifactDataAsync allows only read-only connector tools as live data sources', async () => {
+  const root = tempRoot('kcw-art-');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '连接器表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: {} },
+  });
+  const makeRegistry = (descriptor: ReturnType<ToolRegistryLike['descriptor']>): ToolRegistryLike => ({
+    descriptor: () => descriptor,
+    call: () => ({
+      viz: { kind: 'table', data: { columns: ['name'], rows: [['from tool']] } },
+    }),
+  });
+
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id }),
+    (error: unknown) => assertHttpError(error, 503, /connector data source is unavailable/),
+  );
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry(null) }),
+    (error: unknown) => assertHttpError(error, 409, /connector tool is not connected/),
+  );
+  for (const descriptor of [
+    { source: 'mcp:demo', name: 'mcp__demo__read_report', risk: 'high' },
+    { source: 'mcp:demo', name: 'mcp__demo__read_report', mutating: true },
+    { source: 'mcp:demo', name: 'mcp__demo__read_report', requiresApproval: true },
+  ]) {
+    await assert.rejects(
+      () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry(descriptor) }),
+      (error: unknown) => assertHttpError(error, 403, /not allowed as a live data source/),
+    );
+  }
+
+  const fsRegistry = makeRegistry({ source: 'mcp:fs', name: 'mcp__fs__read_text', risk: 'critical', mutating: true, requiresApproval: true });
+  fsRegistry.call = () => ({
+    content: [{ type: 'text', text: JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['fs text']] } } }) }],
+  });
+  const data = await refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: fsRegistry });
+  const vizData = recordValue(data.viz.data, 'fs connector viz data');
+  assert.deepEqual(vizData.rows, [['fs text']]);
+});
+
+test('refreshLiveArtifactDataAsync rejects malformed connector payloads before rendering', async () => {
+  const root = tempRoot('kcw-art-');
+  const out = buildLiveArtifact({
+    trustedRoot: root,
+    title: '连接器表',
+    viz: { kind: 'table', data: { columns: ['name'], rows: [['initial']] } },
+    dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: {} },
+  });
+  const makeRegistry = (result: unknown): ToolRegistryLike => ({
+    descriptor: () => ({ source: 'mcp:demo', name: 'mcp__demo__read_report', risk: 'low' }),
+    call: () => result,
+  });
+
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry({ content: [{ type: 'image', text: '{}' }] }) }),
+    (error: unknown) => assertHttpError(error, 400, /must return text JSON/),
+  );
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry({ content: [{ type: 'text', text: '{bad' }] }) }),
+    (error: unknown) => assertHttpError(error, 400, /text is not valid JSON/),
+  );
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry('plain text') }),
+    (error: unknown) => assertHttpError(error, 400, /must return a JSON object/),
+  );
+  await assert.rejects(
+    () => refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: makeRegistry({ viz: [] }) }),
+    (error: unknown) => assertHttpError(error, 400, /unknown viz kind|must contain a viz object/),
+  );
 });
 
 test('buildLiveArtifact rejects file-json data sources outside trustedRoot', () => {

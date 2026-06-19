@@ -8,6 +8,7 @@ type QueryLog = { t: string; params: unknown[] };
 type MockPool = PgPool & {
   queries: QueryLog[];
   _rows: Map<string, RunRecord>;
+  closeCount: number;
 };
 
 const storedRecordSchema = z.object({
@@ -50,9 +51,10 @@ function itemAt<T>(items: readonly T[], index: number, label: string): T {
 function mockPool(): MockPool {
   const rows = new Map<string, RunRecord>();
   const queries: QueryLog[] = [];
-  return {
+  const pool = {
     queries,
     _rows: rows,
+    closeCount: 0,
     async query(text: string, params: unknown[] = []): Promise<PgResult> {
       const t = text.replace(/\s+/g, ' ').trim();
       queries.push({ t, params });
@@ -72,7 +74,11 @@ function mockPool(): MockPool {
         return { rowCount: had ? 1 : 0 };
       }
       if (t.includes('FROM runs_index') && t.includes('ORDER BY')) {
-        const list = [...rows.values()].sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
+        let list = [...rows.values()].sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
+        for (const filter of params.slice(0, -1)) {
+          const value = String(filter);
+          list = list.filter((r) => [r.tenantId, r.userId, r.status, r.type, r.recipeId].includes(value));
+        }
         const cap = intParam(params, params.length - 1);
         return { rows: list.slice(0, cap).map((r) => ({ record_json: JSON.stringify(r) })) };
       }
@@ -89,7 +95,11 @@ function mockPool(): MockPool {
       if (t.includes('COUNT(*)')) return { rows: [{ count: rows.size }] };
       return { rows: [] };
     },
+    async end(): Promise<void> {
+      pool.closeCount += 1;
+    },
   };
+  return pool;
 }
 
 test('PostgresRunsIndex.upsert inserts with ON CONFLICT and bumps version on re-upsert', async () => {
@@ -128,6 +138,63 @@ test('PostgresRunsIndex list/size/stats/remove work through the adapter', async 
   assert.equal(stats.byType.recipe, 1);
   assert.equal(await idx.remove('r_a'), true);
   assert.equal(await idx.size(), 1);
+});
+
+test('PostgresRunsIndex.list applies every public filter and clamps limit', async () => {
+  const pool = mockPool();
+  const idx = new PostgresRunsIndex({ pool });
+  await idx.upsert({ id: 'filter_a', tenantId: 'tenant-a', userId: 'user-a', type: 'agent-chat', status: 'succeeded', recipeId: 'summary-report', startedAt: '2026-05-23T01:00:00Z' });
+  await idx.upsert({ id: 'filter_b', tenantId: 'tenant-a', userId: 'user-b', type: 'recipe', status: 'failed', recipeId: 'meeting-actions', startedAt: '2026-05-23T02:00:00Z' });
+  await idx.upsert({ id: 'filter_c', tenantId: 'tenant-b', userId: 'user-a', type: 'agent-chat', status: 'queued', recipeId: 'summary-report', startedAt: '2026-05-23T03:00:00Z' });
+
+  const list = await idx.list({
+    tenantId: 'tenant-a',
+    userId: 'user-a',
+    status: 'succeeded',
+    type: 'agent-chat',
+    recipeId: 'summary-report',
+    limit: 9999,
+  });
+
+  assert.deepEqual(list.map((record) => record.id), ['filter_a']);
+  const query = pool.queries.find((candidate) => candidate.t.startsWith('SELECT record_json FROM runs_index') && candidate.t.includes('ORDER BY'));
+  assert.ok(query, 'filtered list query should be recorded');
+  assert.match(query.t, /tenant_id=\$1/);
+  assert.match(query.t, /user_id=\$2/);
+  assert.match(query.t, /status=\$3/);
+  assert.match(query.t, /type=\$4/);
+  assert.match(query.t, /recipe_id=\$5/);
+  assert.equal(query.params.at(-1), 500, 'limit is capped at 500 before reaching SQL');
+});
+
+test('PostgresRunsIndex.close delegates to the pool and factory/safe writer preserve the public contract', async () => {
+  const pool = mockPool();
+  const idx = new PostgresRunsIndex({ pool });
+  const wrapped = (await import('../src/storage/postgres-runs-index.js')).withSafeWrites(idx);
+  await wrapped.upsert({ id: 'safe_1', tenantId: 't1', type: 'agent-chat', status: 'succeeded' });
+  assert.ok(await wrapped.get('safe_1'));
+  assert.equal(await wrapped.remove('safe_1'), true);
+  assert.equal(await wrapped.size(), 0);
+  const stats = await wrapped.stats();
+  assert.equal(stats.total, 0);
+  assert.deepEqual(Object.keys(stats.byStatus), []);
+  assert.deepEqual(Object.keys(stats.byType), []);
+  await wrapped.close?.();
+  assert.equal(pool.closeCount, 1);
+});
+
+test('PostgresRunsIndex.withSafeWrites still returns rejecting promises while swallowing background rejection handlers', async () => {
+  const failing = {
+    upsert: async () => { throw new Error('write failed'); },
+    remove: async () => { throw new Error('remove failed'); },
+    get: async () => null,
+    list: async () => [],
+    size: async () => 0,
+    stats: async () => ({ total: 0, byStatus: {}, byType: {} }),
+  };
+  const wrapped = (await import('../src/storage/postgres-runs-index.js')).withSafeWrites(failing);
+  await assert.rejects(() => wrapped.upsert({ id: 'bad', type: 'agent-chat', status: 'failed' }), /write failed/);
+  await assert.rejects(() => wrapped.remove('bad'), /remove failed/);
 });
 
 test('PostgresRunsIndex without pool or connectionString throws on first query', async () => {

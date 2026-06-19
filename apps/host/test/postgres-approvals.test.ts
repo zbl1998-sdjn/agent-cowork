@@ -67,6 +67,17 @@ function mockCluster(): {
           }
           return { rows: out, rowCount: out.length };
         }
+        if (normalized.startsWith("UPDATE pending_approvals SET status='expired'")) {
+          const out: Array<{ id: string }> = [];
+          for (const row of rows.values()) {
+            if (row.status === 'pending') {
+              row.status = 'resolved';
+              row.decision = 'expired';
+              out.push({ id: row.id });
+            }
+          }
+          return { rows: out, rowCount: out.length };
+        }
         if (normalized.startsWith('SELECT COUNT')) {
           let count = 0;
           for (const row of rows.values()) {
@@ -140,6 +151,66 @@ test('cross-instance: tenant-scoped resolve also rejects missing tenant context'
   assert.equal(await B.resolve(id, 'once'), false);
   assert.equal(await B.resolve(id, 'once', { tenantId: 't1' }), true);
   assert.equal(await promise, 'once');
+});
+
+test('local resolve and respond use the in-memory fast path even before async insert settles', async () => {
+  const cluster = mockCluster();
+  const store = new PostgresApprovalStore({ client: cluster.makeClient(), generateId: () => 'apr_local' });
+  await store.start();
+
+  const approval = store.request({ runId: 'r-local', tenantId: 'tenant-a', kind: 'approval' });
+  assert.equal(await store.resolve(approval.id, 'not-a-valid-decision', { tenantId: 'tenant-a' }), true);
+  assert.equal(await approval.promise, 'reject', 'invalid approval decision is normalized to reject');
+
+  const question = store.request({ runId: 'r-local', tenantId: 'tenant-a', kind: 'question' });
+  assert.equal(await store.respond(question.id, { answer: '继续' }, { tenantId: 'tenant-a' }), true);
+  assert.deepEqual(await question.promise, { answer: '继续' });
+});
+
+test('start is idempotent and ignores malformed NOTIFY payloads', async () => {
+  const calls: string[] = [];
+  const listeners = new Set<NotificationHandler>();
+  const client = {
+    async query(text: string): Promise<QueryResult> {
+      calls.push(text);
+      return { rows: [] };
+    },
+    on(_event: 'notification', handler: NotificationHandler): void {
+      listeners.add(handler);
+    },
+  };
+  const store = new PostgresApprovalStore({ client });
+  await store.start();
+  await store.start();
+  assert.deepEqual(calls, ['LISTEN kcw_approvals']);
+  for (const handler of listeners) {
+    handler({ payload: null });
+    handler({ payload: '{bad json' });
+    handler({ payload: JSON.stringify({ id: 'missing-local', decision: 'once' }) });
+  }
+  assert.equal(await store.pendingCount(), 0);
+});
+
+test('prune expires pending rows and rejects local waiters', async () => {
+  const cluster = mockCluster();
+  const store = new PostgresApprovalStore({ client: cluster.makeClient(), generateId: () => 'apr_prune' });
+  await store.start();
+  const { id, promise } = store.request({ runId: 'r-prune', kind: 'approval' });
+  await flushAsyncInsert();
+
+  assert.equal(await store.prune(1234), 1);
+  assert.equal(await promise, 'reject');
+  const row = cluster.rows.get(id);
+  assert.ok(row);
+  assert.equal(row.status, 'resolved');
+  assert.equal(row.decision, 'expired');
+});
+
+test('cancelByRun returns zero without touching the database for empty run ids', async () => {
+  const cluster = mockCluster();
+  const store = new PostgresApprovalStore({ client: cluster.makeClient() });
+  await store.start();
+  assert.equal(await store.cancelByRun(''), 0);
 });
 
 test('cross-instance: AskUserQuestion answer text flows from B back to A', async () => {
@@ -227,6 +298,14 @@ test('connectionString creates a PG client for LISTEN, INSERT, and NOTIFY', asyn
   assert.deepEqual(calls[0], ['constructor', 'postgres://example/db']);
   assert.deepEqual(calls[1], ['connect']);
   assert.equal(calls.some((call) => call[0] === 'query' && call[1] === 'LISTEN kcw_approvals'), true);
+});
+
+test('PostgresApprovalStore fails fast without connection settings or a pg Client export', async () => {
+  await assert.rejects(() => new PostgresApprovalStore({}).start(), /client or connectionString/);
+  await assert.rejects(
+    () => new PostgresApprovalStore({ connectionString: 'postgres://example/db', pg: {} }).start(),
+    /Client export/,
+  );
 });
 
 test('PostgresApprovalStore rejects unsafe channel names', () => {

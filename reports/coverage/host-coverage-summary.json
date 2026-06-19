@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-06-19T21:33:39.004Z",
+  "command": "node --enable-source-maps --import file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/run-host-node.mjs?register-only=1 --test --experimental-test-coverage --test-isolation=process --test-timeout=60000 --import ../../scripts/test-setup.ts --test-coverage-include=src/**/*.ts test/*.test.js test/*.test.ts",
+  "status": 0,
+  "signal": null,
+  "spawnError": null,
+  "failUnderLinePct": 90,
+  "meetsFailUnder": true,
+  "summary": {
+    "linePct": 94.87,
+    "branchPct": 78.58,
+    "functionPct": 95.73
+  },
+  "artifacts": {
+    "textReport": "reports/coverage/host-coverage-latest.txt",
+    "summary": "reports/coverage/host-coverage-summary.json",
+    "v8CoverageDir": "reports/coverage/host-v8-2026-06-19T21-32-25-591Z"
+  }
+}

@@ -57,6 +57,31 @@ test('skill registry exposes recipe manifests with enabled state', () => {
   assert.equal(meeting.enabled, true);
 });
 
+test('skill registry supports injected recipes, fallback manifests, and initial disabled ids', () => {
+  const reg = createSkillRegistry({
+    recipes: [
+      { id: 'custom-audit-pack', name: 'Audit Pack', description: 'Build an audit pack' },
+      { id: 'email-draft', name: 'Email Draft' },
+    ],
+    initialDisabled: ['custom-audit-pack'],
+  });
+
+  const custom = reg.get('custom-audit-pack');
+  assert.ok(custom, 'custom skill should exist');
+  assert.deepEqual(custom.trigger, ['custom', 'audit', 'pack']);
+  assert.deepEqual(custom.permissions, ['read-files', 'write-files']);
+  assert.deepEqual(custom.outputs, ['plan']);
+  assert.equal(custom.description, 'Build an audit pack');
+  assert.equal(custom.enabled, false);
+  assert.equal(reg.isEnabled('custom-audit-pack'), false);
+  assert.equal(reg.get('missing'), null);
+
+  const known = reg.get('email-draft');
+  assert.ok(known, 'known skill should exist');
+  assert.deepEqual(known.permissions, ['read-files']);
+  assert.equal(reg.enabledSkills().map((skill) => skill.id).join(','), 'email-draft');
+});
+
 test('setEnabled toggles and reflects in list; unknown id throws 404', () => {
   const reg = createSkillRegistry();
   reg.setEnabled('email-draft', false);

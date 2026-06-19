@@ -37,12 +37,17 @@ function objectOrEmpty(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function numberOrZero(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function usageOrZero(value: unknown): ResumeUsage {
   const usage = objectOrEmpty(value);
   return {
-    prompt_tokens: Number(usage.prompt_tokens || 0),
-    completion_tokens: Number(usage.completion_tokens || 0),
-    total_tokens: Number(usage.total_tokens || 0),
+    prompt_tokens: numberOrZero(usage.prompt_tokens),
+    completion_tokens: numberOrZero(usage.completion_tokens),
+    total_tokens: numberOrZero(usage.total_tokens),
   };
 }
 
@@ -56,13 +61,16 @@ export function resumeStateFromCheckpoint(checkpoint: unknown): ResumeState {
     throw new Error('run-resume: checkpoint runId is required');
   }
   const metadata = objectOrEmpty(record.metadata);
+  const approvedTools = Array.isArray(record.approvedTools)
+    ? record.approvedTools.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
   return {
     runId,
-    step: Math.max(0, Math.floor(Number(record.step || 0))),
+    step: Math.max(0, Math.floor(numberOrZero(record.step))),
     phase: String(record.phase || 'unknown'),
     messages: Array.isArray(record.messages) ? (jsonClone(record.messages) as unknown[]) : [],
     usage: usageOrZero(record.usage),
-    approvedTools: Array.isArray(record.approvedTools) ? record.approvedTools.map((item) => String(item)) : [],
+    approvedTools,
     todos: Array.isArray(record.todos) ? (jsonClone(record.todos) as unknown[]) : [],
     metadata: jsonClone(metadata) as Record<string, unknown>,
     checkpoint: jsonClone(record),

@@ -14,21 +14,31 @@ export type DetectedKimiInfo = KimiInfo & {
   command: string;
   version: string;
 };
+type StreamLike = {
+  on(event: 'data', listener: (chunk: unknown) => void): unknown;
+};
+type SpawnedDetectChild = {
+  stdout: StreamLike;
+  stderr: StreamLike;
+  on(event: 'error', listener: (error: Error) => void): unknown;
+  on(event: 'close', listener: (code: number | null) => void): unknown;
+};
+type SpawnDetectProcess = (command: string, args: string[], options: Record<string, unknown>) => SpawnedDetectChild;
 
 /** 无 shell 地 spawn 一个命令,收集 stdout;非零退出码或出错时 reject。 */
-function runCommand(command: string, args: string[]): Promise<string> {
+function runCommand(command: string, args: string[], spawn: SpawnDetectProcess): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = childProcess.spawn(command, args, {
+    const child = spawn(command, args, {
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
     let err = '';
     child.stdout.on('data', (chunk) => {
-      out += chunk.toString();
+      out += Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
     });
     child.stderr.on('data', (chunk) => {
-      err += chunk.toString();
+      err += Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
     });
     child.on('error', reject);
     child.on('close', (code) => {
@@ -42,9 +52,9 @@ function runCommand(command: string, args: string[]): Promise<string> {
 }
 
 /** 探测本地 Kimi CLI:返回命令名、版本号与 info 解析出的协议信息。 */
-export async function detectKimiInfo(command = 'kimi'): Promise<DetectedKimiInfo> {
-  const versionOutput = await runCommand(command, ['--version']);
-  const infoOutput = await runCommand(command, ['info']);
+export async function detectKimiInfo(command = 'kimi', spawn = childProcess.spawn as SpawnDetectProcess): Promise<DetectedKimiInfo> {
+  const versionOutput = await runCommand(command, ['--version'], spawn);
+  const infoOutput = await runCommand(command, ['info'], spawn);
   const info = parseKimiInfo(infoOutput);
   return {
     ...info,

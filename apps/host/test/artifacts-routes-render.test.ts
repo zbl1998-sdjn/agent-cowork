@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { sendHtml } from '../src/routes/viz-route-support.js';
 import { createServer } from '../src/server.js';
 import {
   approveVizRender,
@@ -145,4 +146,30 @@ test('POST /api/viz/render rejects unknown kind (400) and missing key (428)', as
   } finally {
     await close(server);
   }
+});
+
+test('sendHtml writes no-store HTML with byte-accurate length', () => {
+  const writes: Array<{ status: number; headers: Record<string, string | number> }> = [];
+  let ended: string | Buffer | undefined;
+  const response = {
+    writeHead(status: number, headers: Record<string, string | number>) {
+      writes.push({ status, headers });
+    },
+    end(chunk?: string | Buffer) {
+      ended = chunk;
+    },
+  };
+  const body = '<h1>可视化</h1>';
+
+  sendHtml(response, 202, body);
+
+  assert.deepEqual(writes, [{
+    status: 202,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'content-length': Buffer.byteLength(body),
+      'cache-control': 'no-store',
+    },
+  }]);
+  assert.equal(ended, body);
 });

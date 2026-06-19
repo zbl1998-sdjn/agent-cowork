@@ -14,6 +14,9 @@
   },
   "files": [
     "types/host-node-shim.d.ts",
+    "demos/blackboard-poc-live.ts",
+    "demos/blackboard-poc.ts",
+    "demos/shared-memory-poc.ts",
     "eslint.config.ts",
     "apps/host/scripts/bench-local.ts",
     "scripts/audit-mvp.ts",
@@ -42,6 +45,7 @@
     "scripts/host-ts-support.ts",
     "scripts/host-ts-support.d.mts",
     "scripts/release.ts",
+    "scripts/run-host-coverage.ts",
     "scripts/run-host-node.ts",
     "scripts/smoke-kimi-api.ts",
     "scripts/smoke-local-operations.ts",

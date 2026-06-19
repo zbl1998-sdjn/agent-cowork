@@ -190,7 +190,12 @@ export async function executeToolCall({
     ));
   } catch (err) {
     const error = err && typeof err === 'object' ? err as { message?: unknown } : {};
-    result = { error: error.message };
+    const message = typeof error.message === 'string' && error.message
+      ? error.message
+      : typeof err === 'string' && err
+        ? err
+        : 'tool handler failed';
+    result = { error: message };
   }
   const durationMs = Math.max(0, Date.now() - toolStartedAt);
   if (activeRetryPolicy.lastRun.retried) {

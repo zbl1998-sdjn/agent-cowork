@@ -85,8 +85,10 @@ export async function load(url, context, nextLoad) {
         compilerOptions: {
             module: ts.ModuleKind.ES2022,
             target: ts.ScriptTarget.ES2022,
-            sourceMap: false,
-            inlineSources: false,
+            // Node coverage needs source maps here; otherwise stripped TypeScript
+            // type lines shift execution counts onto the wrong .ts source lines.
+            inlineSourceMap: true,
+            inlineSources: true,
         },
         reportDiagnostics: true,
     });

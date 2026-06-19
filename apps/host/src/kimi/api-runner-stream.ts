@@ -120,31 +120,46 @@ export async function runKimiApiChatStream({
     }
     const decoder = new TextDecoder();
     let buffer = '';
+    let streamDone = false;
+    const processSseLine = (rawLine: string): void => {
+      const line = rawLine.trim();
+      if (!line || !line.startsWith('data:')) return;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') {
+        buffer = '';
+        streamDone = true;
+        return;
+      }
+      try {
+        const json = JSON.parse(data) as KimiPayload;
+        const choiceDelta = json.choices?.[0]?.delta || {};
+        const reasoning = typeof choiceDelta.reasoning_content === 'string' ? choiceDelta.reasoning_content : '';
+        if (reasoning && typeof onReasoning === 'function') onReasoning(reasoning);
+        const delta = typeof choiceDelta.content === 'string' ? choiceDelta.content : '';
+        if (delta) {
+          text += delta;
+          if (typeof onToken === 'function') onToken(delta);
+        }
+      } catch {
+        // ignore partial / non-JSON keepalive lines
+      }
+    };
     for (;;) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        buffer += decoder.decode();
+        if (buffer.trim()) processSseLine(buffer);
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
       let nl;
       while ((nl = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, nl).trim();
+        const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
-        if (!line || !line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') { buffer = ''; break; }
-        try {
-          const json = JSON.parse(data) as KimiPayload;
-          const choiceDelta = json.choices?.[0]?.delta || {};
-          const reasoning = typeof choiceDelta.reasoning_content === 'string' ? choiceDelta.reasoning_content : '';
-          if (reasoning && typeof onReasoning === 'function') onReasoning(reasoning);
-          const delta = typeof choiceDelta.content === 'string' ? choiceDelta.content : '';
-          if (delta) {
-            text += delta;
-            if (typeof onToken === 'function') onToken(delta);
-          }
-        } catch {
-          // ignore partial / non-JSON keepalive lines
-        }
+        processSseLine(line);
+        if (streamDone) break;
       }
+      if (streamDone) break;
     }
     return { ok: true, provider: cleanProvider(provider), model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
   } catch (error) {

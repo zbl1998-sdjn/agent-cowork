@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolveSandboxStartup } from '../src/sandbox/startup-probe.js';
+import type { SpawnSyncLike } from '../src/sandbox/startup-probe.js';
 import { objectField } from './helpers/host-http.js';
 import { fakeProbeSpawnSync } from './helpers/sandbox.js';
 
@@ -49,4 +50,86 @@ test('resolveSandboxStartup falls back to local when no true isolated backend is
   assert.equal(docker.usable, false);
   assert.equal(wsl.available, true);
   assert.equal(wsl.networkIsolated, false);
+});
+
+test('resolveSandboxStartup keeps probe failures and explicit backend isolation claims honest', () => {
+  const calls: Array<{ command: string; args: readonly string[]; options: Record<string, unknown> }> = [];
+  const spawnSync: SpawnSyncLike = (command, args, options) => {
+    calls.push({ command, args, options });
+    if (command === 'docker') {
+      return { status: 1, stdout: '', stderr: '', error: { code: 'ENOENT', message: 'docker missing' } };
+    }
+    throw new Error('wsl probe exploded');
+  };
+
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: {},
+    env: {},
+    spawnSync,
+    timeoutMs: 25,
+  });
+
+  assert.equal(startup.options.backend, 'local');
+  assert.equal(startup.info.networkIsolated, false);
+  assert.equal(startup.info.fallback, true);
+  assert.match(startup.info.fallbackReason || '', /No Docker backend/);
+  assert.equal(calls[0]?.command, 'docker');
+  assert.deepEqual(calls[0]?.args, ['info', '--format', '{{.ServerVersion}}']);
+  assert.equal(calls[0]?.options.timeout, 25);
+  assert.equal(calls[0]?.options.windowsHide, true);
+  const backends = objectField(startup.info, 'backends', 'startup backends');
+  const docker = objectField(backends, 'docker', 'docker backend probe');
+  const wsl = objectField(backends, 'wsl', 'wsl backend probe');
+  assert.equal(docker.reason, 'ENOENT');
+  assert.equal(wsl.reason, 'wsl probe exploded');
+
+  const missingImage = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: {},
+    env: {},
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+  assert.equal(missingImage.options.backend, 'local');
+  assert.match(missingImage.info.fallbackReason || '', /KCW_SANDBOX_DOCKER_IMAGE is not configured/);
+
+  const envImage = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: {},
+    env: { KCW_SANDBOX_IMAGE: 'node:20-slim' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'docker image inspect node:20-slim': { status: 1, stderr: 'No such image' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+  assert.equal(envImage.options.image, 'node:20-slim');
+  assert.match(envImage.info.fallbackReason || '', /image "node:20-slim" is not present locally/);
+
+  const explicitWsl = resolveSandboxStartup({
+    requestedBackend: 'wsl',
+    sandboxOptions: { distro: 'Ubuntu' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { status: 1, stderr: 'daemon down' },
+      'wsl.exe --status': { stdout: 'Default Version: 2\n' },
+    }),
+  });
+  assert.equal(explicitWsl.options.backend, 'wsl');
+  assert.equal(explicitWsl.info.networkIsolated, false);
+  assert.equal(explicitWsl.info.userMessage, '本地不隔离网络: local sandbox runs on the host and cannot enforce network isolation.');
+
+  const explicitVm = resolveSandboxStartup({
+    requestedBackend: 'vm',
+    sandboxOptions: {},
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { status: 1, stderr: 'daemon down' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+  assert.equal(explicitVm.options.backend, 'vm');
+  assert.equal(explicitVm.info.networkIsolated, true);
+  assert.equal(explicitVm.info.userMessage, 'explicit VM sandbox backend requested');
 });

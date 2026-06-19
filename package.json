@@ -64,6 +64,8 @@
     "release": "node scripts/run-host-node.mjs scripts/release.ts",
     "test": "npm run test:host && npm run test:ui",
     "test:isolated": "node scripts/run-host-node.mjs --cwd apps/host -- --test",
+    "test:host:coverage": "node scripts/run-host-node.mjs scripts/run-host-coverage.ts",
+    "test:host:coverage:90": "node scripts/run-host-node.mjs scripts/run-host-coverage.ts --fail-under=90",
     "build:ui": "node scripts/run-host-node.mjs scripts/build-ui.ts",
     "build:ui:fresh": "node scripts/run-host-node.mjs scripts/build-ui.ts --install",
     "build:host-source": "node scripts/run-host-node.mjs scripts/build-host-source.ts",
