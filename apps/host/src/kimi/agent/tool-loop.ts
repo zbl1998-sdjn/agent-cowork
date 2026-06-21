@@ -8,7 +8,7 @@
 //      tool-loop-support/tool-call-executor)及同层 agent-tools/system-prompt/context 等。
 // 导出:runAgentChat
 import { createAgentTools } from '../agent-tools.js';
-import { buildSystemPrompt } from '../system-prompt.js';
+import { buildSystemPrompt, buildEnvBlock } from '../system-prompt.js';
 import { resolveAgentEnvFacts } from '../agent-env.js';
 import { defaultAgentModelCall } from '../model-call.js';
 import { ensureExitPlanModeTool, makeAudit } from './approval-gate.js';
@@ -28,6 +28,7 @@ import { createCheckpointRecorder } from './checkpoint-state.js';
 import { traceModelContext, traceToolDecision } from './run-trace-events.js';
 import { addLazySearchTool, createNoopBudgetGuard } from './tool-loop-support.js';
 import { executeToolCall } from './tool-call-executor.js';
+import { recordCacheUsage, logCacheTelemetry, hashPrefix } from '../cache-telemetry.js';
 import { omitUndefined } from '../../util/object.js';
 import type { AskTool } from './clarification.js';
 import type { AgentTool } from './tool-call-executor.js';
@@ -49,7 +50,7 @@ export type {
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
+  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
 
   // ═══════════ 【大白话导读 · Derrick 学习注释】Agent 主循环骨架 ═══════════
   // 一句话:模型每轮二选一——「要调工具」就执行完、把结果喂回去再问一遍;「直接给答案」就收工。最多转 maxSteps 轮。
@@ -78,22 +79,28 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   const clarified = clarifyBeforeModel
     ? await clarifyPromptBeforeModel({ prompt, userContent, toolMap: toolMap as unknown as Map<string, AskTool> })
     : { prompt, clarified: false };
+  // env(含每日日期)从系统前缀移到用户轮:让 system+工具前缀跨天稳定可缓存,日期随易变的用户轮走。
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const envPreamble = buildEnvBlock(envFacts).join('\n');
   const userMessage = (Array.isArray(userContent) && userContent.length)
-    ? { role: 'user', content: userContent }
-    : { role: 'user', content: clarified.prompt };
+    ? { role: 'user', content: [{ type: 'text', text: `${envPreamble}\n\n` }, ...userContent] }
+    : { role: 'user', content: `${envPreamble}\n\n${clarified.prompt}` };
   const activeContextManager = (contextManager || createContextManager(contextOptions as Parameters<typeof createContextManager>[0])) as ContextManagerLike;
   const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions as Parameters<typeof createLoopGuard>[0]);
   const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions as Parameters<typeof createRetryPolicy>[0]);
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   const resumed = resumeState;
   const resumeUsage = (resumed && resumed.usage) || {};
-  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
-  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode, env: envFacts }) }, userMessage];
+  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode, includeEnvBlock: false }) }, userMessage];
   let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   const steps: Array<Record<string, unknown>> = [];
   const sessionApproved = new Set((resumed && Array.isArray(resumed.approvedTools)) ? resumed.approvedTools : []);
   const hasApprovals = !!approvals;
   const usageTotals = { prompt_tokens: Number(resumeUsage.prompt_tokens || 0), completion_tokens: Number(resumeUsage.completion_tokens || 0), total_tokens: Number(resumeUsage.total_tokens || 0) };
+  // 稳定前缀(system 提示)指纹:用于诊断动态内容是否漏进前缀、打穿前缀缓存(distinctPrefixes>1 即不稳)。
+  const cachePrefixHash = hashPrefix(String((Array.isArray(messages) && messages[0] && (messages[0] as { content?: unknown }).content) || ''));
+  // 前缀缓存键:优先用跨运行稳定的会话 id(同一对话多轮追问复用缓存),无则回退到本次 runId。
+  const cacheKeyForRun = (cacheKey || runId) || undefined;
   const audit = makeAudit(auditBus, context);
   let finalText = '';
   let planApproved = !planMode;
@@ -182,6 +189,8 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           signal: runTimeout.signal,
           onContent,
           onReasoning,
+          // 稳定缓存键:优先会话 id(跨运行复用)、回退 runId;官方建议多轮 agent 传入以提高前缀缓存命中率。
+          promptCacheKey: cacheKeyForRun,
         }, omitUndefined({
           kimiConfig,
           timeoutMs: modelTimeoutMs,
@@ -196,6 +205,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       }
       if (!streamedReasoning && message.reasoning_content) emit('reasoning', { delta: message.reasoning_content });
       addUsage(usageTotals, message.usage);
+      recordCacheUsage(message.usage as Parameters<typeof recordCacheUsage>[0], omitUndefined({ cacheKey: cacheKeyForRun, prefixHash: cachePrefixHash }));
       const usageBudgetDecision = activeBudgetGuard.recordUsage(message.usage);
       if (usageBudgetDecision.shouldAbort) {
         stopOnBudget(usageBudgetDecision);
@@ -250,6 +260,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       const phase = stopForBudget ? 'budget_stopped' : (stopForTimeout ? 'timeout_stopped' : 'loop_guard_stopped');
       saveCheckpoint(phase, lastCheckpointStep || stepBudget, [...messages, { role: 'assistant', content: finalText }]);
     }
+    logCacheTelemetry(); // 收尾打印本会话缓存命中累计(+前缀不稳定告警);无调用则静默。
     return {
       text: finalText,
       steps,

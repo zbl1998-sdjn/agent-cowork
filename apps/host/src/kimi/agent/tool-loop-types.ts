@@ -42,7 +42,7 @@ export type RunAgentChatOptions = {
   prompt?: unknown; kimiConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall; maxSteps?: number;
   approvals?: ApprovalRegistry | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
   memoryText?: string; skills?: SkillDescriptor[]; emit?: EmitFn; sandbox?: unknown; sandboxLimits?: unknown; runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknown;
-  context?: RequestContext; fetchImpl?: unknown; lazyTools?: AgentTool[]; verify?: boolean; maxVerifySteps?: number; signal?: AbortSignal | null; runId?: string | null;
+  context?: RequestContext; fetchImpl?: unknown; lazyTools?: AgentTool[]; verify?: boolean; maxVerifySteps?: number; signal?: AbortSignal | null; runId?: string | null; cacheKey?: string | null;
   userContent?: unknown; clarifyBeforeModel?: boolean; contextManager?: ContextManagerLike | null; contextOptions?: unknown; loopGuard?: LoopGuard | null; loopGuardOptions?: unknown;
   retryPolicy?: RetryPolicy | null; retryOptions?: unknown; budgetGuard?: BudgetGuardLike | null; runTimeoutMs?: number; checkpointer?: Checkpointer | null;
   resumeState?: ResumeState | null; runTrace?: RunTraceLike | null;

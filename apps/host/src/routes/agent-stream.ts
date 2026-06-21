@@ -202,6 +202,8 @@ export async function streamAgentChat({
       context: requestContext,
       signal: controller ? controller.signal : null,
       runId,
+      // 跨运行稳定的会话 id 作前缀缓存键:同一对话窗口的多轮追问复用缓存(官方建议用 session/task id)。
+      cacheKey: maseConversation,
       userContent,
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
       budgetGuard,

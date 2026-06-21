@@ -19,6 +19,7 @@
     "demos/shared-memory-poc.ts",
     "eslint.config.ts",
     "apps/host/scripts/bench-local.ts",
+    "apps/host/scripts/cache-baseline.ts",
     "scripts/audit-mvp.ts",
     "scripts/bench.ts",
     "scripts/build-ui.ts",

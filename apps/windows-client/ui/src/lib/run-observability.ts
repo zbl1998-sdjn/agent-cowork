@@ -176,6 +176,13 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
   const runFailed = Boolean(failures.runFailed);
   const failureTone: ObservabilityTone = runFailed || failureRate >= 0.2 ? 'danger' : failureRate > 0 ? 'warn' : 'neutral';
   const toolTone: ObservabilityTone = toolFailures > 0 ? 'warn' : 'neutral';
+  // 前缀缓存命中:cached_tokens(Kimi/OpenAI)或 prompt_cache_hit_tokens(DeepSeek)占输入 token 的比例。
+  // 仅在确有命中时追加到用量卡详情,避免在无缓存数据的旧记录上改变既有展示。
+  const cachedTokens = numberValue(tokens.cached_tokens ?? tokens.prompt_cache_hit_tokens, 0);
+  const promptTokensForCache = numberValue(tokens.prompt_tokens, 0);
+  const cacheHitPct = promptTokensForCache > 0 ? (cachedTokens / promptTokensForCache) * 100 : 0;
+  const usageDetail = `Prompt ${integerText(tokens.prompt_tokens)} / Completion ${integerText(tokens.completion_tokens)}`
+    + (cachedTokens > 0 ? ` · 缓存命中 ${integerText(cachedTokens)} (${cacheHitPct.toFixed(0)}%)` : '');
 
   return {
     title,
@@ -184,7 +191,7 @@ export function buildRunObservabilityView(record: RunRecord | null | undefined):
       {
         label: '用量',
         value: formatTokenCount(tokens.total_tokens),
-        detail: `Prompt ${integerText(tokens.prompt_tokens)} / Completion ${integerText(tokens.completion_tokens)}`,
+        detail: usageDetail,
         tone: 'neutral',
       },
       {

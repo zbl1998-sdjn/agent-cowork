@@ -7,8 +7,9 @@
 import { callModelResilient } from './model-resilience.js';
 import { omitUndefined } from '../../util/object.js';
 
-export type Usage = { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
-export type UsageTotals = { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+// cached_tokens:Kimi/OpenAI 顶层缓存命中输入 token;prompt_cache_hit_tokens:DeepSeek 同义字段。两者兼容读取。
+export type Usage = { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown; cached_tokens?: unknown; prompt_cache_hit_tokens?: unknown };
+export type UsageTotals = { prompt_tokens: number; completion_tokens: number; total_tokens: number; cached_tokens?: number };
 export type Message = { role: string; content: unknown };
 export type ModelResult = { usage?: Usage; content?: string };
 export type Emit = (type: string, payload: Record<string, unknown>) => void;
@@ -25,12 +26,15 @@ export type SummarizeOptions = {
   usageTotals: UsageTotals;
 };
 
-/** 把单次调用的 token 用量累加进运行总量(空值安全)。 */
+/** 把单次调用的 token 用量累加进运行总量(空值安全);cached_tokens 兼容 Kimi/DeepSeek 两种命名。 */
 export function addUsage(totals: UsageTotals, usage: Usage | null | undefined): void {
   if (!usage) return;
   totals.prompt_tokens += Number(usage.prompt_tokens || 0);
   totals.completion_tokens += Number(usage.completion_tokens || 0);
   totals.total_tokens += Number(usage.total_tokens || 0);
+  // 仅在确有缓存命中时累加 cached_tokens(无命中不写键,保持与既有 deepEqual 断言/旧记录兼容)。
+  const cached = Number(usage.cached_tokens ?? usage.prompt_cache_hit_tokens ?? 0);
+  if (cached) totals.cached_tokens = (Number(totals.cached_tokens) || 0) + cached;
 }
 
 /** 达到工具调用上限/预算后,禁用工具再请模型做一次中文收尾总结(失败则返回空串)。 */

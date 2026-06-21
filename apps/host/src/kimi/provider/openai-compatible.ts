@@ -64,6 +64,7 @@ export function createOpenAiCompatibleProvider({
       onContent,
       onReasoning,
       signal,
+      promptCacheKey,
     }: ProviderChatArgs): Promise<Record<string, unknown>> {
       const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
@@ -88,6 +89,8 @@ export function createOpenAiCompatibleProvider({
         tool_choice: 'auto',
         max_tokens: config.maxTokens || 2048,
         stream: true,
+        // 稳定缓存键(通常为 session/run id):提高前缀缓存命中率;不支持的后端会忽略。
+        ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
       if (typeof config.temperature === 'number' && Number.isFinite(config.temperature)) {
         body.temperature = config.temperature;

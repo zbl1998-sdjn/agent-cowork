@@ -17,6 +17,9 @@ type SystemPromptOptions = {
   planMode?: boolean;
   developerMode?: boolean;
   env?: EnvFacts;
+  // 是否把含「每日日期」的 <env> 块拼进系统提示。默认 true(向后兼容)。
+  // agent 循环传 false 取「不含日期、跨天稳定」的系统前缀,另把 env 放进用户轮,避免日期按天打穿前缀缓存。
+  includeEnvBlock?: boolean;
 };
 
 /** 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,放在系统提示词最顶部。 */
@@ -54,10 +57,11 @@ export function buildSystemPrompt({
   planMode = false,
   developerMode = false,
   env,
+  includeEnvBlock = true,
 }: SystemPromptOptions = {}): string {
   const lines = [
-    ...buildEnvBlock(env || {}),
-    '',
+    // <env> 含每日变化的日期;放进系统前缀会按天打穿缓存,故可由调用方关掉(改放用户轮)。
+    ...(includeEnvBlock ? [...buildEnvBlock(env || {}), ''] : []),
     '你是 Agent Cowork，一个运行在用户本地电脑上的 AI 助手。',
     '你可以调用提供的工具来读写工作区文件、运行命令、抓取网页、调用已连接的外部连接器(MCP)，真正完成用户的任务，而不只是给建议。',
     '文件工具：Read 读文件、Glob 找文件、Grep 搜内容、Write 写文件、Edit 精确替换；需要跑命令用 Shell；需要联网搜索"今天/最近/最新"信息(新闻、文档版本、价格、是否还活着)用 WebSearch,知道具体网址用 web.fetch；外部能力用 mcp__ 开头的工具。所有文件操作限定在工作区内。',

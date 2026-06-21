@@ -47,6 +47,7 @@ export function createKimiProvider(): Provider {
       onContent,
       onReasoning,
       signal,
+      promptCacheKey,
     }: ProviderChatArgs): Promise<unknown> {
       if (!kimiConfig || !kimiConfig.apiKey) {
         throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
@@ -68,6 +69,8 @@ export function createKimiProvider(): Provider {
         // OpenAI 兼容流只有设置 include_usage 才会在最终 SSE chunk 返回 usage。
         // 否则 run 记录的 token 用量会全为 0,观测面板也会显示为空。
         stream_options: { include_usage: true },
+        // 稳定缓存键:官方建议多轮 agent 传入(通常为 session/run id),提高前缀缓存命中率。
+        ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
       if (typeof kimiConfig.temperature === 'number' && Number.isFinite(kimiConfig.temperature)) {
         body.temperature = kimiConfig.temperature;
