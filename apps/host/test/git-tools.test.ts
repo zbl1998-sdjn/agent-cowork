@@ -9,6 +9,7 @@ import { createAgentTools } from '../src/kimi/agent-tools.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../src/tools/dev/git.js';
 import { intInRange, resolveGitPath, resolveWorkspace } from '../src/tools/dev/git-runner.js';
+import { canonicalizePath } from '../src/security/path-policy.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { createAgentApprovalRegistry } from './helpers/approvals.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
@@ -168,8 +169,10 @@ test('git runner helpers clamp options and keep workspaces inside the trusted ro
   assert.equal(intInRange('not-a-number', 2, 0, 5), 2);
 
   const resolved = resolveWorkspace(root, 'child');
-  assert.equal(resolved.root, path.resolve(root));
-  assert.equal(resolved.workspace, path.resolve(child));
+  // resolveWorkspace 内部走 assertTrustedPath -> canonicalizePath,会把 Windows 8.3 短文件名
+  // (如临时目录在某些机器上以 ADMINI~1 形式返回)展开成真实长名,断言需同样展开后比较。
+  assert.equal(resolved.root, canonicalizePath(path.resolve(root)));
+  assert.equal(resolved.workspace, canonicalizePath(path.resolve(child)));
   assert.throws(() => resolveWorkspace(root, '..'), /outside|escaped|trusted/i);
 
   assert.equal(resolveGitPath(resolved.root, resolved.workspace, 'src/file.txt'), 'src/file.txt');
