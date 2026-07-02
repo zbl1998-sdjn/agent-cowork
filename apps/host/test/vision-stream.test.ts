@@ -60,6 +60,9 @@ test('E2E: agent stream attaches uploaded images as multipart image_url content'
       return p.type === 'image_url' && /^data:image\/png;base64,/.test(String(imageUrl.url || ''));
     }), 'has image_url part');
     assert.ok(parts.some((p) => p.type === 'text' && /这是什么图/.test(String(p.text || ''))), 'has text part');
+    // 前缀缓存优化(caa53404)把 <env> 日期块从系统前缀挪到每轮用户消息最前面的独立 text part。
+    assert.equal(parts[0]?.type, 'text', 'first part is the stable env preamble');
+    assert.ok(/^<env>\n/.test(String(parts[0]?.text || '')), 'env preamble opens the multipart content');
   } finally {
     await closeTestServer(server);
   }
@@ -76,7 +79,12 @@ test('E2E: agent stream without images keeps a plain string user message', async
     const userMsg = captured.find((m) => m.role === 'user');
     assert.ok(userMsg, 'user message should be captured');
     assert.equal(typeof userMsg.content, 'string');
-    assert.equal(userMsg.content, '只是文字');
+    // 前缀缓存优化(caa53404)把 <env> 日期块从系统前缀挪到每轮用户消息最前面,
+    // 让 system+工具前缀跨天稳定可缓存;这里锁定"仍是纯字符串 + 原始 prompt 逐字保留在末尾"。
+    const content = String(userMsg.content);
+    assert.ok(content.startsWith('<env>\n'), 'user message is prefixed with the stable env preamble');
+    assert.ok(content.includes('</env>'), 'env preamble is closed');
+    assert.ok(content.endsWith('\n\n只是文字'), 'original prompt text follows the env preamble unchanged');
   } finally {
     await closeTestServer(server);
   }
