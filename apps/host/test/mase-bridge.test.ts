@@ -207,3 +207,46 @@ test('remember is no-op for empty turns and missing tools', async () => {
   await maseRememberTurn(registry, '我的默认模型是 Fable 5', '已记录');
   assert.equal(registry.calls.length, 0);
 });
+
+test('remember skips credential-bearing user log and derived facts (DLP guard)', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: () => ({ content: [{ type: 'text', text: 'Event logged with ID 7' }] }),
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  // 用户这轮贴了登录口令(凭据),助手回答是干净的普通文本。
+  await maseRememberTurn(registry, '记住我的登录 password 是 hunter2abc', '已收到,我不会明文回显它', 'thread-secret');
+
+  const remembers = registry.calls.filter((call) => call.name === REMEMBER);
+  const userRemember = remembers.find((call) => recordValue(call.args, 'remember args').role === 'user');
+  // 含凭据的用户 log 不得写入外部 MASE 存储;由凭据派生的事实也不得 upsert。
+  assert.equal(userRemember, undefined, 'credential-bearing user log must not be written to MASE');
+  const upserts = registry.calls.filter((call) => call.name === UPSERT_FACT);
+  assert.equal(upserts.length, 0, 'credential-bearing facts must not be upserted to MASE');
+  // 逐条判定:用户侧含密不连累干净的助手侧,助手 log 仍写入。
+  const assistantRemember = remembers.find((call) => recordValue(call.args, 'remember args').role === 'assistant');
+  assert.ok(assistantRemember, 'clean assistant log should still be written');
+});
+
+test('remember skips credential-bearing assistant log while keeping clean user log/facts', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: (args) => ({
+      content: [{ type: 'text', text: recordValue(args, 'remember').role === 'user' ? 'Event logged with ID 9' : 'assistant logged' }],
+    }),
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  // 助手回答里回显了 Authorization/Bearer 令牌;用户这句是干净的普通事实。
+  await maseRememberTurn(registry, '我的城市是悉尼', '这是你的 Authorization: Bearer abcdef123456 令牌', 'thread-secret-2');
+
+  const remembers = registry.calls.filter((call) => call.name === REMEMBER);
+  assert.ok(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'user'),
+    'clean user log should still be written',
+  );
+  assert.equal(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'assistant'),
+    undefined,
+    'credential-bearing assistant log must be skipped',
+  );
+  // 干净的用户事实(城市=悉尼)不受助手侧含密影响,仍 upsert。
+  assert.equal(registry.calls.filter((call) => call.name === UPSERT_FACT).length, 1, 'clean user fact should still be upserted');
+});

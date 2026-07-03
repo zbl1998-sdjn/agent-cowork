@@ -5,6 +5,7 @@
 // 依赖:L1 kimi/agent(tool-loop/toolset/finalize)+ memory/workspace + L2 hooks/action-audit/run-trace
 //       + 同层 agent-resume/session-model-config 等。导出:streamAgentChat。
 import { loadLayeredMemory } from '../memory/memory-layers.js';
+import { isMemoryActiveForRoot } from '../memory/memory-control.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createRunTrace } from '../runtime/run-trace.js';
@@ -124,6 +125,9 @@ export async function streamAgentChat({
   };
   let outcome: AgentOutcome = { text: '', steps: [] };
   let status = 'succeeded';
+  // 记忆总闸(读/写共用):默认活跃,进 try 后按 memory-settings 覆写。声明在 try 外,
+  // 好让 finally 的写缝也能读到;真赋值失败会被 catch 兜住并把 status 置 failed,不会误写。
+  let memoryActive = true;
   // MASE 记忆线程:稳定的「按租户/用户/会话」标识,读缝(时间线召回)与写缝(回写)共用。
   // conversationId 由 UI 每个对话窗口透传 → 各窗口对话时间线互不串(窗口隔离);UI 不传时回退 default。
   const maseConversation = String(body.conversationId ?? '').trim().slice(0, 64) || 'default';
@@ -161,9 +165,16 @@ export async function streamAgentChat({
     });
     const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
+    // 记忆总闸:尊重用户「暂停/隐身/停用」开关(memory-settings)——非活跃时本轮既不注入也不回写,
+    // 内置分层记忆与 MASE 记忆桥接对同一个开关保持一致(否则 UI 里的开关对实时对话形同虚设)。
+    memoryActive = isMemoryActiveForRoot(trustedRoot);
     // 读缝:MASE 作为记忆后端——注入【最近对话(本线程时序)+ 当前事实 + 相关历史】到会话记忆层。
-    const maseSessionMemory = await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread);
-    const memory = loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }));
+    const maseSessionMemory = memoryActive
+      ? await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread)
+      : '';
+    const memory = memoryActive
+      ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }))
+      : { text: '', layers: [] };
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
@@ -240,7 +251,8 @@ export async function streamAgentChat({
     });
     // 写缝:MASE 作为记忆后端——把成功一轮的「用户输入+助手回答」写回长期记忆。
     // 用稳定的会话 thread(按租户/用户)而非每轮变化的 runId,timeline 才能按"一段对话"归组。
-    if (status === 'succeeded' && outcome.text) {
+    // 同样受记忆总闸约束:暂停/隐身/停用时不回写(与读缝一致)。
+    if (memoryActive && status === 'succeeded' && outcome.text) {
       await maseRememberTurn(toolRegistry, String(body.prompt || ''), outcome.text, maseThread);
     }
     response.end();

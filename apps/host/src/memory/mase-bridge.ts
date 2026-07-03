@@ -4,7 +4,9 @@
 //       agent cowork 的「自动记忆后端」:每轮对话开始用 mase_recall 召回相关历史事实、
 //       作为会话记忆层注入上下文;每轮结束用 mase_remember 把「用户输入+助手回答」写回 MASE。
 //       仅在 mase-memory 工具已注册(MASE_MCP_ENABLED=1 且连接成功)时生效,否则全程 no-op。
-// 依赖:仅一个最小 ToolCaller 形状(has/call),不直接持有/创建 MCP 连接。导出:两个桥接函数。
+// 依赖:仅一个最小 ToolCaller 形状(has/call),不直接持有/创建 MCP 连接;
+//       写前复用同层 memory-dlp-guard 做凭据/密钥分级(与内置记忆同一道关)。导出:两个桥接函数。
+import { decideMemoryDlp } from './memory-dlp-guard.js';
 
 // 只依赖工具注册表的 has/call 形状,避免与 ToolRegistry 实现强耦合。
 type ToolCaller = {
@@ -55,6 +57,14 @@ function segmentForRecall(query: string): string {
 function toolAvailable(registry: ToolCaller | null | undefined, tool: string): registry is ToolCaller {
   if (!registry || typeof registry.call !== 'function') return false;
   return typeof registry.has === 'function' ? registry.has(tool) : true;
+}
+
+// 写前凭据/密钥闸:复用内置记忆的 DLP 分级(memory-dlp-guard),命中 deny_write(API key/token/
+// 密码/Authorization/Bearer 等)即判定"含密"。MASE 是外部记忆后端,一旦写入内容就离开本机沙箱,
+// 因此每条写路径(用户 log / 助手 log / 单条事实)都在这里逐条过关——含密即跳过、不外发。fail-closed。
+function carriesSecret(text: string): boolean {
+  if (!text) return false;
+  return decideMemoryDlp({ content: text }).action === 'deny_write';
 }
 
 // 解析 mase_get_facts 返回的当前事实列表(content[].text 里是 JSON 数组或单条对象)。
@@ -282,16 +292,17 @@ export async function maseRememberTurn(
   const thread = threadId || 'agent-cowork';
 
   // ① 用户/助手各一条 log(role 各自正确),记下用户那条的 log_id 供事实溯源。
+  //    逐条过 DLP:含密的一侧跳过、不外发,干净的另一侧不受连累。
   let userLogId: number | undefined;
   if (toolAvailable(registry, REMEMBER_TOOL)) {
-    if (user) {
+    if (user && !carriesSecret(user)) {
       try {
         userLogId = parseLogId(await registry.call(REMEMBER_TOOL, { text: user.slice(0, REMEMBER_MAX_CHARS), thread_id: thread, role: 'user' }));
       } catch {
         // 用户 log 写入失败不影响后续。
       }
     }
-    if (assistant) {
+    if (assistant && !carriesSecret(assistant)) {
       try {
         await registry.call(REMEMBER_TOOL, { text: assistant.slice(0, REMEMBER_MAX_CHARS), thread_id: thread, role: 'assistant' });
       } catch {
@@ -301,9 +312,11 @@ export async function maseRememberTurn(
   }
 
   // ② 结构化事实 → entity_state,带 source_log_id + reason 溯源。
+  //    单条事实(key+value)再过一道 DLP:含密的事实不 upsert,干净事实照常写。
   if (user && toolAvailable(registry, UPSERT_FACT_TOOL)) {
     const reason = /更正|纠正|改成|改为|不对|说错|应该是/.test(user) ? 'agent-cowork:用户更正' : 'agent-cowork:用户陈述';
     for (const fact of extractFactsFromUser(user)) {
+      if (carriesSecret(`${fact.key}: ${fact.value}`)) continue;
       try {
         await registry.call(UPSERT_FACT_TOOL, {
           category: fact.category,
