@@ -47,3 +47,10 @@ agent-demo*.md
 approval-demo.txt
 risk-demo.txt
 reports/eval/
+
+# --- scratch run/output dirs (regenerable; never part of the release baseline) ---
+# Playwright screenshots, eval-replay records, dev-server logs and other run outputs.
+output/
+# Python bytecode cache emitted next to scripts/quality_gate.py.
+__pycache__/
+*.pyc
