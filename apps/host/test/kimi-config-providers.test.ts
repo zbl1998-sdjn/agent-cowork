@@ -156,7 +156,7 @@ test('POST /api/kimi/config stores fallback providers without echoing fallback k
   });
 });
 
-test('sendKimiInfo normalizes providers and summarizes fallback keys without echoing secrets', () => {
+test('sendKimiInfo normalizes providers and summarizes fallback keys without echoing secrets', async () => {
   const root = makeTestWorkspace('kcw-kimi-route-info');
   const response = new CapturingJsonResponse();
   const state = kimiRouteState(root, {
@@ -176,7 +176,7 @@ test('sendKimiInfo normalizes providers and summarizes fallback keys without ech
 
   assert.equal(modelProvider(null), 'kimi-api');
   assert.equal(modelProvider({ provider: ' OpenAI ' }), 'openai');
-  sendKimiInfo(response, state);
+  await sendKimiInfo(response, state);
 
   assert.equal(response.statusCode, 200);
   assert.ok(!response.body.includes(CONFIG_SECRET), 'info response leaked primary key');
@@ -184,6 +184,13 @@ test('sendKimiInfo normalizes providers and summarizes fallback keys without ech
   const body = response.json();
   assert.equal(body.provider, 'kimi-api');
   assert.equal(body.hasKey, true);
+  assert.equal(body.fullModelId, 'kimi-api/primary-model');
+  assert.equal(body.modelIdFormat, 'provider_id/model_id');
+  assert.equal((body.catalogSource as Record<string, unknown> | undefined)?.id, 'models.dev');
+  assert.ok(Array.isArray(body.providers));
+  assert.ok((body.providers as Array<Record<string, unknown>>).some((item) => item.id === 'deepseek'));
+  const catalog = body.catalog as Record<string, unknown>;
+  assert.ok(catalog && typeof catalog === 'object');
   const fallbacks = body.fallbacks as Array<Record<string, unknown>>;
   assert.equal(fallbacks.length, 3);
   assert.equal(fallbacks[0]?.provider, 'openai/local');

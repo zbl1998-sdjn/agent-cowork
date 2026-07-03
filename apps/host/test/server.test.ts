@@ -106,7 +106,7 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
       return {
         ok: true,
         provider: 'kimi-api',
-        model: String(runnerInput.model || 'kimi-k2.6'),
+        model: String(runnerInput.model || 'kimi-k2.7-code'),
         mode: String(runnerInput.mode || 'cowork'),
         text: 'Kimi API 计划输出',
         durationMs: 12,
@@ -130,7 +130,7 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
     assert.equal(body.text, 'Kimi API 计划输出');
     const capturedPlan = present(captured, 'captured plan input');
     assert.equal(capturedPlan.baseUrl, 'https://api.moonshot.ai/v1');
-    assert.equal(capturedPlan.model, 'kimi-k2.6');
+    assert.equal(capturedPlan.model, 'kimi-k2.7-code');
     assert.equal(capturedPlan.trustedRoot, trustedRoot);
     assert.equal(capturedPlan.prompt, '生成计划');
     assert.equal(capturedPlan.summary, '本地摘要');
@@ -324,7 +324,7 @@ test('document extraction, search, and recipe endpoints generate approval operat
   await withServer({ trustedRoot }, async (baseUrl) => {
     const recipes = await fetch(`${baseUrl}/api/recipes`);
     assert.equal(recipes.status, 200);
-    assert.equal(recordArray((await jsonBody(recipes, 'recipes response')).recipes, 'recipes').length, 8);
+    assert.equal(recordArray((await jsonBody(recipes, 'recipes response')).recipes, 'recipes').length, 14);
 
     const extract = await fetch(`${baseUrl}/api/files/extract`, {
       method: 'POST',
@@ -351,9 +351,11 @@ test('document extraction, search, and recipe endpoints generate approval operat
     const body = await jsonBody(run, 'recipe run response');
     assertMatches(body.runId, /^run_/);
     const generatedOperations = recordArray(body.operations, 'recipe operations');
-    assert.equal(generatedOperations.length, 2);
+    assert.equal(generatedOperations.length, 3);
     assertMatches(body.fileOperationApprovalId, /^fop_/);
     assert.equal(generatedOperations.some((op) => String(op.path).endsWith('.xlsx') && Boolean(op.contentBase64)), true);
+    assert.equal(generatedOperations.some((op) => String(op.path).endsWith('.docx') && Boolean(op.contentBase64)), true);
+    assert.equal(generatedOperations.some((op) => String(op.path).endsWith('.txt') && typeof op.content === 'string'), true);
     assert.equal(fs.existsSync(String(body.runPath)), true);
   });
 });

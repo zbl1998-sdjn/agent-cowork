@@ -711,6 +711,25 @@ test('POST /api/tools/call rejects approval-gated tools', async () => {
   }
 });
 
+test('POST /api/tools/call blocks external web tools in local strict mode', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, securityMode: 'local_strict', enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/tools/call', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'call-local-strict-web' },
+      body: { name: 'web.fetch', args: { url: 'https://example.com' } },
+    });
+    const payload = bodyRecord(res, 'local strict web tool');
+    assert.equal(res.status, 403);
+    assert.equal(payload.code, 'POLICY_DENIED');
+    assert.match(String(payload.error || ''), /local_strict|external network/i);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('POST /api/tools/call requires an Idempotency-Key', async () => {
   const trustedRoot = tempRoot();
   const server = createToolsServer({ trustedRoot, enableScheduler: false });

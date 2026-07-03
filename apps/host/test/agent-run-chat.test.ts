@@ -80,6 +80,78 @@ test('a run that exhausts the step budget still returns a written reply', async 
   assert.match(out.text, /小结|工作区/);
 });
 
+test('runAgentChat allows a final productive tool call before no-tool summary', async () => {
+  const root = tempRoot('kcw-agent-');
+  fs.writeFileSync(path.join(root, 'a.txt'), 'x', 'utf8');
+  const events: EmittedEvent[] = [];
+  const seenToolCounts: number[] = [];
+  let toolCallId = 0;
+  const modelCall: ModelCall = async (args) => {
+    const tools = Array.isArray(args.tools) ? args.tools : [];
+    seenToolCounts.push(tools.length);
+    if (tools.length > 0) {
+      toolCallId += 1;
+      return {
+        content: '',
+        tool_calls: [{ id: `c${toolCallId}`, function: { name: 'Glob', arguments: JSON.stringify({ pattern: '*' }) } }],
+      };
+    }
+    const messages = Array.isArray(args.messages) ? args.messages : [];
+    const lastMessage = messages.at(-1) as { content?: unknown } | undefined;
+    assert.match(String(lastMessage?.content || ''), /工具调用上限/);
+    return { content: '已基于现有结果收尾。' };
+  };
+
+  const out = await runAgentChat({
+    prompt: '看看这里',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    modelCall,
+    maxSteps: 2,
+    emit: (type, payload) => events.push({ type, payload }),
+  });
+
+  assert.equal(out.text, '已基于现有结果收尾。');
+  assert.equal(out.steps.length, 2, 'final productive step should still be allowed to run a tool');
+  assert.deepEqual(seenToolCounts.map((count) => count > 0), [true, true, false]);
+  assert.ok(!events.some((event) => event.type === 'tool_budget_finalizing'));
+});
+
+test('runAgentChat finalizes early when the latest tool batch made no progress', async () => {
+  const root = tempRoot('kcw-agent-');
+  const events: EmittedEvent[] = [];
+  const seenToolCounts: number[] = [];
+  const modelCall: ModelCall = async (args) => {
+    const tools = Array.isArray(args.tools) ? args.tools : [];
+    seenToolCounts.push(tools.length);
+    if (tools.length > 0) {
+      return {
+        content: '',
+        tool_calls: [{ id: 'bad-read', function: { name: 'Read', arguments: JSON.stringify({ path: 'missing.txt' }) } }],
+      };
+    }
+    const messages = Array.isArray(args.messages) ? args.messages : [];
+    const lastMessage = messages.at(-1) as { content?: unknown } | undefined;
+    assert.match(String(lastMessage?.content || ''), /剩余工具预算不足/);
+    return { content: '失败路径已收尾。' };
+  };
+
+  const out = await runAgentChat({
+    prompt: '读取不存在的文件',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    modelCall,
+    maxSteps: 2,
+    emit: (type, payload) => events.push({ type, payload }),
+  });
+
+  assert.equal(out.text, '失败路径已收尾。');
+  assert.equal(out.steps.length, 1, 'failed tool batch should not spend the final step on another tool');
+  assert.equal(out.steps[0]?.ok, false);
+  assert.deepEqual(seenToolCounts.map((count) => count > 0), [true, false]);
+  assert.ok(events.some((event) => event.type === 'tool_budget_finalizing'));
+});
+
 test('static backstop fires when even the forced summary comes back empty', async () => {
   const root = tempRoot('kcw-agent-');
   const modelCall: ModelCall = async ({ tools }) => {

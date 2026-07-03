@@ -44,15 +44,22 @@ export type SkillRegistry = {
 };
 
 const MANIFEST: Record<string, SkillManifest> = {
-  'meeting-actions': { trigger: ['会议', '纪要', '行动项', 'meeting'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'plan'] },
-  'excel-cleaning': { trigger: ['表格', '清洗', 'excel', 'csv'], permissions: ['read-files', 'write-files'], outputs: ['xlsx'] },
-  'reimbursement': { trigger: ['报销', '发票', '供应商'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'plan'] },
-  'folder-organize': { trigger: ['整理', '文件夹', '归类'], permissions: ['read-files'], outputs: ['plan'] },
-  'contract-summary': { trigger: ['合同', '摘要', '风险'], permissions: ['read-files'], outputs: ['md'] },
-  'feedback-clusters': { trigger: ['反馈', '聚类', '主题'], permissions: ['read-files'], outputs: ['md'] },
-  'summary-report': { trigger: ['总结', '周报', '报告'], permissions: ['read-files', 'write-files'], outputs: ['md', 'docx'] },
-  'email-draft': { trigger: ['邮件', '草稿', 'email'], permissions: ['read-files'], outputs: ['md'] },
+  'meeting-actions': { trigger: ['会议', '纪要', '行动项', 'meeting'], permissions: ['read-files', 'write-files'], outputs: ['docx', 'xlsx', 'txt'] },
+  'excel-cleaning': { trigger: ['表格', '清洗', 'excel', 'csv'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'csv', 'docx', 'txt'] },
+  'reimbursement': { trigger: ['报销', '发票', '供应商'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'csv', 'docx', 'txt'] },
+  'folder-organize': { trigger: ['整理', '文件夹', '归类'], permissions: ['read-files'], outputs: ['docx', 'txt'] },
+  'contract-summary': { trigger: ['合同', '摘要', '风险'], permissions: ['read-files'], outputs: ['docx', 'pdf', 'txt'] },
+  'feedback-clusters': { trigger: ['反馈', '聚类', '主题'], permissions: ['read-files'], outputs: ['docx', 'txt'] },
+  'summary-report': { trigger: ['总结', '周报', '报告'], permissions: ['read-files', 'write-files'], outputs: ['docx', 'pptx', 'pdf', 'txt'] },
+  'email-draft': { trigger: ['邮件', '草稿', 'email'], permissions: ['read-files'], outputs: ['docx', 'txt'] },
+  'boss-summary-onepager': { trigger: ['老板', '领导', '一页总结'], permissions: ['read-files', 'write-files'], outputs: ['docx', 'pdf', 'txt'] },
+  'weekly-report-beginner': { trigger: ['一键周报', '写周报', '周报'], permissions: ['read-files', 'write-files'], outputs: ['docx', 'pdf', 'txt'] },
+  'excel-rescue-basic': { trigger: ['表格急救', 'Excel 急救', '清洗表格'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'csv', 'docx', 'txt'] },
+  'word-make-formal': { trigger: ['Word 改正式', '正式文档', '改写'], permissions: ['read-files', 'write-files'], outputs: ['docx', 'pdf', 'txt', 'md'] },
+  'ppt-from-folder-beginner': { trigger: ['做 PPT', '文件夹生成PPT', '汇报'], permissions: ['read-files', 'write-files'], outputs: ['pptx', 'docx', 'txt'] },
+  'chat-to-action-list': { trigger: ['群聊转待办', '会议待办', '聊天记录'], permissions: ['read-files', 'write-files'], outputs: ['xlsx', 'txt'] },
 };
+
 
 function manifestFor(recipe: RecipeDescriptor): SkillManifest {
   return MANIFEST[recipe.id] || {

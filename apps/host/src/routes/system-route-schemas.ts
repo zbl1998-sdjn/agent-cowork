@@ -23,7 +23,8 @@ type RouteRequest = HttpRequestLike & { method?: string };
 export type RuntimeDependencyPlanOptions =
   & RuntimeDependencyInstallPlanOptions
   & RuntimeDependencyCleanupPlanOptions
-  & RuntimeDependencyUpdatePlanOptions;
+  & RuntimeDependencyUpdatePlanOptions
+  & { packIds?: unknown[] };
 
 const objectBody = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -37,6 +38,10 @@ const selectedIdsSchema = z.preprocess(
   (value) => (value == null ? undefined : value),
   z.array(z.string().trim().min(1).max(96), 'selectedIds must be an array of ids').optional(),
 );
+const packIdsSchema = z.preprocess(
+  (value) => (value == null ? undefined : value),
+  z.array(z.string().trim().min(1).max(96), 'packIds must be an array of ids').optional(),
+);
 const freeBytesSchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),
   z.number().nonnegative().optional(),
@@ -49,6 +54,7 @@ const safePathSegmentSchema = z.string()
 
 export const dependencyPlanBodySchema = objectBodySchema.pipe(z.object({
   selectedIds: selectedIdsSchema,
+  packIds: packIdsSchema,
   freeBytes: freeBytesSchema,
   keepUserData: z.boolean().optional(),
   currentVersion: optionalText(80),
@@ -107,6 +113,7 @@ export function dependencyPlanOptions(
 ): RuntimeDependencyPlanOptions {
   return omitUndefined({
     selectedIds: body.selectedIds,
+    packIds: body.packIds,
     freeBytes: body.freeBytes,
     keepUserData: body.keepUserData,
     currentVersion: body.currentVersion,

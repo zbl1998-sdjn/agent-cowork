@@ -5,6 +5,15 @@
 import path from 'node:path';
 import { z } from 'zod';
 import { MEMORY_LIMITS } from '../memory/memory-constants.js';
+import {
+  buildMemorySnapshot,
+  deleteMemoryItem,
+  listMemoryItems,
+  readMemorySettings,
+  upsertMemoryItem,
+  writeMemorySettings,
+  type MemorySettings,
+} from '../memory/memory-control.js';
 import { createUserProfile } from '../memory/profile.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
@@ -60,6 +69,25 @@ const profileForgetBodySchema = z.object({
   type: z.unknown().optional(),
   key: z.unknown().optional(),
 }).loose();
+const memorySettingsBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  enabled: z.boolean().optional(),
+  paused: z.boolean().optional(),
+  incognito: z.boolean().optional(),
+  defaultScope: z.enum(['project', 'user', 'session']).optional(),
+}).loose();
+const memoryItemQuerySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  query: z.string().optional(),
+}).loose();
+const memoryItemBodySchema = z.object({
+  trustedRoot: trustedRootSchema,
+  kind: z.string().optional(),
+  title: z.string().trim().min(1, 'memory title is required'),
+  content: z.string().trim().min(1, 'memory content is required'),
+  evidence: z.string().optional(),
+  scope: z.string().optional(),
+}).loose();
 const noteBodySchema = z.object({
   trustedRoot: trustedRootSchema,
   name: z.string().trim().min(1, 'body.name is required'),
@@ -103,6 +131,36 @@ export async function handleMemoryRoutes({
   trustedRootDefault,
   memoryStore,
 }: MemoryRouteOptions): Promise<boolean> {
+  if (request.method === 'GET' && pathname === '/api/memory/settings') {
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    if (!safeRoot) return true;
+    sendJson(response, 200, { trustedRoot: safeRoot, settings: readMemorySettings(safeRoot), context: requestContext });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/memory/settings') {
+    await withJsonBody(request, response, async (body) => {
+      const parsed = memorySettingsBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
+      }
+      const input = parsed.data;
+      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const patch: Partial<MemorySettings> = {};
+      if (input.enabled != null) patch.enabled = input.enabled;
+      if (input.paused != null) patch.paused = input.paused;
+      if (input.incognito != null) patch.incognito = input.incognito;
+      if (input.defaultScope != null) patch.defaultScope = input.defaultScope;
+      sendJson(response, 200, {
+        trustedRoot: safeRoot,
+        settings: writeMemorySettings(safeRoot, patch),
+        context: requestContext,
+      });
+    });
+    return true;
+  }
+
   if (request.method === 'GET' && pathname === '/api/memory') {
     const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
     if (!safeRoot) return true;
@@ -122,6 +180,77 @@ export async function handleMemoryRoutes({
       },
       limits: MEMORY_LIMITS,
     });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/memory/snapshot') {
+    let query: z.infer<typeof memoryItemQuerySchema>;
+    try {
+      query = memoryItemQuerySchema.parse(Object.fromEntries(requestUrl.searchParams.entries()));
+    } catch (err) {
+      sendJson(response, 400, { error: errorMessage(err) });
+      return true;
+    }
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
+    if (!safeRoot) return true;
+    const snapshotOptions: { query?: string; context: RequestContext } = { context: requestContext };
+    if (query.query) snapshotOptions.query = query.query;
+    const snapshot = await buildMemorySnapshot(memoryStore, safeRoot, snapshotOptions);
+    sendJson(response, 200, { trustedRoot: safeRoot, snapshot, context: requestContext });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/memory/items') {
+    let query: z.infer<typeof memoryItemQuerySchema>;
+    try {
+      query = memoryItemQuerySchema.parse(Object.fromEntries(requestUrl.searchParams.entries()));
+    } catch (err) {
+      sendJson(response, 400, { error: errorMessage(err) });
+      return true;
+    }
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
+    if (!safeRoot) return true;
+    const snapshotOptions: { query?: string; context: RequestContext } = { context: requestContext };
+    if (query.query) snapshotOptions.query = query.query;
+    const snapshot = await buildMemorySnapshot(memoryStore, safeRoot, snapshotOptions);
+    const items = query.query ? snapshot.used : await listMemoryItems(memoryStore, safeRoot, requestContext);
+    sendJson(response, 200, { trustedRoot: safeRoot, items, settings: snapshot.settings, context: requestContext });
+    return true;
+  }
+
+  if ((request.method === 'POST' || request.method === 'PATCH') && pathname === '/api/memory/items') {
+    await withJsonBody(request, response, async (body) => {
+      const parsed = memoryItemBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error) });
+        return;
+      }
+      const input = parsed.data;
+      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      try {
+        const result = await upsertMemoryItem(memoryStore, safeRoot, input, requestContext);
+        sendJson(response, 200, { trustedRoot: safeRoot, ...result, context: requestContext });
+      } catch (err) {
+        sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
+      }
+    });
+    return true;
+  }
+
+  if (request.method === 'DELETE' && pathname.startsWith('/api/memory/items/')) {
+    const id = decodePathSegment(pathname.slice('/api/memory/items/'.length));
+    if (!id) {
+      sendJson(response, 400, { error: 'Invalid memory item id' });
+      return true;
+    }
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    if (!safeRoot) return true;
+    try {
+      const result = await deleteMemoryItem(memoryStore, safeRoot, id, requestContext);
+      sendJson(response, 200, { trustedRoot: safeRoot, ...result, context: requestContext });
+    } catch (err) {
+      sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
+    }
     return true;
   }
 

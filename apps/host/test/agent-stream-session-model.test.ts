@@ -18,12 +18,13 @@ test('session model config validates, normalizes, and keeps fallback chains host
     },
   );
 
-  assert.equal(config.provider, 'local-openai');
+  assert.equal(config.provider, 'openai/local');
   assert.equal(config.baseUrl, 'https://api.local.test/v1');
   assert.equal(config.model, 'gpt-local');
   assert.equal(config.apiKey, 'test-session-key');
   assert.deepEqual(config.fallbacks, fallback);
   assert.equal(hasSessionModelAccess({ modelConfig: { provider: ' OPENAI/LOCAL ' } }), true);
+  assert.equal(hasSessionModelAccess({ modelConfig: { provider: ' OLLAMA ' } }), true);
 });
 
 test('session model config rejects malformed scalar override fields', () => {

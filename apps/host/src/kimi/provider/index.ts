@@ -8,27 +8,57 @@
 // 导出:resolveModelProvider(按配置解析)、callProviderChatCompletion(统一调用)。
 import { createAnthropicProvider } from './anthropic.js';
 import { createKimiProvider } from './kimi.js';
-import { createLocalOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
+import { createLocalOpenAiCompatibleProvider, createOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
+import { MODEL_PROVIDER_CATALOG } from './catalog.js';
 import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
 
 export type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+export {
+  composeFullModelId,
+  defaultBaseUrlForProvider,
+  defaultModelForProvider,
+  findModelProviderCatalog,
+  listModelProviderCatalog,
+  modelProviderCatalogResponse,
+  normaliseModelProviderId,
+  openCodeProviderCatalog,
+  providerRequiresApiKey,
+  splitFullModelId,
+} from './catalog.js';
+export { clearModelsDevCatalogCache, modelsDevProviderCatalogResponse } from './models-dev-catalog.js';
 
 const anthropicProvider = createAnthropicProvider();
 const kimiProvider = createKimiProvider();
 const openAiProvider = createOpenAiProvider();
 const localOpenAiProvider = createLocalOpenAiCompatibleProvider();
 
-const BUILTIN_PROVIDERS = new Map<string, Provider>([
-  ['kimi', kimiProvider],
-  ['kimi-api', kimiProvider],
-  ['openai', openAiProvider],
-  ['openai-compatible', openAiProvider],
-  ['anthropic', anthropicProvider],
-  ['claude', anthropicProvider],
-  ['openai/local', localOpenAiProvider],
-  ['local-openai', localOpenAiProvider],
-  ['local', localOpenAiProvider],
-]);
+function providerFromCatalogEntry(entry: (typeof MODEL_PROVIDER_CATALOG)[number]): Provider {
+  if (entry.id === 'kimi-api') return kimiProvider;
+  if (entry.id === 'openai') return openAiProvider;
+  if (entry.id === 'anthropic') return anthropicProvider;
+  if (entry.id === 'openai/local') return localOpenAiProvider;
+  if (entry.protocol === 'openai-chat') {
+    return createOpenAiCompatibleProvider({
+      id: entry.id,
+      defaultBaseUrl: entry.defaultBaseUrl,
+      requiresApiKey: entry.requiresApiKey,
+      notConfiguredMessage: `未配置 ${entry.displayName} 模型。请配置 baseUrl、model${entry.requiresApiKey ? ' 和 API key' : ''} 后重试。`,
+    });
+  }
+  return kimiProvider;
+}
+
+function createBuiltinProviders(): Map<string, Provider> {
+  const providers = new Map<string, Provider>();
+  for (const entry of MODEL_PROVIDER_CATALOG) {
+    const provider = providerFromCatalogEntry(entry);
+    providers.set(entry.id, provider);
+    for (const alias of entry.aliases) providers.set(alias, provider);
+  }
+  return providers;
+}
+
+const BUILTIN_PROVIDERS = createBuiltinProviders();
 
 // 解析目标 Provider:优先使用注入实现,否则按别名表查找,未知 id 兜底到 kimi。
 export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {

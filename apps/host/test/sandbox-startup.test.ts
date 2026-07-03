@@ -52,6 +52,40 @@ test('resolveSandboxStartup falls back to local when no true isolated backend is
   assert.equal(wsl.networkIsolated, false);
 });
 
+test('resolveSandboxStartup marks local strict high-risk execution as policy blocked instead of safe fallback', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    env: { SECURITY_MODE: 'local_strict', KCW_SANDBOX_DOCKER_IMAGE: 'python:3.12-slim' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'docker image inspect python:3.12-slim': { status: 1, stderr: 'No such image' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'local');
+  assert.equal(startup.info.securityMode, 'local_strict');
+  assert.equal(startup.info.networkIsolated, false);
+  assert.equal(startup.info.policyBlocked, true);
+  assert.match(startup.info.userMessage, /high-risk execution tools are blocked/);
+});
+
+test('resolveSandboxStartup marks explicit non-isolated local strict sandbox as policy blocked', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'local',
+    env: { SECURITY_MODE: 'local_strict' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { status: 1, stderr: 'daemon down' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'local');
+  assert.equal(startup.info.securityMode, 'local_strict');
+  assert.equal(startup.info.policyBlocked, true);
+  assert.match(startup.info.userMessage, /explicit non-isolated sandbox/);
+});
+
 test('resolveSandboxStartup keeps probe failures and explicit backend isolation claims honest', () => {
   const calls: Array<{ command: string; args: readonly string[]; options: Record<string, unknown> }> = [];
   const spawnSync: SpawnSyncLike = (command, args, options) => {

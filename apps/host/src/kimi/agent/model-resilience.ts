@@ -6,6 +6,8 @@
 // 依赖:L0 security/redaction(脱敏)、L2 runtime/model-breakers(熔断器),同层 provider/router(回退编排)。
 // 导出:callModelResilient / friendlyAgentError / modelBreakerStats(再导出)
 import { redactText } from '../../security/redaction.js';
+import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../../security/egress-gateway.js';
+import { filterModelCandidatesBySecurityMode, modelProviderPolicyError } from '../../security/security-mode.js';
 import { modelBreaker, modelBreakerStats, modelProvider } from '../../runtime/model-breakers.js';
 import { runWithFallback } from '../provider/router.js';
 
@@ -89,6 +91,19 @@ function fallbackExhausted(errors: unknown[]): ModelError {
 
 async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiConfig: ModelConfig, timeoutMs: number): Promise<unknown> {
   return modelBreaker(kimiConfig).run(async () => {
+    const egress = decideEgressPolicy({
+      kind: 'model_inference',
+      provider: kimiConfig.provider,
+      model: kimiConfig.model,
+      baseUrl: kimiConfig.baseUrl,
+      securityMode: kimiConfig.securityMode,
+      content: callArgs.messages,
+      trustedRoot: callArgs.trustedRoot,
+    });
+    if (callArgs.trustedRoot) {
+      try { recordEgressDecision(callArgs.trustedRoot, egress); } catch { /* audit failure must not leak or mask model policy */ }
+    }
+    if (egress.decision === 'deny') throw egressPolicyError(egress);
     const controller = new AbortController();
     const upstreamSignal = callArgs && callArgs.signal;
     const abortFromUpstream = () => {
@@ -115,9 +130,15 @@ export async function callModelResilient(
   { kimiConfig, timeoutMs = 60000, onFallback }: ResilienceOptions = {},
 ): Promise<unknown> {
   const candidates = modelCandidates(kimiConfig);
-  if (candidates.length <= 1) return callOneModel(modelCall, callArgs, candidates[0] as ModelConfig, timeoutMs);
+  const policy = filterModelCandidatesBySecurityMode(candidates, {
+    securityMode: objectConfig(kimiConfig).securityMode,
+  });
+  if (policy.candidates.length === 0) {
+    throw modelProviderPolicyError(policy.denied);
+  }
+  if (policy.candidates.length <= 1) return callOneModel(modelCall, callArgs, policy.candidates[0] as ModelConfig, timeoutMs);
   try {
-    const routed = await runWithFallback(candidates, (candidate) => (
+    const routed = await runWithFallback(policy.candidates, (candidate) => (
       callOneModel(modelCall, callArgs, candidate as ModelConfig, timeoutMs)
     ), {
       shouldFallback: (err) => shouldFallbackModelError(err),

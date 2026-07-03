@@ -30,8 +30,10 @@ export type StartupBackends = {
 export type SandboxStartupInfo = {
   requestedBackend: string;
   selectedBackend: string;
+  securityMode?: string;
   networkIsolated: boolean;
   fallback: boolean;
+  policyBlocked?: boolean;
   fallbackReason: string | null;
   userMessage: string;
   backends: StartupBackends;

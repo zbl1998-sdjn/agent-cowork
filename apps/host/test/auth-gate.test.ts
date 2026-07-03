@@ -67,6 +67,11 @@ test('new file and route surfaces are covered by the auth gate', async () => {
       ['/api/runtime/dependencies/install-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
       ['/api/runtime/dependencies/cleanup-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
       ['/api/runtime/dependencies/update-plan', { method: 'POST', body: { selectedIds: ['data-science'] } }],
+      ['/api/capabilities/catalog', { method: 'GET' }],
+      ['/api/capabilities/recommend?role=developer', { method: 'GET' }],
+      ['/api/install/plan', { method: 'POST', body: { packIds: ['frontend-design-pack'] } }],
+      ['/api/capabilities/install-plan', { method: 'POST', body: { packIds: ['frontend-design-pack'] } }],
+      ['/api/fallback/status', { method: 'GET' }],
     ];
 
     for (const [route, options] of routes) {

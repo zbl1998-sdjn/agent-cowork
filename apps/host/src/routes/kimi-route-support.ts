@@ -5,6 +5,8 @@ import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { KimiApiConfig } from '../kimi/api-runner-config.js';
+import { composeFullModelId, normaliseModelProviderId } from '../kimi/provider/catalog.js';
+import { modelsDevProviderCatalogResponse } from '../kimi/provider/models-dev-catalog.js';
 import type { HostState } from '../runtime/host-state-types.js';
 import type { streamChat } from '../kimi/chat-stream.js';
 
@@ -50,6 +52,8 @@ type RunKimiAndRecordOptions = {
 };
 
 type RouteError = Error & { statusCode?: number; payload?: Record<string, unknown> };
+type CatalogOptions = NonNullable<Parameters<typeof modelsDevProviderCatalogResponse>[0]>;
+type CatalogFetchImpl = Exclude<CatalogOptions['fetchImpl'], undefined>;
 
 function asRouteError(err: unknown): RouteError {
   if (err instanceof Error) return err as RouteError;
@@ -60,7 +64,7 @@ export function modelProvider(kimiConfig: unknown): string {
   const config = kimiConfig && typeof kimiConfig === 'object'
     ? kimiConfig as { provider?: unknown }
     : {};
-  return String(config.provider || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+  return normaliseModelProviderId(config.provider, 'kimi-api');
 }
 
 function fallbackSummaries(value: unknown): Array<{ provider: string; baseUrl: unknown; model: unknown; hasKey: boolean }> {
@@ -75,6 +79,13 @@ function fallbackSummaries(value: unknown): Array<{ provider: string; baseUrl: u
       };
     })
     : [];
+}
+
+function modelCatalogOptions(state: KimiRouteState): CatalogOptions {
+  const fetchImpl = state.config.fetchImpl;
+  return typeof fetchImpl === 'function'
+    ? { fetchImpl: fetchImpl as CatalogFetchImpl }
+    : {};
 }
 
 export async function runKimiAndRecord({
@@ -188,15 +199,37 @@ export async function runKimiAndRecord({
   }
 }
 
-export function sendKimiInfo(response: HttpResponseLike, state: KimiRouteState): void {
+export async function sendKimiInfo(response: HttpResponseLike, state: KimiRouteState): Promise<void> {
+  const provider = modelProvider(state.kimiApiConfig);
+  const catalog = await modelsDevProviderCatalogResponse(modelCatalogOptions(state));
   sendJson(response, 200, {
-    provider: modelProvider(state.kimiApiConfig),
+    provider,
     configured: state.kimiApiConfig.configured,
     planEnabled: state.kimiApiEnabled,
     chatEnabled: state.kimiApiEnabled,
     baseUrl: state.kimiApiConfig.baseUrl,
     model: state.kimiApiConfig.model,
+    fullModelId: state.kimiApiConfig.fullModelId || composeFullModelId(provider, state.kimiApiConfig.model),
+    modelIdFormat: catalog.modelIdFormat,
+    providers: catalog.providers,
+    catalog: catalog.catalog,
+    catalogSource: catalog.source,
     fallbacks: fallbackSummaries(state.kimiApiConfig.fallbacks),
     hasKey: Boolean(state.kimiApiConfig.apiKey),
+  });
+}
+
+export async function sendModelProviderCatalog(response: HttpResponseLike, state: KimiRouteState): Promise<void> {
+  const provider = modelProvider(state.kimiApiConfig);
+  sendJson(response, 200, {
+    ...await modelsDevProviderCatalogResponse(modelCatalogOptions(state)),
+    current: {
+      provider,
+      model: state.kimiApiConfig.model,
+      fullModelId: state.kimiApiConfig.fullModelId || composeFullModelId(provider, state.kimiApiConfig.model),
+      baseUrl: state.kimiApiConfig.baseUrl,
+      configured: state.kimiApiConfig.configured,
+      hasKey: Boolean(state.kimiApiConfig.apiKey),
+    },
   });
 }

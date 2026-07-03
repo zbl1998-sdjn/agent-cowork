@@ -59,7 +59,7 @@ export async function handleRouteChain({
   server,
 }: RouteChainOptions): Promise<boolean> {
   const base = { request, response, pathname, requestContext };
-  if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, state }))) return true;
+  if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, requestUrl, state }))) return true;
   if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore }))) return true;
   if (await handleApprovalRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRoutes>>({ ...base, approvalRegistry: state.approvalRegistry }))) return true;
   if (await handleRunRoutes(routeOptions<RouteHandlerOptions<typeof handleRunRoutes>>({

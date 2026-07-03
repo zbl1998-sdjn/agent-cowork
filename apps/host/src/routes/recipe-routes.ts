@@ -53,6 +53,40 @@ const objectBodySchema = z.object({}).loose();
 const customRecipeBodySchema = z.object({
   recipe: objectBodySchema.optional(),
 }).loose();
+const recipeTemplateStepSchema = z.strictObject({
+  index: z.number().int().nonnegative().optional(),
+  tool: z.string().trim().min(1).max(120),
+  status: z.string().trim().max(80).optional(),
+  args: z.unknown().optional(),
+  result: z.unknown().optional(),
+  summary: z.unknown().optional(),
+});
+const recipeTemplateArtifactSchema = z.strictObject({
+  path: z.string().trim().min(1).max(500),
+  kind: z.string().trim().min(1).max(80),
+  source: z.unknown().optional(),
+});
+const recipeTemplateFormatSchema = z.strictObject({
+  kind: z.literal('markdown'),
+  body: z.string().min(1).max(12000),
+});
+const uploadedRecipeTemplateSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  id: z.string().trim().regex(RECIPE_ID_RE, 'Invalid template id'),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(500),
+  prompt: z.string().trim().min(1).max(4000),
+  output: z.string().trim().min(1).max(120),
+  riskLevel: z.enum(['safe-write', 'preview-only', 'requires-approval']),
+  requiresSources: z.boolean(),
+  redacted: z.literal(true),
+  format: recipeTemplateFormatSchema,
+  steps: z.array(recipeTemplateStepSchema).max(40),
+  artifacts: z.array(recipeTemplateArtifactSchema).max(80),
+});
+const importRecipeBodySchema = z.object({
+  template: uploadedRecipeTemplateSchema,
+}).loose();
 const captureBodySchema = z.object({
   runId: z.string().trim().regex(RECIPE_ID_RE, 'Invalid run id'),
 }).loose();
@@ -104,6 +138,29 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
   if (request.method === 'GET' && pathname === '/api/recipes') {
     sendJson(response, 200, {
       recipes: [...listRecipes(), ...customRecipes.list({ tenantId: requestContext.tenantId })],
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/recipes/import') {
+    await withJsonBody(request, response, async (body) => {
+      const parsed = importRecipeBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendJson(response, 400, { error: errorMessage(parsed.error, 'invalid recipe template') });
+        return;
+      }
+      cachedWrite(options, body, () => {
+        const recipe = customRecipes.save(parsed.data.template, omitUndefined({
+          tenantId: requestContext.tenantId,
+          userId: requestContext.userId,
+        }));
+        return {
+          ok: true,
+          templateFormat: 'agent-cowork.recipe-template.v1',
+          recipe,
+          context: requestContext,
+        };
+      });
     });
     return true;
   }

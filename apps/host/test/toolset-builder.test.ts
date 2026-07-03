@@ -114,7 +114,7 @@ test('Skill tool rejects unavailable skills and runs an enabled recipe through r
   assert.ok(result && typeof result === 'object', 'skill result should be an object');
   const record = result as { skill?: unknown; operations?: unknown; runId?: unknown };
   assert.equal(record.skill, 'email-draft');
-  assert.equal(record.operations, 1);
+  assert.equal(record.operations, 2);
   assert.match(String(record.runId), /^run_/);
   assert.ok(fs.existsSync(path.join(runStoreRoot, `${record.runId}.json`)), 'enabled skill writes a real run record');
 });

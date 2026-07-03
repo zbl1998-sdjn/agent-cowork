@@ -1,11 +1,12 @@
 // 审计事件总线与 JSONL 落盘订阅者(host · L1 领域层 · storage)
 // ---------------------------------------------------------------------------
 // 职责:提供进程内审计事件发布/订阅总线,统一补齐 ts/trace/tenant/user 字段,
-//       异步分发并聚合订阅者异常;附带把事件追加写入 JSONL 文件的订阅者工厂。
-// 依赖:同层 jsonl-writer(L1)。
+//       异步分发并聚合订阅者异常;附带把事件追加写入 hash-chain JSONL 文件的订阅者工厂。
+// 依赖:同层 jsonl-writer / audit-chain。
 // 导出:AuditEventBus(类) · createJsonlAuditSubscriber(filePath, opts)(工厂)。
 import { JsonlWriter } from './jsonl-writer.js';
 import type { JsonlWriterOptions } from './jsonl-writer.js';
+import { createAuditChainRecord, readLastAuditHash } from './audit-chain.js';
 
 export type AuditEvent = Record<string, unknown>;
 export type AuditSubscriber = (event: AuditEvent) => unknown | Promise<unknown>;
@@ -13,6 +14,9 @@ export type AuditErrorHandler = (error: Error, event: AuditEvent) => void;
 export type AuditEventBusOptions = {
   now?: () => Date;
   onError?: AuditErrorHandler | null;
+};
+export type AuditJsonlSubscriberOptions = JsonlWriterOptions & {
+  hashChain?: unknown;
 };
 
 /**
@@ -101,10 +105,28 @@ export class AuditEventBus {
 /**
  * 创建一个把审计事件追加写入 JSONL 文件的订阅者(可挂到 AuditEventBus.subscribe)。
  */
-export function createJsonlAuditSubscriber(filePath: string, opts: JsonlWriterOptions = {}): AuditSubscriber {
+export function createJsonlAuditSubscriber(filePath: string, opts: AuditJsonlSubscriberOptions = {}): AuditSubscriber {
   if (!filePath || typeof filePath !== 'string') {
     throw new Error('audit filePath is required');
   }
-  const writer = new JsonlWriter(filePath, opts);
-  return (event) => writer.append(event);
+  const { hashChain = true, ...writerOptions } = opts;
+  const writer = new JsonlWriter(filePath, writerOptions);
+  const withHashChain = hashChain !== false;
+  let previousHash = withHashChain ? readLastAuditHash(filePath) : null;
+  return (event) => {
+    const record = withHashChain ? createAuditChainRecord(event, previousHash) : event;
+    writer.append(record);
+    if (withHashChain && typeof record.event_hash === 'string') {
+      previousHash = record.event_hash;
+    }
+  };
 }
+
+export {
+  AUDIT_CHAIN_VERSION,
+  AUDIT_HASH_ALGORITHM,
+  createAuditChainRecord,
+  hashAuditRecord,
+  readLastAuditHash,
+  verifyAuditHashChain,
+} from './audit-chain.js';

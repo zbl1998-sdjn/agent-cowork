@@ -16,6 +16,7 @@ import {
   addUsage,
   applyStaticBackstop,
   summarizeAfterBudget,
+  summarizeBeforeToolBudget,
 } from './finalize.js';
 import { clarifyPromptBeforeModel } from './clarification.js';
 import { callModelResilient } from './model-resilience.js';
@@ -47,6 +48,10 @@ export type {
   RunAgentChatOptions,
   RunAgentChatResult,
 } from './tool-loop-types.js';
+
+function hasToolResult(messages: ChatMessage[]): boolean {
+  return messages.some((message) => message && message.role === 'tool');
+}
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
@@ -106,6 +111,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   let planApproved = !planMode;
   let didMutate = false;
   let verified = false;
+  let lastToolBatchHadSuccess = false;
   const checkpointRecorder = createCheckpointRecorder({
     checkpointer,
     runId,
@@ -173,6 +179,12 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           });
         }
       }
+      if (stepNumber >= stepBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
+        emit('tool_budget_finalizing', { stepNumber, stepBudget });
+        finalText = (await summarizeBeforeToolBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
+        if (finalText) saveCheckpoint('tool_budget_finalized', stepNumber, [...messages, { role: 'assistant', content: finalText }]);
+        break;
+      }
       const toolSpecs = buildToolSpecs();
       traceModelContext(runTrace, stepNumber, messages, toolSpecs);
       const onContent = (d: unknown) => { streamedContent = true; if (d) emit('token', { delta: d }); };
@@ -186,6 +198,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           tools: toolSpecs,
           kimiConfig,
           fetchImpl,
+          trustedRoot,
           signal: runTimeout.signal,
           onContent,
           onReasoning,
@@ -235,6 +248,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       traceToolDecision(runTrace, stepNumber, message);
       saveCheckpoint('assistant_tool_calls', stepNumber);
       // 【骨架·有工具调用】逐个真执行工具(读文件/跑命令);executeToolCall 里串着审批闸门/沙箱/重试,执行结果会塞回 messages,让下一轮模型看得见
+      const stepsBeforeToolBatch = steps.length;
       for (const call of calls) {
         // 取消/超时后不再启动本批剩余的工具调用——避免"UI 已停止"后后台仍继续调用工具。
         if (runTimeout.aborted()) break;
@@ -252,6 +266,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
         if (result.stopForLoopGuard) stopForLoopGuard = true;
         if (result.breakToolLoop) break;
       }
+      lastToolBatchHadSuccess = steps.slice(stepsBeforeToolBatch).some((step) => step.ok === true);
     }
 
     finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';

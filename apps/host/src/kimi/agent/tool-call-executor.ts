@@ -17,6 +17,7 @@ import { validateToolArguments } from './arg-validator.js';
 import { traceToolResult, type RunTraceLike } from './run-trace-events.js';
 import { parseToolCall } from './tool-loop-support.js';
 import { omitUndefined } from '../../util/object.js';
+import { decideToolPolicy } from '../../security/policy-decision.js';
 import type { ApprovalRegistry, HookEngine, RequestContext } from './approval-gate.js';
 
 export type ToolArgs = Record<string, unknown>;
@@ -126,7 +127,35 @@ export async function executeToolCall({
   }
 
   const isMutating = !!(tool && tool.mutating === true);
-  const needsApproval = toolNeedsApproval(tool);
+  const policy = decideToolPolicy({
+    toolName,
+    risk: tool?.risk,
+    mutating: tool?.mutating,
+    requiresApproval: tool?.requiresApproval,
+    securityMode: context?.securityMode,
+    sandbox: toolCtx.sandbox,
+  });
+  emit('policy_decision', policy.audit);
+  audit('policy.decision', policy.audit);
+  if (policy.decision === 'deny') {
+    const result = {
+      error: policy.reason,
+      code: 'POLICY_DENIED',
+      policy: {
+        securityMode: policy.securityMode,
+        riskLevel: policy.riskLevel,
+        reasonCode: policy.reasonCode,
+      },
+    };
+    steps.push({ tool: toolName, ok: false, policyDenied: true, reasonCode: policy.reasonCode });
+    emit('tool_result', { name: toolName, status: 'blocked', result });
+    traceToolResult(runTrace, stepNumber, call, toolName, 'failed', result);
+    const formatted = activeContextManager.formatToolResult(result, { toolName });
+    messages.push({ role: 'tool', tool_call_id: call.id, content: formatted.content });
+    callbacks.saveCheckpoint('tool_result', stepNumber);
+    return {};
+  }
+  const needsApproval = toolNeedsApproval(tool) || policy.decision === 'needs_approval';
   if (await runPreToolHook(omitUndefined({ hooks, name: toolName, args, steps, audit, emit, messages, call }))) {
     callbacks.saveCheckpoint('tool_result', stepNumber);
     return {};

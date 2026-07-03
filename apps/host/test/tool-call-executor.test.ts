@@ -158,6 +158,44 @@ test('executeToolCall rejects invalid arguments before a tool handler can run', 
   assert.ok(harness.events.some((event) => event.type === 'tool_args_invalid' && event.payload.name === 'WriteReport'));
 });
 
+test('executeToolCall blocks local strict external tools before hooks, approvals, or handlers', async () => {
+  let handlerRuns = 0;
+  const tool: AgentTool = {
+    name: 'WebFetch',
+    risk: 'safe',
+    parameters: { type: 'object', properties: { url: { type: 'string' } } },
+    handler: () => {
+      handlerRuns += 1;
+      return { ok: true };
+    },
+  };
+  const hooks: HookEngine = {
+    run: () => {
+      throw new Error('pre_tool hook should not run after policy denial');
+    },
+    blocked: () => false,
+  };
+  const harness = createHarness({ tool, hooks, hasApprovals: true });
+
+  const result = await harness.execute(makeCall('WebFetch', { url: 'https://example.com' }), {
+    context: { tenantId: 'tenant-1', userId: 'user-1', securityMode: 'local_strict' },
+  });
+
+  assert.deepEqual(result, {});
+  assert.equal(handlerRuns, 0);
+  assert.deepEqual(harness.steps, [{
+    tool: 'WebFetch',
+    ok: false,
+    policyDenied: true,
+    reasonCode: 'local_strict_blocks_external_network_tool',
+  }]);
+  assert.deepEqual(harness.todoFinishes, []);
+  assert.ok(harness.audits.some((event) => event.kind === 'policy.decision'));
+  assert.ok(harness.events.some((event) => event.type === 'policy_decision' && event.payload.decision === 'deny'));
+  assert.ok(harness.events.some((event) => event.type === 'tool_result' && event.payload.status === 'blocked'));
+  assert.match(String(harness.messages.at(-1)?.content), /POLICY_DENIED|local_strict/);
+});
+
 test('executeToolCall records successful mutating tool output, summaries, injection flags, and loop guard stops', async () => {
   const controller = new AbortController();
   const postHookPayloads: Array<Record<string, unknown>> = [];

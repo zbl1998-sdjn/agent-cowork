@@ -83,6 +83,12 @@ test('resolveModelProvider registers OpenAI-compatible providers', () => {
   assert.equal(resolveModelProvider({ provider: 'OPENAI-COMPATIBLE' }).id, 'openai');
   assert.equal(resolveModelProvider({ provider: 'openai/local' }).id, 'openai/local');
   assert.equal(resolveModelProvider({ provider: 'local-openai' }).id, 'openai/local');
+  assert.equal(resolveModelProvider({ provider: 'ollama' }).id, 'ollama');
+  assert.equal(resolveModelProvider({ provider: 'local-ollama' }).id, 'ollama');
+  assert.equal(resolveModelProvider({ provider: 'deepseek' }).id, 'deepseek');
+  assert.equal(resolveModelProvider({ provider: 'dashscope' }).id, 'qwen-dashscope-cn');
+  assert.equal(resolveModelProvider({ provider: 'volcengine-ark' }).id, 'volcengine-ark');
+  assert.equal(resolveModelProvider({ provider: 'custom-openai-compatible' }).id, 'custom-openai-compatible');
 });
 
 test('resolveModelProvider registers Anthropic aliases', () => {
@@ -256,6 +262,78 @@ test('local OpenAI-compatible provider does not require or send an API key', asy
   assert.equal(message.provider, 'openai/local');
   assert.equal(message.model, 'local-model');
   assert.equal(message.usage?.total_tokens, 3);
+});
+
+test('Ollama provider is local OpenAI-compatible and does not send an API key', async () => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return { choices: [{ message: { content: 'ollama ok' } }], usage: { total_tokens: 5 } };
+      },
+    };
+  };
+
+  const message = await defaultAgentModelCall({
+    kimiConfig: {
+      provider: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model: 'qwen3:8b',
+    },
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [],
+    fetchImpl,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
+  assert.equal(captured.headers.authorization, undefined);
+  assert.equal(captured.body.model, 'qwen3:8b');
+  assert.equal(message.content, 'ollama ok');
+  assert.equal(message.provider, 'ollama');
+  assert.equal(message.model, 'qwen3:8b');
+});
+
+test('domestic catalog providers route through OpenAI-compatible fetch', async () => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return { choices: [{ message: { content: 'deepseek ok' } }], usage: { total_tokens: 4 } };
+      },
+    };
+  };
+
+  const message = await defaultAgentModelCall({
+    kimiConfig: {
+      provider: 'deepseek',
+      apiKey: 'test-deepseek-key',
+      baseUrl: 'https://api.deepseek.example',
+      model: 'deepseek-v4-flash',
+    },
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [],
+    fetchImpl,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'https://api.deepseek.example/chat/completions');
+  assert.equal(captured.headers.authorization, 'Bearer test-deepseek-key');
+  assert.equal(captured.body.model, 'deepseek-v4-flash');
+  assert.equal(message.provider, 'deepseek');
+  assert.equal(message.content, 'deepseek ok');
 });
 
 test('OpenAI provider fails closed without an API key', async () => {

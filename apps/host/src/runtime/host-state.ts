@@ -67,6 +67,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   );
   const kimiApiConfig = resolveKimiApiConfig(config);
   applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
+  const securityMode = kimiApiConfig.securityMode;
 
   const state: HostState = {
     config,
@@ -76,6 +77,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     uiDistRoot,
     uiDistEnabled: isUiDistEnabled(config, uiDistRoot),
     kimiConfigFile,
+    securityMode,
     kimiApiConfig,
     kimiPlanRunner: config.kimiPlanRunner || runKimiApiPlan,
     kimiChatRunner: config.kimiChatRunner || runKimiApiChat,
@@ -138,6 +140,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup(omitUndefined({
     requestedBackend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'auto',
     sandboxOptions: config.sandboxOptions || {},
+    securityMode,
     env: process.env,
     spawnSync: config.sandboxProbeSpawnSync,
     timeoutMs: config.sandboxProbeTimeoutMs,
