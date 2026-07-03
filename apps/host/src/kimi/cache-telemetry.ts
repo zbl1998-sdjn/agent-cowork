@@ -6,7 +6,9 @@
 //      出现多种即 distinctPrefixes>1,说明前缀不稳定、命中被打穿。
 //      只算账、不发请求;由工具循环在每次调用后喂 usage 进来。镜像 bot 的 cache-stats。
 // 依赖:仅标准库。
-// 导出:hashPrefix / recordCacheUsage / getCacheTelemetry / logCacheTelemetry / resetCacheTelemetry
+// 导出:hashPrefix / recordCacheUsage / getCacheTelemetry / getSafeCacheTelemetry / logCacheTelemetry / resetCacheTelemetry
+
+import { sanitizeTelemetryPayload } from '../security/telemetry-allowlist.js';
 
 /** usage 中与缓存相关的字段(Kimi 与 DeepSeek 两种命名都兼容)。 */
 export type CacheUsage = {
@@ -63,6 +65,16 @@ export interface KeyCacheStat {
   prefixStable: boolean; //    distinctPrefixes <= 1
 }
 
+export type SafeCacheTelemetry = {
+  calls: number;
+  promptTokens: number;
+  cachedTokens: number;
+  hitRatePct: number;
+  distinctPrefixes: number;
+  prefixStable: boolean;
+  byKey: Array<Omit<KeyCacheStat, 'key'> & { slot: number }>;
+};
+
 /** 会话聚合摘要 + 分 key 明细(命中率低→前,最该排查前缀)。 */
 export function getCacheTelemetry(): {
   calls: number;
@@ -91,6 +103,16 @@ export function getCacheTelemetry(): {
       }))
       .sort((a, b) => a.hitRatePct - b.hitRatePct),
   };
+}
+
+/** Safe export surface for telemetry uploads: no raw cache keys, prompts, files, paths, or outputs. */
+export function getSafeCacheTelemetry(): SafeCacheTelemetry {
+  const raw = getCacheTelemetry();
+  const summary = {
+    ...raw,
+    byKey: raw.byKey.map(({ key: _key, ...item }, index) => ({ slot: index + 1, ...item })),
+  };
+  return sanitizeTelemetryPayload(summary).payload as SafeCacheTelemetry;
 }
 
 /** 收尾时打印一行会话累计缓存命中(无调用则静默)。 */
