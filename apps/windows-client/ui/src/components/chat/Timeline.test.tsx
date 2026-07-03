@@ -257,11 +257,17 @@ describe('Timeline', () => {
       starters: ['整理日报', '总结文件'],
     });
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(3);
+    expect(html.match(/class="ui-btn /g)?.length).toBeGreaterThan(3);
+    expect(html).toContain('今天想完成什么');
+    expect(html).toContain('Word');
+    expect(html).toContain('Excel');
+    expect(html).toContain('PPT');
+    expect(html).toContain('PDF');
     expect(html).toContain('starter-chip');
     expect(html).toContain('整理日报');
     expect(html).toContain('jump-to-bottom');
     expect(html).toContain('回到底部 ↓');
+    expect(html).not.toContain('直接和 Kimi 对话');
   });
 
   it('renders assistant suggestion chips with Button primitives', () => {

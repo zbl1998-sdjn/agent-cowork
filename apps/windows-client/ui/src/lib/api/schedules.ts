@@ -16,6 +16,42 @@ export interface ScheduleItem {
   runs?: number;
 }
 
+export interface ScheduleCreateRequest {
+  name: string;
+  cron?: string;
+  fireAt?: string;
+  payload: Record<string, unknown>;
+}
+
+export interface WeeklyReportReminderOptions {
+  trustedRoot?: string;
+  hour?: number;
+  minute?: number;
+}
+
+function clampInteger(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  const integer = Math.trunc(Number(value));
+  return Math.min(max, Math.max(min, integer));
+}
+
+export function buildWeeklyReportReminderRequest(options: WeeklyReportReminderOptions = {}): ScheduleCreateRequest {
+  const hour = clampInteger(options.hour, 0, 23, 17);
+  const minute = clampInteger(options.minute, 0, 59, 0);
+  const payload: Record<string, unknown> = {
+    recipeId: 'weekly-report-beginner',
+    beginnerMode: true,
+    prompt: '按我的周报偏好整理本周材料,先生成周报草稿和可复制文本。写文件前等我确认,不要覆盖原文件。',
+  };
+  if (options.trustedRoot) payload.trustedRoot = options.trustedRoot;
+
+  return {
+    name: '每周五周报草稿提醒',
+    cron: `${minute} ${hour} * * 5`,
+    payload,
+  };
+}
+
 export async function listSchedules(): Promise<ScheduleItem[]> {
   const res = await getJson<{ schedules: ScheduleItem[] }>('/api/schedules');
   return res.schedules || [];

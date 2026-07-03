@@ -11,6 +11,7 @@ import {
   logout as apiLogout,
   type AuthIdentity,
   type KimiInfo,
+  type ModelProviderOption,
 } from '../lib/api';
 import { AUTO_CLARIFY_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
 import { buildContextualStarters } from '../lib/starter-suggestions';
@@ -18,7 +19,8 @@ import type { WorkspaceInfo } from '../lib/app-types';
 import { ONBOARDING_DONE_KEY } from '../lib/onboarding';
 import type { RunSummary } from '../lib/types';
 import type { HistoryRun, Recipe } from '../components/Composer';
-import type { SettingsTab } from '../components/Settings';
+import type { AppFontFamily, AppFontScale, SettingsTab } from '../components/settings-types';
+import type { SecurityStatus } from '../components/SecurityStatusBar';
 
 interface RuntimeDefaults {
   chatEnabled: boolean;
@@ -26,16 +28,74 @@ interface RuntimeDefaults {
   baseUrl: string;
   model: string;
   models: string[];
+  providers: ModelProviderOption[];
+}
+
+const LOCAL_PROVIDER_IDS = new Set(['ollama', 'lmstudio', 'openai/local']);
+const FONT_SCALE_KEY = 'kcw.fontScale';
+const FONT_FAMILY_KEY = 'kcw.fontFamily';
+const FONT_SCALES = new Set<AppFontScale>(['small', 'normal', 'large', 'xlarge']);
+const FONT_FAMILIES = new Set<AppFontFamily>(['system', 'chinese', 'serif', 'mono']);
+
+function isLocalProviderId(id: string): boolean {
+  return id.includes('local') || LOCAL_PROVIDER_IDS.has(id);
+}
+
+function readStoredFontScale(): AppFontScale {
+  try {
+    const value = localStorage.getItem(FONT_SCALE_KEY) as AppFontScale | null;
+    return value && FONT_SCALES.has(value) ? value : 'normal';
+  } catch {
+    return 'normal';
+  }
+}
+
+function readStoredFontFamily(): AppFontFamily {
+  try {
+    const value = localStorage.getItem(FONT_FAMILY_KEY) as AppFontFamily | null;
+    return value && FONT_FAMILIES.has(value) ? value : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): ModelProviderOption[] {
+  if (Array.isArray(info?.providers) && info.providers.length) return info.providers;
+  const catalog = info?.catalog?.all || {};
+  return Object.values(catalog).map((item) => ({
+    id: item.id,
+    displayName: item.name,
+    region: isLocalProviderId(item.id) ? 'local' : item.source === 'custom' ? 'custom' : 'cn',
+    protocol: 'openai-chat',
+    defaultBaseUrl: item.options.baseURL || '',
+    defaultModel: info?.catalog?.default?.[item.id] || Object.keys(item.models)[0] || '',
+    models: Object.keys(item.models),
+    apiKeyEnv: item.env,
+    requiresApiKey: item.options.requiresApiKey,
+    allowCustomModel: true,
+    allowCustomBaseUrl: item.source === 'custom' || isLocalProviderId(item.id),
+    source: 'builtin',
+  }));
 }
 
 export function runtimeDefaultsFromKimiInfo(info: Partial<KimiInfo> | null | undefined): RuntimeDefaults {
+  const providers = providersFromCatalog(info);
+  const provider = info?.provider || 'kimi-api';
   const model = info?.model || '';
+  const selectedProvider = providers.find((item) => item.id === provider);
+  const modelSet = new Set<string>();
+  if (model) modelSet.add(model);
+  if (selectedProvider?.defaultModel) modelSet.add(selectedProvider.defaultModel);
+  for (const candidate of selectedProvider?.models || []) {
+    if (candidate) modelSet.add(candidate);
+  }
   return {
     chatEnabled: Boolean(info?.chatEnabled),
-    provider: info?.provider || 'kimi-api',
+    provider,
     baseUrl: info?.baseUrl || '',
     model,
-    models: model ? [model] : [],
+    models: [...modelSet],
+    providers,
   };
 }
 
@@ -52,9 +112,11 @@ export function useAppRuntimeState() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [history, setHistory] = useState<HistoryRun[]>([]);
   const [models, setModels] = useState<string[]>([]);
+  const [modelProviders, setModelProviders] = useState<ModelProviderOption[]>([]);
   const [defaultModel, setDefaultModel] = useState('');
   const [defaultProvider, setDefaultProvider] = useState('kimi-api');
   const [defaultBaseUrl, setDefaultBaseUrl] = useState('');
+  const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
   const [chatEnabled, setChatEnabled] = useState(false);
   const [autoClarify, setAutoClarify] = useState(() => {
     try { return localStorage.getItem(AUTO_CLARIFY_KEY) === '1'; } catch { return false; }
@@ -63,6 +125,8 @@ export function useAppRuntimeState() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try { return localStorage.getItem('kcw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
   });
+  const [fontScale, setFontScale] = useState<AppFontScale>(() => readStoredFontScale());
+  const [fontFamily, setFontFamily] = useState<AppFontFamily>(() => readStoredFontFamily());
   const [user, setUser] = useState<AuthIdentity | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -77,6 +141,7 @@ export function useAppRuntimeState() {
     setChatEnabled(defaults.chatEnabled);
     setDefaultProvider(defaults.provider);
     setDefaultBaseUrl(defaults.baseUrl);
+    setModelProviders(defaults.providers);
     if (defaults.model) {
       setDefaultModel(defaults.model);
       setModels(defaults.models);
@@ -108,6 +173,16 @@ export function useAppRuntimeState() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.setAttribute('data-font-scale', fontScale);
+    try { localStorage.setItem(FONT_SCALE_KEY, fontScale); } catch { /* 本地存储不可用时只保留内存状态 */ }
+  }, [fontScale]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font-family', fontFamily);
+    try { localStorage.setItem(FONT_FAMILY_KEY, fontFamily); } catch { /* 本地存储不可用时只保留内存状态 */ }
+  }, [fontFamily]);
+
+  useEffect(() => {
     try { localStorage.setItem(AUTO_CLARIFY_KEY, autoClarify ? '1' : '0'); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [autoClarify]);
 
@@ -137,6 +212,9 @@ export function useAppRuntimeState() {
       try {
         applyKimiInfo(await getKimiInfo());
       } catch { /* 模型配置加载失败不阻断主界面 */ }
+      try {
+        setSecurityStatus(await getJson<SecurityStatus>('/api/security/status'));
+      } catch { /* 安全状态加载失败不阻断主界面 */ }
     })();
   }, [applyKimiInfo, user]);
 
@@ -189,9 +267,12 @@ export function useAppRuntimeState() {
     defaultModel,
     defaultProvider,
     doLogout,
+    fontFamily,
+    fontScale,
     handleAuthed: setUser,
     history,
     models,
+    modelProviders,
     onboardingOpen,
     openSettings,
     openSettingsFromOnboarding,
@@ -200,7 +281,10 @@ export function useAppRuntimeState() {
     setAutoClarify,
     setChatEnabled,
     setCmdkOpen,
+    setFontFamily,
+    setFontScale,
     setTheme,
+    securityStatus,
     settingsInitialTab,
     settingsOpen,
     starters,

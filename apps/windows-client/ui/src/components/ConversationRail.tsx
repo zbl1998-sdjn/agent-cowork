@@ -77,8 +77,18 @@ export function ConversationRail({
 }: ConversationRailProps) {
   return (
     <aside className="conversation-rail">
+      <div className="rail-head">
+        <span className="rail-title">对话</span>
+        <span className="rail-count">{conversations.length}</span>
+      </div>
       <Button className="new-conv-btn" onClick={onNew} style={newConversationButtonStyle}>＋ 新建对话</Button>
-      <input className="conv-search" placeholder="搜索对话…" value={convSearch} onChange={(e) => onSearch(e.target.value)} />
+      <input
+        className="conv-search"
+        aria-label="搜索对话"
+        placeholder="搜索对话…"
+        value={convSearch}
+        onChange={(e) => onSearch(e.target.value)}
+      />
       <div className="conv-list">
         {conversations.map((c) => (
           <div key={c.id} className={`conv-item${c.id === activeConvId ? ' is-active' : ''}${c.pinned ? ' is-pinned' : ''}`}>

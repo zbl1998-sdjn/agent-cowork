@@ -4,7 +4,7 @@
 //       lib/api。本身只做编排与连线,具体数据逻辑在 hooks、渲染在 components(plan/00 目标:App < 250 行)。
 // 依赖:hooks/* + components/* + lib/api + lib/app-logic 纯逻辑。
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
+import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importRecipeTemplate, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
@@ -19,12 +19,23 @@ import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
 import { AppOverlays } from './components/AppOverlays';
+import { SecurityStatusBar } from './components/SecurityStatusBar';
 import type { Command } from './components/CommandPalette';
-import type { ComposerMeta, FileHit, Recipe } from './components/Composer';
+import type { ComposerDraftPreview, ComposerMeta, FileHit, Recipe, WorkbenchPreviewState } from './components/Composer';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useConversations } from './hooks/useConversations';
 import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
+
+type ImportedRecipeResponse = {
+  recipe: {
+    id: string;
+    name: string;
+    description?: string;
+    prompt?: string;
+  };
+};
+
 export function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0]?.messages || []);
@@ -49,17 +60,23 @@ export function App() {
     defaultModel,
     defaultProvider,
     doLogout,
+    fontFamily,
+    fontScale,
     handleAuthed,
     history,
     models,
+    modelProviders,
     onboardingOpen,
     openSettings,
     openSettingsFromOnboarding,
     openSettingsTabFromOnboarding,
     recipes,
+    securityStatus,
     setAutoClarify,
     setChatEnabled,
     setCmdkOpen,
+    setFontFamily,
+    setFontScale,
     setTheme,
     settingsInitialTab,
     settingsOpen,
@@ -70,9 +87,26 @@ export function App() {
     upsertRecipe,
     user,
   } = useAppRuntimeState();
+  const [composerDraft, setComposerDraft] = useState<ComposerDraftPreview>(() => ({
+    text: '',
+    files: [],
+    provider: defaultProvider || 'kimi-api',
+    model: defaultModel || '',
+    thinking: 'standard',
+    updatedAt: new Date().toISOString(),
+  }));
   // 工作区切换器:用户手选目录优先于 host 默认目录;每次请求都传 trustedRoot,由 host path-policy 做最终校验。
   const [workspaceOverride, setWorkspaceOverride] = useState<string | null>(null);
   const trustedRoot = workspaceOverride || hostTrustedRoot;
+  const workbenchPreview = useMemo<WorkbenchPreviewState>(() => ({
+    ...composerDraft,
+    provider: composerDraft.provider || defaultProvider || 'kimi-api',
+    model: composerDraft.model || defaultModel || '未选择',
+    mode,
+    workspace: trustedRoot,
+    recipe: selectedRecipe,
+    streaming: Boolean(streamingId),
+  }), [composerDraft, defaultModel, defaultProvider, mode, selectedRecipe, streamingId, trustedRoot]);
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -98,12 +132,30 @@ export function App() {
   }), [patchAssistant]);
   const uploadAttachments = useCallback(async (files: File[]): Promise<string[]> => {
     if (!files.length) return [];
-    try {
-      const payload = await Promise.all(files.map((f) => fileToUpload(f)));
-      const res = await importUploads(payload, trustedRoot);
-      return (res.imported || []).map((it) => it.path || it.relativePath || '').filter(Boolean);
-    } catch { return []; }
+    const payload = await Promise.all(files.map((f) => fileToUpload(f)));
+    const res = await importUploads(payload, trustedRoot);
+    return (res.imported || []).map((it) => it.path || it.relativePath || '').filter(Boolean);
   }, [trustedRoot]);
+  const uploadTemplates = useCallback(async (files: File[]): Promise<Recipe[]> => {
+    const imported: Recipe[] = [];
+    for (const file of files) {
+      let template: unknown;
+      try {
+        template = JSON.parse(await file.text());
+      } catch {
+        throw new Error(`${file.name}: 模板必须是 JSON`);
+      }
+      const saved = await importRecipeTemplate<ImportedRecipeResponse>(template);
+      const recipe = {
+        id: saved.recipe.id,
+        name: saved.recipe.name,
+        summary: saved.recipe.description || saved.recipe.prompt,
+      };
+      upsertRecipe(recipe);
+      imported.push(recipe);
+    }
+    return imported;
+  }, [upsertRecipe]);
 
   const runRecipeTurn = useCallback(async (assistantId: string, recipeId: string, prompt: string, uploaded: string[]) => {
     try {
@@ -121,7 +173,13 @@ export function App() {
     setMessages((list) => [...list, { id: nextMessageId(), role: 'user', text: userText }]);
     const assistantId = nextMessageId();
     setMessages((list) => [...list, { id: assistantId, role: 'assistant', status: 'thinking', progress: [], operations: [], sources: [], approvalState: 'idle' }]);
-    const uploaded = resumeRunId ? [] : await uploadAttachments(meta.files);
+    let uploaded: string[] = [];
+    try {
+      uploaded = resumeRunId ? [] : await uploadAttachments(meta.files);
+    } catch (error) {
+      patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '上传附件' }) }));
+      return;
+    }
     if (!resumeRunId && selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
 
     const sessionModelAccess = hasSessionModelAccess(meta.modelConfig);
@@ -219,15 +277,16 @@ export function App() {
   if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${panel !== 'none' ? ' has-side-panel' : ''}`}>
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} />
       <div className="app-content">
         <AppHeader mode={mode} panel={panel} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onOpenSettings={() => openSettings('account')} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onTogglePanel={togglePanel} onToggleTheme={toggleTheme} />
+        <SecurityStatusBar status={securityStatus} />
         <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
-        <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} />
+        <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} modelProviders={modelProviders} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onDraftChange={setComposerDraft} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} onUploadTemplates={uploadTemplates} />
       </div>
-      <AppSidePanel panel={panel} trustedRoot={trustedRoot} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} />
+      <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );
 }

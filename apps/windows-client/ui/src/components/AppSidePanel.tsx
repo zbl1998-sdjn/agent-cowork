@@ -5,6 +5,7 @@
 import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
+import type { WorkbenchPreviewState } from './composer-types';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { IconButton } from './ui/Button';
 import { Loading } from './ui/StateViews';
@@ -21,6 +22,7 @@ const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then
 interface AppSidePanelProps {
   panel: SidePanel;
   trustedRoot: string;
+  workbenchPreview?: WorkbenchPreviewState | undefined;
   onClose: () => void;
   onRunSubagent: (goal: string, steps: SubagentStep[]) => void;
 }
@@ -36,9 +38,14 @@ const PANEL_LABELS: Record<Exclude<SidePanel, 'none'>, string> = {
   observability: '可观测面板',
 };
 
-function panelContent(panel: Exclude<SidePanel, 'none'>, trustedRoot: string, onRunSubagent: AppSidePanelProps['onRunSubagent']) {
+function panelContent(
+  panel: Exclude<SidePanel, 'none'>,
+  trustedRoot: string,
+  onRunSubagent: AppSidePanelProps['onRunSubagent'],
+  workbenchPreview?: WorkbenchPreviewState,
+) {
   if (panel === 'tools') return <ToolsPanel trustedRoot={trustedRoot} onRunPlan={onRunSubagent} />;
-  if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} />;
+  if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} />;
   if (panel === 'connectors') return <ConnectorsPanel trustedRoot={trustedRoot} />;
   if (panel === 'artifacts') return <ArtifactsPanel trustedRoot={trustedRoot} />;
   if (panel === 'projects') return <ProjectsPanel trustedRoot={trustedRoot} />;
@@ -47,14 +54,17 @@ function panelContent(panel: Exclude<SidePanel, 'none'>, trustedRoot: string, on
   return <ObservabilityPanel />;
 }
 
-export function AppSidePanel({ panel, trustedRoot, onClose, onRunSubagent }: AppSidePanelProps) {
+export function AppSidePanel({ panel, trustedRoot, workbenchPreview, onClose, onRunSubagent }: AppSidePanelProps) {
   if (panel === 'none') return null;
   return (
     <aside className="side-drawer">
-      <IconButton className="drawer-close" label="关闭" onClick={onClose}>×</IconButton>
+      <div className="drawer-header">
+        <span>{PANEL_LABELS[panel]}</span>
+        <IconButton className="drawer-close" label="关闭" onClick={onClose}>×</IconButton>
+      </div>
       <ErrorBoundary key={panel} label={PANEL_LABELS[panel]}>
         <Suspense fallback={<Loading message="正在加载面板…" />}>
-          {panelContent(panel, trustedRoot, onRunSubagent)}
+          {panelContent(panel, trustedRoot, onRunSubagent, workbenchPreview)}
         </Suspense>
       </ErrorBoundary>
     </aside>

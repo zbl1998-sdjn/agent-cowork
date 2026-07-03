@@ -165,7 +165,14 @@ export function hasSessionModelAccess(config?: ModelRunConfig): boolean {
   if (!config) return false;
   if (typeof config.apiKey === 'string' && config.apiKey.trim()) return true;
   const provider = typeof config.provider === 'string' ? config.provider.trim().toLowerCase() : '';
-  return provider === 'openai/local' || provider === 'local-openai';
+  return provider === 'openai/local'
+    || provider === 'local-openai'
+    || provider === 'local'
+    || provider === 'ollama'
+    || provider === 'lmstudio'
+    || provider === 'lm-studio'
+    || provider === 'local-lmstudio'
+    || provider.includes('/local');
 }
 
 // 把工具/事件回显的文件路径解析为可预览/可打开的完整路径。

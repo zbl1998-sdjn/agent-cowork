@@ -20,6 +20,12 @@ function collectByType(node: ReactNode, type: unknown): ReactElement<Record<stri
   return matches;
 }
 
+function textOf(value: ReactNode): string {
+  if (Array.isArray(value)) return value.map(textOf).join('');
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return '';
+}
+
 function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parameters<typeof AppHeader>[0] {
   return {
     mode: 'execute',
@@ -47,7 +53,8 @@ describe('AppHeader', () => {
     // current mode is always visible.)
     expect(html.match(/class="ui-btn /g)?.length).toBe(14);
     expect(html).toContain('Agent Cowork');
-    expect(html).toContain('header-user');
+    expect(html).toContain('header-more');
+    expect(html).toContain('header-more-user');
     expect(html).toContain('ui-btn--secondary');
     expect(html).toContain('is-active');
     expect(html).toContain('class="mode-select"');
@@ -80,13 +87,13 @@ describe('AppHeader', () => {
     buttons[0]!.props.onClick();
     buttons[1]!.props.onClick();
     buttons.find((button) => button.props.children === '记忆')?.props.onClick();
-    buttons.find((button) => button.props.children === '⚙️ 设置')?.props.onClick();
+    buttons.find((button) => textOf(button.props.children).includes('外观'))?.props.onClick();
     buttons.find((button) => button.props.children === '退出')?.props.onClick();
 
     expect(onOpenCommandPalette).toHaveBeenCalledOnce();
+    expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onToggleTheme).toHaveBeenCalledOnce();
     expect(onTogglePanel).toHaveBeenCalledWith('memory' satisfies SidePanel);
-    expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onLogout).toHaveBeenCalledOnce();
 
     // mode <select> is the only one — simulate onChange to verify the callback wiring.

@@ -1,8 +1,8 @@
 // 配方 API(UI · 传输层 · lib/api)
 // ---------------------------------------------------------------------------
-// 职责:封装配方相关 host 调用——列出、运行、捕获草稿、保存自定义配方(写操作带幂等键)。
-// 对应路由:/api/recipes、/api/recipes/:id/run、/api/recipes/capture、/api/recipes/custom。
-// 导出:listRecipes、runRecipe、captureRecipeDraft、saveCustomRecipe。
+// 职责:封装配方相关 host 调用——列出、运行、捕获草稿、保存/导入自定义配方(写操作带幂等键)。
+// 对应路由:/api/recipes、/api/recipes/:id/run、/api/recipes/capture、/api/recipes/custom、/api/recipes/import。
+// 导出:listRecipes、runRecipe、captureRecipeDraft、saveCustomRecipe、importRecipeTemplate。
 import { getJson, newIdempotencyKey, postJson, type PostBody } from './transport';
 
 export async function listRecipes<TRecipe = unknown>(): Promise<TRecipe[]> {
@@ -23,4 +23,8 @@ export async function captureRecipeDraft<TResponse = unknown>(runId: string): Pr
 
 export async function saveCustomRecipe<TResponse = unknown>(recipe: unknown): Promise<TResponse> {
   return postJson<TResponse>('/api/recipes/custom', { recipe, idempotencyKey: newIdempotencyKey('recipe-save') });
+}
+
+export async function importRecipeTemplate<TResponse = unknown>(template: unknown): Promise<TResponse> {
+  return postJson<TResponse>('/api/recipes/import', { template, idempotencyKey: newIdempotencyKey('recipe-template-import') });
 }

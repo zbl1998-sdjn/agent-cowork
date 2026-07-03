@@ -12,3 +12,7 @@ export type SettingsTab =
   | 'runtime'
   | 'updates'
   | 'selfcheck';
+
+export type AppFontScale = 'small' | 'normal' | 'large' | 'xlarge';
+
+export type AppFontFamily = 'system' | 'chinese' | 'serif' | 'mono';

@@ -14,6 +14,8 @@ function renderOverlays({ settingsOpen = false, onboardingOpen = false } = {}): 
       onboardingOpen={onboardingOpen}
       settingsOpen={settingsOpen}
       theme="light"
+      fontScale="normal"
+      fontFamily="system"
       trustedRoot="C:/work"
       user={user}
       autoClarify={false}
@@ -26,6 +28,8 @@ function renderOverlays({ settingsOpen = false, onboardingOpen = false } = {}): 
       onSettingsSaved={vi.fn()}
       onSetAutoClarify={vi.fn()}
       onSetTheme={vi.fn()}
+      onSetFontScale={vi.fn()}
+      onSetFontFamily={vi.fn()}
     />,
   );
 }

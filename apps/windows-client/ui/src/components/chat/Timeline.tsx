@@ -5,6 +5,7 @@ import type { AssistantMessage, Message } from '../../lib/app-types';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
 import { Button } from '../ui/Button';
 import { AssistantTurn, UserEditTurn, UserTurn } from './TimelineTurns';
+import { BeginnerHome } from '../BeginnerHome';
 
 export {
   assistantTurnPropsEqual,
@@ -51,15 +52,6 @@ const TIMELINE_VIRTUALIZE_AFTER = 120;
 const TIMELINE_ESTIMATED_ROW_HEIGHT = 132;
 const TIMELINE_VIEWPORT_FALLBACK = 720;
 const TIMELINE_OVERSCAN = 8;
-
-const starterChipStyle: CSSProperties = {
-  borderColor: 'var(--border)',
-  background: '#fff',
-  color: '#3a3e36',
-  borderRadius: 14,
-  padding: '8px 14px',
-  fontSize: 13,
-};
 
 const jumpToBottomStyle: CSSProperties = {
   position: 'absolute',
@@ -178,15 +170,7 @@ export function Timeline({
         ref={timelineRef}
         onScroll={onTimelineScroll}
       >
-        {empty && (
-          <div className="empty-state">
-            <strong>Agent Cowork</strong>
-            <p>直接和 Kimi 对话即可，它能读写工作区文件、运行代码。需要文件操作时会先请你批准。</p>
-            <div className="starter-chips">
-              {starters.map((sug) => <Button key={sug} className="starter-chip" onClick={() => onQuickSend(sug)} style={starterChipStyle}>{sug}</Button>)}
-            </div>
-          </div>
-        )}
+        {empty && <BeginnerHome starters={starters} onQuickSend={onQuickSend} />}
         {pendingApprovals.length > 1 && <BatchApprovalBar pendingApprovals={pendingApprovals} onPatchAssistant={onPatchAssistant} />}
         <div className="timeline-window" data-virtualized={timelineWindow.virtualized ? 'true' : undefined}>
           {timelineWindow.topSpacer > 0 && <div aria-hidden="true" className="timeline-window-spacer" style={{ height: timelineWindow.topSpacer }} />}

@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { AppComposerDockStatus } from './AppComposerDock';
+import { AppComposerDockStatus, TemplateUploadBar } from './AppComposerDock';
 import { Button } from './ui/Button';
 
 function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -55,5 +55,18 @@ describe('AppComposerDockStatus', () => {
     buttons[1]!.props.onClick();
     expect(onStopStreaming).toHaveBeenCalledOnce();
     expect(onClearRecipe).toHaveBeenCalledOnce();
+  });
+
+  it('renders a batch template upload control without exposing JSON jargon', () => {
+    const html = renderToStaticMarkup(<TemplateUploadBar onUploadTemplates={async () => []} />);
+
+    expect(html).toContain('导入任务模板');
+    expect(html).toContain('支持批量任务模板文件');
+    expect(html).toContain('class="template-upload-input"');
+    expect(html).toContain('type="file"');
+    expect(html).toContain('accept=".json,application/json"');
+    expect(html).toContain('multiple=""');
+    expect(html).not.toContain('支持批量 JSON 模板');
+    expect(html).toContain('aria-label="上传任务模板文件"');
   });
 });

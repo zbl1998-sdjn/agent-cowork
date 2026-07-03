@@ -18,7 +18,7 @@ const base: CSSProperties = {
   justifyContent: 'center',
   gap: 6,
   border: '1px solid transparent',
-  borderRadius: 6,
+  borderRadius: 12,
   cursor: 'pointer',
   fontSize: 13,
   lineHeight: 1.2,

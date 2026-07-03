@@ -13,7 +13,7 @@ export interface MessageBubbleProps {
   children?: ReactNode | undefined;
 }
 
-const NAME: Record<MessageRole, string> = { user: 'Derrick', assistant: 'Kimi' };
+const NAME: Record<MessageRole, string> = { user: 'Derrick', assistant: 'Agent' };
 
 export function MessageBubble({ role, status, time, children }: MessageBubbleProps) {
   return (

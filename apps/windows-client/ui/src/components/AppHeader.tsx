@@ -70,28 +70,52 @@ export function AppHeaderActions({
 }: AppHeaderActionsProps) {
   return (
     <nav className="header-actions">
-      <Button onClick={onOpenCommandPalette} title="命令面板 (Ctrl/Cmd+K)">⌘K</Button>
-      <Button onClick={onToggleTheme} title="深色 / 浅色">{theme === 'dark' ? '☀' : '🌙'}</Button>
-      <select
-        className="mode-select"
-        value={mode}
-        onChange={(e) => onSetMode(e.target.value as AgentMode)}
-        title={MODE_OPTIONS.find((o) => o.value === mode)?.title}
-        aria-label="运行模式"
-      >
-        {MODE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>模式·{opt.label}</option>
-        ))}
-      </select>
-      {panelButtons.map((item) => (
-        <Button key={item.panel} className={panel === item.panel ? 'is-active' : ''} onClick={() => onTogglePanel(item.panel)}>
-          {item.label}
-        </Button>
-      ))}
-      <Button onClick={() => void revealInstaller()} title="在文件管理器里打开安装包目录(latest .exe / .msi)">{`${ICONS.PACKAGE} 安装包`}</Button>
-      <Button onClick={onOpenSettings} title="API 设置">{`${ICONS.SETTINGS} 设置`}</Button>
-      <span className="header-user" title={`租户 ${user.tenantId}`}>{user.username}</span>
-      <Button className="header-logout" onClick={onLogout} title="退出登录">退出</Button>
+      <div className="header-quick-actions" aria-label="工作台快捷操作">
+        <Button onClick={onOpenCommandPalette} title="命令面板 (Ctrl/Cmd+K)">⌘K</Button>
+        <Button onClick={onOpenSettings} title="设置">{ICONS.SETTINGS}</Button>
+      </div>
+      <details className="header-more">
+        <summary className="header-more-summary" title="更多功能">更多</summary>
+        <div className="header-more-menu">
+          <div className="header-more-section">
+            <span className="header-more-label">运行模式</span>
+            <select
+              className="mode-select"
+              value={mode}
+              onChange={(e) => onSetMode(e.target.value as AgentMode)}
+              title={MODE_OPTIONS.find((o) => o.value === mode)?.title}
+              aria-label="运行模式"
+            >
+              {MODE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>模式·{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="header-more-section">
+            <span className="header-more-label">面板</span>
+            <div className="header-more-panel-grid" aria-label="侧边面板">
+              {panelButtons.map((item) => (
+                <Button
+                  key={item.panel}
+                  className={panel === item.panel ? 'is-active' : ''}
+                  aria-pressed={panel === item.panel}
+                  onClick={() => onTogglePanel(item.panel)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="header-more-section header-more-actions">
+            <Button onClick={onToggleTheme} title="深色 / 浅色">{theme === 'dark' ? '☀' : '🌙'} 外观</Button>
+            <Button onClick={() => void revealInstaller()} title="在文件管理器里打开安装包目录(latest .exe / .msi)">{`${ICONS.PACKAGE} 安装包`}</Button>
+            <Button className="header-logout" onClick={onLogout} title="退出登录">退出</Button>
+          </div>
+          <div className="header-more-user" title={`租户 ${user.tenantId}`}>
+            {user.username}
+          </div>
+        </div>
+      </details>
     </nav>
   );
 }
@@ -112,9 +136,13 @@ export function AppHeader({
 }: AppHeaderProps) {
   return (
     <header className="app-header">
-      <span className="brand-dot" aria-hidden="true" />
-      <h1>Agent Cowork</h1>
-      <WorkspaceSwitcher current={trustedRoot} onSwitch={onSwitchWorkspace} />
+      <div className="header-brand">
+        <span className="brand-dot" aria-hidden="true" />
+        <h1>Agent Cowork</h1>
+      </div>
+      <div className="header-workspace">
+        <WorkspaceSwitcher current={trustedRoot} onSwitch={onSwitchWorkspace} />
+      </div>
       <AppHeaderActions
         mode={mode}
         panel={panel}
