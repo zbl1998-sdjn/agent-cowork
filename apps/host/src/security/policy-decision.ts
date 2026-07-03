@@ -43,7 +43,12 @@ function sandboxNetworkIsolated(sandbox: unknown): boolean {
 export function classifyToolRisk(input: Pick<ToolPolicyInput, 'toolName' | 'risk' | 'mutating'>): ToolRiskLevel {
   const name = lower(input.toolName);
   const risk = lower(input.risk);
-  if (name === 'webfetch' || name === 'web.fetch' || name === 'web.search' || name.includes('webfetch')) {
+  // 联网工具:web.fetch 与 WebSearch(及带前缀/分隔符变体)都归为对外网络,
+  // 好让 local_demo/local_strict/air_gap 统一拦截。compact 去掉点/下划线/连字符后
+  // 等价比较,修此前只匹配 web.fetch 家族、漏掉实际工具名 WebSearch(会在 air_gap
+  // “零外发”下仍打 DuckDuckGo/Bing)的缺口。
+  const compact = name.replace(/[^a-z0-9]/gu, '');
+  if (compact === 'webfetch' || compact === 'websearch' || name.includes('webfetch') || name.includes('websearch')) {
     return 'network_external';
   }
   if (name === 'shell' || name === 'sandbox.exec' || name === 'sandbox.run-code' || name.includes('run-code')) {
