@@ -1,0 +1,1089 @@
+{
+  "ok": true,
+  "mode": "installed-a11y",
+  "generatedAt": "2026-07-02T21:39:02.356Z",
+  "installedExe": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\cargo-target-acceptance\\release\\agent-cowork-desktop.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-a11y-workspace",
+  "debugPort": 56743,
+  "auth": {
+    "usedGuest": false,
+    "user": "guest_2a242b5fc03d"
+  },
+  "onboardingClosed": false,
+  "summary": {
+    "viewsScanned": 20,
+    "contrastIssues": 0,
+    "sendButtonMinContrast": 5.34,
+    "liveRegionCount": 4,
+    "timelineOk": true,
+    "overflowIssues": [],
+    "axSummary": {
+      "nodeCount": 1126,
+      "statusLikeCount": 2,
+      "logLikeCount": 1,
+      "statusSamples": [],
+      "logSamples": [
+        "对话时间线"
+      ]
+    }
+  },
+  "views": [
+    {
+      "name": "main:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 89,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:plan",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 88,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 88,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:yolo",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 88,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:工具",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 95,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "输入关键字搜索工具匹配到的可用工具会显示在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:可视化",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 140,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "尚未生成活页渲染完成后会在这里预览。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:连接器",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 95,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "没有匹配的连接器调整关键词或刷新连接器目录。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:产物",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 101,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有成果完成一次任务后，Word、Excel、PPT、PDF、可复制文本或 CSV 会出现在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:项目",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 95,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有项目工作区创建项目后可把对话、记忆和产物归到同一个上下文。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:定时任务",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 95,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有定时任务可以对 Kimi 说「每天早上 9 点把今天的日程发我」「每周一总结一下上周的邮件」这样的话,它就会帮你安排。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:记忆",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 101,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没记下任何东西把你想让 Kimi 记住的名词、项目、偏好写在下面,以后它就能用上。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:可观测",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 98,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:账户",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 113,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:外观",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 111,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:模型",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 111,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:输入",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 111,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:API",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 111,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:运行时",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 111,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:更新",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 110,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:健康检查",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 129,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    }
+  ],
+  "issues": [],
+  "stderr": ""
+}
