@@ -15,6 +15,7 @@
 - **MCP 协议栈**：完整四层实现（StdioTransport → JsonRpc → McpClient → connect），命名空间 `mcp__<server>__<tool>`
 - **生产级稳定性**：CircuitBreaker 三态机（closed/open/half-open）+ Token Bucket 限流 + ApprovalRegistry TTL 防挂起
 - **双存储后端**：SQLite（单机）/ PostgreSQL（多实例，含 LISTEN/NOTIFY 跨实例 approval）
+- **长期记忆桥接（可选，MASE）**：主对话流可选接入外部 MASE MCP 记忆后端（独立仓库，不随本仓库分发），每轮开始注入「本线程最近对话 + 当前结构化事实 + 跨会话相关历史」，每轮结束写回并抽取结构化事实；召回硬超时 2.5s，未配置或超时一律安全降级为不带记忆，不阻塞对话
 - **安全边界**：path-policy trusted root jail + 敏感段黑名单 + symlink 解析 + redaction 脱敏 + JWT 鉴权（HS256 锁定 + timingSafeEqual）+ 出站 SSRF 守卫（解析后 IP 判定 + 逐跳重定向复核）+ Host 头白名单（防 DNS-rebinding）+ 全链路 `shell:false`
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
@@ -114,6 +115,32 @@ $env:PORT = "3011"
 $env:TRUSTED_ROOT = "C:\Users\Administrator\Desktop\agent cowork"
 npm start
 ```
+
+## 长期记忆（MASE 桥接，可选）
+
+Host 支持把外部 MASE 项目（独立仓库，不随本仓库分发，需要本机自备可运行的 MASE + Python 环境）接成跨会话长期记忆后端。启动时若检测到 `MASE_MCP_ENABLED=1` 且配置了 `MASE_REPO`，会以 stdio 方式拉起 MASE 的 `integrations.mcp_server.server` 作为一条 MCP 连接器（暴露 `mcp__mase-memory__*` 工具），并在主对话流（`apps/host/src/routes/agent-stream.ts` → `apps/host/src/memory/mase-bridge.ts`）里自动接入，不需要额外前端开关：
+
+- **读缝（每轮开始）**：拼出三段会话记忆——①本线程最近对话时间线（回答“第一句/刚才聊了啥”这类问题）；②当前结构化事实（`mase_get_facts`，无条件全量注入，不依赖措辞）；③按本轮输入做关键词召回的跨会话相关历史（与①去重，避免把“别的会话”误当“本窗口”）。召回整体有 2.5s 硬超时，超时或出错一律降级为“本轮不带记忆”，绝不让对话干等。
+- **写缝（每轮成功结束）**：把用户输入、助手回答各写一条 `mase_remember` 日志；并从用户话里保守抽取显式陈述（如“我的 X 是 Y”“记住…”，跳过疑问句/任务句）upsert 成 `entity_state` 结构化事实，带 `source_log_id` 溯源，同 key 更正会自动 supersede。
+- **未启用时全程 no-op**：不配置 `MASE_MCP_ENABLED`/`MASE_REPO` 时工具不会注册，两个桥接函数直接跳过，不影响现有的本地分层记忆（`loadLayeredMemory`）。
+
+启用方式（写入本地 `.env`；`.env.example` 未内置这段，因为 MASE 是外部依赖，默认关闭）：
+
+```
+MASE_MCP_ENABLED=1
+MASE_REPO=<本机 MASE 仓库绝对路径>
+MASE_CONFIG_PATH=<本机 MASE 仓库绝对路径>\config.json
+MASE_MEMORY_DIR=<可写的记忆数据目录>
+```
+
+确定性验收脚本（未接入 `npm run` 别名，需手动执行，且脚本内 `MASE_REPO`/路径当前写死指向本机 `E:\MASE-demo`，换机器需先改脚本里的路径常量）：
+
+```powershell
+node scripts/run-host-node.mjs scripts/smoke-mase-mcp.ts
+node scripts/run-host-node.mjs scripts/smoke-mase-memory-bridge.ts
+```
+
+`smoke-mase-mcp.ts` 只验证 MCP 连接和 `mase_remember`/`mase_recall` 直连；`smoke-mase-memory-bridge.ts` 走真实 `connectMcpServers → maseRememberTurn → maseRecallSessionMemory` 桥接路径。单测见 `apps/host/test/mase-bridge.test.ts`。
 
 ## MVP-1 骨架验证
 
