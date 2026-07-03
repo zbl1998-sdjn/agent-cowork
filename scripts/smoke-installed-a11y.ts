@@ -89,7 +89,7 @@ const reportPath = process.env.KCW_A11Y_REPORT_PATH || path.join(reportDir, `ins
 const installedExe = process.env.KCW_INSTALLED_EXE || path.join(process.env.LOCALAPPDATA || '', 'Agent Cowork', 'agent-cowork-desktop.exe');
 const workspace = process.env.KCW_A11Y_WORKSPACE || path.join(repoRoot, 'build', 'installed-a11y-workspace');
 const panelLabels = ['工具', '可视化', '连接器', '产物', '项目', '定时任务', '记忆', '可观测'];
-const settingsTabs = ['账户', '外观', '模型', '输入', 'API', '运行时', '更新', '健康检查'];
+const settingsTabs = ['账户', '外观', '默认模型', '输入助手', '密钥', '组件', '更新', '健康检查'];
 
 function readNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -229,17 +229,34 @@ async function closeOnboarding(sendPage: SendPage): Promise<boolean> {
 
 async function selectMode(sendPage: SendPage, mode: string): Promise<void> {
   await evaluate(sendPage, `new Promise((resolve, reject) => {
-    const select = document.querySelector(".mode-select");
-    if (!select) { reject(new Error("mode select missing")); return; }
-    select.value = ${JSON.stringify(mode)};
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
+    const more = document.querySelector("details.header-more");
+    if (more && !more.open) {
+      const summary = more.querySelector("summary");
+      if (summary) summary.click();
+      else more.setAttribute("open", "");
+    }
+    requestAnimationFrame(() => {
+      const select = document.querySelector(".mode-select");
+      if (!select) { reject(new Error("mode select missing")); return; }
+      select.value = ${JSON.stringify(mode)};
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      requestAnimationFrame(() => {
+        if (more) more.removeAttribute("open");
+        requestAnimationFrame(resolve);
+      });
+    });
   })`);
 }
 
 async function openPanel(sendPage: SendPage, label: string): Promise<void> {
   await evaluate(sendPage, `new Promise((resolve, reject) => {
-    const button = Array.from(document.querySelectorAll(".header-actions button"))
+    const more = document.querySelector("details.header-more");
+    if (more && !more.open) {
+      const summary = more.querySelector("summary");
+      if (summary) summary.click();
+      else more.setAttribute("open", "");
+    }
+    const button = Array.from(document.querySelectorAll(".header-more-panel-grid button, .header-actions button"))
       .find((item) => item.textContent?.trim() === ${JSON.stringify(label)});
     if (!button) { reject(new Error("panel button missing: " + ${JSON.stringify(label)})); return; }
     button.click();
@@ -247,7 +264,10 @@ async function openPanel(sendPage: SendPage, label: string): Promise<void> {
     function tick() {
       const drawer = document.querySelector(".side-drawer");
       const loading = drawer?.textContent?.includes("正在加载面板");
-      if (drawer && !loading) requestAnimationFrame(() => requestAnimationFrame(resolve));
+      if (drawer && !loading) {
+        if (more) more.removeAttribute("open");
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }
       else if (Date.now() > deadline) reject(new Error("panel did not settle: " + ${JSON.stringify(label)}));
       else setTimeout(tick, 100);
     }
@@ -257,10 +277,13 @@ async function openPanel(sendPage: SendPage, label: string): Promise<void> {
 
 async function openSettings(sendPage: SendPage, tab: string): Promise<void> {
   await evaluate(sendPage, `new Promise((resolve, reject) => {
-    const settings = Array.from(document.querySelectorAll(".header-actions button"))
-      .find((item) => item.textContent?.includes("设置"));
-    if (!settings) { reject(new Error("settings button missing")); return; }
-    settings.click();
+    const existing = document.querySelector('[role="dialog"][aria-label="设置"]');
+    if (!existing) {
+      const settings = Array.from(document.querySelectorAll(".header-quick-actions button, .header-actions button"))
+        .find((item) => item.textContent?.includes("设置") || item.getAttribute("title")?.includes("设置"));
+      if (!settings) { reject(new Error("settings button missing")); return; }
+      settings.click();
+    }
     const deadline = Date.now() + 5000;
     function chooseTab() {
       const dialog = document.querySelector('[role="dialog"][aria-label="设置"]');
@@ -472,6 +495,7 @@ async function main(): Promise<void> {
   let axSummary: AxSummary | null = null;
   let auth: { usedGuest: boolean; user: string } | null = null;
   let onboardingClosed = false;
+  let mobileComposer: Record<string, unknown> | null = null;
   try {
     const target = await waitForTarget(debugPort);
     assert(target.webSocketDebuggerUrl, 'WebView target did not expose websocket URL');
@@ -507,6 +531,71 @@ async function main(): Promise<void> {
       views.push(await scanView(sendPage, `settings:${tab}`));
     }
     await closeSettings(sendPage);
+    await sendPage('Emulation.setDeviceMetricsOverride', {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+    mobileComposer = await evaluate(sendPage, `new Promise((resolve, reject) => {
+      const insert = document.querySelector("details.composer-insert");
+      if (!insert) { reject(new Error("composer insert missing")); return; }
+      if (!insert.open) {
+        const summary = insert.querySelector("summary");
+        if (summary) summary.click();
+        else insert.setAttribute("open", "");
+      }
+      requestAnimationFrame(() => {
+        const advanced = document.querySelector("details.composer-advanced");
+        if (!advanced) { reject(new Error("composer advanced missing")); return; }
+        if (!advanced.open) {
+          const summary = advanced.querySelector("summary");
+          if (summary) summary.click();
+          else advanced.setAttribute("open", "");
+        }
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const doc = document.documentElement;
+          const selectors = [
+            ".composer-footer",
+            ".composer-insert-body",
+            ".composer-tools",
+            ".composer-advanced-body",
+            ".provider-select",
+            ".model-input",
+            ".thinking-select",
+            ".send-button"
+          ];
+          const snapshotFor = (selector) => {
+            const element = document.querySelector(selector);
+            if (!element) return { selector, missing: true };
+            const rect = element.getBoundingClientRect();
+            return {
+              selector,
+              missing: false,
+              scrollWidth: element.scrollWidth,
+              clientWidth: element.clientWidth,
+              rectWidth: Number(rect.width.toFixed(2)),
+              overflows: element.scrollWidth > element.clientWidth + 1 || rect.right > window.innerWidth + 1 || rect.left < -1
+            };
+          };
+          const elements = selectors.map(snapshotFor);
+          resolve({
+            url: location.href,
+            viewport: {
+              innerWidth: window.innerWidth,
+              innerHeight: window.innerHeight,
+              clientWidth: doc.clientWidth,
+              scrollWidth: doc.scrollWidth
+            },
+            pageOverflow: doc.scrollWidth > doc.clientWidth + 1,
+            insertOpen: insert.open === true,
+            advancedOpen: advanced.open === true,
+            elementOverflows: elements.filter((item) => item.overflows || item.missing),
+            elements
+          });
+        }));
+      });
+    })`) as Record<string, unknown>;
 
     axSummary = await readAxSummary(sendPage);
     const allIssues = views.flatMap((view) => view.contrast.issues.map((issue) => ({ view: view.name, ...issue })));
@@ -517,11 +606,20 @@ async function main(): Promise<void> {
       && view.contrast.timeline.ariaLive === 'polite');
     const overflowIssues = views.filter((view) => view.contrast.scroll.width > view.contrast.scroll.clientWidth + 1);
     const sendButtonMinContrast = sendButtons.length ? Math.min(...sendButtons.map((button) => button.ratio)) : 0;
+    const mobileElementOverflows = isRecord(mobileComposer) && Array.isArray(mobileComposer.elementOverflows)
+      ? mobileComposer.elementOverflows
+      : [];
+    const mobileComposerOk = isRecord(mobileComposer)
+      && mobileComposer.pageOverflow === false
+      && mobileComposer.insertOpen === true
+      && mobileComposer.advancedOpen === true
+      && mobileElementOverflows.length === 0;
     const ok = allIssues.length === 0
       && sendButtonMinContrast >= 4.5
       && liveRegionCount > 0
       && timelineOk
       && overflowIssues.length === 0
+      && mobileComposerOk
       && (axSummary.logLikeCount > 0 || timelineOk);
 
     const report = {
@@ -540,9 +638,12 @@ async function main(): Promise<void> {
         liveRegionCount,
         timelineOk,
         overflowIssues: overflowIssues.map((view) => view.name),
+        mobileComposerOk,
+        mobileComposerOverflows: mobileElementOverflows,
         axSummary,
       },
       views,
+      mobileComposer,
       issues: allIssues,
       stderr: stderr.join('').slice(-4000),
     };

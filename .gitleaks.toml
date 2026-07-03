@@ -1,0 +1,7 @@
+[allowlist]
+description = "Allow documented test fixture keys and local storage identifiers only."
+regexes = [
+  '''sk-test-[A-Za-z0-9._-]+''',
+  '''sk-ABCDEFGHIJ[0-9]+''',
+  '''kcw\.conversations\.v1''',
+]
