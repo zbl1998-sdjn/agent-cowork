@@ -6,6 +6,7 @@
 //       + 同层 agent-resume/session-model-config 等。导出:streamAgentChat。
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { isMemoryActiveForRoot } from '../memory/memory-control.js';
+import { redactText } from '../security/redaction.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createRunTrace } from '../runtime/run-trace.js';
@@ -175,6 +176,10 @@ export async function streamAgentChat({
     const memory = memoryActive
       ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }))
       : { text: '', layers: [] };
+    // 读侧脱敏(纵深防御):记忆注入模型前统一过 redactText——即便历史遗留的旧凭据
+    // 已落在 MASE/分层记忆存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
+    // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
+    const memoryText = redactText(memory.text) || '';
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
@@ -195,7 +200,7 @@ export async function streamAgentChat({
       tools: coreTools,
       lazyTools,
       hooks,
-      memoryText: memory.text,
+      memoryText,
       skills,
       maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
       verify: body.verify === true || body.thinking === 'deep',

@@ -72,3 +72,31 @@ test('E2E agent run does NOT inject layered memory when memory is paused', async
     await close(server);
   }
 });
+
+test('E2E recalled memory is redacted before injection (read-side DLP)', async () => {
+  const root = tempRoot('kcw-mem-redact-');
+  // 历史遗留:记忆文件里存了一条含凭据的旧内容(写侧守卫上线前落库的)。
+  const dir = path.join(root, '.AgentCowork');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'MEMORY.md'),
+    `- ${MEMORY_MARKER} 是本项目的记忆标记\n- 我的部署令牌 api_key=sk-abcdef1234567890deadbeef 请记住`,
+    'utf8',
+  );
+  const model = captureModelCall();
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const base = await bind(server);
+  try {
+    const res = await postAgentStream(base, { prompt: '你好' });
+    assert.equal(res.status, 200);
+    assert.match(await readAgentStream(res), /event: done/);
+    const prompt = model.systemPrompt();
+    // 普通记忆仍注入(功能不受损)。
+    assert.ok(prompt.includes(MEMORY_MARKER), 'non-secret memory should still be injected');
+    // 但凭据被读侧脱敏,绝不进模型上下文(即便旧密钥已在存储里)。
+    assert.ok(!prompt.includes('sk-abcdef1234567890deadbeef'), 'credential in recalled memory must be redacted before injection');
+    assert.ok(prompt.includes('[REDACTED]'), 'redaction placeholder should mark where the credential was');
+  } finally {
+    await close(server);
+  }
+});
