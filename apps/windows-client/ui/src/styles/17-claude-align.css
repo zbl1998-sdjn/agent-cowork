@@ -103,3 +103,23 @@
 .header-cmdk { display: inline-flex !important; align-items: center; gap: 3px; }
 .header-cmdk svg { color: var(--rail-ink-soft); }
 .header-more-summary svg, .header-more-item svg { color: var(--rail-ink-soft); }
+
+/* —— 聊天区对齐 Claude:助手消息无框纯排版、无头像;用户消息轻背景气泡;更大留白 —— */
+.timeline { padding: 30px 24px 44px !important; gap: 26px !important; }
+.bubble { gap: 5px !important; }
+.bubble-head { font-size: 11px !important; color: var(--rail-ink-soft) !important; gap: 7px !important; }
+.bubble-name { font-weight: 600 !important; color: var(--rail-ink) !important; }
+.bubble-assistant .bubble-avatar { display: none !important; }
+.bubble-assistant .bubble-body { background: transparent !important; border: none !important; padding: 0 !important; border-radius: 0 !important; font-size: 15px !important; line-height: 1.7 !important; }
+.bubble-user .bubble-avatar { width: 24px !important; height: 24px !important; font-size: 11px !important; }
+.bubble-user .bubble-body { background: var(--rail-hover) !important; border: 1px solid transparent !important; border-radius: 14px !important; padding: 10px 14px !important; }
+
+/* —— 输入区对齐 Claude:柔和大圆角、轻阴影、无顶部硬线 —— */
+.composer-dock { border-top: 1px solid transparent !important; padding-bottom: 20px !important; }
+.composer { border: 1px solid var(--control-border) !important; border-radius: 20px !important; box-shadow: 0 4px 18px rgba(31,31,29,0.07) !important; }
+
+/* —— 右侧面板抽屉对齐 Claude:暖白画布、柔边、软阴影 —— */
+.side-drawer { background: var(--canvas) !important; border-left: 1px solid var(--control-border) !important; box-shadow: -14px 0 44px rgba(31,31,29,0.07) !important; }
+.drawer-header { background: transparent !important; border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
+.drawer-header span { font-weight: 600 !important; color: var(--rail-ink) !important; }
+[data-theme="dark"] .drawer-header { border-bottom-color: rgba(255,255,255,0.06) !important; }
