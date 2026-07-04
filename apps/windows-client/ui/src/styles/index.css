@@ -1,0 +1,20 @@
+/* 拆分自 styles.css(2026-07-05)。按历史段落保序,Vite 打包时内联,cascade 与原单文件等效。
+   后续瘦身:逐文件去重合并 + 删本轮重构死代码。 */
+@import './00-foundation.css';
+@import './01-visual-polish.css';
+@import './02-ux-refine.css';
+@import './03-login-api.css';
+@import './04-settings-center.css';
+@import './05-chat-ux.css';
+@import './06-prompt-refine.css';
+@import './07-file-preview.css';
+@import './08-onboarding.css';
+@import './09-selfcheck.css';
+@import './10-workbench.css';
+@import './11-viz-upload.css';
+@import './12-firstscreen.css';
+@import './13-realtime-preview.css';
+@import './14-typography-controls.css';
+@import './15-convergence.css';
+@import './16-header-guard.css';
+@import './17-claude-align.css';

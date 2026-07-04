@@ -1,0 +1,17 @@
+/* ================= 统一设置中心 ================= */
+.settings-card { max-width: 560px; }
+.settings-body { display: flex; min-height: 280px; }
+.settings-tabs { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; border-right: 1px solid var(--border); min-width: 116px; }
+.settings-tabs button { font: inherit; font-size: 13px; text-align: left; border: none; background: none; color: var(--muted);
+  padding: 9px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.settings-tabs button:hover { background: var(--bg); color: var(--text); }
+.settings-tabs button.is-active { background: var(--bg); color: var(--text); font-weight: 600; }
+.settings-pane { flex: 1; padding: 20px; }
+.set-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.set-label { width: 88px; color: var(--muted); font-size: 13px; }
+.set-val { color: var(--text); font-size: 13px; font-weight: 500; }
+.settings-pane .btn-secondary { margin-top: 14px; }
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.seg button { font: inherit; font-size: 13px; border: none; background: none; color: var(--muted); padding: 6px 16px; border-radius: 7px; cursor: pointer; }
+.seg button.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 500; }
+[data-theme="dark"] .seg button.is-active { box-shadow: none; background: #2f2f29; }

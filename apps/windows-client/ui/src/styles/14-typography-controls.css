@@ -1,0 +1,422 @@
+/* ================= Claude-like typography preferences + restrained controls ================= */
+:root {
+  --app-font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --app-font-size-base: 14px;
+  --app-font-size-small: calc(var(--app-font-size-base) - 2px);
+  --app-font-size-ui: calc(var(--app-font-size-base) - 1px);
+  --app-font-size-caption: calc(var(--app-font-size-base) - 2.5px);
+  --control-radius: 10px;
+  --control-radius-sm: 8px;
+  --control-border: #e4ded3;
+  --control-hover: #f5f1ea;
+  --control-active: #efe7db;
+  /* 主按钮回归 Claude 陶土橙(此前被 restrained pass 改成近黑 #2d2924,丢了暖色气质)。 */
+  --control-primary-bg: #b5482f;
+  --control-primary-fg: #fff;
+  --control-primary-bg-hover: #a03f28;
+}
+
+[data-font-scale="small"] {
+  --app-font-size-base: 13px;
+}
+
+[data-font-scale="normal"] {
+  --app-font-size-base: 14px;
+}
+
+[data-font-scale="large"] {
+  --app-font-size-base: 15.5px;
+}
+
+[data-font-scale="xlarge"] {
+  --app-font-size-base: 17px;
+}
+
+[data-font-family="system"] {
+  --app-font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+[data-font-family="chinese"] {
+  --app-font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-font-family="serif"] {
+  --app-font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, Georgia, serif;
+}
+
+[data-font-family="mono"] {
+  --app-font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Microsoft YaHei", ui-monospace, monospace;
+}
+
+[data-theme="dark"] {
+  --control-border: #3a3a35;
+  --control-hover: #2b2b27;
+  --control-active: #34342e;
+  /* 暗色下主按钮用陶土橙的加亮变体,保持与浅色一致的品牌暖色。 */
+  --control-primary-bg: #c15a3f;
+  --control-primary-fg: #fff;
+  --control-primary-bg-hover: #cf6647;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--app-font-family);
+}
+
+body {
+  font-size: var(--app-font-size-base);
+}
+
+.app-shell {
+  background: var(--bg);
+}
+
+.app-header {
+  min-height: 44px;
+  padding: 7px 10px;
+  border-bottom-color: rgba(31,31,29,0.08);
+}
+
+.header-brand h1 {
+  font-size: var(--app-font-size-base);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.brand-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.header-quick-actions {
+  gap: 5px;
+}
+
+.header-quick-actions .ui-btn,
+.header-more-summary {
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 9px !important;
+}
+
+.header-more-summary {
+  border-color: var(--control-border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  font-size: var(--app-font-size-ui);
+}
+
+.header-more-menu {
+  width: min(332px, calc(100vw - 28px));
+  gap: 10px;
+  border-radius: var(--control-radius);
+  padding: 10px;
+}
+
+.header-more-label,
+.header-more-user,
+.security-status-bar {
+  font-size: var(--app-font-size-caption);
+}
+
+.header-more-panel-grid {
+  gap: 5px;
+}
+
+.header-more-panel-grid .ui-btn,
+.header-more-actions .ui-btn {
+  min-height: 30px;
+  padding: 6px 8px !important;
+}
+
+.conversation-rail {
+  width: clamp(208px, 17vw, 252px);
+  background: #f0efea;
+  border-right: 1px solid rgba(31,31,29,0.08);
+}
+
+.timeline,
+.composer-dock {
+  max-width: min(820px, calc(100% - 48px));
+}
+
+.timeline {
+  gap: 18px;
+  padding-top: clamp(30px, 6vh, 58px);
+}
+
+.empty-state {
+  max-width: 620px;
+  margin: 12vh auto 0;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  text-align: center;
+}
+
+.empty-state strong {
+  font-size: calc(var(--app-font-size-base) + 7px);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.bubble-body,
+.composer textarea,
+.message-text.markdown,
+.user-edit-area,
+.auth-field input,
+.auth-field select,
+.settings-pane,
+.modal-note {
+  font-size: var(--app-font-size-base);
+}
+
+.bubble-head,
+.progress-line,
+.turn-status,
+.recipe-chip,
+.panel-note,
+.set-label,
+.set-val {
+  font-size: var(--app-font-size-ui);
+}
+
+.message-text.markdown code,
+.panel-result,
+.tools-result,
+.workbench-code-mock {
+  font-size: var(--app-font-size-small);
+}
+
+.ui-btn,
+.header-actions button,
+.panel-row button,
+.panel-call button,
+.tool-button,
+.starter-chip,
+.suggestion-chip,
+.msg-act,
+.new-conv-btn,
+.template-upload-button,
+.sources-toggle,
+.artifact-card button,
+.plan-card-actions button,
+.question-options button,
+.clarification-options button {
+  min-height: 30px;
+  border-radius: var(--control-radius) !important;
+  border-color: var(--control-border) !important;
+  background: var(--surface) !important;
+  color: var(--ink-soft, var(--text)) !important;
+  box-shadow: none !important;
+  font-size: var(--app-font-size-ui) !important;
+  font-weight: 500;
+}
+
+.ui-btn:hover:not(:disabled),
+.header-actions button:hover:not(:disabled),
+.tool-button:hover:not(:disabled),
+.starter-chip:hover,
+.suggestion-chip:hover,
+.msg-act:hover,
+.new-conv-btn:hover {
+  background: var(--control-hover) !important;
+}
+
+.ui-btn.is-active,
+.header-more-panel-grid .ui-btn.is-active,
+.header-panel-tabs button.is-active,
+.tool-button.is-active,
+.conv-item.is-active,
+.popover-item.is-active {
+  background: var(--control-active) !important;
+  color: var(--text) !important;
+  border-color: rgba(45,41,36,0.18) !important;
+}
+
+.ui-btn--primary,
+.btn-primary,
+.composer .send-button,
+.plan-card-actions button.plan-approve,
+.approval-actions button:not(.reject) {
+  background: var(--control-primary-bg) !important;
+  color: var(--control-primary-fg) !important;
+  border-color: var(--control-primary-bg) !important;
+}
+
+.ui-btn--danger,
+.btn-ghost-danger {
+  color: #a33a2a !important;
+}
+
+.composer .send-button {
+  border-radius: 10px !important;
+  min-width: 58px;
+}
+
+.ui-icon-btn,
+.drawer-close,
+.modal-close,
+.conv-act,
+.code-copy {
+  border-radius: var(--control-radius-sm) !important;
+}
+
+.mode-select,
+.provider-select,
+.model-select,
+.model-input,
+.base-url-input,
+.api-key-input,
+.thinking-select,
+.workspace-chip,
+.workspace-input,
+.auth-field input,
+.auth-field select {
+  border-radius: var(--control-radius) !important;
+  font-size: var(--app-font-size-ui);
+}
+
+.composer {
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(31,31,29,0.08);
+}
+
+.composer-tools {
+  gap: 6px;
+}
+
+.composer-tools .tool-button {
+  min-height: 28px;
+  padding: 5px 8px !important;
+}
+
+.composer-insert summary,
+.composer-advanced summary {
+  border-radius: var(--control-radius) !important;
+}
+
+.beginner-hero h2 {
+  font-size: 34px;
+  letter-spacing: 0;
+}
+
+.beginner-quick-grid .beginner-task-quiet {
+  border-radius: var(--control-radius) !important;
+}
+
+.settings-card {
+  max-width: min(620px, calc(100vw - 40px));
+  border-radius: 12px;
+}
+
+.settings-body {
+  min-height: 330px;
+}
+
+.settings-pane {
+  padding: 18px;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.set-row {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.set-label {
+  width: 92px;
+  line-height: 30px;
+}
+
+.seg {
+  flex: 1 1 240px;
+  max-width: 100%;
+  flex-wrap: wrap;
+  border-radius: var(--control-radius);
+}
+
+.seg button {
+  flex: 1 1 auto;
+  min-width: 48px;
+  padding: 5px 10px !important;
+  border-radius: 6px !important;
+  font-size: var(--app-font-size-ui) !important;
+}
+
+.seg button.is-active {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: 0 1px 2px rgba(31,31,29,0.08) !important;
+}
+
+.side-drawer {
+  width: min(480px, 92vw);
+}
+
+[data-theme="dark"] .conversation-rail {
+  background: #1f211d;
+}
+
+[data-theme="dark"] .header-more-summary,
+[data-theme="dark"] .header-more-menu,
+[data-theme="dark"] .ui-btn,
+[data-theme="dark"] .header-actions button,
+[data-theme="dark"] .tool-button,
+[data-theme="dark"] .starter-chip,
+[data-theme="dark"] .suggestion-chip,
+[data-theme="dark"] .msg-act,
+[data-theme="dark"] .new-conv-btn {
+  background: var(--control-bg) !important;
+}
+
+@media (max-width: 760px) {
+  .timeline,
+  .composer-dock {
+    max-width: 100%;
+  }
+
+  .beginner-hero h2 {
+    font-size: 28px;
+  }
+
+  .settings-card {
+    max-width: calc(100vw - 24px);
+  }
+
+  .settings-body {
+    flex-direction: column;
+  }
+
+  .settings-tabs {
+    min-width: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .settings-tabs button {
+    width: auto !important;
+  }
+
+  .set-label {
+    width: 100%;
+    line-height: 1.2;
+  }
+
+  .seg {
+    flex-basis: 100%;
+  }
+}
