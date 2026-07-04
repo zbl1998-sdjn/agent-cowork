@@ -39,11 +39,11 @@
 ## 当前执行顺序
 P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → v0.2.0 发布 → P2-A 启动探测真隔离 → P2-B 连接器。
 
-## 当前状态快照(2026-05-27)
+## 当前状态快照(始于 2026-05-27,持续追加;最后复核 2026-07-04)
 - [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
 - [x] `03/04/05/06/07` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
 - [x] P0-T10a/T10b host `checkJs` + JSDoc 类型护栏全量覆盖: `tsconfig.host-checkjs.json` 已纳入 215/215 个 `apps/host/src/**/*.js` 模块和 host Node shim,覆盖 host L0-L4、routes、runtime、workspace、storage、sandbox、provider、agent loop、MCP/connector、Office/data/workspace index 等现有 JS 边界;`npm run check:host-types` 已接入 `npm run check` 并通过。
-- [ ] P0-T10c 延后项:逐文件 `.ts` 转换尚未开始;后续仍按 L0/L1 叶子模块小批量推进,保持 `.js` import specifier/直接 Node 运行链路清晰,不改 host 语言栈、不重写。
+- [x] P0-T10c(2026-07-04 复核订正):逐文件 `.ts` 转换已完成,`apps/host/src` 下 0 个 `.js` 源文件、293 个 `.ts`(`git ls-files "apps/host/src/**/*.js"` 为空);此前这里长期写着"尚未开始",与实际分支进度严重脱节——迁移是在 `feat/mase-memory-backend` 分支上分小批量提交完成的(见 `git log --oneline | grep 迁移`),但没有同步回这份状态快照。教训:里程碑状态要跟着分支真实进度更新,不能只信历史记录。
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。
 - [ ] P1-A3 延后项:真实 Kimi/API key 环境下的用户工作区多文件任务端到端留档仍未完成,不得计作真实模型验收。
@@ -188,6 +188,15 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
 - [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
 - [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
+
+### 2026-07-04 追加(记忆安全 + 出口加固复核)
+- [x] MASE 记忆写入接入 DLP 守卫:`maseRememberTurn` 三条写路径(用户 log/助手 log/事实 upsert)此前绕过 `memory-dlp-guard`,含凭据内容会外发到 MASE;现逐条过 `carriesSecret`,含密跳过、fail-closed。
+- [x] 记忆暂停/隐身开关补齐总闸:`agent-stream` 此前无条件调 `loadLayeredMemory`/MASE 召回回写,UI 的记忆暂停/隐身开关对实时对话不生效;现按 `isMemoryActiveForRoot` 统一 gate 读写两侧。
+- [x] 记忆读侧脱敏:注入 system prompt 前对 `memory.text` 统一过 `redactText`,历史遗留旧凭据(写侧守卫上线前落库的)也不会被回放进模型上下文,与写侧形成"写不进、读不出"双保险。
+- [x] 安全加固:`classifyToolRisk` 此前只匹配 `web.fetch`/`webfetch`,漏判实际工具名 `WebSearch`,致 `local_strict`/`air_gap`「零外发」承诺下 `WebSearch` 仍会打 DuckDuckGo/Bing;已改用 compact 等价比较统一归为 `network_external` 并 deny。
+- [x] 安装版桌面 smoke 复核:当前源 host(含以上加固)热替换已安装 sidecar 后跑 `smoke:installed-tauri` 通过(启动/健康/鉴权/存储/退出清理全绿),证据 `reports/windows-client-smoke/installed-tauri-smoke-20260704T002045Z.json`;完整 installer 重打包被 `cargo tauri build` 的 `beforeBuildCommand`(`prepare-embedded-python.ps1` 嵌套 pwsh exit 64)阻断,是既有环境问题,与本次改动无关,待后续修复该 beforeBuild 步骤。
+- [x] 工作树历史遗留在制品全部落库:2.x 后端新模块(安全护城河/国产 provider/能力包/审计链/办公配方)、host 接线、前端(小白首页/安全状态条)、规划/设计文档、验收证据分子系统提交完毕;`output/` 运行产物与 `__pycache__` 补进 `.gitignore`。
+- [x] README/`plan/README` 状态核对:修正 P0-T10c 的滞后描述(见上方 P0-T10c 行)、刷新测试计数与覆盖率徽章、更正已过时的前端发送入口描述(旧"对话/协作"双页模型已不存在,现单一 `/api/agent/chat/stream` SSE 入口)。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)

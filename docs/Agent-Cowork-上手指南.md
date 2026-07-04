@@ -38,13 +38,13 @@
 
 ---
 
-## 三、配置 API Key(必须)
+## 三、配置模型(按需)
 
-Agent Cowork 需要一个 **Kimi / Moonshot 的 API Key** 才能和模型对话。
+不填 API Key 也能用:本地文件读写、写入 preview、审批、产物生成等大部分能力离线可用；只有需要模型对话/生成时才要配置一个 provider。
 
-1. 点右上角 **⚙ 设置 → API**。
-2. 在 **API Key** 填入你的 key(形如 `sk-...`),Base URL / 模型一般保持默认即可(默认 `https://api.moonshot.cn/v1` + `kimi-k2.6`)。
-3. 点 **保存**。
+- 最简单:本机装了 Ollama 的话,设置里选 `ollama` provider、填一个已拉取的本地模型名(如 `qwen2.5:7b`),不需要 API Key。
+- 用云端模型:点右上角 **⚙ 设置 → API**，在 **API Key** 填入你的 key(形如 `sk-...`)。默认 provider 是 **Kimi / Moonshot**（Base URL 默认 `https://api.moonshot.cn/v1`，模型默认 `kimi-k2.7-code`），也可以切换到 DeepSeek、通义千问、智谱 GLM、OpenAI、Anthropic/Claude 等内置 provider，或填自定义 OpenAI-compatible 地址。
+- 点 **保存**。会话内也可以临时切换 provider/model/自带 key，不会覆盖全局默认配置。
 
 > **安全说明**:你的 key 只会保存在本机的 `<用户主目录>\.AgentCowork\config.json`,**永远不会显示明文、也不会上传**。界面只显示"已配置"状态。换 key 时直接覆盖,清除时点"清除密钥"。
 

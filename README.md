@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml/badge.svg)](https://github.com/zbl1998-sdjn/agent-cowork/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
-![Tests](https://img.shields.io/badge/tests-host%20944%20%2B%20ui%20344-brightgreen)
-![Host Coverage](https://img.shields.io/badge/host%20coverage-94.87%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-host%20995%20%2B%20ui%20359-brightgreen)
+![Host Coverage](https://img.shields.io/badge/host%20coverage-94.36%25-brightgreen)
 ![Security](https://img.shields.io/badge/red%20team-no%20high%20severity-success)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -15,13 +15,22 @@
 - **MCP 协议栈**：完整四层实现（StdioTransport → JsonRpc → McpClient → connect），命名空间 `mcp__<server>__<tool>`
 - **生产级稳定性**：CircuitBreaker 三态机（closed/open/half-open）+ Token Bucket 限流 + ApprovalRegistry TTL 防挂起
 - **双存储后端**：SQLite（单机）/ PostgreSQL（多实例，含 LISTEN/NOTIFY 跨实例 approval）
-- **长期记忆桥接（可选，MASE）**：主对话流可选接入外部 MASE MCP 记忆后端（独立仓库，不随本仓库分发），每轮开始注入「本线程最近对话 + 当前结构化事实 + 跨会话相关历史」，每轮结束写回并抽取结构化事实；召回硬超时 2.5s，未配置或超时一律安全降级为不带记忆，不阻塞对话
-- **安全边界**：path-policy trusted root jail + 敏感段黑名单 + symlink 解析 + redaction 脱敏 + JWT 鉴权（HS256 锁定 + timingSafeEqual）+ 出站 SSRF 守卫（解析后 IP 判定 + 逐跳重定向复核）+ Host 头白名单（防 DNS-rebinding）+ 全链路 `shell:false`
+- **长期记忆桥接（可选，MASE）+ 内置分层记忆**：内置五层记忆（企业/用户/项目/本地/会话）默认注入；可选接入外部 MASE MCP 记忆后端（独立仓库，不随本仓库分发），每轮开始注入「本线程最近对话 + 当前结构化事实 + 跨会话相关历史」，每轮结束写回并抽取结构化事实；召回硬超时 2.5s，未配置或超时一律安全降级为不带记忆，不阻塞对话。所有记忆写入统一过 DLP 分级拒绝疑似凭据（API key/token/密码），注入模型前再做一次读侧脱敏兜底（历史遗留旧密钥也不会被回放进上下文）；记忆暂停/隐身开关对内置记忆与 MASE 桥接一致生效
+- **安全护城河 / 出口治理**：5 档安全模式（`local_demo`/`local_strict`/`enterprise_local`/`air_gap`/`controlled_hybrid`）+ 统一出站网关对模型调用/WebFetch/WebSearch/连接器/插件下载做策略判定与审计留痕（`.AgentCowork/security/egress-audit.jsonl`），前端安全状态条实时展示当前档位与「外发 N B」；工具风险分类（`network_external`/`sandbox_exec`/`connector`/…）让 `local_strict`/`air_gap` 下自动拦截对外网络工具（含 WebSearch）与非网络隔离沙箱执行
+- **多 Provider 目录**：内置 14+ 家 OpenAI-compatible / Anthropic 兼容 provider（Kimi/Moonshot、DeepSeek、通义千问、智谱 GLM、火山方舟、百度千帆、腾讯混元、MiniMax、讯飞星火、硅基流动、OpenAI、Anthropic/Claude、Ollama、LM Studio、自定义 OpenAI-compatible），支持会话级 BYO-key 覆盖与串行 fallback 降级（按 `provider|baseUrl|model` 粒度熔断，成本按 provider 归因）
+- **一键办公配方**：内置周报草稿、给老板看的一页总结、聊天转行动项清单、PPT 初稿、正式 Word、邮件初稿等配方，产出 Markdown/DOCX/XLSX/PPTX/PDF；支持把一次真实操作「存成我的配方」复用
+- **子代理**：`/api/subagent/run`（单个，只读/低风险直跑，写入型仍走审批）与 `/api/subagent/parallel` + `AgentParallel` 工具（并发派发多个子任务，各自独立上下文预算/步数上限，子任务生命周期事件前端分组展示）
+- **Agent 运行时韧性**：LoopGuard（重复调用/连续失败打断）、有界重试（仅对可重试错误退避）、BudgetGuard（token/成本/wall-clock 硬上限）、整轮超时、流式中断保留已生成内容、Checkpoint/Resume（可从崩溃点续跑、不重放已完成写操作）、InjectionGuard（工具输出包成不可信数据块，检测提示注入/工具劫持/数据外泄/审批绕过模式）
+- **可观测性 + 确定性评测**：每次 run 自动带 token/成本/耗时/工具/失败率与决策 trace，前端可观测面板可查历史 run；`npm run eval` 跑 golden + 红队任务集，走离线回放后端（ModelRecorder/Replayer），默认必须提供 replay records 才回放（缺失 fail-closed）
+- **运行时依赖管理**：设置页展示 SQLite / 内置 Python / Node / CJK 字体 / VC++ 运行库 / Chromium / OCR（Tesseract 中文包）/ Pandoc / MinGit / ffmpeg / 数据分析组件等的可用性，只生成可审查的安装/清理/更新计划，不静默下载或删除
+- **定时任务**：cron 5 段或一次性 `fireAt` 调度执行配方/工具
+- **安全边界**：path-policy trusted root jail + 敏感段黑名单（含 Windows 文件名等价/NTFS ADS 归一，防绕过）+ symlink 解析 + redaction 脱敏 + JWT 鉴权（HS256 锁定 + timingSafeEqual）+ 出站 SSRF 守卫（解析后 IP 判定 + 逐跳重定向复核）+ Host 头白名单（防 DNS-rebinding）+ 全链路 `shell:false`
+- **小白友好前端**：首页「今天想完成什么」任务卡（周报/表格急救/PPT/会议纪要等常见场景），安全状态条实时展示当前安全档位与外发字节数，专家术语（MCP/Provider/Shell 等）默认不出现在小白视图
 - **全栈**：Node.js 后端 + React/TypeScript 前端 + Tauri 2 桌面端 + Node SEA 打包
 
 **测试覆盖：**
-- Host：`npm run test:host:coverage:90` 通过（945 tests，944 pass，1 skip，0 fail），Node 内置 test runner + V8 coverage，line 94.87%，branch 78.58%，function 95.73%，`fail-under=90` 已生效；机器可读摘要提交在 `reports/coverage/host-coverage-summary.json`，文本报告和 V8 原始数据本地写入 `reports/coverage/host-coverage-latest.txt` 与 `reports/coverage/host-v8-*`，不依赖 Python/pytest/pytest-cov。
-- UI：`npm run test:ui` 通过（76 个测试文件 / 344 个测试用例）。
+- Host：`npm run test:host:coverage:90` 通过（995 tests，994 pass，1 skip，0 fail），Node 内置 test runner + V8 coverage，line 94.36%，branch 78.75%，function 95.32%，`fail-under=90` 已生效；机器可读摘要提交在 `reports/coverage/host-coverage-summary.json`，文本报告和 V8 原始数据本地写入 `reports/coverage/host-coverage-latest.txt` 与 `reports/coverage/host-v8-*`，不依赖 Python/pytest/pytest-cov。
+- UI：`npm run test:ui` 通过（78 个测试文件 / 359 个测试用例）。
 - 仓库门禁：`npm run check` 通过，覆盖架构、secrets、host/root/script/ui 类型、lint、JS/TS 边界、TS project coverage、language service 与 icons。
 - 覆盖面包括：circuit breaker、rate limiter、approvals 硬化、path-policy、MCP 协议、PostgreSQL 适配层、SSE 断连与 Last-Event-ID、tenant scope、路径 jail、OAuth 凭证流、沙箱、出站 SSRF 守卫与 Host 头白名单等。
 
@@ -41,7 +50,9 @@ npm run demo:mvp
 
 `npm run demo:mvp` 是当前 Web/Host MVP 的一键演示验收入口：如果没有健康的 MVP 运行态，它会在后台启动 `start:mvp` 并打开页面；随后运行 live 操作测试、默认验证、Windows readiness 只读检查和总审计，最后写出 `build/mvp-demo-report.json`。
 
-手动拆分执行时，建议按这个顺序：
+> **当前生产验收口径**：真正把关合并/发布的门禁是 `python -X utf8 scripts/quality_gate.py --level full`（委托 `security:local-strict` → `build:ui` → `smoke:playwright-all`（真机浏览器全链路）→ `npm run ci`（`check` + `test:host` + `test:ui` + `eval`））。下面这份手动分步命令列表来自更早的 MVP 阶段，命令仍可运行，但已不是当前的权威验收顺序；桌面安装版验收见 `npm run smoke:installed-tauri`。
+
+手动拆分执行时（历史 MVP 阶段的验收顺序，命令仍可用，供逐项排查参考）：
 
 ```powershell
 npm run start:mvp
@@ -84,16 +95,16 @@ Host 测试使用 Node 内置 test runner；覆盖率用 `npm run test:host:cove
 
 `npm run start:mvp` 默认监听 `http://127.0.0.1:3017`(与 Tauri sidecar 同端口;`npm start` 走 `main.ts` 默认 `3001`),并直接服务 Agent Cowork 前端工作台。页面会调用同源 Host API 读取 trusted root、列出本地文件、生成写入型操作预览,并在审批后写入 `.AgentCowork/artifacts/`。如果端口被占用,用 `PORT` 覆盖;trusted root 可用 `TRUSTED_ROOT` 覆盖。
 
-Kimi API 计划生成功能默认只在配置服务端 API key 后启用，避免普通 MVP 验证依赖真实账号/网络。前端主输入遵循 Cowork handoff：即使当前在“对话”页，点击发送也会自动切到“协作”工作台，生成透明计划和审批预览，而不是停留在普通聊天气泡。要让前端“发送”时调用 Kimi API：
+模型回复功能默认只在配置了 provider API key（或本地 `ollama`/`openai/local` 无需 key）后启用，避免普通 MVP 验证依赖真实账号/网络。前端主发送入口现在是 `/api/agent/chat/stream`（SSE 驱动的 agent tool-loop：工具调用、审批、活页/产物、计划模式全在这条流里），不再是早期的「对话页/协作页」两页切换模型。要让前端“发送”时调用 Kimi API：
 
 ```powershell
 $env:KIMI_API_KEY = "<your-kimi-api-key>"
 $env:KIMI_BASE_URL = "https://api.moonshot.ai/v1"
-$env:KIMI_MODEL = "kimi-k2.6"
+$env:KIMI_MODEL = "kimi-k2.7-code"
 npm run start:mvp
 ```
 
-后端接口是 `POST /api/kimi/chat` 和 `POST /api/kimi/plan`，只接受 trusted root 内的工作区，并由服务端通过 OpenAI-compatible `POST /chat/completions` 生成文本回复或计划；每次调用都会生成 `runId`、`runPath` 并写入 `.AgentCowork/runs/`。当前 UI 的主发送入口使用 `/api/kimi/plan` 创建 Cowork 任务，`/api/kimi/chat` 保留给直接对话 API 和后续更细的聊天视图。审批执行仍走本地 `file-ops/apply`，API key 不会暴露给前端。
+历史遗留接口 `POST /api/kimi/chat` 和 `POST /api/kimi/plan` 仍保留（只接受 trusted root 内的工作区，服务端经 OpenAI-compatible `POST /chat/completions` 生成文本/计划，每次调用生成 `runId`/`runPath` 写入 `.AgentCowork/runs/`），供直接调用或脚本化验收使用；当前 UI 主发送不再依赖它们。审批执行走本地 `file-ops/apply`，API key 不会暴露给前端；会话内也可通过 Composer 的模型控制面临时切换 provider/model/BYO-key，不落盘持久化。
 
 GitHub OAuth 连接器使用 device flow；Host 从 `KCW_GITHUB_OAUTH_CLIENT_ID` 或 `GITHUB_OAUTH_CLIENT_ID` 读取 client id。前端会先调用 `/api/connectors/oauth/approve` 审批 allowlist 内的 scope，`/api/connectors/oauth/start` 需要匹配的单次 approval id，只返回 user code / verification URL / server-side session id，不把 `device_code` 下发给前端；完成授权后 access token 写入 Host 凭证仓库，Windows 默认使用 DPAPI 保护，`KCW_CREDENTIAL_STORE` 可覆盖存储路径，状态和撤销接口只返回脱敏摘要。
 
