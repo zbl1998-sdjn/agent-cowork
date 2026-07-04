@@ -18,7 +18,9 @@ import { AppHeader, type AgentMode } from './components/AppHeader';
 import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
+import { AppContextRail } from './components/AppContextRail';
 import { AppOverlays } from './components/AppOverlays';
+import { Icon } from './components/ui/Icon';
 import type { Command } from './components/CommandPalette';
 import type { ComposerDraftPreview, ComposerMeta, FileHit, Recipe, WorkbenchPreviewState } from './components/Composer';
 import { useStickToBottom } from './hooks/useStickToBottom';
@@ -47,6 +49,7 @@ export function App() {
   const [editText, setEditText] = useState('');
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [contextRailCollapsed, setContextRailCollapsed] = useState(false);
   const {
     applyKimiInfo,
     authReady,
@@ -289,6 +292,13 @@ export function App() {
           </>
         )}
       </div>
+      {panel === 'none' && (contextRailCollapsed ? (
+        <button type="button" className="context-expand" onClick={() => setContextRailCollapsed(false)} title="展开上下文栏" aria-label="展开上下文栏">
+          <Icon name="sidebar" size={16} />
+        </button>
+      ) : (
+        <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
+      ))}
       <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );

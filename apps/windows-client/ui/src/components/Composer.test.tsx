@@ -54,8 +54,8 @@ describe('Composer', () => {
   it('renders per-session provider + model controls but NOT credential fields', () => {
     const html = renderComposer();
 
-    expect(html).toContain('class="composer-advanced"');
-    expect(html).toContain('<summary>高级</summary>');
+    expect(html).toContain('class="composer-footer-right"'); // 模型控件直接可见,不再折叠进「高级」
+    expect(html).toContain('provider-select');
     expect(html).toContain('title="本轮模型提供商"');
     expect(html).toContain('placeholder="今天想完成什么？例如：帮我把这些表格合并成一个总表"');
     expect(html).toContain('value="openai"');

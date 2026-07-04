@@ -7,7 +7,7 @@ export type IconName =
   | 'observability' | 'schedules' | 'projects' | 'viz' | 'settings' | 'folder'
   | 'command' | 'more' | 'sun' | 'moon' | 'send' | 'plus' | 'paperclip'
   | 'sidebar' | 'chevron-down' | 'pin' | 'sparkle' | 'template' | 'history'
-  | 'package' | 'stop' | 'trash' | 'export' | 'rename' | 'check';
+  | 'package' | 'stop' | 'trash' | 'export' | 'rename' | 'check' | 'mic';
 
 // 每个图标是一组 SVG 子元素(path/circle/…),统一 stroke 渲染。
 const GLYPHS: Record<IconName, ReactNode> = {
@@ -42,6 +42,7 @@ const GLYPHS: Record<IconName, ReactNode> = {
   export: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5M12 15V3" /></>,
   rename: <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />,
   check: <path d="M20 6 9 17l-5-5" />,
+  mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 19v3" /></>,
 };
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

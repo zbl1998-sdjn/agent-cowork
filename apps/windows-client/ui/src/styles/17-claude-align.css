@@ -136,3 +136,59 @@
 .header-sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: var(--rail-ink-soft); cursor: pointer; flex: 0 0 auto; transition: background .1s ease; }
 .header-sidebar-toggle:hover { background: var(--rail-hover); }
 .app-shell.sidebar-collapsed .conversation-rail { width: 0 !important; min-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; border-right: none !important; overflow: hidden; }
+
+/* —— 右侧上下文栏(对齐 Claude 三栏右栏:运行状态 / 工作文件夹 / 技能·模板)—— */
+.app-content { flex: 1 1 0 !important; min-width: 0 !important; }
+.context-rail {
+  width: 300px; flex-shrink: 0; height: 100vh; box-sizing: border-box;
+  background: var(--rail-surface); border-left: 1px solid transparent;
+  padding: 14px 14px 18px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+[data-theme="dark"] .context-rail { border-left-color: rgba(255,255,255,0.05); }
+.context-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 2px; }
+.context-title { font-size: 13px; font-weight: 600; color: var(--rail-ink); }
+.context-collapse { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--rail-ink-soft); cursor: pointer; }
+.context-collapse:hover { background: var(--rail-hover); }
+.context-card { background: var(--canvas); border: 1px solid var(--control-border); border-radius: 12px; padding: 12px 13px; display: flex; flex-direction: column; gap: 9px; }
+.context-card-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--rail-ink); }
+.context-card-head svg { color: var(--rail-ink-soft); }
+.context-count { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--rail-ink-soft); background: var(--rail-hover); border-radius: 10px; padding: 1px 8px; }
+.context-run-dot { width: 8px; height: 8px; border-radius: 50%; background: #b7b4a9; margin-left: auto; }
+.context-run-dot.is-running { background: #55a06f; box-shadow: 0 0 0 3px rgba(85,160,111,0.18); }
+.context-run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.context-run-grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.context-k { font-size: 10.5px; color: var(--rail-ink-soft); }
+.context-v { font-size: 12.5px; color: var(--rail-ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-folder { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rail-ink); font-weight: 500; }
+.context-folder svg { color: var(--align-accent); flex-shrink: 0; }
+.context-folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-folder-path { font-size: 11px; color: var(--rail-ink-soft); word-break: break-all; line-height: 1.4; }
+.context-empty { font-size: 12px; color: var(--rail-ink-soft); }
+.context-skill-list { display: flex; flex-direction: column; gap: 3px; }
+.context-skill { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: none; border-radius: 7px; background: transparent; color: var(--rail-ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.context-skill svg { color: var(--rail-ink-soft); flex-shrink: 0; }
+.context-skill:hover { background: var(--rail-hover); }
+.context-skill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-expand { position: fixed; top: 62px; right: 14px; z-index: 20; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); color: var(--rail-ink-soft); cursor: pointer; box-shadow: 0 2px 8px rgba(31,31,29,0.08); }
+.context-expand:hover { background: var(--rail-hover); }
+
+/* —— 底部输入框工具条对齐 Claude:左组工具图标 · 右组模型/发送,一行疏朗 —— */
+.composer-footer { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; flex-wrap: nowrap; }
+.composer-footer-left { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.composer-footer-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.composer-footer .composer-triggers { display: flex; gap: 2px; }
+.composer-footer .tool-button, .composer-footer .composer-trigger-btn {
+  width: 32px !important; height: 32px !important; padding: 0 !important;
+  display: inline-flex !important; align-items: center; justify-content: center;
+  border-radius: 8px !important; background: transparent !important; border: none !important;
+  color: var(--rail-ink-soft) !important; box-shadow: none !important; min-width: 0 !important;
+}
+.composer-footer .tool-button:hover, .composer-footer .composer-trigger-btn:hover { background: var(--rail-hover) !important; color: var(--rail-ink) !important; }
+.composer-footer .tool-button.is-active { background: var(--rail-active) !important; color: var(--align-accent) !important; }
+.composer-footer .tool-button svg, .composer-footer .composer-trigger-btn svg { flex-shrink: 0; }
+.composer-divider { width: 1px; height: 20px; background: var(--control-border); margin: 0 6px; flex-shrink: 0; }
+.composer-footer .provider-select { max-width: 128px; padding: 6px 8px !important; font-size: 12px !important; border-radius: 8px !important; border: 1px solid var(--control-border) !important; background: var(--surface) !important; color: var(--rail-ink) !important; height: auto !important; }
+.composer-footer .model-input { width: 92px !important; padding: 6px 8px !important; font-size: 12px !important; border-radius: 8px !important; border: 1px solid var(--control-border) !important; background: var(--surface) !important; color: var(--rail-ink) !important; height: auto !important; }
+.composer-footer .thinking-select { padding: 6px 8px !important; font-size: 12px !important; border-radius: 8px !important; border: 1px solid var(--control-border) !important; background: var(--surface) !important; color: var(--rail-ink) !important; height: auto !important; }
+.composer-footer .send-button { flex-shrink: 0; border-radius: 12px !important; padding: 8px 18px !important; margin-left: 2px; }
