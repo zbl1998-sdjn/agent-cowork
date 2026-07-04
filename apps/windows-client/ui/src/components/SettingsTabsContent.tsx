@@ -102,7 +102,8 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
   } = props;
   const providerOptions = providers?.length ? providers : FALLBACK_MODEL_PROVIDERS;
   const selectedProvider = providerOptions.find((item) => item.id === provider) || providerOptions[0];
-  const modelOptions = [...new Set([model, selectedProvider?.defaultModel, ...(selectedProvider?.models || [])].filter(Boolean))];
+  const knownModels = [...new Set([selectedProvider?.defaultModel, ...(selectedProvider?.models || [])].filter(Boolean))] as string[];
+  const isCustomModel = Boolean(model) && !knownModels.includes(model);
   const providerLabel = selectedProvider?.displayName || provider || '模型提供商';
   const apiKeyNames = selectedProvider?.apiKeyEnv?.length ? selectedProvider.apiKeyEnv.join(' / ') : '本地模型通常不需要 API Key';
   const selectProvider = (next: string) => {
@@ -147,13 +148,23 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
             </select>
           </label>
           <label className="auth-field">
-            <span>默认模型名称</span>
-            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="点开选一个,或直接粘贴" list="settings-common-models" />
-            <datalist id="settings-common-models">
-              {modelOptions.map((m) => <option key={m} value={m} />)}
-            </datalist>
+            <span>默认模型{knownModels.length ? `（${knownModels.length} 个可选）` : ''}</span>
+            <select
+              value={isCustomModel ? '__custom__' : model}
+              onChange={(e) => { const v = e.target.value; setModel(v === '__custom__' ? '' : v); }}
+            >
+              {!model && <option value="" disabled>选一个模型…</option>}
+              {knownModels.map((m) => <option key={m} value={m}>{m}</option>)}
+              <option value="__custom__">自定义（手动填 model id）…</option>
+            </select>
           </label>
-          <p className="modal-note">模型按 provider_id/model_id 管理；这里保存默认值，每轮对话仍可临时切换。</p>
+          {isCustomModel && (
+            <label className="auth-field">
+              <span>自定义 model id</span>
+              <input value={model} onChange={(e) => setModel(e.target.value)} placeholder={selectedProvider?.defaultModel || '如 kimi-k2-0905-preview'} autoFocus />
+            </label>
+          )}
+          <p className="modal-note">模型按 provider_id/model_id 管理；换厂商会自动带出它的推荐模型。这里存默认值，每轮对话仍可临时切换。</p>
           <div className="modal-actions">
             <span className="modal-actions-spacer" />
             <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
