@@ -3051,13 +3051,15 @@ textarea:focus-visible,
   --app-font-size-small: calc(var(--app-font-size-base) - 2px);
   --app-font-size-ui: calc(var(--app-font-size-base) - 1px);
   --app-font-size-caption: calc(var(--app-font-size-base) - 2.5px);
-  --control-radius: 8px;
-  --control-radius-sm: 7px;
-  --control-border: #d9d5cc;
-  --control-hover: #f3f1ec;
-  --control-active: #ece6dc;
-  --control-primary-bg: #2d2924;
+  --control-radius: 10px;
+  --control-radius-sm: 8px;
+  --control-border: #e4ded3;
+  --control-hover: #f5f1ea;
+  --control-active: #efe7db;
+  /* 主按钮回归 Claude 陶土橙(此前被 restrained pass 改成近黑 #2d2924,丢了暖色气质)。 */
+  --control-primary-bg: #b5482f;
   --control-primary-fg: #fff;
+  --control-primary-bg-hover: #a03f28;
 }
 
 [data-font-scale="small"] {
@@ -3096,8 +3098,10 @@ textarea:focus-visible,
   --control-border: #3a3a35;
   --control-hover: #2b2b27;
   --control-active: #34342e;
-  --control-primary-bg: #f2eee7;
-  --control-primary-fg: #1f1f1d;
+  /* 暗色下主按钮用陶土橙的加亮变体,保持与浅色一致的品牌暖色。 */
+  --control-primary-bg: #c15a3f;
+  --control-primary-fg: #fff;
+  --control-primary-bg-hover: #cf6647;
 }
 
 body,
@@ -3462,3 +3466,103 @@ body {
     flex-basis: 100%;
   }
 }
+
+/* ============================================================
+   Claude Cowork 收敛层(2026-07-04,末位权威)
+   统一被多轮 pass 打散的按钮/侧栏/输入区,放最后靠 cascade 收口。
+   前提:Button / IconButton / ConversationRail 已去掉内联 style,样式全权交此处。
+   ============================================================ */
+
+/* —— 按钮:尺寸与内边距(背景/圆角在上方 .ui-btn 收敛段已 !important 定义)—— */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border: 1px solid transparent;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+}
+.ui-btn--sm { padding: 4px 9px; min-height: 26px; font-size: var(--app-font-size-caption); }
+.ui-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ui-btn:active:not(:disabled) { transform: translateY(0.5px); }
+
+/* ghost:上方收敛段把所有 .ui-btn 背景 !important 成 surface,这里把 ghost 拉回透明。 */
+.ui-btn--ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: inherit !important;
+}
+.ui-btn--ghost:hover:not(:disabled) { background: var(--control-hover) !important; }
+.ui-btn--primary:hover:not(:disabled),
+.composer .send-button:hover:not(:disabled) {
+  background: var(--control-primary-bg-hover, var(--control-primary-bg)) !important;
+  border-color: var(--control-primary-bg-hover, var(--control-primary-bg)) !important;
+}
+
+/* 图标按钮:方形、居中、透明底、hover 微高亮 */
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-soft, var(--text));
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.ui-icon-btn--sm { width: 24px; height: 24px; }
+.ui-icon-btn:hover:not(:disabled) { background: var(--control-hover); }
+.ui-icon-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* —— 左侧会话栏:标题占满宽度;操作按钮 hover 才浮现,且不再挤占标题 —— */
+.conv-item { position: relative; }
+.conv-title { flex: 1 1 auto; min-width: 0; justify-content: flex-start; text-align: left; }
+/* ghost 变体默认继承 .ui-btn 的居中;列表型 ghost(会话标题)需要左对齐 */
+.new-conv-btn { justify-content: center; }
+.conv-actions {
+  position: absolute; right: 5px; top: 5px;
+  display: flex; align-items: center; gap: 1px;
+  padding-left: 22px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .12s ease;
+  background: linear-gradient(90deg, transparent, var(--control-hover) 40%);
+}
+.conv-item:hover .conv-actions { opacity: 1; pointer-events: auto; }
+.conv-item.is-active .conv-actions {
+  opacity: 1; pointer-events: auto;
+  background: linear-gradient(90deg, transparent, var(--surface) 40%);
+}
+.conv-act { width: 24px; height: 24px; font-size: 12px; color: #9b9b97; }
+
+/* —— 输入区 “+ / 高级” 折叠钮:统一成低调小文字钮,去掉浏览器默认三角 —— */
+.composer-insert > summary,
+.composer-advanced > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--app-font-size-ui);
+  color: var(--ink-soft, var(--text));
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius) !important;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+}
+.composer-insert > summary::-webkit-details-marker,
+.composer-advanced > summary::-webkit-details-marker { display: none; }
+.composer-insert > summary::marker,
+.composer-advanced > summary::marker { content: ""; }
+.composer-insert > summary:hover,
+.composer-advanced > summary:hover { background: var(--control-hover); }
+.composer-advanced > summary { min-height: 26px; padding: 3px 9px; font-size: var(--app-font-size-caption); }

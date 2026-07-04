@@ -1,5 +1,5 @@
 // ConversationRail(UI · components):左侧会话栏——列出历史会话、切换/新建/改名/删除,显示当前选中。纯展示+回调。
-import type { CSSProperties } from 'react';
+// 样式全在 styles.css(.conversation-rail / .conv-item / .conv-title / .conv-actions);组件不内联 style,避免覆盖收敛层。
 import type { Conversation } from '../lib/app-types';
 import { conversationBranchOptions } from '../lib/conversation-branches';
 import { ICONS } from '../lib/icons';
@@ -22,41 +22,6 @@ interface ConversationRailProps {
   onSwitch: (id: string) => void;
   onTogglePin: (id: string) => void;
 }
-
-const newConversationButtonStyle: CSSProperties = {
-  borderColor: '#c0846f',
-  background: '#fff',
-  color: '#b5482f',
-  borderRadius: 10,
-  padding: '9px 12px',
-  fontSize: 13,
-  flexShrink: 0,
-};
-
-const conversationTitleStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  justifyContent: 'flex-start',
-  textAlign: 'left',
-  border: 'none',
-  background: 'transparent',
-  color: 'inherit',
-  padding: 2,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-
-const conversationActionStyle: CSSProperties = {
-  width: 'auto',
-  height: 'auto',
-  border: 'none',
-  background: 'transparent',
-  color: '#9b9b97',
-  fontSize: 12,
-  lineHeight: 1,
-  padding: '3px 5px',
-  borderRadius: 6,
-};
 
 export function ConversationRail({
   activeConvId,
@@ -81,7 +46,7 @@ export function ConversationRail({
         <span className="rail-title">对话</span>
         <span className="rail-count">{conversations.length}</span>
       </div>
-      <Button className="new-conv-btn" onClick={onNew} style={newConversationButtonStyle}>＋ 新建对话</Button>
+      <Button className="new-conv-btn" onClick={onNew}>＋ 新建对话</Button>
       <input
         className="conv-search"
         aria-label="搜索对话"
@@ -106,21 +71,22 @@ export function ConversationRail({
               />
             ) : (
               <>
-                <Button variant="ghost" className="conv-title" onClick={() => onSwitch(c.id)} style={conversationTitleStyle}>{c.pinned ? `${ICONS.PIN} ` : ''}{c.title || '新对话'}</Button>
-                <IconButton className="conv-act" label={c.pinned ? '取消置顶' : '置顶'} onClick={() => onTogglePin(c.id)} style={conversationActionStyle}>{c.pinned ? '☆' : '⤒'}</IconButton>
-                <IconButton className="conv-act" label="导出 Markdown" onClick={() => onExport(c.id)} style={conversationActionStyle}>⤓</IconButton>
-                <IconButton
-                  className="conv-act"
-                  label="重命名"
-                  onClick={() => {
-                    onSetRenamingId(c.id);
-                    onRenameText(c.title || '');
-                  }}
-                  style={conversationActionStyle}
-                >
-                  ✎
-                </IconButton>
-                <IconButton className="conv-act" label="删除" onClick={() => onDelete(c.id)} style={conversationActionStyle}>✕</IconButton>
+                <Button variant="ghost" className="conv-title" onClick={() => onSwitch(c.id)}>{c.pinned ? `${ICONS.PIN} ` : ''}{c.title || '新对话'}</Button>
+                <div className="conv-actions">
+                  <IconButton className="conv-act" label={c.pinned ? '取消置顶' : '置顶'} onClick={() => onTogglePin(c.id)}>{c.pinned ? '☆' : '⤒'}</IconButton>
+                  <IconButton className="conv-act" label="导出 Markdown" onClick={() => onExport(c.id)}>⤓</IconButton>
+                  <IconButton
+                    className="conv-act"
+                    label="重命名"
+                    onClick={() => {
+                      onSetRenamingId(c.id);
+                      onRenameText(c.title || '');
+                    }}
+                  >
+                    ✎
+                  </IconButton>
+                  <IconButton className="conv-act" label="删除" onClick={() => onDelete(c.id)}>✕</IconButton>
+                </div>
                 {(() => {
                   const branchOptions = conversationBranchOptions(c);
                   const activeBranch = branchOptions.find((branch) => branch.id === (c.activeBranchId || 'main')) || branchOptions[0];
