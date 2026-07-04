@@ -1,8 +1,7 @@
 // ConversationRail(UI · components):左侧栏——对标 Claude 桌面的「导航中心」。
-// 品牌 → 新建对话 → 面板导航(工具/连接器/产物/记忆/可观测/定时/项目/可视化)→ 搜索 → 最近对话 → 底部(设置/主题/安全)。
-// 纯展示+回调;样式全在 styles.css 的 .rail-* / .conv-*,组件不内联 style。
+// 品牌 → 新建对话 → 面板导航(工具/连接器/产物/记忆/可观测/定时/项目/可视化)→ 搜索 → 最近对话。
+// 对齐 Claude:侧栏底部保持极简(设置/主题/安全下沉到顶栏「更多」与命令面板,不再放侧栏 footer)。
 import type { Conversation, SidePanel } from '../lib/app-types';
-import type { SecurityStatus } from './SecurityStatusBar';
 import { conversationBranchOptions } from '../lib/conversation-branches';
 import { Icon, type IconName } from './ui/Icon';
 
@@ -19,11 +18,6 @@ const NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
   { id: 'viz', icon: 'viz', label: '可视化' },
 ];
 
-const MODE_LABELS: Record<string, string> = {
-  local_demo: '本地演示', local_strict: '本地严格', enterprise_local: '企业本地',
-  air_gap: '离线隔离', controlled_hybrid: '受控混合',
-};
-
 interface ConversationRailProps {
   activeConvId: string;
   convSearch: string;
@@ -31,8 +25,6 @@ interface ConversationRailProps {
   renamingId: string | null;
   renameText: string;
   panel: SidePanel;
-  theme: 'light' | 'dark';
-  securityStatus: SecurityStatus | null;
   onCommitRename: () => void;
   onDelete: (id: string) => void;
   onExport: (id: string) => void;
@@ -44,19 +36,13 @@ interface ConversationRailProps {
   onSwitch: (id: string) => void;
   onTogglePin: (id: string) => void;
   onNavigate: (panel: PanelId) => void;
-  onOpenSettings: () => void;
-  onToggleTheme: () => void;
 }
 
 export function ConversationRail({
-  activeConvId, convSearch, conversations, renamingId, renameText,
-  panel, theme, securityStatus,
+  activeConvId, convSearch, conversations, renamingId, renameText, panel,
   onCommitRename, onDelete, onExport, onNew, onRenameText, onSearch,
-  onSetRenamingId, onSwitchBranch, onSwitch, onTogglePin,
-  onNavigate, onOpenSettings, onToggleTheme,
+  onSetRenamingId, onSwitchBranch, onSwitch, onTogglePin, onNavigate,
 }: ConversationRailProps) {
-  const egress = securityStatus?.egress?.todayContentBytes || 0;
-  const egressText = egress <= 0 ? '0 B' : egress < 1024 ? `${egress} B` : egress < 1048576 ? `${(egress / 1024).toFixed(1)} KB` : `${(egress / 1048576).toFixed(1)} MB`;
   return (
     <aside className="conversation-rail">
       <div className="rail-brand">
@@ -127,22 +113,6 @@ export function ConversationRail({
           </div>
         ))}
         {conversations.length === 0 && <div className="conv-empty">没有匹配的对话</div>}
-      </div>
-
-      <div className="rail-footer">
-        {securityStatus && (
-          <div className="rail-security" title={`安全模式:${MODE_LABELS[securityStatus.securityMode] || securityStatus.securityMode} · 今日外发 ${egressText}`}>
-            <span className="rail-security-dot" aria-hidden="true" />
-            <span>{MODE_LABELS[securityStatus.securityMode] || securityStatus.securityMode}</span>
-            <span className="rail-security-egress">外发 {egressText}</span>
-          </div>
-        )}
-        <div className="rail-footer-actions">
-          <button type="button" className="rail-foot-btn" onClick={onOpenSettings}><Icon name="settings" size={16} /><span>设置</span></button>
-          <button type="button" className="rail-foot-btn rail-foot-icon" aria-label="深色 / 浅色" title="深色 / 浅色" onClick={onToggleTheme}>
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-          </button>
-        </div>
       </div>
     </aside>
   );

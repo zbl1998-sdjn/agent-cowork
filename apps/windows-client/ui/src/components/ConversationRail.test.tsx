@@ -37,8 +37,6 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
     renamingId: null,
     renameText: '',
     panel: 'none',
-    theme: 'light',
-    securityStatus: null,
     onCommitRename: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
@@ -50,14 +48,12 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
     onSwitch: vi.fn(),
     onTogglePin: vi.fn(),
     onNavigate: vi.fn(),
-    onOpenSettings: vi.fn(),
-    onToggleTheme: vi.fn(),
     ...overrides,
   };
 }
 
 describe('ConversationRail', () => {
-  it('renders a Claude-style nav center: brand, new chat, 8 panels, search, recents, footer', () => {
+  it('renders a Claude-style nav center: brand, new chat, 8 panels, search, recents', () => {
     const html = renderToStaticMarkup(<ConversationRail {...props()} />);
 
     expect(html).toContain('rail-brand');
@@ -72,12 +68,11 @@ describe('ConversationRail', () => {
     expect(html).toContain('rail-search');
     expect(html).toContain('最近');
     expect(html).toContain('主线');
-    expect(html).toContain('rail-footer');
-    expect(html).toContain('rail-foot-btn');
-    expect(html).toContain('设置');
+    // 底部 footer 已移除(对齐 Claude 极简侧栏,设置/主题走顶栏)
+    expect(html).not.toContain('rail-footer');
   });
 
-  it('wires nav, new-chat, conversation and footer callbacks', () => {
+  it('wires nav, new-chat and conversation callbacks', () => {
     const p = props();
     const buttons = collectByType(ConversationRail(p), 'button');
 
@@ -86,15 +81,11 @@ describe('ConversationRail', () => {
     buttons.find((b) => (b.props.className || '') === 'conv-title' && textOf(b.props.children).includes('主线'))?.props.onClick();
     buttons.find((b) => b.props['aria-label'] === '取消置顶')?.props.onClick();
     buttons.find((b) => b.props['aria-label'] === '删除')?.props.onClick();
-    buttons.find((b) => textOf(b.props.children).includes('设置'))?.props.onClick();
-    buttons.find((b) => b.props['aria-label'] === '深色 / 浅色')?.props.onClick();
 
     expect(p.onNew).toHaveBeenCalledOnce();
     expect(p.onNavigate).toHaveBeenCalledWith('tools');
     expect(p.onSwitch).toHaveBeenCalledWith('c1');
     expect(p.onTogglePin).toHaveBeenCalledWith('c1');
     expect(p.onDelete).toHaveBeenCalledWith('c1');
-    expect(p.onOpenSettings).toHaveBeenCalledOnce();
-    expect(p.onToggleTheme).toHaveBeenCalledOnce();
   });
 });

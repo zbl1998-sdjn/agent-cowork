@@ -30,14 +30,16 @@ interface AppHeaderProps {
   theme: 'light' | 'dark';
   trustedRoot: string;
   user: AuthIdentity;
+  sidebarCollapsed: boolean;
   onLogout: () => void;
   onOpenCommandPalette: () => void;
   onSetMode: (value: AgentMode) => void;
   onSwitchWorkspace: (path: string) => void;
   onToggleTheme: () => void;
+  onToggleSidebar: () => void;
 }
 
-type AppHeaderActionsProps = Omit<AppHeaderProps, 'trustedRoot' | 'onSwitchWorkspace'>;
+type AppHeaderActionsProps = Omit<AppHeaderProps, 'trustedRoot' | 'onSwitchWorkspace' | 'sidebarCollapsed' | 'onToggleSidebar'>;
 
 export function AppHeaderActions({
   mode, theme, user, onLogout, onOpenCommandPalette, onSetMode, onToggleTheme,
@@ -76,10 +78,19 @@ export function AppHeaderActions({
 }
 
 export function AppHeader({
-  mode, theme, trustedRoot, user, onLogout, onOpenCommandPalette, onSetMode, onSwitchWorkspace, onToggleTheme,
+  mode, theme, trustedRoot, user, sidebarCollapsed, onLogout, onOpenCommandPalette, onSetMode, onSwitchWorkspace, onToggleTheme, onToggleSidebar,
 }: AppHeaderProps) {
   return (
     <header className="app-header">
+      <button
+        type="button"
+        className="header-sidebar-toggle"
+        onClick={onToggleSidebar}
+        title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+        aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+      >
+        <Icon name="sidebar" size={17} />
+      </button>
       <div className="header-workspace">
         <WorkspaceSwitcher current={trustedRoot} onSwitch={onSwitchWorkspace} />
       </div>

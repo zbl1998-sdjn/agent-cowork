@@ -123,3 +123,16 @@
 .drawer-header { background: transparent !important; border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
 .drawer-header span { font-weight: 600 !important; color: var(--rail-ink) !important; }
 [data-theme="dark"] .drawer-header { border-bottom-color: rgba(255,255,255,0.06) !important; }
+
+/* —— 右侧面板改主区切换(对齐 Claude:点导航→主区显示面板,而非右侧抽屉)—— */
+.main-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--canvas); }
+.main-panel-head { display: flex; align-items: center; gap: 12px; padding: 16px 28px 10px; max-width: 920px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.main-panel-back { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--control-border); background: var(--surface); color: var(--rail-ink); border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 12.5px; cursor: pointer; transition: background .1s ease; flex: 0 0 auto; }
+.main-panel-back:hover { background: var(--rail-hover); }
+.main-panel-title { font-size: 16px; font-weight: 600; color: var(--rail-ink); }
+.main-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 28px 28px; max-width: 920px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+
+/* —— 侧栏收放 —— */
+.header-sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: var(--rail-ink-soft); cursor: pointer; flex: 0 0 auto; transition: background .1s ease; }
+.header-sidebar-toggle:hover { background: var(--rail-hover); }
+.app-shell.sidebar-collapsed .conversation-rail { width: 0 !important; min-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; border-right: none !important; overflow: hidden; }

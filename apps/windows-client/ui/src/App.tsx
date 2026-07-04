@@ -46,6 +46,7 @@ export function App() {
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
     applyKimiInfo,
     authReady,
@@ -70,7 +71,6 @@ export function App() {
     openSettingsFromOnboarding,
     openSettingsTabFromOnboarding,
     recipes,
-    securityStatus,
     setAutoClarify,
     setChatEnabled,
     setCmdkOpen,
@@ -276,14 +276,19 @@ export function App() {
   if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;
 
   return (
-    <div className={`app-shell${panel !== 'none' ? ' has-side-panel' : ''}`}>
-      <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} panel={panel} theme={theme} securityStatus={securityStatus} onNavigate={togglePanel} onOpenSettings={() => openSettings('account')} onToggleTheme={toggleTheme} />
+    <div className={`app-shell${panel !== 'none' ? ' has-side-panel' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+      <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} panel={panel} onNavigate={togglePanel} />
       <div className="app-content">
-        <AppHeader mode={mode} theme={theme} trustedRoot={trustedRoot} user={user} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onToggleTheme={toggleTheme} />
-        <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
-        <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} modelProviders={modelProviders} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onDraftChange={setComposerDraft} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} onUploadTemplates={uploadTemplates} />
+        <AppHeader mode={mode} theme={theme} trustedRoot={trustedRoot} user={user} sidebarCollapsed={sidebarCollapsed} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onToggleTheme={toggleTheme} onToggleSidebar={() => setSidebarCollapsed((v) => !v)} />
+        {panel !== 'none' ? (
+          <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
+        ) : (
+          <>
+            <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
+            <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} modelProviders={modelProviders} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onDraftChange={setComposerDraft} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} onUploadTemplates={uploadTemplates} />
+          </>
+        )}
       </div>
-      <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
       <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );

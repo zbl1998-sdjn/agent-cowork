@@ -32,11 +32,13 @@ function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parame
     theme: 'dark',
     trustedRoot: 'C:/work',
     user: { userId: 'u1', tenantId: 't1', username: 'demo' },
+    sidebarCollapsed: false,
     onLogout: vi.fn(),
     onOpenCommandPalette: vi.fn(),
     onSetMode: vi.fn(),
     onSwitchWorkspace: vi.fn(),
     onToggleTheme: vi.fn(),
+    onToggleSidebar: vi.fn(),
     ...overrides,
   };
 }
