@@ -20,7 +20,10 @@
 .app-shell, .app-content { background: var(--canvas); }
 
 .conversation-rail {
+  position: relative;
   width: var(--rail-w) !important;
+  height: 100vh !important;
+  align-self: stretch !important;
   background: var(--rail-surface) !important;
   border-right: 1px solid transparent !important;
   padding: 12px 10px !important;
@@ -69,7 +72,7 @@
 
 .rail-recents-head { font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--rail-ink-soft); text-transform: uppercase; padding: 10px 10px 4px; flex-shrink: 0; }
 
-.conversation-rail .conv-list { flex: 1 1 0; min-height: 0; overflow-y: auto; gap: 1px !important; }
+.conversation-rail .conv-list { flex: 1 1 0 !important; min-height: 0 !important; overflow-y: auto; gap: 1px !important; }
 .conversation-rail .conv-item { border: 1px solid transparent !important; border-radius: 8px !important; padding: 7px 10px !important; }
 .conversation-rail .conv-item:hover { background: var(--rail-hover) !important; }
 .conversation-rail .conv-item.is-active { background: var(--rail-active) !important; border-color: transparent !important; }
