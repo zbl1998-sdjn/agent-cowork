@@ -57,21 +57,7 @@ function hasToolResult(messages: ChatMessage[]): boolean {
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
   const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
 
-  // ═══════════ 【大白话导读 · Derrick 学习注释】Agent 主循环骨架 ═══════════
-  // 一句话:模型每轮二选一——「要调工具」就执行完、把结果喂回去再问一遍;「直接给答案」就收工。最多转 maxSteps 轮。
-  // 骨架其实就十来行(这就是 ReAct):
-  //   messages = [系统提示, 用户问题]          // 开局发牌
-  //   for (轮 = 1..最大轮数) {
-  //     回复 = 问大模型(messages, 工具清单)
-  //     若 回复「没有工具调用」 → 最终答案 = 回复文字 → break(收工)
-  //     否则 → 把「要调 xx 工具」记进 messages → 逐个执行工具 → 结果塞回 messages → 进下一轮
-  //   }
-  //   return 最终答案
-  // 这函数为啥有 200 行?骨架外面裹了一圈「守卫」,都不是循环本身:
-  //   · 上下文太长 → 压缩(prepareMessages)   · 跑太久/烧太多/原地打转 → 叫停(timeout/budget/loopGuard)
-  //   · 中途存档、崩了能续跑(checkpoint)     · 主模型挂了自动降级(callModelResilient)   · 危险操作执行前要审批(在 executeToolCall 里)
-  // 读码技巧:先往下找那个 `for` —— 那才是循环本体;它上面 50 多行全是「装配/守卫」的准备工作。
-  // ════════════════════════════════════════════════════════════════════
+  // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, context } as Parameters<typeof createAgentTools>[0]) as AgentTool[]).slice();
   ensureExitPlanModeTool(agentTools, planMode);
@@ -155,7 +141,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
     emit('token', { delta: finalText });
   };
   try {
-    // ▼▼▼ 【骨架·主循环本体】整个 agent 就这一个 for:每转一轮 = 问一次模型(+执行它要的工具),转满 maxSteps(默认6)就停 ▼▼▼
+    // 主循环本体:每轮调用一次模型,并执行这一轮返回的工具调用。
     for (let i = 0; i < stepBudget; i += 1) {
       if (runTimeout.aborted()) break;
       if (stopForLoopGuard) break;
@@ -189,7 +175,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       traceModelContext(runTrace, stepNumber, messages, toolSpecs);
       const onContent = (d: unknown) => { streamedContent = true; if (d) emit('token', { delta: d }); };
       const onReasoning = (d: unknown) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); };
-      // 【骨架·问模型】把当前对话 + 可用工具丢给 Kimi;callModelResilient 的「Resilient」= 主模型挂了自动降级到备用/本地
+      // 调用模型;callModelResilient 负责主模型失败后的有界降级。
       let message;
       try {
         const modelTimeoutMs = typeof kimiConfig?.timeoutMs === 'number' ? kimiConfig.timeoutMs : undefined;
@@ -224,9 +210,9 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
         stopOnBudget(usageBudgetDecision);
         break;
       }
-      // 【骨架·关键岔路】模型这一轮的输出,要么「要调工具(tool_calls,JSON 结构)」、要么「直接给答案(纯文本,没有 tool_calls)」
+      // 模型输出要么包含工具调用,要么直接给出最终文本。
       const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-      if (calls.length === 0) { // ← 没有工具调用 = 模型直接答了 = 收工,break 跳出 for
+      if (calls.length === 0) {
         finalText = message.content || '';
         const finalMessage = { role: 'assistant', content: finalText };
         // 发生过真实写改且尚未复核时,先不收尾:塞一条只读核对指令再跑一轮,确认改动无误。
@@ -247,7 +233,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       messages.push({ role: 'assistant', content: message.content || '', tool_calls: calls, ...(message.reasoning_content ? { reasoning_content: message.reasoning_content } : {}) });
       traceToolDecision(runTrace, stepNumber, message);
       saveCheckpoint('assistant_tool_calls', stepNumber);
-      // 【骨架·有工具调用】逐个真执行工具(读文件/跑命令);executeToolCall 里串着审批闸门/沙箱/重试,执行结果会塞回 messages,让下一轮模型看得见
+      // 执行工具调用并把结果回填 messages,供下一轮模型继续推理。
       const stepsBeforeToolBatch = steps.length;
       for (const call of calls) {
         // 取消/超时后不再启动本批剩余的工具调用——避免"UI 已停止"后后台仍继续调用工具。

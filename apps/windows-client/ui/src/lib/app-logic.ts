@@ -1,7 +1,7 @@
 // 应用纯逻辑(UI · lib):把流式事件/审批/待办/子任务等聚合归并的「纯函数」逻辑从 App/hooks 抽出,便于单测,
 // 让组件只管渲染、hooks 只管编排。依赖:lib/types + api/chat 类型。
 import type { ApprovalState, RunEvent, SourceRef, SubtaskGroupItem, SubtaskStatus, TodoItem, TodoStatus } from './types';
-import type { ModelRunConfig } from './api/chat';
+import type { ContextCompactionConfig, ModelRunConfig } from './api/chat';
 
 export type ProgressStatus = 'pending' | 'running' | 'done' | 'failed' | 'wait';
 
@@ -147,6 +147,7 @@ export function buildAgentChatStreamOptions(input: {
   images?: string[] | undefined;
   resumeRunId?: string | undefined;
   conversationId?: string | undefined;
+  autoContextCompaction?: boolean | undefined;
 }) {
   return {
     trustedRoot: input.trustedRoot,
@@ -158,6 +159,7 @@ export function buildAgentChatStreamOptions(input: {
     images: input.images,
     ...(input.resumeRunId ? { resumeRunId: input.resumeRunId } : {}),
     ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+    contextCompaction: { enabled: input.autoContextCompaction !== false } satisfies ContextCompactionConfig,
   };
 }
 

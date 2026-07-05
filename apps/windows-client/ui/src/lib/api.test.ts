@@ -730,6 +730,9 @@ describe('SSE streams', () => {
           'event: start',
           'data: {"runId":"run_2"}',
           '',
+          'event: context_compacted',
+          'data: {"beforeTokens":12000,"afterTokens":7000,"keyFacts":["important: keep workspace"]}',
+          '',
           'event: todo_snapshot',
           'data: {"todos":[{"id":"plan-1","text":"读取现状","status":"pending"}]}',
           '',
@@ -745,23 +748,28 @@ describe('SSE streams', () => {
     });
     const snapshots: unknown[] = [];
     const updates: unknown[] = [];
+    const compactions: unknown[] = [];
     let done: unknown = null;
 
     await api.agentChatStream('执行计划', {
       trustedRoot: 'C:/work',
       autoApprove: true,
       planMode: true,
+      contextCompaction: { enabled: true, maxContextTokens: 9000 },
       modelConfig: { provider: 'openai', model: 'gpt-session', baseUrl: 'https://api.openai.test/v1', apiKey: 'sk-session' },
     }, {
       onTodoSnapshot: (todos) => snapshots.push(todos),
       onTodoUpdate: (todo) => updates.push(todo),
+      onContextCompacted: (stats) => compactions.push(stats),
       onDone: (full) => { done = full; },
     });
 
     const streamCall = calls.find((call) => call.url.endsWith('/api/agent/chat/stream'));
     expect(JSON.parse(String(streamCall?.init?.body))).toMatchObject({
+      contextCompaction: { enabled: true, maxContextTokens: 9000 },
       modelConfig: { provider: 'openai', model: 'gpt-session', baseUrl: 'https://api.openai.test/v1', apiKey: 'sk-session' },
     });
+    expect(compactions).toEqual([{ beforeTokens: 12000, afterTokens: 7000, keyFacts: ['important: keep workspace'] }]);
     expect(snapshots).toEqual([[{ id: 'plan-1', text: '读取现状', status: 'pending' }]]);
     expect(updates).toEqual([{ id: 'plan-1', text: '读取现状', status: 'done' }]);
     expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });

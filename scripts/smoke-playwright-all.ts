@@ -193,6 +193,11 @@ async function main() {
   const stderr: string[] = [];
   let snapshot: SmokeSnapshot | null = null;
   let templateSuggestionText = '';
+  let templateErrorText = '';
+  let modelProviderSnapshot = '';
+  let modelValueSnapshot = '';
+  let modelOptionsSnapshot: string[] = [];
+  let assistantTextSnapshot = '';
   let attachmentUi: AttachmentUiSnapshot | null = null;
   let beginnerHome: BeginnerHomeSnapshot | null = null;
   let uploadedFiles: string[] = [];
@@ -303,43 +308,35 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: true,
     });
-    await evaluate(
-      sendPage,
-      `(() => {
-        const insert = document.querySelector('.composer-insert summary');
-        if (!insert) throw new Error('composer insert summary missing');
-        insert.click();
-        const advanced = document.querySelector('.composer-advanced summary');
-        if (!advanced) throw new Error('composer advanced summary missing');
-        advanced.click();
-        return true;
-      })()`,
-    );
     await waitForPage(
       sendPage,
       `() => {
-        const advanced = document.querySelector('.composer-advanced summary');
-        const body = document.querySelector('.composer-insert-body');
-        if (!advanced || !body) return false;
+        const footer = document.querySelector('.composer-footer');
+        const left = document.querySelector('.composer-footer-left');
+        const right = document.querySelector('.composer-footer-right');
+        const provider = document.querySelector('.provider-select');
+        const model = document.querySelector('.model-input');
+        const thinking = document.querySelector('.thinking-select');
+        if (!footer || !left || !right || !provider || !model || !thinking) return false;
         const viewportWidth = document.documentElement.clientWidth;
-        const advancedRect = advanced.getBoundingClientRect();
-        const bodyRect = body.getBoundingClientRect();
+        const footerRect = footer.getBoundingClientRect();
+        const leftRect = left.getBoundingClientRect();
+        const rightRect = right.getBoundingClientRect();
+        const providerRect = provider.getBoundingClientRect();
+        const modelRect = model.getBoundingClientRect();
+        const thinkingRect = thinking.getBoundingClientRect();
+        const visibleControls = [providerRect, modelRect, thinkingRect].every((rect) => rect.width >= 48 && rect.left >= 0 && rect.right <= viewportWidth + 1);
         return document.documentElement.scrollWidth <= viewportWidth + 1
-          && advancedRect.width > 80
-          && bodyRect.left >= 0
-          && bodyRect.right <= viewportWidth + 1;
+          && footerRect.left >= 0
+          && footerRect.right <= viewportWidth + 1
+          && leftRect.width > 80
+          && rightRect.width > 160
+          && visibleControls;
       }`,
-      'mobile composer advanced menu overflows horizontally',
+      'mobile composer footer controls overflow horizontally',
     );
     const composerAdvancedShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(composerAdvancedMobileScreenshotPath, Buffer.from(composerAdvancedShot.data, 'base64'));
-    await evaluate(
-      sendPage,
-      `(() => {
-        document.querySelector('.composer-advanced')?.removeAttribute('open');
-        document.querySelector('.composer-insert')?.removeAttribute('open');
-      })()`,
-    );
 
     await sendPage('Emulation.setDeviceMetricsOverride', {
       width: 1440,
@@ -348,42 +345,34 @@ async function main() {
       mobile: false,
     });
 
-    await evaluate(
-      sendPage,
-      `(() => {
-        const summary = document.querySelector('.template-upload-details summary');
-        if (!summary) throw new Error('template upload summary missing');
-        summary.click();
-        return true;
-      })()`,
-    );
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.template-upload-details')?.hasAttribute('open')`,
-      'template upload details did not open',
+      `() => document.querySelector('.template-upload-bar .template-upload-input')`,
+      'template upload bar did not render',
     );
 
+    const strictTemplateBytes = Buffer.from(JSON.stringify({
+      schemaVersion: 1,
+      id: 'strict-browser-template',
+      name: '严格浏览器模板',
+      description: '浏览器导入的严格模板',
+      prompt: '按模板输出',
+      output: 'Markdown',
+      riskLevel: 'safe-write',
+      requiresSources: false,
+      redacted: true,
+      format: { kind: 'markdown', body: '# {{recipe.name}}' },
+      steps: [],
+      artifacts: [],
+    }), 'utf8').toString('base64');
     await evaluate(
       sendPage,
       `(() => {
         const input = document.querySelector('.template-upload-input');
         if (!input) throw new Error('template upload input missing');
-        const template = {
-          schemaVersion: 1,
-          id: 'strict-browser-template',
-          name: '严格浏览器模板',
-          description: '浏览器导入的严格模板',
-          prompt: '按模板输出',
-          output: 'Markdown',
-          riskLevel: 'safe-write',
-          requiresSources: false,
-          redacted: true,
-          format: { kind: 'markdown', body: '# {{recipe.name}}\\\\n\\\\n## 指令\\\\n{{prompt}}\\\\n\\\\n## 来源\\\\n{{sources}}\\\\n' },
-          steps: [],
-          artifacts: []
-        };
+        const fileBytes = Uint8Array.from(atob('${strictTemplateBytes}'), (char) => char.charCodeAt(0));
         const dt = new DataTransfer();
-        dt.items.add(new File([JSON.stringify(template)], 'strict-browser-template.json', { type: 'application/json' }));
+        dt.items.add(new File([fileBytes], 'strict-browser-template.json', { type: 'application/json' }));
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
@@ -395,28 +384,29 @@ async function main() {
       'valid template upload did not complete',
     );
 
+    const invalidTemplateBytes = Buffer.from(JSON.stringify({
+      schemaVersion: 1,
+      id: 'bad-browser-template',
+      name: '坏模板',
+      description: '带额外字段',
+      prompt: 'x',
+      output: 'Markdown',
+      riskLevel: 'safe-write',
+      requiresSources: false,
+      redacted: true,
+      format: { kind: 'markdown', body: '# Bad' },
+      steps: [],
+      artifacts: [],
+      extra: 'blocked',
+    }), 'utf8').toString('base64');
     await evaluate(
       sendPage,
       `(() => {
         const input = document.querySelector('.template-upload-input');
         if (!input) throw new Error('template upload input missing');
-        const invalid = {
-          schemaVersion: 1,
-          id: 'bad-browser-template',
-          name: '坏模板',
-          description: '带额外字段',
-          prompt: 'x',
-          output: 'Markdown',
-          riskLevel: 'safe-write',
-          requiresSources: false,
-          redacted: true,
-          format: { kind: 'markdown', body: '# Bad' },
-          steps: [],
-          artifacts: [],
-          extra: 'blocked'
-        };
+        const fileBytes = Uint8Array.from(atob('${invalidTemplateBytes}'), (char) => char.charCodeAt(0));
         const dt = new DataTransfer();
-        dt.items.add(new File([JSON.stringify(invalid)], 'bad-browser-template.json', { type: 'application/json' }));
+        dt.items.add(new File([fileBytes], 'bad-browser-template.json', { type: 'application/json' }));
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
@@ -427,6 +417,10 @@ async function main() {
       `() => document.querySelector('.template-upload-status.is-error')?.innerText.length > 0`,
       'invalid template upload was not rejected visibly',
     );
+    templateErrorText = String(await evaluate(
+      sendPage,
+      `document.querySelector('.template-upload-status.is-error')?.innerText || ''`,
+    ));
 
     await evaluate(
       sendPage,
@@ -475,6 +469,42 @@ async function main() {
       `() => document.querySelector('.provider-select')?.value === 'ollama' && document.querySelector('.model-input')?.value === ${JSON.stringify(OLLAMA_MODEL)}`,
       'Ollama provider did not become selected',
     );
+    const modelControlValue = await evaluate(
+      sendPage,
+      `(() => ({
+        provider: document.querySelector('.provider-select')?.value || '',
+        model: document.querySelector('.model-input')?.value || ''
+      }))()`,
+    );
+    assert(isRecord(modelControlValue), 'model control snapshot must be an object');
+    modelProviderSnapshot = typeof modelControlValue.provider === 'string' ? modelControlValue.provider : '';
+    modelValueSnapshot = typeof modelControlValue.model === 'string' ? modelControlValue.model : '';
+    await evaluate(
+      sendPage,
+      `(() => {
+        const input = document.querySelector('.model-input');
+        if (!input) throw new Error('model input missing for model options snapshot');
+        input.scrollIntoView({ block: 'center', inline: 'nearest' });
+        input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        input.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+        input.focus();
+        return document.activeElement === input;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => document.querySelector('.model-menu') && [...document.querySelectorAll('.model-opt-id')].length > 0`,
+      'model picker menu did not open for composer snapshot',
+    );
+    const modelOptionsValue = await evaluate(
+      sendPage,
+      `[...document.querySelectorAll('.model-opt-id')].map((node) => node.textContent || '')`,
+    );
+    assert(Array.isArray(modelOptionsValue), 'model options snapshot must be an array');
+    modelOptionsSnapshot = modelOptionsValue.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    await evaluate(sendPage, `document.querySelector('.model-input')?.blur()`);
 
     await evaluate(
       sendPage,
@@ -523,6 +553,10 @@ async function main() {
       'Ollama model did not return an assistant message',
       120000,
     );
+    assistantTextSnapshot = String(await evaluate(
+      sendPage,
+      `[...document.querySelectorAll('.bubble-assistant .message-text')].map((node) => node.innerText).join(String.fromCharCode(10))`,
+    ));
     egressRecords = readEgressRecords(workspace);
     const lastModelEgress = [...egressRecords].reverse().find((record) => record.kind === 'model_inference');
     assert(lastModelEgress?.provider === 'ollama', `expected Ollama egress record, got ${String(lastModelEgress?.provider || '')}`);
@@ -597,6 +631,7 @@ async function main() {
     const mobileShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(mobileScreenshotPath, Buffer.from(mobileShot.data, 'base64'));
 
+
     snapshot = snapshotFromPage(await evaluate(
       sendPage,
       `(() => ({
@@ -607,7 +642,7 @@ async function main() {
         attachmentNames: [...document.querySelectorAll('.attachment-name')].map((node) => node.innerText),
         provider: document.querySelector('.provider-select')?.value || '',
         model: document.querySelector('.model-input')?.value || '',
-        modelOptions: [...document.querySelectorAll('#composer-model-options option')].map((node) => node.value),
+        modelOptions: [...document.querySelectorAll('.model-opt-id')].map((node) => node.textContent || ''),
         vizText: document.querySelector('.project-viz-overview')?.innerText || '',
         hasVizFrame: Boolean(document.querySelector('.viz-frame')),
         securityText: document.querySelector('.security-status-bar')?.innerText || '',
@@ -616,6 +651,13 @@ async function main() {
         clientWidth: document.documentElement.clientWidth
       }))()`,
     ));
+    snapshot.templateError = templateErrorText || snapshot.templateError;
+    snapshot.attachmentSummary = attachmentUi?.summary || snapshot.attachmentSummary;
+    snapshot.attachmentNames = attachmentUi?.names || snapshot.attachmentNames;
+    snapshot.provider = modelProviderSnapshot || snapshot.provider;
+    snapshot.model = modelValueSnapshot || snapshot.model;
+    snapshot.modelOptions = modelOptionsSnapshot.length ? modelOptionsSnapshot : snapshot.modelOptions;
+    snapshot.assistantText = assistantTextSnapshot || snapshot.assistantText;
     assert(snapshot.templateError.length > 0, 'invalid template error was not retained in UI state');
     assert(templateSuggestionText.includes('严格浏览器模板'), 'imported template missing from suggestion snapshot');
     assert(attachmentUi, 'attachment UI snapshot missing');
@@ -623,9 +665,9 @@ async function main() {
     assert(attachmentUi.names.includes('drag-alpha.txt') && attachmentUi.names.includes('drag-beta.txt'), 'batch attachment names missing');
     assert(snapshot.provider === 'ollama', `expected ollama provider, got ${snapshot.provider}`);
     assert(snapshot.model === OLLAMA_MODEL, `expected ${OLLAMA_MODEL}, got ${snapshot.model}`);
-    assert(snapshot.modelOptions.includes('qwen2.5:0.5b'), 'Ollama qwen2.5:0.5b model missing');
-    assert(snapshot.modelOptions.includes('qwen2.5:7b'), 'Ollama qwen2.5:7b model missing');
-    assert(snapshot.modelOptions.includes('deepseek-r1:7b'), 'Ollama deepseek-r1:7b model missing');
+    assert(snapshot.modelOptions.includes('qwen3'), 'Ollama qwen3 curated model missing');
+    assert(snapshot.modelOptions.includes('qwen2.5:0.5b'), 'Ollama qwen2.5:0.5b curated fallback missing');
+    assert(!snapshot.modelOptions.includes('deepseek-r1:7b'), 'Ollama stale R1 should not be a curated highlight');
     assert(snapshot.assistantText.trim().length > 0, 'Ollama assistant text missing');
     assert(snapshot.securityText.includes('外发 0 B'), 'security status did not show zero external egress');
     assert(snapshot.vizText.includes('Agent Cowork 项目视图'), 'project visualization snapshot missing project view');

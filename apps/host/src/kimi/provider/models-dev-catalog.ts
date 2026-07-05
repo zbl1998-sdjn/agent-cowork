@@ -64,24 +64,28 @@ const MODELS_DEV_PROVIDER_IDS: Record<string, string> = {
 };
 
 const DEFAULT_MODEL_HINTS: Record<string, string[]> = {
-  'kimi-api': ['kimi-k2.7-code', 'kimi-k2.6'],
+  'kimi-api': ['kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6'],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
   'qwen-dashscope-cn': ['qwen3.7-plus', 'qwen-plus', 'qwen-max'],
   'zai-glm': ['glm-5.2', 'glm-5.1', 'glm-5'],
   minimax: ['MiniMax-M2.7', 'MiniMax-M3'],
   'siliconflow-cn': ['Qwen/Qwen3-Coder-480B-A35B-Instruct', 'Pro/deepseek-ai/DeepSeek-V3.2'],
-  openai: ['gpt-5.2', 'gpt-5', 'gpt-4.1'],
-  anthropic: ['claude-sonnet-4-5', 'claude-sonnet-5'],
-  google: ['gemini-3-pro-preview', 'gemini-2.5-pro'],
-  xai: ['grok-4.3', 'grok-4.20-0309-reasoning'],
+  openai: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5-codex', 'gpt-image-2'],
+  anthropic: ['claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5'],
+  google: ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
+  xai: ['grok-4.3', 'grok-build-0.1'],
   groq: ['llama-3.3-70b-versatile'],
   mistral: ['mistral-large-latest', 'mistral-medium-latest'],
-  openrouter: ['anthropic/claude-sonnet-4.5'],
+  openrouter: ['anthropic/claude-sonnet-5', 'anthropic/claude-opus-4.8', 'openai/gpt-5.5'],
   perplexity: ['sonar-pro', 'sonar'],
 };
 
 const MODEL_EXCLUDES: Record<string, string[]> = {
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  'kimi-api': ['kimi-k2-thinking', 'kimi-k2-thinking-turbo', 'kimi-k2-0711-preview', 'kimi-k2-turbo-preview'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-r1'],
+  google: ['gemini-3-pro-preview'],
+  xai: ['grok-4.20-0309-reasoning', 'grok-4.20-0309-non-reasoning', 'grok-4.20-multi-agent-0309'],
+  openai: ['gpt-5.2', 'gpt-5.2-pro', 'gpt-5.2-codex', 'gpt-5.2-chat-latest', 'gpt-5-pro', 'gpt-image-1', 'gpt-image-1.5', 'gpt-image-1-mini'],
 };
 
 let cache: CacheEntry | null = null;

@@ -37,13 +37,15 @@ function props(overrides: Partial<Parameters<typeof AppContextRail>[0]> = {}): P
 }
 
 describe('AppContextRail', () => {
-  it('renders three cards: run status, working folder, skills — Claude 三栏右栏', () => {
+  it('renders context cards: run status, agent team, working folder, skills — Claude 三栏右栏', () => {
     const html = renderToStaticMarkup(<AppContextRail {...props()} />);
     expect(html).toContain('context-rail');
     expect(html).toContain('上下文');
     expect(html).toContain('运行状态');
     expect(html).toContain('空闲');
     expect(html).toContain('执行');
+    expect(html).toContain('Agent Team');
+    expect(html).toContain('暂无多 Agent 运行');
     expect(html).toContain('工作文件夹');
     expect(html).toContain('work'); // trustedRoot 末段
     expect(html).toContain('技能');

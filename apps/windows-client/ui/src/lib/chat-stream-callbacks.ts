@@ -1,13 +1,24 @@
 // 聊天流回调(UI · lib):构建 Agent SSE 流的事件回调集——把后端事件(消息/工具/审批/进度/收尾)映射成
 // 对前端状态的更新与对审批的应答。是 App/hooks 与 api/chat 流之间的胶水。依赖:lib/api + api/chat 类型。
 import { respondApproval } from './api';
-import type { AgentStreamHandlers } from './api/chat';
+import type { AgentStreamHandlers, ContextCompactionStats } from './api/chat';
 import { mergeTodoUpdate } from './app-logic';
 import { humanizeError } from './friendly-error';
 import type { AssistantMessage, ToolCallItem } from './app-types';
 
 export type AgentMode = 'plan' | 'execute' | 'yolo';
 
+function formatTokenCount(value?: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  return value >= 1000 ? `${Math.round(value / 100) / 10}K tokens` : `${Math.round(value)} tokens`;
+}
+
+export function contextCompactionProgressText(stats: ContextCompactionStats): string {
+  const before = formatTokenCount(stats.beforeTokens);
+  const after = formatTokenCount(stats.afterTokens);
+  if (before && after) return `已自动压缩上下文:${before} -> ${after}`;
+  return '已自动压缩上下文';
+}
 export interface ChatStreamCallbackDeps {
   /** 正在接收流的 assistant 消息 id。 */
   assistantId: string;
@@ -61,6 +72,11 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
       ...m,
       verifying: true,
       progress: [...m.progress, { status: 'running', text: '自检产物中…' }],
+    })),
+
+    onContextCompacted: (stats) => patch((m) => ({
+      ...m,
+      progress: [...m.progress, { status: 'done', text: contextCompactionProgressText(stats) }],
     })),
 
     onQuestion: (id, question, options) => patch((m) => ({

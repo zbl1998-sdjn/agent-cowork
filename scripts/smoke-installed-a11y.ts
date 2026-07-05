@@ -88,7 +88,7 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '-').sl
 const reportPath = process.env.KCW_A11Y_REPORT_PATH || path.join(reportDir, `installed-a11y-${stamp}.json`);
 const installedExe = process.env.KCW_INSTALLED_EXE || path.join(process.env.LOCALAPPDATA || '', 'Agent Cowork', 'agent-cowork-desktop.exe');
 const workspace = process.env.KCW_A11Y_WORKSPACE || path.join(repoRoot, 'build', 'installed-a11y-workspace');
-const panelLabels = ['工具', '可视化', '连接器', '产物', '项目', '定时任务', '记忆', '可观测'];
+const panelLabels = ['工具', '可视化', '连接器', '产物', '项目', '定时任务', '记忆', '成本 · 可观测'];
 const settingsTabs = ['账户', '外观', '默认模型', '输入助手', '密钥', '组件', '更新', '健康检查'];
 
 function readNumber(value: unknown): number {
@@ -250,21 +250,35 @@ async function selectMode(sendPage: SendPage, mode: string): Promise<void> {
 
 async function openPanel(sendPage: SendPage, label: string): Promise<void> {
   await evaluate(sendPage, `new Promise((resolve, reject) => {
+    const normalizedLabel = ${JSON.stringify(label)}.replace(/\\s+/g, "");
     const more = document.querySelector("details.header-more");
     if (more && !more.open) {
       const summary = more.querySelector("summary");
       if (summary) summary.click();
       else more.setAttribute("open", "");
     }
-    const button = Array.from(document.querySelectorAll(".header-more-panel-grid button, .header-actions button"))
-      .find((item) => item.textContent?.trim() === ${JSON.stringify(label)});
+    const button = Array.from(document.querySelectorAll(".rail-nav-item, .header-more-panel-grid button, .header-actions button"))
+      .find((item) => {
+        const text = (item.textContent || "").trim();
+        const normalizedText = text.replace(/\\s+/g, "");
+        return text === ${JSON.stringify(label)}
+          || normalizedText === normalizedLabel
+          || normalizedText.includes(normalizedLabel)
+          || normalizedLabel.includes(normalizedText);
+      });
     if (!button) { reject(new Error("panel button missing: " + ${JSON.stringify(label)})); return; }
     button.click();
     const deadline = Date.now() + 5000;
     function tick() {
-      const drawer = document.querySelector(".side-drawer");
-      const loading = drawer?.textContent?.includes("正在加载面板");
-      if (drawer && !loading) {
+      const panel = document.querySelector(".main-panel") || document.querySelector(".side-drawer");
+      const title = panel?.querySelector(".main-panel-title")?.textContent?.trim() || "";
+      const normalizedTitle = title.replace(/\\s+/g, "");
+      const loading = panel?.textContent?.includes("正在加载");
+      const titleMatches = !title
+        || normalizedTitle === normalizedLabel
+        || normalizedTitle.includes(normalizedLabel)
+        || normalizedLabel.includes(normalizedTitle);
+      if (panel && !loading && titleMatches) {
         if (more) more.removeAttribute("open");
         requestAnimationFrame(() => requestAnimationFrame(resolve));
       }
@@ -281,8 +295,27 @@ async function openSettings(sendPage: SendPage, tab: string): Promise<void> {
     if (!existing) {
       const settings = Array.from(document.querySelectorAll(".header-quick-actions button, .header-actions button"))
         .find((item) => item.textContent?.includes("设置") || item.getAttribute("title")?.includes("设置"));
-      if (!settings) { reject(new Error("settings button missing")); return; }
-      settings.click();
+      if (settings) {
+        settings.click();
+      } else {
+        const commandButton = document.querySelector(".header-cmdk")
+          || Array.from(document.querySelectorAll(".header-actions button"))
+            .find((item) => item.getAttribute("title")?.includes("命令面板"));
+        if (!commandButton) { reject(new Error("settings command entry missing")); return; }
+        commandButton.click();
+        const commandDeadline = Date.now() + 3000;
+        function chooseCommand() {
+          const command = Array.from(document.querySelectorAll(".cmdk-item"))
+            .find((item) => item.textContent?.includes("API 设置"));
+          if (command) {
+            command.click();
+            return;
+          }
+          if (Date.now() > commandDeadline) reject(new Error("settings command missing"));
+          else setTimeout(chooseCommand, 50);
+        }
+        chooseCommand();
+      }
     }
     const deadline = Date.now() + 5000;
     function chooseTab() {
@@ -538,28 +571,25 @@ async function main(): Promise<void> {
       mobile: true,
     });
     mobileComposer = await evaluate(sendPage, `new Promise((resolve, reject) => {
-      const insert = document.querySelector("details.composer-insert");
-      if (!insert) { reject(new Error("composer insert missing")); return; }
-      if (!insert.open) {
-        const summary = insert.querySelector("summary");
-        if (summary) summary.click();
-        else insert.setAttribute("open", "");
-      }
-      requestAnimationFrame(() => {
-        const advanced = document.querySelector("details.composer-advanced");
-        if (!advanced) { reject(new Error("composer advanced missing")); return; }
-        if (!advanced.open) {
-          const summary = advanced.querySelector("summary");
-          if (summary) summary.click();
-          else advanced.setAttribute("open", "");
+      const back = document.querySelector(".main-panel-back");
+      if (back) back.click();
+      const deadline = Date.now() + 5000;
+      function waitForComposer() {
+        const composer = document.querySelector(".composer");
+        if (!composer) {
+          if (Date.now() > deadline) { reject(new Error("composer missing")); return; }
+          setTimeout(waitForComposer, 100);
+          return;
         }
         requestAnimationFrame(() => requestAnimationFrame(() => {
           const doc = document.documentElement;
           const selectors = [
+            ".composer",
+            ".composer textarea",
             ".composer-footer",
-            ".composer-insert-body",
-            ".composer-tools",
-            ".composer-advanced-body",
+            ".composer-footer-left",
+            ".composer-triggers",
+            ".composer-footer-right",
             ".provider-select",
             ".model-input",
             ".thinking-select",
@@ -588,13 +618,14 @@ async function main(): Promise<void> {
               scrollWidth: doc.scrollWidth
             },
             pageOverflow: doc.scrollWidth > doc.clientWidth + 1,
-            insertOpen: insert.open === true,
-            advancedOpen: advanced.open === true,
+            composerVisible: true,
+            controlsVisible: elements.every((item) => !item.missing),
             elementOverflows: elements.filter((item) => item.overflows || item.missing),
             elements
           });
         }));
-      });
+      }
+      waitForComposer();
     })`) as Record<string, unknown>;
 
     axSummary = await readAxSummary(sendPage);
@@ -611,8 +642,8 @@ async function main(): Promise<void> {
       : [];
     const mobileComposerOk = isRecord(mobileComposer)
       && mobileComposer.pageOverflow === false
-      && mobileComposer.insertOpen === true
-      && mobileComposer.advancedOpen === true
+      && mobileComposer.composerVisible === true
+      && mobileComposer.controlsVisible === true
       && mobileElementOverflows.length === 0;
     const ok = allIssues.length === 0
       && sendButtonMinContrast >= 4.5

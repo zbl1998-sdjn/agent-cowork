@@ -5,9 +5,10 @@
 // 依赖:同层 kimi.js 的 parseOpenAiCompatibleStream;其余仅标准库。
 // 导出:createOpenAiCompatibleProvider(通用工厂)、createOpenAiProvider、
 //       createLocalOpenAiCompatibleProvider(供注册表登记)。
-import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+import type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult } from './types.js';
 import { parseOpenAiCompatibleStream } from './kimi.js';
 import { omitUndefined } from '../../util/object.js';
+import { providerChatResultFromMessage } from './result.js';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
@@ -36,17 +37,13 @@ function providerMessage(id: string, message: string): string {
   return message || `未配置 ${id} 模型提供商。请配置 baseUrl、model 和 API key 后重试。`;
 }
 
-function jsonMessage(payload: unknown): Record<string, unknown> {
+function jsonMessage(payload: unknown): ProviderChatResult {
   const body = payload && typeof payload === 'object'
     ? payload as { choices?: Array<{ message?: Record<string, unknown> & { usage?: unknown } }>; usage?: unknown }
     : {};
   const message = body.choices?.[0]?.message || { content: '' };
-  return {
-    ...message,
-    usage: body.usage || message.usage,
-  };
+  return providerChatResultFromMessage(message, body.usage || message.usage);
 }
-
 /** 派生一个 OpenAI 兼容 Provider(参数化 id/baseUrl/是否需要 key/未配置文案)。 */
 export function createOpenAiCompatibleProvider({
   id = 'openai-compatible',
@@ -65,7 +62,7 @@ export function createOpenAiCompatibleProvider({
       onReasoning,
       signal,
       promptCacheKey,
-    }: ProviderChatArgs): Promise<Record<string, unknown>> {
+    }: ProviderChatArgs): Promise<ProviderChatResult> {
       const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const baseUrl = trimBaseUrl(config.baseUrl || defaultBaseUrl);

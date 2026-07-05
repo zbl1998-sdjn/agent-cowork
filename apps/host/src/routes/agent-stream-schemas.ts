@@ -14,6 +14,13 @@ const requestBudgetSchema = z.object({
   maxWallClockMs: numericLimitSchema.optional(),
 }).loose();
 
+const contextCompactionSchema = z.object({
+  enabled: z.boolean().optional(),
+  maxContextTokens: numericLimitSchema.optional(),
+  keepRecentMessages: numericLimitSchema.optional(),
+  maxFacts: numericLimitSchema.optional(),
+}).loose();
+
 export const agentStreamBodySchema = z.object({
   prompt: z.string().optional(),
   conversationId: z.string().optional(),
@@ -30,6 +37,11 @@ export const agentStreamBodySchema = z.object({
   mode: z.string().max(64).optional(),
   clarifyBeforeModel: z.boolean().optional(),
   autoClarify: z.boolean().optional(),
+  contextCompaction: contextCompactionSchema.optional(),
+  autoCompactContext: z.boolean().optional(),
+  maxContextTokens: numericLimitSchema.optional(),
+  keepRecentMessages: numericLimitSchema.optional(),
+  maxContextFacts: numericLimitSchema.optional(),
   trustedRoot: z.unknown().optional(),
   modelConfig: z.unknown().optional(),
   kimiConfig: z.unknown().optional(),

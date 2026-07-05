@@ -15,6 +15,7 @@ import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
 import { ConversationRail } from './components/ConversationRail';
 import { AppHeader, type AgentMode } from './components/AppHeader';
+import { SecurityStatusBar } from './components/SecurityStatusBar';
 import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
@@ -27,6 +28,7 @@ import { useStickToBottom } from './hooks/useStickToBottom';
 import { useConversations } from './hooks/useConversations';
 import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
+import { useAgentTeamTimeline } from './hooks/useAgentTeamTimeline';
 
 type ImportedRecipeResponse = {
   recipe: {
@@ -54,6 +56,7 @@ export function App() {
     applyKimiInfo,
     authReady,
     autoClarify,
+    autoContextCompaction,
     chatEnabled,
     closeSettings,
     cmdkOpen,
@@ -74,7 +77,9 @@ export function App() {
     openSettingsFromOnboarding,
     openSettingsTabFromOnboarding,
     recipes,
+    securityStatus,
     setAutoClarify,
+    setAutoContextCompaction,
     setChatEnabled,
     setCmdkOpen,
     setFontFamily,
@@ -89,6 +94,7 @@ export function App() {
     upsertRecipe,
     user,
   } = useAppRuntimeState();
+  const agentTeamTimeline = useAgentTeamTimeline({ enabled: Boolean(user) });
   const [composerDraft, setComposerDraft] = useState<ComposerDraftPreview>(() => ({
     text: '',
     files: [],
@@ -212,9 +218,10 @@ export function App() {
         images: uploaded.filter((p) => isImagePath(p)),
         resumeRunId,
         conversationId: conversations.activeConvId,
+        autoContextCompaction,
       }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
-  }, [autoApprove, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
+  }, [autoApprove, autoContextCompaction, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
@@ -283,6 +290,7 @@ export function App() {
       <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} panel={panel} onNavigate={togglePanel} />
       <div className="app-content">
         <AppHeader mode={mode} theme={theme} trustedRoot={trustedRoot} user={user} sidebarCollapsed={sidebarCollapsed} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onToggleTheme={toggleTheme} onToggleSidebar={() => setSidebarCollapsed((v) => !v)} />
+        <SecurityStatusBar status={securityStatus} />
         {panel !== 'none' ? (
           <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
         ) : (
@@ -297,9 +305,9 @@ export function App() {
           <Icon name="sidebar" size={16} />
         </button>
       ) : (
-        <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
+        <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} agentTeamView={agentTeamTimeline.view} agentTeamLoading={agentTeamTimeline.loading} agentTeamError={agentTeamTimeline.error} onRefreshAgentTeam={agentTeamTimeline.refresh} onOpenRuns={() => setPanel('observability')} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
       ))}
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} autoContextCompaction={autoContextCompaction} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetAutoContextCompaction={setAutoContextCompaction} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );
 }

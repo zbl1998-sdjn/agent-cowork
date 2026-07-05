@@ -22,6 +22,7 @@ import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
+import { resolveAgentContextOptions } from './agent-stream-context.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
 import type { ModelCall } from '../kimi/agent/model-resilience.js';
@@ -181,6 +182,7 @@ export async function streamAgentChat({
     // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
     const memoryText = redactText(memory.text) || '';
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
+    const contextOptions = resolveAgentContextOptions(body);
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
@@ -222,6 +224,7 @@ export async function streamAgentChat({
       cacheKey: maseConversation,
       userContent,
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
+      contextOptions,
       budgetGuard,
       runTimeoutMs,
       checkpointer,

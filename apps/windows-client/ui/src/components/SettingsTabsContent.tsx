@@ -11,10 +11,10 @@ const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependencies
 const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((m) => ({ default: m.UpdatePanel })));
 
 const FALLBACK_MODEL_PROVIDERS: ModelProviderOption[] = [
-  { id: 'kimi-api', displayName: 'Kimi(月之暗面)', region: 'cn', protocol: 'openai-chat', defaultModel: 'kimi-k2.7-code', models: ['kimi-k2.7-code', 'kimi-k2.6'], defaultBaseUrl: 'https://api.moonshot.ai/v1', apiKeyEnv: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'], requiresApiKey: true, source: 'builtin' },
-  { id: 'ollama', displayName: 'Ollama', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen2.5:0.5b', models: ['qwen2.5:0.5b', 'qwen2.5:1.5b', 'qwen2.5:3b', 'qwen2.5:7b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
-  { id: 'openai/local', displayName: '本机 OpenAI-compatible', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen2.5:0.5b', models: ['qwen2.5:0.5b', 'qwen2.5:1.5b', 'qwen2.5:3b', 'qwen2.5:7b', 'deepseek-r1:7b', 'local-model'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
-  { id: 'lmstudio', displayName: 'LM Studio', region: 'local', protocol: 'openai-chat', defaultModel: 'local-model', models: ['local-model', 'qwen3', 'deepseek-r1', 'llama-3.1-8b-instruct'], defaultBaseUrl: 'http://127.0.0.1:1234/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
+  { id: 'kimi-api', displayName: 'Kimi(月之暗面)', region: 'cn', protocol: 'openai-chat', defaultModel: 'kimi-k2.7-code', models: ['kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6', 'kimi-k2.5'], defaultBaseUrl: 'https://api.moonshot.ai/v1', apiKeyEnv: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'], requiresApiKey: true, source: 'builtin' },
+  { id: 'ollama', displayName: 'Ollama', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen3', models: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
+  { id: 'openai/local', displayName: '本机 OpenAI-compatible', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen3', models: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'local-model'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
+  { id: 'lmstudio', displayName: 'LM Studio', region: 'local', protocol: 'openai-chat', defaultModel: 'local-model', models: ['local-model', 'qwen3', 'qwen3-coder', 'gpt-oss-20b', 'deepseek-r1', 'llama-3.1-8b-instruct'], defaultBaseUrl: 'http://127.0.0.1:1234/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
 ];
 
 const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
@@ -64,6 +64,8 @@ export interface SettingsTabsContentProps {
   onSetFontFamily: (family: AppFontFamily) => void;
   autoClarify: boolean;
   onSetAutoClarify: (enabled: boolean) => void;
+  autoContextCompaction: boolean;
+  onSetAutoContextCompaction: (enabled: boolean) => void;
   // model / api state
   provider: string;
   setProvider: (v: string) => void;
@@ -94,7 +96,7 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
   const {
     tab,
     username, tenantId, onLogout,
-    theme, onSetTheme, fontScale, onSetFontScale, fontFamily, onSetFontFamily, autoClarify, onSetAutoClarify,
+    theme, onSetTheme, fontScale, onSetFontScale, fontFamily, onSetFontFamily, autoClarify, onSetAutoClarify, autoContextCompaction, onSetAutoContextCompaction,
     provider, setProvider, providers, model, setModel, baseUrl, setBaseUrl,
     apiKey, setApiKey, hasKey, loading, busy, persist,
     selfCheck, scError, scLoading, onRefreshSelfCheck,
@@ -178,6 +180,11 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
             <SegmentedControl ariaLabel="发送前澄清" className="seg" value={autoClarify} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoClarify} />
           </div>
           <p className="modal-note">开启后,模糊请求(如「整理一下」)发出去之前,Kimi 会先反问一两个具体问题,确认要做什么,再开始干活。多花 3 秒,少返工一轮。</p>
+          <div className="set-row">
+            <span className="set-label">自动压缩上下文</span>
+            <SegmentedControl ariaLabel="自动压缩上下文" className="seg" value={autoContextCompaction} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoContextCompaction} />
+          </div>
+          <p className="modal-note">开启后,长对话会自动把较早消息折叠为摘要,减少超上下文失败和无效 token 消耗。</p>
         </div>
       )}
       {tab === 'api' && (

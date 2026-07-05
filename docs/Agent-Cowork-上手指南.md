@@ -15,10 +15,10 @@
 
 双击后按提示下一步完成,桌面 / 开始菜单会出现 **Agent Cowork** 图标。
 
-> **关于安全提示**:当前安装包是**自签名**的,首次运行 Windows SmartScreen 会弹"未知发布者"提示。确认来源可信后点 **"更多信息 → 仍要运行"** 即可。
-> 要彻底消除这个提示,需用真实 CA 代码签名证书(OV/EV)重新签名:
+> **关于安全提示**:内部测试安装包在接入真实 CA 证书前会显示"未知发布者"或未签名提示。确认来源可信后点 **"更多信息 → 仍要运行"** 即可。
+> 要彻底消除这个提示,需用真实 CA 代码签名证书(OV/EV)重新签名;优先使用已导入证书库的 thumbprint:
 > ```powershell
-> pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\sign-windows.ps1 -Pfx <你的证书.pfx> -Password (Read-Host -AsSecureString)
+> pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\sign-windows.ps1 -Thumbprint <证书指纹> -Files <安装包.exe>
 > ```
 
 ---

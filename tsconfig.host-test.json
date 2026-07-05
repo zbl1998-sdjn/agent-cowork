@@ -125,6 +125,8 @@
     "apps/host/test/oauth-permission-approvals.test.ts",
     "apps/host/test/object-utils.test.ts",
     "apps/host/test/onboarding.test.ts",
+    "apps/host/test/orchestrator-runtime.test.ts",
+    "apps/host/test/orchestrator-routes.test.ts",
     "apps/host/test/path-policy.test.ts",
     "apps/host/test/path-policy-create.test.ts",
     "apps/host/test/plan.test.ts",

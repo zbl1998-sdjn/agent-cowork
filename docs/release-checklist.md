@@ -12,6 +12,10 @@ Use this checklist for every milestone release.
 - [ ] Q8/R5: Windows installer or installed-client smoke status is recorded as JSON under `reports/windows-client-smoke/` with `npm run smoke:installed-tauri -- -DryRun` at minimum, and with the installed executable path when available. `smoke:windows-client` is the legacy C/Win32 source-build harness.
 - [ ] Known environment-only blockers are documented separately from code failures.
 - [ ] No secrets, local credentials, or generated private data are included.
+- [ ] Production signing credential is available before any executable release:
+  - Preferred: import a trusted CA code-signing cert with private key, then set `KCW_CODESIGN_THUMBPRINT`.
+  - Alternative: set `KCW_CODESIGN_PFX` and provide the password through `KCW_CODESIGN_PFX_PASSWORD` or a CI secret.
+  - Do not use `scripts/sign-windows.ps1 -SelfSigned` for production distribution.
 
 ## Dry Run
 
@@ -28,7 +32,7 @@ Confirm the plan includes:
 
 - `releases/v<semver>/VERSION.txt`
 - `releases/v<semver>/agent-cowork-v<semver>.bundle`
-- signing step using `scripts/sign-windows.ps1` when installers exist
+- production signing step using `scripts/sign-windows.ps1 -Thumbprint ...` or `-Pfx ...` when installers exist
 - installer archive copies from `installers/`
 - annotated git tag `v<semver>`
 
@@ -42,8 +46,10 @@ Only execute from a clean worktree:
 npm run ci
 $env:E2E_SMOKE_REAL = "1"; npm run smoke:e2e; Remove-Item Env:E2E_SMOKE_REAL
 $env:BENCH_FAIL_ON_REGRESSION = "1"; npm run bench; Remove-Item Env:BENCH_FAIL_ON_REGRESSION
+$env:KCW_CODESIGN_THUMBPRINT = "<trusted-code-signing-cert-thumbprint>"
 npm run smoke:installed-tauri -- -InstallerPath <path-to-installer> -InstalledExePath <path-to-installed-agent-cowork-desktop.exe>
 npm run release -- --version <semver> --execute
+Remove-Item Env:KCW_CODESIGN_THUMBPRINT
 ```
 
 Expected artifacts:

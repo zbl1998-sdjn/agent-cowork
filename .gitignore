@@ -51,6 +51,13 @@ reports/eval/
 # --- scratch run/output dirs (regenerable; never part of the release baseline) ---
 # Playwright screenshots, eval-replay records, dev-server logs and other run outputs.
 output/
+.planning/
+.playwright-mcp/
+composer-final.png
+composer-flat.png
+composer-flat2.png
+model-menu.png
+threecol-browser.png
 # Python bytecode cache emitted next to scripts/quality_gate.py.
 __pycache__/
 *.pyc

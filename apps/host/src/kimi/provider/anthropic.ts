@@ -6,7 +6,8 @@
 // 导出:parseAnthropicStream(流解析)、createAnthropicProvider(工厂,产出
 //       带 id/chatCompletion 的 Provider,供注册表 index 登记)。
 import { omitUndefined } from '../../util/object.js';
-import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+import type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult, ProviderToolCall, ProviderUsage } from './types.js';
+import { providerUsage } from './result.js';
 
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -21,8 +22,8 @@ type ChatTool = { function?: { name?: unknown; description?: unknown; parameters
 type ToolCallLike = { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
 type AnthropicMessage = { role: string; content: unknown[] };
 type AnthropicTool = { name: string; description: unknown; input_schema: unknown };
-type AnthropicToolBlock = { index: number; id: string; type: string; function: { name: string; arguments: string } };
-type UsageTotals = Record<string, number>;
+type AnthropicToolBlock = ProviderToolCall & { index: number; id: string; type: string };
+type UsageTotals = ProviderUsage;
 type StreamReader = { read(): Promise<{ value?: BufferSource; done?: boolean }> };
 type StreamHandlers = { onContent?: (delta: string) => void };
 type FetchLike = (
@@ -115,18 +116,18 @@ function mergeUsage(target: UsageTotals, usage: unknown = {}): void {
   target.total_tokens = (target.prompt_tokens || 0) + (target.completion_tokens || 0);
 }
 
-function fromAnthropicMessage(payload: unknown): Record<string, unknown> {
+function fromAnthropicMessage(payload: unknown): ProviderChatResult {
   let content = '';
-  const toolCalls: unknown[] = [];
+  const toolCalls: ProviderToolCall[] = [];
   const body = payload && typeof payload === 'object' ? payload as { content?: unknown[]; usage?: unknown } : {};
   for (const rawPart of Array.isArray(body.content) ? body.content : []) {
     const part = rawPart && typeof rawPart === 'object' ? rawPart as Record<string, unknown> : {};
     if (part.type === 'text') content += String(part.text || '');
     if (part.type === 'tool_use') {
       toolCalls.push({
-        id: part.id,
+        id: typeof part.id === 'string' && part.id ? part.id : `toolu_${toolCalls.length}`,
         type: 'function',
-        function: { name: part.name, arguments: JSON.stringify(part.input || {}) },
+        function: { name: String(part.name || ''), arguments: JSON.stringify(part.input || {}) },
       });
     }
   }
@@ -139,7 +140,7 @@ function fromAnthropicMessage(payload: unknown): Record<string, unknown> {
 export async function parseAnthropicStream(
   reader: StreamReader,
   { onContent }: StreamHandlers = {},
-): Promise<Record<string, unknown>> {
+): Promise<ProviderChatResult> {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
@@ -148,7 +149,7 @@ export async function parseAnthropicStream(
   const finish = () => ({
     content,
     tool_calls: toolBlocks.size ? [...toolBlocks.values()].sort((a, b) => a.index - b.index).map(({ index: _index, ...call }) => call) : undefined,
-    usage,
+    usage: providerUsage(usage) || undefined,
   });
   for (;;) {
     const { value, done } = await reader.read();
@@ -187,7 +188,7 @@ export async function parseAnthropicStream(
 export function createAnthropicProvider(): Provider {
   return {
     id: 'anthropic',
-    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal }: ProviderChatArgs): Promise<Record<string, unknown>> {
+    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal }: ProviderChatArgs): Promise<ProviderChatResult> {
       const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const model = String(config.model || '').trim();

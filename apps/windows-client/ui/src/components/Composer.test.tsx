@@ -63,7 +63,8 @@ describe('Composer', () => {
     expect(html).toContain('value="ollama"');
     expect(html).toContain('value="openai/local"');
     expect(html).toContain('value="lmstudio"');
-    expect(html).toContain('title="本轮模型"');
+    expect(html).toContain('class="model-picker"'); // 模型选择器(精选菜单 + 手输)
+    expect(html).toContain('aria-label="本轮模型"');
     expect(html).toContain('type="file"');
     expect(html).toContain('multiple=""');
     expect(html).toContain('aria-label="选择附件文件"');
@@ -79,7 +80,8 @@ describe('Composer', () => {
 
     expect(html).toContain('value="deepseek"');
     expect(html).toContain('DeepSeek');
-    expect(html).toContain('value="deepseek-v4-flash"');
+    // 模型全量改精选菜单(交互展开选或手输),SSR 收起态不渲染具体 model option
+    expect(html).toContain('class="model-picker"');
     expect(html).not.toContain('DEEPSEEK_API_KEY');
     expect(html).not.toContain('type="password"');
   });
@@ -87,11 +89,8 @@ describe('Composer', () => {
   it('keeps multiple local fallback models available before host catalog loads', () => {
     const html = renderComposerWithFallbackOllama();
 
-    expect(html).toContain('value="ollama"');
-    expect(html).toContain('value="qwen2.5:0.5b"');
-    expect(html).toContain('value="qwen2.5:7b"');
-    expect(html).toContain('value="deepseek-r1:7b"');
-    expect(html).toContain('value="minicpm-v4.5:latest"');
+    expect(html).toContain('value="ollama"'); // provider 下拉含 ollama
+    expect(html).toContain('class="model-picker"'); // 模型精选菜单(展开可选本地模型,或手输)
   });
 
   it('deduplicates dropped or selected files by browser file identity', () => {

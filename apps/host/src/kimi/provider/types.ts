@@ -2,9 +2,41 @@
 // ---------------------------------------------------------------------------
 // 职责:给 provider 注册表、适配器与调用方提供同层类型,不承载运行时代码。
 
+export type ProviderToolCall = {
+  id?: string | undefined;
+  type?: string | undefined;
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+export type ProviderUsage = {
+  prompt_tokens?: number | undefined;
+  completion_tokens?: number | undefined;
+  total_tokens?: number | undefined;
+  input_tokens?: number | undefined;
+  output_tokens?: number | undefined;
+  cached_tokens?: number | undefined;
+  prompt_cache_hit_tokens?: number | undefined;
+} & Record<string, number | string | boolean | null | undefined>;
+
+export type ProviderChatResult = {
+  content: string;
+  reasoning_content?: string | undefined;
+  tool_calls?: ProviderToolCall[] | undefined;
+  partial_tool_calls?: ProviderToolCall[] | undefined;
+  usage?: ProviderUsage | null | undefined;
+  provider?: string | undefined;
+  model?: string | undefined;
+  finish_reason?: string | undefined;
+  stream_interrupted?: boolean | undefined;
+  stream_error?: string | undefined;
+};
+
 export type Provider = {
   id: string;
-  chatCompletion(args: ProviderChatArgs): unknown | Promise<unknown>;
+  chatCompletion(args: ProviderChatArgs): ProviderChatResult | Promise<ProviderChatResult>;
 };
 
 export type ModelConfig = Record<string, unknown> & {

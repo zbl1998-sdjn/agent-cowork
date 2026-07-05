@@ -13,7 +13,7 @@ import {
   type KimiInfo,
   type ModelProviderOption,
 } from '../lib/api';
-import { AUTO_CLARIFY_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
+import { AUTO_CLARIFY_KEY, AUTO_CONTEXT_COMPACTION_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
 import { buildContextualStarters } from '../lib/starter-suggestions';
 import type { WorkspaceInfo } from '../lib/app-types';
 import { ONBOARDING_DONE_KEY } from '../lib/onboarding';
@@ -121,6 +121,12 @@ export function useAppRuntimeState() {
   const [autoClarify, setAutoClarify] = useState(() => {
     try { return localStorage.getItem(AUTO_CLARIFY_KEY) === '1'; } catch { return false; }
   });
+  const [autoContextCompaction, setAutoContextCompaction] = useState(() => {
+    try {
+      const value = localStorage.getItem(AUTO_CONTEXT_COMPACTION_KEY);
+      return value == null ? true : value === '1';
+    } catch { return true; }
+  });
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try { return localStorage.getItem('kcw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
@@ -185,6 +191,10 @@ export function useAppRuntimeState() {
   useEffect(() => {
     try { localStorage.setItem(AUTO_CLARIFY_KEY, autoClarify ? '1' : '0'); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [autoClarify]);
+
+  useEffect(() => {
+    try { localStorage.setItem(AUTO_CONTEXT_COMPACTION_KEY, autoContextCompaction ? '1' : '0'); } catch { /* 本地存储不可用时只保留内存状态 */ }
+  }, [autoContextCompaction]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -258,6 +268,7 @@ export function useAppRuntimeState() {
     applyKimiInfo,
     authReady,
     autoClarify,
+    autoContextCompaction,
     chatEnabled,
     closeSettings: () => setSettingsOpen(false),
     cmdkOpen,
@@ -279,6 +290,7 @@ export function useAppRuntimeState() {
     openSettingsTabFromOnboarding,
     recipes,
     setAutoClarify,
+    setAutoContextCompaction,
     setChatEnabled,
     setCmdkOpen,
     setFontFamily,

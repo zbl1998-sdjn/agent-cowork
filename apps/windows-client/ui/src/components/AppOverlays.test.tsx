@@ -19,6 +19,7 @@ function renderOverlays({ settingsOpen = false, onboardingOpen = false } = {}): 
       trustedRoot="C:/work"
       user={user}
       autoClarify={false}
+      autoContextCompaction={true}
       onCloseCommandPalette={vi.fn()}
       onCompleteOnboarding={vi.fn()}
       onClosePreview={vi.fn()}
@@ -27,6 +28,7 @@ function renderOverlays({ settingsOpen = false, onboardingOpen = false } = {}): 
       onLogout={vi.fn()}
       onSettingsSaved={vi.fn()}
       onSetAutoClarify={vi.fn()}
+      onSetAutoContextCompaction={vi.fn()}
       onSetTheme={vi.fn()}
       onSetFontScale={vi.fn()}
       onSetFontFamily={vi.fn()}

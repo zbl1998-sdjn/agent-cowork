@@ -12,7 +12,9 @@ function renderSettings(initialTab: SettingsTab): string {
       fontScale="normal"
       fontFamily="system"
       autoClarify={false}
+      autoContextCompaction={true}
       onSetAutoClarify={vi.fn()}
+      onSetAutoContextCompaction={vi.fn()}
       onSetTheme={vi.fn()}
       onSetFontScale={vi.fn()}
       onSetFontFamily={vi.fn()}

@@ -128,10 +128,12 @@ export function AppComposerDock({
   onSearchFiles,
   onSend,
   onStopStreaming,
+  onUploadTemplates,
 }: AppComposerDockProps) {
   return (
     <footer className="composer-dock">
       <AppComposerDockStatus selectedRecipe={selectedRecipe} streamingId={streamingId} onClearRecipe={onClearRecipe} onStopStreaming={onStopStreaming} />
+      <TemplateUploadBar onUploadTemplates={onUploadTemplates} />
       <Composer
         recipes={recipes}
         historyRuns={history}

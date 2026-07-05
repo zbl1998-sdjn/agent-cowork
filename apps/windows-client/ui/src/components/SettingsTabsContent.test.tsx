@@ -9,7 +9,7 @@ const providers: ModelProviderOption[] = [
   { id: 'openai/local', displayName: 'Local', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen2.5-coder:7b', models: ['qwen2.5-coder:7b'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, source: 'builtin' },
 ];
 
-function render(tab: 'appearance' | 'model' | 'api'): string {
+function render(tab: 'appearance' | 'model' | 'api' | 'input'): string {
   const persist = vi.fn<(payload: SettingsPersistPayload, okMsg: string) => void>();
   return renderToStaticMarkup(
     <SettingsTabsContent
@@ -25,6 +25,8 @@ function render(tab: 'appearance' | 'model' | 'api'): string {
       onSetFontFamily={vi.fn()}
       autoClarify={false}
       onSetAutoClarify={vi.fn()}
+      autoContextCompaction={true}
+      onSetAutoContextCompaction={vi.fn()}
       provider="deepseek"
       setProvider={vi.fn()}
       providers={providers}
@@ -75,5 +77,11 @@ describe('SettingsTabsContent provider catalog', () => {
     expect(html).toContain('>大</button>');
     expect(html).toContain('>中文</button>');
     expect(html).toContain('aria-pressed="true"');
+  });
+  it('renders automatic context compaction in input settings', () => {
+    const html = render('input');
+
+    expect(html).toContain('aria-label="自动压缩上下文"');
+    expect(html).toContain('自动压缩上下文');
   });
 });

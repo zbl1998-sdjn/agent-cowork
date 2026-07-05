@@ -6,7 +6,8 @@
 // 导出:createKimiProvider(工厂,供注册表登记)、parseOpenAiCompatibleStream(共用流解析)。
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
 import { omitUndefined } from '../../util/object.js';
-import type { Provider, ProviderChatArgs } from './types.js';
+import type { Provider, ProviderChatArgs, ProviderChatResult, ProviderToolCall, ProviderUsage } from './types.js';
+import { providerChatResultFromMessage, providerUsage } from './result.js';
 
 type StreamToolCallDelta = {
   id?: string;
@@ -14,8 +15,8 @@ type StreamToolCallDelta = {
   index?: number;
   function?: { name?: string; arguments?: string };
 };
-type ToolCall = { id: string; type: string; function: { name: string; arguments: string } };
-type SplitToolCalls = { executable: ToolCall[]; partial: ToolCall[] };
+type ToolCall = ProviderToolCall & { id: string; type: string };
+type SplitToolCalls = { executable: ProviderToolCall[]; partial: ProviderToolCall[] };
 type StreamReader = { read(): Promise<{ value?: BufferSource; done?: boolean }> };
 type StreamHandlers = {
   onContent?: (delta: string) => void;
@@ -48,7 +49,7 @@ export function createKimiProvider(): Provider {
       onReasoning,
       signal,
       promptCacheKey,
-    }: ProviderChatArgs): Promise<unknown> {
+    }: ProviderChatArgs): Promise<ProviderChatResult> {
       if (!kimiConfig || !kimiConfig.apiKey) {
         throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
       }
@@ -82,18 +83,18 @@ export function createKimiProvider(): Provider {
       }
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
       if (!reader) {
-        const json = await resp.json() as { choices?: Array<{ message?: unknown }> };
-        return (json.choices && json.choices[0] && json.choices[0].message) || { content: '' };
+        const json = await resp.json() as { choices?: Array<{ message?: unknown }>; usage?: unknown };
+        const message = json.choices && json.choices[0] && json.choices[0].message;
+        return providerChatResultFromMessage(message, json.usage);
       }
       return parseOpenAiCompatibleStream(reader, omitUndefined({ onContent, onReasoning }));
     },
   };
 }
 
-function hasCompleteToolCallArguments(call: unknown): boolean {
-  const item = call && typeof call === 'object' ? call as Partial<ToolCall> : {};
-  const fn: Partial<ToolCall['function']> = item.function || {};
-  const rawArgs = typeof fn.arguments === 'string' ? fn.arguments.trim() : '';
+function hasCompleteToolCallArguments(call: ProviderToolCall): boolean {
+  const fn = call.function;
+  const rawArgs = fn.arguments.trim();
   if (!fn.name || !rawArgs) return false;
   try {
     JSON.parse(rawArgs);
@@ -102,7 +103,6 @@ function hasCompleteToolCallArguments(call: unknown): boolean {
     return false;
   }
 }
-
 function splitInterruptedToolCalls(calls: ToolCall[], interrupted: boolean): SplitToolCalls {
   if (!interrupted) return { executable: calls, partial: [] };
   const executable: ToolCall[] = [];
@@ -118,12 +118,12 @@ function splitInterruptedToolCalls(calls: ToolCall[], interrupted: boolean): Spl
 export async function parseOpenAiCompatibleStream(
   reader: StreamReader,
   { onContent, onReasoning }: StreamHandlers = {},
-): Promise<Record<string, unknown>> {
+): Promise<ProviderChatResult> {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
   let reasoning = '';
-  let usage: unknown = null;
+  let usage: ProviderUsage | null | undefined;
   let interrupted = false;
   let streamError = '';
   const toolCalls: ToolCall[] = [];
@@ -136,7 +136,7 @@ export async function parseOpenAiCompatibleStream(
       reasoning_content: reasoning || undefined,
       tool_calls: executable.length ? executable : undefined,
       partial_tool_calls: partial.length ? partial : undefined,
-      usage,
+      ...(usage !== undefined ? { usage } : {}),
       ...(interrupted ? {
         stream_interrupted: true,
         finish_reason: 'stream_interrupted',
@@ -176,7 +176,7 @@ export async function parseOpenAiCompatibleStream(
         continue;
       }
       json = json && typeof json === 'object' ? json : {};
-      if (json.usage) usage = json.usage;
+      if (json.usage) usage = providerUsage(json.usage);
       const firstChoice = json.choices?.[0];
       const delta = firstChoice ? (firstChoice.delta || {}) : {};
       if (typeof delta.reasoning_content === 'string') {

@@ -29,7 +29,9 @@ interface SettingsProps {
   fontScale: AppFontScale;
   fontFamily: AppFontFamily;
   autoClarify: boolean;
+  autoContextCompaction: boolean;
   onSetAutoClarify: (enabled: boolean) => void;
+  onSetAutoContextCompaction: (enabled: boolean) => void;
   onSetTheme: (t: 'light' | 'dark') => void;
   onSetFontScale: (scale: AppFontScale) => void;
   onSetFontFamily: (family: AppFontFamily) => void;
@@ -41,7 +43,7 @@ interface SettingsProps {
 // 统一设置中心:账户/外观/模型/API/健康检查在一个模态框里。
 // API key 只展示 hasKey 标记,绝不回显;保存空 key 会保留原 key。
 // 模态框状态与持久化留在此处,各标签正文放进 SettingsTabsContent 以控制文件体量。
-export function Settings({ initialTab = 'account', username, tenantId, theme, fontScale, fontFamily, autoClarify, onSetAutoClarify, onSetTheme, onSetFontScale, onSetFontFamily, onLogout, onClose, onSaved }: SettingsProps) {
+export function Settings({ initialTab = 'account', username, tenantId, theme, fontScale, fontFamily, autoClarify, autoContextCompaction, onSetAutoClarify, onSetAutoContextCompaction, onSetTheme, onSetFontScale, onSetFontFamily, onLogout, onClose, onSaved }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [apiKey, setApiKey] = useState('');
   const [provider, setProvider] = useState('kimi-api');
@@ -136,6 +138,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
             fontScale={fontScale} onSetFontScale={onSetFontScale}
             fontFamily={fontFamily} onSetFontFamily={onSetFontFamily}
             autoClarify={autoClarify} onSetAutoClarify={onSetAutoClarify}
+            autoContextCompaction={autoContextCompaction} onSetAutoContextCompaction={onSetAutoContextCompaction}
             provider={provider} setProvider={setProvider}
             providers={providers}
             model={model} setModel={setModel}

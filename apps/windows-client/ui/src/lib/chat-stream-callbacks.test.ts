@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyToolResult, buildChatStreamCallbacks, humanizeChatTurnError } from './chat-stream-callbacks';
+import { applyToolResult, buildChatStreamCallbacks, contextCompactionProgressText, humanizeChatTurnError } from './chat-stream-callbacks';
 import type { AssistantMessage } from './app-types';
 
 function emptyAssistant(): AssistantMessage {
@@ -56,7 +56,16 @@ describe('buildChatStreamCallbacks', () => {
     expect(tools[0]!.startedAt).toBeTypeOf('number');
   });
 
-  it('onDone clears streamingId and finalises text/usage', () => {
+
+  it('onContextCompacted appends a visible progress line', () => {
+    const { cb, getState } = makeHarness();
+    cb.onContextCompacted?.({ beforeTokens: 12345, afterTokens: 6789, keyFacts: ['important: keep context'] });
+
+    expect(getState().progress).toEqual([
+      { status: 'done', text: '已自动压缩上下文:12.3K tokens -> 6.8K tokens' },
+    ]);
+    expect(contextCompactionProgressText({})).toBe('已自动压缩上下文');
+  });  it('onDone clears streamingId and finalises text/usage', () => {
     const { cb, getState, setStreamingId } = makeHarness();
     cb.onToken?.('partial');
     cb.onDone?.({ text: 'final answer', runId: 'r1', usage: { total_tokens: 42 } });

@@ -16,8 +16,8 @@ export type { ComposerDraftPreview, ComposerMeta, ComposerProps, FileHit, Histor
 export type { ThinkingLevel } from './ComposerFooter';
 
 const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
-  ollama: ['qwen2.5:0.5b', 'qwen2.5:1.5b', 'qwen2.5:3b', 'qwen2.5:7b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'],
-  'openai/local': ['qwen2.5:0.5b', 'qwen2.5:1.5b', 'qwen2.5:3b', 'qwen2.5:7b', 'deepseek-r1:7b', 'local-model'],
+  ollama: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'],
+  'openai/local': ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'local-model'],
   lmstudio: ['local-model', 'qwen3', 'qwen3-coder', 'deepseek-r1', 'llama-3.1-8b-instruct', 'gpt-oss-20b'],
 };
 

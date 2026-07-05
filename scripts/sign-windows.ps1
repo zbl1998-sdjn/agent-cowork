@@ -16,6 +16,11 @@
     -Thumbprint <sha1>                 sign with a cert already in the cert store
     -SelfSigned                        generate/reuse a dev self-signed cert
 
+  For non-interactive release automation, PFX mode may read the password from
+  KCW_CODESIGN_PFX_PASSWORD or WINDOWS_SIGNING_PFX_PASSWORD. Prefer
+  -Thumbprint with a cert already imported into the Windows certificate store
+  when possible, so the PFX password never needs to enter process arguments.
+
 .EXAMPLE
   # Real certificate (recommended for distribution):
   ./sign-windows.ps1 -Pfx C:\secrets\codesign.pfx -Password (Read-Host -AsSecureString)
@@ -55,6 +60,15 @@ function Find-SignTool {
   throw 'signtool.exe not found. Install the Windows 10/11 SDK (Windows Kits).'
 }
 
+function Read-FirstEnvValue {
+  param([string[]] $Names)
+  foreach ($name in $Names) {
+    $value = [Environment]::GetEnvironmentVariable($name)
+    if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+  }
+  return $null
+}
+
 # Default to installers produced by `cargo tauri build`, copied into installers\.
 if (-not $Files -or $Files.Count -eq 0) {
   $installerDir = Join-Path $repoRoot 'installers'
@@ -77,11 +91,22 @@ $credArgs = @()
 $selfCertThumb = $null
 switch ($PSCmdlet.ParameterSetName) {
   'Pfx' {
-    if (-not (Test-Path $Pfx)) { throw "PFX not found: $Pfx" }
+    if (-not (Test-Path -LiteralPath $Pfx)) { throw "PFX not found: $Pfx" }
     $credArgs += @('/f', $Pfx)
+    if (-not $Password) {
+      $envPassword = Read-FirstEnvValue -Names @('KCW_CODESIGN_PFX_PASSWORD', 'WINDOWS_SIGNING_PFX_PASSWORD')
+      if ($envPassword) {
+        $Password = ConvertTo-SecureString -String $envPassword -AsPlainText -Force
+        Write-Host 'Using PFX password from environment variable (value hidden).'
+      }
+    }
     if ($Password) {
-      $plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password))
+      $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+      try {
+        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+      } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+      }
       $credArgs += @('/p', $plain)
     }
   }

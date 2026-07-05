@@ -168,7 +168,8 @@ export async function evaluate(sendPage: SendPage, expression: string, awaitProm
   });
   if (result.exceptionDetails) {
     const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate failed';
-    throw new Error(detail);
+    const preview = expression.length > 1200 ? expression.slice(0, 1200) + '...' : expression;
+    throw new Error(detail + '\nExpression preview:\n' + preview);
   }
   return result.result?.value;
 }

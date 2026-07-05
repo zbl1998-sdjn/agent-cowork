@@ -27,6 +27,7 @@ interface AppOverlaysProps {
   trustedRoot: string;
   user: AuthIdentity;
   autoClarify: boolean;
+  autoContextCompaction: boolean;
   onCloseCommandPalette: () => void;
   onCompleteOnboarding: () => void;
   onClosePreview: () => void;
@@ -36,6 +37,7 @@ interface AppOverlaysProps {
   onLogout: () => void;
   onSettingsSaved: (info: KimiInfo) => void;
   onSetAutoClarify: (enabled: boolean) => void;
+  onSetAutoContextCompaction: (enabled: boolean) => void;
   onSetTheme: (theme: 'light' | 'dark') => void;
   onSetFontScale: (scale: AppFontScale) => void;
   onSetFontFamily: (family: AppFontFamily) => void;
@@ -54,6 +56,7 @@ export function AppOverlays({
   trustedRoot,
   user,
   autoClarify,
+  autoContextCompaction,
   onCloseCommandPalette,
   onCompleteOnboarding,
   onClosePreview,
@@ -63,6 +66,7 @@ export function AppOverlays({
   onLogout,
   onSettingsSaved,
   onSetAutoClarify,
+  onSetAutoContextCompaction,
   onSetTheme,
   onSetFontScale,
   onSetFontFamily,
@@ -89,7 +93,9 @@ export function AppOverlays({
             fontScale={fontScale}
             fontFamily={fontFamily}
             autoClarify={autoClarify}
+            autoContextCompaction={autoContextCompaction}
             onSetAutoClarify={onSetAutoClarify}
+            onSetAutoContextCompaction={onSetAutoContextCompaction}
             onSetTheme={onSetTheme}
             onSetFontScale={onSetFontScale}
             onSetFontFamily={onSetFontFamily}

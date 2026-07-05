@@ -63,6 +63,19 @@ export async function chatStream(
   });
 }
 
+export interface ContextCompactionConfig {
+  enabled?: boolean | undefined;
+  maxContextTokens?: number | undefined;
+  keepRecentMessages?: number | undefined;
+  maxFacts?: number | undefined;
+}
+
+export interface ContextCompactionStats {
+  beforeTokens?: number | undefined;
+  afterTokens?: number | undefined;
+  keyFacts?: string[] | undefined;
+}
+
 export interface AgentStreamHandlers {
   onToken?: ((delta: string) => void) | undefined;
   onApprovalRequest?: ((id: string, name: string, args: unknown) => void) | undefined;
@@ -76,6 +89,7 @@ export interface AgentStreamHandlers {
   onVerifyStart?: (() => void) | undefined;
   onQuestion?: ((id: string, question: string, options: Array<{ label: string; description?: string | undefined }>) => void) | undefined;
   onStart?: ((runId: string, meta?: { resumed?: boolean | undefined }) => void) | undefined;
+  onContextCompacted?: ((stats: ContextCompactionStats) => void) | undefined;
   onDone?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
   onCancelled?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
   onError?: ((message: string) => void) | undefined;
@@ -101,6 +115,19 @@ function usage(data: SsePayload): TokenUsage | undefined {
 function num(data: SsePayload, key: string): number | undefined {
   const value = data[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function stringList(data: SsePayload, key: string): string[] {
+  const value = data[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function contextCompactionStats(data: SsePayload): ContextCompactionStats {
+  return {
+    beforeTokens: num(data, 'beforeTokens'),
+    afterTokens: num(data, 'afterTokens'),
+    keyFacts: stringList(data, 'keyFacts'),
+  };
 }
 
 function questionOptions(data: SsePayload): Array<{ label: string; description?: string | undefined }> {
@@ -145,6 +172,7 @@ export async function agentChatStream(
     images?: string[] | undefined;
     resumeRunId?: string | undefined;
     conversationId?: string | undefined;
+    contextCompaction?: ContextCompactionConfig | undefined;
   } = {},
   handlers: AgentStreamHandlers = {},
 ): Promise<void> {
@@ -163,6 +191,7 @@ export async function agentChatStream(
       images: opts.images,
       resumeRunId: opts.resumeRunId,
       conversationId: opts.conversationId,
+      contextCompaction: opts.contextCompaction,
     }),
   });
   if (!response.ok || !response.body) {
@@ -186,6 +215,7 @@ export async function agentChatStream(
       handlers.onToolResult?.(str(data, 'name') || '', str(data, 'status') || 'succeeded', data.result, { durationMs: num(data, 'durationMs') });
     } else if (type === 'file_written') handlers.onFileWritten?.(str(data, 'path') || '');
     else if (type === 'verify_start') handlers.onVerifyStart?.();
+    else if (type === 'context_compacted') handlers.onContextCompacted?.(contextCompactionStats(data));
     else if (type === 'question') {
       handlers.onQuestion?.(str(data, 'id') || '', str(data, 'question') || '', questionOptions(data));
     } else if (type === 'done') {

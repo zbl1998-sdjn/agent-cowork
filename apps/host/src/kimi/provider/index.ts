@@ -10,9 +10,9 @@ import { createAnthropicProvider } from './anthropic.js';
 import { createKimiProvider } from './kimi.js';
 import { createLocalOpenAiCompatibleProvider, createOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
 import { MODEL_PROVIDER_CATALOG } from './catalog.js';
-import type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+import type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult } from './types.js';
 
-export type { ModelConfig, Provider, ProviderChatArgs } from './types.js';
+export type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult } from './types.js';
 export {
   composeFullModelId,
   defaultBaseUrlForProvider,
@@ -77,7 +77,7 @@ export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
 }
 
 // 统一发起一次对话补全,让调用方无需感知具体 provider 实现。
-export async function callProviderChatCompletion(args: ProviderChatArgs): Promise<unknown> {
+export async function callProviderChatCompletion(args: ProviderChatArgs): Promise<ProviderChatResult> {
   const provider = resolveModelProvider(args?.kimiConfig);
   return provider.chatCompletion(args);
 }
