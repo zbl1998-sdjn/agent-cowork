@@ -55,6 +55,12 @@ const MODELS_DEV_PROVIDER_IDS: Record<string, string> = {
   'siliconflow-cn': 'siliconflow-cn',
   openai: 'openai',
   anthropic: 'anthropic',
+  google: 'google',
+  xai: 'xai',
+  groq: 'groq',
+  mistral: 'mistral',
+  openrouter: 'openrouter',
+  perplexity: 'perplexity',
 };
 
 const DEFAULT_MODEL_HINTS: Record<string, string[]> = {
@@ -66,6 +72,12 @@ const DEFAULT_MODEL_HINTS: Record<string, string[]> = {
   'siliconflow-cn': ['Qwen/Qwen3-Coder-480B-A35B-Instruct', 'Pro/deepseek-ai/DeepSeek-V3.2'],
   openai: ['gpt-5.2', 'gpt-5', 'gpt-4.1'],
   anthropic: ['claude-sonnet-4-5', 'claude-sonnet-5'],
+  google: ['gemini-3-pro-preview', 'gemini-2.5-pro'],
+  xai: ['grok-4.3', 'grok-4.20-0309-reasoning'],
+  groq: ['llama-3.3-70b-versatile'],
+  mistral: ['mistral-large-latest', 'mistral-medium-latest'],
+  openrouter: ['anthropic/claude-sonnet-4.5'],
+  perplexity: ['sonar-pro', 'sonar'],
 };
 
 const MODEL_EXCLUDES: Record<string, string[]> = {

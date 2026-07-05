@@ -77,6 +77,8 @@
     "apps/host/src/kimi/protocol-info.ts",
     "apps/host/src/kimi/provider/anthropic.ts",
     "apps/host/src/kimi/provider/catalog.ts",
+    "apps/host/src/kimi/provider/catalog-data.ts",
+    "apps/host/src/kimi/provider/catalog-types.ts",
     "apps/host/src/kimi/provider/index.ts",
     "apps/host/src/kimi/provider/kimi.ts",
     "apps/host/src/kimi/provider/models-dev-catalog.ts",

@@ -2,9 +2,18 @@
 import type { ModelProviderOption } from '../lib/api/kimiConfig';
 
 const FALLBACK_PROVIDER_OPTIONS = [
-  { id: 'kimi-api', displayName: 'Kimi' },
+  { id: 'kimi-api', displayName: 'Kimi / Moonshot' },
+  { id: 'deepseek', displayName: 'DeepSeek' },
+  { id: 'qwen-dashscope-cn', displayName: 'Qwen / DashScope' },
+  { id: 'zai-glm', displayName: 'Z.ai / GLM' },
   { id: 'openai', displayName: 'OpenAI' },
-  { id: 'anthropic', displayName: 'Claude' },
+  { id: 'anthropic', displayName: 'Anthropic Claude' },
+  { id: 'google', displayName: 'Google Gemini' },
+  { id: 'xai', displayName: 'xAI Grok' },
+  { id: 'groq', displayName: 'Groq' },
+  { id: 'mistral', displayName: 'Mistral' },
+  { id: 'openrouter', displayName: 'OpenRouter' },
+  { id: 'perplexity', displayName: 'Perplexity' },
   { id: 'ollama', displayName: 'Ollama' },
   { id: 'openai/local', displayName: '本地 OpenAI-compatible' },
   { id: 'lmstudio', displayName: 'LM Studio' },
