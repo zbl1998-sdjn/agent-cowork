@@ -58,6 +58,8 @@ describe('ConversationRail', () => {
 
     expect(html).toContain('rail-brand');
     expect(html).toContain('Agent Cowork');
+    expect(html).toContain('rail-release-badge');
+    expect(html).toContain('Beta');
     expect(html).toContain('rail-new');
     expect(html).toContain('新建对话');
     expect(html.match(/rail-nav-item/g)?.length).toBe(8);

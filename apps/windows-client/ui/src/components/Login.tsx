@@ -56,6 +56,7 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
           <div className="auth-card-brand">
             <span className="brand-dot auth-brand-dot" aria-hidden="true" />
             <span>Agent Cowork</span>
+            <span className="auth-release-badge" title="Internal beta build">Beta</span>
           </div>
           <h1 className="auth-title">{mode === 'login' ? '登录' : '创建账户'}</h1>
           <p className="auth-sub">{mode === 'login' ? '继续你的本地工作。' : '创建本地账户，隔离你的工作数据。'}</p>

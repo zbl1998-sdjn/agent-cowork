@@ -48,6 +48,7 @@ export function ConversationRail({
       <div className="rail-brand">
         <span className="rail-brand-mark" aria-hidden="true"><Icon name="sparkle" size={16} /></span>
         <span className="rail-brand-name">Agent Cowork</span>
+        <span className="rail-release-badge" title="Internal beta build; suitable for small-circle testing">Beta</span>
       </div>
 
       <button type="button" className="rail-new" onClick={onNew}>

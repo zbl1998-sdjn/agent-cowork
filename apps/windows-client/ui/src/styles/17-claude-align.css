@@ -31,13 +31,21 @@
   overflow: hidden;
 }
 
-.rail-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 10px; flex-shrink: 0; }
+.rail-brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 10px; flex-shrink: 0; min-width: 0; }
 .rail-brand-mark {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 8px; color: #fff;
   background: linear-gradient(135deg, var(--align-accent), #d3855a);
 }
-.rail-brand-name { font-family: var(--app-font-family); font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--rail-ink); }
+.rail-brand-name { font-family: var(--app-font-family); font-size: 15px; font-weight: 600; color: var(--rail-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-release-badge,
+.auth-release-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 0; height: 18px; padding: 0 6px; border-radius: 5px;
+  background: color-mix(in srgb, #b5482f 14%, transparent); color: var(--align-accent);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  flex: 0 0 auto;
+}
 
 .rail-new {
   display: flex; align-items: center; gap: 9px; width: 100%;

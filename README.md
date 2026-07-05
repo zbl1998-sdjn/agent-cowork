@@ -7,6 +7,8 @@
 ![Security](https://img.shields.io/badge/red%20team-no%20high%20severity-success)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+> **Windows 安装包状态：Internal Beta / 朋友试用版。** 当前可分发文件是 `releases/Agent-Cowork-Setup-v0.2.0-internal-beta.exe` 与同名 `.sha256`。它已通过本地全量门禁、安装版 smoke、依赖审计和 secrets 扫描，适合小范围可信朋友试用；但安装包仍为 `NotSigned`，未完成 OV/EV 代码签名、正式 updater endpoint、clean tag release 和外部生产发布证据，因此不应标成公开生产版。
+
 一个生产级 Agentic Cowork 系统，让 AI Agent 真正帮你完成本地文件操作、代码执行和跨工具协作任务。
 
 **核心能力：**

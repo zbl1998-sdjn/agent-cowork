@@ -16,6 +16,8 @@ describe('Login', () => {
     expect(html).toContain('auth-guest');
     expect(html).toContain('auth-screen-quiet');
     expect(html).toContain('auth-card-brand');
+    expect(html).toContain('auth-release-badge');
+    expect(html).toContain('Beta');
     expect(html).toContain('跳过，先在本地使用 →');
     expect(html).not.toContain('auth-aside');
     expect(html).not.toContain('你的本地办公智能体');

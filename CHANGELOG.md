@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+### Changed
+
+- Marked the current Windows distributable and desktop shell as `Internal Beta` for small-circle testing, keeping production-release claims blocked on code signing, updater publishing, clean tag release, and external release evidence.
+
 ### Added (2.x milestone, backfilled 2026-07-04 — see `git log` for individual commits)
 
 - Optional MASE MCP long-term memory bridge integrated into the main agent chat stream: layered recall (thread timeline + structured facts + cross-session history) on read, write-back with fact extraction on success, 2.5s hard recall timeout with safe no-memory fallback.
