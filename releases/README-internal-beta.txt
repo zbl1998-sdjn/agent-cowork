@@ -4,6 +4,11 @@ This folder's current friend-test installer is:
 
 - Agent-Cowork-Setup-v0.2.0-internal-beta.exe
 - Agent-Cowork-Setup-v0.2.0-internal-beta.exe.sha256
+- INSTALL-Windows-internal-beta.md
+
+The friend-test zip package is:
+
+- Agent-Cowork-v0.2.0-internal-beta-windows-x64.zip
 
 Use scope:
 
@@ -20,3 +25,7 @@ Known release boundary:
 SHA256:
 
 72E79232C769547F8C73DAE2671B2BACA3FF1E98C994D5740C978C3C19E61388  Agent-Cowork-Setup-v0.2.0-internal-beta.exe
+
+Install guide:
+
+Read INSTALL-Windows-internal-beta.md before running the installer.

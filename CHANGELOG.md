@@ -9,6 +9,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 ### Changed
 
 - Marked the current Windows distributable and desktop shell as `Internal Beta` for small-circle testing, keeping production-release claims blocked on code signing, updater publishing, clean tag release, and external release evidence.
+- Added a friend-test zip package with a Windows install guide, bundled installer SHA256, and beta scope notes for safer small-circle distribution.
 
 ### Added (2.x milestone, backfilled 2026-07-04 — see `git log` for individual commits)
 
