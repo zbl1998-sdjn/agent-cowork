@@ -45,5 +45,37 @@ test('derived budget stays positive and clamps an out-of-range ratio', () => {
 
 test('resolveHistoryBudgetTokens returns a derived budget for known models, undefined otherwise', () => {
   assert.equal(resolveHistoryBudgetTokens({ provider: 'anthropic', model: 'claude-sonnet-5', inputRatio: 0.75 }), 150_000);
-  assert.equal(resolveHistoryBudgetTokens({ provider: 'mystery', model: 'unknown-model-x' }), undefined);
+  assert.equal(resolveHistoryBudgetTokens({ provider: 'mystery', model: 'unknown-model-x' }, {}), undefined);
+});
+
+test('explicit contextWindowTokens takes highest precedence (e.g. declared Ollama num_ctx)', () => {
+  assert.equal(
+    resolveHistoryBudgetTokens({ provider: 'openai/local', model: 'qwen2.5:0.5b', contextWindowTokens: 8192, inputRatio: 0.75 }, {}),
+    6_144,
+  );
+  // explicit window wins even when the family would say something bigger
+  assert.equal(
+    resolveHistoryBudgetTokens({ provider: 'openai/local', model: 'qwen2.5:0.5b', contextWindowTokens: 4096, inputRatio: 0.75 }, {}),
+    3_072,
+  );
+});
+
+test('env KCW_MODEL_CONTEXT_WINDOW supplies the window when no explicit value is passed', () => {
+  assert.equal(
+    resolveHistoryBudgetTokens(
+      { provider: 'openai/local', model: 'qwen2.5:0.5b', skipFamilyWindow: true, inputRatio: 0.75 },
+      { KCW_MODEL_CONTEXT_WINDOW: '8192' },
+    ),
+    6_144,
+  );
+});
+
+test('skipFamilyWindow avoids over-estimating local/BYO gateways (safety against overflow)', () => {
+  // openai/local + qwen would family-match to 131072 — dangerous for a short-num_ctx Ollama.
+  // With skipFamilyWindow and no explicit window, return undefined → caller keeps conservative default.
+  assert.equal(resolveModelContextWindowTokens({ provider: 'openai/local', model: 'qwen2.5:0.5b' }), 131_072);
+  assert.equal(
+    resolveHistoryBudgetTokens({ provider: 'openai/local', model: 'qwen2.5:0.5b', skipFamilyWindow: true }, {}),
+    undefined,
+  );
 });

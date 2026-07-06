@@ -57,6 +57,13 @@ function cleanId(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
 }
 
+function positiveInteger(value: unknown): number | undefined {
+  if (value == null || value === '') return undefined;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return undefined;
+  return Math.floor(num);
+}
+
 export type ModelWindowInput = { provider?: unknown; model?: unknown };
 
 /**
@@ -99,16 +106,32 @@ export function deriveHistoryBudgetTokens(
   return Math.min(upper, Math.max(MIN_BUDGET_TOKENS, budget));
 }
 
+export type HistoryBudgetInput = ModelWindowInput & {
+  // 显式声明的上下文窗口 token 数(最高优先级)。本地/BYO 网关(Ollama、LM Studio、
+  // 自建 OpenAI 兼容端点)的真实 num_ctx 无法从模型名静态推断,必须靠这个显式声明;
+  // 未传时回落环境变量 KCW_MODEL_CONTEXT_WINDOW。
+  contextWindowTokens?: number;
+  inputRatio?: number;
+  // 跳过「按模型族/厂商猜窗口」。本地区域 provider 应置 true:同一本地网关可服务任意
+  // 模型、任意 num_ctx,按模型名猜出的大窗口会危险高估(→ 溢出);无显式声明时宁可
+  // 回落保守默认,也不乐观高估。
+  skipFamilyWindow?: boolean;
+};
+
 /**
- * 一步到位:已知 provider/model 时返回推导出的历史压缩预算;未知模型返回 undefined,
- * 让调用方保留既有的保守默认(不因接入本能力而改变未知模型的行为)。
+ * 一步到位:返回推导出的历史压缩预算,解析优先级:
+ *   1) 显式窗口(contextWindowTokens 或环境变量 KCW_MODEL_CONTEXT_WINDOW);
+ *   2) 非本地 provider 时按模型族/厂商静态窗口(skipFamilyWindow=false);
+ *   3) 都没有 → undefined,让调用方保留既有保守默认(未知/本地模型行为不变、不高估)。
  * inputRatio 未显式传入时读环境变量 KCW_CONTEXT_INPUT_RATIO,再回落默认 0.75。
  */
 export function resolveHistoryBudgetTokens(
-  { provider, model, inputRatio }: ModelWindowInput & { inputRatio?: number },
+  { provider, model, contextWindowTokens, inputRatio, skipFamilyWindow }: HistoryBudgetInput,
   env: Record<string, string | undefined> = process.env,
 ): number | undefined {
-  const window = resolveModelContextWindowTokens({ provider, model });
+  const explicitWindow = positiveInteger(contextWindowTokens) ?? positiveInteger(env.KCW_MODEL_CONTEXT_WINDOW);
+  const window = explicitWindow
+    ?? (skipFamilyWindow ? undefined : resolveModelContextWindowTokens({ provider, model }));
   if (window == null) return undefined;
   const ratio = inputRatio ?? (env.KCW_CONTEXT_INPUT_RATIO != null ? Number(env.KCW_CONTEXT_INPUT_RATIO) : undefined);
   return deriveHistoryBudgetTokens(window, ratio == null ? {} : { inputRatio: ratio });

@@ -5,6 +5,7 @@
 //       压缩阈值(留输出余量),避免大窗口模型被写死的保守默认过早压缩。
 import { omitUndefined } from '../util/object.js';
 import { resolveHistoryBudgetTokens } from '../kimi/context/model-context-window.js';
+import { findModelProviderCatalog } from '../kimi/provider/catalog.js';
 
 type NumericLimit = number | string;
 
@@ -13,6 +14,7 @@ type ContextCompactionConfig = {
   maxContextTokens?: NumericLimit;
   keepRecentMessages?: NumericLimit;
   maxFacts?: NumericLimit;
+  contextWindowTokens?: NumericLimit;
 };
 
 type AgentContextRequestBody = {
@@ -21,6 +23,7 @@ type AgentContextRequestBody = {
   maxContextTokens?: NumericLimit;
   keepRecentMessages?: NumericLimit;
   maxContextFacts?: NumericLimit;
+  contextWindowTokens?: NumericLimit;
 };
 
 export type AgentContextOptions = {
@@ -63,8 +66,17 @@ export function resolveAgentContextOptions(
   if (!enabled) return { maxContextTokens: DISABLED_MAX_CONTEXT_TOKENS };
   // 显式请求值优先;否则按模型窗口自适应;都没有则留空,交由 history-compactor 用其保守默认。
   const explicitMax = positiveInt(nested.maxContextTokens ?? raw.maxContextTokens, 256, 1_000_000);
+  // 本地/BYO 网关(Ollama、LM Studio、自建 OpenAI 兼容端点)的真实 num_ctx 不可从模型名
+  // 静态推断,按模型族猜大窗口会危险高估;这类 provider 跳过族猜测,只认显式声明的窗口。
+  const localProvider = findModelProviderCatalog(modelHint?.provider)?.region === 'local';
+  const explicitWindow = positiveInt(nested.contextWindowTokens ?? raw.contextWindowTokens, 256, 10_000_000);
   const derivedMax = explicitMax == null && modelHint
-    ? resolveHistoryBudgetTokens({ provider: modelHint.provider, model: modelHint.model })
+    ? resolveHistoryBudgetTokens(omitUndefined({
+      provider: modelHint.provider,
+      model: modelHint.model,
+      contextWindowTokens: explicitWindow,
+      skipFamilyWindow: localProvider,
+    }))
     : undefined;
   return omitUndefined({
     maxContextTokens: explicitMax ?? derivedMax,

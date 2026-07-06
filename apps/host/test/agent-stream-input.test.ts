@@ -82,3 +82,22 @@ test('unknown model leaves maxContextTokens unset (compactor keeps its conservat
   // and calling without a model hint is unchanged (backward compatible)
   assert.deepEqual(resolveAgentContextOptions({ prompt: 'hi' }), {});
 });
+
+test('local provider (Ollama) does NOT get the optimistic family window without an explicit declaration', () => {
+  // openai/local + qwen would family-match to 131072; local providers must not over-estimate
+  // (real Ollama num_ctx is short) → leave unset so the conservative default applies.
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'openai/local', model: 'qwen2.5:0.5b' }),
+    {},
+  );
+});
+
+test('explicit contextWindowTokens lets a local model declare its short window', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions(
+      { contextCompaction: { enabled: true, contextWindowTokens: 8192 } },
+      { provider: 'openai/local', model: 'qwen2.5:0.5b' },
+    ),
+    { maxContextTokens: 6144 },
+  );
+});
