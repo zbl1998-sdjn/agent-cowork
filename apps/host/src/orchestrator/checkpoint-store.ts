@@ -49,6 +49,12 @@ export class OrchestrationCheckpointStore {
       ...sanitized,
       version: 1,
       runId: normalizeRunId(input.runId),
+      // Structural filesystem paths, not user/model-authored free text: redaction's
+      // AppData path pattern (meant to scrub credential-adjacent paths out of logs)
+      // would otherwise mangle these, since this app's own data root lives under
+      // %APPDATA%\AgentCowork and any real workspace/run path commonly matches it.
+      workspaceRoot: input.workspaceRoot,
+      eventsPath: input.eventsPath,
       completedStepIds: Array.from(new Set(input.completedStepIds.map((id) => String(id || '').trim()).filter(Boolean))),
       artifacts: Array.from(new Set(input.artifacts.map((artifact) => String(artifact || '').trim()).filter(Boolean))),
       checkpointPath,
