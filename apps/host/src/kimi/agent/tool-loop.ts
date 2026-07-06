@@ -27,7 +27,7 @@ import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 import { createCheckpointRecorder } from './checkpoint-state.js';
 import { traceModelContext, traceToolDecision } from './run-trace-events.js';
-import { addLazySearchTool, createNoopBudgetGuard } from './tool-loop-support.js';
+import { addLazySearchTool, createNoopBudgetGuard, stepBudgetNudgeMessage } from './tool-loop-support.js';
 import { executeToolCall } from './tool-call-executor.js';
 import { recordCacheUsage, logCacheTelemetry, hashPrefix } from '../cache-telemetry.js';
 import { omitUndefined } from '../../util/object.js';
@@ -117,6 +117,8 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   let stopForLoopGuard = false;
   let stopForBudget = false;
   let stopForTimeout = false;
+  // 一次性开关:步数收尾提醒只在跨过阈值时注入一次,避免每步重复刷屏。
+  let stepBudgetNudged = false;
   let lastCheckpointStep = 0;
   const saveCheckpoint = (phase: string, step: number, checkpointMessages: unknown = messages) => {
     if (checkpointRecorder.save(phase, step, checkpointMessages)) lastCheckpointStep = step;
@@ -163,6 +165,16 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
             afterTokens: prepared.afterTokens,
             keyFacts: prepared.keyFacts || [],
           });
+        }
+      }
+      // 步数收尾提醒:用掉约 70% 步数还在调工具时,注入一次「够了就收尾」的软提醒,
+      // 鼓励模型收敛而不是把步数用满(硬耗尽仍由 stepBudget/预算/超时兜底)。
+      if (!stepBudgetNudged) {
+        const nudge = stepBudgetNudgeMessage(stepNumber, stepBudget);
+        if (nudge) {
+          messages.push(nudge);
+          stepBudgetNudged = true;
+          emit('step_budget_reminder', { stepNumber, stepBudget });
         }
       }
       if (stepNumber >= stepBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
