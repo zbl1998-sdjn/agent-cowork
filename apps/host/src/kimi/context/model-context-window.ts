@@ -17,6 +17,9 @@ export const DEFAULT_INPUT_RATIO = 0.75;
 const MIN_INPUT_RATIO = 0.1;
 const MAX_INPUT_RATIO = 1;
 const MIN_BUDGET_TOKENS = 2_000;
+// 上限护栏:任何声明/推断出的窗口都收敛到此上限内,避免一个笔误的巨大
+// KCW_MODEL_CONTEXT_WINDOW(如 999999999)推导出荒谬预算、让压缩形同虚设。
+export const MAX_CONTEXT_WINDOW_TOKENS = 2_000_000;
 
 // 模型族优先(最具体):同一 provider 可能路由到窗口差异极大的模型(如 openrouter、
 // 本地 openai-compatible 网关),按模型名里的族关键字判定更可靠。
@@ -99,7 +102,8 @@ export function deriveHistoryBudgetTokens(
   contextWindow: number,
   { inputRatio }: { inputRatio?: number } = {},
 ): number {
-  const window = Number.isFinite(contextWindow) && contextWindow > 0 ? Math.floor(contextWindow) : 0;
+  const raw = Number.isFinite(contextWindow) && contextWindow > 0 ? Math.floor(contextWindow) : 0;
+  const window = Math.min(MAX_CONTEXT_WINDOW_TOKENS, raw);
   const ratio = clampRatio(inputRatio);
   const budget = Math.floor(window * ratio);
   const upper = window > 0 ? window : Number.MAX_SAFE_INTEGER;

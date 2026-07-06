@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   DEFAULT_INPUT_RATIO,
+  MAX_CONTEXT_WINDOW_TOKENS,
   deriveHistoryBudgetTokens,
   resolveHistoryBudgetTokens,
   resolveModelContextWindowTokens,
@@ -41,6 +42,24 @@ test('derived budget stays positive and clamps an out-of-range ratio', () => {
   assert.ok(deriveHistoryBudgetTokens(8_000, { inputRatio: 5 }) <= 8_000);
   assert.ok(deriveHistoryBudgetTokens(8_000, { inputRatio: 0 }) > 0);
   assert.ok(deriveHistoryBudgetTokens(0) > 0);
+});
+
+test('a bogus huge declared window is capped so compaction is not defeated', () => {
+  // e.g. a typo KCW_MODEL_CONTEXT_WINDOW=999999999 must not yield an absurd budget.
+  const budget = resolveHistoryBudgetTokens(
+    { provider: 'openai/local', model: 'qwen2.5:0.5b', skipFamilyWindow: true, inputRatio: 0.75 },
+    { KCW_MODEL_CONTEXT_WINDOW: '999999999' },
+  );
+  assert.equal(budget, Math.floor(MAX_CONTEXT_WINDOW_TOKENS * 0.75));
+  // NaN / negative declarations are ignored (fall through to conservative default).
+  assert.equal(
+    resolveHistoryBudgetTokens({ provider: 'openai/local', model: 'x', skipFamilyWindow: true }, { KCW_MODEL_CONTEXT_WINDOW: 'abc' }),
+    undefined,
+  );
+  assert.equal(
+    resolveHistoryBudgetTokens({ provider: 'openai/local', model: 'x', skipFamilyWindow: true }, { KCW_MODEL_CONTEXT_WINDOW: '-5' }),
+    undefined,
+  );
 });
 
 test('resolveHistoryBudgetTokens returns a derived budget for known models, undefined otherwise', () => {
