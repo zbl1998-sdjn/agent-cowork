@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { openAtRest, sealAtRest } from '../security/at-rest.js';
 import {
   AUDIT_FILE,
   MAIN_MEMORY_FILE,
@@ -18,6 +19,15 @@ import {
   MEMORY_DIR_NAME,
   NOTES_DIR,
 } from './memory-constants.js';
+
+// 从记忆文件路径推导共享的 at-rest 密钥箱目录 <…/.AgentCowork/security>。
+// 记忆文件都在 .AgentCowork(或其子目录 notes)下,定位该段即可;找不到则回退同级 security。
+export function securityDirForMemoryPath(filePath: string): string {
+  const parts = path.resolve(filePath).split(/[\\/]/);
+  const idx = parts.lastIndexOf(MEMORY_DIR_NAME);
+  if (idx >= 0) return path.join(...parts.slice(0, idx + 1), 'security');
+  return path.join(path.dirname(filePath), 'security');
+}
 
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export type MemoryScope = 'project' | 'user' | 'session';
@@ -89,8 +99,15 @@ export function mainMemoryPath(trustedRoot: unknown): string {
  */
 export function safeWriteSync(filePath: string, body: string): string {
   ensureDirSync(path.dirname(filePath));
-  fs.writeFileSync(filePath, body, 'utf8');
+  fs.writeFileSync(filePath, sealAtRest(body, securityDirForMemoryPath(filePath)), 'utf8');
   return filePath;
+}
+
+/** 读记忆文件并透明解封(遗留明文透传);文件缺失或解不开返回 fallback。 */
+export function safeReadSync(filePath: string, fallback = ''): string {
+  if (!fs.existsSync(filePath)) return fallback;
+  const opened = openAtRest(fs.readFileSync(filePath, 'utf8'), securityDirForMemoryPath(filePath));
+  return opened === null ? fallback : opened;
 }
 
 /**

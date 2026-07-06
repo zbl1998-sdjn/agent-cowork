@@ -39,6 +39,7 @@
     "security:capability-pack": "node scripts/run-host-node.mjs scripts/security-local-strict.ts",
     "security:trust-report": "node scripts/run-host-node.mjs scripts/security-local-strict.ts",
     "security:airgap": "node scripts/run-host-node.mjs scripts/security-local-strict.ts",
+    "security:egress-firewall-plan": "node scripts/run-host-node.mjs scripts/security-egress-firewall.ts",
     "smoke:windows-resources": "node scripts/run-host-node.mjs scripts/smoke-windows-client-resources.ts",
     "smoke:windows-paths": "node scripts/run-host-node.mjs scripts/smoke-windows-paths.ts",
     "smoke:sqlite-runtime": "node scripts/run-host-node.mjs scripts/smoke-sqlite-runtime.ts",

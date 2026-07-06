@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { redactValue } from '../security/redaction.js';
+import { openAtRest, sealAtRest } from '../security/at-rest.js';
 import type { OrchestrationCheckpoint } from './types.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
@@ -61,8 +62,9 @@ export class OrchestrationCheckpointStore {
       updatedAt: this.now().toISOString(),
     };
     const tempPath = `${checkpointPath}.${process.pid}.${Date.now()}.tmp`;
+    const secDir = path.join(path.dirname(this.root), 'security');
     try {
-      fs.writeFileSync(tempPath, `${JSON.stringify(checkpoint, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(tempPath, sealAtRest(`${JSON.stringify(checkpoint, null, 2)}\n`, secDir), 'utf8');
       fs.renameSync(tempPath, checkpointPath);
     } catch (err) {
       try { fs.unlinkSync(tempPath); } catch { /* keep the original checkpoint write error */ }
@@ -76,7 +78,8 @@ export class OrchestrationCheckpointStore {
     if (!fs.existsSync(checkpointPath)) {
       return null;
     }
-    return JSON.parse(fs.readFileSync(checkpointPath, 'utf8')) as OrchestrationCheckpoint;
+    const opened = openAtRest(fs.readFileSync(checkpointPath, 'utf8'), path.join(path.dirname(this.root), 'security'));
+    return opened === null ? null : JSON.parse(opened) as OrchestrationCheckpoint;
   }
 }
 

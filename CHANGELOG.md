@@ -6,6 +6,14 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+### Added (2026-07-07 — 企业机密档安全基线 plan/08)
+
+- 机密模式一键总开关 `KCW_CONFIDENTIAL=1`(L0 `security/confidential.ts`):`resolveSecurityMode` 强制返回 `air_gap` 且不可被任何配置/env 削弱(fail-closed);启动期 MCP(含 MASE)全丢、`/api/connectors/oauth/*` 一律 403、云模型/外网工具全部拒绝、本地 provider 仍可用;`/api/selfcheck` 暴露 `security.confidential`。
+- 落盘加密(切片 2):可复用的 at-rest 信封(`security/at-rest.ts`)——随机 DEK 走 AES-256-GCM,DEK 只被 DPAPI(Windows)/环境派生密钥封印一次存 `.AgentCowork/security/at-rest.key`,避免每次写盘拉 PowerShell。开关 `KCW_ENCRYPT_AT_REST`(机密模式自动开),透明接入对话正文、运行记录、run/orchestrator checkpoints、长期记忆(MEMORY.md/笔记),读侧兼容遗留明文、开不了的密文按损坏跳过。附带修复 DPAPI 在 Windows PowerShell 5.1 下 `TypeNotFound`(缺 `Add-Type -AssemblyName System.Security`),该修复同时让连接器凭据存储在 5.1 环境可用。kimi apiKey(含 fallbacks)从明文落盘改为封印落盘。
+- 数据生命周期(切片 2):工作区数据一键彻底销毁 + 保留期。`POST /api/security/data/purge-plan`(只读预览)、`/purge`(需 `confirm:true`,scope: conversations|runs|memory|content|everything,jail 固定服务端 `.AgentCowork`)、`/retention`(删除超 N 天的 run/对话 JSON)。计划先行 + 逐目标复核 jail,被篡改越界的计划抛错拒绝。
+- OS 级出网强制(切片 3,计划模块):`security/egress-firewall.ts` 生成"对 app 进程树 program-scoped 出站 Block + loopback/内网网关 Allow"的可审查 Windows 防火墙规则计划(`npm run security:egress-firewall-plan`),含建规命令与一把回滚;非 IP 网关主机名不静默放行(要求 DNS pin)。诚实边界:Windows 防火墙 Block 优先于 Allow,纯规则无法完美"默认拒绝仅放行白名单",本切片为 best-effort OS 强制、应用层出口网关仍是主执行点;真机 apply + 零出网探测证据标"待验收"。
+- 连接器治理(切片 4):机密档下连接器攻击面由三道闸锁死(启动 MCP 全丢 + OAuth 403 + connect 只接受本地 filesystem 内置),消除客户端注入任意 stdio 连接器出网的旁路;确认测试 `confidential-connector-posture.test.ts`。CA/EV 代码签名与外部渗透测试需外部条件(证书/第三方),已在 `plan/08` 标"待外部"。
+
 ### Added (2026-07-06 — agent runtime convergence & context window)
 
 - Model-aware automatic history compaction: when a request does not pin `maxContextTokens`, the compaction threshold now adapts to the selected model's context window (conservative per-family floors, capped at 2M) instead of a hardcoded 12k. Local/BYO gateways (Ollama, LM Studio, custom OpenAI-compatible) do not get a guessed window (real `num_ctx` is unknowable from the model name and over-guessing risks overflow); declare it via `KCW_MODEL_CONTEXT_WINDOW` / per-request `contextWindowTokens`. Verified end-to-end through the real HTTP route against a real Ollama model.

@@ -2,13 +2,48 @@
 // ---------------------------------------------------------------------------
 // 职责:读写磁盘上的 kimiApi 配置(provider/apiKey/baseUrl/model/fallbacks),
 //       做字段清洗与归一,损坏文件时静默回退到环境变量派生的配置。
-// 依赖:node:fs / node:path(均标准库)。
+// 安全:apiKey(含 fallbacks 内的)写盘前经 CredentialProtector 封印
+//       (Windows=DPAPI / 其余 AES-GCM,与 credential-store 同一模式),磁盘不落明文;
+//       读侧兼容三种形态——封印密文(解封)、遗留明文(原样读入,下次写盘自动升级)、
+//       解封失败(如换机器/换用户 DPAPI 打不开)按"未配置"跳过该 key,不拖垮其他字段。
+// 依赖:node:fs / node:path + L0 security/credential-store。
 // 导出:applyPersistedKimiConfig(读入并写进目标对象)、persistKimiConfig(写盘)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { composeFullModelId, normaliseModelProviderId, providerRequiresApiKey } from './provider/catalog.js';
+import {
+  createDefaultCredentialProtector,
+  isSealedCredential,
+  type CredentialProtector,
+} from '../security/credential-store.js';
 
 type KimiConfigRecord = Record<string, unknown>;
+type ConfigStoreOptions = { protector?: CredentialProtector };
+
+// 默认加密器懒加载单例:DPAPI 每次 protect/unprotect 都要拉起 PowerShell,
+// 只有真正碰到 apiKey 时才创建/调用,避免无谓的进程开销。
+let defaultProtector: CredentialProtector | null = null;
+function activeProtector(options: ConfigStoreOptions): CredentialProtector {
+  if (options.protector) return options.protector;
+  if (!defaultProtector) defaultProtector = createDefaultCredentialProtector();
+  return defaultProtector;
+}
+
+/** 写侧封印:非空且尚未封印的明文 key 加密;空串原样(不 protect 空值)。 */
+function sealSecret(value: string, protector: CredentialProtector): string {
+  if (!value || isSealedCredential(value)) return value;
+  return protector.protect(value);
+}
+
+/** 读侧解封:封印密文尝试解开,失败返回 null(按未配置处理);明文遗留原样返回。 */
+function unsealSecret(value: string, protector: CredentialProtector): string | null {
+  if (!isSealedCredential(value)) return value;
+  try {
+    return protector.unprotect(value);
+  } catch {
+    return null;
+  }
+}
 
 /** 把 provider 归一为去空白的小写串。 */
 function cleanProvider(value: unknown): string {
@@ -42,7 +77,7 @@ function cleanFallbacks(value: unknown): KimiConfigRecord[] {
 }
 
 /** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);文件不存在或损坏则不动。 */
-export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord): void {
+export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
   try {
     if (!fs.existsSync(file)) return;
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -51,8 +86,20 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord)
     if (!kimi || typeof kimi !== 'object') return;
     const source = kimi as KimiConfigRecord;
     if (typeof source.provider === 'string' && source.provider.trim()) target.provider = cleanProvider(source.provider);
-    if (Array.isArray(source.fallbacks)) target.fallbacks = cleanFallbacks(source.fallbacks);
-    if (typeof source.apiKey === 'string' && source.apiKey.trim()) target.apiKey = source.apiKey.trim();
+    if (Array.isArray(source.fallbacks)) {
+      // fallback 内的 apiKey 同样解封;解不开的按未配置丢弃该 key,保留其余路由字段。
+      target.fallbacks = cleanFallbacks(source.fallbacks).map((item) => {
+        if (typeof item.apiKey !== 'string' || !item.apiKey) return item;
+        const plain = unsealSecret(item.apiKey, activeProtector(options));
+        if (plain) return { ...item, apiKey: plain };
+        const { apiKey: _dropped, ...rest } = item;
+        return rest;
+      }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
+    }
+    if (typeof source.apiKey === 'string' && source.apiKey.trim()) {
+      const plain = unsealSecret(source.apiKey.trim(), activeProtector(options));
+      if (plain) target.apiKey = plain;
+    }
     if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) {
       target.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
     }
@@ -63,15 +110,20 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord)
   }
 }
 
-/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录)。 */
-export function persistKimiConfig(file: string, source: KimiConfigRecord): void {
+/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
+export function persistKimiConfig(file: string, source: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
+  const apiKey = String(source.apiKey || '').trim();
   const payload = {
     kimiApi: {
-      apiKey: source.apiKey || '',
+      apiKey: apiKey ? sealSecret(apiKey, activeProtector(options)) : '',
       baseUrl: source.baseUrl || '',
       model: source.model || '',
       provider: source.provider || 'kimi-api',
-      fallbacks: cleanFallbacks(source.fallbacks),
+      fallbacks: cleanFallbacks(source.fallbacks).map((item) => (
+        typeof item.apiKey === 'string' && item.apiKey
+          ? { ...item, apiKey: sealSecret(item.apiKey, activeProtector(options)) }
+          : item
+      )),
     },
   };
   fs.mkdirSync(path.dirname(file), { recursive: true });

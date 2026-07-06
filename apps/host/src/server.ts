@@ -16,6 +16,7 @@ import { connectMcpServers, closeMcpClients } from './mcp/connect.js';
 import type { ConnectedMcpClient, ConnectMcpResult, McpServerSpec } from './mcp/connect.js';
 import type { SpawnFn } from './mcp/stdio-transport.js';
 import { handleRouteChain } from './routes/route-chain.js';
+import { filterMcpServersForConfidential } from './security/confidential.js';
 import { createHostState } from './runtime/host-state.js';
 import type { HostConfig } from './runtime/host-state-types.js';
 import { redactText } from './security/redaction.js';
@@ -127,7 +128,12 @@ export function createServer(config: ServerConfig = {}): HostServer {
   };
 
   if (Array.isArray(config.mcpServers) && config.mcpServers.length > 0 && config.connectMcpOnStart !== false) {
-    server.connectMcpServers(config.mcpServers).catch(() => { /* 连接器损坏不能拖垮 host 启动 */ });
+    // 机密模式咽喉:启动期 MCP(含 MASE 记忆桥接)在此统一过滤——覆盖 main.ts 与嵌入式调用两条装配路径。
+    const mcpFilter = filterMcpServersForConfidential(config.mcpServers);
+    if (mcpFilter.dropped.length > 0) console.warn(`[host] ${mcpFilter.reason}(丢弃 ${mcpFilter.dropped.length} 个)`);
+    if (mcpFilter.servers.length > 0) {
+      server.connectMcpServers(mcpFilter.servers).catch(() => { /* 连接器损坏不能拖垮 host 启动 */ });
+    }
   }
 
   return server;

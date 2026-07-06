@@ -8,8 +8,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withRunAttribution } from './run-attribution.js';
 import { withRunMetrics } from './run-metrics.js';
+import { openAtRest, sealAtRest } from '../security/at-rest.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
+
+// run 记录含完整对话正文+模型输出,是最高敏感落盘面之一。加密密钥箱与其它 store 共享
+// 在工作区的 .AgentCowork/security 下(runStoreRoot 通常是 .AgentCowork/runs)。
+function runSecurityDir(runStoreRoot: string): string {
+  return path.join(path.dirname(runStoreRoot), 'security');
+}
 
 export type RunRecord = {
   id: string;
@@ -79,7 +86,7 @@ export function writeRunRecord(runStoreRoot: string, record: RunRecord): string 
   fs.mkdirSync(runStoreRoot, { recursive: true });
   const enriched = withRunMetrics(withRunAttribution(record)) as RunRecord;
   const runPath = getRunPath(runStoreRoot, enriched.id);
-  fs.writeFileSync(runPath, `${JSON.stringify(enriched, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(runPath, sealAtRest(`${JSON.stringify(enriched, null, 2)}\n`, runSecurityDir(runStoreRoot)), 'utf8');
   return runPath;
 }
 
@@ -88,7 +95,8 @@ export function readRunRecord(runStoreRoot: string, runId: string): RunRecord | 
   if (!fs.existsSync(runPath)) {
     return null;
   }
-  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
+  const opened = openAtRest(fs.readFileSync(runPath, 'utf8'), runSecurityDir(runStoreRoot));
+  return opened === null ? null : JSON.parse(opened) as RunRecord;
 }
 
 export function listRunRecords(
@@ -103,7 +111,9 @@ export function listRunRecords(
     if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
     const fullPath = path.join(runStoreRoot, entry.name);
     try {
-      const record = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as RunRecord;
+      const opened = openAtRest(fs.readFileSync(fullPath, 'utf8'), runSecurityDir(runStoreRoot));
+      if (opened === null) continue; // 开不了的记录跳过,列表尽力可用
+      const record = JSON.parse(opened) as RunRecord;
       records.push({
         id: record.id,
         type: record.type,

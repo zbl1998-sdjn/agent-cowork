@@ -1,5 +1,6 @@
 // Security mode and model-provider classification (host L0 security).
 // Keep this module pure so L1/L2 callers can share the same fail-closed rules.
+import { isConfidentialMode } from './confidential.js';
 
 export const SECURITY_MODES = Object.freeze([
   'local_demo',
@@ -87,6 +88,9 @@ export function resolveSecurityMode({
   configuredMode?: unknown;
   env?: RuntimeEnv;
 } = {}): SecurityMode {
+  // 机密模式总开关优先级最高:强制 air_gap,任何 configuredMode/env 模式都不能削弱。
+  // 放在这里让所有 L0 策略消费方(模型 provider 策略/工具策略/出口网关)自动继承。
+  if (isConfidentialMode(env)) return 'air_gap';
   const configured = clean(configuredMode);
   if (configured) return normalizeSecurityMode(configured);
   const envMode = clean(env.SECURITY_MODE || env.KCW_SECURITY_MODE);

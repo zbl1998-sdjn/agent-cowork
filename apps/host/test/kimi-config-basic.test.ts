@@ -50,7 +50,10 @@ test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags
 
   assert.ok(fs.existsSync(persistedConfigPath(trustedRoot)), 'config.json was not written');
   const persisted = readPersistedConfig(trustedRoot);
-  assert.equal(persisted.kimiApi.apiKey, CONFIG_SECRET);
+  // apiKey 落盘必须是封印密文(DPAPI/AES-GCM),绝不明文;明文只存在于进程内存。
+  assert.ok(persisted.kimiApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
+  assert.match(String(persisted.kimiApi.apiKey), /^(dpapi|aesgcm):v1:/);
+  assert.ok(!fs.readFileSync(persistedConfigPath(trustedRoot), 'utf8').includes(CONFIG_SECRET), 'config.json leaked the plaintext API key');
   assert.equal(persisted.kimiApi.model, 'kimi-k2-test');
 });
 
