@@ -6,10 +6,18 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+### Added (2026-07-06 — agent runtime convergence & context window)
+
+- Model-aware automatic history compaction: when a request does not pin `maxContextTokens`, the compaction threshold now adapts to the selected model's context window (conservative per-family floors, capped at 2M) instead of a hardcoded 12k. Local/BYO gateways (Ollama, LM Studio, custom OpenAI-compatible) do not get a guessed window (real `num_ctx` is unknowable from the model name and over-guessing risks overflow); declare it via `KCW_MODEL_CONTEXT_WINDOW` / per-request `contextWindowTokens`. Verified end-to-end through the real HTTP route against a real Ollama model.
+- Auto-continue for oversized single-message tasks: when a turn runs out of its per-turn step budget while still working, the loop auto-extends by another window up to a hard cap `maxSteps*(1+maxAutoContinues)` (default 2 → up to 3 windows; `KCW_MAX_AUTO_CONTINUE` / `body.maxAutoContinues`, budget/timeout/loop/approval guards still apply). If even the hard cap is not enough, the run reports `stepsExhausted` and the UI surfaces a 继续 entry that resumes from the checkpoint without replaying completed writes. Verified with real Kimi (`kimi-k2.6`): a 10-step chain that used to be cut off at the 6-step budget now finishes naturally.
+- Configurable convergence guardrails: a tool-use discipline block in the system prompt (batch parallel calls, stop when done, don't repeat) and a one-shot step-budget wrap-up reminder at ~70% of the budget. Both default-on and tunable/disable via `KCW_TOOL_DISCIPLINE` / `KCW_STEP_NUDGE_RATIO`. Real Ollama + Kimi A/B evidence archived under `reports/step-convergence/` (finding: capable models already converge, so these are zero-cost guardrails rather than a measured step reduction).
+
 ### Changed
 
 - Marked the current Windows distributable and desktop shell as `Internal Beta` for small-circle testing, keeping production-release claims blocked on code signing, updater publishing, clean tag release, and external release evidence.
 - Added a friend-test zip package with a Windows install guide, bundled installer SHA256, and beta scope notes for safer small-circle distribution.
+- CI (`.github/workflows/ci.yml`) now runs the full local static gate (`npm run check` — arch/filesize/secrets/all TS type-checks/lint/ui-types/ts-coverage/js-boundary/icons) and a new UI unit-test job, instead of a narrower subset, so the local gate is no longer the only safety net.
+- Documented the `services/` + `apps/local-agent` Go code as a frozen v1.0 pre-research skeleton that is not part of any build/CI (see `plan/00`), to remove architecture ambiguity.
 
 ### Added (2.x milestone, backfilled 2026-07-04 — see `git log` for individual commits)
 
