@@ -49,7 +49,7 @@ type SkillRegistryLike = SkillRegistry & {
 type StreamRequestContext = RequestContext & { traceId?: unknown };
 type ApprovalRegistry = AgentApprovalRegistry & { cancelByRun?: (runId: string) => unknown };
 type RunEventsLike = { publish(runId: string, event: Record<string, unknown>): unknown };
-type AgentOutcome = { text: string; steps: Array<Record<string, unknown>>; usage?: unknown };
+type AgentOutcome = { text: string; steps: Array<Record<string, unknown>>; usage?: unknown; stepsExhausted?: boolean; autoContinues?: number };
 export type StreamAgentChatOptions = {
   response: ResponseLike;
   requestContext: StreamRequestContext;
@@ -212,6 +212,9 @@ export async function streamAgentChat({
       memoryText,
       skills,
       maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
+      // 自动续跑窗数:大任务跑满一窗还没做完时,自动再扩窗接着做(硬上限 = maxSteps*(1+此值))。
+      // 默认 2(即最多 3 窗);可用 body.maxAutoContinues / 环境变量 KCW_MAX_AUTO_CONTINUE 覆盖,夹取 [0,10]。
+      maxAutoContinues: Math.min(10, Math.max(0, Math.floor(Number(body.maxAutoContinues ?? process.env.KCW_MAX_AUTO_CONTINUE ?? 2) || 0))),
       verify: body.verify === true || body.thinking === 'deep',
       approvals,
       autoApprove: body.autoApprove === true,
@@ -243,7 +246,8 @@ export async function streamAgentChat({
       status = 'cancelled';
       sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });
     } else {
-      sse(response, 'done', { runId, text: outcome.text, steps: outcome.steps, usage: outcome.usage });
+      // stepsExhausted=true 表示自动续跑到硬上限仍没做完 → 前端可提示"任务较大,已完成部分,可点继续"并携原 runId 续跑。
+      sse(response, 'done', omitUndefined({ runId, text: outcome.text, steps: outcome.steps, usage: outcome.usage, stepsExhausted: outcome.stepsExhausted === true ? true : undefined, autoContinues: outcome.autoContinues }));
     }
   } catch (err) {
     status = 'failed';

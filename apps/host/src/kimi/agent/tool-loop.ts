@@ -55,7 +55,7 @@ function hasToolResult(messages: ChatMessage[]): boolean {
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline } = options;
+  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
 
   // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
@@ -113,6 +113,12 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
 
   // 开启 verify 时额外预留若干步给"读回改动核对"阶段,避免复核挤占正常任务步数。
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
+  // 自动续跑:任务没做完只是步数用光时,把预算按窗扩展到硬上限(防跑飞)。
+  const autoContinueRounds = Math.max(0, Math.floor(Number(maxAutoContinues) || 0));
+  const hardStepCap = stepBudget + autoContinueRounds * maxSteps;
+  let effectiveBudget = stepBudget;
+  let autoContinues = 0;
+  let finishedNaturally = false;
   const runTimeout = createRunTimeout({ signal, timeoutMs: runTimeoutMs });
   let stopForLoopGuard = false;
   let stopForBudget = false;
@@ -144,7 +150,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   };
   try {
     // 主循环本体:每轮调用一次模型,并执行这一轮返回的工具调用。
-    for (let i = 0; i < stepBudget; i += 1) {
+    for (let i = 0; i < effectiveBudget; i += 1) {
       if (runTimeout.aborted()) break;
       if (stopForLoopGuard) break;
       if (stopForBudget) break;
@@ -171,16 +177,16 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       // 鼓励模型收敛而不是把步数用满(硬耗尽仍由 stepBudget/预算/超时兜底)。
       if (!stepBudgetNudged) {
         const nudge = stepNudgeRatio === undefined
-          ? stepBudgetNudgeMessage(stepNumber, stepBudget)
-          : stepBudgetNudgeMessage(stepNumber, stepBudget, stepNudgeRatio);
+          ? stepBudgetNudgeMessage(stepNumber, effectiveBudget)
+          : stepBudgetNudgeMessage(stepNumber, effectiveBudget, stepNudgeRatio);
         if (nudge) {
           messages.push(nudge);
           stepBudgetNudged = true;
-          emit('step_budget_reminder', { stepNumber, stepBudget });
+          emit('step_budget_reminder', { stepNumber, stepBudget: effectiveBudget });
         }
       }
-      if (stepNumber >= stepBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
-        emit('tool_budget_finalizing', { stepNumber, stepBudget });
+      if (stepNumber >= effectiveBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
+        emit('tool_budget_finalizing', { stepNumber, stepBudget: effectiveBudget });
         finalText = (await summarizeBeforeToolBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
         if (finalText) saveCheckpoint('tool_budget_finalized', stepNumber, [...messages, { role: 'assistant', content: finalText }]);
         break;
@@ -227,6 +233,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       // 模型输出要么包含工具调用,要么直接给出最终文本。
       const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
       if (calls.length === 0) {
+        finishedNaturally = true;
         finalText = message.content || '';
         const finalMessage = { role: 'assistant', content: finalText };
         // 发生过真实写改且尚未复核时,先不收尾:塞一条只读核对指令再跑一轮,确认改动无误。
@@ -267,6 +274,17 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
         if (result.breakToolLoop) break;
       }
       lastToolBatchHadSuccess = steps.slice(stepsBeforeToolBatch).some((step) => step.ok === true);
+      // 自动续跑:走到当前窗最后一步、模型仍在调工具(没自然收尾),且未到硬上限、
+      // 未被预算/超时/循环护栏叫停 → 再扩一窗步数继续,让大任务一口气做完。
+      if ((i + 1) >= effectiveBudget
+        && autoContinues < autoContinueRounds
+        && effectiveBudget < hardStepCap
+        && !stopForBudget && !stopForLoopGuard && !runTimeout.aborted()) {
+        effectiveBudget = Math.min(hardStepCap, effectiveBudget + maxSteps);
+        autoContinues += 1;
+        stepBudgetNudged = false; // 新窗里收尾提醒可再触发一次
+        emit('auto_continue', { round: autoContinues, atStep: stepNumber, newBudget: effectiveBudget, hardCap: hardStepCap });
+      }
     }
 
     finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
@@ -276,13 +294,19 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       saveCheckpoint(phase, lastCheckpointStep || stepBudget, [...messages, { role: 'assistant', content: finalText }]);
     }
     logCacheTelemetry(); // 收尾打印本会话缓存命中累计(+前缀不稳定告警);无调用则静默。
+    // 步数耗尽:任务未自然收尾,也不是被取消/预算/超时/循环护栏叫停,而是跑满了(含续跑后的)步数硬上限。
+    const cancelled = !!(signal && signal.aborted);
+    const stepsExhausted = !finishedNaturally && !cancelled && !stopForBudget && !stopForTimeout && !stopForLoopGuard;
+    if (stepsExhausted) emit('steps_exhausted', { toolRounds: steps.length, hardCap: hardStepCap, autoContinues });
     return {
       text: finalText,
       steps,
       usage: usageTotals,
-      cancelled: !!(signal && signal.aborted),
+      cancelled,
       budgetStopped: stopForBudget,
       timeoutStopped: stopForTimeout,
+      stepsExhausted,
+      autoContinues,
     };
   } finally {
     runTimeout.dispose();

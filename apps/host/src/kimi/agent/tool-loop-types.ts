@@ -50,6 +50,9 @@ export type RunAgentChatOptions = {
   stepNudgeRatio?: number;
   // 是否注入【工具使用纪律】收敛引导(默认 true)。false 可关闭(对照/特殊部署)。
   toolDiscipline?: boolean;
+  // 单条消息任务太大跑满步数时,自动用新一窗步数续跑的次数(默认 0=不续跑)。
+  // 硬上限 = maxSteps*(1+maxAutoContinues);预算/超时/循环护栏仍照常兜底。
+  maxAutoContinues?: number;
 };
 export type RunAgentChatResult = {
   text: string;
@@ -58,4 +61,8 @@ export type RunAgentChatResult = {
   cancelled: boolean;
   budgetStopped: boolean;
   timeoutStopped: boolean;
+  // 因跑满(含自动续跑后的)步数硬上限而被截断(任务未自然收尾)。
+  stepsExhausted: boolean;
+  // 本次运行实际自动续跑了几窗。
+  autoContinues: number;
 };
