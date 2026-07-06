@@ -15,6 +15,7 @@ import {
   sanitizeConversationMessages,
 } from './conversation-sanitizers.js';
 import { omitUndefined } from '../util/object.js';
+import { openAtRest, sealAtRest } from '../security/at-rest.js';
 import type {
   ConversationContext,
   ConversationInput,
@@ -67,6 +68,11 @@ function userDir(trustedRoot: unknown, context: ConversationContext = {}): strin
   return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, CONV_DIR, tenant, user);
 }
 
+// 对话正文是最高敏感落盘面;加密密钥箱与其它 store 共享 <trustedRoot>/.AgentCowork/security。
+function convSecurityDir(trustedRoot: unknown): string {
+  return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, 'security');
+}
+
 /** 把完整对话记录压成列表用的摘要(含消息/分支计数)。 */
 function summarise(conv: ConversationRecord): ConversationSummary {
   return omitUndefined({
@@ -97,7 +103,9 @@ export class FileConversationStore {
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.json')) continue;
       try {
-        const conv = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as ConversationRecord;
+        const opened = openAtRest(fs.readFileSync(path.join(dir, name), 'utf8'), convSecurityDir(trustedRoot));
+        if (opened === null) continue; // 开不了的对话跳过,列表尽力可用
+        const conv = JSON.parse(opened) as ConversationRecord;
         if (conv && conv.id) out.push(mapper(conv));
       } catch {
         /* 跳过损坏的对话文档。 */
@@ -137,7 +145,8 @@ export class FileConversationStore {
     const file = path.join(userDir(trustedRoot, context), `${cleanConversationId(id)}.json`);
     if (!fs.existsSync(file)) return null;
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf8')) as ConversationRecord;
+      const opened = openAtRest(fs.readFileSync(file, 'utf8'), convSecurityDir(trustedRoot));
+      return opened === null ? null : JSON.parse(opened) as ConversationRecord;
     } catch {
       return null;
     }
@@ -167,11 +176,11 @@ export class FileConversationStore {
     });
     let body = JSON.stringify(record);
     if (Buffer.byteLength(body, 'utf8') > MAX_BYTES) {
-      // 超限时进一步裁剪历史而不是直接拒绝保存。
+      // 超限时进一步裁剪历史而不是直接拒绝保存。(按明文正文量算,不含加密膨胀)
       record.messages = record.messages.slice(-50);
       body = JSON.stringify(record);
     }
-    fs.writeFileSync(file, body, 'utf8');
+    fs.writeFileSync(file, sealAtRest(body, convSecurityDir(trustedRoot)), 'utf8');
     return summarise(record);
   }
 

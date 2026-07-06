@@ -270,6 +270,7 @@
     "apps/host/src/sandbox/startup-probe.ts",
     "apps/host/src/sandbox/vm-sandbox.ts",
     "apps/host/src/sandbox/wsl-docker-runner.ts",
+    "apps/host/src/security/at-rest.ts",
     "apps/host/src/security/confidential.ts",
     "apps/host/src/security/credential-store-types.ts",
     "apps/host/src/security/credential-summary.ts",
