@@ -10,6 +10,7 @@ import { readDesktopUpdateManifest } from '../runtime/desktop-update-source.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 import { readMemorySettings } from '../memory/memory-control.js';
 import { readEgressAuditRecords, summariseEgressAudit } from '../security/egress-audit.js';
+import { isConfidentialMode } from '../security/confidential.js';
 import { buildTrustReport } from '../security/trust-report.js';
 import {
   buildCapabilityInstallPlan,
@@ -196,6 +197,7 @@ export async function handleSystemRoutes({
     };
     add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
     add('security-mode', true, state.securityMode || 'controlled_hybrid');
+    add('confidential-mode', true, isConfidentialMode() ? '机密模式已启用(强制 air_gap,MASE/OAuth/外网工具全部禁用)' : '未启用(标准档)');
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
     add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
     add('rate-limit', Boolean(rateLimitStats), rateLimitStats ? `${rateLimitStats.ratePerSec}/s · burst ${rateLimitStats.burst}` : '限流未启用');
@@ -211,6 +213,7 @@ export async function handleSystemRoutes({
       time: new Date().toISOString(),
       security: {
         mode: state.securityMode || 'controlled_hybrid',
+        confidential: isConfidentialMode(),
         responseHeaders: Object.keys(SECURITY_HEADERS),
         cors: 'loopback+tauri only',
         apiKey: { configured: state.kimiApiConfig.configured, hasKey: Boolean(state.kimiApiConfig.apiKey) },

@@ -7,6 +7,7 @@ import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { listConnectors, suggestConnectors } from '../connectors/catalog.js';
 import { omitUndefined } from '../util/object.js';
 import { handleConnectorOAuthRoutes } from './connector-oauth-routes.js';
+import { isConfidentialMode } from '../security/confidential.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { CredentialStore } from '../security/credential-store.js';
 import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
@@ -121,6 +122,11 @@ export async function handleConnectorRoutes({
   }
 
   if (pathname.startsWith('/api/connectors/oauth/')) {
+    // 机密模式:OAuth 连接器意味着对外网授权流量(如 GitHub device flow),整面禁用。
+    if (isConfidentialMode()) {
+      sendJson(response, 403, { error: '机密模式已禁用外部 OAuth 连接器:隔离档承诺数据不出本机边界。' });
+      return true;
+    }
     return handleConnectorOAuthRoutes(omitUndefined({
       request,
       response,
