@@ -48,8 +48,20 @@ test('buildSystemPrompt puts the env block at the very TOP', () => {
   assert.ok(envEndIdx > 0 && preambleIdx > envEndIdx, 'preamble must follow </env>');
 });
 
-test('SYSTEM_PROMPT_VERSION bumped to v2 (env block addition)', () => {
-  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v2');
+test('SYSTEM_PROMPT_VERSION bumped to v3 (tool-use discipline addition)', () => {
+  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v3');
+});
+
+test('base system prompt teaches Claude-cowork-style convergence (do not exhaust steps)', () => {
+  const prompt = buildSystemPrompt({});
+  assert.match(prompt, /【工具使用纪律】/);
+  // stop when done, not "use up all the steps"
+  assert.match(prompt, /用满步数/);
+  assert.match(prompt, /拿到足够信息就直接给出最终答复/);
+  // batch independent calls in one turn (parallel), reduce round-trips
+  assert.match(prompt, /同一轮里一起发起\(并行\)/);
+  // do not repeat already-known work
+  assert.match(prompt, /不要反复读取|不重复/);
 });
 
 test('developer mode system prompt includes code-work constraints', () => {
