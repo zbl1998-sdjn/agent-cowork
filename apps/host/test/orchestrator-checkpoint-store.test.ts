@@ -37,15 +37,15 @@ function baseCheckpoint(overrides: Partial<OrchestrationCheckpoint> = {}): Orche
 
 test('checkpoint store preserves workspaceRoot/eventsPath containing AppData segments verbatim', () => {
   const root = tempRoot();
-  const runStoreRoot = path.join(root, '.AgentCowork', 'runs');
-  const workspaceRoot = path.join(root, 'workspace');
+  // Build paths that explicitly carry an "AppData" segment on any host OS (on real
+  // Windows this app's data root is %APPDATA%\AgentCowork; CI runs on Linux where the
+  // temp dir is /tmp, so we can't rely on the OS temp path containing it). The redaction
+  // pass on save() must never mangle these structural path fields.
+  const runStoreRoot = path.join(root, 'AppData', 'Local', 'AgentCowork', 'runs');
+  const workspaceRoot = path.join(root, 'AppData', 'Local', 'workspace');
   const eventsPath = path.join(runStoreRoot, 'run_checkpoint_store_test.events.jsonl');
   fs.mkdirSync(workspaceRoot, { recursive: true });
-
-  // Any Windows user/temp/app-data path realistically contains an "AppData" segment
-  // (this app's own default data root is %APPDATA%\AgentCowork), so the redaction
-  // pass applied on save() must never mangle structural path fields.
-  assert.match(root, /AppData/i);
+  assert.match(workspaceRoot, /[\\/]AppData[\\/]/i);
 
   const store = createOrchestrationCheckpointStore({ root: runStoreRoot });
   store.save(baseCheckpoint({ workspaceRoot, eventsPath }));

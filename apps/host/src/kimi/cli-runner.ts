@@ -148,7 +148,10 @@ function runKimiCliText({
       resolve({
         ok: true,
         provider: 'kimi-cli',
-        command: path.basename(command),
+        // 同时按 `\` 和 `/` 取末段:一个 Windows 路径命令(如 C:\tools\kimi.exe)在任意
+        // 宿主 OS(含 CI 的 Linux)上都能正确脱去目录、只保留 kimi.exe;POSIX 的
+        // path.basename 遇到 `\` 不拆,会整串泄漏路径。用纯字符串拆分避开平台差异。
+        command: command.split(/[\\/]/).filter(Boolean).pop() || command,
         mode: resultMode || (mode === 'code' ? 'code' : 'cowork'),
         text: output,
         durationMs,
