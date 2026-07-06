@@ -16,6 +16,7 @@ import {
   createOrchestrationCheckpointStore,
   listOrchestrationRecipeDefinitions,
 } from '../src/orchestrator/index.js';
+import { canonicalizePath } from '../src/security/path-policy.js';
 import { folderMapReduceRecipe } from '../src/orchestrator/recipes/folder-map-reduce.js';
 import { officeTeamRecipe } from '../src/orchestrator/recipes/office-team.js';
 import { pptFromFolderRecipe } from '../src/orchestrator/recipes/ppt-from-folder.js';
@@ -509,7 +510,9 @@ test('Subagent task runner executes bounded read-only SearchWorkspace tool plan'
   assert.match(String(result.structured.subagentRunId || ''), /^run_/);
   assert.equal(calls.length, 1);
   assert.equal(calls[0]?.name, 'SearchWorkspace');
-  assert.equal(calls[0]?.trustedRoot, root);
+  // assertTrustedPath canonicalizes the trusted root (resolves Windows 8.3 short
+  // names like ADMINI~1 to their real long-form path) before tool calls see it.
+  assert.equal(calls[0]?.trustedRoot, canonicalizePath(root));
   assert.ok(fs.existsSync(path.join(runStoreRoot, `${String(result.structured.subagentRunId)}.json`)));
 });
 
