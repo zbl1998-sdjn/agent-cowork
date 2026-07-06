@@ -11,6 +11,7 @@ import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 import { readMemorySettings } from '../memory/memory-control.js';
 import { readEgressAuditRecords, summariseEgressAudit } from '../security/egress-audit.js';
 import { isConfidentialMode } from '../security/confidential.js';
+import { handleSecurityDataRoutes } from './security-data-routes.js';
 import { buildTrustReport } from '../security/trust-report.js';
 import {
   buildCapabilityInstallPlan,
@@ -338,6 +339,11 @@ export async function handleSystemRoutes({
     await withParsedDependencyPlanBody(request, response, 'invalid runtime dependency update plan request', (body) => {
       sendJson(response, 200, buildRuntimeDependencyUpdatePlan(dependencyPlanOptions(body, state.config.runtimeDependencyAppDataRoot)));
     });
+    return true;
+  }
+
+  // 数据销毁/保留(切片 2d)拆到独立模块,避免 system-routes 变上帝文件。
+  if (await handleSecurityDataRoutes({ request, response, pathname, requestContext, trustedRoot: state.trustedRootDefault })) {
     return true;
   }
 
