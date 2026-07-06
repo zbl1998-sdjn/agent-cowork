@@ -1,0 +1,262 @@
+<style>
+  :root {
+    --paper: #faf9f6;
+    --card: #ffffff;
+    --ink: #23201c;
+    --ink-soft: #5c554b;
+    --muted: #8a8479;
+    --edge: #e7e2d8;
+    --cowork: #b5482f;
+    --cowork-soft: #f3e4de;
+    --workbuddy: #0a5fd4;
+    --workbuddy-soft: #dde8fb;
+    --good: #2f7d55;
+    --warn: #a5702a;
+    --none: #b04a3f;
+    --shadow: 0 1px 2px rgba(35,32,28,.04), 0 8px 24px rgba(35,32,28,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #17150f; --card: #201d17; --ink: #ece7dc; --ink-soft: #b3ab9c;
+      --muted: #857e70; --edge: #322d24; --cowork: #e0714f; --cowork-soft: #3a2318;
+      --workbuddy: #5f9bf0; --workbuddy-soft: #17233a;
+      --good: #6bbf8e; --warn: #d3a35f; --none: #e0857a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #17150f; --card: #201d17; --ink: #ece7dc; --ink-soft: #b3ab9c;
+    --muted: #857e70; --edge: #322d24; --cowork: #e0714f; --cowork-soft: #3a2318;
+    --workbuddy: #5f9bf0; --workbuddy-soft: #17233a;
+    --good: #6bbf8e; --warn: #d3a35f; --none: #e0857a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #faf9f6; --card: #ffffff; --ink: #23201c; --ink-soft: #5c554b;
+    --muted: #8a8479; --edge: #e7e2d8; --cowork: #b5482f; --cowork-soft: #f3e4de;
+    --workbuddy: #0a5fd4; --workbuddy-soft: #dde8fb;
+    --good: #2f7d55; --warn: #a5702a; --none: #b04a3f;
+    --shadow: 0 1px 2px rgba(35,32,28,.04), 0 8px 24px rgba(35,32,28,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-size: clamp(28px, 4.5vw, 44px); line-height: 1.1; margin: 12px 0 0; text-wrap: balance; letter-spacing: -.02em; }
+  h1 .vs { color: var(--muted); font-weight: 400; margin: 0 .3em; }
+  h1 .a { color: var(--cowork); }
+  h1 .b { color: var(--workbuddy); }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 62ch; margin: 18px 0 0; text-wrap: pretty; }
+  .meta { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+  .verdict { margin: 40px 0; padding: 22px 24px; background: var(--card); border: 1px solid var(--edge); border-left: 3px solid var(--cowork); border-radius: 12px; box-shadow: var(--shadow); }
+  .verdict strong { color: var(--cowork); }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 36px 0; }
+  @media (max-width: 680px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--edge); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
+  .card.a { border-top: 3px solid var(--cowork); }
+  .card.b { border-top: 3px solid var(--workbuddy); }
+  .card h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+  .card.a h2 { color: var(--cowork); }
+  .card.b h2 { color: var(--workbuddy); }
+  .card .tag { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  .card.a .tag { background: var(--cowork-soft); color: var(--cowork); }
+  .card.b .tag { background: var(--workbuddy-soft); color: var(--workbuddy); }
+  .card p { font-size: 14px; color: var(--ink-soft); margin: 14px 0 0; }
+  .card dl { margin: 16px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; }
+  .card dt { color: var(--muted); }
+  .card dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .section-label { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 48px 0 16px; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--edge); border-radius: 14px; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; background: var(--card); }
+  thead th { text-align: left; padding: 14px 16px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--edge); position: sticky; top: 0; background: var(--card); }
+  thead th.a { color: var(--cowork); }
+  thead th.b { color: var(--workbuddy); }
+  tbody td { padding: 13px 16px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--paper) 55%, transparent); }
+  .dim { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; margin-bottom: 4px; }
+  .chip.yes { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .chip.part { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .chip.no { background: color-mix(in srgb, var(--none) 14%, transparent); color: var(--none); }
+  .chip.unk { background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+  td small { display: block; color: var(--ink-soft); font-size: 12.5px; line-height: 1.5; }
+  .win { box-shadow: inset 3px 0 0 var(--cowork); }
+
+  .edge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 680px) { .edge-grid { grid-template-columns: 1fr; } }
+  .edge-col { background: var(--card); border: 1px solid var(--edge); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); }
+  .edge-col.a { border-top: 3px solid var(--cowork); }
+  .edge-col.b { border-top: 3px solid var(--workbuddy); }
+  .edge-col h3 { margin: 0 0 4px; font-size: 16px; }
+  .edge-col.a h3 { color: var(--cowork); }
+  .edge-col.b h3 { color: var(--workbuddy); }
+  .edge-col ul { margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .edge-col li { font-size: 13.5px; color: var(--ink-soft); padding-left: 18px; position: relative; }
+  .edge-col li::before { content: ""; position: absolute; left: 0; top: 8px; width: 7px; height: 7px; border-radius: 2px; }
+  .edge-col.a li::before { background: var(--cowork); }
+  .edge-col.b li::before { background: var(--workbuddy); }
+  .edge-col li b { color: var(--ink); font-weight: 600; }
+
+  .sources { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--edge); font-size: 12.5px; color: var(--muted); }
+  .sources a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+  .sources p { margin: 6px 0; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">竞品全方位对比 · 本地办公 AI Agent</div>
+  <h1><span class="a">Agent Cowork</span><span class="vs">对比</span><span class="b">腾讯 WorkBuddy</span></h1>
+  <p class="lede">两款定位几乎重合的产品:都在本地跑、都把"帮你把办公活干完"当卖点、都支持多模型与 MCP。差别不在方向,而在<strong>安全边界的深度、模型与自托管的开放度,以及生态与厂商背书的成熟度</strong>。</p>
+  <p class="meta">对比口径:Agent Cowork 数据取自本仓库 README(一手);WorkBuddy 数据取自官网 + 第三方评测(截至 2026-07,标注见文末)。</p>
+
+  <div class="verdict">
+    一句话结论:<strong>Agent Cowork</strong> 的护城河是<strong>可审计的安全治理 + 开源自托管 + 更宽的模型选择</strong>;<span style="color:var(--workbuddy);font-weight:600">WorkBuddy</span> 的护城河是<strong>腾讯背书 + 成熟的集成生态 + 多 Agent 编排的产品化程度</strong>。选型取决于你更看重"可控与可自托管"还是"开箱即用与生态"。
+  </div>
+
+  <div class="cards">
+    <div class="card a">
+      <h2>Agent Cowork</h2>
+      <span class="tag">独立开源 · MIT</span>
+      <p>生产级 Agentic 系统:tool-calling loop + 计划审批,强调本地文件操作、安全边界与工程韧性。面向看重可控、可审计、可自托管的用户。</p>
+      <dl>
+        <dt>形态</dt><dd>Node 后端 + React + Tauri 2 桌面</dd>
+        <dt>模型厂商</dt><dd>22 家(BYO-key + fallback)</dd>
+        <dt>安全档位</dt><dd>5 档 + 出口审计</dd>
+        <dt>测试</dt><dd>host 995 / ui 359,覆盖 94%</dd>
+        <dt>阶段</dt><dd>早期 / MVP,开源</dd>
+      </dl>
+    </div>
+    <div class="card b">
+      <h2>腾讯 WorkBuddy</h2>
+      <span class="tag">Tencent · 商业闭源</span>
+      <p>腾讯的"日常办公 AI Agent":多 Agent 拆解并行、20+ 技能包、企业 IM 集成。面向 PM / 分析师 / 运营的重复多步工作流。</p>
+      <dl>
+        <dt>形态</dt><dd>本地 desktop 客户端 + 企业 IM Bot</dd>
+        <dt>模型厂商</dt><dd>5 家(混元/DeepSeek/GLM/Kimi/MiniMax)</dd>
+        <dt>安全档位</dt><dd>依赖组织配置</dd>
+        <dt>技能包</dt><dd>20+</dd>
+        <dt>阶段</dt><dd>已发布(2026-03),腾讯云</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="section-label">全方位对比</div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>维度</th><th class="a">Agent Cowork</th><th class="b">腾讯 WorkBuddy</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="dim">厂商 / 授权</td>
+          <td><span class="chip yes">开源</span><small>独立项目,MIT 许可,可自托管、可审计源码</small></td>
+          <td><span class="chip part">大厂闭源</span><small>腾讯出品,商业产品,背书与支持强,但不可自托管</small></td>
+        </tr>
+        <tr>
+          <td class="dim">任务范式</td>
+          <td><small>Agentic tool-loop(Read/Write/Edit/Glob/Grep/Shell/WebFetch)+ 计划模式(审批后才写)</small></td>
+          <td><small>Multi-agent 编排:拆解 → 专门 Agent 并行 → 组装成品</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">安全 / 审批</td>
+          <td><span class="chip yes">纵深</span><small>5 档安全模式 + 出站网关审计留痕 + 逐次审批 + path-policy 路径 jail + SSRF 守卫 + 提示注入检测(InjectionGuard)+ 记忆 DLP 脱敏</small></td>
+          <td><span class="chip part">依赖配置</span><small>本地处理(文档不必上云);但第三方评测指出<b>无自动审批工作流、无数据驻留保证</b>,安全取决于组织自行配置</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">模型选择</td>
+          <td><span class="chip yes">22 家</span><small>OpenAI/Anthropic 兼容 22 家 + 会话级 BYO-key 覆盖 + 按 provider 串行 fallback 熔断 + 成本归因;模型目录接 models.dev 实时更新</small></td>
+          <td><span class="chip part">5 家</span><small>混元 / DeepSeek / GLM / Kimi / MiniMax 切换,按任务选模型平衡成本延迟</small></td>
+        </tr>
+        <tr>
+          <td class="dim">MCP 协议</td>
+          <td><span class="chip yes">完整四层</span><small>StdioTransport → JsonRpc → McpClient → connect,命名空间化工具</small></td>
+          <td><span class="chip yes">支持</span><small>MCP-style 可插拔工具,按需调用</small></td>
+        </tr>
+        <tr>
+          <td class="dim">多 Agent / 并行</td>
+          <td><span class="chip yes">子代理</span><small>subagent/run + AgentParallel:独立上下文预算/步数上限,写入型仍走审批</small></td>
+          <td><span class="chip yes">编排成熟</span><small>多窗口多 Agent 并行,产品化程度高(核心卖点)</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">集成生态</td>
+          <td><span class="chip part">起步</span><small>文件系统 MCP + GitHub OAuth(device flow,scope 审批、凭证 DPAPI 保护)</small></td>
+          <td><span class="chip yes">广</span><small>GitHub/Jira/Notion/Google Drive/Gmail/Slack/Discord + 微信/飞书/钉钉/QQ/Telegram,可从 IM 派发任务</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">记忆</td>
+          <td><span class="chip yes">五层 + DLP</span><small>内置五层记忆(企业/用户/项目/本地/会话)+ 可选 MASE 桥接;写入过 DLP 分级、注入前读侧脱敏,召回 2.5s 硬超时安全降级</small></td>
+          <td><span class="chip unk">未披露</span><small>公开资料未明确记忆架构</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">工程韧性</td>
+          <td><span class="chip yes">完备</span><small>CircuitBreaker 三态 + Token Bucket 限流 + BudgetGuard(token/成本/wall-clock 硬上限)+ Checkpoint/Resume 崩溃续跑 + LoopGuard</small></td>
+          <td><span class="chip unk">未披露</span><small>公开资料未明确韧性机制</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">可观测 / 评测</td>
+          <td><span class="chip yes">内建</span><small>每 run 带 token/成本/耗时/失败率 + 决策 trace;<code>npm run eval</code> 跑 golden + 红队集,离线回放 fail-closed</small></td>
+          <td><span class="chip unk">未披露</span><small>公开资料未明确评测体系</small></td>
+        </tr>
+        <tr>
+          <td class="dim">成品产物</td>
+          <td><small>Markdown / DOCX / XLSX / PPTX / PDF,本地 OOXML writer;可把一次操作存成配方复用</small></td>
+          <td><small>报告 / PPT / 表格等可验证成品;20+ 技能包覆盖研究/分析/沟通</small></td>
+        </tr>
+        <tr class="win">
+          <td class="dim">存储 / 部署</td>
+          <td><span class="chip yes">单机+多实例</span><small>SQLite(单机)/ PostgreSQL(多实例,LISTEN/NOTIFY 跨实例审批);Node SEA 打包</small></td>
+          <td><span class="chip part">桌面</span><small>本地 desktop 客户端 + 腾讯云生态</small></td>
+        </tr>
+        <tr>
+          <td class="dim">成熟度</td>
+          <td><span class="chip part">早期</span><small>MVP 阶段,但测试/覆盖/红队门禁完备(995+359 测试,94% 覆盖,red team no high severity)</small></td>
+          <td><span class="chip yes">已发布</span><small>2026-03 正式发布,腾讯云商业运营,生态成熟</small></td>
+        </tr>
+        <tr>
+          <td class="dim">主要短板</td>
+          <td><small>集成生态起步、品牌与商业化早期、桌面 exe 需自行构建/分发</small></td>
+          <td><small>第三方评测:偏中国市场、国际文档/功能深度滞后、高级用法设置复杂、闭源不可自托管、安全靠自配</small></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-label">双向差异化 — 各自的护城河</div>
+  <div class="edge-grid">
+    <div class="edge-col a">
+      <h3>Agent Cowork 更强的地方</h3>
+      <ul>
+        <li><b>可审计的安全治理</b>:5 档安全模式 + 出口网关审计 + 逐次审批 + 路径 jail + 提示注入检测,是"可控/可自托管"场景的硬优势(评测指 WorkBuddy 无自动审批与数据驻留保证)。</li>
+        <li><b>开源 + 自托管</b>:MIT 许可、源码可审计、可私有部署(SQLite/PostgreSQL 双后端),不绑定单一云。</li>
+        <li><b>模型开放度</b>:22 家 provider + BYO-key + fallback 熔断,接 models.dev 实时更新,远多于 WorkBuddy 的 5 家。</li>
+        <li><b>工程韧性与评测</b>:CircuitBreaker / BudgetGuard / Checkpoint 续跑 + token/成本 trace + 红队评测门禁,可观测性成体系。</li>
+      </ul>
+    </div>
+    <div class="edge-col b">
+      <h3>WorkBuddy 更强的地方</h3>
+      <ul>
+        <li><b>厂商背书与成熟度</b>:腾讯出品、已正式发布并商业运营,稳定性与支持是独立项目短期难比的。</li>
+        <li><b>集成生态广</b>:GitHub/Jira/Notion/Drive/Slack + 微信/飞书/钉钉/QQ/Telegram,能直接从企业 IM 派发任务,贴合国内团队工作流。</li>
+        <li><b>多 Agent 编排产品化</b>:多窗口多 Agent 并行是其核心卖点,编排成熟度高。</li>
+        <li><b>开箱即用</b>:20+ 技能包 + 云生态,普通团队上手成本低,无需自建后端。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sources">
+    <p><b>数据来源与口径</b></p>
+    <p>Agent Cowork:本仓库 <code>README.md</code>(一手,含测试/覆盖/安全边界描述);功能均可在源码核对。</p>
+    <p>WorkBuddy:<a href="https://www.workbuddy.ai/">workbuddy.ai 官网</a>、<a href="https://technode.com/2026/03/09/tencent-launches-openclaw-like-workplace-ai-agent-workbuddy/">TechNode 报道</a>、<a href="https://www.eigent.ai/blog/workbuddy-ai-review">eigent.ai 第三方评测</a>、<a href="https://www.tencentcloud.com/techpedia/144100?lang=en">腾讯云文档</a>。第三方评测为独立观点,"无自动审批/数据驻留保证""偏中国市场"等表述来自 eigent.ai review,可能不代表 WorkBuddy 最新版本。</p>
+    <p>对比时间:2026-07;WorkBuddy 为闭源商业产品,部分内部机制(记忆/韧性/评测)无公开资料,标注为"未披露"而非"没有"。</p>
+  </div>
+</div>

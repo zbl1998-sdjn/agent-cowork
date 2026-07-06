@@ -1,0 +1,56 @@
+/* ================= UX + 视觉细化轮次 ================= */
+:root { --ring: 0 0 0 3px rgba(201,100,66,0.22); }
+html { scroll-behavior: smooth; }
+
+/* 自定义滚动条(克制且跟随主题) */
+.timeline, .conv-list, .side-drawer, .cmdk-list, .toolcall-args, .toolcall-result, .panel-result { scrollbar-width: thin; scrollbar-color: #cfcdc5 transparent; }
+.timeline::-webkit-scrollbar, .conv-list::-webkit-scrollbar, .side-drawer::-webkit-scrollbar, .cmdk-list::-webkit-scrollbar { width: 10px; height: 10px; }
+.timeline::-webkit-scrollbar-thumb, .conv-list::-webkit-scrollbar-thumb, .side-drawer::-webkit-scrollbar-thumb, .cmdk-list::-webkit-scrollbar-thumb { background: rgba(120,116,108,0.35); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+.timeline::-webkit-scrollbar-thumb:hover { background: rgba(120,116,108,0.55); background-clip: content-box; }
+[data-theme="dark"] .timeline, [data-theme="dark"] .conv-list, [data-theme="dark"] .side-drawer, [data-theme="dark"] .cmdk-list { scrollbar-color: #4a4a40 transparent; }
+
+/* 给键盘用户统一 focus-visible 光环 */
+button:focus-visible, input:focus-visible, textarea:focus-visible, .conv-item:focus-visible, .popover-item:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 8px; }
+
+/* 头部细化 */
+.app-header { box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+.app-header h1 { letter-spacing: -0.01em; }
+.header-actions button { transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease; }
+.header-actions button:hover { transform: translateY(-1px); }
+
+/* 头像 + 气泡 */
+.bubble-avatar { box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.bubble { animation: kcw-rise 0.24s cubic-bezier(0.2,0.7,0.2,1) both; }
+@keyframes kcw-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.bubble-user .bubble-body { box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+/* 助手正文阅读舒适度 */
+.bubble-assistant .message-text { font-size: 14.5px; line-height: 1.75; }
+.message-text h3, .message-text h4 { letter-spacing: -0.01em; }
+
+/* 输入框:更柔和,聚焦时带光晕 */
+.composer { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+.composer:focus-within { border-color: #c0846f; box-shadow: 0 22px 50px rgba(27,28,30,0.14); }
+.composer .send-button { transition: transform 0.12s ease, filter 0.15s ease; }
+.composer .send-button:hover { --send-button-bg: var(--send-button-bg-hover); transform: translateY(-1px); filter: none; }
+.composer .send-button:active { transform: translateY(0); }
+
+/* 空状态首屏 */
+.empty-state strong { font-size: 24px; letter-spacing: -0.02em; background: linear-gradient(135deg, #c96442, #db7658); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.empty-state p { font-size: 14px; }
+
+/* 侧边抽屉滑入 */
+.side-drawer { animation: kcw-slide-in 0.2s ease both; }
+@keyframes kcw-slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cmdk { animation: kcw-rise 0.16s ease both; }
+
+/* 胶囊和卡片 hover 时轻微抬起 */
+.starter-chip, .suggestion-chip, .conv-item { transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
+.starter-chip:hover { transform: translateY(-1px); }
+
+/* 尊重减少动态效果设置 */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .bubble, .side-drawer, .cmdk, .progress-line.is-running::before, .turn-status::before, .toolcall-icon.icon-running { animation: none !important; }
+  * { transition: none !important; }
+}

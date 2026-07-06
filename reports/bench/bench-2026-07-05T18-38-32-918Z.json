@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "generatedAt": "2026-07-05T18:38:32.934Z",
+  "mode": "local-offline",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\bench\\workspace",
+  "baseUrl": "http://127.0.0.1:61784",
+  "metrics": {
+    "startupMs": 3.0024000000000797,
+    "health": {
+      "status": 200,
+      "firstByteMs": 9.975500000000011,
+      "totalMs": 10.623599999999897,
+      "bytes": 41
+    },
+    "firstScreen": {
+      "status": 200,
+      "firstByteMs": 2.31899999999996,
+      "totalMs": 2.4220000000000255,
+      "bytes": 1244
+    },
+    "streamingFrames": {
+      "frameCount": 2000,
+      "parsed": 2000,
+      "elapsedMs": 0.14709999999990941,
+      "framesPerSecond": 13596193
+    },
+    "memory": {
+      "rssMb": 375.3,
+      "heapUsedMb": 38.5,
+      "heapTotalMb": 65.7,
+      "externalMb": 4
+    }
+  },
+  "thresholds": {
+    "startupMs": 2500,
+    "firstScreenMs": 3000,
+    "frameProcessingMs": 500,
+    "rssMb": 512,
+    "heapUsedMb": 192
+  },
+  "failOnRegression": false,
+  "thresholdChecks": [
+    {
+      "name": "startupMs",
+      "actual": 3.0024000000000797,
+      "threshold": 2500,
+      "status": "pass"
+    },
+    {
+      "name": "firstScreenMs",
+      "actual": 2.31899999999996,
+      "threshold": 3000,
+      "status": "pass"
+    },
+    {
+      "name": "frameProcessingMs",
+      "actual": 0.14709999999990941,
+      "threshold": 500,
+      "status": "pass"
+    },
+    {
+      "name": "rssMb",
+      "actual": 375.3,
+      "threshold": 512,
+      "status": "pass"
+    },
+    {
+      "name": "heapUsedMb",
+      "actual": 38.5,
+      "threshold": 192,
+      "status": "pass"
+    }
+  ]
+}

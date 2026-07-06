@@ -59,6 +59,14 @@ export function markdownOperation(trustedRoot: string, recipeId: string, filenam
   };
 }
 
+export function textOperation(trustedRoot: string, recipeId: string, filename: string, content: string): FileOperationInput {
+  return {
+    type: 'write',
+    path: artifactPath(trustedRoot, recipeId, filename),
+    content,
+  };
+}
+
 export function binaryOperation(trustedRoot: string, recipeId: string, filename: string, buffer: Buffer): FileOperationInput {
   return {
     type: 'write',
@@ -109,7 +117,9 @@ export function parseTableRows(text: string): ParsedTable {
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 200);
-  const rows = lines
+  const firstDelimitedLine = lines.findIndex((line) => line.includes('\t') || line.includes(','));
+  const tableLines = firstDelimitedLine > 0 ? lines.slice(firstDelimitedLine) : lines;
+  const rows = tableLines
     .map((line) => (line.includes('\t') ? line.split('\t') : line.split(',')))
     .map((row) => row.map((cell) => cell.trim()).filter((cell) => cell !== ''))
     .filter((row) => row.length > 0);

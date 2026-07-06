@@ -174,7 +174,7 @@ test('summary-report recipe produces Office document artifacts', () => {
   });
   const paths = result.operations.map(operationPath);
 
-  assert.ok(paths.some((item) => item.endsWith('.md')));
+  assert.ok(paths.some((item) => item.endsWith('.txt')));
   assert.ok(paths.some((item) => item.endsWith('.docx')));
   assert.ok(paths.some((item) => item.endsWith('.pptx')));
   assert.ok(paths.some((item) => item.endsWith('.pdf')));
@@ -244,7 +244,7 @@ test('captureRun falls back to runsIndex runPath when runStoreRoot has no record
     events: [
       {
         type: 'preview',
-        operations: [{ type: 'write', path: path.join(root, '.AgentCowork', 'artifacts', 'summary.md') }],
+        operations: [{ type: 'write', path: path.join(root, '.AgentCowork', 'artifacts', 'summary.txt') }],
       },
     ],
   });

@@ -8,11 +8,20 @@ import { SECURITY_HEADERS } from '../http/middleware/common.js';
 import { omitUndefined } from '../util/object.js';
 import { readDesktopUpdateManifest } from '../runtime/desktop-update-source.js';
 import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
+import { readMemorySettings } from '../memory/memory-control.js';
+import { readEgressAuditRecords, summariseEgressAudit } from '../security/egress-audit.js';
+import { buildTrustReport } from '../security/trust-report.js';
+import {
+  buildCapabilityInstallPlan,
+  listCapabilityPacks,
+  recommendCapabilityPacks,
+} from '../runtime/capability-packs.js';
 import {
   buildRuntimeDependencyCleanupPlan,
   buildRuntimeDependencyInstallPlan,
   buildRuntimeDependencyUpdatePlan,
 } from '../runtime/dependency-install-plan.js';
+import { buildFallbackStatus } from '../runtime/fallback-engine.js';
 import {
   dependencyPlanOptions,
   parseCancelRunId,
@@ -54,6 +63,7 @@ type HostStateLike = {
   rateLimiter?: RateLimiterLike | null;
   draining?: boolean;
   kimiApiConfig: KimiApiConfigLike;
+  securityMode?: string;
   kimiApiEnabled?: boolean;
   sandboxEnabled?: boolean;
   sandbox?: SandboxLike | null;
@@ -69,6 +79,7 @@ export type SystemRouteOptions = {
   request: RouteRequest;
   response: HttpResponseLike;
   pathname: string;
+  requestUrl: URL;
   requestContext: SystemRequestContext;
   state: HostStateLike;
 };
@@ -85,7 +96,30 @@ function safeModelBreakerStats(): CircuitBreakerStats[] {
   }
 }
 
-export async function handleSystemRoutes({ request, response, pathname, requestContext, state }: SystemRouteOptions): Promise<boolean> {
+function runtimeDependencyStatus(state: HostStateLike) {
+  return getRuntimeDependencyStatus(omitUndefined({
+    env: state.config.runtimeDependencyEnv || process.env,
+    platform: state.config.runtimeDependencyPlatform || process.platform,
+    sandboxStartup: state.sandboxStartup,
+  }));
+}
+
+function safeMemorySettings(state: HostStateLike) {
+  try {
+    return readMemorySettings(state.trustedRootDefault);
+  } catch {
+    return null;
+  }
+}
+
+export async function handleSystemRoutes({
+  request,
+  response,
+  pathname,
+  requestUrl,
+  requestContext,
+  state,
+}: SystemRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/health') {
     sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
     return true;
@@ -161,6 +195,7 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
       checks.push({ id, status: ok ? 'pass' : 'warn', detail });
     };
     add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
+    add('security-mode', true, state.securityMode || 'controlled_hybrid');
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
     add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
     add('rate-limit', Boolean(rateLimitStats), rateLimitStats ? `${rateLimitStats.ratePerSec}/s · burst ${rateLimitStats.burst}` : '限流未启用');
@@ -175,6 +210,7 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
       service: 'agent-cowork-host',
       time: new Date().toISOString(),
       security: {
+        mode: state.securityMode || 'controlled_hybrid',
         responseHeaders: Object.keys(SECURITY_HEADERS),
         cors: 'loopback+tauri only',
         apiKey: { configured: state.kimiApiConfig.configured, hasKey: Boolean(state.kimiApiConfig.apiKey) },
@@ -198,12 +234,86 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
     return true;
   }
 
+  if (request.method === 'GET' && pathname === '/api/security/egress/summary') {
+    const summary = summariseEgressAudit(readEgressAuditRecords(state.trustedRootDefault));
+    sendJson(response, 200, { ok: true, summary, context: requestContext });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/security/trust-report') {
+    sendJson(response, 200, {
+      ok: true,
+      report: buildTrustReport({
+        trustedRoot: state.trustedRootDefault,
+        securityMode: state.securityMode,
+        modelConfig: state.kimiApiConfig as unknown as Record<string, unknown>,
+        sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
+      }),
+      context: requestContext,
+    });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/security/status') {
+    const report = buildTrustReport({
+      trustedRoot: state.trustedRootDefault,
+      securityMode: state.securityMode,
+      modelConfig: state.kimiApiConfig as unknown as Record<string, unknown>,
+      sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
+    });
+    sendJson(response, 200, {
+      ok: report.ok,
+      securityMode: report.securityMode,
+      model: report.model,
+      egress: report.egress,
+      checks: report.checks,
+      context: requestContext,
+    });
+    return true;
+  }
+
+  if (request.method === 'GET' && (pathname === '/api/capabilities' || pathname === '/api/capabilities/catalog')) {
+    sendJson(response, 200, { ok: true, packs: listCapabilityPacks(), context: requestContext });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/capabilities/recommend') {
+    sendJson(response, 200, {
+      ok: true,
+      recommendations: recommendCapabilityPacks({
+        role: requestUrl.searchParams.get('role') || undefined,
+        taskIntent: requestUrl.searchParams.get('taskIntent') || undefined,
+      }),
+      context: requestContext,
+    });
+    return true;
+  }
+
+  if (request.method === 'POST' && (pathname === '/api/install/plan' || pathname === '/api/capabilities/install-plan')) {
+    await withParsedDependencyPlanBody(request, response, 'invalid capability install plan request', (body) => {
+      sendJson(response, 200, buildCapabilityInstallPlan(dependencyPlanOptions(body, state.config.runtimeDependencyAppDataRoot)));
+    });
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/fallback/status') {
+    const dependencies = runtimeDependencyStatus(state);
+    sendJson(response, 200, {
+      ...buildFallbackStatus(omitUndefined({
+        modelConfigured: state.kimiApiConfig.configured,
+        sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
+        sandboxMessage: state.sandboxStartup?.info?.userMessage,
+        memorySettings: safeMemorySettings(state),
+        dependencies,
+      })),
+      dependencies,
+      context: requestContext,
+    });
+    return true;
+  }
+
   if (request.method === 'GET' && pathname === '/api/runtime/dependencies') {
-    sendJson(response, 200, getRuntimeDependencyStatus(omitUndefined({
-      env: state.config.runtimeDependencyEnv || process.env,
-      platform: state.config.runtimeDependencyPlatform || process.platform,
-      sandboxStartup: state.sandboxStartup,
-    })));
+    sendJson(response, 200, runtimeDependencyStatus(state));
     return true;
   }
 
@@ -232,6 +342,7 @@ export async function handleSystemRoutes({ request, response, pathname, requestC
     sendJson(response, 200, {
       trustedRoot: state.trustedRootDefault,
       context: requestContext,
+      securityMode: state.securityMode || 'controlled_hybrid',
       kimiApi: {
         provider: modelProvider(state.kimiApiConfig),
         configured: state.kimiApiConfig.configured,

@@ -47,7 +47,7 @@ const HOST_LAYERS = [
       'workspace/',
     ],
   },
-  { name: 'L2', rank: 2, prefixes: ['runtime/'] },
+  { name: 'L2', rank: 2, prefixes: ['orchestrator/', 'runtime/'] },
   { name: 'L3', rank: 3, prefixes: ['routes/'] },
   { name: 'L4', rank: 4, files: ['server.ts', 'main.ts'] },
 ] satisfies HostLayer[];

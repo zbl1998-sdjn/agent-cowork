@@ -3,21 +3,25 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { Conversation } from '../lib/app-types';
 import { ConversationRail } from './ConversationRail';
-import { Button, IconButton } from './ui/Button';
 
 function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
   const matches: ReactElement<Record<string, any>>[] = [];
   const visit = (value: ReactNode) => {
     Children.forEach(value, (child) => {
       if (!isValidElement(child)) return;
-      if (child.type === type) {
-        matches.push(child as ReactElement<Record<string, any>>);
-      }
+      if (child.type === type) matches.push(child as ReactElement<Record<string, any>>);
       visit((child.props as { children?: ReactNode }).children);
     });
   };
   visit(node);
   return matches;
+}
+
+function textOf(value: ReactNode): string {
+  if (Array.isArray(value)) return value.map(textOf).join('');
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (isValidElement(value)) return textOf((value.props as { children?: ReactNode }).children);
+  return '';
 }
 
 const conversations: Conversation[] = [
@@ -32,6 +36,7 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
     conversations,
     renamingId: null,
     renameText: '',
+    panel: 'none',
     onCommitRename: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
@@ -42,41 +47,47 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
     onSwitchBranch: vi.fn(),
     onSwitch: vi.fn(),
     onTogglePin: vi.fn(),
+    onNavigate: vi.fn(),
     ...overrides,
   };
 }
 
 describe('ConversationRail', () => {
-  it('renders conversation actions with Button primitives', () => {
+  it('renders a Claude-style nav center: brand, new chat, 8 panels, search, recents', () => {
     const html = renderToStaticMarkup(<ConversationRail {...props()} />);
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(3);
-    expect(html.match(/class="ui-icon-btn/g)?.length).toBe(8);
-    expect(html).toContain('new-conv-btn');
-    expect(html).toContain('conv-title');
-    expect(html).toContain('aria-label="删除"');
-    expect(html).toContain('title="导出 Markdown"');
+    expect(html).toContain('rail-brand');
+    expect(html).toContain('Agent Cowork');
+    expect(html).toContain('rail-release-badge');
+    expect(html).toContain('Beta');
+    expect(html).toContain('rail-new');
+    expect(html).toContain('新建对话');
+    expect(html.match(/rail-nav-item/g)?.length).toBe(8);
+    expect(html).toContain('工具');
+    expect(html).toContain('连接器');
+    expect(html).toContain('记忆');
+    expect(html).toContain('可视化');
+    expect(html).toContain('rail-search');
+    expect(html).toContain('最近');
+    expect(html).toContain('主线');
+    // 底部 footer 已移除(对齐 Claude 极简侧栏,设置/主题走顶栏)
+    expect(html).not.toContain('rail-footer');
   });
 
-  it('keeps conversation action callbacks wired', () => {
-    const callbacks = props();
-    const tree = ConversationRail(callbacks);
-    const buttons = collectByType(tree, Button);
-    const iconButtons = collectByType(tree, IconButton);
+  it('wires nav, new-chat and conversation callbacks', () => {
+    const p = props();
+    const buttons = collectByType(ConversationRail(p), 'button');
 
-    buttons.find((button) => button.props.className === 'new-conv-btn')?.props.onClick();
-    buttons.find((button) => button.props.className === 'conv-title')?.props.onClick();
-    iconButtons.find((button) => button.props.label === '取消置顶')?.props.onClick();
-    iconButtons.find((button) => button.props.label === '导出 Markdown')?.props.onClick();
-    iconButtons.find((button) => button.props.label === '重命名')?.props.onClick();
-    iconButtons.find((button) => button.props.label === '删除')?.props.onClick();
+    buttons.find((b) => (b.props.className || '') === 'rail-new')?.props.onClick();
+    buttons.find((b) => (b.props.className || '').includes('rail-nav-item') && textOf(b.props.children).includes('工具'))?.props.onClick();
+    buttons.find((b) => (b.props.className || '') === 'conv-title' && textOf(b.props.children).includes('主线'))?.props.onClick();
+    buttons.find((b) => b.props['aria-label'] === '取消置顶')?.props.onClick();
+    buttons.find((b) => b.props['aria-label'] === '删除')?.props.onClick();
 
-    expect(callbacks.onNew).toHaveBeenCalledOnce();
-    expect(callbacks.onSwitch).toHaveBeenCalledWith('c1');
-    expect(callbacks.onTogglePin).toHaveBeenCalledWith('c1');
-    expect(callbacks.onExport).toHaveBeenCalledWith('c1');
-    expect(callbacks.onSetRenamingId).toHaveBeenCalledWith('c1');
-    expect(callbacks.onRenameText).toHaveBeenCalledWith('主线');
-    expect(callbacks.onDelete).toHaveBeenCalledWith('c1');
+    expect(p.onNew).toHaveBeenCalledOnce();
+    expect(p.onNavigate).toHaveBeenCalledWith('tools');
+    expect(p.onSwitch).toHaveBeenCalledWith('c1');
+    expect(p.onTogglePin).toHaveBeenCalledWith('c1');
+    expect(p.onDelete).toHaveBeenCalledWith('c1');
   });
 });

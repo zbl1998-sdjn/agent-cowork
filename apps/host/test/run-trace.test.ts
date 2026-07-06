@@ -7,6 +7,7 @@ import {
   replayRunTraceEvents,
 } from '../src/runtime/run-trace.js';
 import { runAgentChat } from '../src/kimi/agent/tool-loop.js';
+import { traceModelContext, traceToolDecision, traceToolResult } from '../src/kimi/agent/run-trace-events.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -100,6 +101,27 @@ test('RunTrace appends sanitized entries and publishes replayable run events', (
   const runTraceEvents = bus.replay('run_trace_1', 0);
   assert.equal(runTraceEvents.length, 3);
   assert.deepEqual(replayRunTraceEvents(runTraceEvents), entries);
+});
+
+test('agent run trace helpers append diagnostic events and never interrupt execution', () => {
+  const events: Record<string, unknown>[] = [];
+  const runTrace = {
+    append(event: Record<string, unknown>) {
+      events.push(event);
+    },
+  };
+
+  traceModelContext(runTrace, 2, [{ role: 'user', content: 'hi' }], [{ name: 'Read' }]);
+  traceToolDecision(runTrace, 2, { content: 'calling Read' });
+  traceToolResult(runTrace, 2, { id: 'call_1' }, 'Read', 'succeeded', { ok: true });
+  traceModelContext(null, 3, [], []);
+  traceToolResult({ append: () => { throw new Error('trace sink failed'); } }, 4, null, undefined, 'failed', { error: 'x' });
+
+  assert.deepEqual(events, [
+    { kind: 'model_context', step: 2, modelSaw: { messages: [{ role: 'user', content: 'hi' }], tools: [{ name: 'Read' }] } },
+    { kind: 'tool_decision', step: 2, modelMessage: { content: 'calling Read' } },
+    { kind: 'tool_result', step: 2, callId: 'call_1', tool: 'Read', status: 'succeeded', result: { ok: true } },
+  ]);
 });
 
 test('buildDecisionTraceFromMessages links model context, tool decisions, why text, and results', () => {

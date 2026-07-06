@@ -50,18 +50,16 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
   };
 
   return (
-    <div className="auth-screen">
-      <aside className="auth-aside" aria-hidden="true">
-        <div className="auth-aside-inner">
-          <span className="auth-logo"><span className="brand-dot auth-brand-dot" />Agent Cowork</span>
-          <h2>你的本地办公智能体</h2>
-          <p>读写工作区文件、运行代码、连接你的工具——全部在本机完成，关键操作先经你批准。</p>
-        </div>
-      </aside>
+    <div className="auth-screen auth-screen-quiet">
       <main className="auth-main">
         <form className="auth-card" onSubmit={submit}>
+          <div className="auth-card-brand">
+            <span className="brand-dot auth-brand-dot" aria-hidden="true" />
+            <span>Agent Cowork</span>
+            <span className="auth-release-badge" title="Internal beta build">Beta</span>
+          </div>
           <h1 className="auth-title">{mode === 'login' ? '登录' : '创建账户'}</h1>
-          <p className="auth-sub">{mode === 'login' ? '欢迎回来，登录后继续工作。' : '注册一个本地账户开始使用。'}</p>
+          <p className="auth-sub">{mode === 'login' ? '继续你的本地工作。' : '创建本地账户，隔离你的工作数据。'}</p>
           <div className="auth-tabs" role="tablist">
             <Button role="tab" aria-selected={mode === 'login'} variant="ghost" className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(''); }} style={authTabStyle(mode === 'login')}>登录</Button>
             <Button role="tab" aria-selected={mode === 'register'} variant="ghost" className={mode === 'register' ? 'is-active' : ''} onClick={() => { setMode('register'); setError(''); }} style={authTabStyle(mode === 'register')}>注册</Button>

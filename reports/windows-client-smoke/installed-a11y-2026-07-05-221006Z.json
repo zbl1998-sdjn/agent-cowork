@@ -1,0 +1,975 @@
+{
+  "ok": true,
+  "mode": "installed-a11y",
+  "generatedAt": "2026-07-05T22:10:08.888Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-a11y-workspace",
+  "debugPort": 64906,
+  "auth": {
+    "usedGuest": false,
+    "user": ""
+  },
+  "onboardingClosed": false,
+  "summary": {
+    "viewsScanned": 20,
+    "contrastIssues": 0,
+    "sendButtonMinContrast": 5.34,
+    "liveRegionCount": 3,
+    "timelineOk": true,
+    "overflowIssues": [],
+    "mobileComposerOk": true,
+    "mobileComposerOverflows": [],
+    "axSummary": {
+      "nodeCount": 180,
+      "statusLikeCount": 1,
+      "logLikeCount": 1,
+      "statusSamples": [
+        "本地安全状态"
+      ],
+      "logSamples": [
+        "对话时间线"
+      ]
+    }
+  },
+  "views": [
+    {
+      "name": "main:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 72,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "U用户我要上传一个模板,请严格按照我的模板来进行,可以做到吗✎ 编辑AAgent思考过程用户说\"我要上传一个模板，请严格按照我的模板来进行，可以做到吗\"。 这是一个确认性问题，用户似乎想让我承诺按照他们的模板来操作。我应该直接回答可以，并询"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:plan",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 91,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "U用户我要上传一个模板,请严格按照我的模板来进行,可以做到吗✎ 编辑AAgent思考过程用户说\"我要上传一个模板，请严格按照我的模板来进行，可以做到吗\"。 这是一个确认性问题，用户似乎想让我承诺按照他们的模板来操作。我应该直接回答可以，并询"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 91,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "U用户我要上传一个模板,请严格按照我的模板来进行,可以做到吗✎ 编辑AAgent思考过程用户说\"我要上传一个模板，请严格按照我的模板来进行，可以做到吗\"。 这是一个确认性问题，用户似乎想让我承诺按照他们的模板来操作。我应该直接回答可以，并询"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:yolo",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 91,
+        "issues": [],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "U用户我要上传一个模板,请严格按照我的模板来进行,可以做到吗✎ 编辑AAgent思考过程用户说\"我要上传一个模板，请严格按照我的模板来进行，可以做到吗\"。 这是一个确认性问题，用户似乎想让我承诺按照他们的模板来操作。我应该直接回答可以，并询"
+          },
+          {
+            "tag": "span",
+            "role": null,
+            "ariaLive": "polite",
+            "label": null,
+            "text": "支持批量任务模板文件"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:工具",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 38,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "输入关键字搜索工具匹配到的可用工具会显示在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:可视化",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 81,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "尚未生成活页渲染完成后会在这里预览。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:连接器",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 63,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:产物",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 47,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有成果完成一次任务后，Word、Excel、PPT、PDF、可复制文本或 CSV 会出现在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:项目",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 41,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有项目工作区创建项目后可把对话、记忆和产物归到同一个上下文。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:定时任务",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 41,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有定时任务可以对 Kimi 说「每天早上 9 点把今天的日程发我」「每周一总结一下上周的邮件」这样的话,它就会帮你安排。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:记忆",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 47,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没记下任何东西把你想让 Kimi 记住的名词、项目、偏好写在下面,以后它就能用上。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:成本 · 可观测",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 44,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:账户",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 59,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:外观",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 68,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:默认模型",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 60,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:输入助手",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 62,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:密钥",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 63,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:组件",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 59,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:更新",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 56,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:健康检查",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 57,
+        "issues": [],
+        "sendButton": null,
+        "liveRegions": [
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": "本地安全状态",
+            "text": "受控混合模型 kimi-api / kimi-k2.7-code外发 0 B"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": false,
+          "role": null,
+          "ariaLive": null,
+          "ariaRelevant": null,
+          "label": null
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    }
+  ],
+  "mobileComposer": {
+    "url": "http://tauri.localhost/",
+    "viewport": {
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "clientWidth": 390,
+      "scrollWidth": 390
+    },
+    "pageOverflow": false,
+    "composerVisible": true,
+    "controlsVisible": true,
+    "elementOverflows": [],
+    "elements": [
+      {
+        "selector": ".composer",
+        "missing": false,
+        "scrollWidth": 369,
+        "clientWidth": 369,
+        "rectWidth": 370.4,
+        "overflows": false
+      },
+      {
+        "selector": ".composer textarea",
+        "missing": false,
+        "scrollWidth": 345,
+        "clientWidth": 345,
+        "rectWidth": 344.8,
+        "overflows": false
+      },
+      {
+        "selector": ".composer-footer",
+        "missing": false,
+        "scrollWidth": 346,
+        "clientWidth": 345,
+        "rectWidth": 344.8,
+        "overflows": false
+      },
+      {
+        "selector": ".composer-footer-left",
+        "missing": false,
+        "scrollWidth": 345,
+        "clientWidth": 345,
+        "rectWidth": 344.8,
+        "overflows": false
+      },
+      {
+        "selector": ".composer-triggers",
+        "missing": false,
+        "scrollWidth": 100,
+        "clientWidth": 100,
+        "rectWidth": 100,
+        "overflows": false
+      },
+      {
+        "selector": ".composer-footer-right",
+        "missing": false,
+        "scrollWidth": 346,
+        "clientWidth": 345,
+        "rectWidth": 344.8,
+        "overflows": false
+      },
+      {
+        "selector": ".provider-select",
+        "missing": false,
+        "scrollWidth": 110,
+        "clientWidth": 110,
+        "rectWidth": 112,
+        "overflows": false
+      },
+      {
+        "selector": ".model-input",
+        "missing": false,
+        "scrollWidth": 70,
+        "clientWidth": 70,
+        "rectWidth": 72,
+        "overflows": false
+      },
+      {
+        "selector": ".thinking-select",
+        "missing": false,
+        "scrollWidth": 82,
+        "clientWidth": 82,
+        "rectWidth": 84,
+        "overflows": false
+      },
+      {
+        "selector": ".send-button",
+        "missing": false,
+        "scrollWidth": 58,
+        "clientWidth": 58,
+        "rectWidth": 58,
+        "overflows": false
+      }
+    ]
+  },
+  "issues": [],
+  "stderr": ""
+}

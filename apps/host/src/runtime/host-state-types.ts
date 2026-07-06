@@ -9,6 +9,7 @@ import type { McpRegistry } from '../mcp/connect.js';
 import type { RunsIndexLike as RecipeRunsIndexLike } from '../recipes/run-recipe-types.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 import type { SandboxStartupOptions, SandboxStartupResult, SpawnSyncLike } from '../sandbox/startup-probe.js';
+import type { SecurityMode } from '../security/security-mode.js';
 import type { ProjectStore, ProjectStoreContext } from './project-stores.js';
 import type { ScheduleStore, Scheduler, SchedulerExecutor } from './scheduler.js';
 import type { StoreBackend, StoreBackendConfigInput } from './store-backend-config.js';
@@ -27,6 +28,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   staticRoot?: string | false;
   uiDistRoot?: string;
   kimiConfigFile?: string;
+  securityMode?: SecurityMode;
   kimiPlanRunner?: typeof runKimiApiPlan;
   kimiChatRunner?: typeof runKimiApiChat;
   kimiChatStreamRunner?: typeof runKimiApiChatStream;
@@ -102,6 +104,7 @@ export type HostState = Record<string, unknown> & {
   uiDistRoot: string;
   uiDistEnabled: boolean;
   kimiConfigFile: string;
+  securityMode: SecurityMode;
   kimiApiConfig: KimiApiConfig;
   kimiApiEnabled?: boolean;
   runStoreRoot: string;

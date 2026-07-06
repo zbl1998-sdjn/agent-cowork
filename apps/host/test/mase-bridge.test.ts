@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { maseRecallSessionMemory } from '../src/memory/mase-bridge.js';
+import { extractFactsFromUser, maseRecallSessionMemory, maseRememberTurn } from '../src/memory/mase-bridge.js';
 
 type Call = { name: string; args: unknown };
 
@@ -30,6 +30,18 @@ function mcpHits(hits: string[]) {
 const TIMELINE = 'mcp__mase-memory__mase_recall_thread_tail';
 const FACTS = 'mcp__mase-memory__mase_get_facts';
 const RECALL = 'mcp__mase-memory__mase_recall';
+const REMEMBER = 'mcp__mase-memory__mase_remember';
+const UPSERT_FACT = 'mcp__mase-memory__mase_upsert_fact';
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value), `${label} should be an object`);
+  return value as Record<string, unknown>;
+}
+
+function callArgs(call: Call | undefined, label: string): Record<string, unknown> {
+  assert.ok(call, `${label} should be called`);
+  return recordValue(call.args, label);
+}
 
 test('recall labels 相关历史 as cross-conversation and dedups timeline turns', async () => {
   const registry = makeRegistry({
@@ -64,4 +76,177 @@ test('recall returns empty string when no MASE tools are registered (no-op)', as
   const registry = makeRegistry({});
   const out = await maseRecallSessionMemory(registry, '随便问点啥', 'cowork:t:u:conv-A');
   assert.equal(out, '');
+  assert.equal(await maseRecallSessionMemory(null, '随便问点啥', 'cowork:t:u:conv-A'), '');
+});
+
+test('recall injects sorted timeline, current facts, segmented query hits, and ignores malformed MCP text', async () => {
+  let recallArgs: unknown = null;
+  const longAssistant = `${'a'.repeat(210)} tail`;
+  const registry = makeRegistry({
+    [TIMELINE]: () => ({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify([
+            { role: 'assistant', content: longAssistant, id: 3 },
+            { role: 'user', content: '先说中文事实', id: 1 },
+            { role: 'user', content: '   ', id: 2 },
+            'malformed row',
+          ]),
+        },
+        { type: 'text', text: 'not-json' },
+      ],
+    }),
+    [FACTS]: () => ({
+      content: [
+        { type: 'text', text: JSON.stringify([{ entity_key: '默认模型', entity_value: 'Fable 5' }, { key: '城市', value: '悉尼' }]) },
+        { type: 'text', text: JSON.stringify({ entity_key: '空值', entity_value: null }) },
+        { type: 'text', text: 'not-json' },
+      ],
+    }),
+    [RECALL]: (args) => {
+      recallArgs = args;
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ content: '历史命中 A' }) },
+          { type: 'text', text: 'raw history B' },
+          { type: 'text', text: JSON.stringify({ content: '  ' }) },
+        ],
+      };
+    },
+  });
+
+  const out = await maseRecallSessionMemory(registry, '中文ABC测试', 'thread-1', 3);
+
+  assert.match(out, /【最近对话】/);
+  assert.ok(out.indexOf('用户: 先说中文事实') < out.indexOf('助手: aaaaaaaaaa'), 'timeline should be sorted by fallback id');
+  assert.match(out, /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…/);
+  assert.match(out, /【当前事实】/);
+  assert.match(out, /- 默认模型: Fable 5/);
+  assert.match(out, /- 城市: 悉尼/);
+  assert.doesNotMatch(out, /空值/);
+  assert.match(out, /【相关历史】/);
+  assert.match(out, /历史命中 A/);
+  assert.match(out, /raw history B/);
+  assert.deepEqual(recallArgs, { query: '中文 ABC 测试', top_k: 3 });
+});
+
+test('extractFactsFromUser keeps explicit user facts and filters questions, tasks, duplicates, and bad keys', () => {
+  assert.deepEqual(extractFactsFromUser([
+    '我的默认模型是 Fable 5',
+    '还有我的发布分支改成 release/v1',
+    '我的默认模型是 Fable 5',
+    '今天天气是晴天',
+    '默认模型是什么？',
+    '301是房间号',
+  ].join('。')), [
+    { category: 'conversation_facts', key: '默认模型', value: 'Fable 5' },
+    { category: 'conversation_facts', key: '发布分支', value: 'release/v1' },
+  ]);
+
+  assert.deepEqual(extractFactsFromUser('请记住一个事实: 项目代号是 MASE；更正一下: 默认模型改成 Fable 6'), [
+    { category: 'conversation_facts', key: '项目代号', value: 'MASE' },
+    { category: 'conversation_facts', key: '默认模型', value: 'Fable 6' },
+  ]);
+});
+
+test('remember writes role-specific logs and upserts sourced facts without leaking oversized text', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: (args) => {
+      const role = recordValue(args, 'remember args').role;
+      return { content: [{ type: 'text', text: role === 'user' ? 'Event logged with ID 42' : 'assistant logged' }] };
+    },
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  const userText = `我的默认模型是 Fable 5。\n${'x'.repeat(5000)}`;
+
+  await maseRememberTurn(registry, userText, '已记录', 'thread-2');
+
+  assert.equal(registry.calls.length, 3);
+  const userLog = callArgs(registry.calls[0], 'user remember');
+  assert.equal(userLog.role, 'user');
+  assert.equal(userLog.thread_id, 'thread-2');
+  assert.equal(String(userLog.text).length, 4000);
+  const assistantLog = callArgs(registry.calls[1], 'assistant remember');
+  assert.equal(assistantLog.role, 'assistant');
+  assert.equal(assistantLog.text, '已记录');
+
+  const upsert = callArgs(registry.calls[2], 'fact upsert');
+  assert.equal(upsert.category, 'conversation_facts');
+  assert.equal(upsert.key, '默认模型');
+  assert.equal(upsert.value, 'Fable 5');
+  assert.equal(upsert.reason, 'agent-cowork:用户陈述');
+  assert.equal(upsert.source_log_id, 42);
+});
+
+test('remember remains fail-safe when logging or individual fact upserts fail', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: () => {
+      throw new Error('remember unavailable');
+    },
+    [UPSERT_FACT]: (args) => {
+      if (recordValue(args, 'upsert args').key === '默认模型') {
+        throw new Error('one fact failed');
+      }
+      return { content: [] };
+    },
+  });
+
+  await maseRememberTurn(registry, '更正一下: 默认模型改成 Fable 6；项目代号是 Agent Cowork', '收到');
+
+  const upsertCalls = registry.calls.filter((call) => call.name === UPSERT_FACT);
+  assert.equal(upsertCalls.length, 2);
+  assert.equal(callArgs(upsertCalls[0], 'first upsert').source_log_id, 0);
+  assert.equal(callArgs(upsertCalls[0], 'first upsert').reason, 'agent-cowork:用户更正');
+  assert.equal(callArgs(upsertCalls[1], 'second upsert').key, '项目代号');
+});
+
+test('remember is no-op for empty turns and missing tools', async () => {
+  const registry = makeRegistry({});
+  await maseRememberTurn(registry, '   ', '\n');
+  await maseRememberTurn(registry, '我的默认模型是 Fable 5', '已记录');
+  assert.equal(registry.calls.length, 0);
+});
+
+test('remember skips credential-bearing user log and derived facts (DLP guard)', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: () => ({ content: [{ type: 'text', text: 'Event logged with ID 7' }] }),
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  // 用户这轮贴了登录口令(凭据),助手回答是干净的普通文本。
+  await maseRememberTurn(registry, '记住我的登录 password 是 hunter2abc', '已收到,我不会明文回显它', 'thread-secret');
+
+  const remembers = registry.calls.filter((call) => call.name === REMEMBER);
+  const userRemember = remembers.find((call) => recordValue(call.args, 'remember args').role === 'user');
+  // 含凭据的用户 log 不得写入外部 MASE 存储;由凭据派生的事实也不得 upsert。
+  assert.equal(userRemember, undefined, 'credential-bearing user log must not be written to MASE');
+  const upserts = registry.calls.filter((call) => call.name === UPSERT_FACT);
+  assert.equal(upserts.length, 0, 'credential-bearing facts must not be upserted to MASE');
+  // 逐条判定:用户侧含密不连累干净的助手侧,助手 log 仍写入。
+  const assistantRemember = remembers.find((call) => recordValue(call.args, 'remember args').role === 'assistant');
+  assert.ok(assistantRemember, 'clean assistant log should still be written');
+});
+
+test('remember skips credential-bearing assistant log while keeping clean user log/facts', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: (args) => ({
+      content: [{ type: 'text', text: recordValue(args, 'remember').role === 'user' ? 'Event logged with ID 9' : 'assistant logged' }],
+    }),
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  // 助手回答里回显了 Authorization/Bearer 令牌;用户这句是干净的普通事实。
+  await maseRememberTurn(registry, '我的城市是悉尼', '这是你的 Authorization: Bearer abcdef123456 令牌', 'thread-secret-2');
+
+  const remembers = registry.calls.filter((call) => call.name === REMEMBER);
+  assert.ok(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'user'),
+    'clean user log should still be written',
+  );
+  assert.equal(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'assistant'),
+    undefined,
+    'credential-bearing assistant log must be skipped',
+  );
+  // 干净的用户事实(城市=悉尼)不受助手侧含密影响,仍 upsert。
+  assert.equal(registry.calls.filter((call) => call.name === UPSERT_FACT).length, 1, 'clean user fact should still be upserted');
 });

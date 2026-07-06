@@ -1,6 +1,6 @@
 # Agent Cowork v1.0 计划总览(导航 + 决策记录)
 
-基线 = **v0.1.0**(`releases/v0.1.0/`)；当前可试版本 = **v0.2.0**(`releases/v0.2.0/`)。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
+基线 = **v0.1.0**(历史 `VERSION.txt` / bundle 仍在 `releases/v0.1.0/`,旧安装包体已清理)；当前可试安装包 = `releases/Agent-Cowork-Setup-v0.2.0-internal-beta.exe`。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
 
 ## 文档导航(每份小而专)
 | 文档 | 作用 | 何时看 |
@@ -13,6 +13,7 @@
 | `05-深水区能力与高级体验.md` | RAG、Office、技能固化、数据分析、开发者模式、分支/项目/通知等深水能力 | v1.0 扩展能力池 |
 | `06-运行时依赖与集成安装.md` | 开箱即用依赖、安装器组件、按需下载、中文 Windows 生命周期细节 | 安装/发布/依赖任务 |
 | `07-Agent运行时韧性与评测体系.md` | eval、上下文管理、循环韧性、可恢复/可复现、可观测、预算熔断和回路安全 | Agent 运行时加固任务 |
+| `Agent_Cowork_2.5_高性价比多Agent编排实施计划.md` | 2.5 多智能体编排(host 内 `apps/host/src/orchestrator/*`)的实施计划与验收 | 动编排相关任务 |
 | `Agent-Cowork-v1.0-迭代计划-草案.md` | 高层阶段路线(已被 00/01/02 细化) | 看全局 |
 
 ## 已锁决策(可随时复议)
@@ -39,14 +40,14 @@
 ## 当前执行顺序
 P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server.js → P0-T5 拆 agent-runner → P0-T10a host `checkJs`+JSDoc 类型护栏 → FE-1 智能滚动 → v0.2.0 发布 → P2-A 启动探测真隔离 → P2-B 连接器。
 
-## 当前状态快照(2026-05-27)
-- [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,并归档 NSIS/MSI、`agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 到 `releases/v0.2.0/`;当前安装包已静默安装到本机并通过安装版 Tauri smoke,证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
+## 当前状态快照(始于 2026-05-27,持续追加;最后复核 2026-07-06)
+- [x] v0.2.0 已切版交付:P0 + FE-1 已打 `v0.2.0` tag,历史 `agent-cowork-src-v0.2.0.bundle`、`VERSION.txt`、`manifest.json` 保留在 `releases/v0.2.0/`;旧 NSIS/MSI 包体已清理,最新内部 beta 安装包统一保留为 `releases/Agent-Cowork-Setup-v0.2.0-internal-beta.exe`。
 - [x] `03/04/05/06/07` 已纳入 v1.0 总范围,后续按同一完成标准推进,不再视为附加草稿。
 - [x] P0-T10a/T10b host `checkJs` + JSDoc 类型护栏全量覆盖: `tsconfig.host-checkjs.json` 已纳入 215/215 个 `apps/host/src/**/*.js` 模块和 host Node shim,覆盖 host L0-L4、routes、runtime、workspace、storage、sandbox、provider、agent loop、MCP/connector、Office/data/workspace index 等现有 JS 边界;`npm run check:host-types` 已接入 `npm run check` 并通过。
-- [ ] P0-T10c 延后项:逐文件 `.ts` 转换尚未开始;后续仍按 L0/L1 叶子模块小批量推进,保持 `.js` import specifier/直接 Node 运行链路清晰,不改 host 语言栈、不重写。
+- [x] P0-T10c(2026-07-04 复核订正):逐文件 `.ts` 转换已完成,`apps/host/src` 下 0 个 `.js` 源文件、293 个 `.ts`(`git ls-files "apps/host/src/**/*.js"` 为空);此前这里长期写着"尚未开始",与实际分支进度严重脱节——迁移是在 `feat/mase-memory-backend` 分支上分小批量提交完成的(见 `git log --oneline | grep 迁移`),但没有同步回这份状态快照。教训:里程碑状态要跟着分支真实进度更新,不能只信历史记录。
 - [x] P1-A1/P1-A2:后端 `todo_snapshot/todo_update` 事件 + 前端执行清单组件已接入;host/UI 单测与 `npm run ci` 通过。
 - [x] P1-A3(本地可测闭环):计划模式批准后的写入已触发 `verify_start` 自检轮;新增 `npm run smoke:plan-loop`,覆盖多文件"研究→计划→批准→执行→自检→收尾"并输出 `build/plan-closed-loop-smoke-report.json`。
-- [ ] P1-A3 延后项:真实 Kimi/API key 环境下的用户工作区多文件任务端到端留档仍未完成,不得计作真实模型验收。
+- [ ] P1-A3 延后项:真实 Kimi/API key 通路已在 `kimi-k2.7-code` 上通过 smoke,但用户工作区多文件任务端到端留档仍未完成,不得计作 P1-A3 真实业务验收。
 - [x] 04-Q6(真实 Kimi API smoke 子项):`npm run smoke:kimi-api` 已修复 guest auth 并在真实 `KIMI_API_KEY` 环境下通过 `/api/kimi/plan`;证据见 `reports/kimi-api-smoke/kimi-api-smoke-20260524T221510Z.json`。该项只证明 Kimi API 通路,不替代 P1-A3 多文件端到端验收。
 - [x] FE-1:智能滚动代码+单测完成,并新增 `npm run smoke:react-scroll` 真实浏览器验收;覆盖长对话中翻看历史时流式新内容不强行拽回底部,以及"回到底部"按钮出现/点击回底。
 - [x] 03-B1a:活页 `live-artifact.js` 已按 spec/render/refresh 拆为独立模块,新增安全特征测试并通过门禁。
@@ -186,8 +187,19 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] Service 体积治理(Kimi gateway client):`services/kimi-gateway/internal/kimi/client.go` 拆出 `client_helpers.go` 的请求校验、HTTP/retry 默认值、baseURL/API key fallback、breaker、backoff 和 retryable status helper,主 client 降到 212 行;chat/stream 请求与解析语义不变,`go test ./internal/kimi` 与 `npm run check` 通过,体积软警告降为 2 个。
 - [x] P2 安全补强(viz 持久化写入审批):`/api/viz/render/preview` 先生成活页 artifact 写入计划和一次性 `fileOperationApprovalId`, `/api/viz/render` 落盘必须消费匹配 receipt;缺审批 428、root/spec 不匹配 403, `persist:false` 不受影响。
 - [ ] P2-B2 延后项:真实 GitHub OAuth 账号授权仍需配置外部 OAuth App client id 并人工完成浏览器授权;当前不得计作真实外部 OAuth 验收。
-- [ ] 04-R5 延后项:WebView 内部深交互、真实 Kimi 回复、生产代码签名/信任链仍未验收。
-- [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产代码签名信任链相关验证。
+- [x] 04-R5 2026-07-06 收口:真实 Kimi API smoke 已授权执行并通过 `kimi-k2.7-code`,证据 `build/kimi-api-smoke-report.json`;当前源码 UI/host/NSIS 已重建,installer SHA256 `9B19D12DD00A3DAC9A86C78D3FF01BCD83F02F16EFBDF9CF880DDC0784D5D6A5`;已静默重装 installed app 并通过 `reports/windows-client-smoke/installed-tauri-smoke-20260705T142258Z.json` 与 `reports/windows-client-smoke/installed-a11y-2026-07-05-142323Z.json`。生产代码签名/信任链与正式 updater 发布链仍属外部发布阻塞。
+- [x] 04-R5 2026-07-06 全量 E2E / 最新安装包复核:`python -X utf8 scripts\quality_gate.py --level full` passed;`npm run smoke:e2e`、`npm run bench`、`npm run smoke:installed-tauri -- -DryRun` passed;当前源码 UI/host/NSIS 已重新构建并静默安装,最新 release 安装包 `releases/Agent-Cowork-Setup-v0.2.0-internal-beta.exe`,SHA256 `5071F9BEBA6B854297911BBBA3F626AAD15D50F55A8D7C61ACD482B10F428A36`;安装版 smoke `reports/windows-client-smoke/installed-tauri-smoke-20260705T220946Z.json` passed,WebView/a11y `reports/windows-client-smoke/installed-a11y-2026-07-05-221006Z.json` passed。旧 `.exe/.msi/.zip` 包体已清理,只保留最新 release 安装包和 `.sha256`。生产代码签名/信任链、正式 updater 发布链、clean tag release 仍属外部/发布阻塞。
+- [ ] 需真实环境的延期验收:真实 Kimi 多文件 E2E、Office/OCR、生产 CA 代码签名信任链、正式 updater 发布链相关验证。
+
+### 2026-07-04 追加(记忆安全 + 出口加固复核)
+- [x] MASE 记忆写入接入 DLP 守卫:`maseRememberTurn` 三条写路径(用户 log/助手 log/事实 upsert)此前绕过 `memory-dlp-guard`,含凭据内容会外发到 MASE;现逐条过 `carriesSecret`,含密跳过、fail-closed。
+- [x] 记忆暂停/隐身开关补齐总闸:`agent-stream` 此前无条件调 `loadLayeredMemory`/MASE 召回回写,UI 的记忆暂停/隐身开关对实时对话不生效;现按 `isMemoryActiveForRoot` 统一 gate 读写两侧。
+- [x] 记忆读侧脱敏:注入 system prompt 前对 `memory.text` 统一过 `redactText`,历史遗留旧凭据(写侧守卫上线前落库的)也不会被回放进模型上下文,与写侧形成"写不进、读不出"双保险。
+- [x] 安全加固:`classifyToolRisk` 此前只匹配 `web.fetch`/`webfetch`,漏判实际工具名 `WebSearch`,致 `local_strict`/`air_gap`「零外发」承诺下 `WebSearch` 仍会打 DuckDuckGo/Bing;已改用 compact 等价比较统一归为 `network_external` 并 deny。
+- [x] 安装版/当前源码桌面 smoke 复核:2026-07-04 当前源 host(含安全加固)热替换已安装 sidecar 后跑 `smoke:installed-tauri` 通过,证据 `reports/windows-client-smoke/installed-tauri-smoke-20260704T002045Z.json`;2026-07-05 已补当前源码 `npm run build:host`、`cargo tauri build --no-bundle --ci`、`cargo tauri build --ci --bundles nsis` 和 rebuilt sidecar direct smoke,证据 `reports/windows-client-smoke/current-sidecar-smoke-20260705T085841Z.json`。2026-07-06 已补真实 Kimi smoke、当前源码 installer 重建/静默重装、installed smoke 与 WebView/a11y 深验,证据 `reports/acceptance-record-20260706-kimi-installed-signing.md`。生产代码签名/信任链与正式 updater 发布链仍留到具备真实发布凭据后验收。
+- [x] 2.5 多智能体编排本地闭环追加:新增 `ppt-from-folder` recipe,接入 `ORCHESTRATION_RECIPE_IDS`、`/api/orchestrator/run`、只读 subagent adapter、detail/timeline 读取与真实 Host HTTP smoke;补齐按租户分区的 FileSummaryCache(`fileHash + recipeId + agentId`)；controlled handoff MVP 已通过 `handoff_started` trace 记录 reason/contextRefIds/budget/from-to agent,并在 office-team/ppt-from-folder smoke 中断言 6/5 个 handoff 事件。证据 `output/smoke/orchestrator-ppt-from-folder.json`、`output/smoke/orchestrator-office-team.json` 与 `output/smoke/orchestrator-summary-cache.json`;当前 focused orchestrator tests 22 passed,七条 orchestrator HTTP smoke passed,`npm run check` 与 full quality gate passed。真实 Kimi provider smoke、当前 installer 重装与 WebView/a11y 深验已在 2026-07-06 收口,签名/updater 发布链与 clean tag release 复验仍留待具备真实发布凭据后验收。
+- [x] 工作树历史遗留在制品全部落库:2.x 后端新模块(安全护城河/国产 provider/能力包/审计链/办公配方)、host 接线、前端(小白首页/安全状态条)、规划/设计文档、验收证据分子系统提交完毕;`output/` 运行产物与 `__pycache__` 补进 `.gitignore`。
+- [x] README/`plan/README` 状态核对:修正 P0-T10c 的滞后描述(见上方 P0-T10c 行)、刷新测试计数与覆盖率徽章、更正已过时的前端发送入口描述(旧"对话/协作"双页模型已不存在,现单一 `/api/agent/chat/stream` SSE 入口)。
 
 ## 状态
 - [x] 方向与北极星确定(四线全要,排成 P0→P4 + FE 专项)

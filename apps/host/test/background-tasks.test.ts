@@ -92,3 +92,55 @@ test('a throwing subscriber does not break completion', () => {
   assert.doesNotThrow(() => bt.complete('a', { ok: true }));
   assert.equal(mustTask(bt.get('a')).status, 'done');
 });
+
+test('task snapshots, missing-task operations, and invalid subscribers are defensive', () => {
+  let tick = 100;
+  const bt = createBackgroundTasks({ now: () => {
+    tick += 10;
+    return tick;
+  } });
+
+  const registered = bt.register({ id: 'a', title: 'initial', kind: 'sync' });
+  registered.title = 'mutated outside';
+  registered.progress = 99;
+  assert.equal(mustTask(bt.get('a')).title, 'initial');
+  assert.equal(mustTask(bt.get('a')).progress, 0);
+  assert.equal(registered.startedAt, 110);
+  assert.equal(registered.updatedAt, 110);
+
+  const ignored = mustTask(bt.update('a', { progress: '0.8', status: 'bogus' }));
+  assert.equal(ignored.progress, 0);
+  assert.equal(ignored.status, 'running');
+  const patched = mustTask(bt.update('a', { progress: 0.4, status: 'done' }));
+  assert.equal(patched.progress, 0.4);
+  assert.equal(patched.status, 'done');
+  assert.equal(patched.updatedAt, 130);
+
+  assert.equal(bt.complete('missing'), null);
+  assert.equal(bt.cancel('missing'), null);
+  assert.equal(bt.remove('missing'), false);
+  assert.equal(bt.remove('a'), true);
+  assert.equal(bt.get('a'), null);
+
+  const off = bt.onComplete(null as unknown as (task: BackgroundTask) => void);
+  assert.equal(off(), undefined);
+});
+
+test('failed completion defaults its error and subscriber snapshots cannot mutate stored tasks', () => {
+  const bt = createBackgroundTasks();
+  bt.register({ id: 'a' });
+  bt.onComplete((task) => {
+    task.status = 'running';
+    task.error = null;
+  });
+
+  const failed = mustTask(bt.complete('a', { ok: false }));
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.error, 'failed');
+  assert.equal(mustTask(bt.get('a')).status, 'failed');
+  assert.equal(mustTask(bt.get('a')).error, 'failed');
+
+  bt.register({ id: 'b' });
+  assert.equal(mustTask(bt.cancel('b')).completedAt != null, true);
+  assert.equal(bt.list({ status: 'cancelled' }).length, 1);
+});

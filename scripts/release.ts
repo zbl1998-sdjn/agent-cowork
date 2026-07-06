@@ -37,6 +37,11 @@ type CommandSpec = {
   args: string[];
 };
 
+type SigningConfig = {
+  mode: 'thumbprint' | 'pfx';
+  args: string[];
+};
+
 type CommandResult = SpawnSyncResult<string | Buffer> | {
   status: number;
   stdout: string;
@@ -124,6 +129,35 @@ function normalizeVersion(version: string): string {
 
 function commandLine(command: string, args: readonly string[]): string {
   return [command, ...args].map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(' ');
+}
+
+function firstEnvValue(names: readonly string[]): string | null {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function resolveProductionSigningConfig(): SigningConfig | null {
+  const thumbprint = firstEnvValue(['KCW_CODESIGN_THUMBPRINT', 'WINDOWS_SIGNING_THUMBPRINT']);
+  if (thumbprint) {
+    return { mode: 'thumbprint', args: ['-Thumbprint', thumbprint.replace(/\s/g, '')] };
+  }
+  const pfx = firstEnvValue(['KCW_CODESIGN_PFX', 'WINDOWS_SIGNING_PFX']);
+  if (pfx) {
+    return { mode: 'pfx', args: ['-Pfx', pfx] };
+  }
+  return null;
+}
+
+function productionSigningHelp(): string {
+  return [
+    'Production signing requires a trusted CA code-signing certificate.',
+    'Set KCW_CODESIGN_THUMBPRINT (preferred, cert already imported with private key) or',
+    'set KCW_CODESIGN_PFX plus KCW_CODESIGN_PFX_PASSWORD/WINDOWS_SIGNING_PFX_PASSWORD.',
+    'Refusing to fall back to self-signed signing for release execution.',
+  ].join(' ');
 }
 
 function spawnSpec(command: string, args: string[]): CommandSpec {
@@ -308,18 +342,40 @@ git(['bundle', 'create', bundlePath, 'HEAD'], { execute: options.execute });
 if (options.skipSign) {
   console.log('[plan] skip signing (--skip-sign)');
 } else {
-  const signArgs = [
-    '-NoProfile',
-    '-ExecutionPolicy',
-    'Bypass',
-    '-File',
-    path.join('scripts', 'sign-windows.ps1'),
-    '-Files',
-    ...installers,
-  ];
   if (installers.length) {
-    run('pwsh', signArgs, { execute: options.execute });
+    const signingConfig = resolveProductionSigningConfig();
+    if (!signingConfig) {
+      const message = productionSigningHelp();
+      if (options.execute) throw new Error(message);
+      console.log(`[dry-run] signing blocked: ${message}`);
+    } else {
+      console.log(`[plan] signing mode: ${signingConfig.mode}`);
+      const signArgs = [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join('scripts', 'sign-windows.ps1'),
+        ...signingConfig.args,
+        '-Files',
+        ...installers,
+      ];
+      const timestampUrl = firstEnvValue(['KCW_CODESIGN_TIMESTAMP_URL', 'WINDOWS_SIGNING_TIMESTAMP_URL']);
+      if (timestampUrl) signArgs.push('-TimestampUrl', timestampUrl);
+      run('pwsh', signArgs, { execute: options.execute });
+    }
   } else {
+    const signArgs = [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join('scripts', 'sign-windows.ps1'),
+      '-Thumbprint',
+      '<trusted-code-signing-cert-thumbprint>',
+      '-Files',
+      '<installer>',
+    ];
     console.log('[plan] no installers/*.exe or installers/*.msi found; signing step has no files yet');
     console.log(`[dry-run] ${commandLine('pwsh', signArgs)}`);
   }

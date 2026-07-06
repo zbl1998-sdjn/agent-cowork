@@ -1,0 +1,35 @@
+{
+  "screen": "BeginnerHome",
+  "components": [
+    {
+      "name": "BeginnerHero",
+      "purpose": "Explain what the user can do today without technical terms.",
+      "states": ["default"]
+    },
+    {
+      "name": "BeginnerTaskGrid",
+      "purpose": "Large daily-office task buttons that send ready-made requests.",
+      "states": ["default", "hover", "focus"]
+    },
+    {
+      "name": "FileBasketPrimer",
+      "purpose": "Show drag-and-drop material entry and supported input formats.",
+      "states": ["empty", "dragging"]
+    },
+    {
+      "name": "OfficeFormatStrip",
+      "purpose": "Show common office output formats: DOCX, XLSX, PPTX, PDF, TXT, CSV.",
+      "states": ["default"]
+    },
+    {
+      "name": "RecentDeliverablesPreview",
+      "purpose": "Use human names for expected outcomes, not file-system jargon.",
+      "states": ["sample", "empty"]
+    },
+    {
+      "name": "SafetyPromise",
+      "purpose": "Explain copy-first behavior and user confirmation for writes.",
+      "states": ["default"]
+    }
+  ]
+}

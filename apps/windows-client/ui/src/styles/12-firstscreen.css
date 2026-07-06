@@ -1,0 +1,546 @@
+/* ================= Compact Claude-like first screen pass ================= */
+.auth-screen-quiet {
+  min-height: 100vh;
+  height: auto;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.72), transparent 260px),
+    var(--bg);
+}
+
+.auth-screen-quiet .auth-main {
+  flex: 0 1 420px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 32px 16px;
+}
+
+.auth-screen-quiet .auth-card {
+  max-width: 380px;
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(31,31,29,0.08);
+}
+
+.auth-card-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.auth-screen-quiet .auth-brand-dot {
+  background: linear-gradient(135deg, var(--accent-warm), var(--accent-quiet)) !important;
+  box-shadow: none;
+}
+
+.auth-title {
+  letter-spacing: 0;
+}
+
+.app-header {
+  min-height: 48px;
+  padding: 8px 12px;
+  gap: 10px;
+}
+
+.header-actions {
+  flex: 0 0 auto;
+  position: relative;
+  justify-content: flex-end;
+}
+
+.header-quick-actions {
+  gap: 6px;
+}
+
+.header-quick-actions .ui-btn {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 5px 10px !important;
+}
+
+.header-more {
+  position: relative;
+}
+
+.header-more-summary {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.2;
+  list-style: none;
+  padding: 0 12px;
+}
+
+.header-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.header-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 55;
+  width: min(360px, calc(100vw - 28px));
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 20px 48px rgba(31,31,29,0.16);
+  padding: 12px;
+}
+
+.header-more-section {
+  display: grid;
+  gap: 7px;
+}
+
+.header-more-label {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.header-more-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.header-more-panel-grid .ui-btn,
+.header-more-actions .ui-btn {
+  justify-content: flex-start !important;
+  min-width: 0;
+  border-radius: 8px !important;
+  padding: 7px 9px !important;
+}
+
+.header-more-panel-grid .ui-btn.is-active {
+  border-color: rgba(181,72,47,0.34) !important;
+  color: var(--accent-warm) !important;
+  background: #fff8f4 !important;
+}
+
+.header-more-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.header-more-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.security-status-bar {
+  min-height: 24px;
+  gap: 8px;
+  padding: 3px 14px;
+  background: rgba(255,255,255,0.54);
+  font-size: 11.5px;
+}
+
+.security-pill {
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.timeline {
+  padding-top: clamp(28px, 7vh, 72px);
+}
+
+.beginner-home {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  gap: 16px;
+}
+
+.beginner-hero {
+  justify-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.beginner-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.beginner-hero h2 {
+  font-size: clamp(28px, 4.4vw, 42px);
+  font-weight: 650;
+  line-height: 1.08;
+}
+
+.beginner-hero p {
+  max-width: 540px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.beginner-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.beginner-quick-grid .beginner-task-quiet {
+  min-height: 54px;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  border-color: rgba(226,226,223,0.96) !important;
+  border-radius: 8px !important;
+  background: rgba(255,255,255,0.78) !important;
+  box-shadow: none;
+  padding: 9px 10px !important;
+}
+
+.beginner-quick-grid .beginner-task-quiet strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.beginner-quick-grid .beginner-task-quiet span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+
+.beginner-format-line {
+  justify-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.beginner-more,
+.template-upload-details,
+.composer-insert {
+  justify-self: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.beginner-more summary,
+.template-upload-details summary,
+.composer-insert summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+}
+
+.beginner-more summary::-webkit-details-marker,
+.template-upload-details summary::-webkit-details-marker,
+.composer-insert summary::-webkit-details-marker {
+  display: none;
+}
+
+.beginner-more summary:hover,
+.template-upload-details summary:hover,
+.composer-insert summary:hover {
+  color: var(--text);
+}
+
+.beginner-more[open] {
+  width: 100%;
+}
+
+.beginner-more .beginner-task-grid {
+  margin-top: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.beginner-more .beginner-task {
+  min-height: 86px;
+}
+
+.beginner-examples .starter-chips {
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.template-upload-details {
+  width: 100%;
+  margin: 0 0 8px;
+  justify-self: stretch;
+}
+
+.template-upload-details summary {
+  display: inline-flex;
+  margin-left: 2px;
+}
+
+.template-upload-details[open] .template-upload-bar {
+  margin-top: 8px;
+}
+
+.composer {
+  position: relative;
+}
+
+.composer textarea {
+  min-height: 56px;
+}
+
+.composer-footer {
+  position: relative;
+  align-items: center;
+}
+
+.composer-footer .composer-insert {
+  position: static;
+  justify-self: auto;
+  margin: 0;
+}
+
+.composer-footer .composer-insert summary {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.82);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.composer-insert-body {
+  display: none;
+}
+
+.composer-insert[open] .composer-insert-body {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  z-index: 30;
+  width: min(420px, 100%);
+  max-width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 16px 36px rgba(31,31,29,0.14);
+}
+
+.composer-insert[open] .composer-triggers,
+.composer-insert[open] .composer-tools {
+  margin: 0;
+}
+
+.composer-insert .composer-triggers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.composer-insert .composer-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  align-items: start;
+}
+
+.composer-insert .composer-trigger-btn,
+.composer-insert .tool-button {
+  min-width: 0;
+  max-width: 100%;
+  justify-content: center !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+}
+
+.composer-triggers,
+.composer-tools {
+  margin-bottom: 0;
+}
+
+.composer-tools .tool-button {
+  padding: 5px 9px !important;
+  min-height: 28px;
+  color: var(--muted);
+}
+
+.composer-advanced summary {
+  min-height: 28px;
+  color: var(--muted);
+}
+
+.composer-insert .composer-advanced {
+  display: block;
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+}
+
+.composer-insert .composer-advanced summary {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.composer-insert .composer-advanced-body {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(140px, 1fr) minmax(92px, 0.72fr);
+  width: 100%;
+  margin: 8px 0 0;
+  gap: 6px;
+}
+
+.composer-insert .provider-select,
+.composer-insert .model-input,
+.composer-insert .thinking-select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-theme="dark"] .auth-screen-quiet {
+  background: var(--bg);
+}
+
+[data-theme="dark"] .header-more-menu {
+  background: rgba(35,35,32,0.97);
+}
+
+[data-theme="dark"] .header-more-panel-grid .ui-btn.is-active {
+  background: rgba(181,72,47,0.18) !important;
+}
+
+[data-theme="dark"] .security-status-bar {
+  background: rgba(35,35,32,0.52);
+}
+
+[data-theme="dark"] .beginner-quick-grid .beginner-task-quiet {
+  background: rgba(35,35,32,0.78) !important;
+}
+
+@media (max-width: 900px) {
+  .beginner-quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .header-more-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    flex-direction: row;
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .conversation-rail {
+    display: none;
+  }
+
+  .app-content {
+    width: 100%;
+    min-width: 0;
+    height: 100vh;
+  }
+
+  .app-header {
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .security-status-bar {
+    padding: 4px 12px;
+    gap: 8px;
+  }
+
+  .security-status-bar span:nth-of-type(2) {
+    display: none;
+  }
+
+  .header-workspace {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
+  .timeline {
+    padding-top: 24px;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .composer-dock {
+    max-width: 100%;
+    padding: 8px 10px 12px;
+  }
+
+  .composer {
+    border-radius: 16px;
+    padding: 12px 12px 10px;
+  }
+
+  .composer-footer {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .composer .send-button {
+    width: auto;
+    min-width: 62px;
+  }
+
+  .composer-insert[open] .composer-insert-body {
+    width: 100%;
+    max-height: min(54vh, 360px);
+    overflow-y: auto;
+  }
+
+  .composer-insert .composer-triggers,
+  .composer-insert .composer-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .composer-insert .composer-advanced-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .beginner-hero {
+    text-align: left;
+    justify-items: start;
+  }
+
+  .beginner-quick-grid,
+  .beginner-more .beginner-task-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .beginner-format-line {
+    justify-self: start;
+  }
+}

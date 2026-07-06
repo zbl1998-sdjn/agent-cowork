@@ -71,6 +71,11 @@ test('GET /api/connectors + /api/connectors/suggest', async () => {
     const suggestBody = requireJsonRecord(sug.body, 'suggest response');
     assert.equal(suggestBody.query, 'git');
     assert.ok(connectorSummaries(suggestBody.connectors).some((connector) => connector.id === 'git'));
+
+    const byQuery = await readJson(base, '/api/connectors/suggest?query=filesystem&limit=999');
+    const byQueryBody = requireJsonRecord(byQuery.body, 'suggest query response');
+    assert.equal(byQueryBody.query, 'filesystem');
+    assert.ok(connectorSummaries(byQueryBody.connectors).length <= 20);
   } finally {
     await closeTestServer(server);
   }

@@ -4,11 +4,13 @@ import type { Conversation } from './app-types';
 export const GUEST_KEY = 'kcw.guest';
 export const CONV_KEY = 'kcw.conversations.v1';
 export const AUTO_CLARIFY_KEY = 'kcw.autoClarify';
+export const AUTO_CONTEXT_COMPACTION_KEY = 'kcw.autoContextCompaction';
 export const STARTERS = [
   '整理工作区里的文档并列出清单',
   '把一个 CSV 文件做成图表',
   '总结这个文件夹里的会议纪要',
   '帮我起草一封邮件草稿',
+  '把这段内容改成一封礼貌的跟进邮件',
 ];
 
 // id 必须跨「页面加载」全局唯一,不能用加载内自增(c1/c2、m1/m2):

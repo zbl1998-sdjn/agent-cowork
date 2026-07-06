@@ -218,7 +218,8 @@ export async function requestToolApproval({
 }: ToolApprovalOptions): Promise<boolean> {
   if (!needsApproval || !hasApprovals || !approvals || sessionApproved.has(name)) return false;
   const planAuthorized = planMode && planApproved;
-  if ((autoApprove || planAuthorized) && tool.risk !== 'high') {
+  const risk = String(tool.risk || '').toLowerCase();
+  if ((autoApprove || planAuthorized) && risk !== 'high' && risk !== 'critical') {
     audit('tool.auto_approved', { tool: name, risk: tool.risk, via: autoApprove ? 'auto' : 'plan' });
     return false;
   }

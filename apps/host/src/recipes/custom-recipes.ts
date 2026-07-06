@@ -24,12 +24,19 @@ type CapturedArtifact = {
   source?: unknown;
 };
 
+export type CustomRecipeFormat = {
+  kind: 'markdown';
+  body: string;
+};
+
 export type CustomRecipe = {
   id: string;
   name: string;
   description: string;
   output: string;
   riskLevel: string;
+  requiresSources?: boolean;
+  format?: CustomRecipeFormat;
   custom: true;
   tenantId: string;
   userId: string;
@@ -57,8 +64,26 @@ function cleanText(value: unknown, max: number): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
 
+function cleanTemplateBody(value: unknown, max: number): string {
+  return String(value ?? '').slice(0, max);
+}
+
 function slug(value: unknown): string {
   return cleanText(value, 80).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'captured';
+}
+
+function cleanRiskLevel(value: unknown): string {
+  const text = cleanText(value, 80);
+  return ['safe-write', 'preview-only', 'requires-approval'].includes(text) ? text : 'safe-write';
+}
+
+function cleanFormat(value: unknown): CustomRecipeFormat | undefined {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  if (!record || record.kind !== 'markdown') {
+    return undefined;
+  }
+  const body = cleanTemplateBody(record.body, 12000);
+  return body.trim() ? { kind: 'markdown', body } : undefined;
 }
 
 function cleanSteps(value: unknown): CapturedStep[] {
@@ -140,24 +165,26 @@ export function createCustomRecipeStore({ storePath }: { storePath: string }): C
       const requestedId = cleanText(input.id, 120);
       const baseId = requestedId && RECIPE_ID_RE.test(requestedId) ? requestedId : `custom-${slug(name)}-${Date.now().toString(36)}`;
       const previous = existing.find((recipe) => recipe.id === baseId && recipe.tenantId === tenant);
-      const recipe: CustomRecipe = {
+      const recipe: CustomRecipe = omitUndefined({
         ...(previous || {}),
         id: baseId,
         name,
         description: cleanText(input.description || input.prompt, 500),
-        output: 'Markdown',
-        riskLevel: 'safe-write',
-        custom: true,
+        output: cleanText(input.output, 120) || 'DOCX + TXT',
+        riskLevel: cleanRiskLevel(input.riskLevel),
+        requiresSources: typeof input.requiresSources === 'boolean' ? input.requiresSources : false,
+        format: cleanFormat(input.format),
+        custom: true as const,
         tenantId: tenant,
         userId: user,
         sourceRunId: cleanText(input.sourceRunId, 120) || null,
         prompt: cleanText(input.prompt, 4000),
         steps: cleanSteps(input.steps),
         artifacts: cleanArtifacts(input.artifacts),
-        redacted: true,
+        redacted: true as const,
         createdAt: previous?.createdAt || now,
         updatedAt: now,
-      };
+      });
       writeAll([...existing.filter((item) => !(item.id === recipe.id && item.tenantId === tenant)), recipe]);
       return { ...recipe };
     },

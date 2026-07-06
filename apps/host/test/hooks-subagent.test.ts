@@ -4,11 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { z } from 'zod';
-import { createHookEngine } from '../src/runtime/hooks.js';
+import { createHookEngine, loadHooksConfig } from '../src/runtime/hooks.js';
 import { runAgentChat, buildAgentToolset } from '../src/kimi/agent-runner.js';
 import type { AgentDeps } from '../src/kimi/agent/toolset-builder.js';
 import type { AgentTool, HookEngine as AgentHookEngine } from '../src/kimi/agent/approval-gate.js';
-import type { HookEngine, HookResult } from '../src/runtime/hooks.js';
+import type { HookEngine, HookResult, SandboxLike } from '../src/runtime/hooks.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-hk-')); }
@@ -65,6 +65,89 @@ test('hook engine: pre_tool hook can block by tool match', async () => {
   const blocked = engine.blocked(await engine.run('pre_tool', { name: 'Shell' }));
   assert.ok(blocked && blocked.block);
   assert.equal(engine.blocked(await engine.run('pre_tool', { name: 'Write' })), null);
+});
+
+test('hook engine tolerates bad regex hooks and handler failures', async () => {
+  const engine = createHookEngine({ hooks: [
+    { event: 'pre_tool', tool: '[bad', handler: async () => { throw new Error('hook exploded'); } },
+  ] });
+
+  assert.equal(engine.hookCount(), 1);
+  assert.deepEqual(await engine.run('post_tool', { name: '[bad' }), []);
+  assert.deepEqual(await engine.run('pre_tool', { name: 'Other' }), []);
+
+  const results = await engine.run('pre_tool', { name: '[bad' });
+  assert.equal(results.length, 1);
+  assert.match(String(results[0]?.error), /hook exploded/);
+});
+
+test('loadHooksConfig executes normalized hook commands through the sandbox', async () => {
+  const root = tmp();
+  const configPath = path.join(root, 'hooks.json');
+  const calls: Array<{ spec: unknown; options: Parameters<SandboxLike['exec']>[1] }> = [];
+  const sandbox: SandboxLike = {
+    async exec(spec, options) {
+      calls.push({ spec, options });
+      if (calls.length === 1) {
+        return { exitCode: 9, stderr: 'blocked:'.repeat(80) };
+      }
+      return { exitCode: 0, stdout: 'ok' };
+    },
+  };
+
+  fs.writeFileSync(configPath, JSON.stringify({
+    hooks: [
+      { event: 'pre_tool', tool: 'Shell|Write', command: 'node guard --flag' },
+      { event: 'post_tool', command: 'node audit' },
+      { event: 'pre_tool', tool: 'Shell', command: '   ' },
+      { event: 'pre_tool', tool: 'Shell', command: 'bad/tool nope' },
+      { event: 'other', command: 'node ignored' },
+      { event: 'pre_tool', command: 42 },
+    ],
+  }));
+
+  const engine = loadHooksConfig({
+    trustedRoot: root,
+    configPath,
+    sandbox,
+    sandboxLimits: { allowTools: ['node'] },
+  });
+
+  assert.equal(engine.hookCount(), 4);
+  const blocked = engine.blocked(await engine.run('pre_tool', { name: 'Shell' }));
+  assert.equal(blocked?.block, true);
+  assert.equal(blocked?.reason?.length, 300);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0]?.spec, {
+    tool: 'node',
+    args: ['guard', '--flag'],
+    cwd: '',
+    timeoutMs: 15000,
+    network: false,
+    env: {},
+    maxOutputBytes: 262144,
+  });
+  assert.deepEqual(calls[0]?.options, {
+    trustedRoot: root,
+    context: { hook: 'pre_tool', tool: 'Shell' },
+  });
+
+  assert.deepEqual(await engine.run('post_tool', { name: 'Read' }), [{ ok: true }]);
+  assert.equal(calls.length, 2);
+});
+
+test('loadHooksConfig ignores malformed config and no-sandbox hooks fail closed', async () => {
+  const root = tmp();
+  const configPath = path.join(root, 'hooks.json');
+
+  fs.writeFileSync(configPath, '{');
+  assert.equal(loadHooksConfig({ configPath, sandbox: null }).hookCount(), 0);
+
+  fs.writeFileSync(configPath, JSON.stringify([{ event: 'pre_tool', command: 'node ok' }]));
+  const engine = loadHooksConfig({ trustedRoot: root, configPath });
+
+  assert.equal(engine.hookCount(), 1);
+  assert.deepEqual(await engine.run('pre_tool', { name: 'Anything' }), []);
 });
 
 test('runAgentChat: a pre_tool hook blocks the tool (not executed)', async () => {

@@ -1,0 +1,27 @@
+{
+  "model": "qwen3:14b",
+  "maxSteps": 6,
+  "results": [
+    {
+      "task": "chain",
+      "baseline": {
+        "rounds": 7,
+        "toolRounds": 6,
+        "nudgeFired": false,
+        "budgetStopped": false,
+        "converged": true,
+        "finalLen": 159,
+        "ms": 26828
+      },
+      "treatment": {
+        "rounds": 7,
+        "toolRounds": 6,
+        "nudgeFired": true,
+        "budgetStopped": false,
+        "converged": true,
+        "finalLen": 136,
+        "ms": 36816
+      }
+    }
+  ]
+}

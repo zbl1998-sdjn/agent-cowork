@@ -1,0 +1,29 @@
+{
+  "model": "qwen2.5:3b",
+  "maxSteps": 6,
+  "mode": "nudge",
+  "results": [
+    {
+      "task": "chain",
+      "mode": "nudge",
+      "baseline": {
+        "rounds": 2,
+        "toolRounds": 1,
+        "nudgeFired": false,
+        "budgetStopped": false,
+        "exhausted": false,
+        "finalLen": 115,
+        "ms": 2866
+      },
+      "treatment": {
+        "rounds": 4,
+        "toolRounds": 3,
+        "nudgeFired": false,
+        "budgetStopped": false,
+        "exhausted": false,
+        "finalLen": 65,
+        "ms": 2083
+      }
+    }
+  ]
+}

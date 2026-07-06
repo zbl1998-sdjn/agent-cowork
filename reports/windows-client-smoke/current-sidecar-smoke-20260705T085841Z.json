@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "mode": "current-sidecar-direct",
+  "generatedAt": "2026-07-05T08:58:42.1213386Z",
+  "exe": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\target\\release\\agent-cowork-host.exe",
+  "port": 3998,
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\current-sidecar-smoke-20260705T085841Z",
+  "checks": {
+    "sidecarHealth": "passed",
+    "guestAuth": "passed",
+    "kimiInfo": "passed",
+    "sqliteRuntime": "passed",
+    "embeddedPythonRuntime": "passed"
+  },
+  "deferred": [
+    "Tauri shell launch wiring on fixed 3017",
+    "installed app reinstall/installer smoke",
+    "deep WebView UI interaction",
+    "real Kimi reply",
+    "production signing trust chain"
+  ],
+  "host": {
+    "url": "http://127.0.0.1:3998",
+    "health": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    }
+  },
+  "auth": {
+    "guestUserId": "guest_8e6a779814ee",
+    "meUserId": "guest_8e6a779814ee",
+    "tenantId": "tenant_guest_8e6a779814ee"
+  },
+  "kimi": {
+    "configured": false,
+    "provider": "kimi-api",
+    "model": "kimi-k2.7-code"
+  },
+  "runtimeDependencies": {
+    "sqlite": {
+      "id": "sqlite",
+      "section": "F2",
+      "label": "SQLite 存储运行时",
+      "description": "用于本地会话、记录与轻量索引存储。",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "available",
+      "version": "3.53.0",
+      "detail": "node:sqlite 可用"
+    },
+    "pythonEmbedded": {
+      "id": "python-embedded",
+      "section": "A2",
+      "label": "内置 Python",
+      "description": "随包提供的 Python 环境，用于可选数据处理与脚本能力。",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "configured",
+      "source": "KCW_EMBEDDED_PYTHON",
+      "detail": "内置 Python 路径已配置"
+    },
+    "summary": {
+      "total": 14,
+      "requiredMissing": 1,
+      "byStatus": {
+        "available": 4,
+        "unknown": 2,
+        "configured": 2,
+        "missing": 6
+      }
+    }
+  },
+  "logs": {
+    "stdout": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\current-sidecar-smoke-20260705T085841Z\\sidecar.stdout.log",
+    "stderr": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\current-sidecar-smoke-20260705T085841Z\\sidecar.stderr.log"
+  },
+  "cleanup": {
+    "stoppedProcessId": 38620
+  },
+  "portFreed": true
+}

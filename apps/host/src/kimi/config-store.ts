@@ -6,12 +6,23 @@
 // 导出:applyPersistedKimiConfig(读入并写进目标对象)、persistKimiConfig(写盘)。
 import fs from 'node:fs';
 import path from 'node:path';
+import { composeFullModelId, normaliseModelProviderId, providerRequiresApiKey } from './provider/catalog.js';
 
 type KimiConfigRecord = Record<string, unknown>;
 
 /** 把 provider 归一为去空白的小写串。 */
 function cleanProvider(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return normaliseModelProviderId(value, '');
+}
+
+function recomputeConfigured(target: KimiConfigRecord): void {
+  const provider = cleanProvider(target.provider) || 'kimi-api';
+  const baseUrl = String(target.baseUrl || '').trim();
+  const model = String(target.model || '').trim();
+  const apiKey = String(target.apiKey || '').trim();
+  target.provider = provider;
+  target.fullModelId = composeFullModelId(provider, model);
+  target.configured = providerRequiresApiKey(provider) ? Boolean(apiKey) : Boolean(baseUrl && model);
 }
 
 /** 清洗 fallback 列表:仅保留有效字段,丢弃完全为空的项。 */
@@ -46,7 +57,7 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord)
       target.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
     }
     if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
-    target.configured = Boolean(target.apiKey);
+    recomputeConfigured(target);
   } catch {
     // 配置文件损坏时忽略磁盘内容,回退到环境变量派生的配置。
   }

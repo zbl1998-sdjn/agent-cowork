@@ -1,0 +1,55 @@
+import type { OrchestrationRecipe } from '../workflow-types.js';
+
+export const folderMapReduceRecipe: OrchestrationRecipe = {
+  id: 'folder-map-reduce',
+  displayName: 'Folder map-reduce review',
+  mode: 'map_reduce',
+  agents: ['researcher', 'writer', 'verifier', 'security_reviewer'],
+  steps: [
+    {
+      id: 'map_workspace',
+      kind: 'agent_task',
+      agentId: 'researcher',
+      title: 'Map workspace evidence',
+      instruction: 'Search the trusted workspace for source material related to the user goal and extract bounded evidence.',
+      expectedOutput: 'Evidence map grouped by source file or topic.',
+    },
+    {
+      id: 'map_git',
+      kind: 'agent_task',
+      agentId: 'researcher',
+      title: 'Map recent changes',
+      instruction: 'Review supplied context and repository metadata for recent changes relevant to the requested synthesis.',
+      expectedOutput: 'Recent-change map with evidence and risk notes.',
+    },
+    {
+      id: 'reduce_summary',
+      kind: 'agent_task',
+      agentId: 'writer',
+      title: 'Reduce mapped evidence',
+      instruction: 'Merge the mapped evidence into one concise, source-grounded synthesis.',
+      expectedOutput: 'Merged summary with explicit gaps and next steps.',
+      dependencies: ['map_workspace', 'map_git'],
+    },
+    {
+      id: 'verify_reduce',
+      kind: 'agent_task',
+      agentId: 'verifier',
+      title: 'Verify reduced output',
+      instruction: 'Check the reduced summary for unsupported claims, contradictions, and missing evidence.',
+      expectedOutput: 'Verification result with pass/fail and warnings.',
+      dependencies: ['reduce_summary'],
+    },
+    {
+      id: 'security_review',
+      kind: 'agent_task',
+      agentId: 'security_reviewer',
+      title: 'Review data exposure',
+      instruction: 'Check whether any secret-like or disallowed data would be exposed by the summary.',
+      expectedOutput: 'Security review result.',
+      dependencies: ['verify_reduce'],
+    },
+    { id: 'synthesize', kind: 'synthesis', dependencies: ['security_review'] },
+    { id: 'final_verification', kind: 'verification', dependencies: ['synthesize'], minimumConfidence: 0.5 },
+  ],
+};

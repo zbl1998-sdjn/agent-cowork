@@ -58,7 +58,7 @@ test('Tauri scaffold keeps host npm dependencies allowlisted and points at the N
   assert.ok(recordValue(app.security, 'tauri security config').csp, 'Tauri CSP must not be null');
   const bundle = recordValue(config.bundle, 'tauri bundle config');
   assert.equal(bundle.active, true);
-  assert.equal(bundle.createUpdaterArtifacts, true);
+  assert.equal(bundle.createUpdaterArtifacts, false);
   assert.equal(bundle.useLocalToolsDir, true);
   assert.deepEqual(bundle.targets, ['nsis']);
   const bundleWindows = recordValue(bundle.windows, 'tauri bundle windows config');

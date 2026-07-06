@@ -17,9 +17,13 @@ type MemoryNoteRow = {
   updated_at: unknown;
 };
 
-function schedPool(): SchedulePgPool {
+type ScheduleMockPool = SchedulePgPool & { closeCount: number };
+type MemoryMockPool = MemoryPgPool & { closeCount: number };
+
+function schedPool(): ScheduleMockPool {
   const rows = new Map<string, ScheduleRow>();
-  return {
+  const pool = {
+    closeCount: 0,
     async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
       if (t.startsWith('INSERT INTO schedules')) {
@@ -34,6 +38,7 @@ function schedPool(): SchedulePgPool {
       if (t.startsWith('SELECT schedule_json FROM schedules')) {
         let list = [...rows.values()];
         if (t.includes('tenant_id=$1')) list = list.filter((r) => r.tenant_id === params[0]);
+        if (t.includes('user_id=$2')) list = list.filter((r) => r.user_id === params[1]);
         return { rows: list.map((r) => ({ schedule_json: r.schedule_json })) };
       }
       if (t.startsWith('DELETE FROM schedules WHERE id=')) {
@@ -42,13 +47,18 @@ function schedPool(): SchedulePgPool {
       }
       return { rows: [] };
     },
+    async end(): Promise<void> {
+      pool.closeCount += 1;
+    },
   };
+  return pool;
 }
 
-function memPool(): MemoryPgPool {
+function memPool(): MemoryMockPool {
   const facts: MemoryFactRow[] = [];
   const notes = new Map<string, MemoryNoteRow>();
-  return {
+  const pool = {
+    closeCount: 0,
     async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
       if (t.startsWith('INSERT INTO memory_facts')) {
@@ -79,7 +89,11 @@ function memPool(): MemoryPgPool {
       }
       return { rows: [] };
     },
+    async end(): Promise<void> {
+      pool.closeCount += 1;
+    },
   };
+  return pool;
 }
 
 test('PostgresScheduleStore save/get/list/remove with tenant filter', async () => {
@@ -98,6 +112,32 @@ test('PostgresScheduleStore save/get/list/remove with tenant filter', async () =
   assert.equal(await store.get('s1'), null);
 });
 
+test('PostgresScheduleStore filters by user, handles jsonb rows, false removes, and closes the pool', async () => {
+  const pool = schedPool();
+  const store = new PostgresScheduleStore({ pool });
+  await store.save({ id: 's1', tenantId: 't1', userId: 'u1', name: '用户 1', kind: 'once', runs: 2 });
+  await store.save({ id: 's2', tenantId: 't1', userId: 'u2', name: '用户 2', kind: 'once' });
+
+  const u1 = await store.list({ tenantId: 't1', userId: 'u1' });
+  assert.deepEqual(u1.map((item) => item.id), ['s1']);
+  assert.equal(await store.remove('missing'), false);
+  await store.close();
+  assert.equal(pool.closeCount, 1);
+
+  const jsonbStore = new PostgresScheduleStore({
+    pool: {
+      async query(text: string) {
+        const t = text.replace(/\s+/g, ' ').trim();
+        if (t.startsWith('SELECT schedule_json FROM schedules WHERE id=')) {
+          return { rows: [{ schedule_json: { id: 'jsonb', tenantId: 't1', name: 'jsonb row' } }] };
+        }
+        return { rows: [] };
+      },
+    },
+  });
+  assert.deepEqual(await jsonbStore.get('jsonb'), { id: 'jsonb', tenantId: 't1', name: 'jsonb row' });
+});
+
 test('PostgresMemoryStore appendMemoryFact -> readMainMemory (tenant-scoped)', async () => {
   const store = new PostgresMemoryStore({ pool: memPool() });
   await store.appendMemoryFact('x', { key: '部署', value: '用 KCW_STORE=postgres', scope: 'project' }, { tenantId: 't1', userId: 'u1' });
@@ -106,6 +146,61 @@ test('PostgresMemoryStore appendMemoryFact -> readMainMemory (tenant-scoped)', a
   assert.match(md, /用 KCW_STORE=postgres/);
   const other = await store.readMainMemory('x', { tenantId: 't2' });
   assert.equal(other, '', 'other tenant sees no facts');
+});
+
+test('PostgresMemoryStore validates facts, normalizes scope, clips body, builds context, and closes the pool', async () => {
+  const pool = memPool();
+  const store = new PostgresMemoryStore({
+    pool,
+    now: () => new Date('2026-06-01T02:03:04.000Z'),
+  });
+
+  await assert.rejects(() => store.appendMemoryFact('x', { key: '', value: 'v' }), /key is required/);
+  await assert.rejects(() => store.appendMemoryFact('x', { key: 'bad*key', value: 'v' }), /invalid characters/);
+  await assert.rejects(() => store.appendMemoryFact('x', { key: 'ok', value: '' }), /value is required/);
+  const fact = await store.appendMemoryFact('x', { key: '偏好', value: '保留真实证据', scope: 'unknown-scope' }, { tenantId: 't1', userId: 'u1', traceId: 'trace-1' });
+  assert.deepEqual(fact.fact, { key: '偏好', value: '保留真实证据', scope: 'project' });
+
+  const firstPath = await store.writeMemoryNote('x', 'clip.md', 'x'.repeat(70 * 1024), { tenantId: 't1', userId: 'u1' });
+  const secondPath = await store.writeMemoryNote('x', 'clip.md', '更新', { tenantId: 't1', userId: 'u1' });
+  assert.equal(secondPath, firstPath, 'note upsert keeps the first generated id');
+  assert.equal(await store.readMemoryNote('x', 'clip.md', { tenantId: 't1' }), '更新');
+
+  const block = await store.buildMemorySystemBlock('x', { maxBytes: 128, context: { tenantId: 't1' } });
+  assert.match(block, /Agent Cowork/);
+  assert.match(block, /偏好/);
+  const loaded = await store.loadMemoryContext('x', { maxBytes: 128, context: { tenantId: 't1' } });
+  assert.equal(loaded.enabled, true);
+  assert.ok(loaded.bytes <= 512, 'memory system block keeps the documented minimum byte budget');
+  assert.deepEqual(loaded.notes.map((note) => note.name), ['clip.md']);
+
+  await store.close();
+  assert.equal(pool.closeCount, 1);
+});
+
+test('PostgresMemoryStore accepts jsonb fact rows and returns an empty system block when memory is empty', async () => {
+  const jsonbStore = new PostgresMemoryStore({
+    pool: {
+      async query(text: string) {
+        const t = text.replace(/\s+/g, ' ').trim();
+        if (t.startsWith('SELECT fact_json FROM memory_facts WHERE tenant_id=')) {
+          return { rows: [{ fact_json: { key: 'jsonb', value: 'direct object', scope: 'user' } }] };
+        }
+        if (t.startsWith('SELECT id, name')) return { rows: [] };
+        return { rows: [] };
+      },
+    },
+  });
+  assert.match(await jsonbStore.readMainMemory('x', { tenantId: 't1' }), /direct object/);
+
+  const emptyStore = new PostgresMemoryStore({ pool: memPool() });
+  assert.equal(await emptyStore.buildMemorySystemBlock('x', { context: { tenantId: 'missing' } }), '');
+  assert.deepEqual(await emptyStore.loadMemoryContext('x', { context: { tenantId: 'missing' } }), {
+    enabled: false,
+    bytes: 0,
+    text: '',
+    notes: [],
+  });
 });
 
 test('PostgresMemoryStore note write/read/list round-trip', async () => {

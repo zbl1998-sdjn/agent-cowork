@@ -1,5 +1,6 @@
 // 输入框类型(UI · components):Composer 及其子组件共享的 props/状态类型,避免跨组件类型重复。
 import type { ModelRunConfig } from '../lib/api/chat';
+import type { ModelProviderOption } from '../lib/api/kimiConfig';
 import type { PromptRefineResult } from '../lib/api/prompt';
 import type { ThinkingLevel } from './ComposerFooter';
 
@@ -29,15 +30,40 @@ export interface ComposerMeta {
   thinking: ThinkingLevel;
 }
 
+export interface ComposerDraftFile {
+  name: string;
+  size: number;
+  type?: string | undefined;
+  lastModified?: number | undefined;
+}
+
+export interface ComposerDraftPreview {
+  text: string;
+  files: ComposerDraftFile[];
+  provider: string;
+  model: string;
+  thinking: ThinkingLevel;
+  updatedAt: string;
+}
+
+export interface WorkbenchPreviewState extends ComposerDraftPreview {
+  mode: 'plan' | 'execute' | 'yolo';
+  workspace: string;
+  recipe: Recipe | null;
+  streaming: boolean;
+}
+
 export interface ComposerProps {
   recipes: Recipe[];
   historyRuns: HistoryRun[];
   searchFiles: (query: string) => Promise<FileHit[]>;
   onSend: (text: string, meta: ComposerMeta) => void;
+  onDraftChange?: ((draft: ComposerDraftPreview) => void) | undefined;
   onPickTemplate?: ((recipe: Recipe) => void) | undefined;
   onPickHistory?: ((run: HistoryRun) => void) | undefined;
   slashCommands?: Array<{ id: string; label: string; run: () => void }> | undefined;
   models?: string[] | undefined;
+  modelProviders?: ModelProviderOption[] | undefined;
   defaultModel?: string | undefined;
   defaultProvider?: string | undefined;
   defaultBaseUrl?: string | undefined;

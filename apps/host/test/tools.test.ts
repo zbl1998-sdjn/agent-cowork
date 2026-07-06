@@ -6,6 +6,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
+import { argsRecord, contextRecord, parseBuiltinToolsOptions } from '../src/tools/builtin-tool-options.js';
+import { parseMcpTools, parseToolEntry } from '../src/tools/tool-registry-inputs.js';
 import { runSubagent } from '../src/runtime/subagent.js';
 import { runSubagentsParallel } from '../src/runtime/subagent-parallel.js';
 import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
@@ -104,6 +106,86 @@ function assertHttpStatus(err: unknown, statusCode: number): boolean {
 }
 
 // ---- registry ----
+
+test('tool boundary parsers reject polluted setup before registering or running tools', () => {
+  const handler = () => ({ ok: true });
+  assert.deepEqual(parseToolEntry({
+    name: '  custom.read  ',
+    description: 'Read only',
+    source: 'test',
+    inputSchema: { type: 'object' },
+    risk: 'safe',
+    mutating: false,
+    requiresApproval: false,
+    handler,
+  }), {
+    name: 'custom.read',
+    description: 'Read only',
+    source: 'test',
+    inputSchema: { type: 'object' },
+    risk: 'safe',
+    mutating: false,
+    requiresApproval: false,
+    handler,
+  });
+
+  assert.throws(
+    () => parseToolEntry({ name: 'bad', handler, extra: true }),
+    (error: unknown) => error instanceof Error
+      && /ToolRegistry\.register: Unrecognized key/.test(error.message)
+      && assertHttpStatus(error, 400),
+  );
+  assert.throws(
+    () => parseToolEntry({ name: 'bad', handler: 'not-a-function' }),
+    /handler must be a function/,
+  );
+  assert.deepEqual(parseMcpTools([{ name: 'mcp.read', description: 'Read', extra: true }]), [
+    { name: 'mcp.read', description: 'Read' },
+  ]);
+  assert.throws(
+    () => parseMcpTools([{ name: '   ' }]),
+    /ToolRegistry\.registerMcpClient: 0.name: name is required/,
+  );
+});
+
+test('builtin tool options and handler context parsers fail closed on wrong dependency shapes', () => {
+  const sandbox = { exec: async () => ({ ok: true }) };
+  const fetchImpl = async () => ({ ok: true, status: 200, text: async () => '' });
+  assert.deepEqual(parseBuiltinToolsOptions({
+    sandbox,
+    runStoreRoot: 'runs',
+    runEvents: null,
+    runsIndex: null,
+    enableWebTools: true,
+    fetchImpl,
+  }), {
+    sandbox,
+    runStoreRoot: 'runs',
+    runEvents: null,
+    runsIndex: null,
+    enableWebTools: true,
+    fetchImpl,
+  });
+  assert.deepEqual(argsRecord({ path: 'a.txt' }), { path: 'a.txt' });
+  assert.deepEqual(argsRecord(['not', 'record']), {});
+  assert.deepEqual(contextRecord({ trustedRoot: 'C:/workspace' }), { trustedRoot: 'C:/workspace' });
+  assert.deepEqual(contextRecord(null), {});
+
+  assert.throws(
+    () => parseBuiltinToolsOptions({ sandbox: { exec: 'bad' } }),
+    (error: unknown) => error instanceof Error
+      && /createBuiltinTools: sandbox: sandbox must expose exec/.test(error.message)
+      && assertHttpStatus(error, 400),
+  );
+  assert.throws(
+    () => parseBuiltinToolsOptions({ fetchImpl: 'bad' }),
+    /createBuiltinTools: fetchImpl: fetchImpl must be a function/,
+  );
+  assert.throws(
+    () => parseBuiltinToolsOptions({ enableWebTools: 'yes' }),
+    /createBuiltinTools: enableWebTools/,
+  );
+});
 
 test('ToolRegistry.list returns descriptors without leaking handlers', () => {
   const registry = new ToolRegistry();
@@ -258,6 +340,95 @@ test('runSubagent stops on the first failing step', async () => {
   assert.match(failedStep(out.steps[0], 'failed subagent step').error, /kaboom/);
 });
 
+test('runSubagent preserves failed-step history, summaries, event publishing, and index isolation', async () => {
+  const root = tempRoot();
+  const runStoreRoot = path.join(root, 'runs');
+  const registry = new ToolRegistry();
+  registry.register({ name: 'value.step', description: '', handler: () => 'plain value' });
+  registry.register({ name: 'content.step', description: '', handler: () => ({ content: [{ text: 'alpha' }, { text: 'beta' }] }) });
+  registry.register({ name: 'keys.step', description: '', handler: () => ({ a: 1, b: 2, c: 3 }) });
+  registry.register({ name: 'bad.step', description: '', handler: () => { throw new Error('tool failed'); } });
+  registry.register({ name: 'after.step', description: '', handler: () => ({ exitCode: 1, timedOut: true }) });
+
+  const published: Record<string, unknown>[] = [];
+  const indexCalls: unknown[] = [];
+  const out = await runSubagent({
+    goal: '',
+    steps: [
+      { tool: 'value.step' },
+      { tool: 'content.step' },
+      { tool: 'keys.step' },
+      { tool: 'bad.step' },
+      { tool: 'after.step' },
+    ],
+    registry,
+    trustedRoot: root,
+    runStoreRoot,
+    runEvents: {
+      publish(_runId, payload) {
+        const event = { ...payload, type: String(payload.type || 'event'), seq: published.length + 1, ts: '2026-06-19T00:00:00.000Z' };
+        published.push(event);
+        return event;
+      },
+    },
+    runsIndex: {
+      upsert(record) {
+        indexCalls.push(record);
+        throw new Error('index down');
+      },
+    },
+    stopOnError: false,
+  });
+
+  assert.equal(out.ok, false);
+  assert.equal(out.steps.length, 5);
+  assert.equal(succeededStep(out.steps[0], 'primitive summary').summary.value, 'plain value');
+  assert.equal(succeededStep(out.steps[1], 'content summary').summary.content, 'alpha beta');
+  assert.deepEqual(succeededStep(out.steps[2], 'keys summary').summary.keys, ['a', 'b', 'c']);
+  assert.match(failedStep(out.steps[3], 'continued failed step').error, /tool failed/);
+  assert.deepEqual(succeededStep(out.steps[4], 'post-failure exit summary').summary, { exitCode: 1, ok: false });
+  assert.equal(out.events[0]?.type, 'user_message');
+  assert.equal(out.events[0]?.seq, 1);
+  assert.equal(indexCalls.length, 1);
+
+  const record = readRunRecord(runStoreRoot, out.runId);
+  assert.ok(record, 'subagent run record should still be written when index upsert fails');
+  assert.equal(record.status, 'failed');
+});
+
+test('runSubagent rejects missing dependencies and malformed step limits before running tools', async () => {
+  const root = tempRoot();
+  const registry = new ToolRegistry();
+  registry.register({ name: 'safe.read', description: '', handler: noop });
+
+  await assert.rejects(
+    () => runSubagent({ steps: [{ tool: 'safe.read' }], registry: null as unknown as ToolRegistry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    /registry is required/,
+  );
+  await assert.rejects(
+    () => runSubagent({ steps: [{ tool: 'safe.read' }], registry, trustedRoot: root, runStoreRoot: '' }),
+    /runStoreRoot is required/,
+  );
+  await assert.rejects(
+    () => runSubagent({ steps: [], registry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    (err) => assertHttpStatus(err, 400),
+  );
+  await assert.rejects(
+    () => runSubagent({ steps: [{}], registry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    (err) => assertHttpStatus(err, 400),
+  );
+  await assert.rejects(
+    () => runSubagent({
+      steps: [{ tool: 'safe.read' }, { tool: 'safe.read' }],
+      registry,
+      trustedRoot: root,
+      runStoreRoot: path.join(root, 'runs'),
+      maxSteps: 1,
+    }),
+    (err) => assertHttpStatus(err, 400),
+  );
+});
+
 test('runSubagent rejects an unknown tool with 400', async () => {
   const root = tempRoot();
   const registry = new ToolRegistry();
@@ -354,6 +525,80 @@ test('runSubagentsParallel rejects an over-budget child before executing any chi
     (err) => assertHttpStatus(err, 413),
   );
   assert.equal(called, false);
+});
+
+test('runSubagentsParallel records child startup failures and still writes the aggregate run', async () => {
+  const root = tempRoot();
+  const runStoreRoot = path.join(root, 'runs');
+  const registry = new ToolRegistry();
+  registry.register({ name: 'safe.read', description: '', handler: () => ({ ok: true }) });
+  const indexCalls: unknown[] = [];
+
+  const out = await runSubagentsParallel({
+    goal: '',
+    agents: [
+      { task: 'will fail during child event setup', steps: [{ tool: 'safe.read' }] },
+    ],
+    registry,
+    trustedRoot: root,
+    runStoreRoot,
+    runEvents: {
+      publish(_runId, payload) {
+        if (payload.type === 'user_message' && String(payload.text || '').startsWith('will fail')) {
+          throw new Error('event bus down');
+        }
+        return { ...payload, type: String(payload.type || 'event'), seq: 1, ts: '2026-06-19T00:00:00.000Z' };
+      },
+    },
+    runsIndex: {
+      upsert(record) {
+        indexCalls.push(record);
+        throw new Error('parallel index down');
+      },
+    },
+  });
+
+  assert.equal(out.ok, false);
+  assert.equal(out.children.length, 1);
+  assert.equal(out.children[0]?.status, 'failed');
+  assert.match(out.children[0]?.error || '', /event bus down/);
+  assert.equal(indexCalls.length, 1);
+  const record = readRunRecord(runStoreRoot, out.runId);
+  assert.ok(record, 'parallel aggregate record should be written when a child fails before it starts');
+  assert.equal(record.status, 'failed');
+});
+
+test('runSubagentsParallel rejects invalid setup before scheduling workers', async () => {
+  const root = tempRoot();
+  const registry = new ToolRegistry();
+  registry.register({ name: 'safe.read', description: '', handler: noop });
+
+  await assert.rejects(
+    () => runSubagentsParallel({ agents: [{ steps: [{ tool: 'safe.read' }] }], registry: null as unknown as ToolRegistry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    /registry is required/,
+  );
+  await assert.rejects(
+    () => runSubagentsParallel({ agents: [{ steps: [{ tool: 'safe.read' }] }], registry, trustedRoot: root, runStoreRoot: '' }),
+    /runStoreRoot is required/,
+  );
+  await assert.rejects(
+    () => runSubagentsParallel({ agents: [], registry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    (err) => assertHttpStatus(err, 400),
+  );
+  await assert.rejects(
+    () => runSubagentsParallel({
+      agents: [{ steps: [{ tool: 'safe.read' }] }, { steps: [{ tool: 'safe.read' }] }],
+      registry,
+      trustedRoot: root,
+      runStoreRoot: path.join(root, 'runs'),
+      maxAgents: 1,
+    }),
+    (err) => assertHttpStatus(err, 400),
+  );
+  await assert.rejects(
+    () => runSubagentsParallel({ agents: [{ steps: [{}] }], registry, trustedRoot: root, runStoreRoot: path.join(root, 'runs') }),
+    (err) => assertHttpStatus(err, 400),
+  );
 });
 
 // ---- route integration ----
@@ -461,6 +706,25 @@ test('POST /api/tools/call rejects approval-gated tools', async () => {
     });
     assert.equal(res.status, 428);
     assert.match(String(bodyRecord(res, 'approval-gated tools call').error || ''), /requires agent approval/i);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('POST /api/tools/call blocks external web tools in local strict mode', async () => {
+  const trustedRoot = tempRoot();
+  const server = createToolsServer({ trustedRoot, securityMode: 'local_strict', enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await jsonRequest(base, '/api/tools/call', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'call-local-strict-web' },
+      body: { name: 'web.fetch', args: { url: 'https://example.com' } },
+    });
+    const payload = bodyRecord(res, 'local strict web tool');
+    assert.equal(res.status, 403);
+    assert.equal(payload.code, 'POLICY_DENIED');
+    assert.match(String(payload.error || ''), /local_strict|external network/i);
   } finally {
     await closeTestServer(server);
   }

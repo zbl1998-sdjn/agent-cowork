@@ -4,7 +4,7 @@
 //       模式规则 + skills/记忆注入 + 内联图表/建议提示;纯函数无 I/O,易单测。
 // 依赖:仅标准库(Date 等)。
 // 导出:SYSTEM_PROMPT_VERSION、buildEnvBlock、buildSystemPrompt。
-export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v2';
+export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v3';
 
 const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
@@ -16,7 +16,12 @@ type SystemPromptOptions = {
   skills?: SkillDescriptor[];
   planMode?: boolean;
   developerMode?: boolean;
+  // 是否加入【工具使用纪律】收敛引导。默认 true;置 false 可关闭(便于对照实验/特殊部署)。
+  toolDiscipline?: boolean;
   env?: EnvFacts;
+  // 是否把含「每日日期」的 <env> 块拼进系统提示。默认 true(向后兼容)。
+  // agent 循环传 false 取「不含日期、跨天稳定」的系统前缀,另把 env 放进用户轮,避免日期按天打穿前缀缓存。
+  includeEnvBlock?: boolean;
 };
 
 /** 生成钉住真实世界事实(今天日期/工作目录/OS/版本/当前模型)的 <env> 块,放在系统提示词最顶部。 */
@@ -53,11 +58,13 @@ export function buildSystemPrompt({
   skills = [],
   planMode = false,
   developerMode = false,
+  toolDiscipline = true,
   env,
+  includeEnvBlock = true,
 }: SystemPromptOptions = {}): string {
   const lines = [
-    ...buildEnvBlock(env || {}),
-    '',
+    // <env> 含每日变化的日期;放进系统前缀会按天打穿缓存,故可由调用方关掉(改放用户轮)。
+    ...(includeEnvBlock ? [...buildEnvBlock(env || {}), ''] : []),
     '你是 Agent Cowork，一个运行在用户本地电脑上的 AI 助手。',
     '你可以调用提供的工具来读写工作区文件、运行命令、抓取网页、调用已连接的外部连接器(MCP)，真正完成用户的任务，而不只是给建议。',
     '文件工具：Read 读文件、Glob 找文件、Grep 搜内容、Write 写文件、Edit 精确替换；需要跑命令用 Shell；需要联网搜索"今天/最近/最新"信息(新闻、文档版本、价格、是否还活着)用 WebSearch,知道具体网址用 web.fetch；外部能力用 mcp__ 开头的工具。所有文件操作限定在工作区内。',
@@ -67,6 +74,15 @@ export function buildSystemPrompt({
     '【运行环境】你在 Windows 上运行；要执行命令时用 Windows/PowerShell 能识别的写法(如 Get-ChildItem、dir、type、git、npm、node、python，而不是 ls/find/cat/head 这类 Linux 命令)。',
     '【主动动手完成任务】该用工具就直接用，不要只给建议、也不要等用户点名让你用某个工具：读文件/找文件/搜内容用 Read/Glob/Grep；要运行命令、跑脚本、构建、git 操作、查系统信息、处理数据等，就主动用 Shell(它在本机真实执行，会请用户逐条确认)；联网用 WebFetch；外部能力用 mcp__ 工具。',
     '【两点分寸】① 只有"查看/搜索文件"这种场景优先用 Read/Glob/Grep，而不是用 Shell 跑 ls/cat/grep——前者更快且无需批准；凡是真要执行命令/脚本/程序的任务，该用 Shell 就大胆用，别畏手畏脚。② 别用 `**/*` 暴力遍历很大的目录(先用更精确的 Glob 或限定子目录/扩展名)，也别为同一件事反复换不同工具来回试探。',
+    // 工具使用纪律(对齐 Claude cowork 的收敛式风格):目标是"用最少的往返把事办成",
+    // 而不是把步数用满。步数是护栏、不是配额;拿到足够信息就收尾。
+    ...(toolDiscipline ? [
+      '【工具使用纪律】',
+      '1) 拿到足够信息就直接给出最终答复,不要为了"用满步数"或"再确认一下"继续调用工具;能一步得到的结论不要拆成多步试探。',
+      '2) 相互独立、没有先后依赖的多个工具调用,在同一轮里一起发起(并行),而不是一次一个来回等——这样能显著减少轮数。',
+      '3) 不重复:已经读过的文件、已经确认过的事实,不要反复读取或再查一遍;上一步的结果已经够用时,直接据此作答或动手。',
+      '4) 走最直接的路径:先想清楚"要办成这件事最少需要哪几步",只调用真正必要的工具;够了就停。',
+    ] : []),
     '完成后用简洁、自然的中文总结你做了什么。不要编造文件内容，先读再改。',
     '需要展示数据时可在回答里直接输出围栏代码块：' + "```" + 'chart 接 JSON 图表规格(kind 为 bar/line/pie/doughnut/table，含 data)，或 ' + "```" + 'mermaid 接 Mermaid 定义；它们会在对话中内联渲染成图表。',
   ];

@@ -1,0 +1,6290 @@
+{
+  "ok": false,
+  "mode": "installed-a11y",
+  "generatedAt": "2026-07-02T20:49:34.924Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-a11y-workspace",
+  "debugPort": 49881,
+  "auth": {
+    "usedGuest": false,
+    "user": "guest_2a242b5fc03d"
+  },
+  "onboardingClosed": false,
+  "summary": {
+    "viewsScanned": 20,
+    "contrastIssues": 280,
+    "sendButtonMinContrast": 5.34,
+    "liveRegionCount": 3,
+    "timelineOk": true,
+    "overflowIssues": [],
+    "axSummary": {
+      "nodeCount": 1115,
+      "statusLikeCount": 2,
+      "logLikeCount": 1,
+      "statusSamples": [],
+      "logSamples": [
+        "对话时间线"
+      ]
+    }
+  },
+  "views": [
+    {
+      "name": "main:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 87,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:plan",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 87,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:execute",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 86,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "mode:yolo",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 86,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:工具",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 92,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "输入关键字搜索工具匹配到的可用工具会显示在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:可视化",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "尚未生成活页渲染完成后会在这里预览。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:连接器",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 121,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:产物",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 91,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有产物完成一次任务后会出现在这里。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:项目",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 92,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有项目工作区创建项目后可把对话、记忆和产物归到同一个上下文。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:定时任务",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 92,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没有定时任务可以对 Kimi 说「每天早上 9 点把今天的日程发我」「每周一总结一下上周的邮件」这样的话,它就会帮你安排。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:记忆",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 98,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "还没记下任何东西把你想让 Kimi 记住的名词、项目、偏好写在下面,以后它就能用上。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "panel:可观测",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 95,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:账户",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 110,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:外观",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:模型",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:输入",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:API",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:运行时",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 108,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:更新",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 107,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    },
+    {
+      "name": "settings:健康检查",
+      "url": "http://tauri.localhost/",
+      "title": "Agent Cowork",
+      "contrast": {
+        "checked": 124,
+        "issues": [
+          {
+            "selector": "span.bubble-avatar.avatar-user",
+            "text": "D",
+            "color": "rgb(255, 255, 255)",
+            "background": "rgb(255, 79, 66)",
+            "ratio": 3.26,
+            "fontSize": 12,
+            "fontWeight": "500"
+          },
+          {
+            "selector": "summary",
+            "text": "思考过程",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.reasoning-body",
+            "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+            "color": "rgb(138, 143, 132)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 3.17,
+            "fontSize": 12,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-icon.icon-succeeded",
+            "text": "✓",
+            "color": "rgb(25, 195, 125)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.2,
+            "fontSize": 13,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "span.toolcall-toggle",
+            "text": "详情",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(251, 250, 247)",
+            "ratio": 2.67,
+            "fontSize": 11,
+            "fontWeight": "400"
+          },
+          {
+            "selector": "div.usage-line",
+            "text": "用量 16605 tokens",
+            "color": "rgb(155, 155, 151)",
+            "background": "rgb(248, 248, 247)",
+            "ratio": 2.62,
+            "fontSize": 11,
+            "fontWeight": "400"
+          }
+        ],
+        "sendButton": {
+          "text": "发送",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(181, 72, 47)",
+          "ratio": 5.34
+        },
+        "liveRegions": [
+          {
+            "tag": "main",
+            "role": "log",
+            "ariaLive": "polite",
+            "label": "对话时间线",
+            "text": "DDerrick你好请问你是什么大模型✎ 编辑KKimi思考过程用户问\"你好请问你是什么大模型\"。根据系统提示，当前模型是 kimi-api / kimi-k2.6。我应该直接回答这个问题，告诉用户我是基于什么模型的。不需要调用工具，这是一"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "暂无运行记录完成一次 agent 运行后会显示在这里。"
+          },
+          {
+            "tag": "div",
+            "role": "status",
+            "ariaLive": null,
+            "label": null,
+            "text": "选择一条运行记录查看明细运行记录列表加载后可查看成本、工具和来源。"
+          }
+        ],
+        "timeline": {
+          "exists": true,
+          "role": "log",
+          "ariaLive": "polite",
+          "ariaRelevant": "additions text",
+          "label": "对话时间线"
+        },
+        "scroll": {
+          "width": 1536,
+          "clientWidth": 1536,
+          "height": 900,
+          "clientHeight": 900
+        }
+      }
+    }
+  ],
+  "issues": [
+    {
+      "view": "main:execute",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "main:execute",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "main:execute",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:plan",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:execute",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "mode:yolo",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:工具",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可视化",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:连接器",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:产物",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:项目",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:定时任务",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:记忆",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "panel:可观测",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:账户",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:外观",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:模型",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:输入",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:API",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:API",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:运行时",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:更新",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.bubble-avatar.avatar-user",
+      "text": "D",
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(255, 79, 66)",
+      "ratio": 3.26,
+      "fontSize": 12,
+      "fontWeight": "500"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "summary",
+      "text": "思考过程",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "div.reasoning-body",
+      "text": "用户想要把之前生成的《跨境电商获客渠道详细讲解》内容转为 .docx 格式放到桌面。 在 Windows 上，我可以通过几种方式生成 .docx： 1. 使用 python 的 python-docx 库（如果已安装） 2. 使用 pand",
+      "color": "rgb(138, 143, 132)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 3.17,
+      "fontSize": 12,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-icon.icon-succeeded",
+      "text": "✓",
+      "color": "rgb(25, 195, 125)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.2,
+      "fontSize": 13,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "span.toolcall-toggle",
+      "text": "详情",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(251, 250, 247)",
+      "ratio": 2.67,
+      "fontSize": 11,
+      "fontWeight": "400"
+    },
+    {
+      "view": "settings:健康检查",
+      "selector": "div.usage-line",
+      "text": "用量 16605 tokens",
+      "color": "rgb(155, 155, 151)",
+      "background": "rgb(248, 248, 247)",
+      "ratio": 2.62,
+      "fontSize": 11,
+      "fontWeight": "400"
+    }
+  ],
+  "stderr": ""
+}

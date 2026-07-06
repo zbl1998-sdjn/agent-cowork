@@ -19,10 +19,23 @@ export function humanArtifactSize(n?: number): string {
 }
 
 export function artifactMeta(item: ArtifactItem): string {
-  const parts = [item.kind || 'file'];
+  const parts = [artifactFriendlyKind(item)];
   const size = humanArtifactSize(item.size);
   if (size) parts.push(size);
   return parts.join(' · ');
+}
+
+export function artifactFriendlyKind(item: ArtifactItem): string {
+  const name = item.name.toLowerCase();
+  if (name.endsWith('.docx')) return 'Word';
+  if (name.endsWith('.xlsx')) return 'Excel';
+  if (name.endsWith('.pptx')) return 'PPT';
+  if (name.endsWith('.pdf')) return 'PDF';
+  if (name.endsWith('.csv')) return 'CSV 表格';
+  if (name.endsWith('.txt')) return '可复制文本';
+  if (name.endsWith('.md') || item.kind === 'markdown') return '草稿文本';
+  if (name.endsWith('.html') || name.endsWith('.htm') || item.kind === 'html') return '网页预览';
+  return item.kind || '文件';
 }
 
 export function sanitizeArtifactRename(value: string): string {
@@ -36,7 +49,7 @@ export function ArtifactsPanelStateViews({ error, onRetry }: { error: string; on
   if (error) {
     return <ErrorState title="产物加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
-  return <Empty title="还没有产物" message="完成一次任务后会出现在这里。" />;
+  return <Empty title="还没有成果" message="完成一次任务后，Word、Excel、PPT、PDF、可复制文本或 CSV 会出现在这里。" />;
 }
 
 export interface ArtifactPanelItemProps {
@@ -143,7 +156,11 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
 
   return (
     <section className="side-panel">
-      <h2>产物</h2>
+      <h2>成果</h2>
+      <p className="panel-intro">这里优先展示白领常用格式：Word、Excel、PPT、PDF、可复制文本和 CSV。默认生成副本，不会覆盖原文件。</p>
+      <div className="artifact-format-strip" aria-label="常用成果格式">
+        {['Word', 'Excel', 'PPT', 'PDF', '文本', 'CSV'].map((format) => <span key={format}>{format}</span>)}
+      </div>
       <div className="panel-row">
         <Button variant="secondary" disabled={busy} onClick={() => void refresh()}>{busy ? '刷新中…' : '刷新'}</Button>
       </div>

@@ -1,19 +1,31 @@
 // 确定性烟雾:走真实路径验证「MASE 作为 agent cowork 记忆后端」的读写桥接。
 //   connectMcpServers(注册 mcp__mase-memory__* 到 ToolRegistry)
 //     → maseRememberTurn(写一轮) → maseRecallSessionMemory(召回并拼成会话记忆块)。
-// 用法:node scripts/run-host-node.mjs scripts/smoke-mase-memory-bridge.ts
+// 用法:MASE_REPO=<本机 MASE 仓库路径> node scripts/run-host-node.mjs scripts/smoke-mase-memory-bridge.ts
+//   可选:MASE_CONFIG_PATH(默认 <MASE_REPO>\config.json)、MASE_MEMORY_DIR。
+// MASE_REPO 指向的外部仓库不随本仓库分发,需按 .env.example 第 9 节自行准备。
 import { createToolRegistry } from '../apps/host/src/tools/tool-registry.js';
 import { connectMcpServers } from '../apps/host/src/mcp/connect.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../apps/host/src/memory/mase-bridge.js';
+
+function requireMaseRepo(): string {
+  const repo = process.env.MASE_REPO;
+  if (!repo) {
+    console.error('[bridge-smoke] FAILED: set MASE_REPO to a local MASE checkout before running this smoke (see .env.example section 9).');
+    process.exit(1);
+  }
+  return repo;
+}
+const repo = requireMaseRepo();
 
 const MASE_ENV: Record<string, string | undefined> = {
   PATH: process.env.PATH,
   SystemRoot: process.env.SystemRoot,
   TEMP: process.env.TEMP,
   PYTHONUTF8: '1',
-  PYTHONPATH: 'E:\\MASE-demo;E:\\MASE-demo\\src',
-  MASE_CONFIG_PATH: 'E:\\MASE-demo\\config.json',
-  MASE_MEMORY_DIR: 'C:\\Users\\Administrator\\.AgentCowork\\mase-memory',
+  PYTHONPATH: `${repo};${repo}\\src`,
+  MASE_CONFIG_PATH: process.env.MASE_CONFIG_PATH || `${repo}\\config.json`,
+  MASE_MEMORY_DIR: process.env.MASE_MEMORY_DIR,
   MASE_ALLOW_CLOUD_MODELS: '0',
 };
 
@@ -26,7 +38,7 @@ async function main(): Promise<void> {
         name: 'mase-memory',
         command: 'python',
         args: ['-m', 'integrations.mcp_server.server'],
-        cwd: 'E:\\MASE-demo',
+        cwd: repo,
         env: MASE_ENV,
         timeoutMs: 60_000,
       },

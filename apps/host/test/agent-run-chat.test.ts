@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { addUsage, applyStaticBackstop, sse, summarizeAfterBudget } from '../src/kimi/agent/finalize.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import {
   hasTodoEvent,
@@ -14,6 +15,10 @@ import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 function ignoreEmit(type: string, payload: unknown): void {
   void type;
   void payload;
+}
+
+function unexpectedEmit(message: string): never {
+  throw new Error(message);
 }
 
 test('runAgentChat executes a Write tool call then returns a final answer', async () => {
@@ -75,6 +80,78 @@ test('a run that exhausts the step budget still returns a written reply', async 
   assert.match(out.text, /小结|工作区/);
 });
 
+test('runAgentChat allows a final productive tool call before no-tool summary', async () => {
+  const root = tempRoot('kcw-agent-');
+  fs.writeFileSync(path.join(root, 'a.txt'), 'x', 'utf8');
+  const events: EmittedEvent[] = [];
+  const seenToolCounts: number[] = [];
+  let toolCallId = 0;
+  const modelCall: ModelCall = async (args) => {
+    const tools = Array.isArray(args.tools) ? args.tools : [];
+    seenToolCounts.push(tools.length);
+    if (tools.length > 0) {
+      toolCallId += 1;
+      return {
+        content: '',
+        tool_calls: [{ id: `c${toolCallId}`, function: { name: 'Glob', arguments: JSON.stringify({ pattern: '*' }) } }],
+      };
+    }
+    const messages = Array.isArray(args.messages) ? args.messages : [];
+    const lastMessage = messages.at(-1) as { content?: unknown } | undefined;
+    assert.match(String(lastMessage?.content || ''), /工具调用上限/);
+    return { content: '已基于现有结果收尾。' };
+  };
+
+  const out = await runAgentChat({
+    prompt: '看看这里',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    modelCall,
+    maxSteps: 2,
+    emit: (type, payload) => events.push({ type, payload }),
+  });
+
+  assert.equal(out.text, '已基于现有结果收尾。');
+  assert.equal(out.steps.length, 2, 'final productive step should still be allowed to run a tool');
+  assert.deepEqual(seenToolCounts.map((count) => count > 0), [true, true, false]);
+  assert.ok(!events.some((event) => event.type === 'tool_budget_finalizing'));
+});
+
+test('runAgentChat finalizes early when the latest tool batch made no progress', async () => {
+  const root = tempRoot('kcw-agent-');
+  const events: EmittedEvent[] = [];
+  const seenToolCounts: number[] = [];
+  const modelCall: ModelCall = async (args) => {
+    const tools = Array.isArray(args.tools) ? args.tools : [];
+    seenToolCounts.push(tools.length);
+    if (tools.length > 0) {
+      return {
+        content: '',
+        tool_calls: [{ id: 'bad-read', function: { name: 'Read', arguments: JSON.stringify({ path: 'missing.txt' }) } }],
+      };
+    }
+    const messages = Array.isArray(args.messages) ? args.messages : [];
+    const lastMessage = messages.at(-1) as { content?: unknown } | undefined;
+    assert.match(String(lastMessage?.content || ''), /剩余工具预算不足/);
+    return { content: '失败路径已收尾。' };
+  };
+
+  const out = await runAgentChat({
+    prompt: '读取不存在的文件',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    modelCall,
+    maxSteps: 2,
+    emit: (type, payload) => events.push({ type, payload }),
+  });
+
+  assert.equal(out.text, '失败路径已收尾。');
+  assert.equal(out.steps.length, 1, 'failed tool batch should not spend the final step on another tool');
+  assert.equal(out.steps[0]?.ok, false);
+  assert.deepEqual(seenToolCounts.map((count) => count > 0), [true, false]);
+  assert.ok(events.some((event) => event.type === 'tool_budget_finalizing'));
+});
+
 test('static backstop fires when even the forced summary comes back empty', async () => {
   const root = tempRoot('kcw-agent-');
   const modelCall: ModelCall = async ({ tools }) => {
@@ -94,4 +171,80 @@ test('static backstop fires when even the forced summary comes back empty', asyn
   });
 
   assert.ok(out.text.length > 0, 'static backstop must provide a non-empty reply');
+});
+
+test('finalize helpers accumulate usage, write SSE frames, and respect aborts', () => {
+  const usageTotals = { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 };
+  addUsage(usageTotals, { prompt_tokens: '4', completion_tokens: 5, total_tokens: 6 });
+  addUsage(usageTotals, null);
+
+  assert.deepEqual(usageTotals, { prompt_tokens: 5, completion_tokens: 7, total_tokens: 9 });
+
+  let chunk = '';
+  sse({ write(value = '') { chunk += String(value); } }, 'done', { ok: true });
+  assert.equal(chunk, 'event: done\ndata: {"ok":true}\n\n');
+
+  const emitted: Array<{ type: string; payload: Record<string, unknown> }> = [];
+  const text = applyStaticBackstop('', null, (type, payload) => emitted.push({ type, payload }));
+  assert.match(text, /继续/);
+  assert.deepEqual(emitted, [{ type: 'token', payload: { delta: text } }]);
+
+  const controller = new AbortController();
+  controller.abort();
+  assert.equal(applyStaticBackstop('', controller.signal, () => unexpectedEmit('aborted backstop must not emit')), '');
+});
+
+test('summarizeAfterBudget disables tools, emits streamed summary, and records usage', async () => {
+  const messages: Array<{ role: string; content: unknown }> = [{ role: 'user', content: '读取项目' }];
+  const usageTotals = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
+  const seenTools: unknown[] = [];
+  const modelCall: ModelCall = async (args) => {
+    seenTools.push(args.tools);
+    const callbacks = args as { onContent?: (delta: string) => void };
+    callbacks.onContent?.('流式小结');
+    return {
+      content: '预算小结',
+      usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+    };
+  };
+
+  const text = await summarizeAfterBudget({
+    messages,
+    modelCall,
+    kimiConfig: { timeoutMs: 1000 },
+    emit: (type, payload) => events.push({ type, payload }),
+    usageTotals,
+  });
+
+  assert.equal(text, '预算小结');
+  assert.deepEqual(seenTools, [[]]);
+  assert.equal(messages.length, 2);
+  assert.match(String(messages[1]?.content), /工具调用上限/);
+  assert.deepEqual(events, [{ type: 'token', payload: { delta: '流式小结' } }]);
+  assert.deepEqual(usageTotals, { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 });
+});
+
+test('summarizeAfterBudget returns existing or empty text without leaking model failures', async () => {
+  const throwingModel: ModelCall = async () => {
+    throw new Error('network down');
+  };
+  const usageTotals = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+
+  const existing = await summarizeAfterBudget({
+    finalText: '已有答复',
+    messages: [],
+    modelCall: throwingModel,
+    emit: () => unexpectedEmit('existing final text should not emit'),
+    usageTotals,
+  });
+  assert.equal(existing, '已有答复');
+
+  const failed = await summarizeAfterBudget({
+    messages: [],
+    modelCall: throwingModel,
+    emit: () => unexpectedEmit('model failure should be swallowed'),
+    usageTotals,
+  });
+  assert.equal(failed, '');
 });

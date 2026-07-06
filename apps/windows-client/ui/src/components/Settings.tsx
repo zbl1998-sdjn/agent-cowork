@@ -1,11 +1,11 @@
 // Settings(UI · components):设置模态外框——管理标签切换与保存,内容由 SettingsTabsContent 承载。纯展示+回调。
 import { useEffect, useState } from 'react';
-import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type SelfCheckResult } from '../lib/api';
+import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type ModelProviderOption, type SelfCheckResult } from '../lib/api';
 import { humanizeError } from '../lib/friendly-error';
 import { IconButton } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsTabsContent, type SettingsPersistPayload } from './SettingsTabsContent';
-import type { SettingsTab } from './settings-types';
+import type { AppFontFamily, AppFontScale, SettingsTab } from './settings-types';
 
 // 再导出 SettingsTab,让 App.tsx/Settings.test.tsx 的旧 import path 不变。
 export type { SettingsTab } from './settings-types';
@@ -26,9 +26,15 @@ interface SettingsProps {
   username: string;
   tenantId: string;
   theme: 'light' | 'dark';
+  fontScale: AppFontScale;
+  fontFamily: AppFontFamily;
   autoClarify: boolean;
+  autoContextCompaction: boolean;
   onSetAutoClarify: (enabled: boolean) => void;
+  onSetAutoContextCompaction: (enabled: boolean) => void;
   onSetTheme: (t: 'light' | 'dark') => void;
+  onSetFontScale: (scale: AppFontScale) => void;
+  onSetFontFamily: (family: AppFontFamily) => void;
   onLogout: () => void;
   onClose: () => void;
   onSaved: (info: KimiInfo) => void;
@@ -37,12 +43,13 @@ interface SettingsProps {
 // 统一设置中心:账户/外观/模型/API/健康检查在一个模态框里。
 // API key 只展示 hasKey 标记,绝不回显;保存空 key 会保留原 key。
 // 模态框状态与持久化留在此处,各标签正文放进 SettingsTabsContent 以控制文件体量。
-export function Settings({ initialTab = 'account', username, tenantId, theme, autoClarify, onSetAutoClarify, onSetTheme, onLogout, onClose, onSaved }: SettingsProps) {
+export function Settings({ initialTab = 'account', username, tenantId, theme, fontScale, fontFamily, autoClarify, autoContextCompaction, onSetAutoClarify, onSetAutoContextCompaction, onSetTheme, onSetFontScale, onSetFontFamily, onLogout, onClose, onSaved }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [apiKey, setApiKey] = useState('');
   const [provider, setProvider] = useState('kimi-api');
   const [baseUrl, setBaseUrl] = useState('');
   const [model, setModel] = useState('');
+  const [providers, setProviders] = useState<ModelProviderOption[]>([]);
   const [hasKey, setHasKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -59,6 +66,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
         setProvider(info.provider || 'kimi-api');
         setBaseUrl(info.baseUrl || '');
         setModel(info.model || '');
+        setProviders(info.providers || []);
         setHasKey(Boolean(info.hasKey));
       } catch {
         /* host 未就绪时保持默认值 */
@@ -98,6 +106,10 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
       try {
         const info = await saveKimiConfig(payload);
         setHasKey(Boolean(info.hasKey));
+        setProvider(info.provider || provider);
+        setBaseUrl(info.baseUrl || '');
+        setModel(info.model || '');
+        setProviders(info.providers || providers);
         setApiKey('');
         onSaved(info);
         setSavedTip(okMsg);
@@ -123,8 +135,12 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, au
             tab={tab}
             username={username} tenantId={tenantId} onLogout={onLogout}
             theme={theme} onSetTheme={onSetTheme}
+            fontScale={fontScale} onSetFontScale={onSetFontScale}
+            fontFamily={fontFamily} onSetFontFamily={onSetFontFamily}
             autoClarify={autoClarify} onSetAutoClarify={onSetAutoClarify}
+            autoContextCompaction={autoContextCompaction} onSetAutoContextCompaction={onSetAutoContextCompaction}
             provider={provider} setProvider={setProvider}
+            providers={providers}
             model={model} setModel={setModel}
             baseUrl={baseUrl} setBaseUrl={setBaseUrl}
             apiKey={apiKey} setApiKey={setApiKey}

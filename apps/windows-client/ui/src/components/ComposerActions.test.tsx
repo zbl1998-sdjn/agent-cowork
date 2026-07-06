@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { ComposerSendAction, ComposerToolActions, SEND_BUTTON_BACKGROUND, SEND_BUTTON_STYLE } from './ComposerActions';
+import { ComposerSendAction, ComposerToolActions, SEND_BUTTON_BACKGROUND } from './ComposerActions';
 import { Button } from './ui/Button';
 
 function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -59,8 +59,8 @@ describe('ComposerActions', () => {
     );
 
     expect(html.match(/class="ui-btn /g)?.length).toBe(3);
-    expect(html).toContain('tool-button is-active');
-    expect(html).toContain('优化中…');
+    expect(html).toContain('is-active'); // 语音 listening 高亮
+    expect(html).toContain('tool-refining'); // 优化中占位
     expect(html).toContain('disabled=""');
   });
 
@@ -97,7 +97,6 @@ describe('ComposerActions', () => {
     expect(html).toContain('ui-btn ui-btn--primary');
     expect(html).toContain('send-button');
     expect(html).toContain('disabled=""');
-    expect(buttons[0]!.props.style).toMatchObject(SEND_BUTTON_STYLE);
     buttons[0]!.props.onClick();
     expect(onSend).toHaveBeenCalledOnce();
   });

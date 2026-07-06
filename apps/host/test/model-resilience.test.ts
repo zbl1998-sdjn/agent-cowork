@@ -116,6 +116,52 @@ test('callModelResilient keeps same-provider fallbacks distinct by baseUrl and m
   assert.equal(seen[1]?.apiKey, 'sk-fallback-same-provider-123456');
 });
 
+test('callModelResilient skips external candidates before runtime calls in local strict mode', async () => {
+  const seen: SeenModelConfig[] = [];
+  const cfg = {
+    securityMode: 'local_strict',
+    provider: 'kimi-api',
+    apiKey: 'test-external-denied',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    model: 'external-denied-model',
+    fallbacks: [
+      { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local-allowed-model' },
+    ],
+  };
+
+  const out = await callModelResilient(
+    async ({ kimiConfig }) => {
+      seen.push({ provider: kimiConfig.provider, baseUrl: kimiConfig.baseUrl, model: kimiConfig.model, apiKey: kimiConfig.apiKey });
+      return { content: 'local ok', provider: kimiConfig.provider, model: kimiConfig.model };
+    },
+    {},
+    { kimiConfig: cfg, timeoutMs: 5000 },
+  );
+
+  assert.equal((out as ModelOutput).content, 'local ok');
+  assert.deepEqual(seen.map((item) => item.provider), ['openai/local']);
+  assert.equal(seen[0]?.apiKey, undefined);
+});
+
+test('callModelResilient fails closed when local strict leaves no allowed model candidate', async () => {
+  await assert.rejects(
+    () => callModelResilient(
+      async () => ({ content: 'should not run' }),
+      {},
+      {
+        kimiConfig: {
+          securityMode: 'local_strict',
+          provider: 'kimi-api',
+          baseUrl: 'https://api.moonshot.ai/v1',
+          model: 'external-only-model',
+        },
+        timeoutMs: 5000,
+      },
+    ),
+    (err) => errorCode(err) === 'MODEL_PROVIDER_POLICY_DENIED',
+  );
+});
+
 test('callModelResilient reports exhausted fallback chains with redacted layer errors', async () => {
   const cfg = {
     provider: 'openai',

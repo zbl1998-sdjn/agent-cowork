@@ -1,0 +1,42 @@
+{
+  "model": "kimi-k2.6",
+  "provider": "kimi-api",
+  "maxSteps": 10,
+  "reps": 3,
+  "results": [
+    {
+      "task": "read-all",
+      "mode": "discipline",
+      "maxSteps": 10,
+      "reps": 3,
+      "arms": [
+        {
+          "tag": "nodiscipline",
+          "toolRoundsMean": 2,
+          "toolRoundsAll": [
+            2,
+            2,
+            2
+          ],
+          "exhaustedRate": 0,
+          "nudgeFiredRate": 0,
+          "errs": [],
+          "msMean": 27974
+        },
+        {
+          "tag": "discipline",
+          "toolRoundsMean": 2,
+          "toolRoundsAll": [
+            2,
+            2,
+            2
+          ],
+          "exhaustedRate": 0,
+          "nudgeFiredRate": 0,
+          "errs": [],
+          "msMean": 26706
+        }
+      ]
+    }
+  ]
+}

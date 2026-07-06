@@ -84,6 +84,32 @@ export function parseToolCall(call: ToolCall): ParsedToolCall {
   }
 }
 
+// 收尾提醒的触发比例:步数用掉这么多后注入一次「该收尾了」的软提醒(而不是等硬耗尽)。
+export const STEP_BUDGET_NUDGE_RATIO = 0.7;
+
+export type StepBudgetNudge = { role: 'user'; name: string; content: string };
+
+/**
+ * 步数收尾提醒(对齐 Claude cowork 的收敛式风格):当模型已用掉约 70% 的步数预算却
+ * 还在调工具时,注入一次软提醒——鼓励「拿到足够信息就直接作答」而不是把步数用满。
+ * 只在恰好跨过阈值的那一步返回一次提醒(调用方用一次性开关避免每步重复注入);
+ * 未跨阈值返回 null。用 user 角色与既有 verify 提醒保持一致(跨 provider 稳妥,
+ * 避免 mid-array system 消息在 Anthropic 适配层被特殊处理)。
+ */
+export function stepBudgetNudgeMessage(stepNumber: number, stepBudget: number, ratio: number = STEP_BUDGET_NUDGE_RATIO): StepBudgetNudge | null {
+  if (!Number.isFinite(stepBudget) || stepBudget <= 1) return null;
+  // ratio <= 0 关闭收尾提醒(便于部署调优/对照实验);超过 1 视为始终提醒无意义,收敛到 1。
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  const threshold = Math.max(1, Math.ceil(stepBudget * Math.min(1, ratio)));
+  if (stepNumber < threshold) return null;
+  const remaining = Math.max(0, stepBudget - stepNumber + 1);
+  return {
+    role: 'user',
+    name: 'step_budget_reminder',
+    content: `【收尾提醒】你已进入第 ${stepNumber}/${stepBudget} 步(约剩 ${remaining} 步)。如果已经拿到足够信息，请直接给出最终答复，不要为了用满步数继续调用工具；只有确实还差关键信息时才继续调用工具。`,
+  };
+}
+
 /** 创建空预算守卫:check/recordUsage 永不叫停,作为未配置预算时的默认占位。 */
 export function createNoopBudgetGuard(): BudgetGuard {
   const snapshot = {

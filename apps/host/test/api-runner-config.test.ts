@@ -31,6 +31,39 @@ test('resolveKimiApiConfig reads model provider from env/config', () => {
   assert.equal(explicitConfig.provider, 'openai/local');
 });
 
+test('resolveKimiApiConfig reads opencode-style domestic provider defaults and env keys', () => {
+  const config = resolveKimiApiConfig({}, {
+    KCW_MODEL_PROVIDER: 'deepseek',
+    DEEPSEEK_API_KEY: 'test-key-deepseek',
+  });
+
+  assert.equal(config.provider, 'deepseek');
+  assert.equal(config.configured, true);
+  assert.equal(config.apiKey, 'test-key-deepseek');
+  assert.equal(config.baseUrl, 'https://api.deepseek.com');
+  assert.equal(config.model, 'deepseek-v4-flash');
+  assert.equal(config.fullModelId, 'deepseek/deepseek-v4-flash');
+});
+
+test('resolveKimiApiConfig parses provider_id/model_id when provider is omitted', () => {
+  const config = resolveKimiApiConfig({}, {
+    KIMI_MODEL: 'openai/local/qwen2.5-coder:7b',
+  });
+
+  assert.equal(config.provider, 'openai/local');
+  assert.equal(config.model, 'qwen2.5-coder:7b');
+  assert.equal(config.baseUrl, 'http://127.0.0.1:11434/v1');
+  assert.equal(config.configured, true);
+});
+
+test('resolveKimiApiConfig carries host security mode from config or env', () => {
+  const fromEnv = resolveKimiApiConfig({}, { SECURITY_MODE: 'local_strict' });
+  assert.equal(fromEnv.securityMode, 'local_strict');
+
+  const fromConfig = resolveKimiApiConfig({ securityMode: 'enterprise_hybrid' }, { SECURITY_MODE: 'local_strict' });
+  assert.equal(fromConfig.securityMode, 'enterprise_local');
+});
+
 test('resolveKimiApiConfig reads Anthropic provider-specific env without Kimi defaults', () => {
   const config = resolveKimiApiConfig({}, {
     KCW_MODEL_PROVIDER: 'anthropic',
@@ -54,7 +87,7 @@ test('resolveKimiApiConfig fails closed for Anthropic when no model env is confi
     CLAUDE_API_KEY: 'test-key-claude',
   });
 
-  assert.equal(config.provider, 'claude');
+  assert.equal(config.provider, 'anthropic');
   assert.equal(config.configured, true);
   assert.equal(config.apiKey, 'test-key-claude');
   assert.equal(config.baseUrl, 'https://api.anthropic.com/v1');

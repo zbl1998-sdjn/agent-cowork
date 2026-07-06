@@ -9,6 +9,7 @@ import { CommandPalette } from './CommandPalette';
 import { FilePreview } from './FilePreview';
 import { OnboardingPanel } from './overlays/OnboardingPanel';
 import type { SettingsTab } from './Settings';
+import type { AppFontFamily, AppFontScale } from './settings-types';
 import { Loading } from './ui/StateViews';
 
 const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })));
@@ -21,9 +22,12 @@ interface AppOverlaysProps {
   settingsOpen: boolean;
   settingsInitialTab?: SettingsTab;
   theme: 'light' | 'dark';
+  fontScale: AppFontScale;
+  fontFamily: AppFontFamily;
   trustedRoot: string;
   user: AuthIdentity;
   autoClarify: boolean;
+  autoContextCompaction: boolean;
   onCloseCommandPalette: () => void;
   onCompleteOnboarding: () => void;
   onClosePreview: () => void;
@@ -33,7 +37,10 @@ interface AppOverlaysProps {
   onLogout: () => void;
   onSettingsSaved: (info: KimiInfo) => void;
   onSetAutoClarify: (enabled: boolean) => void;
+  onSetAutoContextCompaction: (enabled: boolean) => void;
   onSetTheme: (theme: 'light' | 'dark') => void;
+  onSetFontScale: (scale: AppFontScale) => void;
+  onSetFontFamily: (family: AppFontFamily) => void;
 }
 
 export function AppOverlays({
@@ -44,9 +51,12 @@ export function AppOverlays({
   settingsOpen,
   settingsInitialTab = 'account',
   theme,
+  fontScale,
+  fontFamily,
   trustedRoot,
   user,
   autoClarify,
+  autoContextCompaction,
   onCloseCommandPalette,
   onCompleteOnboarding,
   onClosePreview,
@@ -56,7 +66,10 @@ export function AppOverlays({
   onLogout,
   onSettingsSaved,
   onSetAutoClarify,
+  onSetAutoContextCompaction,
   onSetTheme,
+  onSetFontScale,
+  onSetFontFamily,
 }: AppOverlaysProps) {
   return (
     <>
@@ -77,9 +90,15 @@ export function AppOverlays({
             username={user.username}
             tenantId={user.tenantId}
             theme={theme}
+            fontScale={fontScale}
+            fontFamily={fontFamily}
             autoClarify={autoClarify}
+            autoContextCompaction={autoContextCompaction}
             onSetAutoClarify={onSetAutoClarify}
+            onSetAutoContextCompaction={onSetAutoContextCompaction}
             onSetTheme={onSetTheme}
+            onSetFontScale={onSetFontScale}
+            onSetFontFamily={onSetFontFamily}
             onLogout={onLogout}
             onClose={onCloseSettings}
             onSaved={onSettingsSaved}

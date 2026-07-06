@@ -125,7 +125,7 @@ async function main(): Promise<void> {
       generatedAt: new Date().toISOString(),
       workspace,
       baseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL || 'https://api.moonshot.ai/v1',
-      model: process.env.KIMI_MODEL || 'kimi-k2.6',
+      model: process.env.KIMI_MODEL || 'kimi-k2.7-code',
       durationMs: plan.durationMs,
       runId: plan.runId,
       runPath: plan.runPath,

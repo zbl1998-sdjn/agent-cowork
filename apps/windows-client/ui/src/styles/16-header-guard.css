@@ -1,0 +1,21 @@
+/* —— 顶栏操作区可见性护栏 ——
+   历史碎片化 CSS(多处 .header-actions:137 margin-left:auto + 2135 flex:0 0 auto 组合)
+   在部分窗口宽度下把 ⌘K/⚙/更多 整块挤出可视区(实测换掉类名即恢复)。此处以最高优先级
+   把它钉成"内容自然宽度、靠右、不塌陷、不溢出裁剪"。 */
+.app-header > .header-actions {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  order: 0 !important;
+  align-items: center !important;
+  gap: 8px !important;
+  /* 关键:彻底去掉 margin-left:auto(实测它把整块挤出可视区);靠 workspace 的 flex-grow 自然把它推到右侧 */
+  margin-left: 0 !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+}

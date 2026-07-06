@@ -49,12 +49,41 @@ async function J(base: string, route: string, opt: JsonRequestOptions = {}): Pro
 test('skill registry exposes recipe manifests with enabled state', () => {
   const reg = createSkillRegistry();
   const skills = reg.list();
-  assert.equal(skills.length, 8);
+  assert.equal(skills.length, 14);
   const meeting = skills.find((s) => s.id === 'meeting-actions');
   assert.ok(meeting, 'meeting-actions skill should exist');
   assert.ok(meeting.trigger.includes('会议'));
   assert.ok(Array.isArray(meeting.permissions) && meeting.permissions.length > 0);
   assert.equal(meeting.enabled, true);
+  const weekly = skills.find((s) => s.id === 'weekly-report-beginner');
+  assert.ok(weekly, 'weekly-report-beginner skill should exist');
+  assert.ok(weekly.trigger.includes('一键周报'));
+  assert.equal(weekly.enabled, true);
+});
+
+test('skill registry supports injected recipes, fallback manifests, and initial disabled ids', () => {
+  const reg = createSkillRegistry({
+    recipes: [
+      { id: 'custom-audit-pack', name: 'Audit Pack', description: 'Build an audit pack' },
+      { id: 'email-draft', name: 'Email Draft' },
+    ],
+    initialDisabled: ['custom-audit-pack'],
+  });
+
+  const custom = reg.get('custom-audit-pack');
+  assert.ok(custom, 'custom skill should exist');
+  assert.deepEqual(custom.trigger, ['custom', 'audit', 'pack']);
+  assert.deepEqual(custom.permissions, ['read-files', 'write-files']);
+  assert.deepEqual(custom.outputs, ['plan']);
+  assert.equal(custom.description, 'Build an audit pack');
+  assert.equal(custom.enabled, false);
+  assert.equal(reg.isEnabled('custom-audit-pack'), false);
+  assert.equal(reg.get('missing'), null);
+
+  const known = reg.get('email-draft');
+  assert.ok(known, 'known skill should exist');
+  assert.deepEqual(known.permissions, ['read-files']);
+  assert.equal(reg.enabledSkills().map((skill) => skill.id).join(','), 'email-draft');
 });
 
 test('setEnabled toggles and reflects in list; unknown id throws 404', () => {
@@ -78,7 +107,7 @@ test('GET /api/skills + POST /api/skills/:id/toggle', async () => {
     const list = await J(base, '/api/skills');
     const listBody = isRecord(list.body) ? list.body : {};
     assert.equal(list.status, 200);
-    assert.equal(skillArray(listBody.skills).length, 8);
+    assert.equal(skillArray(listBody.skills).length, 14);
 
     const off = await J(base, '/api/skills/contract-summary/toggle', { method: 'POST', body: { enabled: false } });
     const offBody = isRecord(off.body) ? off.body : {};

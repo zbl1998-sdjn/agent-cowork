@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
-import { RunResumer } from '../src/runtime/run-resume.js';
+import { RunResumer, resumeStateFromCheckpoint } from '../src/runtime/run-resume.js';
 import type { ChatMessage, ResumeState as AgentResumeState } from '../src/kimi/agent/tool-loop-types.js';
 import type { AgentTool, ToolArgs } from '../src/kimi/agent/tool-call-executor.js';
 
@@ -108,4 +108,33 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   assert.equal(executions, 1, 'completed tool handler must not run again during resume');
   assert.equal(fs.readFileSync(effectPath, 'utf8'), 'hello\n');
   assert.ok(hasToolMessage(resumedMessages, 'append_1'));
+});
+
+test('resumeStateFromCheckpoint normalizes malformed legacy checkpoint counters', () => {
+  const state = resumeStateFromCheckpoint({
+    runId: 'run_legacy',
+    step: 'not-a-number',
+    phase: '',
+    messages: 'bad',
+    usage: {
+      prompt_tokens: 'bad',
+      completion_tokens: Infinity,
+      total_tokens: 5,
+    },
+    approvedTools: ['Write', '', null, ' Shell '],
+    todos: [{ id: 'todo-1' }],
+    metadata: ['bad'],
+  });
+
+  assert.equal(state.step, 0);
+  assert.equal(state.phase, 'unknown');
+  assert.deepEqual(state.messages, []);
+  assert.deepEqual(state.usage, {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 5,
+  });
+  assert.deepEqual(state.approvedTools, ['Write', 'Shell']);
+  assert.deepEqual(state.todos, [{ id: 'todo-1' }]);
+  assert.deepEqual(state.metadata, {});
 });

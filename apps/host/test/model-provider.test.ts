@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { defaultAgentModelCall } from '../src/kimi/agent-runner.js';
+import { createAnthropicProvider } from '../src/kimi/provider/anthropic.js';
 import { resolveModelProvider } from '../src/kimi/provider/index.js';
-import { parseOpenAiCompatibleStream } from '../src/kimi/provider/kimi.js';
+import { createKimiProvider, parseOpenAiCompatibleStream } from '../src/kimi/provider/kimi.js';
+import { modelBreaker, modelBreakerStats, modelProvider } from '../src/runtime/model-breakers.js';
 
 type StreamReader = { read(): Promise<{ value?: Uint8Array; done?: boolean }> };
 type RequestBody = Record<string, unknown> & {
@@ -17,6 +19,7 @@ type CapturedRequest = {
   url?: string;
   headers?: Record<string, string>;
   body?: RequestBody;
+  signal?: AbortSignal;
 };
 type ToolCall = { id?: unknown; function: { name?: unknown; arguments?: unknown } };
 type ModelMessage = Record<string, unknown> & {
@@ -25,12 +28,13 @@ type ModelMessage = Record<string, unknown> & {
   partial_tool_calls?: ToolCall[];
   stream_error?: string;
 };
-type FetchInit = { headers: Record<string, string>; body: string };
+type FetchInit = { headers: Record<string, string>; body: string; signal?: AbortSignal };
 
 function assertCaptured(captured: CapturedRequest): asserts captured is {
   url: string;
   headers: Record<string, string>;
   body: RequestBody;
+  signal?: AbortSignal;
 } {
   assert.equal(typeof captured.url, 'string');
   assert.ok(captured.headers);
@@ -79,11 +83,33 @@ test('resolveModelProvider registers OpenAI-compatible providers', () => {
   assert.equal(resolveModelProvider({ provider: 'OPENAI-COMPATIBLE' }).id, 'openai');
   assert.equal(resolveModelProvider({ provider: 'openai/local' }).id, 'openai/local');
   assert.equal(resolveModelProvider({ provider: 'local-openai' }).id, 'openai/local');
+  assert.equal(resolveModelProvider({ provider: 'ollama' }).id, 'ollama');
+  assert.equal(resolveModelProvider({ provider: 'local-ollama' }).id, 'ollama');
+  assert.equal(resolveModelProvider({ provider: 'deepseek' }).id, 'deepseek');
+  assert.equal(resolveModelProvider({ provider: 'dashscope' }).id, 'qwen-dashscope-cn');
+  assert.equal(resolveModelProvider({ provider: 'volcengine-ark' }).id, 'volcengine-ark');
+  assert.equal(resolveModelProvider({ provider: 'custom-openai-compatible' }).id, 'custom-openai-compatible');
 });
 
 test('resolveModelProvider registers Anthropic aliases', () => {
   assert.equal(resolveModelProvider({ provider: 'anthropic' }).id, 'anthropic');
   assert.equal(resolveModelProvider({ provider: 'CLAUDE' }).id, 'anthropic');
+});
+
+test('model breakers are scoped by normalized provider, endpoint, and model', () => {
+  const first = modelBreaker({ provider: ' OpenAI ', baseUrl: 'https://breaker-a.example.invalid/v1', model: 'm1' });
+  const same = modelBreaker({ provider: 'openai', baseUrl: 'https://breaker-a.example.invalid/v1', model: 'm1' });
+  const otherEndpoint = modelBreaker({ provider: 'openai', baseUrl: 'https://breaker-b.example.invalid/v1', model: 'm1' });
+  const otherModel = modelBreaker({ provider: 'openai', baseUrl: 'https://breaker-a.example.invalid/v1', model: 'm2' });
+
+  assert.equal(modelProvider({ provider: '   ' }), 'kimi-api');
+  assert.equal(first, same);
+  assert.ok(first !== otherEndpoint);
+  assert.ok(first !== otherModel);
+
+  first.onFailure();
+  const stats = modelBreakerStats();
+  assert.ok(stats.some((item) => item.name === 'model:openai|https://breaker-a.example.invalid/v1|m1' && item.failures === 1));
 });
 
 test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch', async () => {
@@ -238,6 +264,78 @@ test('local OpenAI-compatible provider does not require or send an API key', asy
   assert.equal(message.usage?.total_tokens, 3);
 });
 
+test('Ollama provider is local OpenAI-compatible and does not send an API key', async () => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return { choices: [{ message: { content: 'ollama ok' } }], usage: { total_tokens: 5 } };
+      },
+    };
+  };
+
+  const message = await defaultAgentModelCall({
+    kimiConfig: {
+      provider: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model: 'qwen3:8b',
+    },
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [],
+    fetchImpl,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
+  assert.equal(captured.headers.authorization, undefined);
+  assert.equal(captured.body.model, 'qwen3:8b');
+  assert.equal(message.content, 'ollama ok');
+  assert.equal(message.provider, 'ollama');
+  assert.equal(message.model, 'qwen3:8b');
+});
+
+test('domestic catalog providers route through OpenAI-compatible fetch', async () => {
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return { choices: [{ message: { content: 'deepseek ok' } }], usage: { total_tokens: 4 } };
+      },
+    };
+  };
+
+  const message = await defaultAgentModelCall({
+    kimiConfig: {
+      provider: 'deepseek',
+      apiKey: 'test-deepseek-key',
+      baseUrl: 'https://api.deepseek.example',
+      model: 'deepseek-v4-flash',
+    },
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [],
+    fetchImpl,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'https://api.deepseek.example/chat/completions');
+  assert.equal(captured.headers.authorization, 'Bearer test-deepseek-key');
+  assert.equal(captured.body.model, 'deepseek-v4-flash');
+  assert.equal(message.provider, 'deepseek');
+  assert.equal(message.content, 'deepseek ok');
+});
+
 test('OpenAI provider fails closed without an API key', async () => {
   await assert.rejects(
     () => defaultAgentModelCall({
@@ -275,6 +373,163 @@ test('Anthropic provider fails closed without API key or model', async () => {
     }),
     /Anthropic\/Claude/,
   );
+});
+
+test('Kimi provider posts streaming request metadata and falls back to JSON response bodies', async () => {
+  const provider = createKimiProvider();
+  const captured: CapturedRequest = {};
+  const abort = new AbortController();
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    if (init.signal) captured.signal = init.signal;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return { choices: [{ message: { content: 'json kimi ok', usage: { total_tokens: 11 } } }] };
+      },
+    };
+  };
+
+  const message = await provider.chatCompletion({
+    kimiConfig: {
+      apiKey: 'sk-test-kimi-provider',
+      baseUrl: 'https://api.moonshot.test/v1/',
+      model: 'moonshot-test',
+      maxTokens: 77,
+      temperature: 0.3,
+      userAgent: 'agent-cowork-test',
+    },
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [{ type: 'function', function: { name: 'Read', parameters: { type: 'object' } } }],
+    fetchImpl,
+    signal: abort.signal,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'https://api.moonshot.test/v1/chat/completions');
+  assert.equal(captured.headers.authorization, 'Bearer sk-test-kimi-provider');
+  assert.equal(captured.headers['user-agent'], 'agent-cowork-test');
+  assert.equal(captured.headers.accept, 'text/event-stream');
+  assert.equal(captured.signal, abort.signal);
+  assert.equal(captured.body.model, 'moonshot-test');
+  assert.equal(captured.body.stream, true);
+  assert.deepEqual(captured.body.stream_options, { include_usage: true });
+  assert.equal(captured.body.max_tokens, 77);
+  assert.equal(captured.body.temperature, 0.3);
+  assert.equal(captured.body.tools?.[0]?.function?.name, 'Read');
+  assert.equal(message.content, 'json kimi ok');
+  assert.equal(message.usage?.total_tokens, 11);
+});
+
+test('Kimi provider fails closed before or after fetch when configuration or HTTP status is bad', async () => {
+  const provider = createKimiProvider();
+  await assert.rejects(
+    () => provider.chatCompletion({
+      kimiConfig: { baseUrl: 'https://api.moonshot.test/v1', model: 'moonshot-test' },
+      messages: [],
+      tools: [],
+      fetchImpl: async () => {
+        throw new Error('must not call fetch without key');
+      },
+    }),
+    /Kimi\/Moonshot API Key/,
+  );
+  await assert.rejects(
+    () => provider.chatCompletion({
+      kimiConfig: {
+        apiKey: 'sk-test-kimi-provider',
+        baseUrl: 'https://api.moonshot.test/v1',
+        model: 'moonshot-test',
+      },
+      messages: [],
+      tools: [],
+      fetchImpl: async () => ({
+        ok: false,
+        status: 503,
+        body: null,
+        async json() { return {}; },
+      }),
+    }),
+    /status 503/,
+  );
+});
+
+test('Anthropic provider converts OpenAI-style messages/tools and falls back to JSON response bodies', async () => {
+  const provider = createAnthropicProvider();
+  const captured: CapturedRequest = {};
+  const fetchImpl = async (url: string, init: FetchInit) => {
+    captured.url = url;
+    captured.headers = init.headers;
+    captured.body = JSON.parse(init.body) as RequestBody;
+    return {
+      ok: true,
+      status: 200,
+      body: null,
+      async json() {
+        return {
+          content: [
+            { type: 'text', text: 'json anthropic ok' },
+            { type: 'tool_use', id: 'toolu_json', name: 'Write', input: { path: 'b.txt' } },
+          ],
+          usage: { input_tokens: 10, output_tokens: 3 },
+        };
+      },
+    };
+  };
+
+  const message = await provider.chatCompletion({
+    kimiConfig: {
+      apiKey: 'sk-ant-provider-test',
+      model: 'claude-json-test',
+      maxTokens: 88,
+      userAgent: 'agent-cowork-test',
+    },
+    messages: [
+      { role: 'system', content: [{ text: 'system one' }, { content: 'system two' }] },
+      {
+        role: 'assistant',
+        content: [{ text: 'previous answer' }],
+        tool_calls: [
+          { id: 'call_read', function: { name: 'Read', arguments: '{"path":"a.txt"}' } },
+          { id: 'call_bad', function: { name: 'BadArgs', arguments: 'not json' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call_read', content: ['tool result body'] },
+      { role: 'user', content: [{ content: 'next question' }] },
+    ],
+    tools: [
+      { type: 'function', function: { name: '', parameters: { type: 'object' } } },
+      { type: 'function', function: { name: 'Read', description: 'read file', parameters: { type: 'object' } } },
+    ],
+    fetchImpl,
+  }) as ModelMessage;
+
+  assertCaptured(captured);
+  assert.equal(captured.url, 'https://api.anthropic.com/v1/messages');
+  assert.equal(captured.headers['x-api-key'], 'sk-ant-provider-test');
+  assert.equal(captured.headers['user-agent'], 'agent-cowork-test');
+  assert.equal(captured.body.model, 'claude-json-test');
+  assert.equal(captured.body.max_tokens, 88);
+  assert.equal(captured.body.system, 'system one\nsystem two');
+  assert.equal(captured.body.messages?.[0]?.role, 'assistant');
+  assert.deepEqual(captured.body.messages?.[0]?.content?.[0], { type: 'text', text: 'previous answer' });
+  assert.deepEqual(captured.body.messages?.[0]?.content?.[1], { type: 'tool_use', id: 'call_read', name: 'Read', input: { path: 'a.txt' } });
+  assert.deepEqual(captured.body.messages?.[0]?.content?.[2], { type: 'tool_use', id: 'call_bad', name: 'BadArgs', input: {} });
+  assert.equal(captured.body.messages?.[1]?.role, 'user');
+  assert.deepEqual(captured.body.messages?.[1]?.content?.[0], { type: 'tool_result', tool_use_id: 'call_read', content: 'tool result body' });
+  assert.equal(captured.body.messages?.[2]?.content?.[0]?.text, 'next question');
+  assert.equal(captured.body.tools?.length, 1);
+  assert.equal(captured.body.tools?.[0]?.name, 'Read');
+  assert.equal(message.content, 'json anthropic ok');
+  assert.equal(message.provider, 'anthropic');
+  assert.equal(message.model, 'claude-json-test');
+  assert.equal(message.usage?.prompt_tokens, 10);
+  assert.equal(message.usage?.completion_tokens, 3);
+  assert.equal(message.tool_calls?.[0]?.function.arguments, '{"path":"b.txt"}');
 });
 
 test('parseOpenAiCompatibleStream accumulates content, reasoning, tools, and usage', async () => {

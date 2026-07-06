@@ -1,12 +1,12 @@
-// 右侧侧边面板容器(UI · 组件层 · components)
+// 主区面板容器(UI · 组件层 · components)
 // ---------------------------------------------------------------------------
-// 职责:按当前选中标签 lazy 加载并挂载对应面板(工具/可视化/连接器/产物/项目/定时任务/记忆/可观测),用 ErrorBoundary 隔离。
-// 依赖:panels/* 各懒加载面板、ErrorBoundary、Loading、IconButton。关键回调:onClose / onRunSubagent。
+// 对标 Claude:面板不再是右侧抽屉,而是切换到主区显示(替代对话/首页),顶部给「返回对话」。
+// 按当前选中标签 lazy 加载并挂载对应面板(工具/可视化/连接器/产物/项目/定时/记忆/可观测),ErrorBoundary 隔离。
 import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
+import type { WorkbenchPreviewState } from './composer-types';
 import { ErrorBoundary } from './ui/ErrorBoundary';
-import { IconButton } from './ui/Button';
 import { Loading } from './ui/StateViews';
 
 const ToolsPanel = lazy(() => import('./panels/ToolsPanel').then((module) => ({ default: module.ToolsPanel })));
@@ -21,24 +21,30 @@ const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then
 interface AppSidePanelProps {
   panel: SidePanel;
   trustedRoot: string;
+  workbenchPreview?: WorkbenchPreviewState | undefined;
   onClose: () => void;
   onRunSubagent: (goal: string, steps: SubagentStep[]) => void;
 }
 
 const PANEL_LABELS: Record<Exclude<SidePanel, 'none'>, string> = {
-  tools: '工具面板',
-  viz: '可视化面板',
-  connectors: '连接器面板',
-  artifacts: '产物面板',
-  projects: '项目面板',
-  schedules: '定时任务面板',
-  memory: '记忆面板',
-  observability: '可观测面板',
+  tools: '工具',
+  viz: '可视化',
+  connectors: '连接器',
+  artifacts: '产物',
+  projects: '项目',
+  schedules: '定时任务',
+  memory: '记忆',
+  observability: '成本 · 可观测',
 };
 
-function panelContent(panel: Exclude<SidePanel, 'none'>, trustedRoot: string, onRunSubagent: AppSidePanelProps['onRunSubagent']) {
+function panelContent(
+  panel: Exclude<SidePanel, 'none'>,
+  trustedRoot: string,
+  onRunSubagent: AppSidePanelProps['onRunSubagent'],
+  workbenchPreview?: WorkbenchPreviewState,
+) {
   if (panel === 'tools') return <ToolsPanel trustedRoot={trustedRoot} onRunPlan={onRunSubagent} />;
-  if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} />;
+  if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} />;
   if (panel === 'connectors') return <ConnectorsPanel trustedRoot={trustedRoot} />;
   if (panel === 'artifacts') return <ArtifactsPanel trustedRoot={trustedRoot} />;
   if (panel === 'projects') return <ProjectsPanel trustedRoot={trustedRoot} />;
@@ -47,16 +53,21 @@ function panelContent(panel: Exclude<SidePanel, 'none'>, trustedRoot: string, on
   return <ObservabilityPanel />;
 }
 
-export function AppSidePanel({ panel, trustedRoot, onClose, onRunSubagent }: AppSidePanelProps) {
+export function AppSidePanel({ panel, trustedRoot, workbenchPreview, onClose, onRunSubagent }: AppSidePanelProps) {
   if (panel === 'none') return null;
   return (
-    <aside className="side-drawer">
-      <IconButton className="drawer-close" label="关闭" onClick={onClose}>×</IconButton>
+    <div className="main-panel">
+      <div className="main-panel-head">
+        <button type="button" className="main-panel-back" onClick={onClose}>← 返回对话</button>
+        <span className="main-panel-title">{PANEL_LABELS[panel]}</span>
+      </div>
       <ErrorBoundary key={panel} label={PANEL_LABELS[panel]}>
-        <Suspense fallback={<Loading message="正在加载面板…" />}>
-          {panelContent(panel, trustedRoot, onRunSubagent)}
+        <Suspense fallback={<Loading message="正在加载…" />}>
+          <div className="main-panel-body">
+            {panelContent(panel, trustedRoot, onRunSubagent, workbenchPreview)}
+          </div>
         </Suspense>
       </ErrorBoundary>
-    </aside>
+    </div>
   );
 }

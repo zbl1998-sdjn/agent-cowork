@@ -36,6 +36,7 @@ export type RequestContext = {
   userId: string;
   authenticated: boolean;
   idempotencyKey: string;
+  securityMode?: string;
 };
 
 /** 以 JSON 响应:序列化 payload 并写好 content-type 与 content-length。 */

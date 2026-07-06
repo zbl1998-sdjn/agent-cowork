@@ -1,0 +1,8 @@
+{
+  "ok": false,
+  "mode": "installed-a11y",
+  "generatedAt": "2026-07-05T18:46:11.948Z",
+  "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-a11y-workspace",
+  "error": "Error: Timed out waiting for installed WebView CDP target: Error: Timed out waiting for http://127.0.0.1:63765/json/list\n    at getJson (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/browser-smoke-utils.ts:77:11)\n    at async waitForTarget (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/smoke-installed-a11y.ts:84:29)\n    at async main (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/smoke-installed-a11y.ts:446:24)\n    at waitForTarget (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/smoke-installed-a11y.ts:96:11)\n    at async main (file:///C:/Users/Administrator/Desktop/agent%20cowork/scripts/smoke-installed-a11y.ts:446:24)"
+}

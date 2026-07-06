@@ -11,6 +11,7 @@ import { handleConnectorRoutes } from './connector-routes.js';
 import { handleConversationRoutes } from './conversation-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
 import { handleOnboardingRoutes } from './onboarding-routes.js';
+import { handleOrchestratorRoutes } from './orchestrator-routes.js';
 import { handlePlanRoutes } from './plan-routes.js';
 import { handleProjectRoutes } from './project-routes.js';
 import { handlePromptRoutes } from './prompt-routes.js';
@@ -59,7 +60,7 @@ export async function handleRouteChain({
   server,
 }: RouteChainOptions): Promise<boolean> {
   const base = { request, response, pathname, requestContext };
-  if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, state }))) return true;
+  if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, requestUrl, state }))) return true;
   if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore }))) return true;
   if (await handleApprovalRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRoutes>>({ ...base, approvalRegistry: state.approvalRegistry }))) return true;
   if (await handleRunRoutes(routeOptions<RouteHandlerOptions<typeof handleRunRoutes>>({
@@ -68,6 +69,20 @@ export async function handleRouteChain({
     runStoreRoot: state.runStoreRoot,
     runsIndex: state.runsIndex,
     runEvents: state.runEvents,
+  }))) return true;
+  if (await handleOrchestratorRoutes(routeOptions<RouteHandlerOptions<typeof handleOrchestratorRoutes>>({
+    ...base,
+    runStoreRoot: state.runStoreRoot,
+    runsIndex: state.runsIndex,
+    runEvents: state.runEvents,
+    toolRegistry: state.toolRegistry,
+    modelConfig: state.kimiApiConfig,
+    fetchImpl: state.oauthFetch,
+    cancellation: state.cancellation,
+    cacheKeyFor: state.cacheKeyFor,
+    requireIdempotencyKey: state.requireIdempotencyKey,
+    sendCachedOrStore: state.sendCachedOrStore,
+    safeTrustedRoot: state.safeTrustedRoot,
   }))) return true;
   if (await handleRecipeRoutes(routeOptions<RouteHandlerOptions<typeof handleRecipeRoutes>>({
     ...base,

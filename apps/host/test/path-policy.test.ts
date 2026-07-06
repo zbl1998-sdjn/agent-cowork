@@ -84,4 +84,52 @@ describe('path-policy', () => {
 
     assert.equal(path.basename(safe), 'note.txt');
   });
+
+  // --- 回归:Windows 文件名等价绕过(尾空格 / 尾点 / NTFS ADS)。---
+  // 修复前,用精确匹配的敏感文件(id_ecdsa/.netrc/.npmrc/credentials.json/*.pem 等)
+  // 可被这些「等价但不同字面」的写法绕过(与 kimi-code 同类缺陷)。
+  it('blocks Windows filename-equivalence variants of exact-match sensitive files', () => {
+    if (process.platform !== 'win32') {
+      return; // 这些写法仅在 Windows/NTFS 上指向同一文件;POSIX 见下个用例。
+    }
+    const variants = [
+      'id_ecdsa ', // 尾空格
+      'id_ed25519.', // 尾点
+      '.netrc ',
+      '.npmrc.',
+      'credentials.json ',
+      'key.pem.',
+      'id_ecdsa::$DATA', // NTFS 默认数据流
+      'credentials.json::$DATA',
+    ];
+    for (const name of variants) {
+      assert.equal(
+        isSensitivePath(path.join(workspace, name), workspace),
+        true,
+        `should block ${JSON.stringify(name)}`,
+      );
+    }
+  });
+
+  it('does not false-positive legitimate files when normalizing Windows names', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    const benign = ['notes.txt', 'report.md', 'id_ecdsafoo', 'data.json', 'key.txt '];
+    for (const name of benign) {
+      assert.equal(
+        isSensitivePath(path.join(workspace, name), workspace),
+        false,
+        `should allow ${JSON.stringify(name)}`,
+      );
+    }
+  });
+
+  it('does NOT normalize POSIX filenames (trailing space / colon are distinct legitimate files)', () => {
+    if (process.platform === 'win32') {
+      return; // win32 归一是有意为之;此用例只在 POSIX 上验证不误伤合法文件。
+    }
+    assert.equal(isSensitivePath(path.join(workspace, '.netrc '), workspace), false);
+    assert.equal(isSensitivePath(path.join(workspace, 'credentials:notes'), workspace), false);
+  });
 });

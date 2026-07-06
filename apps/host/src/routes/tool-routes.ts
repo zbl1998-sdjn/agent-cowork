@@ -6,6 +6,7 @@ import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.j
 import { runSubagent } from '../runtime/subagent.js';
 import { runSubagentsParallel } from '../runtime/subagent-parallel.js';
 import { omitUndefined } from '../util/object.js';
+import { decideToolPolicy } from '../security/policy-decision.js';
 import {
   parseToolBody,
   parseToolSearchQuery,
@@ -64,6 +65,38 @@ function rejectApprovalRequired(response: HttpResponseLike, name: string): void 
   sendJson(response, 428, {
     error: `Tool "${name}" requires agent approval and cannot be called directly from this route`,
   });
+}
+
+function rejectPolicyDenied(response: HttpResponseLike, name: string, reason: string, reasonCode: string): void {
+  sendJson(response, 403, {
+    error: `Tool "${name}" blocked by security policy: ${reason}`,
+    code: 'POLICY_DENIED',
+    policy: { reasonCode },
+  });
+}
+
+function rejectDirectToolIfBlocked(
+  response: HttpResponseLike,
+  name: string,
+  descriptor: ToolDescriptor | null | undefined,
+  requestContext: RequestContext,
+): boolean {
+  const policy = decideToolPolicy({
+    toolName: name,
+    risk: descriptor?.risk,
+    mutating: descriptor?.mutating,
+    requiresApproval: descriptor?.requiresApproval,
+    securityMode: requestContext.securityMode,
+  });
+  if (policy.decision === 'deny') {
+    rejectPolicyDenied(response, name, policy.reason, policy.reasonCode);
+    return true;
+  }
+  if (policy.decision === 'needs_approval') {
+    rejectApprovalRequired(response, name);
+    return true;
+  }
+  return false;
 }
 
 function errorStatus(err: unknown, fallback: number): number {
@@ -125,6 +158,9 @@ export async function handleToolRoutes({
         return;
       }
       const descriptor = toolRegistry.descriptor(input.name);
+      if (rejectDirectToolIfBlocked(response, input.name, descriptor, requestContext)) {
+        return;
+      }
       if (approvalRequiredForTool(descriptor)) {
         rejectApprovalRequired(response, input.name);
         return;
@@ -157,6 +193,9 @@ export async function handleToolRoutes({
       const steps = input.steps || [];
       for (const step of steps) {
         const descriptor = toolRegistry.descriptor(step.tool);
+        if (rejectDirectToolIfBlocked(response, step.tool, descriptor, requestContext)) {
+          return;
+        }
         if (approvalRequiredForTool(descriptor)) {
           rejectApprovalRequired(response, step.tool);
           return;
@@ -204,6 +243,9 @@ export async function handleToolRoutes({
       for (const agent of agents) {
         for (const step of agent.steps || []) {
           const descriptor = toolRegistry.descriptor(step.tool);
+          if (rejectDirectToolIfBlocked(response, step.tool, descriptor, requestContext)) {
+            return;
+          }
           if (approvalRequiredForTool(descriptor)) {
             rejectApprovalRequired(response, step.tool);
             return;

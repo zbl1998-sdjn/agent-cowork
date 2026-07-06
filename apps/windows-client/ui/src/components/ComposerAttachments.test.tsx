@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { ComposerAttachments } from './ComposerAttachments';
+import { attachmentBatchSummary, ComposerAttachments, formatAttachmentSize } from './ComposerAttachments';
 import { IconButton } from './ui/Button';
 
 function collectByType(node: ReactNode, type: unknown): ReactElement<Record<string, any>>[] {
@@ -26,6 +26,8 @@ describe('ComposerAttachments', () => {
 
     expect(html.match(/class="ui-icon-btn/g)?.length).toBe(2);
     expect(html).toContain('attachment-remove');
+    expect(html).toContain('已选 2 个文件');
+    expect(html).toContain('attachment-size');
     expect(html).toContain('aria-label="移除附件"');
     expect(html).toContain('report.md');
     expect(html).toContain('chart.png');
@@ -39,5 +41,10 @@ describe('ComposerAttachments', () => {
     expect(buttons).toHaveLength(2);
     buttons[1]!.props.onClick();
     expect(onRemove).toHaveBeenCalledWith(1);
+  });
+
+  it('formats batch size summaries for multiple uploads', () => {
+    expect(formatAttachmentSize(1536)).toBe('1.5 KB');
+    expect(attachmentBatchSummary([{ name: 'a.txt', size: 1024 }, { name: 'b.txt', size: 2048 }] as File[])).toBe('已选 2 个文件 · 3.0 KB');
   });
 });

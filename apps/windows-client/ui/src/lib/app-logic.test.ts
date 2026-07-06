@@ -236,6 +236,14 @@ describe('buildAgentChatStreamOptions', () => {
       images: [],
     });
   });
+  it('passes automatic context compaction controls to agent stream options', () => {
+    expect(buildAgentChatStreamOptions({ trustedRoot: 'C:/work' })).toMatchObject({
+      contextCompaction: { enabled: true },
+    });
+    expect(buildAgentChatStreamOptions({ trustedRoot: 'C:/work', autoContextCompaction: false })).toMatchObject({
+      contextCompaction: { enabled: false },
+    });
+  });
 });
 
 describe('hasSessionModelAccess', () => {

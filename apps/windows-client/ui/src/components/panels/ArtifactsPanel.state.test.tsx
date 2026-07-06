@@ -24,8 +24,8 @@ describe('ArtifactsPanel state views', () => {
   it('renders the reusable empty state when there are no artifacts', () => {
     const html = renderToStaticMarkup(<ArtifactsPanel trustedRoot="C:/work" />);
 
-    expect(html).toContain('还没有产物');
-    expect(html).toContain('完成一次任务后会出现在这里。');
+    expect(html).toContain('还没有成果');
+    expect(html).toContain('Word、Excel、PPT、PDF、可复制文本或 CSV');
     expect(html).toContain('state-view--empty');
     expect(html).toContain('role="status"');
   });
@@ -61,6 +61,7 @@ describe('ArtifactsPanel state views', () => {
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('保存');
     expect(html).toContain('重命名');
+    expect(html).toContain('草稿文本');
   });
 
   it('keeps artifact row callbacks and disabled state wired through primitives', () => {

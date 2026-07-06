@@ -30,16 +30,16 @@ describe('AppSidePanel', () => {
 
     expect(boundary).toBeTruthy();
     expect(String(boundary?.key)).toContain('tools');
-    expect((boundary?.props as { label?: string }).label).toBe('工具面板');
+    expect((boundary?.props as { label?: string }).label).toBe('工具');
   });
 
   it('renders lazy panel fallback while the selected panel chunk loads', () => {
     const html = renderToStaticMarkup(
       <AppSidePanel panel="schedules" trustedRoot="C:/work" onClose={vi.fn()} onRunSubagent={vi.fn()} />,
     );
-    expect(html).toContain('正在加载面板');
-    expect(html).toContain('aria-label="关闭"');
-    expect(html).toContain('ui-icon-btn drawer-close');
+    expect(html).toContain('正在加载…');
+    expect(html).toContain('main-panel');
+    expect(html).toContain('返回对话');
   });
 
   it('loads panel content behind suspense', () => {

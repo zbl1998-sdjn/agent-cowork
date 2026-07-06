@@ -148,6 +148,8 @@ describe('Timeline', () => {
     expect(assistantContinueRunId({ ...baseAssistant, runId: ' run_resume ' })).toBe('run_resume');
     expect(assistantContinueRunId({ ...baseAssistant, runId: '' })).toBeNull();
     expect(assistantContinueRunId({ ...baseAssistant, status: 'done', runId: 'run_done' })).toBeNull();
+    // 自动续跑到硬上限仍没做完的 done 也可续跑(携原 runId)
+    expect(assistantContinueRunId({ ...baseAssistant, status: 'done', stepsExhausted: true, runId: 'run_big' })).toBe('run_big');
   });
 
   it('shows exact-ID batch approval actions only when multiple approvals are visible', () => {
@@ -257,11 +259,17 @@ describe('Timeline', () => {
       starters: ['整理日报', '总结文件'],
     });
 
-    expect(html.match(/class="ui-btn /g)?.length).toBe(3);
+    expect(html.match(/class="ui-btn /g)?.length).toBeGreaterThan(3);
+    expect(html).toContain('今天想完成什么');
+    expect(html).toContain('Word');
+    expect(html).toContain('Excel');
+    expect(html).toContain('PPT');
+    expect(html).toContain('PDF');
     expect(html).toContain('starter-chip');
     expect(html).toContain('整理日报');
     expect(html).toContain('jump-to-bottom');
     expect(html).toContain('回到底部 ↓');
+    expect(html).not.toContain('直接和 Kimi 对话');
   });
 
   it('renders assistant suggestion chips with Button primitives', () => {

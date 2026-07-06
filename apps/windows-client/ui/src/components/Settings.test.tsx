@@ -9,9 +9,15 @@ function renderSettings(initialTab: SettingsTab): string {
       username="Derrick"
       tenantId="tenant-1"
       theme="light"
+      fontScale="normal"
+      fontFamily="system"
       autoClarify={false}
+      autoContextCompaction={true}
       onSetAutoClarify={vi.fn()}
+      onSetAutoContextCompaction={vi.fn()}
       onSetTheme={vi.fn()}
+      onSetFontScale={vi.fn()}
+      onSetFontFamily={vi.fn()}
       onLogout={vi.fn()}
       onClose={vi.fn()}
       onSaved={vi.fn()}
@@ -59,6 +65,10 @@ describe('Settings', () => {
 
     expect(appearance).toContain('role="group"');
     expect(appearance).toContain('aria-label="主题"');
+    expect(appearance).toContain('aria-label="字体大小"');
+    expect(appearance).toContain('aria-label="字体"');
+    expect(appearance).toContain('>特大</button>');
+    expect(appearance).toContain('>等宽</button>');
     expect(appearance).toContain('aria-pressed="true"');
     expect(input).toContain('aria-label="发送前澄清"');
     expect(input).toContain('>关闭</button>');

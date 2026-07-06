@@ -1,6 +1,6 @@
 // Composer(UI · components):聊天输入框主组件——文本输入、附件、模型控制、发送/停止,组合各 Composer* 子件与建议/触发弹窗。
-import { useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { DragEvent, KeyboardEvent } from 'react';
 import { buildSessionModelConfig } from '../lib/composer-logic';
 import { useComposerRefine } from '../hooks/useComposerRefine';
 import { useComposerSuggestions } from '../hooks/useComposerSuggestions';
@@ -9,12 +9,37 @@ import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
 import { ComposerSuggestions } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
-import { ComposerTriggers } from './ComposerTriggers';
 import type { ComposerProps } from './composer-types';
 // AppComposerDock 与 Composer.test 仍从本模块导入 ComposerMeta;类型实际在 composer-types,
 // 这里再导出以保持旧 import path 稳定。
-export type { ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe } from './composer-types';
+export type { ComposerDraftPreview, ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe, WorkbenchPreviewState } from './composer-types';
 export type { ThinkingLevel } from './ComposerFooter';
+
+const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
+  ollama: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'],
+  'openai/local': ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'local-model'],
+  lmstudio: ['local-model', 'qwen3', 'qwen3-coder', 'deepseek-r1', 'llama-3.1-8b-instruct', 'gpt-oss-20b'],
+};
+
+function composerFileKey(file: File): string {
+  return `${file.name}\u0000${file.size}\u0000${file.lastModified}`;
+}
+
+export function mergeComposerFiles(current: File[], incoming: File[]): File[] {
+  const seen = new Set(current.map(composerFileKey));
+  const next = [...current];
+  for (const file of incoming) {
+    const key = composerFileKey(file);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(file);
+  }
+  return next;
+}
+
+function dragContainsFiles(event: DragEvent<HTMLDivElement>): boolean {
+  return Array.from(event.dataTransfer?.types || []).includes('Files');
+}
 
 export function Composer({
   recipes,
@@ -25,14 +50,17 @@ export function Composer({
   onPickHistory,
   slashCommands = [],
   models = [],
+  modelProviders = [],
   defaultModel = '',
   defaultProvider = 'kimi-api',
   defaultBaseUrl = '',
   autoClarify = false,
+  onDraftChange,
   onRefinePrompt,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [model, setModel] = useState('');
@@ -72,9 +100,37 @@ export function Composer({
     onPickTemplate, onPickHistory, markChanged,
   });
 
-  const modelOptions = models.length ? models : (defaultModel ? [defaultModel] : []);
-  const currentModel = model.trim() || defaultModel;
   const currentProvider = provider || defaultProvider || 'kimi-api';
+  const selectedProvider = modelProviders.find((item) => item.id === currentProvider);
+  const fallbackModelOptions = FALLBACK_PROVIDER_MODELS[currentProvider] || [];
+  const modelOptions = selectedProvider
+    ? [...new Set([selectedProvider.defaultModel, ...selectedProvider.models, model, defaultModel].filter(Boolean))]
+    : fallbackModelOptions.length ? [...new Set([...fallbackModelOptions, model, defaultModel].filter(Boolean))]
+      : models.length ? models : (defaultModel ? [defaultModel] : []);
+  const currentModel = model.trim() || selectedProvider?.defaultModel || fallbackModelOptions[0] || defaultModel;
+
+  useEffect(() => {
+    onDraftChange?.({
+      text: value,
+      files: attachments.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || undefined,
+        lastModified: file.lastModified,
+      })),
+      provider: currentProvider,
+      model: currentModel || '',
+      thinking,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [attachments, currentModel, currentProvider, onDraftChange, thinking, value]);
+
+  function updateProvider(nextProvider: string) {
+    setProvider(nextProvider);
+    const next = modelProviders.find((item) => item.id === nextProvider);
+    if (next?.defaultModel) setModel(next.defaultModel);
+    else setModel(FALLBACK_PROVIDER_MODELS[nextProvider]?.[0] || '');
+  }
 
   async function send() {
     const text = value.trim();
@@ -108,17 +164,47 @@ export function Composer({
 
   function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    setAttachments((prev) => [...prev, ...Array.from(list)]);
+    setAttachments((prev) => mergeComposerFiles(prev, Array.from(list)));
+  }
+
+  function onDragEnter(event: DragEvent<HTMLDivElement>) {
+    if (!dragContainsFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setDragging(true);
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!dragContainsFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    if (!dragging) setDragging(true);
+  }
+
+  function onDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (!dragContainsFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0 || event.currentTarget === event.target) setDragging(false);
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    if (!dragContainsFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDragging(false);
+    addFiles(event.dataTransfer?.files ?? null);
   }
 
   return (
     <div
       className={'composer' + (dragging ? ' is-dragging' : '')}
-      onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true); }}
-      onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer?.files ?? null); }}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
-      {dragging && <div className="composer-drop-hint">松开以添加文件</div>}
+      {dragging && <div className="composer-drop-hint"><strong>松开添加文件</strong><span>支持一次拖入多个文件</span></div>}
       {mode && items.length > 0 && <ComposerSuggestions mode={mode} items={items} active={active} />}
 
       <ComposerAttachments attachments={attachments} onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))} />
@@ -132,27 +218,27 @@ export function Composer({
       )}
       {refineNotice && <div className="composer-refine-notice">{refineNotice}</div>}
 
-      <ComposerTriggers onTrigger={insertTrigger} />
-
       <textarea
         ref={ref}
         value={value}
-        placeholder="今天想让 Kimi 做什么?"
+        placeholder="今天想完成什么？例如：帮我把这些表格合并成一个总表"
         onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
         onKeyDown={onKeyDown}
         onBlur={() => setTimeout(close, 120)}
       />
 
-      <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={fileRef} type="file" multiple hidden aria-label="选择附件文件" data-testid="composer-file-input" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <ComposerFooter
         listening={listening} refining={refining}
         canRefine={canRefine}
         model={model} modelOptions={modelOptions} provider={currentProvider}
+        modelProviders={modelProviders}
         defaultModel={defaultModel} thinking={thinking}
         onUpload={() => fileRef.current?.click()}
         onToggleVoice={toggleVoice} onRefine={() => void refineCurrent(value)}
-        onProvider={setProvider} onModel={setModel}
+        onProvider={updateProvider} onModel={setModel}
         onThinking={setThinking} onSend={() => void send()}
+        onInsertTrigger={insertTrigger}
       />
     </div>
   );

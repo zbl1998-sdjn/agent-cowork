@@ -164,6 +164,62 @@ export interface RunAttribution {
   config?: Record<string, unknown> | undefined;
 }
 
+export type OrchestratorResultStatus = 'succeeded' | 'failed' | 'partial' | 'skipped';
+
+export interface OrchestratorUsage {
+  modelCalls?: number | undefined;
+  toolCalls?: number | undefined;
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
+  runtimeMs?: number | undefined;
+  filesRead?: number | undefined;
+  bytesRead?: number | undefined;
+}
+
+export interface OrchestratorBudgetSnapshot {
+  limit?: OrchestratorUsage | undefined;
+  used?: OrchestratorUsage | undefined;
+  remaining?: OrchestratorUsage | undefined;
+}
+
+export interface OrchestratorTask {
+  taskId: string;
+  runId?: string | undefined;
+  parentTaskId?: string | undefined;
+  agentId: string;
+  title: string;
+  expectedOutput?: string | undefined;
+  dependencies?: string[] | undefined;
+  timeoutMs?: number | undefined;
+  budget?: OrchestratorUsage | undefined;
+}
+
+export interface OrchestratorResult {
+  taskId: string;
+  agentId: string;
+  status: OrchestratorResultStatus | string;
+  summary?: string | undefined;
+  confidence?: number | undefined;
+  warnings?: string[] | undefined;
+  usage?: OrchestratorUsage | undefined;
+  evidenceRefs?: Array<{ refId?: string | undefined; label?: string | undefined; uri?: string | undefined }> | undefined;
+  artifactRefs?: string[] | undefined;
+}
+
+export interface OrchestratorRun {
+  runId: string;
+  userGoal?: string | undefined;
+  recipeId?: string | undefined;
+  mode?: string | undefined;
+  status?: string | undefined;
+  agents?: string[] | undefined;
+  tasks?: OrchestratorTask[] | undefined;
+  results?: OrchestratorResult[] | undefined;
+  artifacts?: string[] | undefined;
+  startedAt?: string | undefined;
+  updatedAt?: string | undefined;
+}
+
 export interface RunRecord extends RunSummary {
   metrics?: RunMetrics | null | undefined;
   attribution?: RunAttribution | null | undefined;
@@ -173,4 +229,5 @@ export interface RunRecord extends RunSummary {
   error?: string | { message?: string | undefined } | null | undefined;
   events?: Array<RunEvent | Record<string, unknown>> | undefined;
   sources?: SourceRef[] | undefined;
+  orchestratorRun?: OrchestratorRun | null | undefined;
 }

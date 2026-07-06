@@ -16,6 +16,12 @@ import {
   flushMemoryAuditEvents,
   MEMORY_LIMITS,
 } from '../src/memory/memory-store.js';
+import {
+  buildMemorySystemBlockFromStore,
+  buildMemorySystemBlockFromText,
+  loadMemoryContextFromStore,
+  type SyncMemoryStoreLike,
+} from '../src/memory/memory-query.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -146,4 +152,58 @@ test('createMemoryStore keeps the default file backend compatible', () => {
   assert.ok(store instanceof FileMemoryStore);
   store.appendMemoryFact(root, { key: '默认后端', value: 'file memory store' });
   assert.match(store.readMainMemory(root), /默认后端/);
+});
+
+test('memory query helpers trim, clamp, and fail closed across stores', () => {
+  assert.equal(buildMemorySystemBlockFromText('   '), '');
+  const clipped = buildMemorySystemBlockFromText(`  ${'x'.repeat(700)}`, { maxBytes: 16 });
+  assert.ok(Buffer.byteLength(clipped, 'utf8') <= 512);
+  assert.match(clipped, /^x+$/);
+
+  const failingStore: SyncMemoryStoreLike = {
+    readMainMemory() {
+      throw new Error('memory backend unavailable');
+    },
+    buildMemorySystemBlock() {
+      return 'unused';
+    },
+    listMemoryNotes() {
+      return [];
+    },
+  };
+
+  assert.equal(buildMemorySystemBlockFromStore(failingStore, tempRoot()), '');
+});
+
+test('memory query context summary forwards context and hides note paths', () => {
+  const root = tempRoot();
+  const calls: Array<{ kind: string; context?: Record<string, unknown> | undefined; maxBytes?: number | undefined }> = [];
+  const store: SyncMemoryStoreLike = {
+    readMainMemory(_trustedRoot, context = {}) {
+      calls.push({ kind: 'read', context });
+      return `tenant=${context.tenantId || 'none'}`;
+    },
+    buildMemorySystemBlock(_trustedRoot, options = {}) {
+      calls.push({ kind: 'block', context: options.context, maxBytes: options.maxBytes });
+      return `marker=${options.context?.marker || ''}`;
+    },
+    listMemoryNotes(_trustedRoot, context = {}) {
+      calls.push({ kind: 'notes', context });
+      return [{ name: 'projects.md', size: 9, modifiedAt: '2026-06-19T00:00:00.000Z', path: 'internal/path' }];
+    },
+  };
+
+  const block = buildMemorySystemBlockFromStore(store, root, { maxBytes: 2048, context: { tenantId: 'tenant_a' } });
+  assert.equal(block, 'tenant=tenant_a');
+
+  const summary = loadMemoryContextFromStore(store, root, { maxBytes: 1234, context: { tenantId: 'tenant_a', marker: 'm1' } });
+  assert.deepEqual(summary, {
+    enabled: true,
+    bytes: Buffer.byteLength('marker=m1', 'utf8'),
+    text: 'marker=m1',
+    notes: [{ name: 'projects.md', size: 9, modifiedAt: '2026-06-19T00:00:00.000Z' }],
+  });
+  assert.deepEqual(calls.map((call) => call.kind), ['read', 'block', 'notes']);
+  assert.equal(calls[1]?.maxBytes, 1234);
+  assert.equal(calls[2]?.context?.tenantId, 'tenant_a');
 });

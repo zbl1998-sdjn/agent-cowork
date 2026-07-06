@@ -148,3 +148,41 @@ test('runAgentChat marks tool output as untrusted data before the next model tur
     && Array.isArray(event.payload.reasons)
     && event.payload.reasons.includes('prompt_injection')));
 });
+
+test('runAgentChat auto-compacts long resumed history and emits token stats', async () => {
+  const root = tmp();
+  const longMessages: ChatMessage[] = [
+    { role: 'system', content: 'system prompt' },
+    ...Array.from({ length: 24 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `important: fact ${i} must survive if relevant\n${'alpha beta gamma '.repeat(90)}`,
+    })),
+  ];
+  const events: EmittedEvent[] = [];
+  let captured: ChatMessage[] = [];
+  const modelCall: ModelCall = async ({ messages }) => {
+    captured = messageArray(messages);
+    return { content: 'done' };
+  };
+
+  const out = await runAgentChat({
+    prompt: 'ignored on resume',
+    kimiConfig: { model: 'fake' },
+    trustedRoot: root,
+    tools: [],
+    modelCall,
+    emit: (type, payload) => events.push({ type, payload: payloadRecord(payload) }),
+    runStoreRoot: path.join(root, 'runs'),
+    resumeState: { messages: longMessages },
+    contextOptions: { maxContextTokens: 220, keepRecentMessages: 4, maxFacts: 3 },
+  });
+
+  assert.equal(out.text, 'done');
+  const compacted = events.find((event) => event.type === 'context_compacted');
+  assert.ok(compacted, 'context_compacted event should be emitted');
+  assert.ok(Number(compacted.payload.beforeTokens) > Number(compacted.payload.afterTokens));
+  assert.ok(Array.isArray(compacted.payload.keyFacts));
+  assert.ok(captured.length < longMessages.length);
+  assert.equal(captured[0]?.name, 'history_compactor');
+  assert.match(String(captured[0]?.content || ''), /history compacted|content compacted/i);
+});

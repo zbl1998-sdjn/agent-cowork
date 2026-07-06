@@ -1,7 +1,6 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { SidePanel } from '../lib/app-types';
 import { AppHeader, AppHeaderActions } from './AppHeader';
 import { Button } from './ui/Button';
 
@@ -20,76 +19,68 @@ function collectByType(node: ReactNode, type: unknown): ReactElement<Record<stri
   return matches;
 }
 
+function textOf(value: ReactNode): string {
+  if (Array.isArray(value)) return value.map(textOf).join('');
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (isValidElement(value)) return textOf((value.props as { children?: ReactNode }).children);
+  return '';
+}
+
 function props(overrides: Partial<Parameters<typeof AppHeader>[0]> = {}): Parameters<typeof AppHeader>[0] {
   return {
     mode: 'execute',
-    panel: 'memory',
     theme: 'dark',
     trustedRoot: 'C:/work',
     user: { userId: 'u1', tenantId: 't1', username: 'demo' },
+    sidebarCollapsed: false,
     onLogout: vi.fn(),
     onOpenCommandPalette: vi.fn(),
-    onOpenSettings: vi.fn(),
     onSetMode: vi.fn(),
     onSwitchWorkspace: vi.fn(),
-    onTogglePanel: vi.fn(),
     onToggleTheme: vi.fn(),
+    onToggleSidebar: vi.fn(),
     ...overrides,
   };
 }
 
 describe('AppHeader', () => {
-  it('renders header actions with Button primitives + a mode dropdown', () => {
+  it('renders a minimal header: workspace + mode select + cmdk + more menu', () => {
     const html = renderToStaticMarkup(<AppHeader {...props()} />);
 
-    // workspace-chip + ⌘K + theme + 8 panels + 📦 installer + settings + logout = 14
-    // (the 3 mode buttons are gone — replaced by a single <select> so the
-    // current mode is always visible.)
-    expect(html.match(/class="ui-btn /g)?.length).toBe(14);
-    expect(html).toContain('Agent Cowork');
-    expect(html).toContain('header-user');
-    expect(html).toContain('ui-btn--secondary');
-    expect(html).toContain('is-active');
+    // 极简顶栏:workspace-chip + ⌘K + 外观 + 安装包 + 退出 = 5 个 ui-btn
+    // 品牌与 8 个面板入口已下沉到左侧导航栏,顶栏不再承载它们。
+    expect(html.match(/class="ui-btn /g)?.length).toBe(5);
+    expect(html).toContain('workspace-switcher');
+    expect(html).toContain('workspace-chip');
     expect(html).toContain('class="mode-select"');
     expect(html).toContain('模式·计划');
     expect(html).toContain('模式·执行');
     expect(html).toContain('模式·YOLO');
-    expect(html).toContain('workspace-switcher');
-    expect(html).toContain('workspace-chip');
+    expect(html).toContain('header-cmdk');
+    expect(html).toContain('header-more');
+    expect(html).toContain('header-more-user');
+    expect(html).toContain('demo');
+    expect(html).not.toContain('header-more-panel-grid');
   });
 
   it('keeps header action callbacks wired', () => {
     const onOpenCommandPalette = vi.fn();
     const onToggleTheme = vi.fn();
     const onSetMode = vi.fn();
-    const onTogglePanel = vi.fn();
-    const onOpenSettings = vi.fn();
     const onLogout = vi.fn();
-    const componentProps = props({
-      onOpenCommandPalette,
-      onToggleTheme,
-      onSetMode,
-      onTogglePanel,
-      onOpenSettings,
-      onLogout,
-    });
-    const tree = AppHeaderActions(componentProps);
+    const tree = AppHeaderActions(props({ onOpenCommandPalette, onToggleTheme, onSetMode, onLogout }));
     const buttons = collectByType(tree, Button);
 
-    expect(buttons).toHaveLength(13);
-    buttons[0]!.props.onClick();
-    buttons[1]!.props.onClick();
-    buttons.find((button) => button.props.children === '记忆')?.props.onClick();
-    buttons.find((button) => button.props.children === '⚙️ 设置')?.props.onClick();
-    buttons.find((button) => button.props.children === '退出')?.props.onClick();
+    // ⌘K + 外观 + 安装包 + 退出 = 4
+    expect(buttons).toHaveLength(4);
+    buttons.find((b) => (b.props.className || '').includes('header-cmdk'))?.props.onClick();
+    buttons.find((b) => textOf(b.props.children).includes('外观'))?.props.onClick();
+    buttons.find((b) => textOf(b.props.children).includes('退出'))?.props.onClick();
 
     expect(onOpenCommandPalette).toHaveBeenCalledOnce();
     expect(onToggleTheme).toHaveBeenCalledOnce();
-    expect(onTogglePanel).toHaveBeenCalledWith('memory' satisfies SidePanel);
-    expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onLogout).toHaveBeenCalledOnce();
 
-    // mode <select> is the only one — simulate onChange to verify the callback wiring.
     const selects = collectByType(tree, 'select');
     const modeSelect = selects.find((s) => s.props.className === 'mode-select');
     expect(modeSelect).toBeDefined();

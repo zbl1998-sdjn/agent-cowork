@@ -1,6 +1,9 @@
-// ComposerFooter(UI · components):输入框底部栏——组合模型控制、工具开关与发送动作的一行布局。纯展示+回调。
+// ComposerFooter(UI · components):输入框底部栏——对标 Claude:左组工具图标(附件/语音/优化 · 模板/引用/历史),
+// 右组推到最右(模型 · 思考 · 发送),中间留白,一行疏朗。纯展示+回调。
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerModelControls } from './ComposerModelControls';
+import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
+import type { ModelProviderOption } from '../lib/api/kimiConfig';
 
 export type ThinkingLevel = 'fast' | 'standard' | 'deep';
 
@@ -16,6 +19,7 @@ interface ComposerFooterProps {
   canRefine: boolean;
   model: string;
   modelOptions: string[];
+  modelProviders?: ModelProviderOption[] | undefined;
   provider: string;
   defaultModel: string;
   thinking: ThinkingLevel;
@@ -26,6 +30,7 @@ interface ComposerFooterProps {
   onModel: (value: string) => void;
   onThinking: (value: ThinkingLevel) => void;
   onSend: () => void;
+  onInsertTrigger: (char: ComposerTriggerChar) => void;
 }
 
 export function ComposerFooter({
@@ -34,6 +39,7 @@ export function ComposerFooter({
   canRefine,
   model,
   modelOptions,
+  modelProviders,
   provider,
   defaultModel,
   thinking,
@@ -44,10 +50,11 @@ export function ComposerFooter({
   onModel,
   onThinking,
   onSend,
+  onInsertTrigger,
 }: ComposerFooterProps) {
   return (
     <div className="composer-footer">
-      <div className="composer-tools">
+      <div className="composer-footer-left">
         <ComposerToolActions
           listening={listening}
           refining={refining}
@@ -56,9 +63,14 @@ export function ComposerFooter({
           onToggleVoice={onToggleVoice}
           onRefine={onRefine}
         />
+        <span className="composer-divider" aria-hidden="true" />
+        <ComposerTriggers onTrigger={onInsertTrigger} />
+      </div>
+      <div className="composer-footer-right">
         <ComposerModelControls
           model={model}
           modelOptions={modelOptions}
+          providerOptions={modelProviders}
           provider={provider}
           defaultModel={defaultModel}
           onProvider={onProvider}
@@ -72,8 +84,8 @@ export function ComposerFooter({
         >
           {THINKING_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>思考·{opt.label}</option>)}
         </select>
+        <ComposerSendAction refining={refining} onSend={onSend} />
       </div>
-      <ComposerSendAction refining={refining} onSend={onSend} />
     </div>
   );
 }

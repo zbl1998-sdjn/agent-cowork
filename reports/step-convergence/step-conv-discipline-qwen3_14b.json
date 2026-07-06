@@ -1,0 +1,29 @@
+{
+  "model": "qwen3:14b",
+  "maxSteps": 6,
+  "mode": "discipline",
+  "results": [
+    {
+      "task": "read-all",
+      "mode": "discipline",
+      "baseline": {
+        "rounds": 2,
+        "toolRounds": 1,
+        "nudgeFired": false,
+        "budgetStopped": false,
+        "exhausted": false,
+        "finalLen": 368,
+        "ms": 14108
+      },
+      "treatment": {
+        "rounds": 3,
+        "toolRounds": 2,
+        "nudgeFired": false,
+        "budgetStopped": false,
+        "exhausted": false,
+        "finalLen": 469,
+        "ms": 23155
+      }
+    }
+  ]
+}

@@ -51,6 +51,7 @@ function roleButtonStyle(active: boolean): CSSProperties {
     background: active ? '#fff4ef' : 'var(--bg)',
     color: 'var(--text)',
     padding: '9px 10px',
+    whiteSpace: 'normal',
   };
 }
 

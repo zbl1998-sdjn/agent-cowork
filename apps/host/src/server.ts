@@ -51,6 +51,7 @@ export function createServer(config: ServerConfig = {}): HostServer {
       const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
       const pathname = requestUrl.pathname;
       const requestContext = createRequestContext(request);
+      requestContext.securityMode = state.securityMode;
       attachRequestIdentity(omitUndefined({
         request,
         requestContext,

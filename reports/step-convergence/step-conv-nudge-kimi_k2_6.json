@@ -1,0 +1,38 @@
+{
+  "model": "kimi-k2.6",
+  "provider": "kimi-api",
+  "maxSteps": 6,
+  "reps": 1,
+  "results": [
+    {
+      "task": "chain",
+      "mode": "nudge",
+      "maxSteps": 6,
+      "reps": 1,
+      "arms": [
+        {
+          "tag": "nonudge",
+          "toolRoundsMean": 6,
+          "toolRoundsAll": [
+            6
+          ],
+          "exhaustedRate": 1,
+          "nudgeFiredRate": 0,
+          "errs": [],
+          "msMean": 23045
+        },
+        {
+          "tag": "nudge",
+          "toolRoundsMean": 6,
+          "toolRoundsAll": [
+            6
+          ],
+          "exhaustedRate": 1,
+          "nudgeFiredRate": 1,
+          "errs": [],
+          "msMean": 25803
+        }
+      ]
+    }
+  ]
+}

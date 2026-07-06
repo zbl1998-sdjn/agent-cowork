@@ -6,6 +6,7 @@
 // 依赖:node:child_process(spawnSync 可注入便于测试)。导出:resolveSandboxStartup。
 import childProcess from 'node:child_process';
 import { omitUndefined } from '../util/object.js';
+import { resolveSecurityMode } from '../security/security-mode.js';
 import type {
   BackendProbe,
   RuntimeEnv,
@@ -150,23 +151,30 @@ function explicitStartup({
   sandboxOptions,
   docker,
   wsl,
+  securityMode,
 }: {
   requestedBackend?: string;
   sandboxOptions: SandboxStartupOptions;
   docker: BackendProbe;
   wsl: BackendProbe;
+  securityMode: string;
 }): SandboxStartupResult {
   const backend = String(requestedBackend || '').toLowerCase();
   const networkIsolated = backend === 'docker' || backend === 'vm' || backend === 'hyperv';
+  const policyBlocked = securityMode === 'local_strict' && !networkIsolated;
   return {
     options: { ...sandboxOptions, backend },
     info: {
       requestedBackend: backend,
       selectedBackend: backend,
+      securityMode,
       networkIsolated,
       fallback: false,
+      policyBlocked,
       fallbackReason: null,
-      userMessage: networkIsolated ? 'explicit VM sandbox backend requested' : LOCAL_WARNING,
+      userMessage: policyBlocked
+        ? 'Local Strict: explicit non-isolated sandbox backend requested; high-risk execution tools are blocked.'
+        : (networkIsolated ? 'explicit VM sandbox backend requested' : LOCAL_WARNING),
       backends: {
         docker,
         wsl,
@@ -185,13 +193,16 @@ export function resolveSandboxStartup({
   env = process.env,
   spawnSync = childProcess.spawnSync,
   timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  securityMode,
 }: {
   requestedBackend?: string;
   sandboxOptions?: SandboxStartupOptions;
   env?: RuntimeEnv;
   spawnSync?: SpawnSyncLike;
   timeoutMs?: number;
+  securityMode?: unknown;
 } = {}): SandboxStartupResult {
+  const mode = resolveSecurityMode({ configuredMode: securityMode, env });
   const image = dockerImageFrom({ sandboxOptions, env });
   const normalizedOptions = { ...sandboxOptions, ...(image ? { image } : {}) };
   const docker = probeDocker({ spawnSync, timeoutMs, image });
@@ -204,6 +215,7 @@ export function resolveSandboxStartup({
       sandboxOptions: normalizedOptions,
       docker,
       wsl,
+      securityMode: mode,
     });
   }
 
@@ -218,8 +230,10 @@ export function resolveSandboxStartup({
       info: {
         requestedBackend: 'auto',
         selectedBackend: 'docker',
+        securityMode: mode,
         networkIsolated: true,
         fallback: false,
+        policyBlocked: false,
         fallbackReason: null,
         userMessage: 'Docker sandbox selected; network is disabled by default.',
         backends,
@@ -228,15 +242,20 @@ export function resolveSandboxStartup({
   }
 
   const reason = fallbackReason(backends);
+  const localStrictBlocked = mode === 'local_strict';
   return {
     options: { ...normalizedOptions, backend: 'local' },
     info: {
       requestedBackend: 'auto',
       selectedBackend: 'local',
+      securityMode: mode,
       networkIsolated: false,
       fallback: true,
+      policyBlocked: localStrictBlocked,
       fallbackReason: reason,
-      userMessage: `${LOCAL_WARNING} ${reason}`,
+      userMessage: localStrictBlocked
+        ? `Local Strict: no isolated sandbox is available; high-risk execution tools are blocked instead of falling back to local subprocess. ${reason}`
+        : `${LOCAL_WARNING} ${reason}`,
       backends,
     },
   };

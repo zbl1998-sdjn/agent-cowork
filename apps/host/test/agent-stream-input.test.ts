@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from '../src/routes/agent-stream-context.js';
 import { parseAgentStreamBody } from '../src/routes/agent-stream-schemas.js';
 
 test('agent stream input schema rejects malformed images before streaming', () => {
@@ -24,4 +25,90 @@ test('agent stream input schema keeps known route flags and unknown extension fi
   assert.equal(body.maxSteps, 3);
   assert.equal(body.thinking, 'deep');
   assert.deepEqual(body.customExtension, { enabled: true });
+});
+
+test('agent stream input schema keeps context compaction controls', () => {
+  const body = parseAgentStreamBody({
+    prompt: 'long chat',
+    contextCompaction: { enabled: true, maxContextTokens: '9000', keepRecentMessages: 8, maxFacts: '12' },
+  });
+
+  assert.deepEqual(body.contextCompaction, {
+    enabled: true,
+    maxContextTokens: '9000',
+    keepRecentMessages: 8,
+    maxFacts: '12',
+  });
+  assert.deepEqual(resolveAgentContextOptions(body), {
+    maxContextTokens: 9000,
+    keepRecentMessages: 8,
+    maxFacts: 12,
+  });
+});
+
+test('agent context options can disable automatic history compaction', () => {
+  assert.deepEqual(resolveAgentContextOptions({ contextCompaction: { enabled: false } }), {
+    maxContextTokens: 1_000_000_000,
+  });
+});
+
+test('agent context options derive maxContextTokens from the selected model window', () => {
+  // No explicit budget in the request → derive from the model's context window (0.75 headroom).
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'anthropic', model: 'claude-sonnet-5' }),
+    { maxContextTokens: 150_000 },
+  );
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'kimi-api', model: 'kimi-k2.7-code' }),
+    { maxContextTokens: 96_000 },
+  );
+});
+
+test('explicit maxContextTokens still wins over model-derived budget', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions(
+      { contextCompaction: { enabled: true, maxContextTokens: 9000 } },
+      { provider: 'google', model: 'gemini-3.5-flash' },
+    ),
+    { maxContextTokens: 9000 },
+  );
+});
+
+test('unknown model leaves maxContextTokens unset (compactor keeps its conservative default)', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'mystery', model: 'unknown-x' }),
+    {},
+  );
+  // and calling without a model hint is unchanged (backward compatible)
+  assert.deepEqual(resolveAgentContextOptions({ prompt: 'hi' }), {});
+});
+
+test('local provider (Ollama) does NOT get the optimistic family window without an explicit declaration', () => {
+  // openai/local + qwen would family-match to 131072; local providers must not over-estimate
+  // (real Ollama num_ctx is short) → leave unset so the conservative default applies.
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'openai/local', model: 'qwen2.5:0.5b' }),
+    {},
+  );
+});
+
+test('explicit contextWindowTokens lets a local model declare its short window', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions(
+      { contextCompaction: { enabled: true, contextWindowTokens: 8192 } },
+      { provider: 'openai/local', model: 'qwen2.5:0.5b' },
+    ),
+    { maxContextTokens: 6144 },
+  );
+});
+
+test('convergence knobs default to no override and read env when set', () => {
+  assert.deepEqual(resolveAgentConvergenceOptions({}), {});
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: '0.5' }), { stepNudgeRatio: 0.5 });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: '0' }), { stepNudgeRatio: 0 });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: '0' }), { toolDiscipline: false });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: 'off' }), { toolDiscipline: false });
+  // discipline defaults on (only an explicit off disables it)
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: '1' }), {});
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: 'abc' }), {});
 });

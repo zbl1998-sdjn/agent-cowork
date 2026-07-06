@@ -6,9 +6,20 @@
 // 导出:常量(DEFAULT_*、MAX_PROMPT_LENGTH、KIMI_API_NOT_CONFIGURED_MESSAGE)、
 //       cleanText、cleanProvider、resolveKimiApiConfig。
 import { omitUndefined } from '../util/object.js';
+import { resolveSecurityMode, type SecurityMode } from '../security/security-mode.js';
+import {
+  apiKeyFromEnvForProvider,
+  composeFullModelId,
+  defaultBaseUrlForProvider,
+  defaultModelForProvider,
+  findModelProviderCatalog,
+  normaliseModelProviderId,
+  providerRequiresApiKey,
+  splitFullModelId,
+} from './provider/catalog.js';
 
 export const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
-export const DEFAULT_MODEL = 'kimi-k2.6';
+export const DEFAULT_MODEL = 'kimi-k2.7-code';
 export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 export const DEFAULT_TIMEOUT_MS = 60_000;
 export const DEFAULT_MAX_TOKENS = 2048;
@@ -26,10 +37,12 @@ export type ModelFallback = {
 };
 export type KimiApiConfig = {
   provider: string;
+  securityMode: SecurityMode;
   configured: boolean;
   apiKey: string;
   baseUrl: string;
   model: string;
+  fullModelId?: string;
   timeoutMs: number;
   maxTokens: number;
   temperature?: number;
@@ -44,13 +57,38 @@ export function cleanText(value: unknown): string {
 
 /** 归一化 provider 名(小写去空白),空值用 fallback 兜底。 */
 export function cleanProvider(value: unknown, fallback = 'kimi-api'): string {
-  const provider = String(value || '').trim().toLowerCase();
-  return provider || fallback;
+  return normaliseModelProviderId(value, fallback);
 }
 
 /** 判断 provider 是否走 Anthropic/Claude 系(决定 key/url/model 的取值来源)。 */
 function isAnthropicProvider(provider: string): boolean {
   return provider === 'anthropic' || provider === 'claude';
+}
+
+function providerEnvNamePrefix(provider: string): string {
+  return provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+}
+
+function envValue(names: string[], env: Record<string, string | undefined>): string {
+  for (const name of names) {
+    const value = env[name]?.trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function providerEnvValue(provider: string, suffix: 'BASE_URL' | 'MODEL', env: Record<string, string | undefined>): string {
+  const entry = findModelProviderCatalog(provider);
+  const names = [`${providerEnvNamePrefix(provider)}_${suffix}`];
+  for (const keyName of entry?.apiKeyEnv || []) {
+    const prefix = keyName.replace(/(?:_API)?_KEY$/, '');
+    if (prefix && prefix !== keyName) names.push(`${prefix}_${suffix}`);
+  }
+  return envValue([...new Set(names)], env);
+}
+
+function providerConfigured(provider: string, apiKey: string, baseUrl: string, model: string): boolean {
+  return providerRequiresApiKey(provider) ? Boolean(apiKey) : Boolean(baseUrl && model);
 }
 
 /** 解析模型回退链:接受 JSON 字符串或数组,逐项规范化并丢弃空条目。 */
@@ -80,21 +118,33 @@ export function resolveKimiApiConfig(
   config: Record<string, unknown> = {},
   env: Record<string, string | undefined> = process.env,
 ): KimiApiConfig {
-  const provider = cleanProvider(config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER);
+  const explicitProvider = config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER;
+  const initialModelInput = config.kimiModel || env.KIMI_MODEL || '';
+  const parsedInitialModel = splitFullModelId(initialModelInput);
+  const provider = cleanProvider(explicitProvider || parsedInitialModel.provider);
+  const securityMode = resolveSecurityMode({ configuredMode: config.securityMode, env });
   const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;
   const anthropic = isAnthropicProvider(provider);
   const apiKey = String(
     config.kimiApiKey
-    || (anthropic ? env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY : env.KIMI_API_KEY || env.MOONSHOT_API_KEY)
+    || apiKeyFromEnvForProvider(provider, env)
     || '',
   ).trim();
+  const modelInput = String(
+    config.kimiModel
+    || providerEnvValue(provider, 'MODEL', env)
+    || (!explicitProvider && parsedInitialModel.provider ? initialModelInput : '')
+    || (anthropic ? '' : defaultModelForProvider(provider) || DEFAULT_MODEL),
+  ).trim();
+  const parsedModel = splitFullModelId(modelInput);
+  const model = parsedModel.provider && (!explicitProvider || parsedModel.provider === provider)
+    ? parsedModel.model
+    : modelInput;
   const baseUrl = String(
     config.kimiBaseUrl
-    || (anthropic ? env.ANTHROPIC_BASE_URL || DEFAULT_ANTHROPIC_BASE_URL : env.KIMI_BASE_URL || env.MOONSHOT_BASE_URL || DEFAULT_BASE_URL),
-  ).trim();
-  const model = String(
-    config.kimiModel
-    || (anthropic ? env.ANTHROPIC_MODEL || env.CLAUDE_MODEL || '' : env.KIMI_MODEL || DEFAULT_MODEL),
+    || providerEnvValue(provider, 'BASE_URL', env)
+    || defaultBaseUrlForProvider(provider)
+    || (anthropic ? DEFAULT_ANTHROPIC_BASE_URL : DEFAULT_BASE_URL),
   ).trim();
   const timeoutMs = Math.max(1000, Number(config.kimiApiTimeoutMs || env.KIMI_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS));
   const maxTokens = Math.max(1, Number(config.kimiApiMaxTokens || env.KIMI_API_MAX_TOKENS || DEFAULT_MAX_TOKENS));
@@ -103,10 +153,12 @@ export function resolveKimiApiConfig(
   const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
   return omitUndefined({
     provider,
-    configured: Boolean(apiKey),
+    securityMode,
+    configured: providerConfigured(provider, apiKey, baseUrl, model),
     apiKey,
     baseUrl: baseUrl.replace(/\/+$/, ''),
     model,
+    fullModelId: composeFullModelId(provider, model),
     timeoutMs,
     maxTokens,
     temperature,

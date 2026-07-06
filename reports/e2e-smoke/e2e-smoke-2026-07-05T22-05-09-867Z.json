@@ -1,0 +1,400 @@
+{
+  "ok": true,
+  "mode": "dry-run",
+  "generatedAt": "2026-07-05T22:05:10.082Z",
+  "durationMs": 215,
+  "workspace": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\e2e-smoke\\workspace",
+  "baseUrl": "http://127.0.0.1:63907",
+  "outputPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\reports\\e2e-smoke\\workspace\\e2e-output.md",
+  "summary": {
+    "start": true,
+    "toolCallCount": 4,
+    "toolResultCount": 4,
+    "shellResultCount": 1,
+    "shellOk": true,
+    "approvals": 2,
+    "fileWritten": true,
+    "done": true,
+    "errors": []
+  },
+  "events": [
+    {
+      "event": "start",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "resumed": false
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 1,
+        "phase": "assistant_tool_calls"
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Read",
+        "args": {
+          "path": "input.txt"
+        }
+      }
+    },
+    {
+      "event": "policy_decision",
+      "data": {
+        "decision": "allow",
+        "securityMode": "controlled_hybrid",
+        "toolName": "Read",
+        "riskLevel": "read_workspace",
+        "reasonCode": "tool_policy_allowed",
+        "sandboxNetworkIsolated": false
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-1-Read",
+        "text": "调用 Read",
+        "status": "running",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-1-Read",
+        "text": "调用 Read",
+        "status": "done",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Read",
+        "status": "succeeded",
+        "result": {
+          "path": "input.txt",
+          "size": 102,
+          "content": "Agent Cowork E2E fixture. Please read, summarize, write e2e-output.md, and run a harmless shell check."
+        },
+        "durationMs": 1
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 1,
+        "phase": "tool_result"
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 2,
+        "phase": "assistant_tool_calls"
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Write",
+        "args": {
+          "path": "e2e-output.md",
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        }
+      }
+    },
+    {
+      "event": "policy_decision",
+      "data": {
+        "decision": "needs_approval",
+        "securityMode": "controlled_hybrid",
+        "toolName": "Write",
+        "riskLevel": "write_workspace",
+        "reasonCode": "tool_requires_approval",
+        "sandboxNetworkIsolated": false
+      }
+    },
+    {
+      "event": "approval_request",
+      "data": {
+        "id": "apr_363f8193c9f8",
+        "name": "Write",
+        "args": {
+          "path": "e2e-output.md",
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        },
+        "risk": "write"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-2-Write",
+        "text": "调用 Write",
+        "status": "running",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "file_written",
+      "data": {
+        "path": "e2e-output.md"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-2-Write",
+        "text": "调用 Write",
+        "status": "done",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Write",
+        "status": "succeeded",
+        "result": {
+          "ok": true,
+          "path": "e2e-output.md",
+          "bytes": 71
+        },
+        "durationMs": 0
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 2,
+        "phase": "tool_result"
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 3,
+        "phase": "assistant_tool_calls"
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Shell",
+        "args": {
+          "command": "node -e \"process.stdout.write('shell-ok')\""
+        }
+      }
+    },
+    {
+      "event": "policy_decision",
+      "data": {
+        "decision": "needs_approval",
+        "securityMode": "controlled_hybrid",
+        "toolName": "Shell",
+        "riskLevel": "sandbox_exec",
+        "reasonCode": "tool_requires_approval",
+        "sandboxNetworkIsolated": false
+      }
+    },
+    {
+      "event": "approval_request",
+      "data": {
+        "id": "apr_8e2949b8f495",
+        "name": "Shell",
+        "args": {
+          "command": "node -e \"process.stdout.write('shell-ok')\""
+        },
+        "risk": "high"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-3-Shell",
+        "text": "调用 Shell",
+        "status": "running",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-3-Shell",
+        "text": "调用 Shell",
+        "status": "done",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Shell",
+        "status": "succeeded",
+        "result": {
+          "exitCode": 0,
+          "stdout": "shell-ok",
+          "stderr": "",
+          "timedOut": false
+        },
+        "durationMs": 149
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 3,
+        "phase": "tool_result"
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 4,
+        "phase": "assistant_tool_calls"
+      }
+    },
+    {
+      "event": "tool_call",
+      "data": {
+        "name": "Read",
+        "args": {
+          "path": "e2e-output.md"
+        }
+      }
+    },
+    {
+      "event": "policy_decision",
+      "data": {
+        "decision": "allow",
+        "securityMode": "controlled_hybrid",
+        "toolName": "Read",
+        "riskLevel": "read_workspace",
+        "reasonCode": "tool_policy_allowed",
+        "sandboxNetworkIsolated": false
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-4-Read",
+        "text": "调用 Read",
+        "status": "running",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "todo_update",
+      "data": {
+        "id": "tool-4-Read",
+        "text": "调用 Read",
+        "status": "done",
+        "kind": "tool"
+      }
+    },
+    {
+      "event": "tool_result",
+      "data": {
+        "name": "Read",
+        "status": "succeeded",
+        "result": {
+          "path": "e2e-output.md",
+          "size": 71,
+          "content": "# E2E Smoke\n\n- read: input.txt\n- write: e2e-output.md\n- shell: pending\n"
+        },
+        "durationMs": 1
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 4,
+        "phase": "tool_result"
+      }
+    },
+    {
+      "event": "token",
+      "data": {
+        "delta": "E2E dry-run smoke completed."
+      }
+    },
+    {
+      "event": "verify_start",
+      "data": {}
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 5,
+        "phase": "verify_requested"
+      }
+    },
+    {
+      "event": "token",
+      "data": {
+        "delta": "E2E dry-run smoke completed."
+      }
+    },
+    {
+      "event": "run_checkpoint_saved",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "step": 6,
+        "phase": "completed"
+      }
+    },
+    {
+      "event": "done",
+      "data": {
+        "runId": "run_20260705220509_a9147b47",
+        "text": "E2E dry-run smoke completed.",
+        "steps": [
+          {
+            "tool": "Read",
+            "ok": true,
+            "durationMs": 1
+          },
+          {
+            "tool": "Write",
+            "ok": true,
+            "durationMs": 0
+          },
+          {
+            "tool": "Shell",
+            "ok": true,
+            "durationMs": 149
+          },
+          {
+            "tool": "Read",
+            "ok": true,
+            "durationMs": 1
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "total_tokens": 0
+        }
+      }
+    }
+  ],
+  "livePrerequisites": {
+    "requested": false,
+    "hasApiKey": false,
+    "baseUrl": null,
+    "model": null
+  }
+}

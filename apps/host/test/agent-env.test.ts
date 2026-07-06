@@ -19,6 +19,29 @@ test('resolveAppVersion never returns empty (falls back to "dev")', () => {
   assert.ok(value.length > 0, 'expected a non-empty version string');
 });
 
+test('resolveAppVersion prefers npm env, then SEA global, then dev', () => {
+  const previousEnv = process.env.npm_package_version;
+  const globalVersion = globalThis as typeof globalThis & { AGENT_COWORK_VERSION?: unknown };
+  const previousGlobal = globalVersion.AGENT_COWORK_VERSION;
+  try {
+    process.env.npm_package_version = ' 1.2.3 ';
+    globalVersion.AGENT_COWORK_VERSION = '9.9.9';
+    assert.equal(resolveAppVersion(), '1.2.3');
+
+    delete process.env.npm_package_version;
+    globalVersion.AGENT_COWORK_VERSION = ' 2.0.0 ';
+    assert.equal(resolveAppVersion(), '2.0.0');
+
+    globalVersion.AGENT_COWORK_VERSION = '';
+    assert.equal(resolveAppVersion(), 'dev');
+  } finally {
+    if (previousEnv === undefined) delete process.env.npm_package_version;
+    else process.env.npm_package_version = previousEnv;
+    if (previousGlobal === undefined) delete globalVersion.AGENT_COWORK_VERSION;
+    else globalVersion.AGENT_COWORK_VERSION = previousGlobal;
+  }
+});
+
 test('resolveAgentEnvFacts bundles platform + provider/model from kimiConfig', () => {
   const facts = resolveAgentEnvFacts({
     trustedRoot: 'C:/work',
@@ -41,4 +64,21 @@ test('resolveAgentEnvFacts handles missing kimiConfig + non-string trustedRoot d
   assert.equal(facts.osName, 'Windows');
   assert.equal(facts.provider, '');
   assert.equal(facts.model, '');
+});
+
+test('resolveAgentEnvFacts ignores malformed config and empty version overrides', () => {
+  const facts = resolveAgentEnvFacts({
+    trustedRoot: 42,
+    kimiConfig: { provider: 1, model: null },
+    now: new Date('bad-date'),
+    platform: 'plan9',
+    appVersion: '',
+  });
+
+  assert.equal(facts.trustedRoot, '');
+  assert.equal(facts.osName, 'plan9');
+  assert.equal(facts.provider, '');
+  assert.equal(facts.model, '');
+  assert.equal(typeof facts.appVersion, 'string');
+  assert.ok(facts.now instanceof Date);
 });

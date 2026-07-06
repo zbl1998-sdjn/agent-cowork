@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import { SqliteMemoryStore, flushMemoryAuditEvents } from '../src/memory/memory-store.js';
+import { resolveStoreBackendConfig } from '../src/runtime/store-backend-config.js';
 import { SqliteRunsIndex, createUlid } from '../src/runtime/runs-index.js';
 import { Scheduler, SqliteScheduleStore } from '../src/runtime/scheduler.js';
 import { createServer } from '../src/server.js';
@@ -295,4 +296,62 @@ test('SQLite migrations roll back failed migration files atomically', { skip: !s
     WHERE type = 'table' AND name = 'rollback_probe'
   `).get();
   assert.equal(leakedTable, undefined);
+});
+
+test('resolveStoreBackendConfig prefers explicit config and falls back to environment safely', () => {
+  const root = tempRoot('kcw-store-backend-');
+  const original = {
+    KCW_STORE: process.env.KCW_STORE,
+    DATABASE_URL: process.env.DATABASE_URL,
+    KCW_SQLITE_PATH: process.env.KCW_SQLITE_PATH,
+  };
+  try {
+    delete process.env.KCW_STORE;
+    delete process.env.DATABASE_URL;
+    delete process.env.KCW_SQLITE_PATH;
+
+    const defaults = resolveStoreBackendConfig({}, root);
+    assert.equal(defaults.storeBackend, 'file');
+    assert.equal(defaults.databaseUrl, null);
+    assert.equal(defaults.usePostgresState, false);
+    assert.equal(defaults.sqliteDbPath, path.resolve(root, '.AgentCowork', 'state.sqlite'));
+
+    process.env.KCW_STORE = 'postgres';
+    process.env.DATABASE_URL = 'postgres://example.invalid/agent_cowork_test';
+    process.env.KCW_SQLITE_PATH = path.join(root, 'env-state.sqlite');
+    const fromEnv = resolveStoreBackendConfig({}, root);
+    assert.equal(fromEnv.storeBackend, 'postgres');
+    assert.equal(fromEnv.databaseUrl, 'postgres://example.invalid/agent_cowork_test');
+    assert.equal(fromEnv.usePostgresState, true);
+    assert.equal(fromEnv.sqliteDbPath, path.resolve(root, 'env-state.sqlite'));
+
+    const explicit = resolveStoreBackendConfig({
+      storeBackend: 'sqlite',
+      databaseUrl: null,
+      sqliteDbPath: path.join(root, 'explicit-state.sqlite'),
+    }, root);
+    assert.equal(explicit.storeBackend, 'sqlite');
+    assert.equal(explicit.databaseUrl, 'postgres://example.invalid/agent_cowork_test');
+    assert.equal(explicit.usePostgresState, false);
+    assert.equal(explicit.sqliteDbPath, path.resolve(root, 'explicit-state.sqlite'));
+
+    const unknown = resolveStoreBackendConfig({ storeBackend: 'memory' }, root);
+    assert.equal(unknown.storeBackend, 'file');
+  } finally {
+    if (original.KCW_STORE === undefined) {
+      delete process.env.KCW_STORE;
+    } else {
+      process.env.KCW_STORE = original.KCW_STORE;
+    }
+    if (original.DATABASE_URL === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = original.DATABASE_URL;
+    }
+    if (original.KCW_SQLITE_PATH === undefined) {
+      delete process.env.KCW_SQLITE_PATH;
+    } else {
+      process.env.KCW_SQLITE_PATH = original.KCW_SQLITE_PATH;
+    }
+  }
 });

@@ -1,16 +1,28 @@
-// 可视化 / 活页面板(UI · 组件层 · components/panels)
+// Agent Cowork 项目可视化 / 活页面板(UI · 组件层 · components/panels)
 // ---------------------------------------------------------------------------
-// 职责:从模板或填表生成 viz 规格(柱/折线/饼/表格/指标卡),校验 JSON 后渲染成可刷新的活页制品并内联预览。只渲染+触发回调。
-// 依赖:lib/api(renderViz/liveArtifactUrl/fetchArtifactHtml)+ LiveArtifactView、ui/Button、ui/StateViews。导出:VizPanel 等。
-import { useMemo, useState } from 'react';
-import { renderViz, liveArtifactUrl, fetchArtifactHtml } from '../../lib/api';
+// 职责:默认展示当前 Agent Cowork 工作区的运行/产物/模型态势,并可渲染为可刷新的活页制品;
+//       高级区仍保留 JSON 模板/填表入口。只渲染+触发回调。
+// 依赖:lib/api(renderViz/listRunRecords/listArtifacts/getKimiInfo)+ LiveArtifactView、ui/Button、ui/StateViews。导出:VizPanel 等。
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { renderViz, liveArtifactUrl, fetchArtifactHtml, listArtifacts, listRunRecords, getKimiInfo } from '../../lib/api';
 import { joinWorkspacePath } from '../../lib/app-logic';
+import { humanizeError } from '../../lib/friendly-error';
 import { LiveArtifactView } from '../LiveArtifactView';
 import { Button } from '../ui/Button';
 import { ErrorState } from '../ui/StateViews';
+import type { WorkbenchPreviewState } from '../composer-types';
+import {
+  ProjectVizOverview,
+  projectVizEmptySnapshot,
+  projectVizSpecFromSnapshot,
+  snapshotFromApis,
+  type ProjectVizSnapshot,
+} from './project-viz';
+import { WorkbenchLivePreview, emptyWorkbenchPreview } from './workbench-preview';
 
 interface VizPanelProps {
   trustedRoot: string;
+  workbenchPreview?: WorkbenchPreviewState | undefined;
 }
 
 // 具体 viz 模板:用户可点击、微调、渲染,不用面对单一 JSON 示例再凭空猜 schema。
@@ -158,8 +170,11 @@ export function VizPanelActions({
 }
 
 // 将 viz spec 渲染成可刷新的活页制品,并在面板内联预览。
-export function VizPanel({ trustedRoot }: VizPanelProps) {
+export function VizPanel({ trustedRoot, workbenchPreview }: VizPanelProps) {
   const [specText, setSpecText] = useState(VIZ_SAMPLES.bar);
+  const [projectSnapshot, setProjectSnapshot] = useState<ProjectVizSnapshot>(() => projectVizEmptySnapshot(trustedRoot));
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [projectError, setProjectError] = useState('');
   const [srcDoc, setSrcDoc] = useState('');
   const [filePath, setFilePath] = useState('');
   const [dataUrl, setDataUrl] = useState('');
@@ -168,17 +183,42 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
   const [busy, setBusy] = useState(false);
 
   const validation = useMemo(() => validateJsonSpec(specText), [specText]);
+  const liveWorkbenchPreview = useMemo(() => workbenchPreview || emptyWorkbenchPreview(trustedRoot), [trustedRoot, workbenchPreview]);
 
-  const onRender = async () => {
-    if (!validation.ok) {
-      setError(validation.message || 'JSON 不合法');
+  const refreshProject = useCallback(async () => {
+    setProjectBusy(true);
+    setProjectError('');
+    const [runsResult, artifactsResult, infoResult] = await Promise.allSettled([
+      listRunRecords(20),
+      listArtifacts(trustedRoot, 20),
+      getKimiInfo(),
+    ]);
+    const failures = [runsResult, artifactsResult, infoResult].filter((item) => item.status === 'rejected');
+    const runs = runsResult.status === 'fulfilled' ? runsResult.value : [];
+    const artifacts = artifactsResult.status === 'fulfilled' ? artifactsResult.value : [];
+    const info = infoResult.status === 'fulfilled' ? infoResult.value : null;
+    setProjectSnapshot(snapshotFromApis(trustedRoot, runs, artifacts, info));
+    if (failures.length) {
+      setProjectError(humanizeError((failures[0] as PromiseRejectedResult).reason, { action: '刷新项目视图' }));
+    }
+    setProjectBusy(false);
+  }, [trustedRoot]);
+
+  useEffect(() => {
+    void refreshProject();
+  }, [refreshProject]);
+
+  const renderSpecText = async (nextSpecText = specText) => {
+    const nextValidation = validateJsonSpec(nextSpecText);
+    if (!nextValidation.ok) {
+      setError(nextValidation.message || 'JSON 不合法');
       return;
     }
     setBusy(true);
     setError('');
     setSrcDoc('');
     try {
-      const spec = JSON.parse(specText);
+      const spec = JSON.parse(nextSpecText);
       const res = await renderViz(spec, true, trustedRoot);
       if (res.viewUrl) {
         const resolvedViewUrl = liveArtifactUrl(res.viewUrl);
@@ -196,26 +236,44 @@ export function VizPanel({ trustedRoot }: VizPanelProps) {
     }
   };
 
+  const renderCurrentProject = () => {
+    const nextSpecText = projectVizSpecFromSnapshot(projectSnapshot);
+    setSpecText(nextSpecText);
+    void renderSpecText(nextSpecText);
+  };
+
   return (
-    <section className="side-panel">
-      <h2>可视化 / 活页</h2>
-      <VizTemplateButtons onPick={(key) => setSpecText(VIZ_SAMPLES[key])} />
-      <VizFormBuilder onGenerate={(spec) => setSpecText(spec)} />
-      <textarea value={specText} rows={8} spellCheck={false} onChange={(e) => setSpecText(e.target.value)} />
-      {!validation.ok && (
-        <p className="viz-json-error" role="alert">
-          ⚠ JSON 解析失败{validation.line ? `(第 ${validation.line} 行第 ${validation.column} 列)` : ''}:{validation.message}
-        </p>
-      )}
-      <VizPanelActions
-        busy={busy}
-        viewUrl={viewUrl}
-        disabled={!validation.ok}
-        onRender={() => void onRender()}
-        onReopen={() => void fetchArtifactHtml(viewUrl).then(setSrcDoc).catch((e) => setError((e as Error).message))}
+    <section className="side-panel viz-panel">
+      <h2>实时工作台</h2>
+      <WorkbenchLivePreview preview={liveWorkbenchPreview} />
+      <ProjectVizOverview
+        snapshot={projectSnapshot}
+        busy={projectBusy}
+        error={projectError}
+        onRefresh={() => void refreshProject()}
+        onRenderProject={renderCurrentProject}
       />
+
+      <details className="viz-manual-builder">
+        <summary>手动 JSON 活页</summary>
+        <VizTemplateButtons onPick={(key) => setSpecText(VIZ_SAMPLES[key])} />
+        <VizFormBuilder onGenerate={(spec) => setSpecText(spec)} />
+        <textarea value={specText} rows={8} spellCheck={false} onChange={(e) => setSpecText(e.target.value)} />
+        {!validation.ok && (
+          <p className="viz-json-error" role="alert">
+            JSON 解析失败{validation.line ? `(第 ${validation.line} 行第 ${validation.column} 列)` : ''}:{validation.message}
+          </p>
+        )}
+        <VizPanelActions
+          busy={busy}
+          viewUrl={viewUrl}
+          disabled={!validation.ok}
+          onRender={() => void renderSpecText()}
+          onReopen={() => void fetchArtifactHtml(viewUrl).then(setSrcDoc).catch((e) => setError((e as Error).message))}
+        />
+      </details>
       <VizPanelErrorState error={error} />
-      <LiveArtifactView srcDoc={srcDoc} dataUrl={dataUrl} filePath={filePath} viewUrl={viewUrl} busy={busy} />
+      <LiveArtifactView title="项目活页 Artifact" srcDoc={srcDoc} dataUrl={dataUrl} filePath={filePath} viewUrl={viewUrl} busy={busy} />
     </section>
   );
 }

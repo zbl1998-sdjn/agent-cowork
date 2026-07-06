@@ -3,6 +3,7 @@
 // 职责:把单次请求体里携带的「会话级模型覆盖」安全叠加到基础 Kimi 配置,并判断调用方
 //       是否有权使用会话级覆盖。依赖:仅第三方 schema 库,不反向依赖 L4 组装根。
 import { z } from 'zod';
+import { findModelProviderCatalog, normaliseModelProviderId } from '../kimi/provider/catalog.js';
 
 export type SessionModelConfig = {
   provider?: string;
@@ -62,7 +63,7 @@ function cleanText(value: unknown): string {
 }
 
 function cleanProvider(value: unknown): string {
-  return cleanText(value).toLowerCase();
+  return normaliseModelProviderId(cleanText(value), '');
 }
 
 function cleanBaseUrl(value: unknown): string {
@@ -104,5 +105,6 @@ export function applySessionModelConfig(kimiConfig: unknown, body: unknown): Rec
 export function hasSessionModelAccess(body: unknown): boolean {
   const override = requestModelConfig(body);
   if (override.apiKey) return true;
-  return override.provider === 'openai/local' || override.provider === 'local-openai';
+  const provider = findModelProviderCatalog(override.provider);
+  return provider?.region === 'local';
 }

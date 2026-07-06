@@ -8,7 +8,7 @@
 //      tool-loop-support/tool-call-executor)及同层 agent-tools/system-prompt/context 等。
 // 导出:runAgentChat
 import { createAgentTools } from '../agent-tools.js';
-import { buildSystemPrompt } from '../system-prompt.js';
+import { buildSystemPrompt, buildEnvBlock } from '../system-prompt.js';
 import { resolveAgentEnvFacts } from '../agent-env.js';
 import { defaultAgentModelCall } from '../model-call.js';
 import { ensureExitPlanModeTool, makeAudit } from './approval-gate.js';
@@ -16,6 +16,7 @@ import {
   addUsage,
   applyStaticBackstop,
   summarizeAfterBudget,
+  summarizeBeforeToolBudget,
 } from './finalize.js';
 import { clarifyPromptBeforeModel } from './clarification.js';
 import { callModelResilient } from './model-resilience.js';
@@ -26,8 +27,9 @@ import { createContextManager } from '../context/context-manager.js';
 import { createRunTimeout, isAbortLikeError } from './run-timeout.js';
 import { createCheckpointRecorder } from './checkpoint-state.js';
 import { traceModelContext, traceToolDecision } from './run-trace-events.js';
-import { addLazySearchTool, createNoopBudgetGuard } from './tool-loop-support.js';
+import { addLazySearchTool, createNoopBudgetGuard, stepBudgetNudgeMessage } from './tool-loop-support.js';
 import { executeToolCall } from './tool-call-executor.js';
+import { recordCacheUsage, logCacheTelemetry, hashPrefix } from '../cache-telemetry.js';
 import { omitUndefined } from '../../util/object.js';
 import type { AskTool } from './clarification.js';
 import type { AgentTool } from './tool-call-executor.js';
@@ -47,25 +49,15 @@ export type {
   RunAgentChatResult,
 } from './tool-loop-types.js';
 
+function hasToolResult(messages: ChatMessage[]): boolean {
+  return messages.some((message) => message && message.role === 'tool');
+}
+
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
+  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
 
-  // ═══════════ 【大白话导读 · Derrick 学习注释】Agent 主循环骨架 ═══════════
-  // 一句话:模型每轮二选一——「要调工具」就执行完、把结果喂回去再问一遍;「直接给答案」就收工。最多转 maxSteps 轮。
-  // 骨架其实就十来行(这就是 ReAct):
-  //   messages = [系统提示, 用户问题]          // 开局发牌
-  //   for (轮 = 1..最大轮数) {
-  //     回复 = 问大模型(messages, 工具清单)
-  //     若 回复「没有工具调用」 → 最终答案 = 回复文字 → break(收工)
-  //     否则 → 把「要调 xx 工具」记进 messages → 逐个执行工具 → 结果塞回 messages → 进下一轮
-  //   }
-  //   return 最终答案
-  // 这函数为啥有 200 行?骨架外面裹了一圈「守卫」,都不是循环本身:
-  //   · 上下文太长 → 压缩(prepareMessages)   · 跑太久/烧太多/原地打转 → 叫停(timeout/budget/loopGuard)
-  //   · 中途存档、崩了能续跑(checkpoint)     · 主模型挂了自动降级(callModelResilient)   · 危险操作执行前要审批(在 executeToolCall 里)
-  // 读码技巧:先往下找那个 `for` —— 那才是循环本体;它上面 50 多行全是「装配/守卫」的准备工作。
-  // ════════════════════════════════════════════════════════════════════
+  // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, context } as Parameters<typeof createAgentTools>[0]) as AgentTool[]).slice();
   ensureExitPlanModeTool(agentTools, planMode);
@@ -78,27 +70,34 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   const clarified = clarifyBeforeModel
     ? await clarifyPromptBeforeModel({ prompt, userContent, toolMap: toolMap as unknown as Map<string, AskTool> })
     : { prompt, clarified: false };
+  // env(含每日日期)从系统前缀移到用户轮:让 system+工具前缀跨天稳定可缓存,日期随易变的用户轮走。
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const envPreamble = buildEnvBlock(envFacts).join('\n');
   const userMessage = (Array.isArray(userContent) && userContent.length)
-    ? { role: 'user', content: userContent }
-    : { role: 'user', content: clarified.prompt };
+    ? { role: 'user', content: [{ type: 'text', text: `${envPreamble}\n\n` }, ...userContent] }
+    : { role: 'user', content: `${envPreamble}\n\n${clarified.prompt}` };
   const activeContextManager = (contextManager || createContextManager(contextOptions as Parameters<typeof createContextManager>[0])) as ContextManagerLike;
   const activeLoopGuard = loopGuard || createLoopGuard(loopGuardOptions as Parameters<typeof createLoopGuard>[0]);
   const activeRetryPolicy = retryPolicy || createRetryPolicy(retryOptions as Parameters<typeof createRetryPolicy>[0]);
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   const resumed = resumeState;
   const resumeUsage = (resumed && resumed.usage) || {};
-  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
-  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode, env: envFacts }) }, userMessage];
+  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt(omitUndefined({ memoryText, skills, planMode, developerMode, toolDiscipline, includeEnvBlock: false })) }, userMessage];
   let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   const steps: Array<Record<string, unknown>> = [];
   const sessionApproved = new Set((resumed && Array.isArray(resumed.approvedTools)) ? resumed.approvedTools : []);
   const hasApprovals = !!approvals;
   const usageTotals = { prompt_tokens: Number(resumeUsage.prompt_tokens || 0), completion_tokens: Number(resumeUsage.completion_tokens || 0), total_tokens: Number(resumeUsage.total_tokens || 0) };
+  // 稳定前缀(system 提示)指纹:用于诊断动态内容是否漏进前缀、打穿前缀缓存(distinctPrefixes>1 即不稳)。
+  const cachePrefixHash = hashPrefix(String((Array.isArray(messages) && messages[0] && (messages[0] as { content?: unknown }).content) || ''));
+  // 前缀缓存键:优先用跨运行稳定的会话 id(同一对话多轮追问复用缓存),无则回退到本次 runId。
+  const cacheKeyForRun = (cacheKey || runId) || undefined;
   const audit = makeAudit(auditBus, context);
   let finalText = '';
   let planApproved = !planMode;
   let didMutate = false;
   let verified = false;
+  let lastToolBatchHadSuccess = false;
   const checkpointRecorder = createCheckpointRecorder({
     checkpointer,
     runId,
@@ -114,10 +113,18 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
 
   // 开启 verify 时额外预留若干步给"读回改动核对"阶段,避免复核挤占正常任务步数。
   const stepBudget = maxSteps + (verify ? Math.max(0, maxVerifySteps) : 0);
+  // 自动续跑:任务没做完只是步数用光时,把预算按窗扩展到硬上限(防跑飞)。
+  const autoContinueRounds = Math.max(0, Math.floor(Number(maxAutoContinues) || 0));
+  const hardStepCap = stepBudget + autoContinueRounds * maxSteps;
+  let effectiveBudget = stepBudget;
+  let autoContinues = 0;
+  let finishedNaturally = false;
   const runTimeout = createRunTimeout({ signal, timeoutMs: runTimeoutMs });
   let stopForLoopGuard = false;
   let stopForBudget = false;
   let stopForTimeout = false;
+  // 一次性开关:步数收尾提醒只在跨过阈值时注入一次,避免每步重复刷屏。
+  let stepBudgetNudged = false;
   let lastCheckpointStep = 0;
   const saveCheckpoint = (phase: string, step: number, checkpointMessages: unknown = messages) => {
     if (checkpointRecorder.save(phase, step, checkpointMessages)) lastCheckpointStep = step;
@@ -142,8 +149,8 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
     emit('token', { delta: finalText });
   };
   try {
-    // ▼▼▼ 【骨架·主循环本体】整个 agent 就这一个 for:每转一轮 = 问一次模型(+执行它要的工具),转满 maxSteps(默认6)就停 ▼▼▼
-    for (let i = 0; i < stepBudget; i += 1) {
+    // 主循环本体:每轮调用一次模型,并执行这一轮返回的工具调用。
+    for (let i = 0; i < effectiveBudget; i += 1) {
       if (runTimeout.aborted()) break;
       if (stopForLoopGuard) break;
       if (stopForBudget) break;
@@ -166,11 +173,29 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           });
         }
       }
+      // 步数收尾提醒:用掉约 70% 步数还在调工具时,注入一次「够了就收尾」的软提醒,
+      // 鼓励模型收敛而不是把步数用满(硬耗尽仍由 stepBudget/预算/超时兜底)。
+      if (!stepBudgetNudged) {
+        const nudge = stepNudgeRatio === undefined
+          ? stepBudgetNudgeMessage(stepNumber, effectiveBudget)
+          : stepBudgetNudgeMessage(stepNumber, effectiveBudget, stepNudgeRatio);
+        if (nudge) {
+          messages.push(nudge);
+          stepBudgetNudged = true;
+          emit('step_budget_reminder', { stepNumber, stepBudget: effectiveBudget });
+        }
+      }
+      if (stepNumber >= effectiveBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
+        emit('tool_budget_finalizing', { stepNumber, stepBudget: effectiveBudget });
+        finalText = (await summarizeBeforeToolBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
+        if (finalText) saveCheckpoint('tool_budget_finalized', stepNumber, [...messages, { role: 'assistant', content: finalText }]);
+        break;
+      }
       const toolSpecs = buildToolSpecs();
       traceModelContext(runTrace, stepNumber, messages, toolSpecs);
       const onContent = (d: unknown) => { streamedContent = true; if (d) emit('token', { delta: d }); };
       const onReasoning = (d: unknown) => { streamedReasoning = true; if (d) emit('reasoning', { delta: d }); };
-      // 【骨架·问模型】把当前对话 + 可用工具丢给 Kimi;callModelResilient 的「Resilient」= 主模型挂了自动降级到备用/本地
+      // 调用模型;callModelResilient 负责主模型失败后的有界降级。
       let message;
       try {
         const modelTimeoutMs = typeof kimiConfig?.timeoutMs === 'number' ? kimiConfig.timeoutMs : undefined;
@@ -179,9 +204,12 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           tools: toolSpecs,
           kimiConfig,
           fetchImpl,
+          trustedRoot,
           signal: runTimeout.signal,
           onContent,
           onReasoning,
+          // 稳定缓存键:优先会话 id(跨运行复用)、回退 runId;官方建议多轮 agent 传入以提高前缀缓存命中率。
+          promptCacheKey: cacheKeyForRun,
         }, omitUndefined({
           kimiConfig,
           timeoutMs: modelTimeoutMs,
@@ -196,14 +224,16 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       }
       if (!streamedReasoning && message.reasoning_content) emit('reasoning', { delta: message.reasoning_content });
       addUsage(usageTotals, message.usage);
+      recordCacheUsage(message.usage as Parameters<typeof recordCacheUsage>[0], omitUndefined({ cacheKey: cacheKeyForRun, prefixHash: cachePrefixHash }));
       const usageBudgetDecision = activeBudgetGuard.recordUsage(message.usage);
       if (usageBudgetDecision.shouldAbort) {
         stopOnBudget(usageBudgetDecision);
         break;
       }
-      // 【骨架·关键岔路】模型这一轮的输出,要么「要调工具(tool_calls,JSON 结构)」、要么「直接给答案(纯文本,没有 tool_calls)」
+      // 模型输出要么包含工具调用,要么直接给出最终文本。
       const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-      if (calls.length === 0) { // ← 没有工具调用 = 模型直接答了 = 收工,break 跳出 for
+      if (calls.length === 0) {
+        finishedNaturally = true;
         finalText = message.content || '';
         const finalMessage = { role: 'assistant', content: finalText };
         // 发生过真实写改且尚未复核时,先不收尾:塞一条只读核对指令再跑一轮,确认改动无误。
@@ -224,7 +254,8 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       messages.push({ role: 'assistant', content: message.content || '', tool_calls: calls, ...(message.reasoning_content ? { reasoning_content: message.reasoning_content } : {}) });
       traceToolDecision(runTrace, stepNumber, message);
       saveCheckpoint('assistant_tool_calls', stepNumber);
-      // 【骨架·有工具调用】逐个真执行工具(读文件/跑命令);executeToolCall 里串着审批闸门/沙箱/重试,执行结果会塞回 messages,让下一轮模型看得见
+      // 执行工具调用并把结果回填 messages,供下一轮模型继续推理。
+      const stepsBeforeToolBatch = steps.length;
       for (const call of calls) {
         // 取消/超时后不再启动本批剩余的工具调用——避免"UI 已停止"后后台仍继续调用工具。
         if (runTimeout.aborted()) break;
@@ -242,6 +273,18 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
         if (result.stopForLoopGuard) stopForLoopGuard = true;
         if (result.breakToolLoop) break;
       }
+      lastToolBatchHadSuccess = steps.slice(stepsBeforeToolBatch).some((step) => step.ok === true);
+      // 自动续跑:走到当前窗最后一步、模型仍在调工具(没自然收尾),且未到硬上限、
+      // 未被预算/超时/循环护栏叫停 → 再扩一窗步数继续,让大任务一口气做完。
+      if ((i + 1) >= effectiveBudget
+        && autoContinues < autoContinueRounds
+        && effectiveBudget < hardStepCap
+        && !stopForBudget && !stopForLoopGuard && !runTimeout.aborted()) {
+        effectiveBudget = Math.min(hardStepCap, effectiveBudget + maxSteps);
+        autoContinues += 1;
+        stepBudgetNudged = false; // 新窗里收尾提醒可再触发一次
+        emit('auto_continue', { round: autoContinues, atStep: stepNumber, newBudget: effectiveBudget, hardCap: hardStepCap });
+      }
     }
 
     finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, kimiConfig, fetchImpl, emit, usageTotals }))) || '';
@@ -250,13 +293,20 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       const phase = stopForBudget ? 'budget_stopped' : (stopForTimeout ? 'timeout_stopped' : 'loop_guard_stopped');
       saveCheckpoint(phase, lastCheckpointStep || stepBudget, [...messages, { role: 'assistant', content: finalText }]);
     }
+    logCacheTelemetry(); // 收尾打印本会话缓存命中累计(+前缀不稳定告警);无调用则静默。
+    // 步数耗尽:任务未自然收尾,也不是被取消/预算/超时/循环护栏叫停,而是跑满了(含续跑后的)步数硬上限。
+    const cancelled = !!(signal && signal.aborted);
+    const stepsExhausted = !finishedNaturally && !cancelled && !stopForBudget && !stopForTimeout && !stopForLoopGuard;
+    if (stepsExhausted) emit('steps_exhausted', { toolRounds: steps.length, hardCap: hardStepCap, autoContinues });
     return {
       text: finalText,
       steps,
       usage: usageTotals,
-      cancelled: !!(signal && signal.aborted),
+      cancelled,
       budgetStopped: stopForBudget,
       timeoutStopped: stopForTimeout,
+      stepsExhausted,
+      autoContinues,
     };
   } finally {
     runTimeout.dispose();

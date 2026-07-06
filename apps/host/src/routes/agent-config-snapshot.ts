@@ -109,6 +109,6 @@ export function buildAgentConfigSnapshot(body: unknown, kimiConfig: unknown): Ag
     planMode: requestBody.planMode === true,
     developerMode: requestBody.developerMode === true || requestBody.mode === 'developer',
     verify: requestBody.verify === true || requestBody.thinking === 'deep',
-    maxSteps: Math.min(Math.max(Number(requestBody.maxSteps) || 8, 1), 16),
+    maxSteps: Math.min(Math.max(Number(requestBody.maxSteps) || 20, 1), 40),
   };
 }
