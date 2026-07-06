@@ -182,7 +182,12 @@ export async function streamAgentChat({
     // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
     const memoryText = redactText(memory.text) || '';
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
-    const contextOptions = resolveAgentContextOptions(body);
+    // 自适应压缩阈值:按本轮实际所选模型(含会话级 BYO 覆盖)的上下文窗口推导预算,
+    // 请求已显式指定 maxContextTokens 时仍以显式值为准。
+    const contextOptions = resolveAgentContextOptions(body, {
+      provider: runKimiConfig.provider,
+      model: runKimiConfig.model,
+    });
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'

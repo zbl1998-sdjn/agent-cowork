@@ -71,6 +71,7 @@
     "apps/host/src/kimi/context/context-manager.ts",
     "apps/host/src/kimi/context/history-compactor-utils.ts",
     "apps/host/src/kimi/context/history-compactor.ts",
+    "apps/host/src/kimi/context/model-context-window.ts",
     "apps/host/src/kimi/context/token-estimator.ts",
     "apps/host/src/kimi/context/tool-result-summarizer.ts",
     "apps/host/src/kimi/model-call.ts",

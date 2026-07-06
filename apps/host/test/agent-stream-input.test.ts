@@ -51,3 +51,34 @@ test('agent context options can disable automatic history compaction', () => {
     maxContextTokens: 1_000_000_000,
   });
 });
+
+test('agent context options derive maxContextTokens from the selected model window', () => {
+  // No explicit budget in the request → derive from the model's context window (0.75 headroom).
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'anthropic', model: 'claude-sonnet-5' }),
+    { maxContextTokens: 150_000 },
+  );
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'kimi-api', model: 'kimi-k2.7-code' }),
+    { maxContextTokens: 96_000 },
+  );
+});
+
+test('explicit maxContextTokens still wins over model-derived budget', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions(
+      { contextCompaction: { enabled: true, maxContextTokens: 9000 } },
+      { provider: 'google', model: 'gemini-3.5-flash' },
+    ),
+    { maxContextTokens: 9000 },
+  );
+});
+
+test('unknown model leaves maxContextTokens unset (compactor keeps its conservative default)', () => {
+  assert.deepEqual(
+    resolveAgentContextOptions({ prompt: 'hi' }, { provider: 'mystery', model: 'unknown-x' }),
+    {},
+  );
+  // and calling without a model hint is unchanged (backward compatible)
+  assert.deepEqual(resolveAgentContextOptions({ prompt: 'hi' }), {});
+});
