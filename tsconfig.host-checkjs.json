@@ -143,6 +143,7 @@
     "apps/host/src/security/data-classifier.ts",
     "apps/host/src/security/data-purge.ts",
     "apps/host/src/security/egress-audit.ts",
+    "apps/host/src/security/egress-firewall.ts",
     "apps/host/src/security/egress-gateway.ts",
     "apps/host/src/security/outbound-preview.ts",
     "apps/host/src/security/policy-decision.ts",
