@@ -1,8 +1,9 @@
 // OS 级出网强制:Windows 防火墙规则计划(host · L1 security · egress-firewall)
 // ---------------------------------------------------------------------------
 // 职责:为企业隔离档生成"对 app 进程树默认拒绝出站、仅放行 loopback 与内网网关"的
-//       Windows 防火墙规则计划(纯函数,不执行);真执行由 scripts/apply-egress-firewall.ps1
-//       在管理员下完成。这是 OS 级强制,补应用层出口网关(Shell/子进程/连接器可绕过应用闸)
+//       Windows 防火墙规则计划(纯函数,不执行);计划发射见 scripts/security-egress-firewall.ts
+//       (npm run security:egress-firewall-plan),打印的命令由管理员在提升权限 PowerShell 执行。
+//       这是 OS 级强制,补应用层出口网关(Shell/子进程/连接器可绕过应用闸)
 //       的纵深防御。
 // 依赖:无(纯函数)。导出:buildEgressFirewallPlan / EGRESS_FIREWALL_GROUP。
 //
