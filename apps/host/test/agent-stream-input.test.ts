@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveAgentContextOptions } from '../src/routes/agent-stream-context.js';
+import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from '../src/routes/agent-stream-context.js';
 import { parseAgentStreamBody } from '../src/routes/agent-stream-schemas.js';
 
 test('agent stream input schema rejects malformed images before streaming', () => {
@@ -100,4 +100,15 @@ test('explicit contextWindowTokens lets a local model declare its short window',
     ),
     { maxContextTokens: 6144 },
   );
+});
+
+test('convergence knobs default to no override and read env when set', () => {
+  assert.deepEqual(resolveAgentConvergenceOptions({}), {});
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: '0.5' }), { stepNudgeRatio: 0.5 });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: '0' }), { stepNudgeRatio: 0 });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: '0' }), { toolDiscipline: false });
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: 'off' }), { toolDiscipline: false });
+  // discipline defaults on (only an explicit off disables it)
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_TOOL_DISCIPLINE: '1' }), {});
+  assert.deepEqual(resolveAgentConvergenceOptions({ KCW_STEP_NUDGE_RATIO: 'abc' }), {});
 });

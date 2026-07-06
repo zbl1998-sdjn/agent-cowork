@@ -55,7 +55,7 @@ function hasToolResult(messages: ChatMessage[]): boolean {
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null } = options;
+  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = {}, fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline } = options;
 
   // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
@@ -82,7 +82,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   const resumed = resumeState;
   const resumeUsage = (resumed && resumed.usage) || {};
-  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt({ memoryText, skills, planMode, developerMode, includeEnvBlock: false }) }, userMessage];
+  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt(omitUndefined({ memoryText, skills, planMode, developerMode, toolDiscipline, includeEnvBlock: false })) }, userMessage];
   let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   const steps: Array<Record<string, unknown>> = [];
   const sessionApproved = new Set((resumed && Array.isArray(resumed.approvedTools)) ? resumed.approvedTools : []);
@@ -170,7 +170,9 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       // 步数收尾提醒:用掉约 70% 步数还在调工具时,注入一次「够了就收尾」的软提醒,
       // 鼓励模型收敛而不是把步数用满(硬耗尽仍由 stepBudget/预算/超时兜底)。
       if (!stepBudgetNudged) {
-        const nudge = stepBudgetNudgeMessage(stepNumber, stepBudget);
+        const nudge = stepNudgeRatio === undefined
+          ? stepBudgetNudgeMessage(stepNumber, stepBudget)
+          : stepBudgetNudgeMessage(stepNumber, stepBudget, stepNudgeRatio);
         if (nudge) {
           messages.push(nudge);
           stepBudgetNudged = true;

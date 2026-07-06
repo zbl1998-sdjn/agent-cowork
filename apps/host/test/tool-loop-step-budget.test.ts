@@ -33,6 +33,11 @@ test('stepBudgetNudgeMessage fires only after ~70% of the budget, once', () => {
   // degenerate budgets never nudge
   assert.equal(stepBudgetNudgeMessage(1, 1), null);
   assert.equal(stepBudgetNudgeMessage(1, 0), null);
+  // ratio<=0 disables the nudge entirely (deployment tuning / A-B control)
+  assert.equal(stepBudgetNudgeMessage(4, 4, 0), null);
+  assert.equal(stepBudgetNudgeMessage(4, 4, -1), null);
+  // a lower ratio fires earlier
+  assert.ok(stepBudgetNudgeMessage(2, 4, 0.5)?.content.includes('【收尾提醒】'));
 });
 
 test('runAgentChat injects the wrap-up reminder once when the model keeps calling tools', async () => {

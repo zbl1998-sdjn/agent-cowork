@@ -96,9 +96,11 @@ export type StepBudgetNudge = { role: 'user'; name: string; content: string };
  * 未跨阈值返回 null。用 user 角色与既有 verify 提醒保持一致(跨 provider 稳妥,
  * 避免 mid-array system 消息在 Anthropic 适配层被特殊处理)。
  */
-export function stepBudgetNudgeMessage(stepNumber: number, stepBudget: number): StepBudgetNudge | null {
+export function stepBudgetNudgeMessage(stepNumber: number, stepBudget: number, ratio: number = STEP_BUDGET_NUDGE_RATIO): StepBudgetNudge | null {
   if (!Number.isFinite(stepBudget) || stepBudget <= 1) return null;
-  const threshold = Math.max(1, Math.ceil(stepBudget * STEP_BUDGET_NUDGE_RATIO));
+  // ratio <= 0 关闭收尾提醒(便于部署调优/对照实验);超过 1 视为始终提醒无意义,收敛到 1。
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  const threshold = Math.max(1, Math.ceil(stepBudget * Math.min(1, ratio)));
   if (stepNumber < threshold) return null;
   const remaining = Math.max(0, stepBudget - stepNumber + 1);
   return {

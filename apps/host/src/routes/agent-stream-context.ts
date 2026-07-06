@@ -56,6 +56,20 @@ function positiveInt(value: unknown, min: number, max: number): number | undefin
   return rounded;
 }
 
+// 收敛行为的运行时开关:让部署可关闭/调整「工具纪律」与「步数收尾提醒」而不改代码。
+export type AgentConvergenceOptions = { stepNudgeRatio?: number; toolDiscipline?: boolean };
+
+export function resolveAgentConvergenceOptions(
+  env: Record<string, string | undefined> = process.env,
+): AgentConvergenceOptions {
+  const out: AgentConvergenceOptions = {};
+  const ratio = env.KCW_STEP_NUDGE_RATIO;
+  if (ratio != null && ratio !== '' && Number.isFinite(Number(ratio))) out.stepNudgeRatio = Number(ratio);
+  const discipline = String(env.KCW_TOOL_DISCIPLINE ?? '').trim().toLowerCase();
+  if (discipline === '0' || discipline === 'false' || discipline === 'off') out.toolDiscipline = false;
+  return out;
+}
+
 export function resolveAgentContextOptions(
   body: unknown,
   modelHint?: AgentModelContextHint,

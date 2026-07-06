@@ -46,6 +46,10 @@ export type RunAgentChatOptions = {
   userContent?: unknown; clarifyBeforeModel?: boolean; contextManager?: ContextManagerLike | null; contextOptions?: unknown; loopGuard?: LoopGuard | null; loopGuardOptions?: unknown;
   retryPolicy?: RetryPolicy | null; retryOptions?: unknown; budgetGuard?: BudgetGuardLike | null; runTimeoutMs?: number; checkpointer?: Checkpointer | null;
   resumeState?: ResumeState | null; runTrace?: RunTraceLike | null;
+  // 步数收尾提醒触发比例(0/负数关闭)。默认走 STEP_BUDGET_NUDGE_RATIO(0.7)。
+  stepNudgeRatio?: number;
+  // 是否注入【工具使用纪律】收敛引导(默认 true)。false 可关闭(对照/特殊部署)。
+  toolDiscipline?: boolean;
 };
 export type RunAgentChatResult = {
   text: string;

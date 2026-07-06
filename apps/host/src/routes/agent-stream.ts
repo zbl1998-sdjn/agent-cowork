@@ -22,7 +22,7 @@ import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
-import { resolveAgentContextOptions } from './agent-stream-context.js';
+import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
 import type { ModelCall } from '../kimi/agent/model-resilience.js';
@@ -188,6 +188,8 @@ export async function streamAgentChat({
       provider: runKimiConfig.provider,
       model: runKimiConfig.model,
     });
+    // 收敛行为运行时开关(KCW_STEP_NUDGE_RATIO / KCW_TOOL_DISCIPLINE),默认不改变行为。
+    const convergenceOptions = resolveAgentConvergenceOptions();
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
@@ -230,6 +232,7 @@ export async function streamAgentChat({
       userContent,
       clarifyBeforeModel: body.clarifyBeforeModel === true || body.autoClarify === true,
       contextOptions,
+      ...convergenceOptions,
       budgetGuard,
       runTimeoutMs,
       checkpointer,

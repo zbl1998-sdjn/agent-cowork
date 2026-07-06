@@ -64,6 +64,14 @@ test('base system prompt teaches Claude-cowork-style convergence (do not exhaust
   assert.match(prompt, /不要反复读取|不重复/);
 });
 
+test('toolDiscipline:false omits the discipline block (deployment/A-B control)', () => {
+  const off = buildSystemPrompt({ toolDiscipline: false });
+  assert.ok(!/【工具使用纪律】/.test(off), 'discipline block should be omitted when toggled off');
+  // the rest of the base prompt is intact
+  assert.match(off, /你是 Agent Cowork/);
+  assert.match(off, /完成后用简洁/);
+});
+
 test('developer mode system prompt includes code-work constraints', () => {
   const prompt = buildSystemPrompt({ developerMode: true });
   assert.match(prompt, /【开发者模式】/);
