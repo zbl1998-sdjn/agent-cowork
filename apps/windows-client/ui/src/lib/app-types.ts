@@ -36,6 +36,8 @@ export interface AssistantMessage {
   verifying?: boolean | undefined;
   question?: { id: string; question: string; options: Array<{ label: string; description?: string | undefined }> } | undefined;
   usage?: { prompt_tokens?: number | undefined; completion_tokens?: number | undefined; total_tokens?: number | undefined } | undefined;
+  // 自动续跑到硬上限仍没做完(任务很大)。为 true 时即便 status=done 也允许点【继续】接着做。
+  stepsExhausted?: boolean | undefined;
   tools?: ToolCallItem[] | undefined;
   recipeDraft?: CapturedRecipeDraft | undefined;
   recipeCaptureStatus?: 'capturing' | 'captured' | 'failed' | undefined;

@@ -90,7 +90,7 @@ export interface AgentStreamHandlers {
   onQuestion?: ((id: string, question: string, options: Array<{ label: string; description?: string | undefined }>) => void) | undefined;
   onStart?: ((runId: string, meta?: { resumed?: boolean | undefined }) => void) | undefined;
   onContextCompacted?: ((stats: ContextCompactionStats) => void) | undefined;
-  onDone?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
+  onDone?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined; stepsExhausted?: boolean | undefined }) => void) | undefined;
   onCancelled?: ((full: { text: string; runId?: string | undefined; usage?: TokenUsage | undefined }) => void) | undefined;
   onError?: ((message: string) => void) | undefined;
 }
@@ -219,7 +219,7 @@ export async function agentChatStream(
     else if (type === 'question') {
       handlers.onQuestion?.(str(data, 'id') || '', str(data, 'question') || '', questionOptions(data));
     } else if (type === 'done') {
-      handlers.onDone?.({ text: str(data, 'text') || '', runId: str(data, 'runId'), usage: usage(data) });
+      handlers.onDone?.({ text: str(data, 'text') || '', runId: str(data, 'runId'), usage: usage(data), stepsExhausted: data.stepsExhausted === true });
     } else if (type === 'cancelled') {
       const full = { text: str(data, 'text') || '', runId: str(data, 'runId'), usage: usage(data) };
       if (handlers.onCancelled) handlers.onCancelled(full);

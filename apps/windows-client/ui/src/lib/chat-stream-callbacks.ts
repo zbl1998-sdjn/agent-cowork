@@ -99,14 +99,17 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
 
     onDone: (full) => {
       setStreamingId(null);
+      // 自动续跑到硬上限仍没做完(任务很大):标记 stepsExhausted 并追加一句提示,让底部出现【继续】。
+      const exhausted = full.stepsExhausted === true;
       patch((m) => ({
         ...m,
         status: 'done',
         verifying: false,
+        stepsExhausted: exhausted,
         // 计划清单(kind=plan)是按计划文本逐行生成的、没有逐项完成回调,运行收尾即代表计划已执行,
         // 把仍 pending 的计划项收敛为 done,避免清单永远停在「待处理」造成困惑。
         todos: (m.todos || []).map((todo) => (todo.kind === 'plan' && todo.status === 'pending' ? { ...todo, status: 'done' } : todo)),
-        text: full.text || m.text || '',
+        text: (full.text || m.text || '') + (exhausted ? '\n\n（任务较大，已完成一部分；点【继续】我接着做完。）' : ''),
         runId: full.runId || m.runId,
         usage: full.usage || m.usage,
       }));

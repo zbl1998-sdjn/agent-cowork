@@ -772,7 +772,7 @@ describe('SSE streams', () => {
     expect(compactions).toEqual([{ beforeTokens: 12000, afterTokens: 7000, keyFacts: ['important: keep workspace'] }]);
     expect(snapshots).toEqual([[{ id: 'plan-1', text: '读取现状', status: 'pending' }]]);
     expect(updates).toEqual([{ id: 'plan-1', text: '读取现状', status: 'done' }]);
-    expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 } });
+    expect(done).toEqual({ text: '完成', runId: 'run_2', usage: { total_tokens: 12 }, stepsExhausted: false });
   });
 
   it('posts resumeRunId to the agent stream and exposes resumed start metadata', async () => {

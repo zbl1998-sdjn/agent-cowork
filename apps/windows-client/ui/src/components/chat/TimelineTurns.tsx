@@ -114,7 +114,9 @@ export interface AssistantTurnProps {
 }
 
 export function assistantContinueRunId(message: AssistantMessage): string | null {
-  if (message.status !== 'failed' && message.status !== 'cancelled') return null;
+  // 失败/取消可续跑;另外「自动续跑到硬上限仍没做完」的 done 也允许携原 runId 续跑接着做。
+  const continuable = message.status === 'failed' || message.status === 'cancelled' || message.stepsExhausted === true;
+  if (!continuable) return null;
   const runId = message.runId?.trim();
   return runId || null;
 }
@@ -135,7 +137,7 @@ export function assistantTurnPropsEqual(prev: AssistantTurnProps, next: Assistan
 
 export const AssistantTurn = memo(function AssistantTurn({ message, streamingId, trustedRoot, onCopyText, onHandleApprove, onOpenOrPreview, onPatchAssistant, onQuickSend, onCaptureRecipe, onRegenerate, onResumeRun }: AssistantTurnProps) {
   const canShowActions = Boolean(message.text && (message.status === 'done' || message.status === 'failed' || message.status === 'cancelled'));
-  const canContinue = message.status === 'failed' || message.status === 'cancelled';
+  const canContinue = message.status === 'failed' || message.status === 'cancelled' || message.stepsExhausted === true;
   const canCaptureRecipe = Boolean(message.runId && message.status === 'done');
   const captureRecipeLabel = message.recipeCaptureStatus === 'capturing' ? '保存中' : message.recipeCaptureStatus === 'captured' ? '已存草稿' : '存为技能';
   const resumeRunId = assistantContinueRunId(message);

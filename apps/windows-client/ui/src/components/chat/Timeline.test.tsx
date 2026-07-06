@@ -148,6 +148,8 @@ describe('Timeline', () => {
     expect(assistantContinueRunId({ ...baseAssistant, runId: ' run_resume ' })).toBe('run_resume');
     expect(assistantContinueRunId({ ...baseAssistant, runId: '' })).toBeNull();
     expect(assistantContinueRunId({ ...baseAssistant, status: 'done', runId: 'run_done' })).toBeNull();
+    // 自动续跑到硬上限仍没做完的 done 也可续跑(携原 runId)
+    expect(assistantContinueRunId({ ...baseAssistant, status: 'done', stepsExhausted: true, runId: 'run_big' })).toBe('run_big');
   });
 
   it('shows exact-ID batch approval actions only when multiple approvals are visible', () => {
