@@ -7,7 +7,7 @@
 //   · 其他平台 → AES-256-GCM(密钥取自环境或 主机名:用户名:home 派生)。
 // 文件权限:0o600(仅属主可读写)。键 = tenant/user/provider/account 四元组。
 // 导出:createAesGcmProtector / createDpapiProtector / createDefaultCredentialProtector
-//       / createCredentialStore。
+//       / createCredentialStore / isSealedCredential。
 
 import childProcess from 'node:child_process';
 import crypto from 'node:crypto';
@@ -143,16 +143,20 @@ function runDpapi(script: string, base64Input: string): string {
 /** 造 Windows DPAPI 加密器:密钥由当前用户账户保管,密文形如 `dpapi:v1:...`。 */
 export function createDpapiProtector(): CredentialProtector {
   const scope = '[System.Security.Cryptography.DataProtectionScope]::CurrentUser';
+  // Windows PowerShell 5.1(.NET Framework)默认不加载 System.Security,直接引用
+  // [System.Security.Cryptography.ProtectedData] 会 TypeNotFound;必须先 Add-Type。
+  // PowerShell 7(.NET)已内置,重复 Add-Type 无害。
+  const preamble = 'Add-Type -AssemblyName System.Security;';
   return {
     protect(plainText: unknown): string {
-      const script = `$b=[Convert]::FromBase64String(([Console]::In.ReadToEnd()).Trim());$e=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,${scope});[Convert]::ToBase64String($e)`;
+      const script = `${preamble}$b=[Convert]::FromBase64String(([Console]::In.ReadToEnd()).Trim());$e=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,${scope});[Convert]::ToBase64String($e)`;
       const sealed = runDpapi(script, Buffer.from(String(plainText), 'utf8').toString('base64'));
       return `dpapi:v1:${sealed}`;
     },
     unprotect(sealedText: unknown): string {
       const text = String(sealedText || '');
       if (!text.startsWith('dpapi:v1:')) throw new Error('Unsupported credential cipher text');
-      const script = `$b=[Convert]::FromBase64String(([Console]::In.ReadToEnd()).Trim());$d=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,${scope});[Convert]::ToBase64String($d)`;
+      const script = `${preamble}$b=[Convert]::FromBase64String(([Console]::In.ReadToEnd()).Trim());$d=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,${scope});[Convert]::ToBase64String($d)`;
       const plainBase64 = runDpapi(script, text.slice('dpapi:v1:'.length));
       return Buffer.from(plainBase64, 'base64').toString('utf8');
     },
@@ -163,6 +167,12 @@ export function createDpapiProtector(): CredentialProtector {
 export function createDefaultCredentialProtector(): CredentialProtector {
   if (process.platform === 'win32') return createDpapiProtector();
   return createAesGcmProtector();
+}
+
+/** 判断文本是否已是 protector 封印格式(dpapi:v1:/aesgcm:v1:),供读侧兼容明文遗留数据。 */
+export function isSealedCredential(value: unknown): boolean {
+  const text = String(value || '');
+  return text.startsWith('dpapi:v1:') || text.startsWith('aesgcm:v1:');
 }
 
 /**

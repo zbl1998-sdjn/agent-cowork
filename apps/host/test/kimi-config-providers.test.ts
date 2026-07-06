@@ -99,7 +99,9 @@ test('POST /api/kimi/config stores provider without echoing the key', async () =
 
   const persisted = readPersistedConfig(trustedRoot);
   assert.equal(persisted.kimiApi.provider, 'openai');
-  assert.equal(persisted.kimiApi.apiKey, CONFIG_SECRET);
+  // apiKey 落盘为封印密文,不落明文(明文只在进程内存 + info.hasKey 反映)。
+  assert.ok(persisted.kimiApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
+  assert.match(String(persisted.kimiApi.apiKey), /^(dpapi|aesgcm):v1:/);
 
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     const info = (await readKimiInfo(baseUrl)).body;
@@ -144,7 +146,9 @@ test('POST /api/kimi/config stores fallback providers without echoing fallback k
   assert.ok(firstPersisted);
   assert.ok(secondPersisted);
   assert.equal(firstPersisted.baseUrl, 'http://127.0.0.1:11434/v1');
-  assert.equal(secondPersisted.apiKey, FALLBACK_SECRET);
+  // fallback 的 apiKey 同样封印落盘,不落明文。
+  assert.ok(secondPersisted.apiKey !== FALLBACK_SECRET, 'fallback apiKey persisted as plaintext');
+  assert.match(String(secondPersisted.apiKey), /^(dpapi|aesgcm):v1:/);
 
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     const infoPayload = await readKimiInfo(baseUrl);
