@@ -25,6 +25,7 @@ import {
   mainMemoryPath,
   notesDir,
   safeWriteSync,
+  safeReadSync,
   type MemoryScope,
 } from './memory-utils.js';
 import {
@@ -48,10 +49,7 @@ export type MemoryContext = MemoryAuditContext & {
 
 export function readMainMemory(trustedRoot: unknown, _context: MemoryContext = {}): string {
   const memoryFile = mainMemoryPath(trustedRoot);
-  if (!fs.existsSync(memoryFile)) {
-    return '';
-  }
-  return fs.readFileSync(memoryFile, 'utf8');
+  return safeReadSync(memoryFile, '');
 }
 
 export function listMemoryNotes(trustedRoot: unknown, _context: MemoryContext = {}): MemoryNote[] {
@@ -83,7 +81,7 @@ export function readMemoryNote(trustedRoot: unknown, noteName: string, _context:
   if (!fs.existsSync(file)) {
     return null;
   }
-  return fs.readFileSync(file, 'utf8');
+  return safeReadSync(file, '');
 }
 
 export function writeMemoryNote(
@@ -123,7 +121,7 @@ export function appendMemoryFact(
   const value = cleanFactValue(fact?.value);
   const scope = cleanScope(fact?.scope);
   const line = `- **${key}** (${scope}): ${value}\n`;
-  const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const current = safeReadSync(file, '');
   const seed = current
     ? current.endsWith('\n')
       ? current

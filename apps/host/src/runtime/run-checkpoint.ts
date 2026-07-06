@@ -5,6 +5,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { openAtRest, sealAtRest } from '../security/at-rest.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
@@ -131,8 +132,9 @@ export class RunCheckpointer {
       metadata: cloneObject(input.metadata),
     };
     const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    const secDir = path.join(path.dirname(this.root), 'security');
     try {
-      fs.writeFileSync(tempPath, `${JSON.stringify(checkpoint, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(tempPath, sealAtRest(`${JSON.stringify(checkpoint, null, 2)}\n`, secDir), 'utf8');
       fs.renameSync(tempPath, filePath);
     } catch (err) {
       try { fs.unlinkSync(tempPath); } catch { /* 临时文件清理失败时保留原始写入错误 */ }
@@ -146,7 +148,8 @@ export class RunCheckpointer {
     if (!fs.existsSync(filePath)) {
       return null;
     }
-    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as RunCheckpoint;
+    const opened = openAtRest(fs.readFileSync(filePath, 'utf8'), path.join(path.dirname(this.root), 'security'));
+    return opened === null ? null : JSON.parse(opened) as RunCheckpoint;
   }
 
   clear(runId: string): boolean {
