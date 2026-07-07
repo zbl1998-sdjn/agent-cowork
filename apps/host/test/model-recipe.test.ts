@@ -1,7 +1,7 @@
 // 模型驱动 recipe 提取(AI 办公助手 slice 1)——纯解析逻辑单测 + 真实 Ollama e2e(可跳过)
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters } from '../src/recipes/model-recipe.js';
+import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters, normalizeWeekly } from '../src/recipes/model-recipe.js';
 
 test('extractJson: 容忍 ```json 包裹、前后噪声、括号配平', () => {
   assert.deepEqual(extractJson('```json\n[{"a":1}]\n```'), [{ a: 1 }]);
@@ -74,4 +74,13 @@ test('normalizeClusters: 主题聚类归一 + 数量兜底 + 空返回 null', ()
   assert.equal(normalizeClusters({ clusters: [{ theme: 'x' }] })?.length, 1); // {clusters:[...]} 包裹
   assert.equal(normalizeClusters([]), null);
   assert.equal(normalizeClusters('乱码'), null);
+});
+
+test('normalizeWeekly: 四段别名归一 + 全空返回 null', () => {
+  const w = normalizeWeekly({ 标题: '周报', 本周完成: ['登录上线'], 进行中: ['联调'], 下周计划: ['压测'], 风险: ['人手不足'] });
+  assert.equal(w?.title, '周报');
+  assert.deepEqual(w?.done, ['登录上线']);
+  assert.deepEqual(w?.next, ['压测']);
+  assert.equal(normalizeWeekly({ title: '空周报' }), null); // 四段全空 → null
+  assert.equal(normalizeWeekly(null), null);
 });

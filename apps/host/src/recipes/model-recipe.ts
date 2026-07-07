@@ -320,6 +320,54 @@ async function buildContractAiOperations(args: AiRecipeArgs): Promise<FileOperat
   ];
 }
 
+export type WeeklyReport = { title: string; done: string[]; doing: string[]; next: string[]; risks: string[] };
+
+/** 归一模型返回的周报结构;四段全空返回 null(回退模板)。 */
+export function normalizeWeekly(parsed: unknown): WeeklyReport | null {
+  const r = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  if (!r) return null;
+  const w: WeeklyReport = {
+    title: cleanStr(r.title ?? r.标题, '本周工作周报'),
+    done: strList(r.done ?? r.本周完成 ?? r.completed ?? r.已完成),
+    doing: strList(r.doing ?? r.进行中 ?? r.inProgress ?? r.ongoing),
+    next: strList(r.next ?? r.下周计划 ?? r.nextWeek ?? r.plan),
+    risks: strList(r.risks ?? r.风险 ?? r.blockers ?? r.阻塞),
+  };
+  if (!w.done.length && !w.doing.length && !w.next.length && !w.risks.length) return null;
+  return w;
+}
+
+/** 一键周报 AI 路径:模型结构化整理本周流水账 → TXT/DOCX/PDF(对齐模板类型)。 */
+async function buildWeeklyReportAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  const source = combinedText(args.sources);
+  const prompt = args.prompt ?? '';
+  if (!source.trim() && !prompt.trim()) return null;
+  const parsed = await callModelForJson({
+    system: '你是严谨的周报助手。只输出 JSON,不要解释或 markdown。',
+    user: `把下面的本周流水账/材料整理成正式周报,输出 JSON {"title":"标题","done":["本周完成"],"doing":["进行中"],"next":["下周计划"],"risks":["风险/阻塞"]}。只基于材料,不编造。${prompt ? `用户额外要求:${prompt}。` : ''}\n\n材料:\n${(source || prompt).slice(0, 8000)}`,
+    modelConfig: args.modelConfig,
+    ...(args.modelCall ? { modelCall: args.modelCall } : {}),
+  });
+  const w = normalizeWeekly(parsed);
+  if (!w) return null;
+  const section = (label: string, items: string[]) => (items.length ? [`【${label}】`, ...items.map((x) => `· ${x}`), ''] : []);
+  const lines = [
+    w.title,
+    prompt ? `用户指令: ${prompt}` : '',
+    '',
+    ...section('本周完成', w.done),
+    ...section('进行中', w.doing),
+    ...section('下周计划', w.next),
+    ...section('风险/阻塞', w.risks),
+  ].filter((line, i, arr) => !(line === '' && arr[i - 1] === ''));
+  const { trustedRoot, recipe } = args;
+  return [
+    textOperation(trustedRoot, recipe.id, `${recipe.name}.txt`, lines.join('\n')),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title: w.title, paragraphs: lines })),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork Weekly Report', lines })),
+  ];
+}
+
 // recipe id → AI 构造器。有模型且命中时用 AI,否则调用方回退模板。
 const AI_RECIPE_BUILDERS: Record<string, (args: AiRecipeArgs) => Promise<FileOperationInput[] | null>> = {
   'meeting-actions': buildMeetingAiOperations,
@@ -327,6 +375,7 @@ const AI_RECIPE_BUILDERS: Record<string, (args: AiRecipeArgs) => Promise<FileOpe
   'contract-summary': buildContractAiOperations,
   'boss-summary-onepager': buildBossSummaryAiOperations,
   'feedback-clusters': buildFeedbackClustersAiOperations,
+  'weekly-report-beginner': buildWeeklyReportAiOperations,
 };
 
 export function hasAiRecipeBuilder(recipeId: string): boolean {
