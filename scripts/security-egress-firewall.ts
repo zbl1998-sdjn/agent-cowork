@@ -22,12 +22,13 @@ function argValues(flag: string): string[] {
 
 const exes = argValues('--exe');
 const allow = argValues('--allow');
+const loopbackPorts = argValues('--loopback-port');
 if (exes.length === 0) {
   console.error('[egress-firewall] 需要至少一个 --exe <app 可执行文件路径>');
   process.exit(1);
 }
 
-const plan = buildEgressFirewallPlan({ appExePaths: exes, allowHosts: allow });
+const plan = buildEgressFirewallPlan({ appExePaths: exes, allowHosts: allow, loopbackAllowPorts: loopbackPorts });
 const outDir = path.join(process.cwd(), 'reports', 'security');
 fs.mkdirSync(outDir, { recursive: true });
 const outPath = path.join(outDir, 'egress-firewall-plan.json');
