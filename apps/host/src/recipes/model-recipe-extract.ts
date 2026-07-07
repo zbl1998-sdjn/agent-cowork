@@ -28,9 +28,19 @@ async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, m
   }
 }
 
-/** 从模型返回文本里稳健抽出第一个 JSON 数组/对象(容忍 ```json 包裹与前后废话)。 */
+/** 剔除思考模型(qwen3 / deepseek-r1 等)的推理块 <think>…</think>。这些块里常含方括号或
+ * 示例 JSON,会破坏或误导后面的 JSON 抽取(实测导致会议纪要等 AI recipe 回退模板)。 */
+export function stripReasoning(raw: string): string {
+  let out = raw.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, ' ').replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, ' ');
+  // 只有闭合标签(开标签在更早被截断/流式丢头):取最后一个 </think> 之后的正文。
+  const lastClose = out.toLowerCase().lastIndexOf('</think>');
+  if (lastClose >= 0) out = out.slice(lastClose + '</think>'.length);
+  return out;
+}
+
+/** 从模型返回文本里稳健抽出第一个 JSON 数组/对象(先剔除思考块,再容忍 ```json 包裹与前后废话)。 */
 export function extractJson(text: unknown): unknown {
-  const raw = String(text ?? '');
+  const raw = stripReasoning(String(text ?? ''));
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate: string = (fenced && fenced[1]) || raw;
   const start = candidate.search(/[[{]/);

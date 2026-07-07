@@ -11,6 +11,23 @@ test('extractJson: 容忍 ```json 包裹、前后噪声、括号配平', () => {
   assert.equal(extractJson('[坏的 json'), null); // 不配平 → null
 });
 
+test('extractJson: 剔除思考模型 <think> 块,不被其中的方括号/假 JSON 破坏', () => {
+  // think 里有非法方括号内容:剔除后才能正确解析后面的真 JSON(否则 null → 回退模板)
+  assert.deepEqual(
+    extractJson('<think>用户要 [{owner, task}] 这样的数组。张三负责登录。</think>\n[{"owner":"张三","task":"联调","due":"下周三"}]'),
+    [{ owner: '张三', task: '联调', due: '下周三' }],
+  );
+  // think 里有完整假 JSON:必须取 think 之后的真数据,不能返回 think 里的示例
+  assert.deepEqual(
+    extractJson('<think>比如 [{"owner":"示例"}]</think>[{"owner":"李四","task":"报销","due":"周五"}]'),
+    [{ owner: '李四', task: '报销', due: '周五' }],
+  );
+  // 只有闭合标签(流式丢了开标签):取 </think> 之后
+  assert.deepEqual(extractJson('推理…</think> [{"task":"x"}]'), [{ task: 'x' }]);
+  // 无 think 时不影响
+  assert.deepEqual(extractJson('[{"task":"y"}]'), [{ task: 'y' }]);
+});
+
 test('normalizeActionItems: 字段别名归一 + 过滤空 task + 容忍非数组', () => {
   const items = normalizeActionItems([
     { 负责人: '张三', 待办: '联调', 截止: '周三' },
