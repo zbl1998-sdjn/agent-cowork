@@ -107,7 +107,7 @@ export function buildAgentToolset({
       handler: async (args = {}) => {
         const skill = skillRegistry.get(args.id);
         if (!skill || !skill.enabled) return { error: `skill not available: ${args.id}` };
-        const result = runRecipe(omitUndefined({
+        const result = await runRecipe(omitUndefined({
           recipeId: String(args.id || ''),
           trustedRoot: ctx.trustedRoot,
           prompt: args.prompt || '',

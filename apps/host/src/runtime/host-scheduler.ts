@@ -74,7 +74,7 @@ export function configureHostScheduler({
       // failed(而非假"completed"),用户才能在历史里看到它并没真正执行。
       throw new Error(`定时任务 ${record.id} 未绑定可执行动作(缺 recipeId),无法自动执行;请改为绑定一个配方/动作再设定。`);
     }
-    const result = runRecipe(omitUndefined({
+    const result = await runRecipe(omitUndefined({
       recipeId: String(payload.recipeId),
       trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
       prompt: payload.prompt || '',

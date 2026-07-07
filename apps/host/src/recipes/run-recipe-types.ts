@@ -31,6 +31,8 @@ export type RunRecipeOptions = {
   runEvents?: RunEventsLike | null;
   runsIndex?: RunsIndexLike | null;
   recipe?: Recipe | null;
+  // 有模型配置时,支持 AI 路径的 recipe 会先用模型做结构化提取,提取不到再回退模板。
+  modelConfig?: Record<string, unknown> | null;
 };
 
 export type RunRecipeResult = {
