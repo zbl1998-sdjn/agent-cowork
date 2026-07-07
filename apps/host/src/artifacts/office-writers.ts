@@ -5,6 +5,7 @@
 // 依赖:workspace/zip-utils(createZip 打 OOXML 包);PDF 为纯字节手写,无外部库。
 // 导出:createDocxDocument / createPptxPresentation / createPdfDocument(均返回 Buffer)
 import { createZip } from '../workspace/zip-utils.js';
+import { createCjkPdfDocument } from './pdf-cjk-font.js';
 
 export type DocxDocumentSpec = {
   title?: string;
@@ -169,10 +170,14 @@ function pdfLiteral(value: unknown): string {
 export function createPdfDocument(spec: PdfDocumentSpec = {}): Buffer {
   const { title = 'Agent Cowork PDF', lines = [] } = spec;
   const rawLines = normalizedLines([title, ...lines], title);
-  // 基础 PDF 引擎用 Helvetica/WinAnsi,不含中日韩字形——pdfLiteral 会把 CJK 字符替换成 '?'。
-  // 检测到 CJK 时在页首加 ASCII 提示,指向同名 .docx/.txt(中文完整正确),避免用户被满屏 '?' 误导。
-  // 待验收:真正的中文 PDF 需嵌入 CJK 字体(CIDFontType2 子集),见 plan/findings。
   const hasCjk = rawLines.some((line) => /[぀-ヿ㐀-鿿＀-￯]/.test(line));
+  // 含中文且有可嵌入的 CJK 字体时,走 CIDFontType2 子集嵌入,真实渲染中文(Chrome PDF 已视觉验收)。
+  if (hasCjk) {
+    const cjk = createCjkPdfDocument({ title, lines: rawLines.slice(1) });
+    if (cjk) return cjk;
+  }
+  // 回退:基础 Helvetica/WinAnsi 引擎不含 CJK 字形(pdfLiteral 把 CJK 替换成 '?');无字体可嵌入时
+  // 加 ASCII 提示指向同名 .docx/.txt(中文完整正确),避免用户被满屏 '?' 误导。
   const noticed = hasCjk
     ? [
         '[Note] This basic PDF engine cannot render Chinese/CJK glyphs (shown as ?).',

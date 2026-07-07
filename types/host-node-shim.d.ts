@@ -2,12 +2,19 @@ interface Buffer extends Iterable<number> {
   readonly length: number;
   readonly [index: number]: number;
   readUInt16LE(offset: number): number;
+  readUInt16BE(offset: number): number;
+  readInt16BE(offset: number): number;
   readUInt32BE(offset: number): number;
   readUInt32LE(offset: number): number;
   slice(start?: number, end?: number): Buffer;
   subarray(start?: number, end?: number): Buffer;
+  includes(value: Buffer | string | number): boolean;
+  write(value: string, offset?: number, encoding?: string): number;
   writeUInt16LE(value: number, offset: number): number;
+  writeUInt16BE(value: number, offset: number): number;
+  writeInt16BE(value: number, offset: number): number;
   writeUInt32LE(value: number, offset: number): number;
+  writeUInt32BE(value: number, offset: number): number;
   values(): IterableIterator<number>;
   toString(encoding?: string, start?: number, end?: number): string;
 }
@@ -300,6 +307,7 @@ declare module 'node:vm' {
 
 declare module 'node:zlib' {
   export function inflateRawSync(buffer: Buffer, options?: { maxOutputLength?: number }): Buffer;
+  export function deflateSync(buffer: Buffer): Buffer;
 }
 
 declare module 'node:net' {
