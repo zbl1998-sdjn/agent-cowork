@@ -1,7 +1,7 @@
 // 模型驱动 recipe 提取(AI 办公助手 slice 1)——纯解析逻辑单测 + 真实 Ollama e2e(可跳过)
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters, normalizeWeekly } from '../src/recipes/model-recipe.js';
+import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters, normalizeWeekly, normalizeTable } from '../src/recipes/model-recipe.js';
 
 test('extractJson: 容忍 ```json 包裹、前后噪声、括号配平', () => {
   assert.deepEqual(extractJson('```json\n[{"a":1}]\n```'), [{ a: 1 }]);
@@ -83,4 +83,25 @@ test('normalizeWeekly: 四段别名归一 + 全空返回 null', () => {
   assert.deepEqual(w?.next, ['压测']);
   assert.equal(normalizeWeekly({ title: '空周报' }), null); // 四段全空 → null
   assert.equal(normalizeWeekly(null), null);
+});
+
+test('normalizeTable: 列/行归一 + 按列数补齐截断 + 过滤空行', () => {
+  const t = normalizeTable({
+    columns: ['姓名', '部门', '金额'],
+    rows: [
+      ['张三', '研发', '1000'],
+      ['李四', '市场'],              // 缺 1 列 → 补齐为 ''
+      ['王五', '销售', '2000', '多余'], // 多 1 列 → 截断
+      ['', '', ''],                   // 全空 → 过滤
+    ],
+    issues: ['第2行金额缺失'],
+  });
+  assert.deepEqual(t?.columns, ['姓名', '部门', '金额']);
+  assert.equal(t?.rows.length, 3);
+  assert.deepEqual(t?.rows[1], ['李四', '市场', '']);       // 补齐
+  assert.deepEqual(t?.rows[2], ['王五', '销售', '2000']);   // 截断
+  assert.deepEqual(t?.issues, ['第2行金额缺失']);
+  assert.equal(normalizeTable({ columns: [] }), null);       // 无列 → null
+  assert.equal(normalizeTable({ columns: ['a'], rows: [] }), null); // 无有效行 → null
+  assert.equal(normalizeTable('乱码'), null);
 });
