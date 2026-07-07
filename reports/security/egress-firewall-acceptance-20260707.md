@@ -45,3 +45,10 @@
 - ✅ netsh program-scoped 出站封锁对**直连外呼**真实有效(PROBE1b/1c/C 全 exit=7),本地模型端口放行、未锁进程不受影响、回滚干净。
 - ❌ 对**经本机转发代理的外呼**无效——Windows 不过滤 loopback,这是 netsh 层的硬限制,不是规则写法问题。
 - 因此"隔离档零出网"的必要前提(除防火墙外):**机密档进程环境必须清除 http_proxy/https_proxy/ALL_PROXY,或隔离机不装本机代理**;否则应用层出口网关(air_gap)仍是唯一可靠防线。此结论已回写代码 warning 与 plan/08。
+
+## 应用层闭环:机密模式剥离代理环境(2026-07-07)
+针对上面"代理旁路"根因的代码强制修复,端到端实证(host 启动装配调用 applyConfidentialProxyLockdown → spawn 子进程看继承的 env):
+- KCW_CONFIDENTIAL 关闭:`applied=false`,子进程仍继承 `http_proxy=http://127.0.0.1:7897`(旧行为不变)。
+- KCW_CONFIDENTIAL=1:`applied=true stripped=[http_proxy,https_proxy,all_proxy]`,子进程 `http_proxy=<none> NO_PROXY=*`。
+结论:机密模式下 host 及其 spawn 的所有子进程(shell 工具/curl/git/npm)不再经本机代理外呼,
+把"零出网必要前提(清代理)"从部署须知变成代码强制。`/api/selfcheck` 新增 `confidential-proxy-stripped` 项供运行时核验。

@@ -199,6 +199,13 @@ export async function handleSystemRoutes({
     add('security-headers', true, Object.keys(SECURITY_HEADERS).join(', '));
     add('security-mode', true, state.securityMode || 'controlled_hybrid');
     add('confidential-mode', true, isConfidentialMode() ? '机密模式已启用(强制 air_gap,MASE/OAuth/外网工具全部禁用)' : '未启用(标准档)');
+    if (isConfidentialMode()) {
+      // 机密模式下代理环境应已被启动期剥离;若仍残留说明子进程可能经本机代理绕过防火墙外泄。
+      const leakedProxy = ['http_proxy', 'https_proxy', 'all_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']
+        .filter((k) => (process.env[k] ?? '') !== '');
+      add('confidential-proxy-stripped', leakedProxy.length === 0,
+        leakedProxy.length === 0 ? '代理环境已剥离(NO_PROXY=*),子进程不经本机代理外呼' : `残留代理变量:${leakedProxy.join(', ')}(有经代理外泄风险)`);
+    }
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
     add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
     add('rate-limit', Boolean(rateLimitStats), rateLimitStats ? `${rateLimitStats.ratePerSec}/s · burst ${rateLimitStats.burst}` : '限流未启用');

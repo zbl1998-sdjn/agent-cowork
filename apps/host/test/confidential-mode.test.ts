@@ -4,7 +4,7 @@
 // 外网工具拒绝、启动期 MCP(含 MASE)全部丢弃、OAuth 路由 403、selfcheck 可见。
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isConfidentialMode, filterMcpServersForConfidential } from '../src/security/confidential.js';
+import { isConfidentialMode, filterMcpServersForConfidential, stripProxyEnv, applyConfidentialProxyLockdown } from '../src/security/confidential.js';
 import { decideModelProviderPolicy, resolveSecurityMode } from '../src/security/security-mode.js';
 import { decideToolPolicy } from '../src/security/policy-decision.js';
 import { createServer } from '../src/server.js';
@@ -98,4 +98,34 @@ test('HTTP surface without confidential keeps selfcheck flag false and OAuth rea
     await close(server);
     if (previous !== undefined) process.env.KCW_CONFIDENTIAL = previous;
   }
+});
+
+test('stripProxyEnv removes all proxy vars (case variants) and sets NO_PROXY=*', () => {
+  const env: Record<string, string | undefined> = {
+    http_proxy: 'http://127.0.0.1:7897', HTTPS_PROXY: 'http://127.0.0.1:7897',
+    ALL_PROXY: 'socks5://127.0.0.1:7897', PATH: '/keep/me', KEEP: '1',
+  };
+  const stripped = stripProxyEnv(env);
+  assert.ok(stripped.includes('http_proxy') && stripped.includes('HTTPS_PROXY') && stripped.includes('ALL_PROXY'));
+  assert.equal(env.http_proxy, undefined);
+  assert.equal(env.HTTPS_PROXY, undefined);
+  assert.equal(env.ALL_PROXY, undefined);
+  assert.equal(env.NO_PROXY, '*');
+  assert.equal(env.no_proxy, '*');
+  assert.equal(env.PATH, '/keep/me', 'non-proxy vars untouched');
+  assert.equal(env.KEEP, '1');
+});
+
+test('applyConfidentialProxyLockdown is a no-op unless confidential mode is on', () => {
+  const off = { http_proxy: 'http://127.0.0.1:7897' } as Record<string, string | undefined>;
+  const r1 = applyConfidentialProxyLockdown(off);
+  assert.equal(r1.applied, false);
+  assert.equal(off.http_proxy, 'http://127.0.0.1:7897', 'env untouched when not confidential');
+
+  const on = { KCW_CONFIDENTIAL: '1', http_proxy: 'http://127.0.0.1:7897' } as Record<string, string | undefined>;
+  const r2 = applyConfidentialProxyLockdown(on);
+  assert.equal(r2.applied, true);
+  assert.ok(r2.stripped.includes('http_proxy'));
+  assert.equal(on.http_proxy, undefined);
+  assert.equal(on.NO_PROXY, '*');
 });

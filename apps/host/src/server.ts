@@ -16,7 +16,7 @@ import { connectMcpServers, closeMcpClients } from './mcp/connect.js';
 import type { ConnectedMcpClient, ConnectMcpResult, McpServerSpec } from './mcp/connect.js';
 import type { SpawnFn } from './mcp/stdio-transport.js';
 import { handleRouteChain } from './routes/route-chain.js';
-import { filterMcpServersForConfidential } from './security/confidential.js';
+import { filterMcpServersForConfidential, applyConfidentialProxyLockdown } from './security/confidential.js';
 import { createHostState } from './runtime/host-state.js';
 import type { HostConfig } from './runtime/host-state-types.js';
 import { redactText } from './security/redaction.js';
@@ -126,6 +126,13 @@ export function createServer(config: ServerConfig = {}): HostServer {
       server.close(() => { clearTimeout(timer); resolve(); });
     });
   };
+
+  // 机密模式咽喉:剥离转发代理环境变量——切断子进程经本机代理(loopback,防火墙封不住)外泄。
+  // 无条件在装配处执行(不依赖 mcpServers),覆盖 main.ts 与嵌入式两条路径;非机密模式空操作。
+  const proxyLockdown = applyConfidentialProxyLockdown();
+  if (proxyLockdown.applied) {
+    console.warn(`[host] 机密模式:已剥离代理环境变量并置 NO_PROXY=*${proxyLockdown.stripped.length ? `(移除 ${proxyLockdown.stripped.join(', ')})` : '(原无代理变量)'}`);
+  }
 
   if (Array.isArray(config.mcpServers) && config.mcpServers.length > 0 && config.connectMcpOnStart !== false) {
     // 机密模式咽喉:启动期 MCP(含 MASE 记忆桥接)在此统一过滤——覆盖 main.ts 与嵌入式调用两条装配路径。
