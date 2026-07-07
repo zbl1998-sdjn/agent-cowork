@@ -200,8 +200,9 @@ export function App() {
       } catch { /* host 不可达时继续走配置兜底 */ }
     }
     if (!enabled) {
-      if (recipes[0]) await runRecipeTurn(assistantId, recipes[0].id, text, uploaded);
-      else patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: '通用聊天需要配置 Kimi API（在 .env 设置 KIMI_API_KEY）。' }));
+      // 未配置对话模型时,不要盲跑第一个技能(此前固定跑 recipes[0]=会议纪要,任何输入都撞
+      // "需要来源材料"报错);给出清晰引导——配模型,或点技能卡片显式选一个再发。
+      patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: '通用对话需要先配置模型:在设置里填入 Kimi API Key,或把模型指向本地端点(如 Ollama)。想直接跑办公技能,请点上方的技能卡片选一个再发。' }));
       return;
     }
 
@@ -221,7 +222,7 @@ export function App() {
         autoContextCompaction,
       }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
-  }, [autoApprove, autoContextCompaction, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, recipes, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
+  }, [autoApprove, autoContextCompaction, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
