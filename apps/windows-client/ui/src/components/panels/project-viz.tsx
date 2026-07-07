@@ -39,12 +39,19 @@ function shortPath(value: string): string {
   return parts.length > 2 ? `${parts.at(-2)}/${parts.at(-1)}` : value;
 }
 
-function runStatusCounts(runs: RunRecord[]): Record<string, number> {
-  return runs.reduce<Record<string, number>>((acc, run) => {
+// 成功状态同义词(与 host runtime/run-metrics 的 SUCCESS_STATUSES 对齐)。run 实际写
+// 'succeeded',此前显示只读 acc.done → 恒 0(dogfood 实测"0 成功"的根因)。
+const SUCCESS_STATUSES = ['succeeded', 'success', 'ok', 'completed', 'done'];
+
+export function runStatusCounts(runs: RunRecord[]): Record<string, number> {
+  const acc = runs.reduce<Record<string, number>>((counts, run) => {
     const key = String(run.status || 'unknown');
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
   }, {});
+  // 合成 done = 全部成功态之和,让"成功"计数不再漏掉 'succeeded'。
+  acc.done = SUCCESS_STATUSES.reduce((sum, status) => sum + (acc[status] || 0), 0);
+  return acc;
 }
 
 function compactDate(value?: string | null): string {
