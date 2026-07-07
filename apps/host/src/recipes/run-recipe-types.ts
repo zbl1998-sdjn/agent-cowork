@@ -42,5 +42,7 @@ export type RunRecipeResult = {
   recipe: Recipe;
   sources: RecipeSource[];
   operations: FileOperationInput[];
+  // 该次产物是否由模型 AI 提取生成(true)还是模板兜底(false)。UI 据此显示「AI 生成」标识。
+  aiGenerated: boolean;
   events: Record<string, unknown>[];
 };

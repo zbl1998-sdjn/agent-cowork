@@ -267,6 +267,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
           context: requestContext,
           sources: result.sources,
           operations: result.operations,
+          aiGenerated: result.aiGenerated,
           fileOperationApprovalId,
           events: result.events,
         };

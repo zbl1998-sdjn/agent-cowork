@@ -80,6 +80,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
 .preview-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .preview-card header { display: flex; align-items: center; margin-bottom: 8px; }
 .preview-card header em { margin-left: auto; font-style: normal; font-size: 12px; background: #fff3e0; color: #8a5a00; padding: 2px 8px; border-radius: 6px; }
+.preview-card header .ai-badge { margin-left: 8px; font-size: 12px; background: var(--accent-soft, #ede7ff); color: var(--accent-strong, #5b3fd6); padding: 2px 8px; border-radius: 6px; font-weight: 600; }
 .preview-op { display: flex; gap: 8px; align-items: baseline; font-size: 13px; padding: 2px 0; }
 .preview-op .op { font-size: 11px; border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
 .preview-op .op.is-write { color: #0f6e56; border-color: #9fe1cb; }

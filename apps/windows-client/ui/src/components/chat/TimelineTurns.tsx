@@ -157,7 +157,7 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
       {message.recipeDraft && <RecipeDraftCard draft={message.recipeDraft} />}
       {message.recipeCaptureStatus === 'failed' && message.recipeCaptureError && <div className="panel-error">{message.recipeCaptureError}</div>}
       {message.files && message.files.length > 0 && <div className="file-cards">{message.files.map((fp, i) => <ArtifactCard key={`${fp}-${i}`} file={{ path: joinWorkspacePath(trustedRoot, fp), relativePath: fp }} metadata={fp} onOpen={onOpenOrPreview} />)}</div>}
-      {message.operations.length > 0 && <PreviewCard operations={message.operations} />}
+      {message.operations.length > 0 && <PreviewCard operations={message.operations} aiGenerated={message.aiGenerated} />}
       {message.operations.length > 0 && <ApprovalActions runId={message.runId || ''} operations={message.operations} approvalState={message.approvalState} onApprove={() => onHandleApprove(message)} onReject={() => onPatchAssistant(message.id, (m) => ({ ...m, approvalState: 'rejected' }))} />}
       <SourcesFooter sources={message.sources} />
       {canShowActions && <MessageActions onCopy={() => onCopyText(extractSuggestions(message.text || '').text)} onContinue={canContinue ? continueRun : undefined} onCaptureRecipe={canCaptureRecipe && message.runId ? () => onCaptureRecipe(message.id, message.runId || '') : undefined} captureRecipeDisabled={message.recipeCaptureStatus === 'capturing' || message.recipeCaptureStatus === 'captured'} captureRecipeLabel={canCaptureRecipe ? captureRecipeLabel : undefined} onRegenerate={() => onRegenerate(message.id)} />}
