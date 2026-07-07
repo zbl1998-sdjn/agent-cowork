@@ -140,6 +140,7 @@
     "apps/host/src/recipes/capture.ts",
     "apps/host/src/recipes/registry.ts",
     "apps/host/src/recipes/run-recipe-types.ts",
+    "apps/host/src/recipes/model-recipe.ts",
     "apps/host/src/recipes/run-recipe.ts",
     "apps/host/src/security/data-classifier.ts",
     "apps/host/src/security/data-purge.ts",
