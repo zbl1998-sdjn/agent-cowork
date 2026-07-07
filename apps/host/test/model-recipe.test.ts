@@ -1,7 +1,7 @@
 // 模型驱动 recipe 提取(AI 办公助手 slice 1)——纯解析逻辑单测 + 真实 Ollama e2e(可跳过)
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract } from '../src/recipes/model-recipe.js';
+import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters } from '../src/recipes/model-recipe.js';
 
 test('extractJson: 容忍 ```json 包裹、前后噪声、括号配平', () => {
   assert.deepEqual(extractJson('```json\n[{"a":1}]\n```'), [{ a: 1 }]);
@@ -59,4 +59,19 @@ test('normalizeContract: 关键字段全空返回 null,有内容则归一', () =
   assert.deepEqual(c?.obligations, ['按期交付']);
   assert.equal(normalizeContract({}), null);       // 全空 → null
   assert.equal(normalizeContract(null), null);
+});
+
+test('normalizeClusters: 主题聚类归一 + 数量兜底 + 空返回 null', () => {
+  const c = normalizeClusters([
+    { 主题: '登录慢', 严重度: '高', 数量: 5, 建议: '优化查询' },
+    { theme: '界面卡', count: 0 },                  // count 非法 → 兜底 1;severity/suggestion 缺 → 默认
+    { severity: '低' },                             // 无 theme → 过滤
+  ]);
+  assert.equal(c?.length, 2);
+  assert.deepEqual(c?.[0], { theme: '登录慢', severity: '高', count: 5, suggestion: '优化查询' });
+  assert.equal(c?.[1]?.count, 1);
+  assert.equal(c?.[1]?.severity, '中');
+  assert.equal(normalizeClusters({ clusters: [{ theme: 'x' }] })?.length, 1); // {clusters:[...]} 包裹
+  assert.equal(normalizeClusters([]), null);
+  assert.equal(normalizeClusters('乱码'), null);
 });
