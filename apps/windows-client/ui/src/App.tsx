@@ -119,6 +119,9 @@ export function App() {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const togglePanel = useCallback((next: SidePanel) => setPanel((current) => (current === next ? 'none' : next)), []);
+  // 新建对话时同时关闭当前侧面板,切回对话视图——否则从面板(工具/记忆等)点"新建对话"会
+  // 停在面板上、看不到新对话(dogfood 实测的 UX 卡点)。
+  const startNewConversation = useCallback(() => { setPanel('none'); conversations.newConversation(); }, [conversations]);
   const patchAssistant = useCallback((id: string, patch: (m: AssistantMessage) => AssistantMessage) => {
     setMessages((list) => list.map((m) => (m.id === id && m.role === 'assistant' ? patch(m) : m)));
   }, []);
@@ -276,19 +279,19 @@ export function App() {
   const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
 
   const commands = useMemo<Command[]>(() => [
-    { id: 'new', label: '新建对话', run: conversations.newConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
+    { id: 'new', label: '新建对话', run: startNewConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
     { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-yolo', label: '模式：YOLO（自动批准一切）', run: () => setMode('yolo') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
     { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
     { id: 'settings', label: 'API 设置', run: () => openSettings('api') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
-  ], [autoClarify, conversations.newConversation, doLogout, openSettings, setAutoClarify, theme, toggleTheme]);
+  ], [autoClarify, startNewConversation, doLogout, openSettings, setAutoClarify, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
   if (!user) return <Login onAuthed={handleAuthed} onGuest={continueAsGuest} />;
 
   return (
     <div className={`app-shell${panel !== 'none' ? ' has-side-panel' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={conversations.newConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} panel={panel} onNavigate={togglePanel} />
+      <ConversationRail activeConvId={conversations.activeConvId} convSearch={conversations.convSearch} conversations={conversations.visibleConversations} renamingId={conversations.renamingId} renameText={conversations.renameText} onCommitRename={conversations.commitRename} onDelete={conversations.deleteConversation} onExport={conversations.exportConversation} onNew={startNewConversation} onRenameText={conversations.setRenameText} onSearch={conversations.setConvSearch} onSetRenamingId={conversations.setRenamingId} onSwitch={conversations.switchConversation} onSwitchBranch={conversations.switchBranch} onTogglePin={conversations.togglePin} panel={panel} onNavigate={togglePanel} />
       <div className="app-content">
         <AppHeader mode={mode} theme={theme} trustedRoot={trustedRoot} user={user} sidebarCollapsed={sidebarCollapsed} onLogout={() => void doLogout()} onOpenCommandPalette={() => setCmdkOpen(true)} onSetMode={setMode} onSwitchWorkspace={setWorkspaceOverride} onToggleTheme={toggleTheme} onToggleSidebar={() => setSidebarCollapsed((v) => !v)} />
         <SecurityStatusBar status={securityStatus} />
