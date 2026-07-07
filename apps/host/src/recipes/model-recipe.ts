@@ -182,8 +182,8 @@ function summaryLines(s: StructuredSummary, prompt: string): string[] {
   ].filter((line, i, arr) => !(line === '' && arr[i - 1] === ''));
 }
 
-/** 总结报告 AI 路径:模型结构化摘要 → TXT/DOCX/PPTX/PDF(对齐模板产物类型)。 */
-async function buildSummaryAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+/** 可复用:把材料交给模型做结构化摘要提取(要点/风险/下一步)。无内容返回 null。 */
+async function extractSummary(args: AiRecipeArgs): Promise<StructuredSummary | null> {
   const source = combinedText(args.sources);
   if (!source.trim()) return null;
   const prompt = args.prompt ?? '';
@@ -193,9 +193,14 @@ async function buildSummaryAiOperations(args: AiRecipeArgs): Promise<FileOperati
     modelConfig: args.modelConfig,
     ...(args.modelCall ? { modelCall: args.modelCall } : {}),
   });
-  const s = normalizeSummary(parsed);
+  return normalizeSummary(parsed);
+}
+
+/** 总结报告 AI 路径:模型结构化摘要 → TXT/DOCX/PPTX/PDF(对齐模板产物类型)。 */
+async function buildSummaryAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  const s = await extractSummary(args);
   if (!s) return null;
-  const lines = summaryLines(s, prompt);
+  const lines = summaryLines(s, args.prompt ?? '');
   const bullets = [...s.keyPoints, ...s.risks.map((x) => `风险:${x}`), ...s.nextSteps.map((x) => `下一步:${x}`)].slice(0, 12);
   const { trustedRoot, recipe } = args;
   return [
@@ -203,6 +208,65 @@ async function buildSummaryAiOperations(args: AiRecipeArgs): Promise<FileOperati
     binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title: s.title, paragraphs: lines })),
     binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pptx`, createPptxPresentation({ title: s.title, slides: [{ title: s.title, bullets }] })),
     binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork Summary Report', lines })),
+  ];
+}
+
+/** 给老板看的一页总结 AI 路径:复用摘要提取,一页纸格式 → TXT/DOCX/PDF(对齐模板类型)。 */
+async function buildBossSummaryAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  const s = await extractSummary(args);
+  if (!s) return null;
+  const lines = summaryLines(s, args.prompt ?? '');
+  const { trustedRoot, recipe } = args;
+  return [
+    textOperation(trustedRoot, recipe.id, `${recipe.name}.txt`, lines.join('\n')),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title: s.title, paragraphs: lines })),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.pdf`, createPdfDocument({ title: 'Agent Cowork One-Pager', lines })),
+  ];
+}
+
+export type FeedbackCluster = { theme: string; severity: string; count: number; suggestion: string };
+
+/** 归一模型返回的反馈聚类;无有效聚类返回 null(回退模板)。 */
+export function normalizeClusters(parsed: unknown): FeedbackCluster[] | null {
+  const arr = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' && Array.isArray((parsed as { clusters?: unknown }).clusters) ? (parsed as { clusters: unknown[] }).clusters : []);
+  const clusters = arr
+    .map((row) => {
+      const r = row && typeof row === 'object' ? row as Record<string, unknown> : {};
+      const countRaw = Number(r.count ?? r.数量 ?? r.数目);
+      return {
+        theme: cleanStr(r.theme ?? r.主题 ?? r.topic),
+        severity: cleanStr(r.severity ?? r.严重度 ?? r.priority, '中'),
+        count: Number.isFinite(countRaw) && countRaw > 0 ? Math.round(countRaw) : 1,
+        suggestion: cleanStr(r.suggestion ?? r.建议 ?? r.action ?? r.建议动作, '待定'),
+      };
+    })
+    .filter((c) => c.theme);
+  return clusters.length ? clusters : null;
+}
+
+/** 反馈聚类 AI 路径:模型按主题/严重度聚合反馈并给建议动作 → TXT/DOCX(对齐模板类型)。 */
+async function buildFeedbackClustersAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  const source = combinedText(args.sources);
+  if (!source.trim()) return null;
+  const prompt = args.prompt ?? '';
+  const parsed = await callModelForJson({
+    system: '你是严谨的用户反馈分析助手。只输出 JSON,不要解释。',
+    user: `把下面的用户反馈按主题聚类,输出 JSON 数组,每项 {"theme":"主题","severity":"严重度(高/中/低)","count":数量,"suggestion":"建议动作"}。只基于反馈,不编造。${prompt ? `用户额外要求:${prompt}。` : ''}\n\n反馈:\n${source.slice(0, 8000)}`,
+    modelConfig: args.modelConfig,
+    ...(args.modelCall ? { modelCall: args.modelCall } : {}),
+  });
+  const clusters = normalizeClusters(parsed);
+  if (!clusters) return null;
+  const lines = [
+    '用户反馈聚类(AI 提取)',
+    prompt ? `用户指令: ${prompt}` : '',
+    '',
+    ...clusters.map((c, i) => `${i + 1}. 【${c.theme}】严重度 ${c.severity} · ${c.count} 条 → ${c.suggestion}`),
+  ].filter((line, i, arr) => !(line === '' && arr[i - 1] === ''));
+  const { trustedRoot, recipe } = args;
+  return [
+    textOperation(trustedRoot, recipe.id, `${recipe.name}.txt`, lines.join('\n')),
+    binaryOperation(trustedRoot, recipe.id, `${recipe.name}.docx`, createDocxDocument({ title: '用户反馈聚类', paragraphs: lines })),
   ];
 }
 
@@ -261,6 +325,8 @@ const AI_RECIPE_BUILDERS: Record<string, (args: AiRecipeArgs) => Promise<FileOpe
   'meeting-actions': buildMeetingAiOperations,
   'summary-report': buildSummaryAiOperations,
   'contract-summary': buildContractAiOperations,
+  'boss-summary-onepager': buildBossSummaryAiOperations,
+  'feedback-clusters': buildFeedbackClustersAiOperations,
 };
 
 export function hasAiRecipeBuilder(recipeId: string): boolean {
