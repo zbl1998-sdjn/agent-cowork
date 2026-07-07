@@ -152,7 +152,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
         sendJson(response, 400, { error: errorMessage(parsed.error, 'invalid recipe template') });
         return;
       }
-      cachedWrite(options, body, () => {
+      await cachedWrite(options, body, () => {
         const recipe = customRecipes.save(parsed.data.template, omitUndefined({
           tenantId: requestContext.tenantId,
           userId: requestContext.userId,
@@ -175,7 +175,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
         sendJson(response, 400, { error: errorMessage(parsed.error) });
         return;
       }
-      cachedWrite(options, body, () => {
+      await cachedWrite(options, body, () => {
         const input = parsed.data;
         const recipeInput = input.recipe || input;
         const recipe = customRecipes.save(recipeInput, omitUndefined({ tenantId: requestContext.tenantId, userId: requestContext.userId }));

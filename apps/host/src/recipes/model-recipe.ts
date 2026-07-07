@@ -6,7 +6,7 @@
 // 依赖:L1 provider(callProviderChatCompletion);纯提取逻辑,不落盘、不审批。
 // 设计:模型只被要求输出严格 JSON(便于稳健解析);解析失败/无模型时由调用方回退模板。
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
-import type { ModelConfig } from '../kimi/provider/types.js';
+import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/types.js';
 import { combinedText, textOperation, xlsxOperation, binaryOperation, type SourceLike } from './recipe-helpers.js';
 import { createDocxDocument, createPptxPresentation, createPdfDocument } from '../artifacts/office-writers.js';
 import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
@@ -15,6 +15,20 @@ import type { FileOperationInput } from '../workspace/file-operations.js';
 export type ActionItem = { owner: string; task: string; due: string };
 
 type ModelCaller = typeof callProviderChatCompletion;
+
+// AI 提取的模型调用超时:模型没配好/不可达/卡住时,到点 abort → 抛错 → 回退模板,
+// 绝不让一个挂住的模型调用拖死整个 recipe 运行(否则 HTTP 请求会一直挂到路由超时)。
+const AI_MODEL_TIMEOUT_MS = 30_000;
+
+async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, ms = AI_MODEL_TIMEOUT_MS): Promise<ProviderChatResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await modelCall({ ...args, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** 从模型返回文本里稳健抽出第一个 JSON 数组/对象(容忍 ```json 包裹与前后废话)。 */
 export function extractJson(text: unknown): unknown {
@@ -72,7 +86,7 @@ export async function extractMeetingActions(
 ): Promise<ActionItem[] | null> {
   if (!String(source || '').trim()) return null;
   try {
-    const result = await modelCall({
+    const result = await callWithTimeout(modelCall, {
       kimiConfig: modelConfig,
       messages: [
         { role: 'system', content: MEETING_SYSTEM },
@@ -127,7 +141,7 @@ async function callModelForJson(
   { system, user, modelConfig, modelCall = callProviderChatCompletion }:
   { system: string; user: string; modelConfig: ModelConfig; modelCall?: ModelCaller },
 ): Promise<unknown> {
-  const result = await modelCall({
+  const result = await callWithTimeout(modelCall, {
     kimiConfig: modelConfig,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     tools: [],
