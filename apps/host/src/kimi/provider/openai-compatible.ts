@@ -100,7 +100,17 @@ export function createOpenAiCompatibleProvider({
         signal,
       }));
       if (!resp.ok) {
-        throw new Error(`${id} request failed with status ${resp.status}`);
+        // 带出后端响应体(Ollama/LM Studio 的 404 会说明是哪个模型不存在),并对 404 给
+        // 本地模型的可操作提示——避免用户只看到晦涩的 "request failed with status 404"。
+        let detail = '';
+        try {
+          const readText = (resp as { text?: () => Promise<string> }).text;
+          if (typeof readText === 'function') detail = (await readText.call(resp)).trim().slice(0, 400);
+        } catch { /* 读取失败忽略 */ }
+        const modelHint = resp.status === 404
+          ? `(若用本地模型,请确认「${model}」已安装:ollama pull ${model};或把模型改成已安装的名称)`
+          : '';
+        throw new Error(`${id} 请求失败(HTTP ${resp.status})${detail ? `:${detail}` : ''}${modelHint}`);
       }
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
       const message = reader
