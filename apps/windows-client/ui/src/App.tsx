@@ -191,7 +191,13 @@ export function App() {
       patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '上传附件' }) }));
       return;
     }
-    if (!resumeRunId && selectedRecipe) { await runRecipeTurn(assistantId, selectedRecipe.id, text, uploaded); return; }
+    if (!resumeRunId && selectedRecipe) {
+      // recipe 来源 = 上传的附件 + 经 @ 提及引用的工作区文件(修复:「引用本地文件」选的源
+      // 之前没进 recipe files,导致 requiresSources 配方报「引用 0 个」)。
+      const recipeFiles = [...uploaded, ...(meta.referencedFiles || [])];
+      await runRecipeTurn(assistantId, selectedRecipe.id, text, recipeFiles);
+      return;
+    }
 
     const sessionModelAccess = hasSessionModelAccess(meta.modelConfig);
     let enabled = Boolean(resumeRunId) || chatEnabled || sessionModelAccess;

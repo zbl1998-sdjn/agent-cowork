@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, KeyboardEvent } from 'react';
 import { buildSessionModelConfig } from '../lib/composer-logic';
+import { referencedFilePaths } from '../lib/composer-trigger';
 import { useComposerRefine } from '../hooks/useComposerRefine';
 import { useComposerSuggestions } from '../hooks/useComposerSuggestions';
 import { ComposerAttachments } from './ComposerAttachments';
@@ -61,6 +62,9 @@ export function Composer({
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
+  // 记录用户经 @ 提及选中的工作区文件(basename → 绝对路径),发送时把仍出现在文本里的
+  // 提及作为 recipe 来源引用一并带上,避免「引用本地文件」选了源却报「引用 0 个」。
+  const mentionedRef = useRef<Map<string, string>>(new Map());
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [model, setModel] = useState('');
@@ -98,7 +102,12 @@ export function Composer({
     value, setValue, textareaRef: ref,
     searchFiles, recipes, historyRuns, slashCommands,
     onPickTemplate, onPickHistory, markChanged,
+    onPickMention: (hit) => {
+      const base = (hit.relativePath || hit.path).split(/[\\/]/).pop();
+      if (base) mentionedRef.current.set(base, hit.path);
+    },
   });
+
 
   const currentProvider = provider || defaultProvider || 'kimi-api';
   const selectedProvider = modelProviders.find((item) => item.id === currentProvider);
@@ -149,9 +158,11 @@ export function Composer({
       { provider: currentProvider, model: currentModel, baseUrl: '', apiKey: '' },
       { provider: defaultProvider, model: defaultModel, baseUrl: defaultBaseUrl },
     );
-    onSend(finalText, { files: attachments, model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
+    const referencedFiles = referencedFilePaths(mentionedRef.current, finalText);
+    onSend(finalText, { files: attachments, ...(referencedFiles.length ? { referencedFiles } : {}), model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
     setValue('');
     setAttachments([]);
+    mentionedRef.current.clear();
     resetRefineAfterSend();
     close();
   }

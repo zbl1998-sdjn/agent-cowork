@@ -35,6 +35,8 @@ export interface UseComposerSuggestionsOptions {
   onPickTemplate?: ((recipe: Recipe) => void) | undefined;
   /** 用户选择历史运行时通知父层。 */
   onPickHistory?: ((run: HistoryRun) => void) | undefined;
+  /** 用户从 @ 提及里选中一个工作区文件时通知父层(用于把该文件作为 recipe 来源引用)。 */
+  onPickMention?: ((hit: FileHit) => void) | undefined;
   /** 来自 useComposerRefine,用于重置「提示词已变化」标记。 */
   markChanged: (next: string) => void;
 }
@@ -55,7 +57,7 @@ export function useComposerSuggestions(opts: UseComposerSuggestionsOptions): Use
   const {
     value, setValue, textareaRef,
     searchFiles, recipes, historyRuns, slashCommands,
-    onPickTemplate, onPickHistory, markChanged,
+    onPickTemplate, onPickHistory, onPickMention, markChanged,
   } = opts;
 
   const [mode, setMode] = useState<ComposerSuggestionMode | null>(null);
@@ -87,7 +89,7 @@ export function useComposerSuggestions(opts: UseComposerSuggestionsOptions): Use
     let hits: FileHit[] = [];
     try { hits = await searchFiles(query); } catch { hits = []; }
     if (token !== searchToken.current) return;
-    setItems(buildMentionSuggestionItems(hits, (hit) => replaceToken(mentionInsertText(hit))));
+    setItems(buildMentionSuggestionItems(hits, (hit) => { replaceToken(mentionInsertText(hit)); onPickMention?.(hit); }));
     setActive(0);
   }
 
