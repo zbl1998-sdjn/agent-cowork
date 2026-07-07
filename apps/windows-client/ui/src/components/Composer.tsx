@@ -107,7 +107,12 @@ export function Composer({
     ? [...new Set([selectedProvider.defaultModel, ...selectedProvider.models, model, defaultModel].filter(Boolean))]
     : fallbackModelOptions.length ? [...new Set([...fallbackModelOptions, model, defaultModel].filter(Boolean))]
       : models.length ? models : (defaultModel ? [defaultModel] : []);
-  const currentModel = model.trim() || selectedProvider?.defaultModel || fallbackModelOptions[0] || defaultModel;
+  // 当前 provider 就是已配置的默认 provider 时,优先用用户配置的 defaultModel(如 Ollama 的
+  // qwen3:14b),而不是 catalog 的裸默认名(如 "qwen3",真实 Ollama 里常不存在 → 404)。
+  const providerDefaultModel = currentProvider === defaultProvider && defaultModel
+    ? defaultModel
+    : (selectedProvider?.defaultModel || fallbackModelOptions[0] || defaultModel);
+  const currentModel = model.trim() || providerDefaultModel;
 
   useEffect(() => {
     onDraftChange?.({
@@ -127,6 +132,8 @@ export function Composer({
 
   function updateProvider(nextProvider: string) {
     setProvider(nextProvider);
+    // 切回已配置的默认 provider 时,用配置的模型;否则用该 provider 的 catalog 默认。
+    if (nextProvider === defaultProvider && defaultModel) { setModel(defaultModel); return; }
     const next = modelProviders.find((item) => item.id === nextProvider);
     if (next?.defaultModel) setModel(next.defaultModel);
     else setModel(FALLBACK_PROVIDER_MODELS[nextProvider]?.[0] || '');
