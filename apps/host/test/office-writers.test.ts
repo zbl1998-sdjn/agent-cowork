@@ -49,9 +49,12 @@ test('createPdfDocument writes a bounded PDF document', () => {
   assert.ok(!/basic PDF engine cannot render/.test(text), 'ASCII content must not get the CJK notice');
 });
 
-test('createPdfDocument prepends an honest ASCII notice when content has CJK', () => {
+test('createPdfDocument on CJK content: embeds a CJK font when available, else ASCII notice', () => {
   const withCjk = createPdfDocument({ title: '中文标题', lines: ['这是一行中文', 'ascii line'] }).toString('latin1');
-  assert.match(withCjk, /basic PDF engine cannot render Chinese\/CJK/, 'CJK content must get the notice');
-  assert.match(withCjk, /Use the \.docx or \.txt version/, 'notice points users to docx/txt');
   assert.match(withCjk, /^%PDF-1\.4/, 'still a valid PDF');
+  const embedded = withCjk.includes('CIDFontType2');
+  const noticed = /basic PDF engine cannot render Chinese\/CJK/.test(withCjk);
+  // 有可嵌入的 CJK 字体(如 Windows simhei)→ 真实字体嵌入渲染中文;否则回退到诚实提示。
+  assert.ok(embedded || noticed, 'CJK content must embed a CJK font or fall back to the notice');
+  assert.ok(!(embedded && noticed), 'exactly one path, not both');
 });

@@ -23,6 +23,7 @@
     "apps/host/src/artifacts/live-render.ts",
     "apps/host/src/artifacts/live-refresh.ts",
     "apps/host/src/artifacts/office-writers.ts",
+    "apps/host/src/artifacts/pdf-cjk-font.ts",
     "apps/host/src/artifacts/xlsx-writer.ts",
     "apps/host/src/artifacts/live-spec.ts",
     "apps/host/src/artifacts/viz.ts",
