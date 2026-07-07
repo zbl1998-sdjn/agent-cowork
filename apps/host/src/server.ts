@@ -17,6 +17,8 @@ import type { ConnectedMcpClient, ConnectMcpResult, McpServerSpec } from './mcp/
 import type { SpawnFn } from './mcp/stdio-transport.js';
 import { handleRouteChain } from './routes/route-chain.js';
 import { filterMcpServersForConfidential, applyConfidentialProxyLockdown } from './security/confidential.js';
+import { resolveSecurityMode } from './security/security-mode.js';
+import { setAtRestSecurityMode } from './security/at-rest.js';
 import { createHostState } from './runtime/host-state.js';
 import type { HostConfig } from './runtime/host-state-types.js';
 import { redactText } from './security/redaction.js';
@@ -133,6 +135,11 @@ export function createServer(config: ServerConfig = {}): HostServer {
   if (proxyLockdown.applied) {
     console.warn(`[host] 机密模式:已剥离代理环境变量并置 NO_PROXY=*${proxyLockdown.stripped.length ? `(移除 ${proxyLockdown.stripped.join(', ')})` : '(原无代理变量)'}`);
   }
+
+  // 落盘加密默认策略:注入权威 securityMode(含 config),让 stores 落盘时的加密开关跟随实际档位
+  // (air_gap 强制开、local_strict/enterprise_local 默认开),不再只认 env。
+  const resolvedMode = resolveSecurityMode({ configuredMode: state.securityMode, env: process.env });
+  setAtRestSecurityMode(resolvedMode);
 
   if (Array.isArray(config.mcpServers) && config.mcpServers.length > 0 && config.connectMcpOnStart !== false) {
     // 机密模式咽喉:启动期 MCP(含 MASE 记忆桥接)在此统一过滤——覆盖 main.ts 与嵌入式调用两条装配路径。
