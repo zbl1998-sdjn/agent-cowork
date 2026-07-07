@@ -11,6 +11,7 @@ import {
   sealAtRest,
   openAtRest,
   atRestKeyPath,
+  setAtRestSecurityMode,
 } from '../src/security/at-rest.js';
 import { createAesGcmProtector, isSealedCredential } from '../src/security/credential-store.js';
 
@@ -20,11 +21,31 @@ function secDir(): string {
 // 注入 AES credential-protector 作 KEK,避免测试真机拉 DPAPI/PowerShell。
 const kek = createAesGcmProtector({ keyMaterial: 'at-rest-test-kek' });
 
-test('isAtRestEncryptionEnabled: explicit flag or confidential mode turns it on', () => {
-  assert.equal(isAtRestEncryptionEnabled({}), false);
-  assert.equal(isAtRestEncryptionEnabled({ KCW_ENCRYPT_AT_REST: '1' }), true);
-  assert.equal(isAtRestEncryptionEnabled({ KCW_ENCRYPT_AT_REST: 'off' }), false);
-  assert.equal(isAtRestEncryptionEnabled({ KCW_CONFIDENTIAL: '1' }), true);
+test('isAtRestEncryptionEnabled: tier-bound default policy (hardened)', () => {
+  setAtRestSecurityMode(null); // 用 env 解析,确定性
+  // 标准档(controlled_hybrid 默认 / local_demo):默认关,可显式开
+  assert.equal(isAtRestEncryptionEnabled({}), false, 'standard tier off by default');
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'local_demo' }), false);
+  assert.equal(isAtRestEncryptionEnabled({ KCW_ENCRYPT_AT_REST: '1' }), true, 'explicit on');
+  // 本地严格 / 企业内网:默认开,可显式关
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'local_strict' }), true, 'local_strict on by default');
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'enterprise_local' }), true, 'enterprise_local on by default');
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'enterprise_local', KCW_ENCRYPT_AT_REST: '0' }), false, 'disable-able outside air_gap');
+  // 隔离档 air_gap(含机密总开关):强制开,显式关也不削弱
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'air_gap' }), true);
+  assert.equal(isAtRestEncryptionEnabled({ KCW_SECURITY_MODE: 'air_gap', KCW_ENCRYPT_AT_REST: 'off' }), true, 'air_gap non-disableable (fail-closed)');
+  assert.equal(isAtRestEncryptionEnabled({ KCW_CONFIDENTIAL: '1', KCW_ENCRYPT_AT_REST: 'false' }), true, 'confidential non-disableable');
+});
+
+test('setAtRestSecurityMode override wins over env (config-driven mode reaches stores)', () => {
+  try {
+    setAtRestSecurityMode('air_gap'); // 模拟 config 设 air_gap、env 无 KCW_SECURITY_MODE
+    assert.equal(isAtRestEncryptionEnabled({}), true, 'config-set air_gap forces encryption even with empty env');
+    setAtRestSecurityMode('local_demo');
+    assert.equal(isAtRestEncryptionEnabled({}), false, 'config-set standard tier defaults off');
+  } finally {
+    setAtRestSecurityMode(null);
+  }
 });
 
 test('resolveAtRestProtector creates a wrapped-DEK keyfile once and reuses it', () => {
