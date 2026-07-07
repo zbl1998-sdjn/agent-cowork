@@ -173,7 +173,7 @@ export function App() {
       const res = await postJson<RecipeRunResponse>(`/api/recipes/${encodeURIComponent(recipeId)}/run`, {
         trustedRoot, prompt, files: uploaded.map((p) => ({ path: p })), idempotencyKey: newIdempotencyKey('recipe'),
       });
-      patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, operations: res.operations || [], fileOperationApprovalId: res.fileOperationApprovalId || null, sources: res.sources || [], status: 'awaiting_approval', approvalState: (res.operations || []).length ? 'awaiting' : 'idle' }));
+      patchAssistant(assistantId, (m) => ({ ...m, runId: res.runId, operations: res.operations || [], aiGenerated: Boolean(res.aiGenerated), fileOperationApprovalId: res.fileOperationApprovalId || null, sources: res.sources || [], status: 'awaiting_approval', approvalState: (res.operations || []).length ? 'awaiting' : 'idle' }));
       wireEvents(assistantId, res.runId);
     } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '运行技能' }) })); }
   }, [trustedRoot, patchAssistant, wireEvents]);

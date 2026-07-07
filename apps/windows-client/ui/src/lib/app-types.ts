@@ -24,6 +24,8 @@ export interface AssistantMessage {
   reasoning?: string | undefined;
   progress: ProgressLineProps[];
   operations: FileOperation[];
+  // 该次产物由模型 AI 提取生成(true)还是模板兜底(false/缺省)。用于展示「AI 生成」标识。
+  aiGenerated?: boolean | undefined;
   fileOperationApprovalId?: string | null | undefined;
   rollbackApprovalId?: string | null | undefined;
   sources: SourceRef[];
@@ -69,6 +71,7 @@ export interface WorkspaceInfo { trustedRoot: string }
 export interface RecipeRunResponse {
   runId: string;
   operations: FileOperation[];
+  aiGenerated?: boolean | undefined;
   sources: SourceRef[];
   fileOperationApprovalId?: string | null | undefined;
 }

@@ -145,6 +145,7 @@ export async function runRecipe({
   });
 
   let operations: FileOperationInput[];
+  let aiGenerated = false;
   try {
     // 来源熔断(grounded 原则):转换型配方在 0 个可用来源时拒绝产出空壳交付物,
     // 与 MASE「检索不到就明说」同一哲学——没有原料不开工,失败也走统一 run 记录。
@@ -165,6 +166,7 @@ export async function runRecipe({
       aiOps = await buildAiRecipeOperations({ trustedRoot: safeRoot, recipe, sources, prompt: String(prompt || ''), modelConfig: modelConfig as Record<string, unknown> });
       if (aiOps) emit('progress', { icon: 'check', text: `AI 提取完成，生成 ${aiOps.length} 个产物` });
     }
+    aiGenerated = Boolean(aiOps);
     operations = aiOps || buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
   } catch (err) {
     const error = recipeError(err);
@@ -192,7 +194,7 @@ export async function runRecipe({
   }
 
   emit('progress', { icon: 'loader', text: `正在生成 ${recipe.name} 的可审批操作…` });
-  emit('preview', { operations, count: operations.length });
+  emit('preview', { operations, count: operations.length, aiGenerated });
   emit('awaiting_approval', { count: operations.length });
 
   const sourceSummaries: RecipeSource[] = sources.map((source) => omitUndefined({
@@ -252,6 +254,7 @@ export async function runRecipe({
     recipe,
     sources: sourceSummaries,
     operations,
+    aiGenerated,
     events,
   };
 }
