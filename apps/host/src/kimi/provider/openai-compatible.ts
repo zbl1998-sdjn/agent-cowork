@@ -86,6 +86,9 @@ export function createOpenAiCompatibleProvider({
         tool_choice: 'auto',
         max_tokens: config.maxTokens || 2048,
         stream: true,
+        // 让流式响应在末尾带回 usage(token 用量)。OpenAI/Kimi/Ollama/LM Studio 均支持;
+        // 不带此项时 Ollama 流式默认不返回 usage → 成本·可观测面板显示 0 tokens(dogfood 实测)。
+        stream_options: { include_usage: true },
         // 稳定缓存键(通常为 session/run id):提高前缀缓存命中率;不支持的后端会忽略。
         ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
