@@ -127,3 +127,13 @@ export function buildMentionSuggestionItems(
 export function mentionInsertText(hit: FileHitLike) {
   return `@${(hit.relativePath || hit.path).split(/[\\/]/).pop()} `;
 }
+
+/** @ 提及选中文件的 basename→path 记录里,挑出仍以 `@basename` 出现在文本中的文件路径(去重)。
+ * 用户删掉 @ 文本即视为取消引用。用于把「引用本地文件」选中的源带进 recipe files。 */
+export function referencedFilePaths(mentioned: ReadonlyMap<string, string>, text: string): string[] {
+  const out: string[] = [];
+  for (const [base, path] of mentioned) {
+    if (base && text.includes(`@${base}`)) out.push(path);
+  }
+  return [...new Set(out)];
+}

@@ -5,6 +5,7 @@ import {
   buildTemplateSuggestionItems,
   findComposerTrigger,
   mentionInsertText,
+  referencedFilePaths,
 } from './composer-trigger';
 
 describe('findComposerTrigger', () => {
@@ -55,5 +56,22 @@ describe('composer suggestion builders', () => {
     );
     expect(mention[0]).toMatchObject({ key: 'C:/repo/README.md', title: 'docs/README.md', detail: 'file' });
     expect(mentionInsertText({ path: 'C:/repo/README.md', relativePath: 'docs/README.md' })).toBe('@README.md ');
+  });
+});
+
+describe('referencedFilePaths', () => {
+  it('returns paths whose @basename still appears in text, deduped', () => {
+    const picked = new Map([
+      ['评审会纪要.txt', 'C:/ws/评审会纪要.txt'],
+      ['contract.txt', 'C:/ws/contracts/contract.txt'],
+    ]);
+    // 只引用了会议纪要:合同的 @ 已被删掉
+    expect(referencedFilePaths(picked, '请整理 @评审会纪要.txt 的行动项')).toEqual(['C:/ws/评审会纪要.txt']);
+    // 两个都在
+    expect(referencedFilePaths(picked, '@评审会纪要.txt @contract.txt')).toEqual(['C:/ws/评审会纪要.txt', 'C:/ws/contracts/contract.txt']);
+    // 用户删光 @ 文本 → 视为取消引用
+    expect(referencedFilePaths(picked, '直接写一段话')).toEqual([]);
+    // 空 map
+    expect(referencedFilePaths(new Map(), '@评审会纪要.txt')).toEqual([]);
   });
 });

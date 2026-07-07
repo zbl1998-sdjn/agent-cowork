@@ -25,6 +25,8 @@ export interface HistoryRun {
 
 export interface ComposerMeta {
   files: File[];
+  // 经 @ 提及引用的工作区文件绝对路径(用于 recipe 来源);不经上传,直接引用磁盘文件。
+  referencedFiles?: string[] | undefined;
   model: string;
   modelConfig?: ModelRunConfig | undefined;
   thinking: ThinkingLevel;
