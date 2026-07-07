@@ -37,3 +37,18 @@ test('non-IP gateway hosts are surfaced as needing a DNS pin, not silently allow
 test('rejects when no app exe path is provided (nothing to lock down)', () => {
   assert.throws(() => buildEgressFirewallPlan({ appExePaths: [], allowHosts: [] }), /exe/i);
 });
+
+test('broad loopback allow warns about local-proxy egress bypass (real-machine finding 2026-07-07)', () => {
+  const plan = buildEgressFirewallPlan({ appExePaths: ['C:\\x\\app.exe'], allowHosts: [] });
+  assert.ok(plan.warnings.some((w) => /代理|proxy/i.test(w) && /loopback|127\.0\.0/i.test(w)), 'must warn loopback+proxy bypass');
+  assert.ok(plan.rules.some((r) => r.action === 'allow' && r.remoteAddress === '127.0.0.0/8' && !r.remotePort), 'broad loopback rule present');
+});
+
+test('loopbackAllowPorts narrows loopback allow to the model port (no proxy port left open)', () => {
+  const plan = buildEgressFirewallPlan({ appExePaths: ['C:\\x\\app.exe'], allowHosts: [], loopbackAllowPorts: [11434] });
+  const loop = plan.rules.find((r) => r.action === 'allow' && r.remoteAddress === '127.0.0.0/8');
+  assert.ok(loop, 'loopback allow present');
+  assert.equal(loop?.remotePort, '11434', 'loopback allow scoped to model port');
+  assert.ok(plan.commands.some((c) => c.includes("-RemotePort '11434'")), 'command carries RemotePort');
+  assert.ok(!plan.warnings.some((w) => /未指定 loopbackAllowPorts/.test(w)), 'no broad-loopback warning when scoped');
+});
