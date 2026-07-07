@@ -168,7 +168,20 @@ function pdfLiteral(value: unknown): string {
 /** 手写最小单页 PDF:逐对象拼字节并计算 xref 偏移,Helvetica 12pt 自上而下排行(最多 36 行)。 */
 export function createPdfDocument(spec: PdfDocumentSpec = {}): Buffer {
   const { title = 'Agent Cowork PDF', lines = [] } = spec;
-  const textLines = normalizedLines([title, ...lines], title).slice(0, 36);
+  const rawLines = normalizedLines([title, ...lines], title);
+  // 基础 PDF 引擎用 Helvetica/WinAnsi,不含中日韩字形——pdfLiteral 会把 CJK 字符替换成 '?'。
+  // 检测到 CJK 时在页首加 ASCII 提示,指向同名 .docx/.txt(中文完整正确),避免用户被满屏 '?' 误导。
+  // 待验收:真正的中文 PDF 需嵌入 CJK 字体(CIDFontType2 子集),见 plan/findings。
+  const hasCjk = rawLines.some((line) => /[぀-ヿ㐀-鿿＀-￯]/.test(line));
+  const noticed = hasCjk
+    ? [
+        '[Note] This basic PDF engine cannot render Chinese/CJK glyphs (shown as ?).',
+        'Use the .docx or .txt version for the full, correct Chinese content.',
+        '',
+        ...rawLines,
+      ]
+    : rawLines;
+  const textLines = noticed.slice(0, 40);
   const stream = textLines
     .map((line, index) => `BT /F1 12 Tf 72 ${780 - index * 20} Td (${pdfLiteral(line)}) Tj ET`)
     .join('\n');

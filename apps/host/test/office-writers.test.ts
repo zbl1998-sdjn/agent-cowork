@@ -45,4 +45,13 @@ test('createPdfDocument writes a bounded PDF document', () => {
   assert.match(text, /xref/);
   assert.match(text, /Summary line/);
   assert.ok(!/\(paren \) and slash \\/.test(text));
+  // 纯 ASCII 内容不应触发 CJK 提示
+  assert.ok(!/basic PDF engine cannot render/.test(text), 'ASCII content must not get the CJK notice');
+});
+
+test('createPdfDocument prepends an honest ASCII notice when content has CJK', () => {
+  const withCjk = createPdfDocument({ title: '中文标题', lines: ['这是一行中文', 'ascii line'] }).toString('latin1');
+  assert.match(withCjk, /basic PDF engine cannot render Chinese\/CJK/, 'CJK content must get the notice');
+  assert.match(withCjk, /Use the \.docx or \.txt version/, 'notice points users to docx/txt');
+  assert.match(withCjk, /^%PDF-1\.4/, 'still a valid PDF');
 });
