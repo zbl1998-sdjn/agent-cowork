@@ -94,6 +94,8 @@ export async function handleRouteChain({
     sendCachedOrStore: state.sendCachedOrStore,
     safeTrustedRoot: state.safeTrustedRoot,
     fileOperationApprovals: state.fileOperationApprovals,
+    // 模型已配置时,支持 AI 路径的 recipe(如会议纪要)走模型提取,否则回退模板。
+    resolveModelConfig: () => (state.kimiApiConfig?.configured ? state.kimiApiConfig as unknown as Record<string, unknown> : null),
   }))) return true;
   if (await handleMemoryRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryRoutes>>({
     ...base,

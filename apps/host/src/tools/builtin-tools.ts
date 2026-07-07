@@ -190,7 +190,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       handler: async (rawArgs, rawCtx) => {
         const args = argsRecord(rawArgs);
         const ctx = contextRecord(rawCtx);
-        return runRecipe(omitUndefined({
+        return await runRecipe(omitUndefined({
           recipeId: recipe.id,
           trustedRoot: ctx.trustedRoot || '',
           prompt: args.prompt || '',

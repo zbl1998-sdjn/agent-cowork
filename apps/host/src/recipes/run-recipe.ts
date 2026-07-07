@@ -10,6 +10,7 @@ import { extractDocumentText } from '../workspace/document-extractor.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { omitUndefined } from '../util/object.js';
 import { buildRecipeOperations, getRecipe } from './registry.js';
+import { buildAiRecipeOperations, hasAiRecipeBuilder } from './model-recipe.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import type { FileOperationInput } from '../workspace/file-operations.js';
@@ -81,7 +82,7 @@ function emitFailedRun({
 }
 
 /** 执行一个配方:读来源→构建可审批操作→发事件并写 run 记录,返回 { ok, runId, recipe, sources, operations, events }。 */
-export function runRecipe({
+export async function runRecipe({
   recipeId,
   trustedRoot,
   prompt = '',
@@ -92,7 +93,8 @@ export function runRecipe({
   runEvents = null,
   runsIndex = null,
   recipe: providedRecipe = null,
-}: RunRecipeOptions): RunRecipeResult {
+  modelConfig = null,
+}: RunRecipeOptions): Promise<RunRecipeResult> {
   const recipe = providedRecipe || getRecipe(recipeId);
   if (!recipe) {
     const err: RecipeError = new Error('Recipe not found');
@@ -156,7 +158,14 @@ export function runRecipe({
         throw guardError;
       }
     }
-    operations = buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
+    // AI 路径优先(有模型且该 recipe 支持):模型结构化提取 → 提取到就用,否则回退模板。
+    let aiOps: FileOperationInput[] | null = null;
+    if (modelConfig && hasAiRecipeBuilder(recipe.id)) {
+      emit('progress', { icon: 'loader', text: `AI 正在从来源提取 ${recipe.name}…` });
+      aiOps = await buildAiRecipeOperations({ trustedRoot: safeRoot, recipe, sources, prompt: String(prompt || ''), modelConfig: modelConfig as Record<string, unknown> });
+      if (aiOps) emit('progress', { icon: 'check', text: `AI 提取完成，生成 ${aiOps.length} 个产物` });
+    }
+    operations = aiOps || buildRecipeOperations({ recipeId, trustedRoot: safeRoot, prompt, sources, recipe });
   } catch (err) {
     const error = recipeError(err);
     emit('assistant_end', { status: 'failed', error: error.message });

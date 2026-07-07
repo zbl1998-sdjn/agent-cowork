@@ -43,6 +43,9 @@ type RecipeRouteOptions = {
   sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): unknown;
   safeTrustedRoot(input?: unknown): string;
   fileOperationApprovals: FileOperationApprovalsLike;
+  // 返回当前模型配置(provider/baseUrl/model/apiKey);支持 AI 路径的 recipe 会据此走模型提取。
+  // 未提供或返回 null 时,所有 recipe 走模板路径(向后兼容)。
+  resolveModelConfig?: () => Record<string, unknown> | null;
 };
 
 const trustedRootSchema = z.preprocess(
@@ -107,17 +110,17 @@ function errorMessage(err: unknown, fallback = 'invalid recipe request'): string
   return err instanceof Error ? err.message : String(err);
 }
 
-function cachedWrite(
+async function cachedWrite(
   options: Pick<RecipeRouteOptions, 'request' | 'response' | 'pathname' | 'requestContext' | 'cacheKeyFor' | 'requireIdempotencyKey' | 'sendCachedOrStore'>,
   body: unknown,
-  handler: () => unknown,
-): void {
+  handler: () => unknown | Promise<unknown>,
+): Promise<void> {
   const { request, response, pathname, requestContext, cacheKeyFor, requireIdempotencyKey, sendCachedOrStore } = options;
   if (!requireIdempotencyKey(response, requestContext)) return;
   const fingerprint = bodyFingerprint(body);
   const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
   if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) return;
-  const payload = handler();
+  const payload = await handler();
   sendCachedOrStore(response, cacheKey, fingerprint, 200, payload);
 }
 
@@ -230,10 +233,10 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
         sendJson(response, 404, { error: 'Recipe not found' });
         return;
       }
-      cachedWrite(options, body, () => {
+      await cachedWrite(options, body, async () => {
         const input = parsed.data;
         const safeRoot = safeTrustedRoot(input.trustedRoot);
-        const result = runRecipe(omitUndefined({
+        const result = await runRecipe(omitUndefined({
           recipeId,
           trustedRoot: safeRoot,
           prompt: input.prompt,
@@ -244,6 +247,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
           runEvents,
           runsIndex,
           recipe: selectedRecipe,
+          modelConfig: options.resolveModelConfig ? options.resolveModelConfig() : null,
         }));
         const preview = result.operations.length
           ? previewFileOperations(result.operations, { trustedRoot: safeRoot })

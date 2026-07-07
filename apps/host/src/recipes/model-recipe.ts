@@ -7,6 +7,10 @@
 // 设计:模型只被要求输出严格 JSON(便于稳健解析);解析失败/无模型时由调用方回退模板。
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
 import type { ModelConfig } from '../kimi/provider/types.js';
+import { combinedText, textOperation, xlsxOperation, binaryOperation, type SourceLike } from './recipe-helpers.js';
+import { createDocxDocument } from '../artifacts/office-writers.js';
+import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
+import type { FileOperationInput } from '../workspace/file-operations.js';
 
 export type ActionItem = { owner: string; task: string; due: string };
 
@@ -81,4 +85,56 @@ export async function extractMeetingActions(
   } catch {
     return null;
   }
+}
+
+export type AiRecipeArgs = {
+  trustedRoot: string;
+  recipe: { id: string; name: string };
+  sources: SourceLike[];
+  prompt?: string;
+  modelConfig: ModelConfig;
+  modelCall?: ModelCaller;
+};
+
+/** 会议纪要 AI 路径:模型提取行动项 → 格式化成 TXT/XLSX/DOCX。提取不到返回 null(回退模板)。 */
+async function buildMeetingAiOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  const source = combinedText(args.sources);
+  const items = await extractMeetingActions({
+    source,
+    prompt: args.prompt ?? '',
+    modelConfig: args.modelConfig,
+    ...(args.modelCall ? { modelCall: args.modelCall } : {}),
+  });
+  if (!items) return null;
+  const lines = [
+    '会议纪要行动项(AI 提取)',
+    `用户指令: ${args.prompt || '未填写'}`,
+    '原文件没有被修改，审批后会另存为副本。',
+    '',
+    ...items.map((it, i) => `${i + 1}. 【${it.owner}】${it.task}（截止：${it.due}）`),
+  ];
+  const rows = items.map((it, i) => [String(i + 1), it.owner, it.task, it.due]);
+  const { trustedRoot, recipe } = args;
+  return [
+    textOperation(trustedRoot, recipe.id, '会议行动项.txt', lines.join('\n')),
+    xlsxOperation(trustedRoot, recipe.id, '会议行动项.xlsx', createXlsxWorkbook({ sheetName: '行动项', columns: ['序号', '负责人', '待办', '截止'], rows })),
+    binaryOperation(trustedRoot, recipe.id, '会议纪要.docx', createDocxDocument({ title: '会议纪要行动项', paragraphs: lines })),
+  ];
+}
+
+// recipe id → AI 构造器。有模型且命中时用 AI,否则调用方回退模板。
+const AI_RECIPE_BUILDERS: Record<string, (args: AiRecipeArgs) => Promise<FileOperationInput[] | null>> = {
+  'meeting-actions': buildMeetingAiOperations,
+};
+
+export function hasAiRecipeBuilder(recipeId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(AI_RECIPE_BUILDERS, recipeId);
+}
+
+/** 有模型配置且该 recipe 有 AI 路径时,产出 AI operations;否则返回 null(回退模板)。 */
+export async function buildAiRecipeOperations(args: AiRecipeArgs): Promise<FileOperationInput[] | null> {
+  if (!args.modelConfig) return null;
+  const builder = AI_RECIPE_BUILDERS[args.recipe.id];
+  if (!builder) return null;
+  try { return await builder(args); } catch { return null; }
 }
