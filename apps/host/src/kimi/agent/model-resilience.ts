@@ -168,6 +168,13 @@ export function friendlyAgentError(err: unknown, context: { traceId?: unknown } 
   const error = err as Partial<ModelError> | undefined;
   if (error?.code === 'CIRCUIT_OPEN') return `模型服务暂时不可用，已启用熔断保护，请稍后重试${trace}`;
   if (error?.code === 'ETIMEDOUT') return `模型响应超时，请稍后重试${trace}`;
+  // 连接失败(本地模型没起/baseUrl 错/网络不通):Node fetch 抛 "fetch failed",cause.code
+  // 常见 ECONNREFUSED/ENOTFOUND。给可操作提示,避免用户只看到晦涩的 "fetch failed"。
+  const rawMsg = String(error?.message || '');
+  const causeCode = String((error as { cause?: { code?: unknown } } | undefined)?.cause?.code || '');
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network/i.test(rawMsg) || /ECONNREFUSED|ENOTFOUND|EAI_AGAIN/i.test(causeCode)) {
+    return `无法连接模型服务:请确认本地模型(Ollama / LM Studio)正在运行、baseUrl 正确、网络可达后重试${trace}`;
+  }
   const msg = redactText(error?.message || '发生未知错误');
   return `${msg}${trace ? ' ' + trace : ''}`;
 }

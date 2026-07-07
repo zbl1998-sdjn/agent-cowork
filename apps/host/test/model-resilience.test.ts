@@ -221,3 +221,15 @@ test('friendlyAgentError degrades known states and redacts everything else', () 
   const leaky = friendlyAgentError({ message: 'failed for key sk-test-live-key-1234567890abc' }, {});
   assert.ok(!leaky.includes('sk-test-live-key'), 'error message must be redacted');
 });
+
+test('friendlyAgentError turns connection failures into actionable guidance', () => {
+  // Node fetch 连不上本地模型:message="fetch failed",cause.code=ECONNREFUSED
+  const byMsg = friendlyAgentError({ message: 'fetch failed' }, { traceId: 't2' });
+  assert.match(byMsg, /无法连接模型服务/);
+  assert.match(byMsg, /Ollama/);
+  assert.match(byMsg, /t2/);
+  const byCause = friendlyAgentError({ message: 'fetch failed', cause: { code: 'ECONNREFUSED' } }, {});
+  assert.match(byCause, /无法连接模型服务/);
+  // 不误伤普通错误
+  assert.ok(!/无法连接模型服务/.test(friendlyAgentError({ message: 'invalid request' }, {})));
+});
