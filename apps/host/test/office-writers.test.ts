@@ -21,6 +21,17 @@ test('createDocxDocument writes escaped WordprocessingML content', () => {
   assert.match(zipText(docx, '[Content_Types].xml'), /wordprocessingml\.document\.main\+xml/);
 });
 
+test('createDocxDocument strips XML-illegal control chars so the OOXML stays valid', () => {
+  // 源含 XML 1.0 非法控制字符(NUL/响铃/单元分隔),不剥离会让 document.xml 非法、Word 打不开。
+  const dirty = '正常' + String.fromCharCode(0) + '带' + String.fromCharCode(7) + '控制' + String.fromCharCode(31) + '符';
+  const docx = createDocxDocument({ title: '测试' + String.fromCharCode(0), paragraphs: [dirty, '第二段'] });
+  const documentXml = zipText(docx, 'word/document.xml');
+  // 剥离后正文可读、控制字符消失
+  assert.match(documentXml, /正常带控制符/);
+  const hasIllegal = [...documentXml].some((ch) => { const n = ch.codePointAt(0) ?? 0; return n <= 8 || n === 11 || n === 12 || (n >= 14 && n <= 31); });
+  assert.equal(hasIllegal, false, 'document.xml 不应残留 XML 非法控制字符');
+});
+
 test('createPptxPresentation writes escaped slide text', () => {
   const pptx = createPptxPresentation({
     title: '管理摘要',

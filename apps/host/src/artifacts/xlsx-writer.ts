@@ -15,8 +15,20 @@ export type WorkbookSpec = {
 };
 
 /** XML 转义,确保单元格文本安全嵌入 SpreadsheetML。 */
+// XML 1.0 非法控制字符(除 \t=9 \n=10 \r=13):0-8、11、12、14-31。源含 NUL/响铃等
+// (脏数据/二进制误读)会让 .xlsx 内的 sheet XML 非法,Excel 报「文件损坏无法打开」。
+function stripXmlControlChars(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const n = ch.codePointAt(0) ?? 0;
+    if (n <= 8 || n === 11 || n === 12 || (n >= 14 && n <= 31)) continue;
+    out += ch;
+  }
+  return out;
+}
+
 function escapeXml(value: unknown): string {
-  return String(value ?? '')
+  return stripXmlControlChars(String(value ?? ''))
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

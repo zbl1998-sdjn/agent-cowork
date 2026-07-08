@@ -29,8 +29,20 @@ export type PdfDocumentSpec = {
 };
 
 /** XML 转义,确保文本安全嵌入 OOXML(含 ' → &apos;)。 */
+// XML 1.0 非法控制字符(除 \t=9 \n=10 \r=13):0-8、11、12、14-31。源里若含 NUL/响铃等
+// (脏数据/二进制被误读为文本),会让生成的 OOXML 成为非法 XML,Word/PPT 报「文件损坏无法打开」。
+function isIllegalXmlChar(n: number): boolean {
+  return n <= 8 || n === 11 || n === 12 || (n >= 14 && n <= 31);
+}
+
+function stripXmlControlChars(text: string): string {
+  let out = '';
+  for (const ch of text) if (!isIllegalXmlChar(ch.codePointAt(0) ?? 0)) out += ch;
+  return out;
+}
+
 function escapeXml(value: unknown): string {
-  return String(value ?? '')
+  return stripXmlControlChars(String(value ?? ''))
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
