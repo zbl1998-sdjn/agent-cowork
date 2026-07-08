@@ -6,6 +6,31 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-08
+
+### Security(dogfood 全量安全审计,PR #22–#33)
+
+- **CSV 公式/DDE 注入(OWASP CSV Injection)**:`csvOperation` 只转义 `",\r\n`,不防公式。`=cmd|'/c calc'!A1` 等原样写入 CSV,Excel 打开即执行任意命令。修:公式前缀单引号中和,合法负数/科学计数不误伤。
+- **AI recipe 绕过机密档出网闸门**(3 处叠加,均已堵上):recipe AI 提取(`model-recipe-extract.ts`)、orchestrator 编排任务(`provider-task-runner.ts`)、内置 `web.fetch`/`WebSearch` 工具,此前均直接裸调而不经 `decideEgressPolicy`,`air_gap`/`local_strict` 下仍会实际出网。三处统一补上出站策略检查,deny 时优雅回退模板/抛错,`controlled_hybrid` 等默认模式不受影响。
+- **OOXML 控制字符致文档损坏**:源数据含 NUL/响铃等 XML 非法控制字符时,生成的 Word/PPT/Excel 是非法 XML,Office 报"文件损坏无法打开"。修:写入前按码点剥离非法控制字符,保留 `\t\n\r`。
+- **可视化产物 CDN 依赖违反零出网承诺**:图表(Chart.js)/流程图(Mermaid)产物内嵌外部 CDN `<script>`,机密模式下打开文件仍会真实出网。修:`air_gap` 下退化为纯 HTML 表格/原始定义文本,不引入任何外部脚本,并显示可见说明横幅。
+- **沙箱严格模式策略未被消费**:`local_strict`/`air_gap` 下无隔离沙箱后端时,`policyBlocked` 只写进展示字段从未真正阻止 `sandbox.exec`/`sandbox.run-code` 注册(定级 P2/P3——调用层 `decideToolPolicy` 独立防线本就正确 fail-closed deny)。修:注册层也据此排除这两个高风险工具,并把散落的 `local_strict` 单点判断统一成 `isStrictLocalMode`(覆盖 local_demo/local_strict/air_gap)。
+- 凭据存储非 Windows 平台 fallback 密钥(`hostname:username:homedir` 派生)缺少可见性,现在首次触发时输出警告日志,提示设置 `KCW_CREDENTIAL_KEY`。
+
+### Added(AI 驱动的办公 recipe,PR #16–#21、#30)
+
+- 6 类内置 recipe(会议纪要转行动项、总结报告、合同摘要、反馈聚类、一键周报、表格清洗)接入模型驱动的结构化提取:有模型配置时先尝试 AI 语义提取,提取失败/无模型/出站策略拒绝时优雅回退现有模板,不破坏离线可用性。真实 Ollama 验证:会议纪要正确识别负责人/待办/截止,反馈聚类做到语义聚合(而非正则重排)。
+- 定时任务(scheduler)现在复用与手动运行相同的 AI recipe 路径,不再永远走模板。
+- 产物预览新增「✨ AI 生成」标识,区分模型提取产物与模板兜底产物。
+
+### Fixed(dogfood 真机验收,PR #7–#15、#22–#24)
+
+- Ollama/本地模型 provider 遮蔽导致的 404 与晦涩错误信息,改为可操作的"请确认本地模型正在运行"提示。
+- 中文 PDF 从乱码占位改为真实 CJK 字体子集嵌入(CIDFontType2),Chrome 视觉验收中文正确渲染。
+- 「引用本地文件」选中的源文件此前未进入 recipe 的 files 参数,导致需要来源材料的 recipe 报"引用 0 个";聊天模式下 @ 提及同样缺失,agent 会先对 `@文件名` 发起必然失败的 Read。两条路径均已把真实路径贯通进请求上下文。
+- 思考模型(qwen3/deepseek-r1)的 `<think>` 推理块污染 JSON 提取,AI recipe 偶发回退模板;提取前先剥离推理块。
+- 新建对话未切回对话视图、可视化项目成功计数漏算、流式响应未采集 token 用量等多项 UI/UX 缺陷。
+
 ### Added (2026-07-07 — 企业机密档安全基线 plan/08)
 
 - 机密模式一键总开关 `KCW_CONFIDENTIAL=1`(L0 `security/confidential.ts`):`resolveSecurityMode` 强制返回 `air_gap` 且不可被任何配置/env 削弱(fail-closed);启动期 MCP(含 MASE)全丢、`/api/connectors/oauth/*` 一律 403、云模型/外网工具全部拒绝、本地 provider 仍可用;`/api/selfcheck` 暴露 `security.confidential`。
