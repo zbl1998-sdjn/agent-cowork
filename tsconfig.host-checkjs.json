@@ -93,6 +93,7 @@
     "apps/host/src/kimi/prompt/refiner.ts",
     "apps/host/src/kimi/safety/untrusted-content.ts",
     "apps/host/src/kimi/system-prompt.ts",
+    "apps/host/src/memory/conversation-buffer.ts",
     "apps/host/src/memory/file-memory-store.ts",
     "apps/host/src/memory/mase-bridge.ts",
     "apps/host/src/memory/memory-audit.ts",

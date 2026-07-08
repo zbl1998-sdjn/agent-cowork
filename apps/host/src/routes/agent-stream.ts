@@ -21,6 +21,7 @@ import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
+import { appendConversationTurn, formatRecentTurns, readRecentTurns } from '../memory/conversation-buffer.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
@@ -174,8 +175,15 @@ export async function streamAgentChat({
     const maseSessionMemory = memoryActive
       ? await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread)
       : '';
+    // 自带对话缓冲兜底:MASE 关闭/无召回时,用本地缓冲的「本会话最近若干轮」喂 session 层,
+    // 让不接 MASE 也有多轮连续性(dogfood 2026-07-09 发现:此前同会话记忆 100% 依赖 MASE)。
+    // MASE 在且有召回时行为不变(maseSessionMemory 非空优先),避免与 MASE 双重注入。
+    const builtinSessionMemory = memoryActive && !maseSessionMemory
+      ? formatRecentTurns(readRecentTurns(trustedRoot, maseConversation))
+      : '';
+    const sessionMemory = maseSessionMemory || builtinSessionMemory;
     const memory = memoryActive
-      ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }))
+      ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: sessionMemory || undefined }))
       : { text: '', layers: [] };
     // 读侧脱敏(纵深防御):记忆注入模型前统一过 redactText——即便历史遗留的旧凭据
     // 已落在 MASE/分层记忆存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
@@ -274,6 +282,12 @@ export async function streamAgentChat({
     // 同样受记忆总闸约束:暂停/隐身/停用时不回写(与读缝一致)。
     if (memoryActive && status === 'succeeded' && outcome.text) {
       await maseRememberTurn(toolRegistry, String(body.prompt || ''), outcome.text, maseThread);
+      // 自带对话缓冲:成功一轮的用户+助手写入本地缓冲(不依赖 MASE),供下一轮 session 层续接
+      // (关闭 MASE 也有多轮记忆),并作为对话结束提炼主题知识(Phase 2)的短期来源。
+      try {
+        appendConversationTurn(trustedRoot, maseConversation, { role: 'user', text: String(body.prompt || '') });
+        appendConversationTurn(trustedRoot, maseConversation, { role: 'assistant', text: String(outcome.text || '') });
+      } catch { /* 缓冲写入失败不阻断收尾 */ }
     }
     response.end();
   }
