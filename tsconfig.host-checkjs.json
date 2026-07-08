@@ -94,6 +94,7 @@
     "apps/host/src/kimi/safety/untrusted-content.ts",
     "apps/host/src/kimi/system-prompt.ts",
     "apps/host/src/memory/consolidate.ts",
+    "apps/host/src/memory/consolidate-trigger.ts",
     "apps/host/src/memory/conversation-buffer.ts",
     "apps/host/src/memory/file-memory-store.ts",
     "apps/host/src/memory/knowledge-extractor.ts",

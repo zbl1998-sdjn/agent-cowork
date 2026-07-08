@@ -22,6 +22,10 @@ import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { appendConversationTurn, formatRecentTurns, readRecentTurns } from '../memory/conversation-buffer.js';
+import { maybeConsolidatePreviousConversation } from '../memory/consolidate-trigger.js';
+import type { ConsolidateCallJson } from '../memory/consolidate.js';
+import { callModelForJson, type ModelCaller } from '../recipes/model-recipe-extract.js';
+import type { ModelConfig } from '../kimi/provider/types.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
@@ -171,6 +175,26 @@ export async function streamAgentChat({
     // 记忆总闸:尊重用户「暂停/隐身/停用」开关(memory-settings)——非活跃时本轮既不注入也不回写,
     // 内置分层记忆与 MASE 记忆桥接对同一个开关保持一致(否则 UI 里的开关对实时对话形同虚设)。
     memoryActive = isMemoryActiveForRoot(trustedRoot);
+    // 惰性提炼触发:用户切到了另一个对话 → 后台把上一个对话缓冲提炼成主题知识(不 await、
+    // 错误吞掉,不加聊天延迟)。提炼的模型调用经 callModelForJson 走 decideEgressPolicy 出站闸门
+    // (与对话路径同一策略,机密档下同样拒绝出网);复用本轮 modelCall,缺省回落默认 provider。
+    if (memoryActive) {
+      const consolidateCallJson: ConsolidateCallJson = (a) => callModelForJson(omitUndefined({
+        system: a.system,
+        user: a.user,
+        modelConfig: a.modelConfig as ModelConfig,
+        modelCall: modelCall as unknown as ModelCaller | undefined,
+        trustedRoot: a.trustedRoot,
+      }));
+      void maybeConsolidatePreviousConversation({
+        trustedRoot,
+        tenantId: requestContext.tenantId,
+        userId: requestContext.userId,
+        conversationId: maseConversation,
+        modelConfig: runKimiConfig,
+        callJson: consolidateCallJson,
+      }).done;
+    }
     // 读缝:MASE 作为记忆后端——注入【最近对话(本线程时序)+ 当前事实 + 相关历史】到会话记忆层。
     const maseSessionMemory = memoryActive
       ? await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread)
