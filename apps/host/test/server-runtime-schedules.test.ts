@@ -89,6 +89,64 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
   }
 });
 
+test('schedules: default executor forwards configured model to runRecipe (functional completeness: scheduled recipes must be able to use the AI path, not always fall back to the template)', async () => {
+  const trustedRoot = tempRoot();
+  const notesPath = path.join(trustedRoot, 'notes.txt');
+  fs.writeFileSync(notesPath, '张三负责登录模块联调,截止下周三。', 'utf8');
+  // 不传 scheduleExecutor:走 host-scheduler.ts 的 defaultScheduleExecutor,验证它真的把
+  // state.kimiApiConfig 转发给了 runRecipe(此前从不转发,定时任务永远只能走模板路径)。
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    kimiProvider: 'ollama',
+    // 端口 1 通常无人监听:立即 ECONNREFUSED,不用等 AI_MODEL_TIMEOUT_MS 超时——
+    // 本测试只验证 modelConfig 被转发、AI 路径被尝试,不验证真实模型响应。
+    kimiBaseUrl: 'http://127.0.0.1:1/v1',
+    kimiModel: 'kimi-k2.7-code',
+  });
+  const base = await bind(server);
+  try {
+    const created = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-ai-forward' },
+      body: { name: 'ai-forward', cron: '* * * * *', payload: { recipeId: 'meeting-actions', files: [notesPath] } },
+    });
+    assert.equal(created.status, 200);
+    const scheduleId = stringField(objectField(created.body, 'schedule', 'created schedule'), 'id', 'schedule id');
+
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
+    const raw = recordValue(JSON.parse(fs.readFileSync(file, 'utf8')) as unknown, 'schedule file');
+    raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
+
+    const tick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-ai-forward-tick' },
+    });
+    assert.equal(tick.status, 200);
+    assert.equal(tick.body.fired, 1);
+
+    // 无法连接的 baseUrl 会让 AI 提取超时/失败并回退模板(这是预期的优雅降级,不是本测试要
+    // 验证的点)。真正要验证的是:defaultScheduleExecutor 确实尝试过 AI 路径而不是直接跳过——
+    // run 记录的 events 里应出现 AI 提取相关的 progress 文案。
+    const runsDir = path.join(trustedRoot, '.AgentCowork', 'runs');
+    const runFiles = fs.readdirSync(runsDir).filter((f) => f.endsWith('.json'));
+    assert.ok(runFiles.length >= 1, 'run record should be written');
+    const runFile = runFiles[0];
+    assert.ok(runFile);
+    const runRecord = recordValue(JSON.parse(fs.readFileSync(path.join(runsDir, runFile), 'utf8')) as unknown, 'run record');
+    const events = Array.isArray(runRecord.events) ? runRecord.events : [];
+    const sawAiAttempt = events.some((e) => {
+      const ev = recordValue(e, 'event');
+      return typeof ev.text === 'string' && ev.text.includes('AI 正在从来源提取');
+    });
+    assert.equal(sawAiAttempt, true, 'defaultScheduleExecutor 必须转发 modelConfig 让 AI 路径被尝试,不能永远跳过');
+  } finally {
+    await close(server);
+  }
+});
+
 test('schedules: one-shot fireAt creates schedule', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({
