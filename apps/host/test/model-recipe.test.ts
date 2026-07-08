@@ -60,6 +60,28 @@ test('extractMeetingActions: modelCall 抛错 → null(调用方回退模板)', 
   assert.equal(r, null);
 });
 
+test('extractMeetingActions: air_gap/local_strict 拦截云端出网,不调用模型(安全回归:AI 提取此前绕过了出站策略)', async () => {
+  let called = false;
+  const spy = async () => { called = true; return { content: '[{"owner":"x","task":"y","due":"z"}]' }; };
+  const cloudConfig = { provider: 'kimi-api', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.7-code' };
+
+  called = false;
+  const airGap = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy as never });
+  assert.equal(called, false, 'air_gap 下不得实际调用模型(即使 baseUrl 是云端)');
+  assert.equal(airGap, null);
+
+  called = false;
+  const strict = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy as never });
+  assert.equal(called, false, 'local_strict 下不得实际调用云端模型');
+  assert.equal(strict, null);
+
+  // 对照组:非严格模式(controlled_hybrid)不能被误伤,出网+提取应正常工作。
+  called = false;
+  const hybrid = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy as never });
+  assert.equal(called, true, 'controlled_hybrid 下应正常允许出网(不能误伤)');
+  assert.equal(hybrid?.length, 1);
+});
+
 test('normalizeSummary: 字段别名归一 + 全空返回 null', () => {
   const s = normalizeSummary({ 标题: '周报', 要点: ['完成登录'], 风险: ['验收待补'], 下一步: ['联调'] });
   assert.equal(s?.title, '周报');
