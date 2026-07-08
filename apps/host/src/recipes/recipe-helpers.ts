@@ -80,8 +80,15 @@ export function xlsxOperation(trustedRoot: string, recipeId: string, filename: s
   return binaryOperation(trustedRoot, recipeId, filename, workbook);
 }
 
+// 合法数值(整数/小数/科学计数,可带正负号):不当作公式,避免把负数金额误改成文本。
+const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+/** 防 CSV 公式/DDE 注入(OWASP CSV Injection):以 = + - @ 或 制表符/回车 开头的单元格,
+ * 在 Excel/LibreOffice 打开时会被当公式执行(=HYPERLINK 外泄、=cmd|... DDE 命令执行)。
+ * 前置单引号中和为纯文本;合法数字(如 -5、+3.2、1e3)保持原样。 */
 function csvEscape(value: unknown): string {
-  const text = String(value ?? '');
+  let text = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text) && !PLAIN_NUMBER.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
