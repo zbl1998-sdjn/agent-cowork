@@ -6,7 +6,17 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-07-08
+## [0.2.1] - 2026-07-09
+
+### Fixed(dogfood 全面遍历审查,2026-07-09)
+
+- **主对话工具集的原生 WebFetch 绕过出站策略网关(P0)**:`/api/agent/chat/stream` 主对话实际暴露的是 `apps/host/src/kimi/agent-tools.ts` 里独立定义的原生 `WebFetch`(`toolset-builder` 只合并 `mcp:` 前缀工具,已网关化的 `web-builtin-tools.ts` 版进不了主聊天集),它 `mutating:false/risk:'safe'` 且直接裸调 `webFetch()`,`controlled_hybrid`/`enterprise_local` 下可无审批、无出站审计地把工作区内容发往任意公网 URL。补上 `decideEgressPolicy`/`recordEgressDecision` 前置检查并对齐风险字段为 `high/requiresApproval`。这是此前三处同类出站旁路(recipe/orchestrator/web-builtin)之外命中生产主路径的第四处。
+- **图表/流程图/活页产物在桌面窗口内无法渲染(CSP 拦截)**:`InlineViz`/`LiveArtifactView` 把产物 HTML 塞进桌面应用 `sandbox="allow-scripts"` 的 `<iframe srcDoc>`,浏览器把外壳 CSP(`script-src 'self'`,无 `unsafe-inline`)继承给子文档且子文档 `<meta CSP>` 无法放宽(Playwright 实测确认),导致 CDN `<script src>` 与内联画图 `<script>` 全被拦、图表永远空白。改为本地打包 Chart.js/Mermaid 到 `public/vendor/`,画图逻辑移入外部脚本,数据经 `<script type="application/json">` 传递,消除全部内联可执行脚本;`air_gap` 行为不变。以真实产物 HTML + 真实 vendor + 真实 CSP 端到端验证渲染正常。
+- **设置→组件面板对内置 Python、中日韩字体、WebView2 误报缺失/待检测**:三处探测都只认环境变量,不看随包实际落盘/系统实际安装。改为实地探测回落——内置 Python 探测 host exe 同级 `python-embedded/python.exe`;CJK 字体回落探测系统字体(与 PDF 渲染同口径);WebView2 探测标准安装目录。真机验证三项核心组件均识别为可用,核心异常计数从 2 降到 0。显式 env 配置仍优先,真正缺失时仍正确报缺失。
+
+### Chore
+
+- 删除三个全仓库零引用、零测试的孤儿模块:`storage/json-store.ts`、`hooks/usePromptRefine.ts`、`lib/api/capabilities.ts`(后端 `/api/capabilities/*` 路由本身保留)。
 
 ### Security(dogfood 全量安全审计,PR #22–#33)
 
