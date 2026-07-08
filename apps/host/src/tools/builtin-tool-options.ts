@@ -17,6 +17,9 @@ export type BuiltinToolsOptions = {
   runsIndex?: RunsIndexLike | null;
   enableWebTools?: boolean;
   fetchImpl?: WebFetchLike | WebSearchFetchLike;
+  // 联网工具(web.fetch/WebSearch)出站策略检查用:取「当前」安全模式,不是装配时的快照——
+  // 传引用而非值,因为 securityMode 所在的配置对象可能在运行期被路由原地更新。
+  resolveSecurityMode?: () => unknown;
 };
 export type BuiltinToolsOptionsInput = {
   sandbox?: unknown;
@@ -26,6 +29,7 @@ export type BuiltinToolsOptionsInput = {
   runsIndex?: unknown;
   enableWebTools?: unknown;
   fetchImpl?: unknown;
+  resolveSecurityMode?: unknown;
 };
 
 const sandboxSchema = z.custom<SandboxLike | null | undefined>(
@@ -43,6 +47,10 @@ const builtinToolsOptionsSchema = z.object({
   fetchImpl: z.custom<WebFetchLike | WebSearchFetchLike | undefined>(
     (value) => value === undefined || typeof value === 'function',
     { message: 'fetchImpl must be a function' },
+  ).optional(),
+  resolveSecurityMode: z.custom<(() => unknown) | undefined>(
+    (value) => value === undefined || typeof value === 'function',
+    { message: 'resolveSecurityMode must be a function' },
   ).optional(),
 }).strict();
 
