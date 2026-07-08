@@ -4,6 +4,7 @@ import {
   upsertKnowledgeItem,
   listKnowledgeItems,
   setKnowledgeItemStatus,
+  deleteKnowledgeItem,
 } from '../src/memory/knowledge-store.js';
 import { tempRoot } from './helpers/host-http.js';
 
@@ -64,6 +65,17 @@ test('active items are capped per scope; the oldest is evicted and reported (no 
   assert.ok(active.length <= 3, `active items should be capped at 3, got ${active.length}`);
   assert.ok(evicted.includes('k0'), 'oldest item k0 should have been evicted');
   assert.equal(active.some((it) => it.title === 'k0'), false);
+});
+
+test('deleteKnowledgeItem removes an item (user can delete a mis-extracted memory)', () => {
+  const root = tempRoot('kcw-know-');
+  upsertKnowledgeItem(root, cand(), { confidenceThreshold: 0.7 });
+  const item = listKnowledgeItems(root)[0];
+  assert.ok(item);
+  assert.equal(deleteKnowledgeItem(root, String(item?.id)), true);
+  assert.equal(listKnowledgeItems(root).length, 0);
+  // 删不存在的 id 返回 false
+  assert.equal(deleteKnowledgeItem(root, 'nope'), false);
 });
 
 test('setKnowledgeItemStatus approves a pending item into active', () => {

@@ -163,3 +163,13 @@ export function setKnowledgeItemStatus(trustedRoot: unknown, id: string, status:
   writeAll(trustedRoot, items);
   return true;
 }
+
+/** 删除某条知识(用户在面板剔除误提炼的记忆);找不到返回 false。 */
+export function deleteKnowledgeItem(trustedRoot: unknown, id: string): boolean {
+  const items = readAll(trustedRoot);
+  const idx = items.findIndex((it) => it.id === id);
+  if (idx < 0) return false;
+  items.splice(idx, 1);
+  writeAll(trustedRoot, items);
+  return true;
+}
