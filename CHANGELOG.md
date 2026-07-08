@@ -6,6 +6,20 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
+### Added(自带跨会话记忆——关闭 MASE 也可用,dogfood 2026-07-09)
+
+- **对话缓冲(同会话连续性)**:`memory/conversation-buffer.ts` 每轮成功后把 `{role,text,ts}`(先 DLP 脱敏)append 到 `<root>/.AgentCowork/conversations/<convId>.jsonl`,按轮数(40)/字节(32KB)滚动;`agent-stream` 读缝把最近若干轮当 session 层注入。修好此前"关闭 MASE 后 Turn 2 完全不记得 Turn 1"(多轮记忆此前 100% 依赖 MASE)。
+- **对话自动提炼主题知识**:切换对话时惰性触发,把上一对话交给模型(经 `decideEgressPolicy` 出站网关)提炼成结构化主题知识(`knowledge-extractor` 保守提取 + `consolidate` 编排)。知识库(`memory/knowledge-store.ts`,`.AgentCowork/knowledge.json`)带置信度门(高→active/低→pending 待确认)、按主题去重合并/supersede、per-scope 容量淘汰、DLP 拒密钥、来源溯源(sourceConversationId+ts)。
+- **新对话相关性召回**:`memory/knowledge-recall.ts` 按当前 prompt 相关性(关键词/CJK 2-gram,零依赖)挑 top-K active 知识注入系统提示;不相关不注入(读侧防污染)、pending 永不召回。另加只读 `SearchMemory` agent 工具供按需深查。
+- **记忆面板主题知识区**:`MemoryKnowledgeSection` 展示 active/pending,可批准 pending→active、删除误提炼条目;端点 `GET/POST/DELETE /api/memory/knowledge*`(`memory-knowledge-routes.ts`)。
+- 真机端到端验收(MASE off + 真实 kimi-k2.6):对话→切换自动提炼→新对话召回全链路通过,证据存 `reports/memory-e2e/`。
+
+### Fixed
+
+- **长上下文压缩丢失注入记忆(问题B)**:`history-compactor` 超预算时会把承载 agent 指令+注入记忆的首条 system 消息折进摘要并尾截断,小窗口本地模型/超大 MEMORY.md 的长对话会丢长期记忆。修:压缩时保护首条 system 消息(只摘要其后历史、给其预留 token 额度),正常长历史下记忆完整、极端小预算下也优先保记忆。
+
 ## [0.2.1] - 2026-07-09
 
 ### Fixed(dogfood 全面遍历审查,2026-07-09)
