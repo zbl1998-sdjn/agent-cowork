@@ -60,6 +60,30 @@ test('recipe helpers build write operations with safe artifact paths and encodin
   assert.equal(workbook.contentBase64, Buffer.from('xlsx').toString('base64'));
 });
 
+test('csvOperation neutralizes formula/DDE injection but keeps plain numbers', () => {
+  const csv = csvOperation(root, 'sec', 'inj.csv', [
+    ['col'],
+    ['=HYPERLINK("http://evil","x")'], // = 公式 → 前置 '
+    ["=cmd|'/c calc'!A1"],             // DDE → 前置 '
+    ['+1+1'],                          // 非纯数字的 + → 前置 '
+    ['@SUM(1)'],                       // @ → 前置 '
+    ['-5'],                            // 合法负数 → 保持
+    ['+3.2'],                          // 合法正数 → 保持
+    ['1200'],                          // 普通数 → 保持
+    ['正常文本'],
+  ]);
+  const lines = String(csv.content).split('\n');
+  const at = (i: number): string => lines[i] ?? '';
+  assert.ok(at(1).startsWith('"\'=HYPERLINK') || at(1).startsWith("'=HYPERLINK"), '= 公式必须前置单引号');
+  assert.ok(at(2).startsWith("'=cmd"), 'DDE 必须前置单引号');
+  assert.ok(at(3).startsWith("'+1+1"), '非数字 + 必须中和');
+  assert.ok(at(4).startsWith("'@SUM"), '@ 必须中和');
+  assert.equal(at(5), '-5');       // 合法负数不误伤
+  assert.equal(at(6), '+3.2');     // 合法正数不误伤
+  assert.equal(at(7), '1200');
+  assert.equal(at(8), '正常文本');
+});
+
 test('parseTableRows normalizes headers, duplicates, and empty fields', () => {
   assert.deepEqual(parseTableRows('').rows, [['1', '未发现可解析表格行', '需人工确认']]);
 
