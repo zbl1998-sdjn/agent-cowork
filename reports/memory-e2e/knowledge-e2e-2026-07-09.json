@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "know_01KX1QR7HS5A5VBEZNADH0VXW8",
+      "topic": "项目",
+      "title": "项目代号",
+      "content": "项目代号是「银河X9」",
+      "confidence": 0.95,
+      "status": "active",
+      "scope": "project",
+      "provenance": {
+        "sourceConversationId": "e2e-A",
+        "ts": "2026-07-08T20:47:15.513Z"
+      },
+      "updatedAt": "2026-07-08T20:47:15.513Z"
+    },
+    {
+      "id": "know_01KX1QR7HTE34BDYVNZPMZV25Q",
+      "topic": "项目",
+      "title": "项目架构师",
+      "content": "该项目的架构师是老李",
+      "confidence": 0.95,
+      "status": "active",
+      "scope": "project",
+      "provenance": {
+        "sourceConversationId": "e2e-A",
+        "ts": "2026-07-08T20:47:15.514Z"
+      },
+      "updatedAt": "2026-07-08T20:47:15.514Z"
+    }
+  ]
+}
