@@ -23,6 +23,7 @@ import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { appendConversationTurn, formatRecentTurns, readRecentTurns } from '../memory/conversation-buffer.js';
 import { maybeConsolidatePreviousConversation } from '../memory/consolidate-trigger.js';
+import { formatKnowledgeForInjection, recallRelevantKnowledge } from '../memory/knowledge-recall.js';
 import type { ConsolidateCallJson } from '../memory/consolidate.js';
 import { callModelForJson, type ModelCaller } from '../recipes/model-recipe-extract.js';
 import type { ModelConfig } from '../kimi/provider/types.js';
@@ -209,10 +210,15 @@ export async function streamAgentChat({
     const memory = memoryActive
       ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: sessionMemory || undefined }))
       : { text: '', layers: [] };
+    // 跨会话主题知识召回:按当前 prompt 相关性挑 top-K active 知识注入(过往对话提炼而来)。
+    // 相关性门控——不相关就不注入(读侧防污染);pending 永不召回。让新对话「想起之前说过的」。
+    const knowledgeText = memoryActive
+      ? formatKnowledgeForInjection(recallRelevantKnowledge(trustedRoot, String(body.prompt || '')))
+      : '';
     // 读侧脱敏(纵深防御):记忆注入模型前统一过 redactText——即便历史遗留的旧凭据
-    // 已落在 MASE/分层记忆存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
+    // 已落在 MASE/分层记忆/知识库存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
     // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
-    const memoryText = redactText(memory.text) || '';
+    const memoryText = redactText([memory.text, knowledgeText].filter(Boolean).join('\n\n')) || '';
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     // 自适应压缩阈值:按本轮实际所选模型(含会话级 BYO 覆盖)的上下文窗口推导预算,
     // 请求已显式指定 maxContextTokens 时仍以显式值为准。
