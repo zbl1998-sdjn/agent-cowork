@@ -215,7 +215,10 @@ export function App() {
       return;
     }
 
-    const prompt = resumeRunId ? '' : uploaded.length ? `${text}\n\n[已上传文件]\n${uploaded.join('\n')}` : text;
+    // 上传附件 + @ 提及引用的工作区文件都作为「文件」上下文附给 agent,给出真实路径,
+    // 避免 agent 拿文本里的 @basename(带 @)去 Read 而 ENOENT(dogfood 实测的多余失败调用)。
+    const contextFiles = resumeRunId ? [] : [...uploaded, ...(meta.referencedFiles || [])];
+    const prompt = resumeRunId ? '' : contextFiles.length ? `${text}\n\n[已引用/上传的文件]\n${contextFiles.join('\n')}` : text;
     setStreamingId(assistantId);
     try {
       await agentChatStream(prompt, buildAgentChatStreamOptions({
@@ -225,7 +228,7 @@ export function App() {
         thinking: meta.thinking,
         autoApprove,
         planMode,
-        images: uploaded.filter((p) => isImagePath(p)),
+        images: contextFiles.filter((p) => isImagePath(p)),
         resumeRunId,
         conversationId: conversations.activeConvId,
         autoContextCompaction,
