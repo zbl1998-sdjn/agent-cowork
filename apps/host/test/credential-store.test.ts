@@ -9,6 +9,7 @@ import {
   createCredentialStore,
   createDefaultCredentialProtector,
   createDpapiProtector,
+  resetWeakCredentialFallbackWarning,
 } from '../src/security/credential-store.js';
 import { summarizeCredential } from '../src/security/credential-summary.js';
 import type { CredentialProtector } from '../src/security/credential-store.js';
@@ -155,6 +156,30 @@ test('AES-GCM credential protector rejects incomplete ciphertext parts', () => {
 
   assert.throws(() => protector.unprotect('aesgcm:v1:::payload'), /Unsupported credential cipher text/);
   assert.throws(() => protector.unprotect('aesgcm:v1:iv:tag'), /Unsupported credential cipher text/);
+});
+
+test('AES-GCM protector warns once when falling back to the weak host/user/home-derived key', () => {
+  const original = process.env.KCW_CREDENTIAL_KEY;
+  delete process.env.KCW_CREDENTIAL_KEY;
+  const originalWarn = console.warn;
+  const calls: unknown[][] = [];
+  console.warn = (...args: unknown[]) => { calls.push(args); };
+  try {
+    resetWeakCredentialFallbackWarning();
+    createAesGcmProtector({}); // 无 keyMaterial、无 env → 走弱 fallback → 应警告一次
+    createAesGcmProtector({}); // 再次落到同一弱 fallback → 不应重复刷屏
+    assert.equal(calls.length, 1, 'weak fallback must warn exactly once, not per-call');
+    assert.match(String(calls[0]?.[0]), /KCW_CREDENTIAL_KEY/);
+
+    // 显式传 keyMaterial 不算弱 fallback,不应触发警告。
+    resetWeakCredentialFallbackWarning();
+    createAesGcmProtector({ keyMaterial: 'explicit-key' });
+    assert.equal(calls.length, 1, 'explicit keyMaterial must not trigger the weak-fallback warning');
+  } finally {
+    console.warn = originalWarn;
+    if (original !== undefined) process.env.KCW_CREDENTIAL_KEY = original;
+    resetWeakCredentialFallbackWarning();
+  }
 });
 
 test('DPAPI credential protector uses stdin, timeout, hidden window, and validates prefixes', () => {

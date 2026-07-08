@@ -87,8 +87,28 @@ function aesKey(keyMaterial: unknown): Buffer {
   return crypto.createHash('sha256').update(String(keyMaterial || '')).digest();
 }
 
+// dogfood 已知记录的弱点:主机名/用户名/家目录都是本机任何进程可查的公开信息,不是真正的
+// 秘密——用它们派生出的密钥只是"混淆"而非"加密",任何拿到密文文件的本地代码都能重算出
+// 同一把密钥解密。真正的修复(口令 + KDF)是产品功能级决策(涉及 UI 交互流程),这里只做
+// 纯技术性加固:让这个已知弱点在日志里可见,而不是悄悄地被使用。
+const WEAK_FALLBACK_WARNING =
+  '[credential-store] 未设置 KCW_CREDENTIAL_KEY,凭据加密密钥退化为 hostname:username:homedir 派生——' +
+  '这三项都是本机任何本地代码可查的公开信息,只提供混淆级保护而非真正的机密性。' +
+  '生产/机密场景请设置 KCW_CREDENTIAL_KEY 为独立的高熵密钥。';
+let warnedWeakFallback = false;
+
+/** 仅测试用:重置"已警告过弱密钥"标记,避免测试间因模块级单例互相影响。 */
+export function resetWeakCredentialFallbackWarning(): void {
+  warnedWeakFallback = false;
+}
+
 /** 造 AES-256-GCM 加密器(跨平台兜底):密文形如 `aesgcm:v1:iv:tag:data`,自带完整性校验。 */
 export function createAesGcmProtector({ keyMaterial }: { keyMaterial?: unknown } = {}): CredentialProtector {
+  const usingWeakFallback = !keyMaterial && !process.env.KCW_CREDENTIAL_KEY;
+  if (usingWeakFallback && !warnedWeakFallback) {
+    warnedWeakFallback = true;
+    console.warn(WEAK_FALLBACK_WARNING);
+  }
   const key = aesKey(keyMaterial || process.env.KCW_CREDENTIAL_KEY || `${os.hostname()}:${os.userInfo().username}:${os.homedir()}`);
   return {
     protect(plainText: unknown): string {
