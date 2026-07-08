@@ -1,10 +1,14 @@
 // 模型驱动 recipe 的提取层(host · L1 领域层 · recipes)
 // ---------------------------------------------------------------------------
-// 职责:把源材料交给已配置模型做「结构化提取」,只依赖 provider,不碰 office-writers/落盘。
-//       模型只被要求输出严格 JSON;解析失败/无来源/模型失败一律返回 null,由调用方回退模板。
-// 依赖:L1 provider(callProviderChatCompletion)。导出:各 extract*/normalize* + 解析工具。
+// 职责:把源材料交给已配置模型做「结构化提取」,只依赖 provider + L0 出站网关,不碰
+//       office-writers/落盘。模型只被要求输出严格 JSON;解析失败/无来源/模型失败/出站
+//       策略拒绝一律返回 null,由调用方回退模板。
+// 依赖:L1 provider(callProviderChatCompletion);L0 security/egress-gateway(出站闸门——
+//       与 kimi/agent/model-resilience.ts 的对话路径共用同一策略,机密档 air_gap/
+//       local_strict 下必须同样拒绝出网,不能因为走了 recipe 分支就绕过)。
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/types.js';
+import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
 
 export type ModelCaller = typeof callProviderChatCompletion;
 export type ActionItem = { owner: string; task: string; due: string };
@@ -18,7 +22,24 @@ export type CleanedTable = { columns: string[]; rows: string[][]; issues: string
 // 绝不让一个挂住的模型调用拖死整个 recipe 运行(否则 HTTP 请求会一直挂到路由超时)。
 const AI_MODEL_TIMEOUT_MS = 30_000;
 
-async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, ms = AI_MODEL_TIMEOUT_MS): Promise<ProviderChatResult> {
+/** 唯一的模型调用出口:先过出站策略(与对话路径共用同一闸门),拒绝就抛错(调用方回退模板);
+ * 通过则带超时调用。trustedRoot 存在时把出站决策记进审计,与对话路径保持同等可审计性。 */
+async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, trustedRoot?: unknown, ms = AI_MODEL_TIMEOUT_MS): Promise<ProviderChatResult> {
+  const kimiConfig = args.kimiConfig as ModelConfig;
+  const egress = decideEgressPolicy({
+    kind: 'model_inference',
+    provider: kimiConfig?.provider,
+    model: kimiConfig?.model,
+    baseUrl: kimiConfig?.baseUrl,
+    securityMode: kimiConfig?.securityMode,
+    content: args.messages,
+    trustedRoot,
+  });
+  if (trustedRoot) {
+    try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
+  }
+  if (egress.decision === 'deny') throw egressPolicyError(egress);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
@@ -72,14 +93,14 @@ export function strList(value: unknown, limit = 12): string[] {
 
 /** 通用:让模型只输出 JSON 并稳健解析(失败返回 null)。 */
 export async function callModelForJson(
-  { system, user, modelConfig, modelCall = callProviderChatCompletion }:
-  { system: string; user: string; modelConfig: ModelConfig; modelCall?: ModelCaller },
+  { system, user, modelConfig, modelCall = callProviderChatCompletion, trustedRoot }:
+  { system: string; user: string; modelConfig: ModelConfig; modelCall?: ModelCaller; trustedRoot?: unknown },
 ): Promise<unknown> {
   const result = await callWithTimeout(modelCall, {
     kimiConfig: modelConfig,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     tools: [],
-  });
+  }, trustedRoot);
   return extractJson((result as { content?: unknown })?.content);
 }
 
@@ -188,8 +209,8 @@ const MEETING_USER = (source: string, prompt: string) =>
 
 /** 用模型从源材料提取会议行动项。无来源/模型失败/解析失败时返回 null(调用方回退模板)。 */
 export async function extractMeetingActions(
-  { source, prompt = '', modelConfig, modelCall = callProviderChatCompletion }:
-  { source: string; prompt?: string; modelConfig: ModelConfig; modelCall?: ModelCaller },
+  { source, prompt = '', modelConfig, modelCall = callProviderChatCompletion, trustedRoot }:
+  { source: string; prompt?: string; modelConfig: ModelConfig; modelCall?: ModelCaller; trustedRoot?: unknown },
 ): Promise<ActionItem[] | null> {
   if (!String(source || '').trim()) return null;
   try {
@@ -200,7 +221,7 @@ export async function extractMeetingActions(
         { role: 'user', content: MEETING_USER(String(source), String(prompt || '')) },
       ],
       tools: [],
-    });
+    }, trustedRoot);
     const items = normalizeActionItems(extractJson((result as { content?: unknown })?.content));
     return items.length ? items : null;
   } catch {
@@ -210,8 +231,8 @@ export async function extractMeetingActions(
 
 /** 把材料交给模型做结构化摘要提取(要点/风险/下一步)。无内容返回 null。 */
 export async function extractSummary(
-  { source, prompt = '', modelConfig, modelCall }:
-  { source: string; prompt?: string; modelConfig: ModelConfig; modelCall?: ModelCaller },
+  { source, prompt = '', modelConfig, modelCall, trustedRoot }:
+  { source: string; prompt?: string; modelConfig: ModelConfig; modelCall?: ModelCaller; trustedRoot?: unknown },
 ): Promise<StructuredSummary | null> {
   if (!String(source || '').trim()) return null;
   const parsed = await callModelForJson({
@@ -219,6 +240,7 @@ export async function extractSummary(
     user: `把下面材料整理成结构化摘要,输出 JSON {"title":"标题","keyPoints":["要点"],"risks":["风险点"],"nextSteps":["下一步行动"]}。只基于材料,不编造。${prompt ? `用户额外要求:${prompt}。` : ''}\n\n材料:\n${source.slice(0, 8000)}`,
     modelConfig,
     ...(modelCall ? { modelCall } : {}),
+    trustedRoot,
   });
   return normalizeSummary(parsed);
 }

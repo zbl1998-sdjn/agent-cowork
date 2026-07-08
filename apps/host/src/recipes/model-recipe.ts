@@ -28,8 +28,10 @@ export type AiRecipeArgs = {
 
 const section = (label: string, items: string[]): string[] => (items.length ? [`【${label}】`, ...items.map((x) => `· ${x}`), ''] : []);
 const dropDoubleBlank = (lines: string[]): string[] => lines.filter((line, i, arr) => !(line === '' && arr[i - 1] === ''));
-function jsonArgs(args: AiRecipeArgs): { modelConfig: ModelConfig; modelCall?: ModelCaller } {
-  return { modelConfig: args.modelConfig, ...(args.modelCall ? { modelCall: args.modelCall } : {}) };
+// 统一带上 trustedRoot:提取层据此走出站策略检查(air_gap/local_strict 等必须拦得住 AI
+// recipe 的模型调用,不能因为走了 recipe 分支就绕过对话路径同款的安全闸门)并记审计。
+function jsonArgs(args: AiRecipeArgs): { modelConfig: ModelConfig; modelCall?: ModelCaller; trustedRoot: string } {
+  return { modelConfig: args.modelConfig, ...(args.modelCall ? { modelCall: args.modelCall } : {}), trustedRoot: args.trustedRoot };
 }
 
 function summaryLines(s: StructuredSummary, prompt: string): string[] {
