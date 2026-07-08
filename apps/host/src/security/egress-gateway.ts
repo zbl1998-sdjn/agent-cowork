@@ -4,6 +4,7 @@ import { buildOutboundPreview, type OutboundPreview, type OutboundPurpose } from
 import {
   classifyModelProvider,
   decideModelProviderPolicy,
+  isStrictLocalMode,
   resolveSecurityMode,
   type ProviderClass,
   type RuntimeEnv,
@@ -42,10 +43,6 @@ function clean(value: unknown): string {
 
 function randomId(): string {
   return `egress_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function isStrictLocalMode(mode: SecurityMode): boolean {
-  return mode === 'local_demo' || mode === 'local_strict' || mode === 'air_gap';
 }
 
 function decisionForNonModel(kind: OutboundPurpose, mode: SecurityMode, approved: boolean): Pick<EgressDecision, 'decision' | 'reasonCode' | 'reason'> {

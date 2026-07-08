@@ -6,7 +6,7 @@
 // 依赖:node:child_process(spawnSync 可注入便于测试)。导出:resolveSandboxStartup。
 import childProcess from 'node:child_process';
 import { omitUndefined } from '../util/object.js';
-import { resolveSecurityMode } from '../security/security-mode.js';
+import { isStrictLocalMode, resolveSecurityMode, type SecurityMode } from '../security/security-mode.js';
 import type {
   BackendProbe,
   RuntimeEnv,
@@ -157,11 +157,13 @@ function explicitStartup({
   sandboxOptions: SandboxStartupOptions;
   docker: BackendProbe;
   wsl: BackendProbe;
-  securityMode: string;
+  securityMode: SecurityMode;
 }): SandboxStartupResult {
   const backend = String(requestedBackend || '').toLowerCase();
   const networkIsolated = backend === 'docker' || backend === 'vm' || backend === 'hyperv';
-  const policyBlocked = securityMode === 'local_strict' && !networkIsolated;
+  // 覆盖 local_demo/local_strict/air_gap 三种「严格本地」模式,不只 local_strict——
+  // 此前只写 `=== 'local_strict'` 漏掉了更严格的 air_gap(机密档强制模式)。
+  const policyBlocked = isStrictLocalMode(securityMode) && !networkIsolated;
   return {
     options: { ...sandboxOptions, backend },
     info: {
@@ -173,7 +175,7 @@ function explicitStartup({
       policyBlocked,
       fallbackReason: null,
       userMessage: policyBlocked
-        ? 'Local Strict: explicit non-isolated sandbox backend requested; high-risk execution tools are blocked.'
+        ? `${securityMode}: explicit non-isolated sandbox backend requested; high-risk execution tools are blocked.`
         : (networkIsolated ? 'explicit VM sandbox backend requested' : LOCAL_WARNING),
       backends: {
         docker,
@@ -242,7 +244,8 @@ export function resolveSandboxStartup({
   }
 
   const reason = fallbackReason(backends);
-  const localStrictBlocked = mode === 'local_strict';
+  // 覆盖 local_demo/local_strict/air_gap,不只 local_strict(同上,防漏检更严格的 air_gap)。
+  const strictBlocked = isStrictLocalMode(mode);
   return {
     options: { ...normalizedOptions, backend: 'local' },
     info: {
@@ -251,10 +254,10 @@ export function resolveSandboxStartup({
       securityMode: mode,
       networkIsolated: false,
       fallback: true,
-      policyBlocked: localStrictBlocked,
+      policyBlocked: strictBlocked,
       fallbackReason: reason,
-      userMessage: localStrictBlocked
-        ? `Local Strict: no isolated sandbox is available; high-risk execution tools are blocked instead of falling back to local subprocess. ${reason}`
+      userMessage: strictBlocked
+        ? `${mode}: no isolated sandbox is available; high-risk execution tools are blocked instead of falling back to local subprocess. ${reason}`
         : `${LOCAL_WARNING} ${reason}`,
       backends,
     },

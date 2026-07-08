@@ -18,6 +18,7 @@ import { closeTestServer } from './helpers/close-server.js';
 import type { McpClient, ToolDescriptor } from '../src/tools/tool-registry.js';
 import type { ServerConfig, HostServer } from '../src/server.js';
 import type { SubagentStepResult } from '../src/runtime/subagent.js';
+import type { SandboxStartupResult } from '../src/sandbox/startup-probe-types.js';
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tools-'));
@@ -281,6 +282,47 @@ test('createBuiltinTools exposes sandbox + recipe tools and sandbox.exec actuall
   const resultRecord = recordValue(result, 'sandbox.exec result');
   assert.equal(resultRecord.exitCode, 0);
   assert.equal(resultRecord.stdout, 'agent-ok');
+});
+
+test('air_gap without an isolated sandbox backend must not register sandbox.exec/sandbox.run-code (dogfood security fix: policyBlocked was computed but never actually consumed to block tool registration)', async () => {
+  const root = tempRoot();
+  // 注入确定性的 sandboxStartup(而非依赖真实机器 Docker 探测):policyBlocked=true 模拟
+  // air_gap 下探测不到任何隔离后端的场景,不因测试机是否装了 Docker 而变得不稳定。
+  const sandboxStartup: SandboxStartupResult = {
+    options: { backend: 'local' as const },
+    info: {
+      requestedBackend: 'auto',
+      selectedBackend: 'local',
+      securityMode: 'air_gap',
+      networkIsolated: false,
+      fallback: true,
+      policyBlocked: true,
+      fallbackReason: 'no isolated backend available (test double)',
+      userMessage: 'air_gap: no isolated sandbox is available; high-risk execution tools are blocked.',
+      backends: {
+        docker: { available: false, usable: false, networkIsolated: false, detail: 'test double', reason: 'n/a' },
+        wsl: { available: false, usable: false, networkIsolated: false, detail: 'test double', reason: 'n/a' },
+        local: { available: true, usable: true, networkIsolated: false },
+      },
+    },
+  };
+  const server = createServer({
+    trustedRoot: root,
+    requireAuth: false,
+    trustIdentityHeaders: true,
+    enableScheduler: false,
+    securityMode: 'air_gap',
+    sandboxStartup,
+  });
+  try {
+    const registry = server.toolRegistry as ToolRegistry;
+    assert.equal(registry.has('sandbox.exec'), false, 'air_gap without isolation must not expose sandbox.exec');
+    assert.equal(registry.has('sandbox.run-code'), false, 'air_gap without isolation must not expose sandbox.run-code');
+    // 非高风险工具(recipe 等)不受影响,不能被这个策略误伤。
+    assert.equal(registry.has('recipe.meeting-actions'), true);
+  } finally {
+    await closeTestServer(server);
+  }
 });
 
 test('createBuiltinTools rejects unknown assembly options', () => {
