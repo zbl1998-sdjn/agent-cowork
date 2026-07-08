@@ -18,6 +18,8 @@ export type AgentToolsContext = {
   sandbox?: SandboxLike;
   sandboxLimits?: SandboxLimits;
   context?: unknown;
+  /** 测试专用:注入 WebFetch 的底层 fetch 实现,不走真实网络。生产路径不传,走真实 fetch。 */
+  fetchImpl?: unknown;
 };
 export type AgentTool = {
   name: string;

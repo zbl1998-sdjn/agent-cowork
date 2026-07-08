@@ -15,6 +15,7 @@ import {
 } from './helpers/agent.js';
 import { tempRoot } from './helpers/host-http.js';
 import type { SandboxLike } from '../src/kimi/agent-tools.js';
+import type { WebFetchLike } from '../src/tools/web-fetch.js';
 
 test('native agent tools (Read/Write/Glob) are jailed to the workspace', async () => {
   const root = tempRoot('kcw-agent-');
@@ -125,4 +126,49 @@ test('Shell captures stdout from quoted node -e commands on Windows local backen
   assert.equal(result.exitCode, 0);
   assert.equal(result.stdout, 'shell-ok');
   assert.equal(result.stderr, '');
+});
+
+test('native WebFetch tool honors egress policy (security regression: agent-tools.ts had its own ungated WebFetch alongside the gated web-builtin-tools.ts one)', async () => {
+  const root = tempRoot('kcw-agent-');
+  let fetchCalled = false;
+  const fetchImpl: WebFetchLike = async () => {
+    fetchCalled = true;
+    return { ok: true, status: 200, headers: { get: () => 'text/plain' }, arrayBuffer: () => new ArrayBuffer(0) };
+  };
+
+  const airGapWebFetch = agentTool(
+    createAgentTools({ trustedRoot: root, context: { securityMode: 'air_gap' }, fetchImpl }),
+    'WebFetch',
+  );
+  fetchCalled = false;
+  await assert.rejects(
+    () => airGapWebFetch.handler({ url: 'https://example.com' }),
+    (err: unknown) => (err as { code?: string }).code === 'EGRESS_POLICY_DENIED',
+  );
+  assert.equal(fetchCalled, false, 'air_gap 下原生 WebFetch 不得实际发起请求');
+
+  const strictWebFetch = agentTool(
+    createAgentTools({ trustedRoot: root, context: { securityMode: 'local_strict' }, fetchImpl }),
+    'WebFetch',
+  );
+  fetchCalled = false;
+  await assert.rejects(
+    () => strictWebFetch.handler({ url: 'https://example.com' }),
+    (err: unknown) => (err as { code?: string }).code === 'EGRESS_POLICY_DENIED',
+  );
+  assert.equal(fetchCalled, false, 'local_strict 下原生 WebFetch 不得实际发起请求');
+
+  // 对照组:controlled_hybrid(多数用户的默认模式)不能被误伤,必须继续正常工作。
+  const hybridWebFetch = agentTool(
+    createAgentTools({ trustedRoot: root, context: { securityMode: 'controlled_hybrid' }, fetchImpl }),
+    'WebFetch',
+  );
+  fetchCalled = false;
+  const ok = await hybridWebFetch.handler({ url: 'https://example.com' }) as { status: number };
+  assert.equal(fetchCalled, true, 'controlled_hybrid 下不能被误伤,应正常发起请求');
+  assert.equal(ok.status, 200);
+
+  // 风险元数据必须与已网关化的 web-builtin-tools.ts 版本对齐,而不是 mutating:false/risk:'safe'。
+  assert.equal(hybridWebFetch.risk, 'high');
+  assert.equal(hybridWebFetch.requiresApproval, true);
 });

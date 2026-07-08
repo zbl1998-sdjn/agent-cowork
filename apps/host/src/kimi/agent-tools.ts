@@ -9,19 +9,21 @@ import { readTextFile } from '../workspace/file-reader.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
 import { webFetch } from '../tools/web-fetch.js';
+import type { WebFetchLike } from '../tools/web-fetch.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../tools/dev/git.js';
 import { analyzeDataFile } from '../tools/data/report.js';
 import { createDataChartArtifact } from '../tools/data/artifact.js';
 import { createShellTool } from './agent-tools-shell.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
 import { omitUndefined } from '../util/object.js';
+import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
 import type { AgentTool, AgentToolsContext } from './agent-tools-types.js';
 
 export type { AgentTool, AgentToolsContext, SandboxLike, SandboxLimits, ToolArgs } from './agent-tools-types.js';
 
 /** 按给定上下文(可信根、沙箱、限额)构造该工作区的 Agent 工具数组。 */
 export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
-  const { trustedRoot, sandbox, sandboxLimits } = ctx;
+  const { trustedRoot, sandbox, sandboxLimits, context, fetchImpl } = ctx;
   if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');
   const root = assertTrustedPath(path.resolve(trustedRoot), path.resolve(trustedRoot));
   // 不要 path.join(root, rel):rel 可能是「root 内的绝对路径」(模型常这么给),
@@ -150,11 +152,24 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
       handler: async (args = {}) => createDataChartArtifact({ trustedRoot: root, ...args }),
     },
     {
-      name: 'WebFetch', mutating: false, risk: 'safe',
+      name: 'WebFetch', mutating: false, risk: 'high', requiresApproval: true,
       description: '抓取一个 http(s) 网址的文本内容（联网检索）。',
       parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+      // 出站前置检查:与 tools/web-builtin-tools.ts 的 web.fetch 同一道 L0 出站网关
+      // (decideEgressPolicy, kind='web_fetch')。这是同一类问题的第二处实现:此前
+      // 这份原生 WebFetch 完全绕过网关,不受 air_gap/local_strict「零外发」约束,也不
+      // 写出站审计——dogfood 全量安全审计发现(2026-07-08)。deny 就抛错,不静默放行。
       handler: async (args = {}) => {
-        const r = await webFetch({ url: args.url });
+        const destination = args.url;
+        const securityMode = context && typeof context === 'object'
+          ? (context as { securityMode?: unknown }).securityMode
+          : undefined;
+        const egress = decideEgressPolicy({ kind: 'web_fetch', destination, securityMode, trustedRoot: root });
+        if (root) {
+          try { recordEgressDecision(root, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
+        }
+        if (egress.decision === 'deny') throw egressPolicyError(egress);
+        const r = await webFetch(omitUndefined({ url: destination, fetchImpl: fetchImpl as WebFetchLike | undefined }));
         return { status: r.status, contentType: r.contentType, text: clip(r.text) };
       },
     },
