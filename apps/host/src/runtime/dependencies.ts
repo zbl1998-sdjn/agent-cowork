@@ -19,13 +19,17 @@ import { detectOcrRuntime } from './ocr-runtime.js';
 import type { ExistsFs as OcrFs } from './ocr-runtime.js';
 import { detectPandocRuntime } from './pandoc-runtime.js';
 import type { StatFs as PandocFs } from './pandoc-runtime.js';
+import { detectEmbeddedPython } from './python-runtime.js';
+import type { ExistsFs as PythonFs } from './python-runtime.js';
+import { detectWebview2 } from './webview2-runtime.js';
+import type { Webview2Fs } from './webview2-runtime.js';
 import { detectVcRuntime } from './windows-runtime.js';
 import type { SpawnSyncLike as VcSpawnSyncLike } from './windows-runtime.js';
 
 export { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
 
 export type EnvLike = Record<string, string | undefined>;
-type RuntimeFsImpl = Partial<FontFs & DataScienceFs & ChromiumFs & OcrFs & PandocFs>;
+type RuntimeFsImpl = Partial<FontFs & DataScienceFs & ChromiumFs & OcrFs & PandocFs & PythonFs>;
 type RuntimeSpawnSync = GitSpawnSyncLike | VcSpawnSyncLike;
 type SandboxStartup = { info?: { backend?: string; networkIsolated?: boolean; userMessage?: string } };
 export type RuntimeDependencyStatusOptions = {
@@ -34,6 +38,9 @@ export type RuntimeDependencyStatusOptions = {
   sandboxStartup?: SandboxStartup | null;
   fsImpl?: RuntimeFsImpl;
   spawnSync?: RuntimeSpawnSync;
+  // host 可执行文件路径:用于探测安装版中与 host exe 同级的随包组件(如 python-embedded)。
+  // 默认取 process.execPath;测试可注入以保持跨机器确定性。
+  execPath?: string;
   now?: Date;
 };
 export type RuntimeDependencyDetection = { status: string; source?: string; version?: unknown; detail?: unknown };
@@ -63,12 +70,6 @@ function redactProxyUrl(value: unknown): string {
   return text.replace(/^([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+):([^@/\s]+)@/i, '$1$2:[REDACTED]@');
 }
 
-function configuredFromEnv(env: EnvLike, keys: string[], detail: string): RuntimeDependencyDetection {
-  const match = envValue(env, keys);
-  if (!match) return { status: 'missing', detail };
-  return { status: 'configured', source: match.key, detail };
-}
-
 function detectDependency(item: RuntimeDependencyCatalogItem, options: RuntimeDependencyStatusOptions): RuntimeDependencyDetection {
   const env = options.env || {};
   const platform = options.platform || process.platform;
@@ -89,15 +90,16 @@ function detectDependency(item: RuntimeDependencyCatalogItem, options: RuntimeDe
   }
 
   if (item.id === 'webview2') {
-    const configured = envValue(env, ['KCW_WEBVIEW2_MODE', 'WEBVIEW2_RELEASE_CHANNEL_PREFERENCE']);
-    if (configured) return { status: 'configured', source: configured.key, detail: `WebView2 模式: ${configured.value}` };
-    return platform === 'win32'
-      ? { status: 'unknown', detail: '需要安装器或 Windows 运行时探测确认' }
-      : { status: 'not_applicable', detail: '仅 Windows 需要' };
+    return detectWebview2(omitUndefined({ env, platform, fsImpl: options.fsImpl as Webview2Fs | undefined }));
   }
 
   if (item.id === 'python-embedded') {
-    return configuredFromEnv(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME'], '内置 Python 路径已配置');
+    return detectEmbeddedPython(omitUndefined({
+      env,
+      platform,
+      execPath: options.execPath,
+      fsImpl: options.fsImpl as PythonFs | undefined,
+    }));
   }
 
   if (item.id === 'cjk-fonts') return detectCjkFonts(omitUndefined({ env, fsImpl: options.fsImpl as FontFs | undefined }));

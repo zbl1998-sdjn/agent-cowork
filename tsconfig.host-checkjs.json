@@ -187,6 +187,8 @@
     "apps/host/src/runtime/oauth-permission-approvals.ts",
     "apps/host/src/runtime/ocr-runtime.ts",
     "apps/host/src/runtime/pandoc-runtime.ts",
+    "apps/host/src/runtime/python-runtime.ts",
+    "apps/host/src/runtime/webview2-runtime.ts",
     "apps/host/src/runtime/plan-builder.ts",
     "apps/host/src/runtime/project-stores.ts",
     "apps/host/src/runtime/rate-limit.ts",

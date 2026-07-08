@@ -71,6 +71,108 @@ test('runtime dependency status rejects empty or non-font CJK directories', () =
   assert.equal(dependencyById(textStatus, 'cjk-fonts').status, 'missing');
 });
 
+// dogfood 2026-07-09 修复:此前 cjk-fonts 探测只认 KCW_CJK_FONT(_DIR) env,而 PDF/制品渲染实际
+// 走 pdf-cjk-font.ts 的系统字体(黑体/雅黑等),导致有中文字体的 Windows 上「渲染正常但面板报缺失」。
+test('runtime dependency status reports CJK available via a system font when no env var is set', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv },
+    fsImpl: {
+      // 仅对系统字体候选返回「是字体文件」,其余一律否;不触碰真实磁盘,保持跨机器确定性。
+      statSync: (target: string) => ({
+        isFile: () => /\.(?:ttf|otf|ttc|woff2)$/i.test(target),
+        isDirectory: () => false,
+      }),
+      readdirSync: () => [],
+      existsSync: () => false,
+    } as never,
+  });
+  const cjkFonts = dependencyById(status, 'cjk-fonts');
+  assert.equal(cjkFonts.status, 'available');
+  assert.equal(cjkFonts.source, 'system');
+  assert.match(String(cjkFonts.detail), /系统/);
+});
+
+test('runtime dependency status reports CJK missing when neither env nor system fonts are present', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv },
+    fsImpl: {
+      statSync: () => { throw new Error('ENOENT'); },
+      readdirSync: () => [],
+      existsSync: () => false,
+    } as never,
+  });
+  const cjkFonts = dependencyById(status, 'cjk-fonts');
+  assert.equal(cjkFonts.status, 'missing');
+});
+
+// dogfood 2026-07-09 修复:python-embedded 探测此前只认 Rust 外壳注入的 KCW_EMBEDDED_PYTHON/
+// KCW_PYTHON_HOME env,env 缺失即误报缺失;实际上安装版里 python-embedded/python.exe 就在
+// host exe 同级目录,应实地探测回落。
+test('runtime dependency status detects bundled python-embedded beside the host exe when no env var is set', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv },
+    platform: 'win32',
+    execPath: 'C:\\Program Files\\Agent Cowork\\agent-cowork-host.exe',
+    fsImpl: {
+      existsSync: (target: string) => /python-embedded[\\/]python\.exe$/i.test(target),
+      statSync: () => { throw new Error('ENOENT'); },
+      readdirSync: () => [],
+    } as never,
+  });
+  const python = dependencyById(status, 'python-embedded');
+  assert.equal(python.status, 'available');
+  assert.match(String(python.detail), /随包内置 Python/);
+});
+
+test('runtime dependency status still honors the injected KCW_EMBEDDED_PYTHON env over disk probing', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv, KCW_EMBEDDED_PYTHON: 'C:\\AgentCowork\\runtime\\python\\python.exe' },
+    platform: 'win32',
+    execPath: 'C:\\Program Files\\Agent Cowork\\agent-cowork-host.exe',
+    fsImpl: { existsSync: () => false, statSync: () => { throw new Error('ENOENT'); }, readdirSync: () => [] } as never,
+  });
+  const python = dependencyById(status, 'python-embedded');
+  assert.equal(python.status, 'configured');
+  assert.equal(python.detail, '内置 Python 路径已配置');
+});
+
+test('runtime dependency status reports python-embedded missing when neither env nor a sibling bundle exists', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv },
+    platform: 'win32',
+    execPath: 'C:\\Program Files\\Agent Cowork\\agent-cowork-host.exe',
+    fsImpl: { existsSync: () => false, statSync: () => { throw new Error('ENOENT'); }, readdirSync: () => [] } as never,
+  });
+  const python = dependencyById(status, 'python-embedded');
+  assert.equal(python.status, 'missing');
+});
+
+// dogfood 2026-07-09 修复:WebView2 此前 win32 一律 unknown「待检测」,即使桌面外壳正靠已装的
+// WebView2 Evergreen 运行时渲染,面板也不显示可用。改为实地探测标准安装目录。
+test('runtime dependency status detects an installed WebView2 runtime via its system install dir', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv, 'ProgramFiles(x86)': 'C:\\Program Files (x86)' },
+    platform: 'win32',
+    fsImpl: {
+      existsSync: (target: string) => /Microsoft[\\/]EdgeWebView[\\/]Application$/i.test(target),
+      statSync: () => { throw new Error('ENOENT'); },
+      readdirSync: () => [],
+    } as never,
+  });
+  const webview2 = dependencyById(status, 'webview2');
+  assert.equal(webview2.status, 'available');
+});
+
+test('runtime dependency status keeps WebView2 unknown when no install dir is present (installer/runtime fallback)', () => {
+  const status = getRuntimeDependencyStatus({
+    env: { ...installedSystemEnv, 'ProgramFiles(x86)': 'C:\\Program Files (x86)' },
+    platform: 'win32',
+    fsImpl: { existsSync: () => false, statSync: () => { throw new Error('ENOENT'); }, readdirSync: () => [] } as never,
+  });
+  const webview2 = dependencyById(status, 'webview2');
+  assert.equal(webview2.status, 'unknown');
+});
+
 test('runtime dependency status reports data science component availability', () => {
   const root = makeTestWorkspace('kcw-runtime-data-science');
   const sitePackages = path.join(root, 'Lib', 'site-packages');
