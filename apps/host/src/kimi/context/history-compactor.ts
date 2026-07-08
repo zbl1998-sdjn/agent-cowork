@@ -193,27 +193,36 @@ export class HistoryCompactor {
       return { compacted: false, beforeTokens, afterTokens: beforeTokens, messages: normalized, keyFacts, summary: '' };
     }
 
-    const recent = normalized.slice(-keepRecentMessages);
-    const old = normalized.slice(0, Math.max(0, normalized.length - recent.length));
+    // 保护首条 system 消息:它承载 agent 指令 + 注入的工作区记忆,绝不能被折进摘要或尾截断
+    // 丢掉(dogfood 2026-07-09 问题B:小窗口/大记忆下长对话会丢长期记忆)。只摘要其后的真正
+    // 对话历史,并给受保护 system 预留额度;它只在自身就超预算的极端情形下才被最后压缩。
+    const protectedSystem = normalized[0]?.role === 'system' ? normalized[0] : null;
+    const body = protectedSystem ? normalized.slice(1) : normalized;
+    const reserve = protectedSystem ? estimateMessages(this.estimator, [protectedSystem]) : 0;
+    const innerBudget = Math.max(1, maxContextTokens - reserve);
+
+    const recent = body.slice(-keepRecentMessages);
+    const old = body.slice(0, Math.max(0, body.length - recent.length));
     let summary = buildSummary(old, keyFacts);
     let compacted: ChatMessageLike[] = [{ role: 'system', name: 'history_compactor', content: summary }, ...recent];
     let afterTokens = estimateMessages(this.estimator, compacted);
-    if (afterTokens > maxContextTokens) {
+    if (afterTokens > innerBudget) {
       const recentTokens = estimateMessages(this.estimator, recent);
-      if (recentTokens < maxContextTokens - 32) {
-        const summaryBudget = Math.max(1, maxContextTokens - recentTokens - 8);
+      if (recentTokens < innerBudget - 32) {
+        const summaryBudget = Math.max(1, innerBudget - recentTokens - 8);
         summary = clipToTokenBudget(summary, summaryBudget, this.estimator);
         compacted = [{ role: 'system', name: 'history_compactor', content: summary }, ...recent];
         afterTokens = estimateMessages(this.estimator, compacted);
       }
     }
 
-    const enforced = enforceBudget(compacted, maxContextTokens, this.estimator);
+    const enforced = enforceBudget(compacted, innerBudget, this.estimator);
+    const finalMessages = protectedSystem ? [protectedSystem, ...enforced.messages] : enforced.messages;
     return {
       compacted: true,
       beforeTokens,
-      afterTokens: enforced.tokens,
-      messages: enforced.messages,
+      afterTokens: estimateMessages(this.estimator, finalMessages),
+      messages: finalMessages,
       keyFacts,
       summary: stableText(enforced.messages[0]?.content || summary),
     };

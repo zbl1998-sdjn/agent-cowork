@@ -183,6 +183,9 @@ test('runAgentChat auto-compacts long resumed history and emits token stats', as
   assert.ok(Number(compacted.payload.beforeTokens) > Number(compacted.payload.afterTokens));
   assert.ok(Array.isArray(compacted.payload.keyFacts));
   assert.ok(captured.length < longMessages.length);
-  assert.equal(captured[0]?.name, 'history_compactor');
-  assert.match(String(captured[0]?.content || ''), /history compacted|content compacted/i);
+  // 问题B 修复后:首条原 system 消息被保护、原样保留在最前;历史摘要放其后一条。
+  assert.equal(captured[0]?.role, 'system');
+  assert.match(String(captured[0]?.content || ''), /system prompt/);
+  assert.equal(captured[1]?.name, 'history_compactor');
+  assert.match(String(captured[1]?.content || ''), /history compacted|content compacted/i);
 });
