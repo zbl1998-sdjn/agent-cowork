@@ -17,7 +17,10 @@ type RenderLivePageOptions = {
   title?: unknown;
   viz: VizSpec;
   dataUrl?: string;
+  securityMode?: unknown;
 };
+
+const AIR_GAP_NOTICE = '机密模式(零出网)下已禁用外部图表脚本(Chart.js/Mermaid CDN),图表退化为数据表格,流程图展示为原始定义文本,避免打开此活页时触发联网请求。';
 
 /** 序列化成可安全嵌入 <script> 的 JSON,转义 < > & 与行/段分隔符以防脚本逃逸。 */
 function safeJson(value: unknown): string {
@@ -39,8 +42,10 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-/** 按 viz.kind 决定要插入哪个 cdnjs 脚本标签(图表用 Chart.js,流程图用 Mermaid)。 */
-function libTag(kind: unknown): string {
+/** 按 viz.kind 决定要插入哪个 cdnjs 脚本标签(图表用 Chart.js,流程图用 Mermaid)。
+ * air_gap 下不插入任何外部脚本标签——客户端渲染器在库缺失时会自动退化(见 CLIENT_RENDERER)。 */
+function libTag(kind: unknown, securityMode?: unknown): string {
+  if (securityMode === 'air_gap') return '';
   const value = String(kind || '');
   if (CHART_KINDS.has(value)) {
     return `    <script src="${CHART_CDN}"></script>`;
@@ -56,14 +61,23 @@ const CLIENT_RENDERER = `
         var chart = null;
         function clearRoot(root) { while (root.firstChild) { root.removeChild(root.firstChild); } if (chart) { chart.destroy(); chart = null; } }
         function renderChart(root, spec) {
+          var data = spec.data || {};
+          var labels = data.labels || [];
+          var datasets = Array.isArray(data.datasets) ? data.datasets : [{ label: data.label || '值', data: data.values || [] }];
+          if (!window.Chart) {
+            // 图表库未加载(air_gap 下按设计不注入 CDN 脚本):不留空白画布,退化成数据表格。
+            var notice = document.createElement('p');
+            notice.className = 'notice';
+            notice.textContent = '图表脚本未加载,展示原始数据:';
+            root.appendChild(notice);
+            renderTable(root, { data: { columns: [''].concat(labels), rows: datasets.map(function (ds) { return [ds.label || ''].concat(ds.data || []); }) } });
+            return;
+          }
           var canvas = document.createElement('canvas');
           canvas.height = 320;
           root.appendChild(canvas);
-          var data = spec.data || {};
-          var config = Array.isArray(data.datasets)
-            ? { type: spec.kind, data: { labels: data.labels || [], datasets: data.datasets }, options: spec.options || { responsive: true } }
-            : { type: spec.kind, data: { labels: data.labels || [], datasets: [{ label: data.label || '值', data: data.values || [] }] }, options: spec.options || { responsive: true } };
-          if (window.Chart) { chart = new window.Chart(canvas.getContext('2d'), config); }
+          var config = { type: spec.kind, data: { labels: labels, datasets: datasets }, options: spec.options || { responsive: true } };
+          chart = new window.Chart(canvas.getContext('2d'), config);
         }
         function renderTable(root, spec) {
           var data = spec.data || {};
@@ -98,9 +112,14 @@ const CLIENT_RENDERER = `
           else { renderChart(root, spec); }
         }`;
 
-/** 生成实时制品活页:首屏渲染 viz 快照,并支持按钮 fetch(dataUrl) 与 postMessage 两种刷新。 */
-export function renderLivePage({ title, viz, dataUrl }: RenderLivePageOptions): string {
+/** 生成实时制品活页:首屏渲染 viz 快照,并支持按钮 fetch(dataUrl) 与 postMessage 两种刷新。
+ * securityMode='air_gap' 时不注入 Chart.js/Mermaid CDN 脚本,客户端渲染器自动退化。 */
+export function renderLivePage({ title, viz, dataUrl, securityMode }: RenderLivePageOptions): string {
   const safeTitle = escapeHtml(title || '活页 Artifact');
+  const needsExternalLib = CHART_KINDS.has(String(viz.kind || '')) || viz.kind === 'mermaid';
+  const notice = securityMode === 'air_gap' && needsExternalLib
+    ? `<p class="notice">${escapeHtml(AIR_GAP_NOTICE)}</p>\n      `
+    : '';
   return `<!doctype html>
 <html lang="zh-CN">
   <head>
@@ -120,8 +139,9 @@ export function renderLivePage({ title, viz, dataUrl }: RenderLivePageOptions): 
       th, td { border: 1px solid #e3e7dd; padding: 8px 10px; text-align: left; }
       th { background: #f0f2ec; }
       .stamp { color: #6b6f66; font-size: 12px; margin-top: 10px; }
+      .notice { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: #fff3e0; color: #8a5a00; font-size: 13px; }
     </style>
-${libTag(viz.kind)}
+${libTag(viz.kind, securityMode)}
   </head>
   <body>
     <main>
@@ -129,7 +149,7 @@ ${libTag(viz.kind)}
         <h1>${safeTitle}</h1>
         <button id="refresh" type="button">刷新</button>
       </header>
-      <div class="card"><div id="viz-root"></div></div>
+      ${notice}<div class="card"><div id="viz-root"></div></div>
       <div class="stamp" id="stamp"></div>
       <script>
         var INITIAL = ${safeJson(viz)};

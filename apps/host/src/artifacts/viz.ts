@@ -63,6 +63,7 @@ function htmlShell({ title, headExtra = '', body }: { title: string; headExtra?:
       main { max-width: 960px; margin: 0 auto; padding: 28px 24px 44px; }
       h1 { margin: 0 0 18px; font-size: 24px; }
       .card { background: #fff; border: 1px solid #d9ded5; border-radius: 12px; padding: 20px; }
+      .notice { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: #fff3e0; color: #8a5a00; font-size: 13px; }
       table { border-collapse: collapse; width: 100%; font-size: 14px; }
       th, td { border: 1px solid #e3e7dd; padding: 8px 10px; text-align: left; }
       th { background: #f0f2ec; font-weight: 600; }
@@ -92,9 +93,39 @@ function normalizeChartData(data: unknown): { labels: unknown[]; datasets: unkno
   return { labels, datasets: [{ label: record.label || '值', data: values }] };
 }
 
-/** 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。 */
-function renderChart(kind: string, title: string, spec: VizSpec): string {
+// air_gap 下的说明横幅:解释为什么图表退化成了表格/原始文本,而不是静默产出一个「看起来
+// 正常但其实缺功能」的页面——用户应该知道发生了什么,而不是猜。
+const AIR_GAP_NOTICE = '机密模式(零出网)下已禁用外部图表脚本(Chart.js/Mermaid CDN),改为退化展示,避免打开此文件时触发联网请求。';
+
+/** 把 {labels, datasets} 摊平成纯表格(第一列=系列名,其余列=各 label 下的值)。 */
+function chartDataToTable(chartData: { labels: unknown[]; datasets: unknown[] }): { columns: unknown[]; rows: unknown[][] } {
+  const columns = ['', ...chartData.labels];
+  const rows = chartData.datasets.map((ds) => {
+    const set = ds && typeof ds === 'object' ? ds as Record<string, unknown> : {};
+    const values = Array.isArray(set.data) ? set.data : [];
+    return [set.label ?? '', ...values];
+  });
+  return { columns, rows };
+}
+
+/** 图表的退化渲染:不加载任何外部脚本,把数据展示成纯 HTML 表格。 */
+function renderChartFallback(title: string, chartData: { labels: unknown[]; datasets: unknown[] }): string {
+  const { columns, rows } = chartDataToTable(chartData);
+  const head = `          <thead><tr>${columns.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>\n`;
+  const bodyRows = rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('\n          ');
+  const body = `        <p class="notice">${escapeHtml(AIR_GAP_NOTICE)}</p>
+        <table>
+${head}          <tbody>
+          ${bodyRows}
+          </tbody>
+        </table>`;
+  return htmlShell({ title, body });
+}
+
+/** 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。air_gap 下退化成表格。 */
+function renderChart(kind: string, title: string, spec: VizSpec, securityMode?: unknown): string {
   const chartData = normalizeChartData(spec.data);
+  if (securityMode === 'air_gap') return renderChartFallback(title, chartData);
   const options = spec.options && typeof spec.options === 'object' ? spec.options : { responsive: true };
   const config = { type: kind, data: chartData, options };
   const headExtra = `    <script src="${CHART_CDN}"></script>`;
@@ -109,12 +140,17 @@ function renderChart(kind: string, title: string, spec: VizSpec): string {
   return htmlShell({ title, headExtra, body });
 }
 
-/** 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。 */
-function renderMermaid(title: string, spec: VizSpec): string {
+/** 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。air_gap 下只展示原始定义文本,不加载渲染脚本。 */
+function renderMermaid(title: string, spec: VizSpec, securityMode?: unknown): string {
   const data = spec.data && typeof spec.data === 'object' ? spec.data as Record<string, unknown> : {};
   const definition = String((data.definition || data.code) || spec.code || spec.definition || '').trim();
   if (!definition) {
     throw fail('mermaid viz requires a diagram definition');
+  }
+  if (securityMode === 'air_gap') {
+    const body = `        <p class="notice">${escapeHtml(AIR_GAP_NOTICE)}</p>
+        <pre>${escapeHtml(definition)}</pre>`;
+    return htmlShell({ title, body });
   }
   const headExtra = `    <script src="${MERMAID_CDN}"></script>`;
   const body = `        <pre class="mermaid">${escapeHtml(definition)}</pre>
@@ -146,15 +182,18 @@ ${head}          <tbody>
   return htmlShell({ title, body });
 }
 
-/** 可视化渲染入口:按 spec.kind 分发到 chart/mermaid/table,未知种类抛 400。 */
-export function renderViz(spec: VizSpec = {}): string {
+/** 可视化渲染入口:按 spec.kind 分发到 chart/mermaid/table,未知种类抛 400。
+ * securityMode='air_gap' 时 chart/mermaid 退化为不含外部脚本的表格/原始文本——机密档
+ * 的「零出网」承诺不该止步于 host 进程本身,生成的产物文件被打开时也不该触发联网请求
+ * (dogfood 发现:此前 Chart.js/Mermaid CDN 引用会让机密模式下的图表文件打开即出网)。 */
+export function renderViz(spec: VizSpec = {}, { securityMode }: { securityMode?: unknown } = {}): string {
   const title = spec.title ? String(spec.title) : '可视化';
   const kind = String(spec.kind || '').toLowerCase();
   if (CHART_KINDS.has(kind)) {
-    return renderChart(kind, title, spec);
+    return renderChart(kind, title, spec, securityMode);
   }
   if (kind === 'mermaid') {
-    return renderMermaid(title, spec);
+    return renderMermaid(title, spec, securityMode);
   }
   if (kind === 'table') {
     return renderTable(title, spec);

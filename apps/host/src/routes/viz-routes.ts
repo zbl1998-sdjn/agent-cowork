@@ -55,6 +55,9 @@ type VizRouteOptions = {
   sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): boolean | undefined;
   toolRegistry?: ToolRegistryLike | null;
   fileOperationApprovals: Pick<FileOperationApprovalStore, 'issue' | 'consume'>;
+  // air_gap 下图表/流程图产物退化为不含外部 CDN 脚本的表格/原始文本(dogfood 发现:机密模式
+  // 下生成的可视化产物打开时仍会真实出网,跟机密档「零出网」承诺相悖)。传引用而非值。
+  resolveSecurityMode?: () => unknown;
 };
 
 function vizFromBody(input: VizRouteBody): VizSpec {
@@ -68,10 +71,11 @@ function vizFromBody(input: VizRouteBody): VizSpec {
   });
 }
 
-function buildVizRenderApprovalPlan({ trustedRoot, body, viz }: {
+function buildVizRenderApprovalPlan({ trustedRoot, body, viz, securityMode }: {
   trustedRoot: string;
   body: VizRouteBody;
   viz: VizSpec;
+  securityMode?: unknown;
 }): VizApprovalPlan {
   const spec = normalizeLiveArtifactSpec(omitUndefined({
     id: body.id,
@@ -79,7 +83,7 @@ function buildVizRenderApprovalPlan({ trustedRoot, body, viz }: {
     viz,
     dataSource: body.dataSource,
   }));
-  renderViz(spec.viz);
+  renderViz(spec.viz, { securityMode });
   if (spec.dataSource?.type === 'file-json') {
     resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });
   }
@@ -117,7 +121,9 @@ export async function handleVizRoutes({
   sendCachedOrStore,
   toolRegistry,
   fileOperationApprovals,
+  resolveSecurityMode,
 }: VizRouteOptions): Promise<boolean> {
+  const securityMode = resolveSecurityMode?.();
   if (request.method === 'POST' && pathname === '/api/viz/render/preview') {
     await withJsonBody(request, response, async (body) => {
       const input = parseVizBody(response, body, 'invalid viz preview request');
@@ -126,7 +132,7 @@ export async function handleVizRoutes({
       const viz = vizFromBody(input);
       let plan;
       try {
-        plan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz });
+        plan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz, securityMode });
       } catch (err) {
         sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
         return;
@@ -161,7 +167,7 @@ export async function handleVizRoutes({
       const viz = vizFromBody(input);
       let html;
       try {
-        html = renderViz(viz);
+        html = renderViz(viz, { securityMode });
       } catch (err) {
         sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
         return;
@@ -169,7 +175,7 @@ export async function handleVizRoutes({
       const payload: Record<string, unknown> = { context: requestContext, kind: String(viz.kind || '').toLowerCase(), html };
       if (input.persist !== false) {
         const trustedRoot = safeTrustedRoot(input.trustedRoot);
-        const approvalPlan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz });
+        const approvalPlan = buildVizRenderApprovalPlan({ trustedRoot, body: input, viz, securityMode });
         fileOperationApprovals.consume(input.fileOperationApprovalId || input.approvalId, {
           kind: VIZ_RENDER_APPROVAL_KIND,
           trustedRoot,
@@ -178,7 +184,7 @@ export async function handleVizRoutes({
         });
         let artifact;
         try {
-          artifact = buildLiveArtifact(omitUndefined({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource }));
+          artifact = buildLiveArtifact(omitUndefined({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource, securityMode }));
         } catch (err) {
           sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
           return;

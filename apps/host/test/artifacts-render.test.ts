@@ -29,6 +29,36 @@ test('renderViz mermaid embeds the definition and Mermaid lib', () => {
   assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/mermaid/);
 });
 
+test('renderViz air_gap: chart degrades to a data table, no external CDN script (dogfood security fix)', () => {
+  const html = renderViz(
+    { title: '季度收入', kind: 'bar', data: { labels: ['Q1', 'Q2'], values: [10, 20] } },
+    { securityMode: 'air_gap' },
+  );
+  assert.equal(html.includes('cdnjs.cloudflare.com'), false, 'air_gap must not reference any CDN');
+  assert.equal(html.includes('<script'), false, 'air_gap chart fallback must not embed any script tag');
+  assert.match(html, /<table>/);
+  assert.match(html, /Q1/);
+  assert.match(html, />10</); // 原始数值仍以表格形式保留,不是静默丢数据
+});
+
+test('renderViz air_gap: mermaid degrades to raw definition text, no external CDN script', () => {
+  const html = renderViz(
+    { title: '流程', kind: 'mermaid', data: { definition: 'graph TD; A-->B' } },
+    { securityMode: 'air_gap' },
+  );
+  assert.equal(html.includes('cdnjs.cloudflare.com'), false, 'air_gap must not reference any CDN');
+  assert.equal(html.includes('<script'), false, 'air_gap mermaid fallback must not embed any script tag');
+  assert.match(html, /graph TD; A--&gt;B/); // 原始定义文本仍可读,不是空白页面
+});
+
+test('renderViz non-air_gap modes are unaffected (no regression for the default/common path)', () => {
+  const html = renderViz(
+    { kind: 'bar', data: { labels: ['a'], values: [1] } },
+    { securityMode: 'controlled_hybrid' },
+  );
+  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js/);
+});
+
 test('renderViz table escapes cell content', () => {
   const html = renderViz({
     kind: 'table',
