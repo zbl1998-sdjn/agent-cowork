@@ -21,6 +21,12 @@ import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
+import { appendConversationTurn, formatRecentTurns, readRecentTurns } from '../memory/conversation-buffer.js';
+import { maybeConsolidatePreviousConversation } from '../memory/consolidate-trigger.js';
+import { formatKnowledgeForInjection, recallRelevantKnowledge } from '../memory/knowledge-recall.js';
+import type { ConsolidateCallJson } from '../memory/consolidate.js';
+import { callModelForJson, type ModelCaller } from '../recipes/model-recipe-extract.js';
+import type { ModelConfig } from '../kimi/provider/types.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
@@ -170,17 +176,49 @@ export async function streamAgentChat({
     // 记忆总闸:尊重用户「暂停/隐身/停用」开关(memory-settings)——非活跃时本轮既不注入也不回写,
     // 内置分层记忆与 MASE 记忆桥接对同一个开关保持一致(否则 UI 里的开关对实时对话形同虚设)。
     memoryActive = isMemoryActiveForRoot(trustedRoot);
+    // 惰性提炼触发:用户切到了另一个对话 → 后台把上一个对话缓冲提炼成主题知识(不 await、
+    // 错误吞掉,不加聊天延迟)。提炼的模型调用经 callModelForJson 走 decideEgressPolicy 出站闸门
+    // (与对话路径同一策略,机密档下同样拒绝出网);复用本轮 modelCall,缺省回落默认 provider。
+    if (memoryActive) {
+      const consolidateCallJson: ConsolidateCallJson = (a) => callModelForJson(omitUndefined({
+        system: a.system,
+        user: a.user,
+        modelConfig: a.modelConfig as ModelConfig,
+        modelCall: modelCall as unknown as ModelCaller | undefined,
+        trustedRoot: a.trustedRoot,
+      }));
+      void maybeConsolidatePreviousConversation({
+        trustedRoot,
+        tenantId: requestContext.tenantId,
+        userId: requestContext.userId,
+        conversationId: maseConversation,
+        modelConfig: runKimiConfig,
+        callJson: consolidateCallJson,
+      }).done;
+    }
     // 读缝:MASE 作为记忆后端——注入【最近对话(本线程时序)+ 当前事实 + 相关历史】到会话记忆层。
     const maseSessionMemory = memoryActive
       ? await maseRecallSessionMemory(toolRegistry, String(body.prompt || ''), maseThread)
       : '';
+    // 自带对话缓冲兜底:MASE 关闭/无召回时,用本地缓冲的「本会话最近若干轮」喂 session 层,
+    // 让不接 MASE 也有多轮连续性(dogfood 2026-07-09 发现:此前同会话记忆 100% 依赖 MASE)。
+    // MASE 在且有召回时行为不变(maseSessionMemory 非空优先),避免与 MASE 双重注入。
+    const builtinSessionMemory = memoryActive && !maseSessionMemory
+      ? formatRecentTurns(readRecentTurns(trustedRoot, maseConversation))
+      : '';
+    const sessionMemory = maseSessionMemory || builtinSessionMemory;
     const memory = memoryActive
-      ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: maseSessionMemory || undefined }))
+      ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: sessionMemory || undefined }))
       : { text: '', layers: [] };
+    // 跨会话主题知识召回:按当前 prompt 相关性挑 top-K active 知识注入(过往对话提炼而来)。
+    // 相关性门控——不相关就不注入(读侧防污染);pending 永不召回。让新对话「想起之前说过的」。
+    const knowledgeText = memoryActive
+      ? formatKnowledgeForInjection(recallRelevantKnowledge(trustedRoot, String(body.prompt || '')))
+      : '';
     // 读侧脱敏(纵深防御):记忆注入模型前统一过 redactText——即便历史遗留的旧凭据
-    // 已落在 MASE/分层记忆存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
+    // 已落在 MASE/分层记忆/知识库存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
     // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
-    const memoryText = redactText(memory.text) || '';
+    const memoryText = redactText([memory.text, knowledgeText].filter(Boolean).join('\n\n')) || '';
     const runTimeoutMs = resolveAgentRunTimeoutMs(body, runKimiConfig);
     // 自适应压缩阈值:按本轮实际所选模型(含会话级 BYO 覆盖)的上下文窗口推导预算,
     // 请求已显式指定 maxContextTokens 时仍以显式值为准。
@@ -274,6 +312,12 @@ export async function streamAgentChat({
     // 同样受记忆总闸约束:暂停/隐身/停用时不回写(与读缝一致)。
     if (memoryActive && status === 'succeeded' && outcome.text) {
       await maseRememberTurn(toolRegistry, String(body.prompt || ''), outcome.text, maseThread);
+      // 自带对话缓冲:成功一轮的用户+助手写入本地缓冲(不依赖 MASE),供下一轮 session 层续接
+      // (关闭 MASE 也有多轮记忆),并作为对话结束提炼主题知识(Phase 2)的短期来源。
+      try {
+        appendConversationTurn(trustedRoot, maseConversation, { role: 'user', text: String(body.prompt || '') });
+        appendConversationTurn(trustedRoot, maseConversation, { role: 'assistant', text: String(outcome.text || '') });
+      } catch { /* 缓冲写入失败不阻断收尾 */ }
     }
     response.end();
   }

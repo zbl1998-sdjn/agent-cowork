@@ -10,6 +10,7 @@ import {
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
 import { humanizeError } from '../../lib/friendly-error';
+import { MemoryKnowledgeSection } from './MemoryKnowledgeSection';
 
 interface MemoryPanelProps {
   trustedRoot: string;
@@ -177,6 +178,8 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
           </li>
         )}
       </ul>
+
+      <MemoryKnowledgeSection trustedRoot={trustedRoot} />
 
       <div className="memory-form">
         <h3>想让我记住什么?</h3>

@@ -10,6 +10,7 @@ import { handleClarifyRoutes } from './clarify-routes.js';
 import { handleConnectorRoutes } from './connector-routes.js';
 import { handleConversationRoutes } from './conversation-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
+import { handleMemoryKnowledgeRoutes } from './memory-knowledge-routes.js';
 import { handleOnboardingRoutes } from './onboarding-routes.js';
 import { handleOrchestratorRoutes } from './orchestrator-routes.js';
 import { handlePlanRoutes } from './plan-routes.js';
@@ -96,6 +97,11 @@ export async function handleRouteChain({
     fileOperationApprovals: state.fileOperationApprovals,
     // 模型已配置时,支持 AI 路径的 recipe(如会议纪要)走模型提取,否则回退模板。
     resolveModelConfig: () => (state.kimiApiConfig?.configured ? state.kimiApiConfig as unknown as Record<string, unknown> : null),
+  }))) return true;
+  if (await handleMemoryKnowledgeRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryKnowledgeRoutes>>({
+    ...base,
+    requestUrl,
+    trustedRootDefault: state.trustedRootDefault,
   }))) return true;
   if (await handleMemoryRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryRoutes>>({
     ...base,

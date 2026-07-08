@@ -7,6 +7,7 @@ import path from 'node:path';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { readTextFile } from '../workspace/file-reader.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
+import { recallRelevantKnowledge } from '../memory/knowledge-recall.js';
 import { planFileOrganization } from '../workspace/file-organizer.js';
 import { webFetch } from '../tools/web-fetch.js';
 import type { WebFetchLike } from '../tools/web-fetch.js';
@@ -124,6 +125,20 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
       description: '在工作区内做本地关键词/RAG 检索，返回相关文本块、来源文件和行号。适合回答“在我的资料里找/根据项目资料回答”。',
       parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] },
       handler: async (args = {}) => searchWorkspaceIndex({ root, query: args.query, limit: args.limit }),
+    },
+    {
+      name: 'SearchMemory', mutating: false, risk: 'safe',
+      description: '在你的长期记忆(由过往对话提炼的主题知识)里检索相关条目。适合回答“我之前说过/你还记得…吗/根据我以前告诉你的”。返回主题、标题、内容与来源对话。',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] },
+      handler: async (args = {}) => {
+        const items = recallRelevantKnowledge(root, String(args.query || ''), omitUndefined({ limit: Number(args.limit) || undefined }));
+        return {
+          items: items.map((it) => ({
+            topic: it.topic, title: it.title, content: it.content,
+            confidence: it.confidence, source: it.provenance?.sourceConversationId || '',
+          })),
+        };
+      },
     },
     {
       name: 'PlanFileOrganization', mutating: false, risk: 'safe',

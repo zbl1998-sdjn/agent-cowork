@@ -37,10 +37,13 @@ test('native agent tools (Read/Write/Glob) are jailed to the workspace', async (
     'Grep',
     'PlanFileOrganization',
     'Read',
+    'SearchMemory',
     'SearchWorkspace',
     'WebFetch',
     'Write',
   ]);
+  assert.equal(byName('SearchMemory').mutating, false);
+  assert.equal(byName('SearchMemory').risk, 'safe');
 
   const glob = parseGlobResult(await byName('Glob').handler({ pattern: '*.txt' }));
   assert.ok(glob.matches.includes('a.txt'));
@@ -126,6 +129,22 @@ test('Shell captures stdout from quoted node -e commands on Windows local backen
   assert.equal(result.exitCode, 0);
   assert.equal(result.stdout, 'shell-ok');
   assert.equal(result.stderr, '');
+});
+
+test('SearchMemory returns relevant active topic knowledge and is read-only', async () => {
+  const { upsertKnowledgeItem } = await import('../src/memory/knowledge-store.js');
+  const root = tempRoot('kcw-agent-mem-');
+  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7 });
+  upsertKnowledgeItem(root, { topic: '八卦', title: '待确认', content: '也许喜欢咖啡', confidence: 0.2 }, { confidenceThreshold: 0.7 });
+  const search = agentTool(createAgentTools({ trustedRoot: root }), 'SearchMemory');
+
+  const hit = await search.handler({ query: '项目代号是什么' }) as { items: Array<{ content: string }> };
+  assert.ok(hit.items.length >= 1);
+  assert.match(String(hit.items[0]?.content), /Phoenix-7/);
+
+  // pending 低置信条目不会被检索到(只查 active)。
+  const none = await search.handler({ query: '咖啡' }) as { items: Array<{ content: string }> };
+  assert.equal(none.items.some((it) => /咖啡/.test(it.content)), false);
 });
 
 test('native WebFetch tool honors egress policy (security regression: agent-tools.ts had its own ungated WebFetch alongside the gated web-builtin-tools.ts one)', async () => {
