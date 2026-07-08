@@ -81,6 +81,14 @@ export function normalizeSecurityMode(value: unknown, fallback: SecurityMode = '
   return isSecurityMode(mode) ? mode : fallback;
 }
 
+/** 「严格本地」模式(local_demo/local_strict/air_gap):唯一权威定义,供 egress-gateway/
+ * sandbox 等 L0/L1 消费方共用同一口径——散落的字面量比较(如只写 `=== 'local_strict'`)
+ * 容易漏掉 air_gap 这个更严格的模式(dogfood 实测踩过:sandbox 的高风险工具阻断策略就
+ * 因此对 air_gap 完全失效)。 */
+export function isStrictLocalMode(mode: SecurityMode): boolean {
+  return mode === 'local_demo' || mode === 'local_strict' || mode === 'air_gap';
+}
+
 export function resolveSecurityMode({
   configuredMode,
   env = process.env as RuntimeEnv,

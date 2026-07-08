@@ -152,8 +152,13 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     maxTimeoutMs: config.sandboxMaxTimeoutMs,
     defaultMaxOutputBytes: config.sandboxMaxOutputBytes,
   });
+  // 严格本地模式(local_demo/local_strict/air_gap)下若没有真隔离的沙箱后端(Docker/VM/
+  // Hyper-V),policyBlocked=true——此前这个字段只写进 info 供展示,从未被读取来真正
+  // 阻止 sandbox.exec/sandbox.run-code 注册,等于「宣称阻塞高风险工具」但代码里从没
+  // 阻塞过(dogfood 实测发现)。这里真正据此决定要不要把 sandbox 传给工具装配。
+  const sandboxPolicyBlocked = state.sandboxStartup.info?.policyBlocked === true;
   state.toolRegistry = (config.toolRegistry || createToolRegistry().registerMany(createBuiltinTools({
-    sandbox: state.sandboxEnabled ? state.sandbox : null,
+    sandbox: state.sandboxEnabled && !sandboxPolicyBlocked ? state.sandbox : null,
     sandboxLimits: state.sandboxLimits,
     runStoreRoot: state.runStoreRoot,
     runEvents: state.runEvents,
