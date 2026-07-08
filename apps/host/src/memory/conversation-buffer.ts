@@ -98,6 +98,16 @@ export function readRecentTurns(
   return turns.slice(-Math.max(1, options.maxTurns ?? DEFAULT_MAX_TURNS));
 }
 
+/** 清空某会话缓冲(对话结束提炼成主题知识后调用,避免重复提炼);文件不存在则静默返回。 */
+export function clearConversationBuffer(trustedRoot: unknown, conversationId: unknown): void {
+  const file = conversationBufferPath(trustedRoot, conversationId);
+  try {
+    if (fs.existsSync(file)) fs.rmSync(file, { force: true });
+  } catch {
+    // 清理失败不阻断收尾。
+  }
+}
+
 const ROLE_LABELS: Record<ConversationRole, string> = { user: '用户', assistant: '助手' };
 
 /** 把最近若干轮渲染成一段带标签的紧凑文本,供注入到 system 段的 session 记忆层;空则返回空串。 */
