@@ -29,6 +29,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
     runsIndex = null,
     enableWebTools = true,
     fetchImpl,
+    resolveSecurityMode,
   } = parseBuiltinToolsOptions(options);
   const tools: ToolEntry[] = [];
 
@@ -78,7 +79,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
   }
 
   if (enableWebTools) {
-    tools.push(...createWebBuiltinTools(omitUndefined({ fetchImpl })));
+    tools.push(...createWebBuiltinTools(omitUndefined({ fetchImpl, resolveSecurityMode })));
   }
 
   tools.push({

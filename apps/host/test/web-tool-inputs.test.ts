@@ -94,3 +94,36 @@ test('web builtin tools expose approval metadata and forward bounded fetch args'
   });
   assert.deepEqual(calls, [{ url: 'https://example.com/page', redirect: 'manual', hasSignal: true }]);
 });
+
+test('web.fetch and WebSearch honor air_gap/local_strict egress policy (security regression: this was the third bypass instance in the same class)', async () => {
+  let fetchCalled = false;
+  const fetchImpl: WebFetchLike = async () => { fetchCalled = true; return { ok: true, status: 200, headers: { get: () => 'text/plain' }, arrayBuffer: () => new ArrayBuffer(0) }; };
+
+  const airGapTools = createWebBuiltinTools({ fetchImpl, resolveSecurityMode: () => 'air_gap' });
+  const airGapFetch = airGapTools.find((tool) => tool.name === 'web.fetch');
+  const airGapSearch = airGapTools.find((tool) => tool.name === 'WebSearch');
+  assert.ok(airGapFetch && airGapSearch);
+
+  fetchCalled = false;
+  await assert.rejects(() => airGapFetch.handler({ url: 'https://example.com' }));
+  assert.equal(fetchCalled, false, 'air_gap 下 web.fetch 不得实际发起请求');
+
+  // WebSearch 的出站检查在 webSearch() 实现细节之前就抛错,不需要 mock 真实的搜索实现。
+  await assert.rejects(() => airGapSearch.handler({ query: 'test' }));
+
+  const strictTools = createWebBuiltinTools({ fetchImpl, resolveSecurityMode: () => 'local_strict' });
+  const strictFetch = strictTools.find((tool) => tool.name === 'web.fetch');
+  assert.ok(strictFetch);
+  fetchCalled = false;
+  await assert.rejects(() => strictFetch.handler({ url: 'https://example.com' }));
+  assert.equal(fetchCalled, false, 'local_strict 下 web.fetch 不得实际发起请求');
+
+  // 对照组:controlled_hybrid(多数用户的默认模式)不能被误伤,必须继续正常工作。
+  const hybridTools = createWebBuiltinTools({ fetchImpl, resolveSecurityMode: () => 'controlled_hybrid' });
+  const hybridFetch = hybridTools.find((tool) => tool.name === 'web.fetch');
+  assert.ok(hybridFetch);
+  fetchCalled = false;
+  const ok = await hybridFetch.handler({ url: 'https://example.com' }) as { ok: boolean };
+  assert.equal(fetchCalled, true, 'controlled_hybrid 下不能被误伤,应正常发起请求');
+  assert.equal(ok.ok, true);
+});

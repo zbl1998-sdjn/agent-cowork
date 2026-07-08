@@ -2,12 +2,19 @@
 // ---------------------------------------------------------------------------
 // 职责:把联网类内置工具(web.fetch / WebSearch)的名称、描述、风险等级、
 // 入参 schema 与 handler 收敛到一处,供工具集装配方按统一描述符形态接入。
-// 依赖:L1 tools(web-fetch/web-search),L0 util(object.omitUndefined)。导出:createWebBuiltinTools。
+// 安全:每次调用前先过 L0 出站网关(decideEgressPolicy, kind='web_fetch')——
+// air_gap/local_strict 下必须拦住这两个工具的真实出网,不能让机密档只挡住模型调用
+// 却漏了 WebFetch/WebSearch(这两个此前完全没接出站策略检查,是比 model_inference
+// 更基础的缺口:dogfood 系统性排查出站面时发现)。
+// 依赖:L1 tools(web-fetch/web-search),L0 security/egress-gateway、util(object.omitUndefined)。
+// 导出:createWebBuiltinTools。
 // 实现:把当前日期(now)注入 WebSearch 描述,提示模型搜「最新/今天」时带上当前年份。
 
 import { webFetch } from './web-fetch.js';
 import { webSearch } from './web-search.js';
 import { omitUndefined } from '../util/object.js';
+import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
+import { contextRecord } from './builtin-tool-options.js';
 import type { WebFetchLike } from './web-fetch.js';
 import type { WebSearchFetchLike } from './web-search.js';
 
@@ -20,15 +27,31 @@ type BuiltinTool = {
   mutating?: boolean;
   requiresApproval?: boolean;
   inputSchema?: Record<string, unknown>;
-  handler(args?: BuiltinToolArgs): unknown | Promise<unknown>;
+  handler(args?: BuiltinToolArgs, ctx?: unknown): unknown | Promise<unknown>;
 };
 type CreateWebBuiltinToolsOptions = {
   fetchImpl?: WebFetchLike | WebSearchFetchLike;
   now?: Date;
+  resolveSecurityMode?: () => unknown;
 };
 
+/** 出站前置检查:deny 就抛错(由工具循环统一转成失败的 tool_result,不静默放行)。 */
+function assertWebEgressAllowed(destination: unknown, ctx: unknown, resolveSecurityMode?: () => unknown): void {
+  const trustedRoot = contextRecord(ctx).trustedRoot;
+  const egress = decideEgressPolicy({
+    kind: 'web_fetch',
+    destination,
+    securityMode: resolveSecurityMode?.(),
+    trustedRoot,
+  });
+  if (trustedRoot) {
+    try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
+  }
+  if (egress.decision === 'deny') throw egressPolicyError(egress);
+}
+
 /** 组装联网工具描述符;当前日期注入只用于提示模型搜索「最新/今天」时带年份。 */
-export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWebBuiltinToolsOptions = {}): BuiltinTool[] {
+export function createWebBuiltinTools({ fetchImpl, now = new Date(), resolveSecurityMode }: CreateWebBuiltinToolsOptions = {}): BuiltinTool[] {
   const monthYear = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
   return [
     {
@@ -42,14 +65,16 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWeb
         properties: { url: { type: 'string' }, maxBytes: { type: 'number' }, timeoutMs: { type: 'number' } },
         required: ['url'],
       },
-      handler: async (args = {}) =>
-        webFetch(omitUndefined({
+      handler: async (args = {}, ctx) => {
+        assertWebEgressAllowed(args.url, ctx, resolveSecurityMode);
+        return webFetch(omitUndefined({
           url: args.url,
           timeoutMs: args.timeoutMs,
           maxBytes: args.maxBytes,
           allowInternal: args.allowInternal === true,
           fetchImpl: fetchImpl as WebFetchLike | undefined,
-        })),
+        }));
+      },
     },
     {
       name: 'WebSearch',
@@ -66,13 +91,15 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date() }: CreateWeb
         },
         required: ['query'],
       },
-      handler: async (args = {}) =>
-        webSearch(omitUndefined({
+      handler: async (args = {}, ctx) => {
+        assertWebEgressAllowed(`search:${String(args.query || '')}`, ctx, resolveSecurityMode);
+        return webSearch(omitUndefined({
           query: args.query,
           maxResults: args.maxResults,
           provider: args.provider || 'auto',
           fetchImpl: fetchImpl as WebSearchFetchLike | undefined,
-        })),
+        }));
+      },
     },
   ];
 }

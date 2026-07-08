@@ -158,6 +158,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     runStoreRoot: state.runStoreRoot,
     runEvents: state.runEvents,
     runsIndex: state.runsIndex,
+    // 传 getter 而非快照值:kimiApiConfig 会被 kimi-routes 等原地更新,WebFetch/WebSearch
+    // 的出站策略检查必须读到「当前」安全模式,不是装配这一刻的值。
+    resolveSecurityMode: () => kimiApiConfig.securityMode,
   }))) as unknown as HostState['toolRegistry'];
   state.skillRegistry = config.skillRegistry || createSkillRegistry();
   state.cancellation = config.cancellation || createCancellationRegistry();
