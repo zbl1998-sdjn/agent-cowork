@@ -1,14 +1,14 @@
-Agent Cowork v0.2.1 Internal Beta
+Agent Cowork v0.3.0 Internal Beta
 
 This folder's current friend-test installer is:
 
-- Agent-Cowork-Setup-v0.2.1-internal-beta.exe
-- Agent-Cowork-Setup-v0.2.1-internal-beta.exe.sha256
+- Agent-Cowork-Setup-v0.3.0-internal-beta.exe
+- Agent-Cowork-Setup-v0.3.0-internal-beta.exe.sha256
 - INSTALL-Windows-internal-beta.md
 
 The friend-test zip package is:
 
-- Agent-Cowork-v0.2.1-internal-beta-windows-x64.zip
+- Agent-Cowork-v0.3.0-internal-beta-windows-x64.zip
 
 Use scope:
 
@@ -24,25 +24,23 @@ Known release boundary:
 
 SHA256:
 
-B5F6DA1A8959287B03F8FF68FA4DB99B6123CADAF77E3B60C4A4ED365584F8D1  Agent-Cowork-Setup-v0.2.1-internal-beta.exe
+AF054A896487E86048D9BC6BE5197EFA97008B80AF9C3370F08533043C582B5B  Agent-Cowork-Setup-v0.3.0-internal-beta.exe
 
 Install guide:
 
 Read INSTALL-Windows-internal-beta.md before running the installer.
 
-What's new since v0.2.0 (see CHANGELOG.md [0.2.1] for full detail):
+What's new since v0.2.1 (see CHANGELOG.md [0.3.0] for full detail):
 
-- Security fixes: CSV formula/DDE injection, three confidential-mode egress bypasses
-  (AI recipe extraction, orchestrator tasks, web.fetch/WebSearch), OOXML control-character
-  file corruption, visualization CDN dependency under air_gap, sandbox strict-mode tool
-  registration.
-- New: 6 built-in office recipes now use real AI extraction (meeting actions, summaries,
-  contract digest, feedback clustering, weekly report, table cleaning) with template fallback;
-  scheduled/cron recipes get the same AI path; preview cards show an "AI generated" badge.
-- Fixed: referenced/@-mentioned files not reaching recipe/chat context, thinking-model
-  `<think>` blocks polluting JSON extraction, and several UI/UX papercuts.
-- Fixed (2026-07-09 dogfood pass): chart/flowchart/live-artifact outputs now render inside the
-  app window (previously blocked by the desktop CSP because charts loaded scripts from a CDN /
-  used inline scripts; now bundled locally). The component panel no longer falsely reports the
-  bundled Python, CJK fonts, or WebView2 runtime as missing (detection now probes the real files,
-  not just env vars). Plus one more P0 egress-gateway fix for the main chat WebFetch tool.
+- New: built-in cross-session memory that works with MASE turned off. Conversations get a
+  short-term turn buffer (same-session continuity), and on switching conversations the previous
+  one is auto-distilled by the model into structured topic knowledge (confidence gate:
+  high -> active / low -> pending, dedup/merge by topic, per-scope capacity eviction, DLP so no
+  secrets are stored, provenance back to the source conversation). New conversations recall
+  relevant active knowledge by relevance, and a read-only SearchMemory tool lets the agent look
+  deeper on demand. The memory panel shows active/pending knowledge with approve/delete controls.
+  Verified end-to-end on the real kimi-k2.6 model with MASE off.
+- Fixed: long-context compaction used to fold the leading system message (which carries the agent
+  instructions plus injected memory) into the summary and tail-truncate it, so long chats on
+  small-window local models / very large MEMORY.md could lose long-term memory. Compaction now
+  protects the leading system message.

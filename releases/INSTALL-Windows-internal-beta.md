@@ -1,4 +1,4 @@
-# Agent Cowork v0.2.1 Internal Beta 安装教程（Windows）
+# Agent Cowork v0.3.0 Internal Beta 安装教程（Windows）
 
 这份教程给第一次安装的朋友使用。当前版本是 **Internal Beta / 朋友试用版**，适合小范围可信测试，不是公开生产版。
 
@@ -6,8 +6,8 @@
 
 解压后应看到这些文件：
 
-- `Agent-Cowork-Setup-v0.2.1-internal-beta.exe`：Windows 安装程序。
-- `Agent-Cowork-Setup-v0.2.1-internal-beta.exe.sha256`：安装程序的 SHA256 指纹。
+- `Agent-Cowork-Setup-v0.3.0-internal-beta.exe`：Windows 安装程序。
+- `Agent-Cowork-Setup-v0.3.0-internal-beta.exe.sha256`：安装程序的 SHA256 指纹。
 - `README-internal-beta.txt`：beta 范围和边界说明。
 - `INSTALL-Windows-internal-beta.md`：本安装教程。
 
@@ -21,13 +21,13 @@ SHA256 用来确认你手里的 `.exe` 没损坏、没被替换。
 2. 运行：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Agent-Cowork-Setup-v0.2.1-internal-beta.exe
+Get-FileHash -Algorithm SHA256 .\Agent-Cowork-Setup-v0.3.0-internal-beta.exe
 ```
 
 3. 确认输出的 `Hash` 等于：
 
 ```text
-B5F6DA1A8959287B03F8FF68FA4DB99B6123CADAF77E3B60C4A4ED365584F8D1
+AF054A896487E86048D9BC6BE5197EFA97008B80AF9C3370F08533043C582B5B
 ```
 
 如果不一致，停止安装，并把文件来源反馈给发布者。
@@ -35,7 +35,7 @@ B5F6DA1A8959287B03F8FF68FA4DB99B6123CADAF77E3B60C4A4ED365584F8D1
 ## 3. 安装步骤
 
 1. 先把 zip 完整解压到普通文件夹，不要直接在压缩包窗口里运行 `.exe`。
-2. 双击 `Agent-Cowork-Setup-v0.2.1-internal-beta.exe`。
+2. 双击 `Agent-Cowork-Setup-v0.3.0-internal-beta.exe`。
 3. 如果 Windows 提示“未知发布者”或 SmartScreen 提醒：
    - 这是因为当前 beta 安装包还没有代码签名。
    - 先确认文件名和 SHA256 都正确。
