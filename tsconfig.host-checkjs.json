@@ -291,7 +291,6 @@
     "apps/host/src/storage/conversation-sanitizers.ts",
     "apps/host/src/storage/conversation-types.ts",
     "apps/host/src/storage/conversation-store.ts",
-    "apps/host/src/storage/json-store.ts",
     "apps/host/src/storage/jsonl-writer.ts",
     "apps/host/src/storage/postgres-approvals.ts",
     "apps/host/src/storage/postgres-conversation-store.ts",
