@@ -179,6 +179,7 @@ export async function handleRouteChain({
     sendCachedOrStore: state.sendCachedOrStore,
     toolRegistry: state.toolRegistry,
     fileOperationApprovals: state.fileOperationApprovals,
+    resolveSecurityMode: () => state.kimiApiConfig?.securityMode,
   }))) return true;
   if (await handleSkillRoutes(routeOptions<RouteHandlerOptions<typeof handleSkillRoutes>>({ ...base, skillRegistry: state.skillRegistry }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({

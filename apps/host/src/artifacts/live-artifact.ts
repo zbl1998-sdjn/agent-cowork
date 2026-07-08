@@ -43,6 +43,7 @@ export type BuildLiveArtifactOptions = {
   viz: VizSpec;
   dataUrl?: string;
   dataSource?: unknown;
+  securityMode?: unknown;
 };
 
 export type BuiltLiveArtifact = {
@@ -64,10 +65,10 @@ type LiveArtifactManifest = {
 };
 
 /** 构建一份实时制品:规格化 spec → 试渲染校验 → 写出活页 HTML 与 manifest,返回落盘路径与 dataUrl。 */
-export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource }: BuildLiveArtifactOptions): BuiltLiveArtifact {
+export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSource, securityMode }: BuildLiveArtifactOptions): BuiltLiveArtifact {
   const spec = normalizeLiveArtifactSpec(omitUndefined({ id, title, viz, dataUrl, dataSource }));
   // 先渲染一次校验 viz 规格;类型或数据不合法会抛 400。
-  renderViz(spec.viz);
+  renderViz(spec.viz, { securityMode });
   if (spec.dataSource?.type === 'file-json') {
     resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource: spec.dataSource });
   }
@@ -75,7 +76,7 @@ export function buildLiveArtifact({ trustedRoot, id, title, viz, dataUrl, dataSo
   const { dir, htmlPath, manifestPath, relativePath } = artifactPaths({ trustedRoot, id: spec.id });
   fs.mkdirSync(dir, { recursive: true });
 
-  const html = renderLivePage({ title: spec.title, viz: spec.viz, dataUrl: spec.dataUrl });
+  const html = renderLivePage({ title: spec.title, viz: spec.viz, dataUrl: spec.dataUrl, securityMode });
   const manifest: LiveArtifactManifest = omitUndefined({
     id: spec.id,
     title: spec.title,

@@ -56,6 +56,28 @@ test('renderLivePage escapes title and script-sensitive data while preserving re
   assert.match(html, /agent-cowork:live-artifact-data/);
 });
 
+test('renderLivePage air_gap: no CDN script tag, client renderer degrades chart to a table (dogfood security fix)', () => {
+  const html = renderLivePage({
+    title: '收入',
+    viz: { kind: 'bar', data: { labels: ['Q1'], values: [10] } },
+    dataUrl: '/api/artifacts/data/viz_airgap',
+    securityMode: 'air_gap',
+  });
+  assert.equal(html.includes('cdnjs.cloudflare.com'), false, 'air_gap live page must not reference any CDN');
+  assert.match(html, /机密模式\(零出网\)/, 'must surface a visible notice, not a silently degraded page');
+  // 客户端渲染器里 renderChart 的 no-Chart 分支必须存在(退化成表格,而不是留空白 canvas)。
+  assert.match(html, /图表脚本未加载/);
+});
+
+test('renderLivePage non-air_gap keeps the CDN script tag (no regression for the default path)', () => {
+  const html = renderLivePage({
+    title: '收入',
+    viz: { kind: 'bar', data: { labels: ['Q1'], values: [10] } },
+    dataUrl: '/api/artifacts/data/viz_default',
+  });
+  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js/);
+});
+
 test('readArtifactManifest / readLiveArtifactHtml reject bad ids and missing artifacts', () => {
   const root = tempRoot('kcw-art-');
   assert.throws(() => readArtifactManifest({ trustedRoot: root, id: '../etc' }), (error: unknown) => {
