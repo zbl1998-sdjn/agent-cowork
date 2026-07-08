@@ -2,31 +2,41 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderViz, VIZ_KINDS } from '../src/artifacts/viz.js';
 
-test('renderViz bar chart embeds Chart.js, the config, and the title', () => {
+// CSP 说明(dogfood 全面审查修复,2026-07-08):产物 HTML 会被塞进桌面应用 sandbox="allow-scripts"
+// 的 <iframe srcDoc> 内,浏览器把壳的 CSP(script-src 'self',无 unsafe-inline)继承给 srcdoc
+// 子文档且无法被子文档自身 <meta CSP> 放宽(已用 Playwright 实测确认)。因此不再用 CDN <script src>
+// 或内联 <script> 画图——改成本地打包的 /vendor/*.js 外部脚本 + <script type="application/json">
+// 承载数据(非可执行数据块,不受 script-src 限制)。见 apps/host/src/artifacts/viz.ts 顶部注释。
+test('renderViz bar chart references the local Chart.js vendor script, config data, and the title', () => {
   const html = renderViz({
     title: '季度收入',
     kind: 'bar',
     data: { labels: ['Q1', 'Q2'], values: [10, 20] },
   });
   assert.match(html, /<!doctype html>/);
-  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js/);
-  assert.match(html, /new window\.Chart/);
+  assert.match(html, /<script src="\/vendor\/chart\.umd\.min\.js"><\/script>/);
+  assert.match(html, /<script src="\/vendor\/viz-client-runtime\.js"><\/script>/);
+  assert.match(html, /<script src="\/vendor\/viz-bootstrap-static\.js"><\/script>/);
+  assert.match(html, /<script type="application\/json" id="viz-config">/);
   assert.match(html, /"labels":\["Q1","Q2"\]/);
   assert.match(html, /季度收入/);
+  assert.equal(html.includes('cdnjs.cloudflare.com'), false, '不得引用 CDN');
+  assert.equal(/<script>[\s\S]*<\/script>/.test(html), false, '不得内联可执行 <script>(CSP script-src \'self\' 会拦截)');
 });
 
 test('renderViz supports line / pie / doughnut kinds', () => {
   for (const kind of ['line', 'pie', 'doughnut']) {
     const html = renderViz({ kind, data: { labels: ['a'], values: [1] } });
-    assert.match(html, new RegExp(`"type":"${kind}"`));
+    assert.match(html, new RegExp(`"kind":"${kind}"`));
   }
 });
 
-test('renderViz mermaid embeds the definition and Mermaid lib', () => {
+test('renderViz mermaid references the definition and the local Mermaid vendor script', () => {
   const html = renderViz({ title: '流程', kind: 'mermaid', data: { definition: 'graph TD; A-->B' } });
-  assert.match(html, /class="mermaid"/);
-  assert.match(html, /graph TD; A--&gt;B/);
-  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/mermaid/);
+  assert.match(html, /"kind":"mermaid"/);
+  assert.match(html, /graph TD; A--\\u003eB/);
+  assert.match(html, /<script src="\/vendor\/mermaid\.min\.js"><\/script>/);
+  assert.equal(html.includes('cdnjs.cloudflare.com'), false, '不得引用 CDN');
 });
 
 test('renderViz air_gap: chart degrades to a data table, no external CDN script (dogfood security fix)', () => {
@@ -56,7 +66,7 @@ test('renderViz non-air_gap modes are unaffected (no regression for the default/
     { kind: 'bar', data: { labels: ['a'], values: [1] } },
     { securityMode: 'controlled_hybrid' },
   );
-  assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js/);
+  assert.match(html, /<script src="\/vendor\/chart\.umd\.min\.js"><\/script>/);
 });
 
 test('renderViz table escapes cell content', () => {

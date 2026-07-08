@@ -35,6 +35,11 @@ const SKIP_PATH_PREFIXES = [
   'apps/windows-client/ui-dist',
   'apps/windows-client/ui/node_modules',
   'apps/windows-client/src-tauri/target',
+  // viz 产物的浏览器端运行时:必须以纯 <script src> 全局脚本形式加载进桌面应用 CSP
+  // (script-src 'self')限定的 sandbox="allow-scripts" iframe,不经过 Vite/TS 应用打包
+  // 管线(public/ 是静态直出目录)。含第三方 vendor 库(chart.umd.min.js/mermaid.min.js)
+  // 与配套的运行时/引导小脚本,详见 apps/host/src/artifacts/viz.ts 顶部 CSP 说明。
+  'apps/windows-client/ui/public/vendor',
 ];
 
 function toPosix(filePath: string): string {

@@ -1,10 +1,23 @@
 // 数据可视化渲染器:把 viz 规格渲染成自包含的单页 HTML(host · L1 领域层 · artifacts)
 // ---------------------------------------------------------------------------
 // 职责:支持 chart(Chart.js)/ mermaid(流程图)/ table(纯内联 HTML)三类;
-//       全部用户文本经 HTML 转义、注入 <script> 的数据经编码,杜绝脚本逃逸。
-// 依赖:仅标准库与 cdnjs 上的两个图表库;不依赖本仓其他模块。
+//       全部用户文本经 HTML 转义、注入 <script type="application/json"> 的数据经编码,
+//       杜绝脚本逃逸。
+// 依赖:仅标准库;chart/mermaid 客户端库经本地打包的 /vendor/*.js 加载(见下方
+//       CHART_VENDOR_SRC/MERMAID_VENDOR_SRC 注释)——不依赖本仓其他模块。
 // 导出:renderViz(渲染单页)、常量 VIZ_KINDS(支持的可视化种类清单)
-
+//
+// CSP 说明(dogfood 2026-07-08 发现,全面审查修复):这段 HTML 会被塞进桌面应用里
+// sandbox="allow-scripts" 的 <iframe srcDoc>(InlineViz/LiveArtifactView)。浏览器会把
+// 桌面壳的 CSP(script-src 'self',无 unsafe-inline)继承给 srcdoc 子文档,子文档自己声明
+// 的 <meta CSP> 无法放宽这一限制(已用 Playwright 实测确认)。因此:
+// 1. 不再用 CDN <script src>(cdnjs 既不在 script-src 'self' 白名单内,机密模式下也不该
+//    出网)——改成本地打包的 /vendor/chart.umd.min.js、/vendor/mermaid.min.js(经
+//    apps/windows-client/ui/public/vendor 随 UI 构建产物一起分发,host 的 ui-dist 静态
+//    响应器与 Tauri frontendDist 都会把它们暴露在应用自身 'self' 源下)。
+// 2. 不再用内联 <script> 传数据+画图——数据放进 <script type="application/json">(非
+//    可执行数据块,不受 script-src 限制),画图逻辑挪进同样本地打包的外部脚本
+//    /vendor/viz-client-runtime.js + /vendor/viz-bootstrap-static.js。
 type HttpError = Error & { statusCode?: number };
 export type VizSpec = {
   kind?: string;
@@ -17,8 +30,10 @@ export type VizSpec = {
 };
 
 const CHART_KINDS = new Set(['bar', 'line', 'pie', 'doughnut']);
-const CHART_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-const MERMAID_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js';
+const CHART_VENDOR_SRC = '/vendor/chart.umd.min.js';
+const MERMAID_VENDOR_SRC = '/vendor/mermaid.min.js';
+const VIZ_RUNTIME_SRC = '/vendor/viz-client-runtime.js';
+const VIZ_BOOTSTRAP_STATIC_SRC = '/vendor/viz-bootstrap-static.js';
 const LINE_SEP = new RegExp(String.fromCharCode(0x2028), 'g');
 const PARA_SEP = new RegExp(String.fromCharCode(0x2029), 'g');
 
@@ -122,25 +137,27 @@ ${head}          <tbody>
   return htmlShell({ title, body });
 }
 
-/** 渲染图表页:数据经 safeJson 注入脚本,由 Chart.js 在 canvas 上绘制。air_gap 下退化成表格。 */
+/** 客户端渲染引导:vendor 库 + 共享运行时 + 静态引导脚本,均为外部 <script src>(CSP script-src 'self' 安全),
+ * 配置数据放进不可执行的 <script type="application/json">。 */
+function clientRenderBootstrap(vendorSrc: string, spec: Record<string, unknown>): { headExtra: string; body: string } {
+  const headExtra = `    <script src="${vendorSrc}"></script>
+    <script src="${VIZ_RUNTIME_SRC}"></script>`;
+  const body = `        <div id="viz-root"></div>
+        <script type="application/json" id="viz-config">${safeJson(spec)}</script>
+        <script src="${VIZ_BOOTSTRAP_STATIC_SRC}"></script>`;
+  return { headExtra, body };
+}
+
+/** 渲染图表页:数据经 <script type="application/json"> 注入,交给本地打包的 Chart.js 客户端渲染。air_gap 下退化成表格。 */
 function renderChart(kind: string, title: string, spec: VizSpec, securityMode?: unknown): string {
   const chartData = normalizeChartData(spec.data);
   if (securityMode === 'air_gap') return renderChartFallback(title, chartData);
   const options = spec.options && typeof spec.options === 'object' ? spec.options : { responsive: true };
-  const config = { type: kind, data: chartData, options };
-  const headExtra = `    <script src="${CHART_CDN}"></script>`;
-  const body = `        <canvas id="viz-canvas" height="320"></canvas>
-        <script>
-          (function () {
-            var config = ${safeJson(config)};
-            var el = document.getElementById('viz-canvas');
-            if (window.Chart && el) { new window.Chart(el.getContext('2d'), config); }
-          })();
-        </script>`;
+  const { headExtra, body } = clientRenderBootstrap(CHART_VENDOR_SRC, { kind, data: spec.data, options });
   return htmlShell({ title, headExtra, body });
 }
 
-/** 渲染 Mermaid 图:定义文本经 HTML 转义后交给 strict 模式的 mermaid 渲染。air_gap 下只展示原始定义文本,不加载渲染脚本。 */
+/** 渲染 Mermaid 图:定义文本交给本地打包的 mermaid 客户端渲染(strict 模式)。air_gap 下只展示原始定义文本,不加载渲染脚本。 */
 function renderMermaid(title: string, spec: VizSpec, securityMode?: unknown): string {
   const data = spec.data && typeof spec.data === 'object' ? spec.data as Record<string, unknown> : {};
   const definition = String((data.definition || data.code) || spec.code || spec.definition || '').trim();
@@ -152,11 +169,7 @@ function renderMermaid(title: string, spec: VizSpec, securityMode?: unknown): st
         <pre>${escapeHtml(definition)}</pre>`;
     return htmlShell({ title, body });
   }
-  const headExtra = `    <script src="${MERMAID_CDN}"></script>`;
-  const body = `        <pre class="mermaid">${escapeHtml(definition)}</pre>
-        <script>
-          if (window.mermaid) { window.mermaid.initialize({ startOnLoad: true, securityLevel: 'strict' }); }
-        </script>`;
+  const { headExtra, body } = clientRenderBootstrap(MERMAID_VENDOR_SRC, { kind: 'mermaid', data: { definition } });
   return htmlShell({ title, headExtra, body });
 }
 

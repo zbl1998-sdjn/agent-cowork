@@ -25,7 +25,7 @@ test('POST /api/viz/render persists a live artifact and is idempotent', async ()
     assert.equal(first.status, 200);
     const firstBody = parsePersistedRenderResponse(first.body);
     assert.match(firstBody.viewUrl, /^\/api\/artifacts\/live\/viz_/);
-    assert.match(firstBody.html, /new window\.Chart/);
+    assert.match(firstBody.html, /<script src="\/vendor\/chart\.umd\.min\.js"><\/script>/);
 
     const page = await textRequest(base, firstBody.viewUrl);
     assert.ok(page.type.includes('text/html'));
