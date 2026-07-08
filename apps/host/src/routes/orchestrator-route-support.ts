@@ -251,6 +251,7 @@ export function selectTaskRunner(kind: OrchestrationRunnerKind, options: RunOrch
         modelConfig: options.modelConfig,
         ...(options.modelCall ? { modelCall: options.modelCall } : {}),
         ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        trustedRoot: workspaceRoot,
       };
       return {
         runnerKind: 'provider',

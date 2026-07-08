@@ -1,5 +1,6 @@
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/index.js';
+import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
 import type {
   AgentDefinition,
   AgentResult,
@@ -25,6 +26,8 @@ export type ProviderTaskRunnerOptions = {
   modelConfig: ModelConfig;
   modelCall?: ProviderModelCall | undefined;
   fetchImpl?: unknown;
+  // 出站策略检查用;不传时(如测试直接构造 runner)不记审计,但策略判断仍生效。
+  trustedRoot?: unknown;
 };
 
 function estimateTokens(text: string): number {
@@ -122,6 +125,7 @@ export function createProviderTaskRunner({
   modelConfig,
   modelCall = callProviderChatCompletion,
   fetchImpl,
+  trustedRoot,
 }: ProviderTaskRunnerOptions) {
   return async function providerTaskRunner(
     task: AgentTask,
@@ -138,6 +142,22 @@ export function createProviderTaskRunner({
     };
     if (fetchImpl !== undefined) args.fetchImpl = fetchImpl;
     if (controls.signal) args.signal = controls.signal;
+    // 与对话路径(model-resilience.ts)同一出站闸门:此前这里直接裸调模型,air_gap/
+    // local_strict 下配了云端 provider 时,orchestrator 任务(Agent Team)会绕过安全模式
+    // 实际出网。deny 就抛错——由调用方(orchestrator 任务失败处理)呈现,不静默继续。
+    const egress = decideEgressPolicy({
+      kind: 'model_inference',
+      provider: modelConfig?.provider,
+      model: modelConfig?.model,
+      baseUrl: modelConfig?.baseUrl,
+      securityMode: modelConfig?.securityMode,
+      content: args.messages,
+      trustedRoot,
+    });
+    if (trustedRoot) {
+      try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
+    }
+    if (egress.decision === 'deny') throw egressPolicyError(egress);
     const response = await modelCall(args);
     const summary = messageText(response).trim();
     if (!summary) {

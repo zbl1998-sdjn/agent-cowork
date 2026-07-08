@@ -580,6 +580,58 @@ test('Provider task runner converts typed provider output into AgentResult', asy
   assert.equal(seenSignals[0], abort.signal);
 });
 
+test('Provider task runner honors air_gap/local_strict egress policy (security regression: orchestrator provider path bypassed the same gate model-recipe once did)', async () => {
+  const registry = createDefaultAgentRegistry();
+  const agent = registry.get('writer');
+  const task: AgentTask = {
+    taskId: 'task_provider_egress',
+    runId: 'run_provider_egress',
+    parentTaskId: '',
+    agentId: 'writer',
+    title: 'Write provider summary',
+    instruction: 'Summarize the packed evidence.',
+    inputRefs: [sampleRef()],
+    expectedOutput: 'Provider summary.',
+    outputSchemaName: agent.outputSchema.name,
+    priority: 'normal',
+    dependencies: [],
+    timeoutMs: agent.budget.maxRuntimeMs,
+    budget: agent.budget,
+    approvalPolicy: 'never',
+  };
+  const pack: ContextPack = {
+    contextPackId: 'ctx_provider_egress',
+    agentId: 'writer',
+    taskId: task.taskId,
+    userGoalSummary: 'Create a provider-backed report',
+    entries: [{
+      refId: 'provider-note', kind: 'file', label: 'provider.md',
+      dataTags: ['internal'], text: 'text', truncated: false, uri: 'file:///provider.md', metadata: {},
+    }],
+    forbidden: [],
+    redactionReport: { mode: 'secrets_only', redactedCount: 0, omittedRefs: 0, truncatedRefs: 0 },
+  };
+  const cloudConfig = { provider: 'kimi-api', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.7-code' };
+  let called = false;
+  const spy = async () => { called = true; return { content: 'x', provider: 'kimi-api', model: 'kimi-k2.7-code' }; };
+
+  called = false;
+  const airGapRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy });
+  await assert.rejects(() => airGapRunner(task, pack, agent));
+  assert.equal(called, false, 'air_gap 下 orchestrator provider runner 不得实际调用云端模型');
+
+  called = false;
+  const strictRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy });
+  await assert.rejects(() => strictRunner(task, pack, agent));
+  assert.equal(called, false, 'local_strict 下不得实际调用云端模型');
+
+  called = false;
+  const hybridRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy });
+  const ok = await hybridRunner(task, pack, agent);
+  assert.equal(called, true, 'controlled_hybrid 下不能被误伤,应正常出网');
+  assert.equal(ok.status, 'succeeded');
+});
+
 test('WorkflowRunner runs map-reduce map steps in parallel', async () => {
   const root = tempRoot();
   const registry = createDefaultAgentRegistry();
