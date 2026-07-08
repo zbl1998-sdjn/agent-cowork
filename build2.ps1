@@ -17,7 +17,10 @@ Copy-Item 'C:\Program Files\nodejs\node.exe' $target -Force
 Set-Location "$root\apps\windows-client\ui"
 npx --no-install postject $target NODE_SEA_BLOB "$root\apps\host\dist\host.blob" --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --overwrite *>> $log
 Log 'STEP 4 cargo tauri build'
-Set-Location "$root\apps\windows-client"; cargo tauri build *>> $log; if($LASTEXITCODE -ne 0){Fail 'tauri'}
+# cwd 必须是 src-tauri(tauri.conf.json 所在目录),因为 beforeBuildCommand 里的
+# "../../scripts/prepare-embedded-python.ps1" 是相对 src-tauri 写的两级相对路径;
+# 之前 cwd 停在上一级 apps\windows-client,少了一级,导致该相对路径解析不到文件。
+Set-Location "$root\apps\windows-client\src-tauri"; cargo tauri build *>> $log; if($LASTEXITCODE -ne 0){Fail 'tauri'}
 Log 'STEP 5 copy + sign NSIS per-user installer'
 $base="$root\apps\windows-client\src-tauri\target\release\bundle"; $dest="$root\installers"
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
