@@ -1,171 +1,174 @@
-// 跨实例审批存储(PostgreSQL + LISTEN/NOTIFY)(host · L1 领域层 · storage)
-// ---------------------------------------------------------------------------
-// 职责:把待审批请求持久化到 pending_approvals 表,用 LISTEN/NOTIFY 做跨实例 pub/sub——
-//       任一实例 resolve/respond/cancelByRun 都能唤醒持有 awaiting promise 的那个实例。
-//       request() 保持同步(本地生成 id + fire-and-forget INSERT),不需改造 agent 循环。
-// 依赖:仅标准库(crypto);pg 运行时按需 import。后端:PostgreSQL。
-// 导出:PostgresApprovalStore(类) · createPostgresApprovalStore(工厂)。
-import crypto from 'node:crypto';
-
-type PgNotification = { payload?: string | null };
-type PgResult = { rows?: unknown[]; rowCount?: number | null };
-type PgClient = {
-  on(event: 'notification', handler: (message: PgNotification) => void): unknown;
-  query(text: string, params?: unknown[]): Promise<PgResult>;
-  connect?: () => Promise<unknown>;
-  end?: () => Promise<unknown>;
-};
-type PgPool = {
-  query(text: string, params?: unknown[]): Promise<PgResult>;
-  end?: () => Promise<unknown>;
-};
-type PgClientConstructor = new (options?: Record<string, unknown>) => PgClient;
-type PgModule = {
-  default?: { Client?: PgClientConstructor };
-  Client?: PgClientConstructor;
-};
-type ApprovalMeta = { runId?: unknown; tenantId?: unknown; kind?: unknown; [key: string]: unknown };
-type ApprovalContext = { tenantId?: unknown; [key: string]: unknown };
+import {
+  type ApprovalChannel,
+  type ApprovalContext,
+  type ApprovalMeta,
+  defaultApprovalId,
+  matchesChannel,
+  normalizeDecision,
+  positiveIntegerOption,
+  reconcilePersistedApproval,
+  type PostgresApprovalStoreOptions,
+  requiredScope,
+  sameScope,
+} from './postgres-approval-support.js';
+import { PostgresApprovalDatabase } from './postgres-approval-database.js';
+import { encodePostgresApprovalAnswer } from './postgres-approval-answer.js';
+import { createPostgresApprovalCatchUp } from './postgres-approval-catch-up.js';
 type ApprovalResolve = (decision: unknown) => void;
-type LocalApproval = { resolve: ApprovalResolve; meta: ApprovalMeta };
-export type PostgresApprovalStoreOptions = {
-  client?: PgClient | null;
-  pool?: PgPool | null;
-  connectionString?: string | null;
-  channel?: string;
-  generateId?: () => string;
-  pg?: PgModule | null;
-};
-
-/** 生成默认审批 id(apr_ 前缀)。 */
-function defaultId(): string {
-  return `apr_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-}
-
-/** 校验 NOTIFY 通道名合法(防 SQL 注入,通道名不能参数化)。 */
-function safePgIdentifier(value: unknown): string {
-  const text = String(value || '').trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(text)) {
-    throw new Error('PostgresApprovalStore: invalid channel name');
-  }
-  return text;
-}
-
-/** 租户隔离:无 tenantId 视为公共,否则要求上下文租户匹配。 */
-function sameTenant(meta: ApprovalMeta = {}, context: ApprovalContext | null = null): boolean {
-  return !meta.tenantId || !!(context && context.tenantId === meta.tenantId);
-}
-
-/** 跨实例审批存储:PG 表持久化 + LISTEN/NOTIFY 跨实例唤醒本地 awaiting promise。 */
+type LocalApproval = { resolve: ApprovalResolve; meta: ApprovalMeta; persistence: Promise<void>; createdAt: number };
+export type { PostgresApprovalStoreOptions } from './postgres-approval-support.js';
 export class PostgresApprovalStore {
-  private _client: PgClient | null;
-  private _pool: PgPool | null;
-  private _connectionString: string | null;
-  private _pg: PgModule | null;
-  private _channel: string;
+  private _database: PostgresApprovalDatabase;
   private _local: Map<string, LocalApproval>;
   private _generateId: () => string;
-  private _started: boolean;
-
-  constructor({ client = null, pool = null, connectionString = null, channel = 'kcw_approvals', generateId = defaultId, pg = null }: PostgresApprovalStoreOptions = {}) {
-    // client 是专用 LISTEN 连接,pool 负责查询;测试里可用同一个 mock 同时扮演两者。
-    this._client = client;
-    this._pool = pool || client;
-    this._connectionString = connectionString;
-    this._pg = pg;
-    this._channel = safePgIdentifier(channel);
+  private _ttlMs: number;
+  private _maxPending: number;
+  private _pruneIntervalMs: number;
+  private _pruneTimer: ReturnType<typeof setInterval> | null;
+  private _onError: (message: string) => void;
+  constructor({
+    client = null,
+    pool = null,
+    connectionString = null,
+    channel = 'kcw_approvals',
+    generateId = defaultApprovalId,
+    pg = null,
+    ttlMs = 15 * 60 * 1000,
+    maxPending = 10000,
+    pruneIntervalMs = 60 * 1000,
+    connectionTimeoutMs = 5000,
+    queryTimeoutMs = 10000,
+    reconnectAttempts = 3,
+    reconnectDelayMs = 100,
+    onError = (message) => console.error('[postgres-approvals]', message),
+  }: PostgresApprovalStoreOptions = {}) {
     this._local = new Map(); // id -> { resolve, meta },仅保存本实例正在等待的 promise。
     this._generateId = generateId;
-    this._started = false;
-  }
-
-  /** 取/建专用 LISTEN 连接(pg 按需 import,缺包给出安装提示)。 */
-  async _getClient(): Promise<PgClient> {
-    if (this._client) return this._client;
-    if (!this._connectionString) throw new Error('PostgresApprovalStore: client or connectionString is required');
-    let pg: PgModule;
-    try {
-      pg = this._pg || await import('pg') as PgModule;
-    } catch {
-      throw new Error("PostgreSQL backend requires the 'pg' package — run `npm i pg`.");
-    }
-    const Client = pg.default?.Client || pg.Client;
-    if (!Client) throw new Error("PostgreSQL backend requires the 'pg' Client export.");
-    const client = new Client({ connectionString: this._connectionString });
-    if (typeof client.connect === 'function') await client.connect();
-    this._client = client;
-    if (!this._pool) this._pool = client;
-    return client;
-  }
-
-  /** 取查询连接池(无则退回到 LISTEN 连接)。 */
-  async _getPool(): Promise<PgPool> {
-    if (this._pool) return this._pool;
-    return this._getClient();
-  }
-
-  /** 启动跨实例监听:订阅通道,收到 NOTIFY 时唤醒本地匹配的 awaiter。 */
-  async start(): Promise<void> {
-    if (this._started) return;
-    this._started = true;
-    const client = await this._getClient();
-    client.on('notification', (msg) => {
-      let data: unknown;
-      if (typeof msg.payload !== 'string') return;
-      try { data = JSON.parse(msg.payload); } catch { return; }
-      const event = data as { id?: unknown; decision?: unknown };
-      const id = String(event.id || '');
-      const entry = this._local.get(id);
-      if (entry) { this._local.delete(id); entry.resolve(event.decision); }
+    this._ttlMs = positiveIntegerOption('ttlMs', ttlMs, 15 * 60 * 1000, { allowZero: true });
+    this._maxPending = positiveIntegerOption('maxPending', maxPending, 10000);
+    this._pruneIntervalMs = positiveIntegerOption('pruneIntervalMs', pruneIntervalMs, 60 * 1000, { allowZero: true });
+    this._onError = onError;
+    const catchUp = createPostgresApprovalCatchUp({
+      snapshot: () => [...this._local],
+      reconcile: (id, entry) => this._reconcileNotification(id, 3, entry),
+      onError: () => this._reportError('LISTEN catch-up failed'),
     });
-    await client.query(`LISTEN ${this._channel}`);
+    this._database = new PostgresApprovalDatabase({
+      client,
+      pool,
+      connectionString,
+      channel,
+      pg,
+      connectionTimeoutMs: positiveIntegerOption('connectionTimeoutMs', connectionTimeoutMs, 5000),
+      queryTimeoutMs: positiveIntegerOption('queryTimeoutMs', queryTimeoutMs, 10000),
+      reconnectAttempts: positiveIntegerOption(
+        'reconnectAttempts', reconnectAttempts, 3, { allowZero: true },
+      ),
+      reconnectDelayMs: positiveIntegerOption(
+        'reconnectDelayMs', reconnectDelayMs, 100, { allowZero: true },
+      ),
+      onNotification: (id) => { void this._reconcileNotification(id); },
+      onListening: () => catchUp(),
+      onError: (message) => this._reportError(message),
+    });
+    this._pruneTimer = null;
   }
 
-  /** 同步发起审批:本地生成 id 与 promise,持久化为 fire-and-forget INSERT。 */
-  request(meta: ApprovalMeta = {}): { id: string; promise: Promise<unknown> } {
-    const id = this._generateId();
-    let resolve: ApprovalResolve = () => undefined;
-    const promise = new Promise<unknown>((r) => { resolve = r; });
-    this._local.set(id, { resolve, meta });
-    // 持久化后其它实例也能解析;INSERT fire-and-forget,本地已知 id 不受写入延迟影响。
-    Promise.resolve(this._getPool()).then((pool) => pool.query(
-      `INSERT INTO pending_approvals (id, run_id, tenant_id, kind, status, created_at)
-       VALUES ($1, $2, $3, $4, 'pending', NOW())`,
-      [id, meta.runId || null, meta.tenantId || null, meta.kind || null],
-    )).catch(() => undefined);
-    return { id, promise };
+  private _reportError(message: string): void { try { this._onError(message); } catch { /* 错误报告器不得制造第二个未处理异常 */ } }
+  private async _reconcileNotification(id: string, attemptsRemaining = 3, expected: LocalApproval | null = null): Promise<void> {
+    const entry = this._local.get(id);
+    if (!entry || (expected && entry !== expected)) return;
+    await reconcilePersistedApproval({
+      id,
+      meta: entry.meta,
+      persistence: entry.persistence,
+      read: (scope) => this._database.read(id, scope),
+      isCurrent: () => this._local.get(id) === entry,
+      settle: (decision) => { this._local.delete(id); entry.resolve(decision); },
+      reportError: (message) => this._reportError(message),
+    }, attemptsRemaining);
   }
 
-  /** 把行置为 resolved 并 NOTIFY,同时走本地快路径唤醒;返回是否命中(行或本地)。 */
-  async _resolveRow(id: string, decision: unknown, context: ApprovalContext | null = null): Promise<boolean> {
-    const params: unknown[] = [id, decision];
-    const tenantClause = context && context.tenantId
-      ? ` AND (tenant_id IS NULL OR tenant_id=$${params.push(context.tenantId)})`
-      : ' AND tenant_id IS NULL';
-    const pool = await this._getPool();
-    const r = await pool.query(
-      `UPDATE pending_approvals SET status='resolved', decision=$2, resolved_at=NOW()
-       WHERE id=$1 AND status='pending'${tenantClause}`,
-      params,
-    );
-    const rowMatched = Number(r.rowCount || 0) > 0;
-    if (rowMatched) {
-      await pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
+  private _startPruneTimer(): void {
+    if (this._pruneTimer || this._pruneIntervalMs === 0) return;
+    this._pruneTimer = setInterval(() => {
+      void this.prune(this._ttlMs).catch(() => {
+        this._reportError('scheduled approval prune failed');
+      });
+    }, this._pruneIntervalMs);
+    const timer = this._pruneTimer as unknown as { unref?: () => void };
+    timer.unref?.();
+  }
+
+  async start(): Promise<void> {
+    await this._database.start();
+    this._startPruneTimer();
+  }
+
+  request(meta: ApprovalMeta = {}): { id: string; ready: Promise<void>; promise: Promise<unknown> } {
+    const scope = requiredScope(meta);
+    if (!scope) {
+      throw new Error('PostgresApprovalStore: request requires non-empty tenantId and userId');
     }
-    // 本地快路径:发起审批的同一实例也在等待。
+    if (this._local.size >= this._maxPending) {
+      throw new Error('PostgresApprovalStore: pending approval capacity exceeded');
+    }
+    const id = this._generateId();
+    if (this._local.has(id)) {
+      throw new Error('PostgresApprovalStore: generated approval id collision');
+    }
+    let resolve: ApprovalResolve = () => undefined;
+    const decision = new Promise<unknown>((r) => { resolve = r; });
+    const entry: LocalApproval = {
+      resolve,
+      meta: { ...meta, ...scope },
+      persistence: Promise.resolve(),
+      createdAt: Date.now(),
+    };
+    const persistence = this._database.insert(id, meta, scope)
+      .catch((cause: unknown) => {
+        if (this._local.get(id) === entry) this._local.delete(id);
+        throw new Error('PostgresApprovalStore: approval persistence failed', { cause });
+      });
+    entry.persistence = persistence;
+    const promise = persistence.then(() => decision);
+    // ready 失败时消费者会先返回；预先挂拒绝处理，避免派生 promise 产生未处理拒绝。
+    void promise.catch(() => undefined);
+    this._local.set(id, entry);
+    return { id, ready: persistence, promise };
+  }
+
+  async _resolveRow(
+    id: string,
+    decision: unknown,
+    context: ApprovalContext | null,
+    channel: ApprovalChannel,
+  ): Promise<boolean> {
+    const scope = requiredScope(context);
+    if (!scope) return false;
+    const persistedDecision = channel === 'answer'
+      ? encodePostgresApprovalAnswer(decision)
+      : decision;
+    const localBeforeQuery = this._local.get(id);
+    if (localBeforeQuery && sameScope(localBeforeQuery.meta, context) && matchesChannel(localBeforeQuery.meta, channel)) {
+      try {
+        await localBeforeQuery.persistence;
+      } catch {
+        return false;
+      }
+    }
+    const rowMatched = await this._database.resolve(id, persistedDecision, scope, channel);
     const local = this._local.get(id);
-    const localMatched = !!(local && sameTenant(local.meta, context));
+    const localMatched = !!(rowMatched && local && sameScope(local.meta, context) && matchesChannel(local.meta, channel));
     if (localMatched) { this._local.delete(id); local.resolve(decision); }
-    return rowMatched || localMatched;
+    return rowMatched;
   }
 
-  /** 解析审批决定:仅允许 once/session/reject,非法回落为 reject。 */
   async resolve(id: string, decision: unknown, context: ApprovalContext | null = null): Promise<boolean> {
-    const DEC = new Set(['once', 'session', 'reject']);
-    return this._resolveRow(id, typeof decision === 'string' && DEC.has(decision) ? decision : 'reject', context);
+    const normalized = normalizeDecision(decision);
+    return normalized ? this._resolveRow(id, normalized, context, 'decision') : false;
   }
 
-  /** 批量按相同决定解析多个审批(去重后逐个 resolve)。 */
   async resolveMany(ids: unknown, decision: unknown, context: ApprovalContext | null = null): Promise<Array<{ id: string; ok: boolean }>> {
     const uniqueIds = [...new Set(Array.isArray(ids) ? ids.map((id) => String(id)) : [])];
     const results: Array<{ id: string; ok: boolean }> = [];
@@ -175,55 +178,70 @@ export class PostgresApprovalStore {
     return results;
   }
 
-  /** 以任意值响应审批(不受 once/session/reject 限制),用于自由表单决定。 */
   async respond(id: string, value: unknown, context: ApprovalContext | null = null): Promise<boolean> {
-    return this._resolveRow(id, value, context);
+    return this._resolveRow(id, value, context, 'answer');
   }
 
-  /** 取消某次 run 名下所有 pending 审批(NOTIFY + 唤醒本地),返回取消数。 */
-  async cancelByRun(runId: unknown, decision: unknown = 'reject'): Promise<number> {
+  async cancelByRun(runId: unknown, context: ApprovalContext | null = null): Promise<number> {
     if (!runId) return 0;
-    const pool = await this._getPool();
-    const rows = await pool.query(
-      `UPDATE pending_approvals SET status='resolved', decision=$2, resolved_at=NOW()
-      WHERE run_id=$1 AND status='pending' RETURNING id`,
-      [runId, decision],
-    );
-    const ids = (rows.rows || []).map((row) => String(((row as { id?: unknown }).id) || ''));
-    for (const id of ids) {
-      await pool.query(`SELECT pg_notify($1, $2)`, [this._channel, JSON.stringify({ id, decision })]);
-      const local = this._local.get(id);
-      if (local) { this._local.delete(id); local.resolve(decision); }
+    const scope = requiredScope(context);
+    if (!scope) return 0;
+    const cancelledIds = new Set<string>();
+    const pendingPersistence: Promise<void>[] = [];
+    for (const [id, entry] of this._local) {
+      if (entry.meta.runId === runId && sameScope(entry.meta, context)) {
+        this._local.delete(id);
+        entry.resolve('reject');
+        cancelledIds.add(id);
+        pendingPersistence.push(entry.persistence);
+      }
     }
-    return Number(rows.rowCount || ids.length || 0);
+    // INSERT 与取消可能并发。先释放本地等待者，再等已发出的 INSERT 收口，
+    // 确保后续 UPDATE 不会先于 INSERT 执行而遗留孤儿 pending 行。
+    await Promise.allSettled(pendingPersistence);
+    const mutation = await this._database.cancelByRun(runId, scope);
+    for (const id of mutation.ids) {
+      if (id) cancelledIds.add(id);
+    }
+    return Math.max(cancelledIds.size, mutation.count);
   }
 
-  /** 统计当前 pending 审批行数。 */
   async pendingCount(): Promise<number> {
-    const pool = await this._getPool();
-    const r = await pool.query(`SELECT COUNT(*)::int AS count FROM pending_approvals WHERE status='pending'`, []);
-    const row = (r.rows && r.rows[0]) as { count?: unknown } | undefined;
-    return Number((row && row.count) || 0);
+    return this._database.pendingCount();
   }
 
-  /** 清理超 TTL 的遗留 pending 行(置 expired),并本地以 reject 唤醒对应 awaiter。 */
   async prune(ttlMs = 15 * 60 * 1000): Promise<number> {
-    const pool = await this._getPool();
-    const rows = await pool.query(
-      `UPDATE pending_approvals SET status='expired', resolved_at=NOW()
-       WHERE status='pending' AND created_at < NOW() - ($1::int * INTERVAL '1 millisecond') RETURNING id`,
-      [ttlMs],
-    );
-    const ids = (rows.rows || []).map((row) => String(((row as { id?: unknown }).id) || ''));
-    for (const id of ids) {
+    const ttl = positiveIntegerOption('ttlMs', ttlMs, this._ttlMs, { allowZero: true });
+    const cutoff = Date.now() - ttl;
+    for (const [id, entry] of this._local) {
+      if (entry.createdAt <= cutoff) {
+        this._local.delete(id);
+        entry.resolve('reject');
+      }
+    }
+    const mutation = await this._database.prune(ttl);
+    for (const id of mutation.ids) {
       const local = this._local.get(id);
       if (local) { this._local.delete(id); local.resolve('reject'); }
     }
-    return ids.length;
+    return mutation.count;
+  }
+
+  async stop(): Promise<void> {
+    if (this._pruneTimer) clearInterval(this._pruneTimer);
+    this._pruneTimer = null;
+    this.cancelAll();
+    await this._database.stop();
+  }
+
+  cancelAll(): void {
+    for (const [id, entry] of this._local) {
+      this._local.delete(id);
+      entry.resolve('reject');
+    }
   }
 }
 
-/** 工厂:构造跨实例 Postgres 审批存储。 */
 export function createPostgresApprovalStore(options: PostgresApprovalStoreOptions = {}): PostgresApprovalStore {
   return new PostgresApprovalStore(options);
 }

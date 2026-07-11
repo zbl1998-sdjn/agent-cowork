@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "files": [
+    "types/host-node-shim.d.ts",
+    "scripts/postgres-integration/postgres-test-url.ts",
+    "scripts/postgres-integration/postgres-integration-harness.ts",
+    "scripts/postgres-integration/postgres-test-url.test.ts",
+    "scripts/postgres-integration/postgres-migrations.integration.test.ts",
+    "scripts/postgres-integration/postgres-approvals.integration.test.ts"
+  ],
+  "include": []
+}
