@@ -172,3 +172,44 @@ test('fetchGitHubViewer sends a bearer token and falls back to a safe login labe
   assert.equal(headerValue(call.init, 'accept'), 'application/vnd.github+json');
   assert.equal(headerValue(call.init, 'authorization'), 'Bearer sample-access-token');
 });
+
+test('GitHub OAuth calls carry an abort signal and fail with a bounded timeout', async () => {
+  let observedSignal: AbortSignal | null = null;
+  const hangingFetch: typeof fetch = async (_input, init) => {
+    observedSignal = init?.signal || null;
+    return await new Promise<Response>((_resolve, reject) => {
+      observedSignal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+    });
+  };
+
+  await assert.rejects(
+    () => startGitHubDeviceFlow({ clientId: 'client-id', fetchImpl: hangingFetch, timeoutMs: 10 }),
+    (error: unknown) => statusCode(error) === 504 && /timed out/i.test(String((error as Error).message)),
+  );
+  assert.ok(observedSignal, 'fetch receives an AbortSignal');
+  assert.equal((observedSignal as AbortSignal).aborted, true);
+});
+
+test('fetchGitHubViewer emits only bounded primitive account fields', async () => {
+  const marker = 'nested-sensitive-value';
+  const { fetchImpl } = makeFetch(jsonResponse({
+    login: { token: marker },
+    id: { raw: marker },
+    name: [marker],
+    email: { address: marker },
+  }));
+
+  const viewer = await fetchGitHubViewer({
+    accessToken: 'sample-access-token',
+    fetchImpl,
+    userUrl: 'https://example.test/user',
+  });
+
+  assert.deepEqual(viewer, {
+    login: 'github-user',
+    id: null,
+    name: null,
+    email: null,
+  });
+  assert.doesNotMatch(JSON.stringify(viewer), new RegExp(marker));
+});

@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { addLazySearchTool, createNoopBudgetGuard, parseToolCall } from '../src/kimi/agent/tool-loop-support.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { AgentTool } from '../src/kimi/agent-tools.js';
 import type { ModelCall, ModelCallArgs } from '../src/kimi/agent/model-resilience.js';
 
@@ -45,7 +46,8 @@ test('lazy tools are hidden until search_tools activates them, then callable', a
     if (n === 2) return { content: '', tool_calls: [{ id: 'c2', function: { name: 'mcp__weather__forecast', arguments: '{}' } }] };
     return { content: '完成。' };
   };
-  const out = await runAgentChat({ prompt: '查天气', kimiConfig: { model: 'fake' }, trustedRoot: root, tools: core, lazyTools: lazy, modelCall, runStoreRoot: path.join(root, 'runs') });
+  const approvals = { request: () => ({ id: 'connector_approval', promise: Promise.resolve('once') }) };
+  const out = await runAgentChat({ prompt: '查天气', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: lazy, modelCall, approvals, runStoreRoot: path.join(root, 'runs') });
 
   // Turn 1: the lazy tool is NOT exposed, but search_tools IS.
   const firstTurnTools = seenToolNames(seenTools, 0);
@@ -53,7 +55,7 @@ test('lazy tools are hidden until search_tools activates them, then callable', a
   assert.ok(!firstTurnTools.includes('mcp__weather__forecast'), 'lazy tool hidden initially');
   // Turn 2: after activation the lazy tool becomes available to the model.
   assert.ok(seenToolNames(seenTools, 1).includes('mcp__weather__forecast'), 'lazy tool activated after search');
-  assert.equal(ran, true, 'activated lazy tool executed');
+  assert.equal(ran, true, `activated lazy tool executed: ${JSON.stringify(out.steps)}`);
   assert.equal(out.text, '完成。');
 });
 
@@ -62,7 +64,7 @@ test('no search_tools meta-tool when there are no lazy tools (unchanged behavior
   const core = [lowTool('Read', () => undefined)];
   const seen: { value: string[] | null } = { value: null };
   const modelCall: ModelCall = async (args) => { seen.value = toolNames(args); return { content: 'ok' }; };
-  await runAgentChat({ prompt: 'x', kimiConfig: { model: 'fake' }, trustedRoot: root, tools: core, lazyTools: [], modelCall, runStoreRoot: path.join(root, 'runs') });
+  await runAgentChat({ prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: [], modelCall, runStoreRoot: path.join(root, 'runs') });
   const names = seen.value;
   assert.ok(names);
   assert.ok(!names.includes('search_tools'), 'no meta-tool when nothing lazy');

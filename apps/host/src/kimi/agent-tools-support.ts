@@ -32,13 +32,24 @@ export function globToRegExp(pattern: unknown): RegExp {
 }
 
 /** 递归收集工作区文件相对路径(跳过软链与被忽略路径),到达上限即停。 */
-export function walkFiles(root: string, current: string, out: string[], limit: number): void {
+export function walkFiles(
+  root: string,
+  current: string,
+  out: string[],
+  limit: number,
+  includeEntry?: (fullPath: string, kind: 'file' | 'directory') => boolean,
+): void {
   if (out.length >= limit || !fs.existsSync(current)) return;
   for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
     if (out.length >= limit || entry.isSymbolicLink()) continue;
     const full = path.join(current, entry.name);
     if (isWorkspaceIgnoredPath(full, root)) continue;
-    if (entry.isDirectory()) walkFiles(root, full, out, limit);
-    else if (entry.isFile()) out.push(path.relative(root, full).replace(/\\/g, '/'));
+    if (entry.isDirectory()) {
+      if (!includeEntry || includeEntry(full, 'directory')) {
+        walkFiles(root, full, out, limit, includeEntry);
+      }
+    } else if (entry.isFile() && (!includeEntry || includeEntry(full, 'file'))) {
+      out.push(path.relative(root, full).replace(/\\/g, '/'));
+    }
   }
 }

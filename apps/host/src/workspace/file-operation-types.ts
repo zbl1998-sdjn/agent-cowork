@@ -27,6 +27,9 @@ export type FileOperationOptions = {
   trustedRoot?: string;
   journalWriter?: JournalWriter;
   rollbackBatchId?: string;
+  inspectWrite?: (path: string, content: Buffer) => void;
+  inspectMove?: (source: string, target: string) => void;
+  prepareWrite?: (path: string) => { abort(): void } | null;
 };
 export type FileOperationEvent = {
   id: string;

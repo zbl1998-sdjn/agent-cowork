@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { AgentTool } from '../src/kimi/agent/tool-call-executor.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-verify-')); }
@@ -26,6 +27,7 @@ test('verify=true: after a mutation, agent runs a read-only self-check round the
   const root = tmp();
   let readBack = false;
   const tools = [mut('Write', noop), ro('Read', () => { readBack = true; })];
+  const approvals = { request: () => ({ id: 'write_approval', promise: Promise.resolve('once') }) };
   const events: EmittedEvent[] = [];
   let n = 0;
   const modelCall = async () => {
@@ -35,7 +37,7 @@ test('verify=true: after a mutation, agent runs a read-only self-check round the
     if (n === 3) return { content: '', tool_calls: [{ id: 'c3', function: { name: 'Read', arguments: '{}' } }] };
     return { content: '已核对，无误。' };
   };
-  const out = await runAgentChat({ prompt: '改文件', kimiConfig: { model: 'fake' }, trustedRoot: root, tools, modelCall, verify: true, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({ prompt: '改文件', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools, modelCall, approvals, verify: true, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
 
   assert.ok(events.some((e) => e.t === 'verify_start'), 'verify_start emitted');
   assert.equal(readBack, true, 'read-only self-check ran');
@@ -80,7 +82,7 @@ test('verify=true with plan mode runs self-check after approved plan execution',
   };
   const out = await runAgentChat({
     prompt: '计划后写报告',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -107,7 +109,7 @@ test('verify=true but nothing mutated: no verification round', async () => {
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Read', arguments: '{}' } }] };
     return { content: '只读完成。' };
   };
-  const out = await runAgentChat({ prompt: '看一下', kimiConfig: { model: 'fake' }, trustedRoot: root, tools, modelCall, verify: true, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({ prompt: '看一下', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools, modelCall, verify: true, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   assert.ok(!events.some((e) => e.t === 'verify_start'), 'no verify when nothing changed');
   assert.equal(out.text, '只读完成。');
 });
@@ -122,7 +124,7 @@ test('verify=false (default): no self-check even after a mutation', async () => 
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: '{}' } }] };
     return { content: '完成。' };
   };
-  const out = await runAgentChat({ prompt: '改文件', kimiConfig: { model: 'fake' }, trustedRoot: root, tools, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({ prompt: '改文件', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   assert.ok(!events.some((e) => e.t === 'verify_start'), 'no verify when verify=false');
   assert.equal(out.text, '完成。');
 });

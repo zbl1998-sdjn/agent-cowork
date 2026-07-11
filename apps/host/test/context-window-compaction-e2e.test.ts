@@ -12,6 +12,7 @@ import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { resolveAgentContextOptions } from '../src/routes/agent-stream-context.js';
 import { createHeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
 
@@ -38,7 +39,7 @@ async function runWithContextOptions(contextOptions: Record<string, unknown>): P
   const modelCall: ModelCall = async () => ({ content: 'done' });
   const out = await runAgentChat({
     prompt: 'ignored on resume',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [],
     modelCall,

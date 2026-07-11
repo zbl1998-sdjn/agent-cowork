@@ -6,7 +6,6 @@ import {
   createDefaultAgentRegistry,
   createOrchestrationCheckpointStore,
 } from '../orchestrator/index.js';
-import { readRunRecord } from '../runtime/run-store.js';
 import {
   bodyFingerprint,
   sendJson,
@@ -19,8 +18,8 @@ import {
   runOrchestration,
   resumeOrchestration,
   startOrchestrationSchema,
-  visibleOrchestratorRecord,
 } from './orchestrator-route-support.js';
+import { orchestratorOwner, readOwnedOrchestratorRecord } from './orchestrator-owner-guard.js';
 import { startAsyncOrchestration } from './orchestrator-async-support.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { OrchestrationRun } from '../orchestrator/index.js';
@@ -161,11 +160,8 @@ function handleCheckpoint(options: OrchestratorRouteOptions): void {
     sendJson(options.response, 400, { error: 'Invalid run id' });
     return;
   }
-  const record = readRunRecord(options.runStoreRoot, runId);
-  if (!record || !visibleOrchestratorRecord(record, options.requestContext)) {
-    sendJson(options.response, 404, { error: 'Orchestrator run not found' });
-    return;
-  }
+  const record = readOwnedOrchestratorRecord(options, runId);
+  if (!record) return;
   const checkpoint = createOrchestrationCheckpointStore({ root: options.runStoreRoot }).load(runId);
   if (!checkpoint) {
     sendJson(options.response, 404, { error: 'Orchestrator checkpoint not found' });
@@ -179,11 +175,8 @@ function handleDetail(options: OrchestratorRouteOptions): void {
     sendJson(options.response, 400, { error: 'Invalid run id' });
     return;
   }
-  const record = readRunRecord(options.runStoreRoot, runId);
-  if (!record || !visibleOrchestratorRecord(record, options.requestContext)) {
-    sendJson(options.response, 404, { error: 'Orchestrator run not found' });
-    return;
-  }
+  const record = readOwnedOrchestratorRecord(options, runId);
+  if (!record) return;
   sendJson(options.response, 200, orchestratorDetailPayload(record, options.requestContext));
 }
 
@@ -194,6 +187,8 @@ async function handleResume(options: OrchestratorRouteOptions): Promise<void> {
     sendJson(response, 400, { error: 'Invalid run id' });
     return;
   }
+  const record = readOwnedOrchestratorRecord(options, runId);
+  if (!record) return;
   await withJsonBody(request, response, async (body) => {
     if (!options.requireIdempotencyKey(response, requestContext)) return;
     const fingerprint = bodyFingerprint(body || {});
@@ -242,12 +237,13 @@ function handleCancel(options: OrchestratorRouteOptions): void {
     sendJson(options.response, 400, { error: 'Invalid run id' });
     return;
   }
-  const record = readRunRecord(options.runStoreRoot, runId);
-  if (!record || !visibleOrchestratorRecord(record, options.requestContext)) {
-    sendJson(options.response, 404, { error: 'Orchestrator run not found' });
-    return;
-  }
-  const cancelled = options.cancellation?.cancel?.(runId, 'user_cancelled') === true;
+  const record = readOwnedOrchestratorRecord(options, runId);
+  if (!record) return;
+  const cancelled = options.cancellation?.cancel?.(
+    runId,
+    'user_cancelled',
+    orchestratorOwner(options.requestContext),
+  ) === true;
   if (cancelled) {
     sendJson(options.response, 200, {
       context: routeContext(options.requestContext),

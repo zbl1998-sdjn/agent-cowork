@@ -12,6 +12,7 @@ import {
 import { oauthPermissions } from '../connectors/oauth-permissions.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { CredentialStore } from '../security/credential-store.js';
+import { credentialSummaryDto } from '../security/credential-persistence.js';
 import type { RequestContext } from './connector-oauth-route-utils.js';
 
 export function unsupportedOAuthConnector(response: HttpResponseLike): void {
@@ -36,7 +37,10 @@ export function sendConnectorOAuthStatus({
     unsupportedOAuthConnector(response);
     return;
   }
-  const accounts = credentialStore.list(oauthFilter(requestContext, 'github'));
+  const accounts = credentialStore.list(oauthFilter(requestContext, 'github')).flatMap((summary) => {
+    const dto = credentialSummaryDto(summary);
+    return dto ? [dto] : [];
+  });
   sendJson(response, 200, {
     context: requestContext,
     provider: 'github',

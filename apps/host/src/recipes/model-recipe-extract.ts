@@ -8,7 +8,11 @@
 //       local_strict 下必须同样拒绝出网,不能因为走了 recipe 分支就绕过)。
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/types.js';
-import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
+import {
+  decideEgressPolicy,
+  enforceRecordedEgressDecision,
+  isEgressAuditFailure,
+} from '../security/egress-gateway.js';
 
 export type ModelCaller = typeof callProviderChatCompletion;
 export type ActionItem = { owner: string; task: string; due: string };
@@ -35,10 +39,7 @@ async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, t
     content: args.messages,
     trustedRoot,
   });
-  if (trustedRoot) {
-    try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
-  }
-  if (egress.decision === 'deny') throw egressPolicyError(egress);
+  enforceRecordedEgressDecision(trustedRoot, egress);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -224,7 +225,8 @@ export async function extractMeetingActions(
     }, trustedRoot);
     const items = normalizeActionItems(extractJson((result as { content?: unknown })?.content));
     return items.length ? items : null;
-  } catch {
+  } catch (error) {
+    if (isEgressAuditFailure(error)) throw error;
     return null;
   }
 }

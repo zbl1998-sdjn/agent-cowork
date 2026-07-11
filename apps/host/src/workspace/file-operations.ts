@@ -7,7 +7,7 @@
 // 导出:previewFileOperations / applyFileOperations,并转出 rollbackFileOperations。
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import { assertExternalWorkspacePath } from '../security/external-workspace-boundary.js';
 import { omitUndefined } from '../util/object.js';
 import { createRollbackBatchId, rollbackEntryForMove, rollbackEntryForWrite, rollbackFileOperations as rollbackEntries } from './file-rollback.js';
 import { fileExists, hashBuffer, hashFile, pathExists, requiredPath } from './file-operation-utils.js';
@@ -45,10 +45,11 @@ function operationContentBuffer(op: FileOperation): Buffer {
   return Buffer.from(String(op.content ?? ''), 'utf8');
 }
 
-function previewWrite(op: FileOperation, trustedRoot: string): OperationPreview {
+function previewWrite(op: FileOperation, trustedRoot: string, inspectWrite?: (path: string, content: Buffer) => void): OperationPreview {
   // 写目标可能尚不存在,因此校验其真实父目录,防止 junction/symlink 越界。
-  const target = assertTrustedPathForCreate(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
+  const target = assertExternalWorkspacePath(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
   const content = operationContentBuffer(op);
+  inspectWrite?.(target, content);
   const overwrite = op.overwrite === true;
   const beforeExists = fileExists(target);
   if (beforeExists && !overwrite) {
@@ -66,10 +67,11 @@ function previewWrite(op: FileOperation, trustedRoot: string): OperationPreview 
   };
 }
 
-function previewRename(op: FileOperation, trustedRoot: string): OperationPreview {
-  const source = assertTrustedPath(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
+function previewRename(op: FileOperation, trustedRoot: string, inspectMove?: (source: string, target: string) => void): OperationPreview {
+  const source = assertExternalWorkspacePath(path.resolve(requiredPath(op.path, 'path')), trustedRoot);
   const base = path.dirname(source);
-  const target = assertTrustedPathForCreate(path.resolve(base, requiredPath(op.newName, 'newName')), trustedRoot);
+  const target = assertExternalWorkspacePath(path.resolve(base, requiredPath(op.newName, 'newName')), trustedRoot);
+  inspectMove?.(source, target);
   if (source === target) {
     throw new Error(`Rename target equals source: ${source}`);
   }
@@ -89,9 +91,10 @@ function previewRename(op: FileOperation, trustedRoot: string): OperationPreview
   };
 }
 
-function previewMove(op: FileOperation, trustedRoot: string): OperationPreview {
-  const source = assertTrustedPath(path.resolve(requiredPath(op.from, 'from')), trustedRoot);
-  const target = assertTrustedPathForCreate(path.resolve(requiredPath(op.to, 'to')), trustedRoot);
+function previewMove(op: FileOperation, trustedRoot: string, inspectMove?: (source: string, target: string) => void): OperationPreview {
+  const source = assertExternalWorkspacePath(path.resolve(requiredPath(op.from, 'from')), trustedRoot);
+  const target = assertExternalWorkspacePath(path.resolve(requiredPath(op.to, 'to')), trustedRoot);
+  inspectMove?.(source, target);
   if (source === target) {
     throw new Error(`Move target equals source: ${source}`);
   }
@@ -128,15 +131,15 @@ export function previewFileOperations(operations: unknown, options: FileOperatio
       throw new Error('delete is forbidden');
     }
     if (op.type === 'write') {
-      previews.push(previewWrite(op, trustedRoot));
+      previews.push(previewWrite(op, trustedRoot, options.inspectWrite));
       continue;
     }
     if (op.type === 'rename') {
-      previews.push(previewRename(op, trustedRoot));
+      previews.push(previewRename(op, trustedRoot, options.inspectMove));
       continue;
     }
     if (op.type === 'move') {
-      previews.push(previewMove(op, trustedRoot));
+      previews.push(previewMove(op, trustedRoot, options.inspectMove));
       continue;
     }
     throw new Error(`Unsupported operation type: ${op.type}`);
@@ -170,7 +173,7 @@ export function applyFileOperations(operations: unknown, options: FileOperationO
   const journalWriter = options.journalWriter;
   const rollbackBatchId = options.rollbackBatchId || createRollbackBatchId();
   const requestedOperations = Array.isArray(operations) ? operations.map(normalizeOp) : operations;
-  const preview = previewFileOperations(requestedOperations, { trustedRoot });
+  const preview = previewFileOperations(requestedOperations, options);
   const appliedOperations = requestedOperations as FileOperation[];
   const results: FileOperationEvent[] = [];
 
@@ -198,16 +201,22 @@ export function applyFileOperations(operations: unknown, options: FileOperationO
     }
 
     if (op.type === 'write') {
-      applyWrite({ ...requested, type: 'write', path: op.path });
-      const afterStat = fs.statSync(op.path);
-      event.status = 'applied';
-      event.afterHash = hashFile(op.path);
-      if (event.rollback) event.rollback.expectedHash = event.afterHash;
-      event.size = afterStat.size;
-      if (journalWriter?.append) {
-        journalWriter.append({ ...event, stage: 'after' });
+      const preparation = options.prepareWrite?.(op.path) || null;
+      try {
+        applyWrite({ ...requested, type: 'write', path: op.path });
+        const afterStat = fs.statSync(op.path);
+        event.status = 'applied';
+        event.afterHash = hashFile(op.path);
+        if (event.rollback) event.rollback.expectedHash = event.afterHash;
+        event.size = afterStat.size;
+        if (journalWriter?.append) {
+          journalWriter.append({ ...event, stage: 'after' });
+        }
+        results.push({ ...event, status: 'applied' });
+      } catch (error) {
+        preparation?.abort();
+        throw error;
       }
-      results.push({ ...event, status: 'applied' });
       continue;
     }
 

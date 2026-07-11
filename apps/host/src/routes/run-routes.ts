@@ -2,10 +2,11 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/runs/* —— 列出运行历史(经索引)、读取单条 run 记录与事件时间线/trace,供历史与回放 UI。
 // 依赖:L2 run-store / runs-index(经参数注入)。导出:handleRunRoutes。
-import { listRunRecords, readRunRecord } from '../runtime/run-store.js';
+import { readRunRecord } from '../runtime/run-store.js';
 import { formatSseFrame, parseLastEventId } from '../runtime/run-events.js';
-import { taskFromRun } from '../runtime/task-presenter.js';
-import { decodePathSegment, headerValue, sendJson, stableHeader } from '../http/request-utils.js';
+import { headerValue, sendJson } from '../http/request-utils.js';
+import { requireIdentityScopeFrom, type IdentityScope } from '../security/identity-scope.js';
+import { AtRestKeyError } from '../security/at-rest.js';
 import { omitUndefined } from '../util/object.js';
 import {
   parseRunQuery,
@@ -13,12 +14,14 @@ import {
   runListQuerySchema,
   taskListQuerySchema,
 } from './run-route-schemas.js';
+import {
+  parseRunId,
+  presentRunTask,
+  recordVisibleToContext,
+  visibleRunRecords,
+} from './run-route-visibility.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import type { RunRecord, RunSummary } from '../runtime/run-store.js';
 import type { RunEvent } from '../runtime/run-events.js';
-import type { RunSummary as PresenterRunSummary, TaskSummary } from '../runtime/task-presenter.js';
-
-const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteResponse = HttpResponseLike & {
@@ -26,7 +29,6 @@ type RouteResponse = HttpResponseLike & {
   on(event: string, listener: (...args: unknown[]) => void): unknown;
 };
 type RequestContext = { tenantId: string; userId?: string; traceId: string; [key: string]: unknown };
-type VisibleRunRecord = RunRecord | RunSummary;
 type RunsIndexListOptions = {
   tenantId?: string;
   userId?: string;
@@ -37,12 +39,12 @@ type RunsIndexListOptions = {
 };
 type RunsIndexLike = {
   list(options?: RunsIndexListOptions): unknown[] | Promise<unknown[]>;
-  stats(options?: { tenantId?: string }): unknown | Promise<unknown>;
+  stats(options?: { tenantId?: string; userId?: string }): unknown | Promise<unknown>;
 };
 type RunEventsLike = {
-  seed(runId: string, events: RunEvent[]): unknown;
-  replay(runId: string, afterSeq?: number): RunEvent[];
-  subscribe(runId: string, listener: (event: RunEvent) => void): () => void;
+  seed(runId: string, events: RunEvent[], scope?: RequestContext): unknown;
+  replay(runId: string, afterSeq?: number, scope?: RequestContext): RunEvent[];
+  subscribe(runId: string, listener: (event: RunEvent) => void, scope?: RequestContext): () => void;
 };
 type RunRouteOptions = {
   request: RouteRequest;
@@ -55,30 +57,6 @@ type RunRouteOptions = {
   runEvents: RunEventsLike;
 };
 
-function recordTenantId(record: VisibleRunRecord | null | undefined): string {
-  return stableHeader(record?.context?.tenantId || record?.tenantId, 'tenant_local');
-}
-
-function recordVisibleToContext(record: VisibleRunRecord | null | undefined, context: RequestContext): boolean {
-  return Boolean(record) && recordTenantId(record) === context.tenantId;
-}
-
-function visibleRunRecords(runStoreRoot: string, context: RequestContext, limit: number): RunSummary[] {
-  return listRunRecords(runStoreRoot, { limit: Number.MAX_SAFE_INTEGER })
-    .filter((record) => recordVisibleToContext(record, context))
-    .slice(0, limit);
-}
-
-function parseRunId(pathname: string, prefix: string, suffix = ''): string | null {
-  const encoded = pathname.slice(prefix.length, suffix ? -suffix.length : undefined);
-  const runId = decodePathSegment(encoded);
-  return runId && RUN_ID_RE.test(runId) ? runId : null;
-}
-
-function presentRunTask(run: RunSummary): TaskSummary {
-  return taskFromRun(run as unknown as PresenterRunSummary);
-}
-
 export async function handleRunRoutes({
   request,
   response,
@@ -89,12 +67,30 @@ export async function handleRunRoutes({
   runsIndex,
   runEvents,
 }: RunRouteOptions): Promise<boolean> {
+  const isRunRoute = pathname === '/api/tasks'
+    || pathname === '/api/runs'
+    || pathname.startsWith('/api/runs/');
+  if (!isRunRoute) return false;
+
+  let requestOwner: IdentityScope;
+  try {
+    requestOwner = requireIdentityScopeFrom(requestContext, { label: 'run route identity' });
+  } catch {
+    sendJson(response, 401, { error: 'Unauthorized' });
+    return true;
+  }
+  const scopedContext: RequestContext = {
+    ...requestContext,
+    tenantId: requestOwner.tenantId,
+    userId: requestOwner.userId,
+  };
+
   if (request.method === 'GET' && pathname === '/api/tasks') {
     const query = parseRunQuery(response, taskListQuerySchema, {
       limit: requestUrl.searchParams.get('limit'),
     }, 'invalid task list query');
     if (!query) return true;
-    const runs = visibleRunRecords(runStoreRoot, requestContext, query.limit);
+    const runs = visibleRunRecords(runStoreRoot, requestOwner, query.limit);
     sendJson(response, 200, {
       runStoreRoot,
       tasks: runs.map(presentRunTask),
@@ -108,22 +104,24 @@ export async function handleRunRoutes({
       status: requestUrl.searchParams.get('status'),
       type: requestUrl.searchParams.get('type'),
       recipeId: requestUrl.searchParams.get('recipeId'),
-      userId: requestUrl.searchParams.get('userId'),
     }, 'invalid run index query');
     if (!query) return true;
     // await: transparent for the sync file/sqlite adapters, required for the
     // async PostgreSQL adapter (multi-instance backend).
     const records = await runsIndex.list(omitUndefined({
-      tenantId: requestContext.tenantId,
-      userId: query.userId,
+      tenantId: requestOwner.tenantId,
+      userId: requestOwner.userId,
       limit: query.limit,
       status: query.status,
       type: query.type,
       recipeId: query.recipeId,
     }));
-    const stats = await runsIndex.stats({ tenantId: requestContext.tenantId });
+    const stats = await runsIndex.stats({
+      tenantId: requestOwner.tenantId,
+      userId: requestOwner.userId,
+    });
     sendJson(response, 200, {
-      context: requestContext,
+      context: scopedContext,
       stats,
       runs: records,
     });
@@ -142,25 +140,29 @@ export async function handleRunRoutes({
     let persisted: RunEvent[] = [];
     try {
       const record = readRunRecord(runStoreRoot, runId);
-      if (!record || !recordVisibleToContext(record, requestContext)) {
+      if (!record || !recordVisibleToContext(record, requestOwner)) {
         sendJson(response, 404, { error: 'Run record not found' });
         return true;
       }
       if (Array.isArray(record.events)) {
         persisted = record.events as RunEvent[];
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof AtRestKeyError) {
+        sendJson(response, error.statusCode, { error: error.message, code: error.code });
+        return true;
+      }
       sendJson(response, 404, { error: 'Run record not found' });
       return true;
     }
-    runEvents.seed(runId, persisted);
+    runEvents.seed(runId, persisted, scopedContext);
 
     response.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-store',
       connection: 'keep-alive',
-      'x-trace-id': requestContext.traceId,
-      'x-tenant-id': requestContext.tenantId,
+      'x-trace-id': scopedContext.traceId,
+      'x-tenant-id': requestOwner.tenantId,
     });
     response.write('retry: 3000\n\n');
 
@@ -180,13 +182,13 @@ export async function handleRunRoutes({
         writeEvent(event);
       }
     }
-    for (const event of runEvents.replay(runId, lastEventId)) {
+    for (const event of runEvents.replay(runId, lastEventId, scopedContext)) {
       writeEvent(event);
     }
 
     const unsubscribe = runEvents.subscribe(runId, (event) => {
       writeEvent(event);
-    });
+    }, scopedContext);
     const heartbeat = setInterval(() => {
       response.write(': ping\n\n');
     }, 15000);
@@ -210,7 +212,7 @@ export async function handleRunRoutes({
     if (!query) return true;
     sendJson(response, 200, {
       runStoreRoot,
-      runs: visibleRunRecords(runStoreRoot, requestContext, query.limit),
+      runs: visibleRunRecords(runStoreRoot, requestOwner, query.limit),
     });
     return true;
   }
@@ -222,7 +224,7 @@ export async function handleRunRoutes({
       return true;
     }
     const run = readRunRecord(runStoreRoot, runId);
-    if (!recordVisibleToContext(run, requestContext)) {
+    if (!recordVisibleToContext(run, requestOwner)) {
       sendJson(response, 404, { error: 'Run record not found' });
       return true;
     }

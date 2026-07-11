@@ -2,7 +2,6 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/memory/* —— 记忆的写入/查询/分层读取与用户画像存取(多租户隔离)。
 // 依赖:L0 path-policy/request-utils + L1 memory 存储(经参数注入)。导出:handleMemoryRoutes。
-import path from 'node:path';
 import { z } from 'zod';
 import { MEMORY_LIMITS } from '../memory/memory-constants.js';
 import {
@@ -15,7 +14,6 @@ import {
   type MemorySettings,
 } from '../memory/memory-control.js';
 import { createUserProfile } from '../memory/profile.js';
-import { assertTrustedPath } from '../security/path-policy.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { MemoryStoreLike as ProfileMemoryStoreLike } from '../memory/profile.js';
@@ -41,7 +39,7 @@ type MemoryRouteOptions = {
   pathname: string;
   requestUrl: URL;
   requestContext: RequestContext;
-  trustedRootDefault: string;
+  safeTrustedRoot(value?: unknown): string;
   memoryStore: MemoryStoreLike;
 };
 
@@ -105,17 +103,16 @@ function errorMessage(err: unknown, fallback = 'invalid memory request'): string
   return err instanceof Error ? err.message : String(err);
 }
 
-function safeMemoryRoot(value: unknown, trustedRootDefault: string): string {
+function safeMemoryRoot(value: unknown, safeTrustedRoot: (value?: unknown) => string): string {
   if (value != null && value !== '' && typeof value !== 'string') {
     throw new Error('trustedRoot must be a string');
   }
-  const trustedRoot = path.resolve(value || trustedRootDefault);
-  return assertTrustedPath(trustedRoot, trustedRootDefault);
+  return safeTrustedRoot(value);
 }
 
-function safeMemoryRootOrSend(value: unknown, trustedRootDefault: string, response: HttpResponseLike): string | null {
+function safeMemoryRootOrSend(value: unknown, safeTrustedRoot: (value?: unknown) => string, response: HttpResponseLike): string | null {
   try {
-    return safeMemoryRoot(value, trustedRootDefault);
+    return safeMemoryRoot(value, safeTrustedRoot);
   } catch (err) {
     sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
     return null;
@@ -128,13 +125,13 @@ export async function handleMemoryRoutes({
   pathname,
   requestUrl,
   requestContext,
-  trustedRootDefault,
+  safeTrustedRoot,
   memoryStore,
 }: MemoryRouteOptions): Promise<boolean> {
   if (request.method === 'GET' && pathname === '/api/memory/settings') {
-    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot, response);
     if (!safeRoot) return true;
-    sendJson(response, 200, { trustedRoot: safeRoot, settings: readMemorySettings(safeRoot), context: requestContext });
+    sendJson(response, 200, { trustedRoot: safeRoot, settings: readMemorySettings(safeRoot, requestContext), context: requestContext });
     return true;
   }
 
@@ -146,7 +143,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       const patch: Partial<MemorySettings> = {};
       if (input.enabled != null) patch.enabled = input.enabled;
       if (input.paused != null) patch.paused = input.paused;
@@ -154,7 +151,7 @@ export async function handleMemoryRoutes({
       if (input.defaultScope != null) patch.defaultScope = input.defaultScope;
       sendJson(response, 200, {
         trustedRoot: safeRoot,
-        settings: writeMemorySettings(safeRoot, patch),
+        settings: writeMemorySettings(safeRoot, patch, requestContext),
         context: requestContext,
       });
     });
@@ -162,7 +159,7 @@ export async function handleMemoryRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/api/memory') {
-    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot, response);
     if (!safeRoot) return true;
     const main = await memoryStore.readMainMemory(safeRoot, requestContext);
     const notes = (await memoryStore.listMemoryNotes(safeRoot, requestContext)).map((note) => ({
@@ -191,7 +188,7 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: errorMessage(err) });
       return true;
     }
-    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, safeTrustedRoot, response);
     if (!safeRoot) return true;
     const snapshotOptions: { query?: string; context: RequestContext } = { context: requestContext };
     if (query.query) snapshotOptions.query = query.query;
@@ -208,7 +205,7 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: errorMessage(err) });
       return true;
     }
-    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, safeTrustedRoot, response);
     if (!safeRoot) return true;
     const snapshotOptions: { query?: string; context: RequestContext } = { context: requestContext };
     if (query.query) snapshotOptions.query = query.query;
@@ -226,7 +223,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       try {
         const result = await upsertMemoryItem(memoryStore, safeRoot, input, requestContext);
         sendJson(response, 200, { trustedRoot: safeRoot, ...result, context: requestContext });
@@ -243,7 +240,7 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: 'Invalid memory item id' });
       return true;
     }
-    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot, response);
     if (!safeRoot) return true;
     try {
       const result = await deleteMemoryItem(memoryStore, safeRoot, id, requestContext);
@@ -262,7 +259,7 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: errorMessage(err) });
       return true;
     }
-    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(query.trustedRoot, safeTrustedRoot, response);
     if (!safeRoot) return true;
     const profile = createUserProfile({ memoryStore });
     const loaded = await profile.load(safeRoot, requestContext);
@@ -283,7 +280,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       const result = await memoryStore.appendMemoryFact(
         safeRoot,
         { key: input.key, value: input.value, scope: input.scope },
@@ -307,7 +304,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       const profile = createUserProfile({ memoryStore });
       const learned = await profile.learn(safeRoot, input.entry || input, requestContext);
       sendJson(response, 200, { trustedRoot: safeRoot, profile: learned, context: requestContext });
@@ -323,7 +320,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       const profile = createUserProfile({ memoryStore });
       const forgetInput = input as { type?: unknown; key?: unknown };
       const result = await profile.forget(safeRoot, { type: forgetInput.type, key: forgetInput.key }, requestContext);
@@ -340,7 +337,7 @@ export async function handleMemoryRoutes({
         return;
       }
       const input = parsed.data;
-      const safeRoot = safeMemoryRoot(input.trustedRoot, trustedRootDefault);
+      const safeRoot = safeMemoryRoot(input.trustedRoot, safeTrustedRoot);
       const written = await memoryStore.writeMemoryNote(safeRoot, input.name, input.body, requestContext);
       sendJson(response, 200, {
         trustedRoot: safeRoot,
@@ -357,7 +354,7 @@ export async function handleMemoryRoutes({
       sendJson(response, 400, { error: 'Invalid memory note name' });
       return true;
     }
-    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), trustedRootDefault, response);
+    const safeRoot = safeMemoryRootOrSend(requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot, response);
     if (!safeRoot) return true;
     const body = await memoryStore.readMemoryNote(safeRoot, noteName, requestContext);
     if (body == null) {

@@ -7,16 +7,15 @@ import {
   TraceRecorder,
   WorkflowRunner,
 } from '../orchestrator/index.js';
-import {
-  getOrchestrationRecipeDefinition,
-  ORCHESTRATION_RECIPE_IDS,
-} from '../orchestrator/recipe-registry.js';
+import { getOrchestrationRecipeDefinition, ORCHESTRATION_RECIPE_IDS } from '../orchestrator/recipe-registry.js';
 import { createSubagentTaskRunner } from '../orchestrator/subagent-task-runner.js';
 import { defaultFileSummaryCacheFor } from './orchestrator-summary-cache.js';
 import { createRunId, getRunPath, writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { decodePathSegment } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
+import { orchestratorOwner } from './orchestrator-owner-guard.js';
+import { resolveOrchestratorSecurityMode } from './orchestrator-security-mode.js';
 import type {
   AgentDefinition,
   AgentResult,
@@ -29,12 +28,12 @@ import type {
   OrchestrationEvent,
   OrchestrationRun,
   OrchestrationStatus,
-  SecurityMode,
 } from '../orchestrator/index.js';
 import type { OrchestrationRunnerKind } from '../orchestrator/recipe-registry.js';
 import type { ReadOnlyToolRegistryLike } from '../orchestrator/subagent-task-runner.js';
 import type { RunEventsLike as SubagentRunEventsLike, RunsIndexLike as SubagentRunsIndexLike } from '../runtime/subagent.js';
 import type { RunRecord } from '../runtime/run-store.js';
+import type { RunOwner } from '../util/run-owner.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/index.js';
 import type { AgentTaskRunner } from '../orchestrator/index.js';
 
@@ -50,9 +49,9 @@ export type OrchestratorRequestContext = {
 };
 export type RunsIndexLike = { upsert?(record: unknown, context?: { traceId?: unknown } | Record<string, unknown>): unknown };
 export type OrchestratorCancellationLike = {
-  register?(runId: string): AbortController;
-  cancel?(runId: string, reason?: string): boolean;
-  done?(runId: string): boolean;
+  register?(runId: string, context?: RunOwner): AbortController;
+  cancel?(runId: string, reason?: string, context?: RunOwner): boolean;
+  done?(runId: string, context?: RunOwner): boolean;
 };
 export type ProviderModelCall = (args: ProviderChatArgs) => Promise<ProviderChatResult>;
 export type RunOrchestrationOptions = {
@@ -89,7 +88,6 @@ export const startOrchestrationSchema = z.strictObject({
   workspaceRoot: z.string().trim().min(1).max(1000).optional(),
   userGoal: z.string().trim().min(1).max(4000),
   recipeId: z.enum(ORCHESTRATION_RECIPE_IDS).default('weekly-report'),
-  securityMode: z.enum(['local_strict', 'enterprise_hybrid', 'cloud_opt_in']).default('local_strict'),
   refs: z.array(contextRefSchema).max(80).default([]),
 });
 export type StartOrchestrationInput = z.infer<typeof startOrchestrationSchema>;
@@ -119,9 +117,10 @@ function jsonObjectFrom(value: unknown): JsonObject {
 }
 
 export function routeContext(requestContext: OrchestratorRequestContext): OrchestratorRequestContext {
+  const owner = orchestratorOwner(requestContext);
   return omitUndefined({
-    tenantId: requestContext.tenantId || 'tenant_local',
-    userId: requestContext.userId || 'user_local',
+    tenantId: owner.tenantId,
+    userId: owner.userId,
     traceId: requestContext.traceId,
     securityMode: requestContext.securityMode,
   });
@@ -196,11 +195,6 @@ export function parseOrchestratorRunId(pathname: string, prefix: string, suffix 
   const encoded = pathname.slice(prefix.length, suffix ? -suffix.length : undefined);
   const runId = decodePathSegment(encoded);
   return runId && RUN_ID_RE.test(runId) ? runId : null;
-}
-
-export function visibleOrchestratorRecord(record: RunRecord | null | undefined, requestContext: OrchestratorRequestContext): boolean {
-  const tenantId = String(record?.context?.tenantId || record?.tenantId || 'tenant_local');
-  return Boolean(record) && tenantId === (requestContext.tenantId || 'tenant_local') && record?.type === 'orchestrator';
 }
 
 export function orchestratorDetailPayload(record: RunRecord, context: OrchestratorRequestContext): Record<string, unknown> {
@@ -287,6 +281,7 @@ export async function runOrchestration(
   const registry = createDefaultAgentRegistry();
   const workspaceRoot = options.safeTrustedRoot(input.workspaceRoot);
   const selected = selectTaskRunner(definition.runnerKind, options, workspaceRoot);
+  const securityMode = resolveOrchestratorSecurityMode(options.requestContext);
   const fileSummaryCache = options.fileSummaryCache || defaultFileSummaryCacheFor(options.requestContext);
   const runner = new WorkflowRunner({
     registry,
@@ -299,7 +294,7 @@ export async function runOrchestration(
     runId,
     userGoal: input.userGoal,
     workspaceRoot,
-    securityMode: input.securityMode as SecurityMode,
+    securityMode,
     refs: input.refs.map(contextRefFromInput),
     signal: options.signal || null,
   });
@@ -343,6 +338,7 @@ export async function resumeOrchestration(
   const definition = getOrchestrationRecipeDefinition(checkpoint.recipeId as StartOrchestrationInput['recipeId']);
   const workspaceRoot = options.safeTrustedRoot(checkpoint.workspaceRoot);
   const selected = selectTaskRunner(definition.runnerKind, options, workspaceRoot);
+  const securityMode = resolveOrchestratorSecurityMode(options.requestContext);
   const fileSummaryCache = options.fileSummaryCache || defaultFileSummaryCacheFor(options.requestContext);
   const trace = new TraceRecorder({ eventsPath: checkpoint.eventsPath || path.join(options.runStoreRoot, `${runId}.events.jsonl`) });
   const runner = new WorkflowRunner({
@@ -356,9 +352,9 @@ export async function resumeOrchestration(
     runId,
     userGoal: checkpoint.userGoal,
     workspaceRoot,
-    securityMode: checkpoint.securityMode,
+    securityMode,
     refs: checkpoint.refs,
-    resumeCheckpoint: { ...checkpoint, workspaceRoot },
+    resumeCheckpoint: { ...checkpoint, workspaceRoot, securityMode },
     signal: options.signal || null,
   });
   const runPath = getRunPath(options.runStoreRoot, run.runId);

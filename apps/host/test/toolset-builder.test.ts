@@ -154,12 +154,14 @@ test('interactive and child-agent tools forward context and handle unavailable d
     kimiConfig: { provider: 'test' },
     modelCall,
     autoApprove: true,
+    planMode: true,
     auditBus: { publish: () => undefined },
     hooks: { name: 'hooks-placeholder' },
   };
 
   const tools = buildAgentToolset({
     ctx,
+    skillRegistry: { get: (id) => id === 'email-draft' ? { enabled: true } : null },
     agentDeps,
     runDeps: { runStoreRoot, runEvents, runsIndex },
   });
@@ -207,6 +209,15 @@ test('interactive and child-agent tools forward context and handle unavailable d
   });
 
   const schedule = toolNamed(tools, 'ScheduleTask');
+  assert.deepEqual((schedule.parameters as { required?: string[] }).required, ['name', 'recipeId']);
+  assert.deepEqual(await schedule.handler({
+    name: '无动作任务',
+    cron: '0 9 * * *',
+    prompt: '总结昨天进展',
+  }), {
+    error: 'recipeId is required for scheduled tasks',
+    code: 'SCHEDULE_ACTION_REQUIRED',
+  });
   assert.deepEqual(await schedule.handler({
     name: '每日简报',
     cron: '0 9 * * *',
@@ -229,7 +240,7 @@ test('interactive and child-agent tools forward context and handle unavailable d
     traceId: 'trace-a',
   });
   schedulerThrows = true;
-  assert.deepEqual(await schedule.handler({ name: '坏任务' }), { error: 'scheduler down' });
+  assert.deepEqual(await schedule.handler({ name: '坏任务', recipeId: 'email-draft' }), { error: 'scheduler down' });
 
   const agent = toolNamed(tools, 'Agent');
   assert.deepEqual(await agent.handler({ task: '审查 README' }), { text: 'child finished', steps: 3 });
@@ -240,6 +251,7 @@ test('interactive and child-agent tools forward context and handle unavailable d
   assert.equal(childRuns[0]?.modelCall, modelCall);
   assert.equal(childRuns[0]?.approvals, agentDeps.approvals);
   assert.equal(childRuns[0]?.autoApprove, true);
+  assert.equal(childRuns[0]?.planMode, true);
   assert.equal(childRuns[0]?.auditBus, agentDeps.auditBus);
   assert.equal(childRuns[0]?.hooks, agentDeps.hooks);
   assert.equal(childRuns[0]?.emit, agentDeps.emit);
@@ -304,6 +316,7 @@ test('AgentParallel normalizes agents aliases, records child failures, and forwa
       modelCall: async () => ({ content: 'unused' }),
       approvals: { request: () => ({ id: 'approval_1', promise: Promise.resolve(true) }) },
       autoApprove: true,
+      planMode: true,
       auditBus: { publish: () => undefined },
       hooks: { run: async () => [], blocked: () => false },
       emit: (type, payload) => { events.push({ type, payload }); },
@@ -344,6 +357,7 @@ test('AgentParallel normalizes agents aliases, records child failures, and forwa
   assert.deepEqual(childRuns.map((run) => (run.context as Record<string, unknown>)?.childIndex), [0, 1, 2]);
   assert.deepEqual(toolNames(childRuns[0]?.tools), ['Read']);
   assert.equal(childRuns[0]?.maxSteps, 2);
+  assert.deepEqual(childRuns.map((run) => run.planMode), [true, true, true]);
   assert.equal(childRuns[0]?.trustedRoot, root);
   assert.match(String(record.summary), /2\. fail project B: child boom/);
   assert.equal(events.filter((event) => event.type === 'child_start').length, 3);

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runKimiApiChatStream } from '../src/kimi/api-runner.js';
+import { makeTestWorkspace } from './test-fixtures.js';
+
+const LOCAL_EGRESS = {
+  trustedRoot: makeTestWorkspace('api-runner-stream'),
+  securityMode: 'local_strict',
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+} as const;
 
 type StreamReader = { read(): Promise<{ value?: Uint8Array; done?: boolean }> };
 type RequestBody = {
@@ -57,9 +65,8 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
 
   const result = await runKimiApiChatStream({
     apiKey: 'test-key-stream',
-    baseUrl: 'https://api.example.test/v1/',
+    ...LOCAL_EGRESS,
     model: 'kimi-stream-test',
-    provider: 'KIMI-API',
     prompt: '打招呼',
     summary: '当前摘要',
     memory: '长期记忆',
@@ -73,7 +80,7 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
     onReasoning: (delta) => reasoning.push(delta),
   });
 
-  assert.equal(captured.url, 'https://api.example.test/v1/chat/completions');
+  assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.headers?.authorization, 'Bearer test-key-stream');
   assert.equal(captured.headers?.accept, 'text/event-stream');
   assert.equal(captured.headers?.['user-agent'], 'AgentCowork-Test');
@@ -88,7 +95,7 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
   assert.match(String(captured.body?.messages?.[1]?.content), /长期记忆/);
   assert.deepEqual(reasoning, ['先想']);
   assert.deepEqual(tokens, ['你好', '呀']);
-  assert.equal(result.provider, 'kimi-api');
+  assert.equal(result.provider, 'openai/local');
   assert.equal(result.model, 'kimi-stream-test');
   assert.equal(result.mode, 'chat');
   assert.equal(result.text, '你好呀');
@@ -97,6 +104,7 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
 test('runKimiApiChatStream keeps the final SSE data line when the stream closes without a trailing newline', async () => {
   const result = await runKimiApiChatStream({
     apiKey: 'test-key-stream',
+    ...LOCAL_EGRESS,
     prompt: '末尾 token',
     fetchImpl: async () => ({
       ok: true,
@@ -126,6 +134,7 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
   await assert.rejects(
     () => runKimiApiChatStream({
       apiKey: 'test-key-stream',
+      ...LOCAL_EGRESS,
       prompt: 'HTTP error',
       fetchImpl: async () => ({ ok: false, status: 429, body: null }),
     }),
@@ -135,6 +144,7 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
   await assert.rejects(
     () => runKimiApiChatStream({
       apiKey: 'test-key-stream',
+      ...LOCAL_EGRESS,
       prompt: 'missing body',
       fetchImpl: async () => ({ ok: true, status: 200, body: null }),
     }),

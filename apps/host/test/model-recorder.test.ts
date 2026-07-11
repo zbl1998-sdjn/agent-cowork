@@ -161,3 +161,155 @@ test('JsonlModelRecordStore ignores failed records during replay', async () => {
     (error) => errorCode(error) === 'MODEL_REPLAY_MISS',
   );
 });
+
+test('JsonlModelRecordStore tolerates only a malformed final non-empty record', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const valid = { fingerprint: 'sha256:valid', status: 'succeeded', response: { content: 'kept' } };
+  fs.writeFileSync(filePath, `${JSON.stringify(valid)}\n{"fingerprint":\n\n`, 'utf8');
+
+  const store = createJsonlModelRecordStore(filePath);
+  assert.deepEqual(store.list(), [valid]);
+  assert.deepEqual(store.findByFingerprint('sha256:valid'), valid);
+});
+
+test('JsonlModelRecordStore rejects malformed non-empty records before a later valid record', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const first = { fingerprint: 'sha256:first', status: 'succeeded', response: { content: 'first' } };
+  const later = { fingerprint: 'sha256:later', status: 'succeeded', response: { content: 'later' } };
+  fs.writeFileSync(filePath, `${JSON.stringify(first)}\n{"fingerprint":\n${JSON.stringify(later)}\n`, 'utf8');
+
+  const store = createJsonlModelRecordStore(filePath);
+  assert.throws(() => store.list(), (error: unknown) => error instanceof SyntaxError);
+  assert.throws(
+    () => store.findByFingerprint('sha256:later'),
+    (error: unknown) => error instanceof SyntaxError,
+  );
+});
+
+test('JsonlModelRecordStore repairs malformed and unterminated tails before append', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  for (const tail of ['{"fingerprint":', JSON.stringify({
+    fingerprint: 'sha256:unterminated',
+    status: 'succeeded',
+    response: { content: 'unterminated-kept' },
+  })]) {
+    const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+    const first = { fingerprint: 'sha256:first', status: 'succeeded', response: { content: 'first' } };
+    const next = { fingerprint: 'sha256:next', status: 'succeeded', response: { content: 'next' } };
+    fs.writeFileSync(filePath, `${JSON.stringify(first)}\n${tail}`, 'utf8');
+
+    const store = createJsonlModelRecordStore(filePath);
+    store.append(next);
+    const fingerprints = store.list().map((record) => record.fingerprint);
+    const expected = tail.startsWith('{"fingerprint":') && !tail.endsWith('}')
+      ? ['sha256:first', 'sha256:next']
+      : ['sha256:first', 'sha256:unterminated', 'sha256:next'];
+    assert.deepEqual(fingerprints, expected);
+  }
+});
+
+test('JsonlModelRecordStore rejects interior schema-invalid records', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const valid = { fingerprint: 'sha256:valid', status: 'succeeded', response: { content: 'kept' } };
+  fs.writeFileSync(filePath, `null\n${JSON.stringify(valid)}\n`, 'utf8');
+
+  assert.throws(
+    () => createJsonlModelRecordStore(filePath).list(),
+    /model record|JSONL/i,
+  );
+});
+
+test('JsonlModelRecordStore rejects complete schema-invalid final records without truncating them', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  const invalidRecords = [
+    { fingerprint: 'sha256:missing-response', status: 'succeeded' },
+    { fingerprint: 'sha256:missing-error', status: 'failed' },
+    { fingerprint: 'sha256:bad-status', status: 'unknown', response: null },
+  ];
+  for (const invalid of invalidRecords) {
+    const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+    const raw = `${JSON.stringify(invalid)}\n`;
+    fs.writeFileSync(filePath, raw, 'utf8');
+    const store = createJsonlModelRecordStore(filePath);
+
+    assert.throws(() => store.list(), /model record|JSONL/i);
+    assert.throws(
+      () => store.append({
+        fingerprint: 'sha256:next',
+        status: 'succeeded',
+        response: { content: 'next' },
+      }),
+      /model record|JSONL/i,
+    );
+    assert.equal(fs.readFileSync(filePath, 'utf8'), raw, 'invalid complete tail must not be truncated');
+  }
+});
+
+test('JsonlModelRecordStore persists an undefined successful response as explicit null', async () => {
+  const { createJsonlModelRecordStore, createModelRecorder } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const store = createJsonlModelRecordStore(filePath);
+
+  const result = await createModelRecorder({ store }).wrap(async () => undefined)(INPUT);
+
+  assert.equal(result, undefined);
+  assert.equal(store.list()[0]?.response, null);
+});
+
+test('ModelRecorder redacts sensitive responses and keeps secret-bearing prompts fingerprint-distinct', async () => {
+  const {
+    createJsonlModelRecordStore,
+    createModelRecorder,
+    createModelReplayer,
+    modelCallFingerprint,
+  } = await import('../src/runtime/model-recorder.js');
+  const secretA = 'sk-test-response-a-12345678901234567890';
+  const secretB = 'sk-test-response-b-12345678901234567890';
+  const inputA = { ...INPUT, messages: [{ role: 'user', content: `inspect ${secretA}` }] };
+  const inputB = { ...INPUT, messages: [{ role: 'user', content: `inspect ${secretB}` }] };
+  assert.ok(modelCallFingerprint(inputA) !== modelCallFingerprint(inputB));
+  assert.notEqual(
+    modelCallFingerprint({ business: { password: 'dummy-business-a' } }),
+    modelCallFingerprint({ business: { password: 'dummy-business-b' } }),
+  );
+  assert.notEqual(
+    modelCallFingerprint({ toolArgs: { authorization: 'dummy-scope-a' } }),
+    modelCallFingerprint({ toolArgs: { authorization: 'dummy-scope-b' } }),
+  );
+
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const store = createJsonlModelRecordStore(filePath);
+  const recorder = createModelRecorder({ store });
+  const live = await recorder.wrap(async () => ({ content: `answer ${secretA}` }))(inputA);
+  assert.match(String((live as { content?: unknown }).content), /sk-test-response-a/);
+  const raw = fs.readFileSync(filePath, 'utf8');
+  assert.equal(raw.includes(secretA), false, 'persisted response leaked a secret');
+  await assert.rejects(
+    () => createModelReplayer({ store }).wrap()(inputB),
+    (error) => errorCode(error) === 'MODEL_REPLAY_MISS',
+  );
+});
+
+test('JsonlModelRecordStore creates append files with private mode', async () => {
+  const { createJsonlModelRecordStore } = await import('../src/runtime/model-recorder.js');
+  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-records-')), 'records.jsonl');
+  const originalOpenSync = fs.openSync;
+  const modes: number[] = [];
+  fs.openSync = ((target: string, flags: string | number, mode?: number) => {
+    if (path.resolve(target) === path.resolve(filePath) && mode !== undefined) modes.push(mode);
+    return originalOpenSync(target, flags, mode);
+  }) as typeof fs.openSync;
+  try {
+    createJsonlModelRecordStore(filePath).append({
+      fingerprint: 'sha256:private',
+      status: 'succeeded',
+      response: { content: 'safe' },
+    });
+  } finally {
+    fs.openSync = originalOpenSync;
+  }
+  assert.ok(modes.includes(0o600), 'record file must be opened with mode 0600');
+});

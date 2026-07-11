@@ -5,7 +5,12 @@
 // 导出:handleConnectorOAuthRoutes。
 import crypto from 'node:crypto';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
-import { completeGitHubDeviceFlow, fetchGitHubViewer, startGitHubDeviceFlow } from '../connectors/oauth-github.js';
+import {
+  completeGitHubDeviceFlow,
+  fetchGitHubViewer,
+  githubViewerDto,
+  startGitHubDeviceFlow,
+} from '../connectors/oauth-github.js';
 import { omitUndefined } from '../util/object.js';
 import { normalizeOAuthScopes, selectedOAuthPermissions } from '../connectors/oauth-permissions.js';
 import { createConnectorOAuthSession } from './connector-oauth-session.js';
@@ -21,6 +26,7 @@ import {
 } from './connector-oauth-route-utils.js';
 import { sendConnectorOAuthStatus, unsupportedOAuthConnector } from './connector-oauth-status.js';
 import { parseConnectorOAuthBody } from './connector-oauth-route-schemas.js';
+import { githubOAuthCompletionDto } from './connector-oauth-response.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { CredentialStore } from '../security/credential-store.js';
 import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
@@ -195,7 +201,9 @@ export async function handleConnectorOAuthRoutes({
           });
           return;
         }
-        const account = await fetchGitHubViewer(omitUndefined({ accessToken: completed.accessToken, fetchImpl: oauthFetch }));
+        const account = githubViewerDto(
+          await fetchGitHubViewer(omitUndefined({ accessToken: completed.accessToken, fetchImpl: oauthFetch })),
+        );
         const summary = credentialStore.put(oauthIdentity(requestContext, 'github', account.login), {
           accessToken: completed.accessToken,
           tokenType: completed.tokenType,
@@ -203,13 +211,14 @@ export async function handleConnectorOAuthRoutes({
           account,
           obtainedAt: new Date().toISOString(),
         });
+        const responseDto = githubOAuthCompletionDto(account, summary);
         oauthSessions.delete(sessionId);
         sendJson(response, 200, {
           context: requestContext,
           provider: 'github',
           connected: true,
-          account,
-          credential: summary,
+          account: responseDto.account,
+          credential: responseDto.credential,
           permissions: session.permissions || [],
         });
       } catch (err) {

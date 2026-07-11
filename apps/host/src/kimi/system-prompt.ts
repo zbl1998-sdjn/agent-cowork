@@ -4,7 +4,7 @@
 //       模式规则 + skills/记忆注入 + 内联图表/建议提示;纯函数无 I/O,易单测。
 // 依赖:仅标准库(Date 等)。
 // 导出:SYSTEM_PROMPT_VERSION、buildEnvBlock、buildSystemPrompt。
-export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v3';
+export const SYSTEM_PROMPT_VERSION = 'agent-system-prompt-v4';
 
 const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
@@ -115,6 +115,6 @@ export function buildSystemPrompt({
     lines.push('', '工作区记忆（分层，越靠后优先级越高，请严格遵守）：', memoryText.trim());
   }
   lines.push('回答结束时，可用 ' + "```" + 'suggestions 围栏块列出 2-3 个用户可能想做的后续动作(每行一句简短中文)，会渲染成可一键点击的建议。');
-  lines.push('当用户要求"每天/每周/每月/到某个时间"自动做某事时，调用 ScheduleTask 工具创建定时任务(cron 5 段，或 fireAt 一次性 ISO 时间)，并把要做的事写进 prompt。');
+  lines.push('当用户要求"每天/每周/每月/到某个时间"自动做某事时，只能把已启用的 skill/recipe 绑定为定时动作：调用 ScheduleTask 时必须传该 recipeId，prompt 仅补充本次输入。没有合适的已启用 recipe 时先向用户说明或询问，不要创建仅含 prompt、到点无法执行的任务。');
   return lines.join('\n');
 }

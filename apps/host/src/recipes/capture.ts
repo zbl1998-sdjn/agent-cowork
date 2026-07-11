@@ -3,8 +3,6 @@
 // 职责:读取一条 run 记录,提炼其步骤/产物/提示词并「脱敏」,组装成可保存的自定义配方草稿。
 //       是「把这次跑的流程存成配方」的取数侧;所有文本经 redaction 抹密。
 // 依赖:L0 security/redaction。导出:captureRun。
-import fs from 'node:fs';
-import path from 'node:path';
 import { redactText, redactValue } from '../security/redaction.js';
 import type {
   ArtifactLike,
@@ -13,11 +11,9 @@ import type {
   CaptureRunOptions,
   CaptureRunResult,
   RunRecord,
-  RunsIndexLike,
 } from './capture-types.js';
 
 const MAX_TEXT = 4000;
-const RUN_ID_RE = /^[a-z0-9_-]+$/i;
 
 function clipText(value: unknown, max = MAX_TEXT): string {
   const text = redactText(value == null ? '' : String(value)) ?? '';
@@ -28,41 +24,13 @@ function cleanValue(value: unknown): unknown {
   return redactValue(value);
 }
 
-async function readRecordFromIndex(runId: string, runsIndex: RunsIndexLike | null | undefined): Promise<RunRecord | null> {
-  if (!runsIndex || typeof runsIndex.get !== 'function') {
-    return null;
+async function loadRunRecord({ runId, runsIndex, recordReader }: Required<Pick<CaptureRunOptions, 'runId'>> & Omit<CaptureRunOptions, 'runId'>): Promise<RunRecord | null> {
+  if (runsIndex && typeof runsIndex.get === 'function') {
+    const authorized = await runsIndex.get(runId as string);
+    if (!authorized) return null;
   }
-  const indexed = await runsIndex.get(runId);
-  const runPath = typeof indexed?.runPath === 'string' ? indexed.runPath : '';
-  if (!runPath || !fs.existsSync(runPath)) {
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
-}
-
-function readRecordFromStoreRoot(runId: string, runStoreRoot: string | null | undefined): RunRecord | null {
-  if (!runStoreRoot) {
-    return null;
-  }
-  if (!RUN_ID_RE.test(runId || '')) {
-    throw new Error('Invalid run id');
-  }
-  const runPath = path.join(runStoreRoot, `${runId}.json`);
-  if (!fs.existsSync(runPath)) {
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(runPath, 'utf8')) as RunRecord;
-}
-
-async function loadRunRecord({ runId, runStoreRoot, runsIndex, recordReader }: Required<Pick<CaptureRunOptions, 'runId'>> & Omit<CaptureRunOptions, 'runId'>): Promise<RunRecord | null> {
-  let record: RunRecord | null = null;
-  if (typeof recordReader === 'function') {
-    record = await recordReader(runId as string);
-  }
-  if (runStoreRoot) {
-    record ||= readRecordFromStoreRoot(runId as string, runStoreRoot);
-  }
-  return record || (await readRecordFromIndex(runId as string, runsIndex));
+  if (typeof recordReader !== 'function') return null;
+  return recordReader(runId as string);
 }
 
 function eventSteps(record: RunRecord): CapturedStep[] {
@@ -183,13 +151,13 @@ function titleFromRecord(record: RunRecord, runId: string): string {
 }
 
 /** 捕获一次运行为配方草稿:定位并读取 run 记录,提炼步骤/产物/提示词并脱敏,返回可保存的草稿。 */
-export async function captureRun({ runId, runStoreRoot = null, runsIndex = null, recordReader = null }: CaptureRunOptions = {}): Promise<CaptureRunResult> {
+export async function captureRun({ runId, runsIndex = null, recordReader = null }: CaptureRunOptions = {}): Promise<CaptureRunResult> {
   if (!runId || typeof runId !== 'string') {
     const err: Error & { statusCode?: number } = new Error('captureRun: runId is required');
     err.statusCode = 400;
     throw err;
   }
-  const record = await loadRunRecord({ runId, runStoreRoot, runsIndex, recordReader });
+  const record = await loadRunRecord({ runId, runsIndex, recordReader });
   if (!record) {
     const err: Error & { statusCode?: number } = new Error('Run record not found');
     err.statusCode = 404;

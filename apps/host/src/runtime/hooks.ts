@@ -5,6 +5,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
+import {
+  createManagedDirectoryBoundary,
+  type ManagedDirectoryBoundary,
+} from '../security/managed-directory-boundary.js';
 import { omitUndefined } from '../util/object.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 
@@ -40,6 +44,46 @@ function toolMatches(hook: { tool?: string }, name: unknown): boolean {
   try { return new RegExp(hook.tool).test(String(name || '')); } catch { return hook.tool === name; }
 }
 
+type HookConfigSource = Readonly<{
+  boundary: ManagedDirectoryBoundary;
+  file: string;
+}>;
+
+function hookConfigSource(trustedRoot?: string, configPath?: string): HookConfigSource | null {
+  if (!configPath && !trustedRoot) return null;
+  const file = configPath
+    ? path.resolve(configPath)
+    : path.join(path.resolve(trustedRoot as string), '.AgentCowork', 'hooks.json');
+  const boundaryRoot = configPath
+    ? path.dirname(file)
+    : path.join(path.resolve(trustedRoot as string), '.AgentCowork');
+  if (!fs.existsSync(boundaryRoot)) return null;
+  return {
+    boundary: createManagedDirectoryBoundary(boundaryRoot, {
+      create: false,
+      label: 'Hook config directory',
+    }),
+    file,
+  };
+}
+
+function readHooksConfig(source: HookConfigSource | null): RawHook[] {
+  if (!source) return [];
+  const before = source.boundary.inspectPath(source.file, { allowMissing: true, kind: 'file' });
+  if (!before) return [];
+  const serialized = fs.readFileSync(before.canonicalPath, 'utf8');
+  source.boundary.revalidatePath(source.file, before, { kind: 'file' });
+  try {
+    const parsed = JSON.parse(serialized) as unknown;
+    const parsedObject = parsed && typeof parsed === 'object' ? parsed as { hooks?: unknown } : null;
+    return Array.isArray(parsed)
+      ? parsed as RawHook[]
+      : (Array.isArray(parsedObject?.hooks) ? parsedObject.hooks as RawHook[] : []);
+  } catch {
+    return [];
+  }
+}
+
 // 创建纯内存钩子引擎;执行阶段只聚合结果,不负责读取文件或直接访问 shell。
 export function createHookEngine({ hooks = [] }: HookEngineOptions = {}): HookEngine {
   const list = Array.isArray(hooks) ? hooks : [];
@@ -69,17 +113,7 @@ export function createHookEngine({ hooks = [] }: HookEngineOptions = {}): HookEn
 //   { "event": "pre_tool"|"post_tool", "tool": "Shell|Write", "command": "<shell cmd>" }
 // pre_tool 命令非零退出即阻断工具调用;命令必须先经 sandbox 规格化,不能绕过安全边界。
 export function loadHooksConfig({ trustedRoot, sandbox, sandboxLimits, configPath }: LoadHooksOptions = {}): HookEngine {
-  const file = configPath || (trustedRoot ? path.join(trustedRoot, '.AgentCowork', 'hooks.json') : null);
-  let raw: RawHook[] = [];
-  try {
-    if (file && fs.existsSync(file)) {
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-      const parsedObject = parsed && typeof parsed === 'object' ? (parsed as { hooks?: unknown }) : null;
-      raw = Array.isArray(parsed) ? (parsed as RawHook[]) : (Array.isArray(parsedObject?.hooks) ? (parsedObject.hooks as RawHook[]) : []);
-    }
-  } catch {
-    raw = [];
-  }
+  const raw = readHooksConfig(hookConfigSource(trustedRoot, configPath));
   const hooks = raw
     .filter((h) => h && (h.event === 'pre_tool' || h.event === 'post_tool') && typeof h.command === 'string')
     .map((h) => ({

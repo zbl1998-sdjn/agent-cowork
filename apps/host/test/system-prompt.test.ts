@@ -48,8 +48,15 @@ test('buildSystemPrompt puts the env block at the very TOP', () => {
   assert.ok(envEndIdx > 0 && preambleIdx > envEndIdx, 'preamble must follow </env>');
 });
 
-test('SYSTEM_PROMPT_VERSION bumped to v3 (tool-use discipline addition)', () => {
-  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v3');
+test('SYSTEM_PROMPT_VERSION tracks the guarded schedule contract', () => {
+  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v4');
+});
+
+test('default system prompt only schedules enabled recipes instead of prompt-only jobs', () => {
+  const prompt = buildSystemPrompt();
+  assert.match(prompt, /已启用的 skill\/recipe/);
+  assert.match(prompt, /recipeId/);
+  assert.match(prompt, /不要创建仅含 prompt/);
 });
 
 test('base system prompt teaches Claude-cowork-style convergence (do not exhaust steps)', () => {

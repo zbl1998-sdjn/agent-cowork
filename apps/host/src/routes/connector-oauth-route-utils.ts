@@ -4,7 +4,11 @@
 //       凭据身份/过滤器、归一化错误状态码与消息。依赖:L1 connectors/catalog。
 import { z } from 'zod';
 import { getConnector } from '../connectors/catalog.js';
-import { omitUndefined } from '../util/object.js';
+import {
+  canonicalCredentialAccountId,
+  canonicalCredentialProvider,
+} from '../security/credential-identity.js';
+import { requireIdentityScopeFrom } from '../security/identity-scope.js';
 import type { ConnectorDescriptor } from '../connectors/catalog.js';
 
 export const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
@@ -15,8 +19,8 @@ export type RequestContext = {
   [key: string]: unknown;
 };
 export type OAuthIdentity = {
-  tenantId?: string;
-  userId?: string;
+  tenantId: string;
+  userId: string;
   provider: string;
   accountId: string;
 };
@@ -29,19 +33,12 @@ const optionalStringField = z.preprocess(
   z.string().optional(),
 );
 
-const requestContextSchema = z.object({
-  tenantId: optionalStringField,
-  userId: optionalStringField,
-}).loose();
-
 const oauthConfigSchema = z.object({
   github: z.object({
     clientId: optionalStringField,
   }).loose().optional(),
 }).loose();
 
-const providerSchema = z.string().trim().min(1, 'provider is required');
-const accountIdSchema = z.string().trim().min(1, 'accountId is required');
 const routeErrorSchema = z.object({
   statusCode: z.number().int().min(100).max(599).optional(),
 }).loose();
@@ -50,11 +47,6 @@ function objectOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-}
-
-function requestContext(value: unknown): RequestContext {
-  const result = requestContextSchema.safeParse(objectOrEmpty(value));
-  return result.success ? omitUndefined(result.data) : {};
 }
 
 export function isGitHub(id: unknown): boolean {
@@ -73,22 +65,17 @@ export function githubClientId(oauthConfig?: unknown): string {
 }
 
 export function oauthIdentity(requestContextInput: RequestContext, providerInput: string, accountIdInput = 'default'): OAuthIdentity {
-  const context = requestContext(requestContextInput);
-  return omitUndefined({
-    tenantId: context.tenantId,
-    userId: context.userId,
-    provider: providerSchema.parse(providerInput),
-    accountId: accountIdSchema.parse(accountIdInput),
-  });
+  const owner = requireIdentityScopeFrom(requestContextInput, { label: 'OAuth request identity' });
+  return {
+    ...owner,
+    provider: canonicalCredentialProvider(providerInput),
+    accountId: canonicalCredentialAccountId(accountIdInput),
+  };
 }
 
 export function oauthFilter(requestContextInput: RequestContext, providerInput: string): OAuthFilter {
-  const context = requestContext(requestContextInput);
-  return omitUndefined({
-    tenantId: context.tenantId,
-    userId: context.userId,
-    provider: providerSchema.parse(providerInput),
-  });
+  const owner = requireIdentityScopeFrom(requestContextInput, { label: 'OAuth request identity' });
+  return { ...owner, provider: canonicalCredentialProvider(providerInput) };
 }
 
 export function githubConnector(): ConnectorDescriptor {

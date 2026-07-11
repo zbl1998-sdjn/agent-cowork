@@ -4,8 +4,10 @@
 //       依次执行,记录一条形如 recipe/sandbox 的 `subagent-run`(带事件时间线),使历史/时间线 UI 无需改动。
 // 依赖:L0 path-policy + 同层 run-store / runs-index。导出:执行子代理计划的函数。
 import path from 'node:path';
+import { LOCAL_IDENTITY_SCOPE } from '../security/identity-scope.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { omitUndefined } from '../util/object.js';
+import { bindRunEventPublisher } from '../util/run-event-publisher.js';
 import { createRunId, writeRunRecord } from './run-store.js';
 import { summariseRunForIndex } from './runs-index.js';
 
@@ -21,7 +23,9 @@ export type ToolRegistryLike = {
     context: { trustedRoot: string; context: Record<string, unknown> },
   ): unknown | Promise<unknown>;
 };
-export type RunEventsLike = { publish(runId: string, payload: Record<string, unknown>): SubagentEvent };
+export type RunEventsLike = {
+  publish(runId: string, payload: Record<string, unknown>): SubagentEvent | Promise<SubagentEvent>;
+};
 export type RunsIndexLike = { upsert(record: unknown, context?: Record<string, unknown>): unknown };
 export type HttpErrorFields = { statusCode?: number; payload?: Record<string, unknown> };
 export type HttpError = Error & HttpErrorFields;
@@ -145,7 +149,8 @@ function summariseResult(result: unknown): Record<string, unknown> {
   return { keys: Object.keys(objectResult).slice(0, 8) };
 }
 
-export async function runSubagent({
+export async function runSubagent(options: RunSubagentOptions): Promise<RunSubagentResult> {
+  const {
   goal = '',
   steps = [],
   registry,
@@ -153,11 +158,14 @@ export async function runSubagent({
   runStoreRoot,
   runEvents = null,
   runsIndex = null,
-  context = {},
+  context: suppliedContext,
   stopOnError = true,
   contextBudgetBytes = DEFAULT_CONTEXT_BUDGET_BYTES,
   maxSteps = DEFAULT_MAX_STEPS,
-}: RunSubagentOptions): Promise<RunSubagentResult> {
+  } = options;
+  const context = Object.hasOwn(options, 'context')
+    ? (suppliedContext ?? {})
+    : LOCAL_IDENTITY_SCOPE;
   if (!registry) {
     throw new Error('runSubagent: registry is required');
   }
@@ -171,16 +179,17 @@ export async function runSubagent({
   const runId = createRunId();
   const startedAt = new Date();
   const events: SubagentEvent[] = [];
-  const emit = (type: string, payload: Record<string, unknown> = {}): SubagentEvent => {
-    const enriched = runEvents
-      ? runEvents.publish(runId, { type, ...payload })
+  const scopedRunEvents = bindRunEventPublisher(runEvents, context);
+  const emit = async (type: string, payload: Record<string, unknown> = {}): Promise<SubagentEvent> => {
+    const enriched: SubagentEvent = scopedRunEvents
+      ? await Promise.resolve(scopedRunEvents.publish(runId, { type, ...payload }))
       : { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
     events.push(enriched);
     return enriched;
   };
 
-  emit('user_message', { text: String(goal || '').slice(0, 2000) || `子任务 (${steps.length} 步)` });
-  emit('assistant_start', { status: 'running', stepCount: steps.length });
+  await emit('user_message', { text: String(goal || '').slice(0, 2000) || `子任务 (${steps.length} 步)` });
+  await emit('assistant_start', { status: 'running', stepCount: steps.length });
 
   const stepResults: SubagentStepResult[] = [];
   let ok = true;
@@ -188,17 +197,17 @@ export async function runSubagent({
     const step = steps[i];
     if (!step) continue;
     const tool = String(step.tool || '');
-    emit('progress', { icon: 'loader', text: `步骤 ${i + 1}/${steps.length}: 调用 ${tool}` });
+    await emit('progress', { icon: 'loader', text: `步骤 ${i + 1}/${steps.length}: 调用 ${tool}` });
     try {
       const result = await registry.call(tool, (step.args || {}) as Record<string, unknown>, { trustedRoot: safeRoot, context });
       const summary = summariseResult(result);
       stepResults.push({ index: i, tool, status: 'succeeded', summary });
-      emit('tool_result', { index: i, tool, status: 'succeeded', summary });
+      await emit('tool_result', { index: i, tool, status: 'succeeded', summary });
     } catch (err) {
       ok = false;
       const message = err instanceof Error ? err.message : String(err);
       stepResults.push({ index: i, tool, status: 'failed', error: message });
-      emit('tool_result', { index: i, tool, status: 'failed', error: message });
+      await emit('tool_result', { index: i, tool, status: 'failed', error: message });
       if (stopOnError) {
         break;
       }
@@ -207,7 +216,7 @@ export async function runSubagent({
 
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
-  emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
+  await emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
 
   const record = {
     id: runId,

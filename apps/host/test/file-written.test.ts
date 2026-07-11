@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 type EmittedEvent = {
   t: string;
@@ -30,7 +31,8 @@ test('successful Write emits a file_written frame with the path (for openable ar
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Write', arguments: JSON.stringify({ path: 'report.md', content: '# hi' }) } }] };
     return { content: '已生成 report.md。' };
   };
-  await runAgentChat({ prompt: '写报告', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  const approvals = { request: () => ({ id: 'write_approval', promise: Promise.resolve('once') }) };
+  await runAgentChat({ prompt: '写报告', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, approvals, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   const fw = events.filter((e) => e.t === 'file_written');
   assert.equal(fw.length, 1, 'one file_written frame');
   assert.ok(fw[0]);
@@ -47,6 +49,6 @@ test('read-only tools do not emit file_written', async () => {
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Read', arguments: JSON.stringify({ path: 'a.txt' }) } }] };
     return { content: '读完了。' };
   };
-  await runAgentChat({ prompt: '看文件', kimiConfig: { model: 'fake' }, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  await runAgentChat({ prompt: '看文件', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   assert.equal(events.filter((e) => e.t === 'file_written').length, 0);
 });

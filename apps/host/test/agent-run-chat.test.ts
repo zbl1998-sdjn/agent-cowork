@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { addUsage, applyStaticBackstop, sse, summarizeAfterBudget } from '../src/kimi/agent/finalize.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { createTrustedInProcessModelCallCapability } from '../src/kimi/agent/model-call-capability.js';
 import {
   hasTodoEvent,
   hasToolResultEvent,
@@ -11,6 +12,12 @@ import {
 } from './helpers/agent.js';
 import { tempRoot } from './helpers/host-http.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+
+const TEST_LOCAL_MODEL_CONFIG = Object.freeze({
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+  model: 'fake',
+});
 
 function ignoreEmit(type: string, payload: unknown): void {
   void type;
@@ -38,9 +45,10 @@ test('runAgentChat executes a Write tool call then returns a final answer', asyn
 
   const out = await runAgentChat({
     prompt: '创建 out.txt',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
+    approvals: { request: () => ({ id: 'write_approval', promise: Promise.resolve('once') }) },
     emit: (type, payload) => events.push({ type, payload }),
     runStoreRoot: path.join(root, 'runs'),
   });
@@ -50,6 +58,52 @@ test('runAgentChat executes a Write tool call then returns a final answer', asyn
   assert.ok(hasTodoEvent(events, 'done', '调用 Write'), 'tool todo finishes done');
   assert.ok(hasToolResultEvent(events, 'Write'), 'tool result reports duration');
   assert.equal(out.text, '已为你创建 out.txt。');
+});
+
+test('runAgentChat keeps an ordinary injected modelCall behind controlled-hybrid egress policy', async () => {
+  const root = tempRoot('kcw-agent-governed-model-');
+  let calls = 0;
+  await assert.rejects(
+    () => runAgentChat({
+      prompt: 'must stay local',
+      kimiConfig: {
+        provider: 'kimi-api',
+        baseUrl: 'https://api.moonshot.ai/v1',
+        model: 'external-model',
+        securityMode: 'controlled_hybrid',
+      },
+      trustedRoot: root,
+      modelCall: async () => {
+        calls += 1;
+        return { content: 'must not run' };
+      },
+      emit: ignoreEmit,
+    }),
+    (error) => Boolean(error && typeof error === 'object'
+      && 'code' in error
+      && error.code === 'EGRESS_APPROVAL_REQUIRED'),
+  );
+  assert.equal(calls, 0);
+});
+
+test('runAgentChat accepts only a capability bound to its exact in-process modelCall', async () => {
+  const root = tempRoot('kcw-agent-trusted-model-');
+  const modelCall: ModelCall = async () => ({ content: 'trusted in-process result' });
+  const result = await runAgentChat({
+    prompt: 'local fixture',
+    kimiConfig: {
+      provider: 'external-looking-fixture',
+      baseUrl: 'https://example.invalid/v1',
+      model: 'fixture-model',
+      securityMode: 'controlled_hybrid',
+    },
+    trustedRoot: root,
+    modelCall,
+    inProcessModelCallCapability: createTrustedInProcessModelCallCapability(modelCall),
+    emit: ignoreEmit,
+  });
+
+  assert.equal(result.text, 'trusted in-process result');
 });
 
 test('a run that exhausts the step budget still returns a written reply', async () => {
@@ -69,7 +123,7 @@ test('a run that exhausts the step budget still returns a written reply', async 
 
   const out = await runAgentChat({
     prompt: '看看这里',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 3,
@@ -104,7 +158,7 @@ test('runAgentChat allows a final productive tool call before no-tool summary', 
 
   const out = await runAgentChat({
     prompt: '看看这里',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -138,7 +192,7 @@ test('runAgentChat finalizes early when the latest tool batch made no progress',
 
   const out = await runAgentChat({
     prompt: '读取不存在的文件',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -163,7 +217,7 @@ test('static backstop fires when even the forced summary comes back empty', asyn
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -212,6 +266,7 @@ test('summarizeAfterBudget disables tools, emits streamed summary, and records u
   const text = await summarizeAfterBudget({
     messages,
     modelCall,
+    inProcessModelCallCapability: createTrustedInProcessModelCallCapability(modelCall),
     kimiConfig: { timeoutMs: 1000 },
     emit: (type, payload) => events.push({ type, payload }),
     usageTotals,
@@ -226,7 +281,9 @@ test('summarizeAfterBudget disables tools, emits streamed summary, and records u
 });
 
 test('summarizeAfterBudget returns existing or empty text without leaking model failures', async () => {
+  let modelCalls = 0;
   const throwingModel: ModelCall = async () => {
+    modelCalls += 1;
     throw new Error('network down');
   };
   const usageTotals = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
@@ -243,8 +300,10 @@ test('summarizeAfterBudget returns existing or empty text without leaking model 
   const failed = await summarizeAfterBudget({
     messages: [],
     modelCall: throwingModel,
+    inProcessModelCallCapability: createTrustedInProcessModelCallCapability(throwingModel),
     emit: () => unexpectedEmit('model failure should be swallowed'),
     usageTotals,
   });
   assert.equal(failed, '');
+  assert.equal(modelCalls, 1, 'the injected model failure must be exercised exactly once');
 });

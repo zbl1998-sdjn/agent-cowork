@@ -2,9 +2,8 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/conversations/* —— 会话的列出/读取/创建/改名/删除(多租户隔离)。
 // 依赖:L0 path-policy/request-utils + L1 storage 会话存储(经参数注入)。导出:handleConversationRoutes。
-import path from 'node:path';
 import { z } from 'zod';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { AtRestKeyError } from '../security/at-rest.js';
 import { decodePathSegment, sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
@@ -33,6 +32,7 @@ type ConversationRouteOptions = {
   requestUrl: URL;
   requestContext: RequestContext;
   trustedRootDefault: string;
+  safeTrustedRoot(value?: unknown): string;
   conversationStore?: ConversationStoreLike | null;
 };
 
@@ -67,16 +67,25 @@ function errorMessage(err: unknown, fallback = 'invalid conversation request'): 
   return err instanceof Error ? err.message : String(err);
 }
 
-function resolveRoot(raw: unknown, trustedRootDefault: string): string {
+function errorPayload(err: unknown): { error: string; code?: string } {
+  const error = errorMessage(err);
+  return err instanceof AtRestKeyError ? { error, code: err.code } : { error };
+}
+
+function resolveRoot(raw: unknown, safeTrustedRoot: (value?: unknown) => string): string {
   if (raw != null && raw !== '' && typeof raw !== 'string') {
     throw new Error('trustedRoot must be a string');
   }
-  return assertTrustedPath(path.resolve(raw || trustedRootDefault), trustedRootDefault);
+  return safeTrustedRoot(raw);
 }
 
-function resolveRootOrSend(response: HttpResponseLike, raw: unknown, trustedRootDefault: string): string | null {
+function resolveRootOrSend(
+  response: HttpResponseLike,
+  raw: unknown,
+  safeTrustedRoot: (value?: unknown) => string,
+): string | null {
   try {
-    return resolveRoot(raw, trustedRootDefault);
+    return resolveRoot(raw, safeTrustedRoot);
   } catch (err) {
     sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
     return null;
@@ -97,7 +106,7 @@ export async function handleConversationRoutes({
   pathname,
   requestUrl,
   requestContext,
-  trustedRootDefault,
+  safeTrustedRoot,
   conversationStore,
 }: ConversationRouteOptions): Promise<boolean> {
   if (!conversationStore || !pathname.startsWith('/api/conversations')) {
@@ -112,7 +121,7 @@ export async function handleConversationRoutes({
       sendJson(response, 400, { error: errorMessage(err) });
       return true;
     }
-    const safeRoot = resolveRootOrSend(response, query.trustedRoot, trustedRootDefault);
+    const safeRoot = resolveRootOrSend(response, query.trustedRoot, safeTrustedRoot);
     if (!safeRoot) return true;
     const full = query.full === '1';
     const limit = normalizeLimit(query.limit);
@@ -146,7 +155,7 @@ export async function handleConversationRoutes({
     }
 
     if (request.method === 'GET') {
-      const safeRoot = resolveRootOrSend(response, requestUrl.searchParams.get('trustedRoot'), trustedRootDefault);
+      const safeRoot = resolveRootOrSend(response, requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot);
       if (!safeRoot) return true;
       try {
         const conversation = await conversationStore.get(safeRoot, id, requestContext);
@@ -156,7 +165,7 @@ export async function handleConversationRoutes({
           sendJson(response, 200, { conversation });
         }
       } catch (err) {
-        sendJson(response, 400, { error: errorMessage(err) });
+        sendJson(response, errorStatus(err, 400), errorPayload(err));
       }
       return true;
     }
@@ -169,7 +178,7 @@ export async function handleConversationRoutes({
           return;
         }
         const input = parsed.data;
-        const safeRoot = resolveRoot(input.trustedRoot, trustedRootDefault);
+        const safeRoot = resolveRoot(input.trustedRoot, safeTrustedRoot);
         try {
           const summary = await conversationStore.save(
             safeRoot,
@@ -185,20 +194,20 @@ export async function handleConversationRoutes({
           );
           sendJson(response, 200, { conversation: summary });
         } catch (err) {
-          sendJson(response, 400, { error: errorMessage(err) });
+          sendJson(response, errorStatus(err, 400), errorPayload(err));
         }
       });
       return true;
     }
 
     if (request.method === 'DELETE') {
-      const safeRoot = resolveRootOrSend(response, requestUrl.searchParams.get('trustedRoot'), trustedRootDefault);
+      const safeRoot = resolveRootOrSend(response, requestUrl.searchParams.get('trustedRoot'), safeTrustedRoot);
       if (!safeRoot) return true;
       try {
         const deleted = await conversationStore.remove(safeRoot, id, requestContext);
         sendJson(response, 200, { deleted });
       } catch (err) {
-        sendJson(response, 400, { error: errorMessage(err) });
+        sendJson(response, errorStatus(err, 400), errorPayload(err));
       }
       return true;
     }

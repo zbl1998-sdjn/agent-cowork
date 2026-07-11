@@ -7,6 +7,8 @@
 //       由 refiner 判定为「无需改写」,绝不打断输入流程。
 // 依赖:../api-runner-config(默认 baseUrl/model)。导出:createKimiRefineModelCall。
 import { DEFAULT_BASE_URL, DEFAULT_MODEL } from '../api-runner-config.js';
+import { createModelEndpointFetch } from '../../security/model-endpoint-request.js';
+import { decideEgressPolicy, enforceRecordedEgressDecision } from '../../security/egress-gateway.js';
 import type { PromptContext, PromptModelCall } from './refiner.js';
 
 type FetchLike = typeof globalThis.fetch;
@@ -59,18 +61,32 @@ export function createKimiRefineModelCall(
     const maxTokens = Math.max(1, Number(kimiConfig.maxTokens) || 1024);
     const timeoutMs = Math.max(1000, Number(kimiConfig.timeoutMs) || 15_000);
     const temperature = Number(kimiConfig.temperature);
-
     const terms = contextTerms(context);
     const hints = [
       `任务类型:${INTENT_LABELS[intent] || INTENT_LABELS.general}`,
       missing && missing.length ? `可补强的要素:${missing.join('、')}` : '',
       terms.length ? `相关上下文:${terms.join('、')}` : '',
     ].filter(Boolean).join('\n');
+    const endpoint = `${baseUrl}/chat/completions`;
+    const messages = [
+      { role: 'system', content: hints ? `${SYSTEM_PROMPT}\n${hints}` : SYSTEM_PROMPT },
+      { role: 'user', content: String(prompt || '') },
+    ];
+    enforceRecordedEgressDecision(context.trustedRoot, decideEgressPolicy({
+      kind: 'model_inference',
+      destination: endpoint,
+      provider: kimiConfig.provider,
+      model,
+      baseUrl,
+      securityMode: kimiConfig.securityMode,
+      content: messages,
+    }));
+    const modelFetch = createModelEndpointFetch(kimiConfig, { fetchImpl: fetchImpl as never });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetchImpl(`${baseUrl}/chat/completions`, {
+      const response = await modelFetch(endpoint, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${apiKey}`,
@@ -79,10 +95,7 @@ export function createKimiRefineModelCall(
         },
         body: JSON.stringify({
           model,
-          messages: [
-            { role: 'system', content: hints ? `${SYSTEM_PROMPT}\n${hints}` : SYSTEM_PROMPT },
-            { role: 'user', content: String(prompt || '') },
-          ],
+          messages,
           max_tokens: maxTokens,
           ...(Number.isFinite(temperature) ? { temperature } : {}),
           stream: false,

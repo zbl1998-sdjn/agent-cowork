@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
+import { createArtifactFileOperationGuards, createArtifactRollbackGuards } from '../artifacts/artifact-owner-write.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import {
   previewFileOperations,
@@ -135,11 +136,12 @@ async function withParsedFileOpsBody<S extends z.ZodType>(
 function cachedWrite(
   options: WorkspaceFileOperationRouteOptions,
   body: FileOperationBody,
+  trustedRoot: string,
   handler: () => unknown,
 ): void {
   const { request, response, pathname, requestContext, cacheKeyFor, requireIdempotencyKey, sendCachedOrStore } = options;
   if (!requireIdempotencyKey(response, requestContext)) return;
-  const fingerprint = bodyFingerprint(body);
+  const fingerprint = bodyFingerprint({ body, trustedRoot });
   const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
   if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) return;
   const payload = handler();
@@ -160,7 +162,10 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
   if (request.method === 'POST' && pathname === '/api/file-ops/preview') {
     await withParsedFileOpsBody(request, response, operationsBodySchema, async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const preview = previewFileOperations(body.operations, { trustedRoot });
+      const preview = previewFileOperations(body.operations, {
+        trustedRoot,
+        ...createArtifactFileOperationGuards(trustedRoot, requestContext),
+      });
       const fileOperationApprovalId = preview.operations.length
         ? fileOperationApprovals.issue({
           kind: 'file-ops:apply',
@@ -176,9 +181,10 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
 
   if (request.method === 'POST' && pathname === '/api/file-ops/apply') {
     await withParsedFileOpsBody(request, response, applyBodySchema, async (body) => {
-      cachedWrite(options, body, () => {
-        const trustedRoot = safeTrustedRoot(body.trustedRoot);
-        const preview = previewFileOperations(body.operations, { trustedRoot });
+      const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      cachedWrite(options, body, trustedRoot, () => {
+        const ownership = createArtifactFileOperationGuards(trustedRoot, requestContext);
+        const preview = previewFileOperations(body.operations, { trustedRoot, ...ownership });
         fileOperationApprovals.consume(body.fileOperationApprovalId || body.approvalId, {
           kind: 'file-ops:apply',
           trustedRoot,
@@ -188,6 +194,7 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
         const applied = applyFileOperations(body.operations, omitUndefined({
           trustedRoot,
           journalWriter: config.journalWriter,
+          ...ownership,
         }));
         const rollbackApprovalId = applied.applied.length
           ? fileOperationApprovals.issue({
@@ -209,8 +216,8 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
 
   if (request.method === 'POST' && pathname === '/api/file-ops/rollback') {
     await withParsedFileOpsBody(request, response, rollbackBodySchema, async (body) => {
-      cachedWrite(options, body, () => {
-        const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      cachedWrite(options, body, trustedRoot, () => {
         const entries = body.rollback ?? body.applied ?? body.operations ?? [];
         fileOperationApprovals.consume(body.rollbackApprovalId || body.fileOperationApprovalId || body.approvalId, {
           kind: 'file-ops:rollback',
@@ -221,6 +228,7 @@ export async function handleWorkspaceFileOperationRoutes(options: WorkspaceFileO
         const rollback = rollbackFileOperations(entries, omitUndefined({
           trustedRoot,
           journalWriter: config.journalWriter,
+          ...createArtifactRollbackGuards(trustedRoot, requestContext),
         }));
         return {
           ...rollback,

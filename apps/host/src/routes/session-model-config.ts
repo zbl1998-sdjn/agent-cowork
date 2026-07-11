@@ -1,9 +1,14 @@
 // 会话级模型配置(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:把单次请求体里携带的「会话级模型覆盖」安全叠加到基础 Kimi 配置,并判断调用方
-//       是否有权使用会话级覆盖。依赖:仅第三方 schema 库,不反向依赖 L4 组装根。
+//       是否有权使用会话级覆盖。依赖:L0 security 策略与 L1 provider catalog,不反向依赖 L4 组装根。
 import { z } from 'zod';
 import { findModelProviderCatalog, normaliseModelProviderId } from '../kimi/provider/catalog.js';
+import {
+  decideModelProviderPolicy,
+  normalizeModelBaseUrl,
+  type RuntimeEnv,
+} from '../security/security-mode.js';
 
 export type SessionModelConfig = {
   provider?: string;
@@ -13,6 +18,7 @@ export type SessionModelConfig = {
 };
 
 type RouteError = Error & { statusCode?: number };
+type SessionModelAccessOptions = { env?: RuntimeEnv };
 
 const sessionModelSourceSchema = z.object({
   provider: z.string().optional(),
@@ -45,6 +51,12 @@ function inputError(message: string): RouteError {
   return error;
 }
 
+function accessError(message: string): RouteError {
+  const error = new Error(`session model config: ${message}`) as RouteError;
+  error.statusCode = 403;
+  return error;
+}
+
 function zodIssueMessage(issue: z.core.$ZodIssue): string {
   const field = issue.path.length ? `${issue.path.join('.')}: ` : '';
   return `${field}${issue.message}`;
@@ -67,7 +79,14 @@ function cleanProvider(value: unknown): string {
 }
 
 function cleanBaseUrl(value: unknown): string {
-  return cleanText(value).replace(/\/+$/, '');
+  const raw = cleanText(value);
+  if (!raw) return '';
+  try {
+    return normalizeModelBaseUrl(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'invalid model base URL';
+    throw inputError('modelConfig.baseUrl: ' + message);
+  }
 }
 
 function nonEmptyObject(value: unknown): value is Record<string, unknown> {
@@ -96,15 +115,44 @@ function requestModelConfig(body: unknown): SessionModelConfig {
  * default. Only scalar model routing fields are accepted; fallback chains stay
  * host-managed so request bodies cannot smuggle secret fallback layers.
  */
-export function applySessionModelConfig(kimiConfig: unknown, body: unknown): Record<string, unknown> {
+export function applySessionModelConfig(
+  kimiConfig: unknown,
+  body: unknown,
+  { env = process.env as RuntimeEnv }: SessionModelAccessOptions = {},
+): Record<string, unknown> {
   const base = { ...objectOrEmpty(kimiConfig) };
   const override = requestModelConfig(body);
-  return Object.keys(override).length ? { ...base, ...override } : base;
+  if (!Object.keys(override).length) return base;
+  const combined = { ...base, ...override };
+  const baseProvider = cleanProvider(base.provider);
+  const overrideProvider = cleanProvider(override.provider);
+  const baseUrl = cleanBaseUrl(base.baseUrl);
+  const overrideBaseUrl = cleanBaseUrl(override.baseUrl);
+  const changesProvider = Boolean(overrideProvider && overrideProvider !== baseProvider);
+  const changesEndpoint = Boolean(overrideBaseUrl && overrideBaseUrl !== baseUrl);
+  if (!changesProvider && !changesEndpoint) return combined;
+
+  // Per-request bodies have no administrator identity or scoped model-egress
+  // receipt. They may select loopback models or an explicitly allowlisted
+  // customer gateway, but cannot mint arbitrary outbound routing authority.
+  const policy = decideModelProviderPolicy(combined, { securityMode: 'enterprise_local', env });
+  if (policy.decision !== 'allow') {
+    throw accessError('session model endpoint override requires host-managed authorization');
+  }
+  return combined;
 }
 
-export function hasSessionModelAccess(body: unknown): boolean {
+export function hasSessionModelAccess(
+  body: unknown,
+  { env = process.env as RuntimeEnv }: SessionModelAccessOptions = {},
+): boolean {
   const override = requestModelConfig(body);
-  if (override.apiKey) return true;
   const provider = findModelProviderCatalog(override.provider);
-  return provider?.region === 'local';
+  const localCatalogProvider = provider?.region === 'local';
+  const policy = decideModelProviderPolicy(
+    { ...override, securityMode: 'local_strict' },
+    { securityMode: localCatalogProvider ? 'local_strict' : 'enterprise_local', env },
+  );
+  return policy.decision === 'allow'
+    && (policy.providerClass === 'local' || policy.providerClass === 'customer_gateway');
 }

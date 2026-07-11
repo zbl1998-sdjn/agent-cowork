@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import { createCustomRecipeStore } from '../src/recipes/custom-recipes.js';
 import {
   arrayField,
   bind,
@@ -22,13 +23,26 @@ function seedMeetingNotes(trustedRoot: string): string {
   return sourcePath;
 }
 
+test('custom recipe persistence fails closed instead of overwriting a corrupt store', () => {
+  const trustedRoot = tempRoot();
+  const storePath = path.join(trustedRoot, '.AgentCowork', 'recipes', 'custom-recipes.json');
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  fs.writeFileSync(storePath, '{not-json', 'utf8');
+  const store = createCustomRecipeStore({ storePath });
+  const scope = { tenantId: 'tenant_alice', userId: 'user_alice' };
+
+  assert.throws(() => store.list(scope), /custom recipe store/i);
+  assert.throws(() => store.save({ name: 'Do not overwrite', redacted: true }, scope), /custom recipe store/i);
+  assert.equal(fs.readFileSync(storePath, 'utf8'), '{not-json');
+});
+
 test('runs index: recipe-run upserts a tenant-scoped record', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
     const indexEmpty = await jsonRequest(base, '/api/runs/index', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     assert.equal(indexEmpty.status, 200);
     assert.equal(arrayField(indexEmpty.body, 'runs', 'empty runs index').length, 0);
@@ -42,18 +56,18 @@ test('runs index: recipe-run upserts a tenant-scoped record', async () => {
     assert.ok(stringField(recipeRun.body, 'runId', 'recipe run id'));
 
     const indexFilled = await jsonRequest(base, '/api/runs/index', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     assert.equal(indexFilled.status, 200);
     const filledRuns = arrayField(indexFilled.body, 'runs', 'filled runs index');
     const firstRun = present(filledRuns[0], 'first indexed run');
     assert.equal(filledRuns.length, 1);
     assert.equal(firstRun.recipeId, 'meeting-actions');
-    assert.equal(firstRun.status, 'succeeded');
+    assert.equal(firstRun.status, 'awaiting_approval');
     assert.equal(firstRun.tenantId, 'tenant_alice');
 
     const otherTenant = await jsonRequest(base, '/api/runs/index', {
-      headers: { 'x-tenant-id': 'tenant_bob' },
+      headers: { 'x-tenant-id': 'tenant_bob', 'x-user-id': 'user_alice' },
     });
     assert.equal(arrayField(otherTenant.body, 'runs', 'other tenant runs').length, 0, 'tenant scoping must hold');
   } finally {
@@ -71,7 +85,7 @@ test('recipe capture route returns a tenant-scoped redacted draft', async () => 
   });
   const base = await bind(server);
   try {
-    const secret = 'sk-ABCDEFGHIJ1234567890';
+    const secret = 'sk-test-dummy-0000000000';
     const recipeRun = await jsonRequest(base, '/api/recipes/meeting-actions/run', {
       method: 'POST',
       headers: {
@@ -97,6 +111,13 @@ test('recipe capture route returns a tenant-scoped redacted draft', async () => 
     assert.equal(capturedRecipe.redacted, true);
     assert.ok(arrayField(capturedRecipe, 'steps', 'captured recipe steps').length > 0);
     assert.equal(JSON.stringify(capturedRecipe).includes(secret), false);
+
+    const siblingUser = await jsonRequest(base, '/api/recipes/capture', {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_sibling' },
+      body: { runId: recipeRunId },
+    });
+    assert.equal(siblingUser.status, 404);
 
     const otherTenant = await jsonRequest(base, '/api/recipes/capture', {
       method: 'POST',
@@ -160,6 +181,26 @@ test('custom recipes save redacted drafts and run tenant-scoped recipes', async 
       headers: { 'x-tenant-id': 'tenant_bob', 'x-user-id': 'user_bob' },
     });
     assert.equal(arrayField(otherTenant.body, 'recipes', 'other tenant recipes').some((recipe) => recipe.id === savedRecipeId), false);
+
+    const siblingUser = await jsonRequest(base, '/api/recipes', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_sibling' },
+    });
+    assert.equal(
+      arrayField(siblingUser.body, 'recipes', 'sibling user recipes').some((recipe) => recipe.id === savedRecipeId),
+      false,
+      'custom recipes must be isolated by both tenant and user',
+    );
+
+    const siblingRun = await jsonRequest(base, `/api/recipes/${encodeURIComponent(savedRecipeId)}/run`, {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_sibling',
+        'idempotency-key': 'custom-recipe-sibling-run',
+      },
+      body: { prompt: '不应运行其他用户的技能', files: [] },
+    });
+    assert.equal(siblingRun.status, 404);
 
     const run = await jsonRequest(base, `/api/recipes/${encodeURIComponent(savedRecipeId)}/run`, {
       method: 'POST',
@@ -313,7 +354,7 @@ test('recipe run endpoint replays duplicate idempotency key without creating a s
     assert.equal(second.body.runId, firstRunId);
 
     const index = await jsonRequest(base, '/api/runs/index', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     assert.equal(arrayField(index.body, 'runs', 'replayed recipe runs').length, 1);
     assert.equal(objectField(index.body, 'stats', 'replayed recipe stats').total, 1);

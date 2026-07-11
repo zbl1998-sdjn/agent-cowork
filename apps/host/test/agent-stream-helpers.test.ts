@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from '../src/routes/agent-stream-budget.js';
 import { buildAgentConfigSnapshot } from '../src/routes/agent-config-snapshot.js';
 import { resolveAgentRunStart } from '../src/routes/agent-resume.js';
-import { streamAgentChat } from '../src/routes/agent-stream.js';
+import { cancelApprovalsForDisconnectedRun, streamAgentChat } from '../src/routes/agent-stream.js';
+import { sanitizeAgentEventData } from '../src/routes/agent-stream-events.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
 import type { RunsIndexLike } from '../src/routes/agent-stream-record.js';
 import { readRunRecord } from '../src/runtime/run-store.js';
 import { present, recordValue, stringField, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp(): string {
   return tempRoot('kcw-agent-stream-');
@@ -106,7 +108,7 @@ test('agent stream budget helpers reject malformed budget fields', () => {
 
 test('agent config snapshot normalizes diagnostics without leaking fallback keys', () => {
   const snapshot = buildAgentConfigSnapshot(
-    { mode: 'developer', thinking: 'deep', maxSteps: '99' },
+    { mode: 'developer', thinking: 'deep', maxSteps: '99', permissionMode: 'guarded_auto' },
     {
       provider: 'openai',
       temperature: '0.25',
@@ -118,6 +120,7 @@ test('agent config snapshot normalizes diagnostics without leaking fallback keys
   );
 
   assert.equal(snapshot.developerMode, true);
+  assert.equal(snapshot.permissionMode, 'guarded_auto');
   assert.equal(snapshot.verify, true);
   assert.equal(snapshot.maxSteps, 40);
   assert.equal(snapshot.temperature, 0.25);
@@ -128,15 +131,42 @@ test('agent config snapshot normalizes diagnostics without leaking fallback keys
   assert.equal(secondFallback.hasKey, false);
 });
 
+test('agent config snapshot normalizes legacy permission flags and keeps unknown modes fail-closed', () => {
+  assert.equal(buildAgentConfigSnapshot({ autoApprove: true }, {}).permissionMode, 'guarded_auto');
+  const legacyPlan = buildAgentConfigSnapshot({ autoApprove: true, planMode: true }, {});
+  assert.equal(legacyPlan.permissionMode, 'plan');
+  assert.equal(legacyPlan.planMode, true);
+
+  const explicitPlan = buildAgentConfigSnapshot({ permissionMode: 'plan' }, {});
+  assert.equal(explicitPlan.permissionMode, 'plan');
+  assert.equal(explicitPlan.planMode, true);
+
+  const unknown = buildAgentConfigSnapshot({ permissionMode: 'invalid', planMode: true }, {});
+  assert.equal(unknown.permissionMode, 'manual');
+  assert.equal(unknown.planMode, false);
+});
+
 test('agent resume helper trims resume ids and keeps seeded ids deterministic', () => {
-  const resumed = resolveAgentRunStart({ body: { resumeRunId: ' run_resume_123 ' }, runStoreRoot: null });
+  const resumed = resolveAgentRunStart({
+    body: { resumeRunId: ' run_resume_123 ' },
+    runStoreRoot: null,
+    requestContext: requestContext(),
+  });
   assert.equal(resumed.runId, 'run_resume_123');
   assert.equal(resumed.resumed, true);
   assert.equal(resumed.checkpointer, null);
   assert.equal(resumed.resumeState, null);
 
-  const seededA = resolveAgentRunStart({ body: { resumeRunId: ['ignored'], runSeed: ' fixed-seed ' }, runStoreRoot: null });
-  const seededB = resolveAgentRunStart({ body: { runSeed: 'fixed-seed' }, runStoreRoot: null });
+  const seededA = resolveAgentRunStart({
+    body: { resumeRunId: ['ignored'], runSeed: ' fixed-seed ' },
+    runStoreRoot: null,
+    requestContext: requestContext(),
+  });
+  const seededB = resolveAgentRunStart({
+    body: { runSeed: 'fixed-seed' },
+    runStoreRoot: null,
+    requestContext: requestContext(),
+  });
   assert.equal(seededA.resumed, false);
   assert.equal(seededA.runId, seededB.runId);
   assert.equal(seededA.startedAt.toISOString(), seededB.startedAt.toISOString());
@@ -158,8 +188,8 @@ test('recordAgentRun normalizes provider, writes index summary, and swallows rec
     startedAt: new Date('2026-01-01T00:00:00Z'),
     status: 'succeeded',
     prompt: 'hello',
-    outcome: { text: 'done', steps: [{ tool: 'Read' }], usage: { total_tokens: 3 } },
-    events: [{ type: 'done' }],
+    outcome: { text: 'done', steps: [{ tool: 'Read', args: { apiKey: 'dummy-step-secret' } }], usage: { total_tokens: 3 } },
+    events: [{ type: 'done', metadata: { authorization: 'Bearer dummy-event-secret' } }],
   });
 
   const record = readRunRecord(runStoreRoot, 'run_agent_stream_helper');
@@ -167,6 +197,9 @@ test('recordAgentRun normalizes provider, writes index summary, and swallows rec
   assert.equal(savedRecord.provider, 'openai-compatible');
   const result = recordValue(savedRecord.result, 'saved run result');
   assert.equal(stringField(result, 'text'), 'done');
+  assert.equal(JSON.stringify(savedRecord).includes('dummy-step-secret'), false);
+  assert.equal(JSON.stringify(savedRecord).includes('dummy-event-secret'), false);
+  assert.match(JSON.stringify(savedRecord), /REDACTED/);
   assert.equal(summaries.length, 1);
   const summary = recordValue(present(summaries[0], 'index summary'), 'index summary');
   assert.equal(stringField(summary, 'provider'), 'openai-compatible');
@@ -202,6 +235,21 @@ test('recordAgentRun normalizes provider, writes index summary, and swallows rec
   }));
 });
 
+test('agent stream event sanitization redacts secrets before SSE and run capture', () => {
+  const sanitized = sanitizeAgentEventData({
+    name: 'Shell',
+    args: {
+      command: 'echo safe',
+      apiKey: 'dummy-api-secret',
+      nested: { Authorization: 'Bearer dummy-auth-secret' },
+    },
+  });
+
+  assert.equal(JSON.stringify(sanitized).includes('dummy-api-secret'), false);
+  assert.equal(JSON.stringify(sanitized).includes('dummy-auth-secret'), false);
+  assert.equal(recordValue(recordValue(sanitized.args, 'args').nested, 'nested').Authorization, '[REDACTED]');
+});
+
 test('streamAgentChat returns 404 for a missing resume checkpoint without recording a run', async () => {
   const root = tmp();
   const response = new CapturingAgentResponse();
@@ -232,34 +280,38 @@ test('streamAgentChat cancels runs and pending approvals when the client disconn
   const controller = new AbortController();
   const cancelled: string[] = [];
   const done: string[] = [];
-  const approvalCancels: string[] = [];
+  const cancellationContexts: unknown[] = [];
+  const approvalCancels: Array<{ runId: string; context: unknown }> = [];
 
   await streamAgentChat({
     response,
     requestContext: requestContext(),
     body: { prompt: 'cancel me', runSeed: 'agent-stream-cancel-seed' },
-    kimiConfig: { provider: 'test-provider', model: 'test-model', timeoutMs: 1000 },
+    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, model: 'test-model', timeoutMs: 1000 },
     trustedRoot: root,
     runStoreRoot: root,
     runsIndex,
     cancellation: {
-      register() {
+      register(_runId: string, context?: unknown) {
+        cancellationContexts.push(context);
         return { signal: controller.signal };
       },
-      cancel(runId: string) {
+      cancel(runId: string, _reason?: string, context?: unknown) {
         cancelled.push(runId);
+        cancellationContexts.push(context);
         controller.abort(new Error('client disconnected'));
       },
-      done(runId: string) {
+      done(runId: string, context?: unknown) {
         done.push(runId);
+        cancellationContexts.push(context);
       },
     },
     approvals: {
       request() {
         throw new Error('approval request should not be reached');
       },
-      cancelByRun(runId: string) {
-        approvalCancels.push(runId);
+      cancelByRun(runId: string, context?: unknown) {
+        approvalCancels.push({ runId, context });
       },
     },
     modelCall: async (args: Record<string, unknown>) => {
@@ -274,13 +326,35 @@ test('streamAgentChat cancels runs and pending approvals when the client disconn
   const start = ssePayload(streamText, 'start');
   const runId = stringField(start, 'runId');
   assert.deepEqual(cancelled, [runId]);
-  assert.deepEqual(approvalCancels, [runId]);
+  assert.deepEqual(cancellationContexts, [requestContext(), requestContext(), requestContext()]);
+  assert.deepEqual(approvalCancels, [{ runId, context: requestContext() }]);
   assert.deepEqual(done, [runId]);
   assert.equal(ssePayload(streamText, 'cancelled').runId, runId);
   assert.equal(streamText.includes('event: done'), false);
   assert.equal(summaries.length, 1);
   const record = recordValue(present(readRunRecord(root, runId), 'cancelled run record'), 'cancelled run record');
   assert.equal(record.status, 'cancelled');
+});
+
+test('disconnect approval cleanup reports synchronous and asynchronous failures without rejecting', async () => {
+  const errors: string[] = [];
+  const request = () => ({ id: 'unused', promise: Promise.resolve('reject') });
+
+  assert.doesNotThrow(() => cancelApprovalsForDisconnectedRun({
+    request,
+    cancelByRun: () => { throw new Error('synchronous cleanup failure'); },
+  }, 'run_sync_failure', requestContext(), (message) => errors.push(message)));
+
+  assert.doesNotThrow(() => cancelApprovalsForDisconnectedRun({
+    request,
+    cancelByRun: async () => { throw new Error('asynchronous cleanup failure'); },
+  }, 'run_async_failure', requestContext(), (message) => errors.push(message)));
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(errors, [
+    'synchronous cleanup failure',
+    'asynchronous cleanup failure',
+  ]);
 });
 
 test('streamAgentChat emits safe error events and still records failed runs', async () => {
@@ -292,7 +366,7 @@ test('streamAgentChat emits safe error events and still records failed runs', as
     response,
     requestContext: requestContext(),
     body: { prompt: 'fail me', runSeed: 'agent-stream-failure-seed' },
-    kimiConfig: { provider: 'test-provider', model: 'test-model', timeoutMs: 1000 },
+    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, model: 'test-model', timeoutMs: 1000 },
     trustedRoot: root,
     runStoreRoot: root,
     runsIndex,

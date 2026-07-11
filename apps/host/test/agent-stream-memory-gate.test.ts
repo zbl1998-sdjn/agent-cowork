@@ -7,6 +7,8 @@ import { isMemoryActive, writeMemorySettings } from '../src/memory/memory-contro
 import type { AgentModelCallInput } from './helpers/agent-stream.js';
 import { noopKimiChatRunner, postAgentStream, readAgentStream } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
+const owner = { tenantId: 'tenant_local', userId: 'user_local' };
 
 // 记忆总闸的判定真值表:启用且未暂停未隐身才算活跃(读注入/写回写共用)。
 test('isMemoryActive is true only when enabled and not paused and not incognito', () => {
@@ -41,7 +43,7 @@ test('E2E agent run injects layered memory when memory is active (control)', asy
   const root = tempRoot('kcw-mem-active-');
   seedProjectMemory(root);
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });
@@ -58,9 +60,9 @@ test('E2E agent run does NOT inject layered memory when memory is paused', async
   const root = tempRoot('kcw-mem-paused-');
   seedProjectMemory(root);
   // 用户在 UI 里把记忆暂停:实时对话应既不注入记忆(也不回写)。
-  writeMemorySettings(root, { paused: true });
+  writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });
@@ -84,7 +86,7 @@ test('E2E recalled memory is redacted before injection (read-side DLP)', async (
     'utf8',
   );
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });

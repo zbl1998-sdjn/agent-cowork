@@ -12,6 +12,7 @@ export type WorkspaceTreeOptions = {
   includeDirectories?: boolean;
   maxDepth?: number;
   maxEntries?: number;
+  includeEntry?: (fullPath: string, kind: 'file' | 'directory') => boolean;
 };
 export type WorkspaceDirectoryEntry = { path: string; fullPath: string; kind: 'directory' };
 export type WorkspaceFileEntry = { path: string; fullPath: string; kind: 'file'; size: number; mtimeMs: number };
@@ -63,6 +64,7 @@ export function listWorkspaceTree(trustedRoot: string, options: WorkspaceTreeOpt
       }
 
       if (entry.isDirectory()) {
+        if (options.includeEntry && !options.includeEntry(next, 'directory')) continue;
         if (depth + 1 <= maxDepth) stack.push({ absPath: next, depth: depth + 1 });
         continue;
       }
@@ -70,6 +72,7 @@ export function listWorkspaceTree(trustedRoot: string, options: WorkspaceTreeOpt
       if (!includeFiles || !entry.isFile()) {
         continue;
       }
+      if (options.includeEntry && !options.includeEntry(next, 'file')) continue;
       if (results.length >= maxEntries) break;
 
       try {

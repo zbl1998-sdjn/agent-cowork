@@ -184,7 +184,15 @@ export async function handleVizRoutes({
         });
         let artifact;
         try {
-          artifact = buildLiveArtifact(omitUndefined({ trustedRoot, id: approvalPlan.id, title: viz.title, viz, dataSource: input.dataSource, securityMode }));
+          artifact = buildLiveArtifact(omitUndefined({
+            trustedRoot,
+            id: approvalPlan.id,
+            title: viz.title,
+            viz,
+            dataSource: input.dataSource,
+            securityMode,
+            owner: requestContext,
+          }));
         } catch (err) {
           sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
           return;
@@ -228,7 +236,7 @@ export async function handleVizRoutes({
     if (!id) return true;
     try {
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
-      const html = readLiveArtifactHtml({ trustedRoot, id });
+      const html = readLiveArtifactHtml({ trustedRoot, id, context: requestContext });
       sendHtml(response, 200, html);
     } catch (err) {
       sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });

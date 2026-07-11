@@ -63,6 +63,7 @@ export function createCheckpointRecorder({
       try {
         checkpointer.save({
           runId,
+          owner: context,
           step,
           phase,
           messages,

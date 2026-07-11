@@ -87,7 +87,6 @@ export type RecordReader = (runId: string) => RunRecord | null | Promise<RunReco
 
 export type CaptureRunOptions = {
   runId?: unknown;
-  runStoreRoot?: string | null;
   runsIndex?: RunsIndexLike | null;
   recordReader?: RecordReader | null;
 };

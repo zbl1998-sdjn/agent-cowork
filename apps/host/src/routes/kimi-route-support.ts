@@ -2,6 +2,8 @@
 // ---------------------------------------------------------------------------
 // 职责:封装 Kimi 配置响应、provider 归一化、运行记录落盘与索引,保持主路由只做分支编排。
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
+import { AtRestKeyError } from '../security/at-rest.js';
+import { isEgressAuditFailure } from '../security/egress-gateway.js';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { KimiApiConfig } from '../kimi/api-runner-config.js';
@@ -133,6 +135,7 @@ export async function runKimiAndRecord({
       provider: modelProvider(state.kimiApiConfig),
       userAgent: state.kimiApiConfig.userAgent,
       temperature: state.kimiApiConfig.temperature,
+      securityMode: state.kimiApiConfig.securityMode,
       fetchImpl: state.config.fetchImpl,
     });
     const finishedAt = new Date();
@@ -171,6 +174,8 @@ export async function runKimiAndRecord({
         : { enabled: false },
     });
   } catch (err) {
+    if (err instanceof AtRestKeyError) throw err;
+    if (isEgressAuditFailure(err)) throw err;
     const error = asRouteError(err);
     const finishedAt = new Date();
     const runPath = writeRunRecord(state.runStoreRoot, {

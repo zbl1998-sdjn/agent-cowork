@@ -6,12 +6,20 @@ import test from 'node:test';
 import { z } from 'zod';
 import { createHookEngine, loadHooksConfig } from '../src/runtime/hooks.js';
 import { runAgentChat, buildAgentToolset } from '../src/kimi/agent-runner.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { AgentDeps } from '../src/kimi/agent/toolset-builder.js';
 import type { AgentTool, HookEngine as AgentHookEngine } from '../src/kimi/agent/approval-gate.js';
 import type { HookEngine, HookResult, SandboxLike } from '../src/runtime/hooks.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-hk-')); }
+
+type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
+const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
+
+function linkDirectory(target: string, linkPath: string): void {
+  try { symlinkSync(target, linkPath, 'junction'); } catch { symlinkSync(target, linkPath, 'dir'); }
+}
 
 const blockedStepSchema = z.object({
   tool: z.literal('Danger'),
@@ -124,6 +132,7 @@ test('loadHooksConfig executes normalized hook commands through the sandbox', as
     cwd: '',
     timeoutMs: 15000,
     network: false,
+    workspaceWrite: false,
     env: {},
     maxOutputBytes: 262144,
   });
@@ -150,6 +159,80 @@ test('loadHooksConfig ignores malformed config and no-sandbox hooks fail closed'
   assert.deepEqual(await engine.run('pre_tool', { name: 'Anything' }), []);
 });
 
+test('loadHooksConfig rejects a default .AgentCowork junction outside trustedRoot', () => {
+  const root = tmp();
+  const outside = tmp();
+  fs.writeFileSync(path.join(outside, 'hooks.json'), JSON.stringify([
+    { event: 'pre_tool', command: 'node outside' },
+  ]));
+  linkDirectory(outside, path.join(root, '.AgentCowork'));
+
+  assert.throws(
+    () => loadHooksConfig({ trustedRoot: root, sandbox: null }),
+    /symbolic link|junction|reparse|managed directory/i,
+  );
+});
+
+test('loadHooksConfig preserves an explicit external managed config path', () => {
+  const trustedRoot = tmp();
+  const external = tmp();
+  const configPath = path.join(external, 'hooks.json');
+  fs.writeFileSync(configPath, JSON.stringify([
+    { event: 'pre_tool', command: 'node external' },
+  ]));
+
+  assert.equal(loadHooksConfig({ trustedRoot, configPath, sandbox: null }).hookCount(), 1);
+});
+
+test('loadHooksConfig revalidates its directory after a runtime swap during read', () => {
+  const root = tmp();
+  const outside = tmp();
+  const appDir = path.join(root, '.AgentCowork');
+  const displaced = path.join(root, '.AgentCowork-original');
+  const configPath = path.join(appDir, 'hooks.json');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify([{ event: 'pre_tool', command: 'node original' }]));
+  fs.writeFileSync(path.join(outside, 'hooks.json'), JSON.stringify([{ event: 'pre_tool', command: 'node outside' }]));
+  const originalReadFileSync = fs.readFileSync;
+  let swapped = false;
+  fs.readFileSync = ((...args: unknown[]) => {
+    if (!swapped && path.resolve(String(args[0])) === path.resolve(configPath)) {
+      fs.renameSync(appDir, displaced);
+      linkDirectory(outside, appDir);
+      swapped = true;
+    }
+    return Reflect.apply(originalReadFileSync, fs, args);
+  }) as typeof fs.readFileSync;
+
+  try {
+    assert.throws(
+      () => loadHooksConfig({ trustedRoot: root, sandbox: null }),
+      /changed|symbolic link|junction|reparse|managed directory/i,
+    );
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
+  assert.equal(swapped, true, 'test must exercise the runtime directory swap');
+});
+
+test('loadHooksConfig never follows a hook-config file symlink', (t) => {
+  const root = tmp();
+  const appDir = path.join(root, '.AgentCowork');
+  const outside = path.join(tmp(), 'outside-hooks.json');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(outside, JSON.stringify([{ event: 'pre_tool', command: 'node outside' }]));
+  try {
+    symlinkSync(outside, path.join(appDir, 'hooks.json'), 'file');
+  } catch (error) {
+    t.skip(`file symlink unavailable: ${String(error)}`);
+    return;
+  }
+  assert.throws(
+    () => loadHooksConfig({ trustedRoot: root, sandbox: null }),
+    /symbolic link|reparse/i,
+  );
+});
+
 test('runAgentChat: a pre_tool hook blocks the tool (not executed)', async () => {
   const root = tmp();
   let ran = false;
@@ -157,7 +240,7 @@ test('runAgentChat: a pre_tool hook blocks the tool (not executed)', async () =>
   let n = 0;
   const modelCall: ModelCall = async () => { n += 1; return n === 1 ? { content: '', tool_calls: [{ id: 'c1', function: { name: 'Danger', arguments: '{}' } }] } : { content: '完成。' }; };
   const hooks = createHookEngine({ hooks: [{ event: 'pre_tool', tool: 'Danger', handler: async () => ({ block: true, reason: '策略禁止' }) }] });
-  const out = await runAgentChat({ prompt: 'x', kimiConfig: { model: 'fake' }, trustedRoot: root, runStoreRoot: path.join(root, 'runs'), tools, modelCall, hooks: asAgentHookEngine(hooks) });
+  const out = await runAgentChat({ prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, runStoreRoot: path.join(root, 'runs'), tools, modelCall, hooks: asAgentHookEngine(hooks) });
   assert.equal(ran, false, 'blocked tool must not run');
   assert.ok(out.steps.some((step) => {
     const parsed = blockedStepSchema.safeParse(step);
@@ -171,12 +254,64 @@ test('Agent tool spawns a nested sub-agent and returns its result', async () => 
   const subModel: ModelCall = async () => ({ content: '子任务完成' });
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: {} },
-    agentDeps: { kimiConfig: { model: 'fake' }, modelCall: subModel, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
+    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: subModel, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
     runDeps: { runStoreRoot: path.join(root, 'runs') },
   });
   const agentTool = toolByName(tools, 'Agent');
   const res = agentResultSchema.parse(await agentTool.handler({ task: '整理一下' }));
   assert.equal(res.text, '子任务完成');
+});
+
+test('Agent child inherits plan mode and cannot write before approving its own plan', async () => {
+  const root = tmp();
+  let calls = 0;
+  let approvalRequests = 0;
+  const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
+  const subModel: ModelCall = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return {
+        content: '',
+        tool_calls: [{
+          id: 'c1',
+          function: {
+            name: 'Write',
+            arguments: JSON.stringify({ path: 'nested.txt', content: 'must-not-write' }),
+          },
+        }],
+      };
+    }
+    return { content: '仍在规划。' };
+  };
+  const tools = buildAgentToolset({
+    ctx: { trustedRoot: root, context: {} },
+    agentDeps: {
+      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelCall: subModel,
+      approvals: {
+        request: () => {
+          approvalRequests += 1;
+          return { id: 'approval_write', promise: Promise.resolve('once') };
+        },
+      },
+      autoApprove: true,
+      planMode: true,
+      hooks: null,
+      emit: (type, payload) => { events.push({ type, payload }); },
+    },
+    runDeps: { runStoreRoot: path.join(root, 'runs') },
+  });
+
+  const res = agentResultSchema.parse(await toolByName(tools, 'Agent').handler({ task: '写 nested.txt' }));
+
+  assert.equal(res.text, '仍在规划。');
+  assert.ok(events.some((event) => (
+    event.type === 'tool_result'
+    && event.payload.name === 'Write'
+    && event.payload.status === 'blocked'
+  )), 'nested Write must be blocked by the plan gate');
+  assert.equal(approvalRequests, 0, 'plan gate must run before ordinary tool approval');
+  assert.equal(fs.existsSync(path.join(root, 'nested.txt')), false, 'nested write must remain blocked');
 });
 
 test('AgentParallel tool dispatches nested sub-agents concurrently and summarizes results', async () => {
@@ -192,7 +327,7 @@ test('AgentParallel tool dispatches nested sub-agents concurrently and summarize
   };
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: {} },
-    agentDeps: { kimiConfig: { model: 'fake' }, modelCall: async () => ({}), runAgentChat: runNestedAgentChat, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
+    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), runAgentChat: runNestedAgentChat, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
     runDeps: { runStoreRoot: path.join(root, 'runs') },
   });
   const parallelTool = toolByName(tools, 'AgentParallel');

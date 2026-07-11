@@ -14,10 +14,15 @@ import { createGitReadOnlyBuiltinTools } from './dev/git.js';
 import { profileDataFile } from './data/profile.js';
 import { analyzeDataFile } from './data/report.js';
 import { createDataChartArtifact } from './data/artifact.js';
-import { argsRecord, contextRecord, parseBuiltinToolsOptions } from './builtin-tool-options.js';
+import { argsRecord, contextRecord, parseBuiltinToolArgs, parseBuiltinToolsOptions } from './builtin-tool-options.js';
+import { builtinArtifactGuards } from './builtin-artifact-guards.js';
 import { omitUndefined } from '../util/object.js';
 import type { BuiltinToolsOptionsInput } from './builtin-tool-options.js';
 import type { ToolEntry } from './tool-registry.js';
+
+const DATA_FILE_ARGS = ['path', 'maxRows', 'maxBytes'] as const;
+const DATA_CHART_ARGS = ['path', 'title', 'id', 'maxRows', 'maxBytes'] as const;
+const ORGANIZE_ARGS = ['files', 'mode', 'targetDir', 'renamePrefix'] as const;
 
 /** 按运行环境组装全部内置工具描述符。 */
 export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): ToolEntry[] {
@@ -100,13 +105,15 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
     },
     handler: async (rawArgs, rawCtx) => {
       const args = argsRecord(rawArgs);
-      const ctx = contextRecord(rawCtx);
+      const guard = builtinArtifactGuards(rawCtx);
+      const { ctx } = guard;
       return searchWorkspaceIndex({
         root: ctx.trustedRoot,
         query: args.query,
         limit: args.limit,
         maxFiles: args.maxFiles,
         maxFileBytes: args.maxFileBytes,
+        includeFile: guard.include,
       });
     },
   });
@@ -123,8 +130,14 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       type: 'object',
       properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
+      additionalProperties: false,
     },
-    handler: async (rawArgs, rawCtx) => profileDataFile(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
+    handler: async (rawArgs, rawCtx) => {
+      const args = parseBuiltinToolArgs(rawArgs, DATA_FILE_ARGS);
+      const guard = builtinArtifactGuards(rawCtx);
+      guard.inspect(args.path);
+      return profileDataFile(omitUndefined({ ...args, trustedRoot: guard.ctx.trustedRoot }));
+    },
   });
 
   tools.push({
@@ -137,8 +150,14 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       type: 'object',
       properties: { path: { type: 'string' }, maxRows: { type: 'number' }, maxBytes: { type: 'number' } },
       required: ['path'],
+      additionalProperties: false,
     },
-    handler: async (rawArgs, rawCtx) => analyzeDataFile(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
+    handler: async (rawArgs, rawCtx) => {
+      const args = parseBuiltinToolArgs(rawArgs, DATA_FILE_ARGS);
+      const guard = builtinArtifactGuards(rawCtx);
+      guard.inspect(args.path);
+      return analyzeDataFile(omitUndefined({ ...args, trustedRoot: guard.ctx.trustedRoot }));
+    },
   });
 
   tools.push({
@@ -158,8 +177,18 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
         maxBytes: { type: 'number' },
       },
       required: ['path'],
+      additionalProperties: false,
     },
-    handler: async (rawArgs, rawCtx) => createDataChartArtifact(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
+    handler: async (rawArgs, rawCtx) => {
+      const args = parseBuiltinToolArgs(rawArgs, DATA_CHART_ARGS);
+      const guard = builtinArtifactGuards(rawCtx);
+      guard.inspect(args.path);
+      return createDataChartArtifact(omitUndefined({
+        ...args,
+        trustedRoot: guard.ctx.trustedRoot,
+        context: guard.ctx.context,
+      }));
+    },
   });
 
   tools.push({
@@ -177,8 +206,14 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
         renamePrefix: { type: 'string' },
       },
       required: ['files'],
+      additionalProperties: false,
     },
-    handler: async (rawArgs, rawCtx) => planFileOrganization(omitUndefined({ trustedRoot: contextRecord(rawCtx).trustedRoot, ...argsRecord(rawArgs) })),
+    handler: async (rawArgs, rawCtx) => {
+      const args = parseBuiltinToolArgs(rawArgs, ORGANIZE_ARGS);
+      const guard = builtinArtifactGuards(rawCtx);
+      guard.inspectFiles(args.files);
+      return planFileOrganization(omitUndefined({ ...args, trustedRoot: guard.ctx.trustedRoot }));
+    },
   });
 
   for (const recipe of listRecipes()) {
@@ -190,7 +225,9 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
       mutating: false,
       handler: async (rawArgs, rawCtx) => {
         const args = argsRecord(rawArgs);
-        const ctx = contextRecord(rawCtx);
+        const guard = builtinArtifactGuards(rawCtx);
+        const { ctx } = guard;
+        guard.inspectFiles(args.files);
         return await runRecipe(omitUndefined({
           recipeId: recipe.id,
           trustedRoot: ctx.trustedRoot || '',

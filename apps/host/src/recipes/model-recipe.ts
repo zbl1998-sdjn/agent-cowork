@@ -9,6 +9,7 @@ import { createDocxDocument, createPptxPresentation, createPdfDocument } from '.
 import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
 import type { FileOperationInput } from '../workspace/file-operations.js';
 import type { ModelConfig } from '../kimi/provider/types.js';
+import { isEgressAuditFailure } from '../security/egress-gateway.js';
 import {
   callModelForJson, extractMeetingActions, extractSummary,
   normalizeClusters, normalizeContract, normalizeWeekly, normalizeTable,
@@ -228,5 +229,10 @@ export async function buildAiRecipeOperations(args: AiRecipeArgs): Promise<FileO
   if (!args.modelConfig) return null;
   const builder = AI_RECIPE_BUILDERS[args.recipe.id];
   if (!builder) return null;
-  try { return await builder(args); } catch { return null; }
+  try {
+    return await builder(args);
+  } catch (error) {
+    if (isEgressAuditFailure(error)) throw error;
+    return null;
+  }
 }

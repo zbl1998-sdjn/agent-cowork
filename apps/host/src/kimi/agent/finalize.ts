@@ -6,6 +6,8 @@
 // 导出:addUsage / summarizeBeforeToolBudget / summarizeAfterBudget / applyStaticBackstop / sse
 import { callModelResilient } from './model-resilience.js';
 import { omitUndefined } from '../../util/object.js';
+import { isEgressAuditFailure } from '../../security/egress-gateway.js';
+import type { TrustedInProcessModelCallCapability } from './model-call-capability.js';
 
 // cached_tokens:Kimi/OpenAI 顶层缓存命中输入 token;prompt_cache_hit_tokens:DeepSeek 同义字段。两者兼容读取。
 export type Usage = { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown; cached_tokens?: unknown; prompt_cache_hit_tokens?: unknown };
@@ -20,6 +22,8 @@ export type SummarizeOptions = {
   signal?: AbortSignal | null;
   messages: Message[];
   modelCall: ModelCall;
+  trustedRoot?: string;
+  inProcessModelCallCapability?: TrustedInProcessModelCallCapability;
   kimiConfig?: Record<string, unknown>;
   fetchImpl?: unknown;
   emit: Emit;
@@ -45,6 +49,8 @@ async function summarizeWithoutTools({
   signal,
   messages,
   modelCall,
+  trustedRoot,
+  inProcessModelCallCapability,
   kimiConfig,
   fetchImpl,
   emit,
@@ -63,17 +69,20 @@ async function summarizeWithoutTools({
       tools: [],
       kimiConfig,
       fetchImpl,
+      trustedRoot,
       onContent: emitToken,
       onReasoning: () => undefined,
     }, omitUndefined({
       kimiConfig,
+      inProcessModelCallCapability,
       timeoutMs,
       onFallback: (event: ModelFallbackEvent) => emit('model_fallback', event),
     }));
     const result = (wrap || {}) as ModelResult;
     addUsage(usageTotals, result.usage);
     return result.content || '';
-  } catch {
+  } catch (error) {
+    if (isEgressAuditFailure(error)) throw error;
     return '';
   }
 }

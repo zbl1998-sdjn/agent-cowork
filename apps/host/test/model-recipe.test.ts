@@ -1,7 +1,14 @@
 // 模型驱动 recipe 提取(AI 办公助手 slice 1)——纯解析逻辑单测 + 真实 Ollama e2e(可跳过)
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters, normalizeWeekly, normalizeTable } from '../src/recipes/model-recipe.js';
+import { callModelForJson, extractJson, normalizeActionItems, extractMeetingActions, normalizeSummary, normalizeContract, normalizeClusters, normalizeWeekly, normalizeTable } from '../src/recipes/model-recipe.js';
+
+function tempRoot(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-model-recipe-'));
+}
 
 test('extractJson: 容忍 ```json 包裹、前后噪声、括号配平', () => {
   assert.deepEqual(extractJson('```json\n[{"a":1}]\n```'), [{ a: 1 }]);
@@ -49,14 +56,14 @@ test('extractMeetingActions: 空源直接返回 null(不调模型)', async () =>
 
 test('extractMeetingActions: 注入的 modelCall 返回 JSON → 结构化行动项', async () => {
   const fakeCall = async () => ({ content: '[{"owner":"张三","task":"联调登录","due":"周三"}]' });
-  const r = await extractMeetingActions({ source: '会议记录...', modelConfig: { provider: 'x', model: 'y', baseUrl: 'z' }, modelCall: fakeCall as never });
+  const r = await extractMeetingActions({ source: '会议记录...', trustedRoot: tempRoot(), modelConfig: { provider: 'openai/local', model: 'y', baseUrl: 'http://127.0.0.1:11434/v1' }, modelCall: fakeCall as never });
   assert.equal(r?.length, 1);
   assert.equal(r?.[0]?.owner, '张三');
 });
 
 test('extractMeetingActions: modelCall 抛错 → null(调用方回退模板)', async () => {
   const boom = async () => { throw new Error('model down'); };
-  const r = await extractMeetingActions({ source: '会议记录...', modelConfig: { provider: 'x', model: 'y', baseUrl: 'z' }, modelCall: boom as never });
+  const r = await extractMeetingActions({ source: '会议记录...', trustedRoot: tempRoot(), modelConfig: { provider: 'openai/local', model: 'y', baseUrl: 'http://127.0.0.1:11434/v1' }, modelCall: boom as never });
   assert.equal(r, null);
 });
 
@@ -64,22 +71,35 @@ test('extractMeetingActions: air_gap/local_strict 拦截云端出网,不调用�
   let called = false;
   const spy = async () => { called = true; return { content: '[{"owner":"x","task":"y","due":"z"}]' }; };
   const cloudConfig = { provider: 'kimi-api', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.7-code' };
+  const trustedRoot = tempRoot();
 
   called = false;
-  const airGap = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy as never });
+  const airGap = await extractMeetingActions({ source: '张三负责登录。', trustedRoot, modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy as never });
   assert.equal(called, false, 'air_gap 下不得实际调用模型(即使 baseUrl 是云端)');
   assert.equal(airGap, null);
 
   called = false;
-  const strict = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy as never });
+  const strict = await extractMeetingActions({ source: '张三负责登录。', trustedRoot, modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy as never });
   assert.equal(called, false, 'local_strict 下不得实际调用云端模型');
   assert.equal(strict, null);
 
-  // 对照组:非严格模式(controlled_hybrid)不能被误伤,出网+提取应正常工作。
+  // controlled_hybrid 也必须先取得真实审批,不能把 needs_approval 当作 allow。
   called = false;
-  const hybrid = await extractMeetingActions({ source: '张三负责登录。', modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy as never });
-  assert.equal(called, true, 'controlled_hybrid 下应正常允许出网(不能误伤)');
-  assert.equal(hybrid?.length, 1);
+  const hybrid = await extractMeetingActions({ source: '张三负责登录。', trustedRoot, modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy as never });
+  assert.equal(called, false, 'controlled_hybrid 未审批时不得实际调用云端模型');
+  assert.equal(hybrid, null);
+
+  await assert.rejects(
+    () => callModelForJson({
+      system: 'return json',
+      user: 'customer data',
+      modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' },
+      modelCall: spy as never,
+      trustedRoot,
+    }),
+    (error: unknown) => Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'EGRESS_APPROVAL_REQUIRED'),
+  );
+  assert.equal(called, false, '审批缺失错误必须发生在 modelCall 之前');
 });
 
 test('normalizeSummary: 字段别名归一 + 全空返回 null', () => {

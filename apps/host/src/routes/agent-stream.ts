@@ -7,6 +7,7 @@
 import { loadLayeredMemory } from '../memory/memory-layers.js';
 import { isMemoryActiveForRoot } from '../memory/memory-control.js';
 import { redactText } from '../security/redaction.js';
+import { resolvePermissionMode, shouldAutoApproveLowRisk } from '../security/permission-mode.js';
 import { loadHooksConfig } from '../runtime/hooks.js';
 import { getActionAuditBus } from '../runtime/action-audit.js';
 import { createRunTrace } from '../runtime/run-trace.js';
@@ -21,39 +22,36 @@ import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
 import { recordAgentRun } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
-import { appendConversationTurn, formatRecentTurns, readRecentTurns } from '../memory/conversation-buffer.js';
 import { maybeConsolidatePreviousConversation } from '../memory/consolidate-trigger.js';
-import { formatKnowledgeForInjection, recallRelevantKnowledge } from '../memory/knowledge-recall.js';
 import type { ConsolidateCallJson } from '../memory/consolidate.js';
 import { callModelForJson, type ModelCaller } from '../recipes/model-recipe-extract.js';
 import type { ModelConfig } from '../kimi/provider/types.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
+import { cancelApprovalsForDisconnectedRun, type DisconnectApprovalRegistry } from './agent-stream-disconnect.js';
+import { sanitizeAgentEventData } from './agent-stream-events.js';
+import { buildMaseMemoryThread, recallBuiltinAgentMemory, rememberBuiltinConversation } from './agent-stream-memory.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
 import type { ModelCall } from '../kimi/agent/model-resilience.js';
 import type { RunAgentChatOptions } from '../kimi/agent/tool-loop.js';
-import type { RequestContext, ApprovalRegistry as AgentApprovalRegistry } from '../kimi/agent/approval-gate.js';
+import type { RequestContext } from '../kimi/agent/approval-gate.js';
 import type { SandboxLike, SandboxLimits } from '../kimi/agent-tools.js';
 import type { AgentDeps, Scheduler, SkillRegistry, ToolRegistry } from '../kimi/agent/toolset-builder.js';
 import type { RunsIndexLike } from './agent-stream-record.js';
-
 type ResponseLike = HttpResponseLike & {
   write(chunk?: string | Buffer): unknown;
   on?(event: string, listener: () => void): unknown;
 };
-type RequestLike = { on?(event: string, listener: () => void): unknown };
-type RunController = { signal: AbortSignal };
 type CancellationRegistry = {
-  register(runId: string): RunController;
-  cancel(runId: string): unknown;
-  done(runId: string): unknown;
+  register(runId: string, context: RequestContext): { signal: AbortSignal };
+  cancel(runId: string, reason: string, context: RequestContext): unknown;
+  done(runId: string, context: RequestContext): unknown;
 };
 type SkillRegistryLike = SkillRegistry & {
   enabledSkills?: () => Array<{ id: unknown; name: unknown; description?: unknown }>;
 };
-type StreamRequestContext = RequestContext & { traceId?: unknown };
-type ApprovalRegistry = AgentApprovalRegistry & { cancelByRun?: (runId: string) => unknown };
+type StreamRequestContext = RequestContext & { tenantId: string; userId: string; traceId?: unknown };
 type RunEventsLike = { publish(runId: string, event: Record<string, unknown>): unknown };
 type AgentOutcome = { text: string; steps: Array<Record<string, unknown>>; usage?: unknown; stepsExhausted?: boolean; autoContinues?: number };
 export type StreamAgentChatOptions = {
@@ -68,15 +66,16 @@ export type StreamAgentChatOptions = {
   sandbox?: SandboxLike | null;
   sandboxLimits?: SandboxLimits;
   runEvents?: RunEventsLike | null;
-  approvals?: ApprovalRegistry | null;
+  approvals?: DisconnectApprovalRegistry | null;
   toolRegistry?: ToolRegistry | null;
   skillRegistry?: SkillRegistryLike | null;
   userHome?: string;
   cancellation?: CancellationRegistry | null;
-  request?: RequestLike | null;
+  request?: { on?(event: string, listener: () => void): unknown } | null;
   scheduler?: Scheduler | null;
 };
 
+export { cancelApprovalsForDisconnectedRun };
 export async function streamAgentChat({
   response,
   requestContext,
@@ -98,7 +97,10 @@ export async function streamAgentChat({
   scheduler = null,
 }: StreamAgentChatOptions): Promise<void> {
   const body = parseAgentStreamBody(rawBody);
-  const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot });
+  const permissionMode = resolvePermissionMode(body);
+  const autoApprove = shouldAutoApproveLowRisk(permissionMode);
+  const planMode = permissionMode === 'plan';
+  const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot, requestContext });
   const runKimiConfig = applySessionModelConfig(kimiConfig, body);
   if (resumed && !resumeState) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
@@ -111,25 +113,21 @@ export async function streamAgentChat({
     'cache-control': 'no-store',
     connection: 'keep-alive',
   });
-  const controller = cancellation ? cancellation.register(runId) : null;
+  const controller = cancellation ? cancellation.register(runId, requestContext) : null;
   sse(response, 'start', { runId, resumed: !!resumeState });
-
   let finished = false;
   const onDisconnect = () => {
     if (finished) return;
-    if (cancellation) cancellation.cancel(runId);
-    if (approvals && typeof approvals.cancelByRun === 'function') approvals.cancelByRun(runId);
+    if (cancellation) cancellation.cancel(runId, 'client disconnected', requestContext);
+    cancelApprovalsForDisconnectedRun(approvals, runId, requestContext);
   };
   if (response && typeof response.on === 'function') response.on('close', onDisconnect);
   if (request && typeof request.on === 'function') request.on('close', onDisconnect);
-
   const events: Array<Record<string, unknown>> = [];
   const emit = (type: string, data: unknown): void => {
-    const eventData = data && typeof data === 'object' && !Array.isArray(data)
-      ? data as Record<string, unknown>
-      : { value: data };
-    events.push({ type, ...eventData });
-    sse(response, type, data);
+    const safeEventData = sanitizeAgentEventData(data);
+    events.push({ type, ...safeEventData });
+    sse(response, type, safeEventData);
   };
   let outcome: AgentOutcome = { text: '', steps: [] };
   let status = 'succeeded';
@@ -139,7 +137,7 @@ export async function streamAgentChat({
   // MASE 记忆线程:稳定的「按租户/用户/会话」标识,读缝(时间线召回)与写缝(回写)共用。
   // conversationId 由 UI 每个对话窗口透传 → 各窗口对话时间线互不串(窗口隔离);UI 不传时回退 default。
   const maseConversation = String(body.conversationId ?? '').trim().slice(0, 64) || 'default';
-  const maseThread = `cowork:${String(requestContext.tenantId ?? 'default')}:${String(requestContext.userId ?? 'default')}:${maseConversation}`;
+  const maseThread = buildMaseMemoryThread(requestContext, maseConversation);
   try {
     const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext };
     const hooks = loadHooksConfig(omitUndefined({
@@ -162,7 +160,8 @@ export async function streamAgentChat({
         kimiConfig: runKimiConfig,
         modelCall,
         approvals,
-        autoApprove: body.autoApprove === true,
+        autoApprove,
+        planMode,
         hooks,
         emit,
         auditBus,
@@ -175,7 +174,7 @@ export async function streamAgentChat({
     const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
     // 记忆总闸:尊重用户「暂停/隐身/停用」开关(memory-settings)——非活跃时本轮既不注入也不回写,
     // 内置分层记忆与 MASE 记忆桥接对同一个开关保持一致(否则 UI 里的开关对实时对话形同虚设)。
-    memoryActive = isMemoryActiveForRoot(trustedRoot);
+    memoryActive = isMemoryActiveForRoot(trustedRoot, requestContext);
     // 惰性提炼触发:用户切到了另一个对话 → 后台把上一个对话缓冲提炼成主题知识(不 await、
     // 错误吞掉,不加聊天延迟)。提炼的模型调用经 callModelForJson 走 decideEgressPolicy 出站闸门
     // (与对话路径同一策略,机密档下同样拒绝出网);复用本轮 modelCall,缺省回落默认 provider。
@@ -203,18 +202,15 @@ export async function streamAgentChat({
     // 自带对话缓冲兜底:MASE 关闭/无召回时,用本地缓冲的「本会话最近若干轮」喂 session 层,
     // 让不接 MASE 也有多轮连续性(dogfood 2026-07-09 发现:此前同会话记忆 100% 依赖 MASE)。
     // MASE 在且有召回时行为不变(maseSessionMemory 非空优先),避免与 MASE 双重注入。
-    const builtinSessionMemory = memoryActive && !maseSessionMemory
-      ? formatRecentTurns(readRecentTurns(trustedRoot, maseConversation))
-      : '';
-    const sessionMemory = maseSessionMemory || builtinSessionMemory;
+    const { sessionMemory, knowledgeText } = memoryActive
+      ? recallBuiltinAgentMemory({
+        trustedRoot, conversationId: maseConversation, prompt: String(body.prompt || ''),
+        context: requestContext, maseSessionMemory,
+      })
+      : { sessionMemory: '', knowledgeText: '' };
     const memory = memoryActive
       ? loadLayeredMemory(omitUndefined({ trustedRoot, userHome, sessionMemory: sessionMemory || undefined }))
       : { text: '', layers: [] };
-    // 跨会话主题知识召回:按当前 prompt 相关性挑 top-K active 知识注入(过往对话提炼而来)。
-    // 相关性门控——不相关就不注入(读侧防污染);pending 永不召回。让新对话「想起之前说过的」。
-    const knowledgeText = memoryActive
-      ? formatKnowledgeForInjection(recallRelevantKnowledge(trustedRoot, String(body.prompt || '')))
-      : '';
     // 读侧脱敏(纵深防御):记忆注入模型前统一过 redactText——即便历史遗留的旧凭据
     // 已落在 MASE/分层记忆/知识库存储里(写侧 DLP 守卫上线前),也不会被回放进模型上下文、
     // 进而外发给云端 provider。与写侧 carriesSecret 形成"写不进、读不出"双保险。
@@ -229,7 +225,7 @@ export async function streamAgentChat({
     // 收敛行为运行时开关(KCW_STEP_NUDGE_RATIO / KCW_TOOL_DISCIPLINE),默认不改变行为。
     const convergenceOptions = resolveAgentConvergenceOptions();
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
-    const runTrace = createRunTrace(omitUndefined({ runId, runEvents }));
+    const runTrace = createRunTrace(omitUndefined({ runId, runEvents, context: requestContext }));
     const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills()
         .map((sk) => omitUndefined({
@@ -255,8 +251,8 @@ export async function streamAgentChat({
       maxAutoContinues: Math.min(10, Math.max(0, Math.floor(Number(body.maxAutoContinues ?? process.env.KCW_MAX_AUTO_CONTINUE ?? 2) || 0))),
       verify: body.verify === true || body.thinking === 'deep',
       approvals,
-      autoApprove: body.autoApprove === true,
-      planMode: body.planMode === true,
+      autoApprove,
+      planMode,
       developerMode: body.developerMode === true || body.mode === 'developer',
       auditBus,
       emit,
@@ -292,7 +288,7 @@ export async function streamAgentChat({
     sse(response, 'error', { error: friendlyAgentError(err, requestContext), runId });
   } finally {
     finished = true;
-    if (cancellation) cancellation.done(runId);
+    if (cancellation) cancellation.done(runId, requestContext);
     recordAgentRun({
       runStoreRoot,
       runsIndex,
@@ -315,8 +311,7 @@ export async function streamAgentChat({
       // 自带对话缓冲:成功一轮的用户+助手写入本地缓冲(不依赖 MASE),供下一轮 session 层续接
       // (关闭 MASE 也有多轮记忆),并作为对话结束提炼主题知识(Phase 2)的短期来源。
       try {
-        appendConversationTurn(trustedRoot, maseConversation, { role: 'user', text: String(body.prompt || '') });
-        appendConversationTurn(trustedRoot, maseConversation, { role: 'assistant', text: String(outcome.text || '') });
+        rememberBuiltinConversation(trustedRoot, maseConversation, String(body.prompt || ''), outcome.text, requestContext);
       } catch { /* 缓冲写入失败不阻断收尾 */ }
     }
     response.end();

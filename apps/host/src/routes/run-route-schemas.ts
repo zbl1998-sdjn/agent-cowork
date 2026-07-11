@@ -22,7 +22,6 @@ export const runIndexQuerySchema = z.object({
   status: optionalFilterSchema,
   type: optionalFilterSchema,
   recipeId: optionalFilterSchema,
-  userId: optionalFilterSchema,
 });
 
 function zodMessage(err: z.ZodError, fallback: string): string {

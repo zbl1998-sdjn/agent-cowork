@@ -3,6 +3,7 @@
 // 职责:把一次 Agent 运行的「生效配置」归一化成快照,随 run 记录留存,便于回放/审计。
 // 依赖:仅 zod schema 归一化。导出:buildAgentConfigSnapshot。
 import { z } from 'zod';
+import { resolvePermissionMode, type PermissionMode } from '../security/permission-mode.js';
 
 export type FallbackConfigSnapshot = {
   provider: unknown;
@@ -18,6 +19,7 @@ export type AgentConfigSnapshot = {
   timeoutMs: unknown;
   maxTokens: unknown;
   temperature: number | undefined;
+  permissionMode: PermissionMode;
   fallbacks: FallbackConfigSnapshot[];
   planMode: boolean;
   developerMode: boolean;
@@ -61,6 +63,8 @@ const requestSnapshotSchema = z.preprocess(
   objectOrEmpty,
   z.object({
     planMode: z.unknown().optional(),
+    permissionMode: z.unknown().optional(),
+    autoApprove: z.unknown().optional(),
     developerMode: z.unknown().optional(),
     mode: z.unknown().optional(),
     verify: z.unknown().optional(),
@@ -98,6 +102,7 @@ function parseSnapshotConfig(kimiConfig: unknown): z.infer<typeof modelConfigSna
 export function buildAgentConfigSnapshot(body: unknown, kimiConfig: unknown): AgentConfigSnapshot {
   const requestBody = parseSnapshotRequest(body);
   const config = parseSnapshotConfig(kimiConfig);
+  const permissionMode = resolvePermissionMode(requestBody);
   return {
     provider: config.provider,
     baseUrl: config.baseUrl,
@@ -105,8 +110,9 @@ export function buildAgentConfigSnapshot(body: unknown, kimiConfig: unknown): Ag
     timeoutMs: config.timeoutMs,
     maxTokens: config.maxTokens,
     temperature: finiteNumber(config.temperature),
+    permissionMode,
     fallbacks: fallbackSummaries(config.fallbacks),
-    planMode: requestBody.planMode === true,
+    planMode: permissionMode === 'plan',
     developerMode: requestBody.developerMode === true || requestBody.mode === 'developer',
     verify: requestBody.verify === true || requestBody.thinking === 'deep',
     maxSteps: Math.min(Math.max(Number(requestBody.maxSteps) || 20, 1), 40),

@@ -5,6 +5,8 @@ import { writeMemorySettings } from '../src/memory/memory-control.js';
 import type { AgentModelCallInput } from './helpers/agent-stream.js';
 import { noopKimiChatRunner, postAgentStream, readAgentStream } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
+const owner = { tenantId: 'tenant_local', userId: 'user_local' };
 
 // 回归:dogfood 2026-07-09 发现,关闭 MASE 时同会话多轮零对话记忆(Turn2 记不得 Turn1),
 // 因为 host 不加载对话历史、多轮记忆 100% 依赖 MASE。自带对话缓冲修好这条:每轮成功写入缓冲,
@@ -27,7 +29,7 @@ function captureModelCall(): { call: (input: AgentModelCallInput) => Promise<{ c
 test('MASE off: same-conversation turn 2 recalls turn 1 via the built-in conversation buffer', async () => {
   const root = tempRoot('kcw-convmem-');
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const t1 = await postAgentStream(base, { prompt: '我的工位号是 555，请记住。', conversationId: 'conv-X' });
@@ -50,7 +52,7 @@ test('MASE off: same-conversation turn 2 recalls turn 1 via the built-in convers
 test('conversation buffers are isolated: a different conversationId does not leak turn 1', async () => {
   const root = tempRoot('kcw-convmem-iso-');
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '我的暗号是 蓝鲸4242。', conversationId: 'conv-A' }));
@@ -64,9 +66,9 @@ test('conversation buffers are isolated: a different conversationId does not lea
 
 test('paused memory does not buffer or inject prior turns', async () => {
   const root = tempRoot('kcw-convmem-paused-');
-  writeMemorySettings(root, { paused: true });
+  writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '我的工位号是 555。', conversationId: 'conv-P' }));

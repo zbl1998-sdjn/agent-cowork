@@ -9,6 +9,7 @@ import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
 import type { KimiTextResult } from '../src/kimi/api-runner.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-vis-')); }
 
@@ -45,7 +46,7 @@ test('E2E: agent stream attaches uploaded images as multipart image_url content'
   fs.writeFileSync(path.join(root, 'shot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]));
   let captured: ChatMessage[] = [];
   const agentModelCall: ModelCall = async (args) => { captured = messageArray(args.messages); return { content: '我看到一张图片。' }; };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => kimiChatResult(), agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => kimiChatResult(), agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '这是什么图', images: ['shot.png'] }) });
@@ -72,7 +73,7 @@ test('E2E: agent stream without images keeps a plain string user message', async
   const root = tmp();
   let captured: ChatMessage[] = [];
   const agentModelCall: ModelCall = async (args) => { captured = messageArray(args.messages); return { content: 'ok' }; };
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => kimiChatResult(), agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => kimiChatResult(), agentModelCall });
   const base = await bind(server);
   try {
     await (await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '只是文字' }) })).text();

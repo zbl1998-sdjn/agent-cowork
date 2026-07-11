@@ -12,6 +12,7 @@ import { intInRange, resolveGitPath, resolveWorkspace } from '../src/tools/dev/g
 import { canonicalizePath } from '../src/security/path-policy.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { createAgentApprovalRegistry } from './helpers/approvals.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { GitRunResult } from '../src/tools/dev/git-runner.js';
 import type { EmittedEvent } from './helpers/agent.js';
@@ -142,7 +143,7 @@ test('GitCommit is high-risk and goes through approval before mutating', async (
 
   const out = await runAgentChat({
     prompt: 'commit b.txt',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,

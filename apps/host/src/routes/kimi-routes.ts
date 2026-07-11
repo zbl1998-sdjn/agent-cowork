@@ -26,6 +26,7 @@ import {
 } from './kimi-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
+import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type KimiRouteOptions = {
@@ -34,6 +35,7 @@ type KimiRouteOptions = {
   pathname: string;
   requestContext: RequestContext;
   state: HostState;
+  safeTrustedRoot(input?: unknown): string;
 };
 
 function recomputeModelConfigured(config: KimiRouteState['kimiApiConfig']): void {
@@ -50,6 +52,7 @@ export async function handleKimiRoutes({
   pathname,
   requestContext,
   state,
+  safeTrustedRoot,
 }: KimiRouteOptions): Promise<boolean> {
   const routeState = state as KimiRouteState;
 
@@ -59,9 +62,15 @@ export async function handleKimiRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/kimi/config') {
+    if (!requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)) return true;
     await withJsonBody(request, response, async (body) => {
       const input = parseKimiBody(response, kimiConfigBodySchema, body, 'invalid kimi config request');
       if (!input) return;
+      const previousConfig = {
+        ...routeState.kimiApiConfig,
+        fallbacks: routeState.kimiApiConfig.fallbacks.map((fallback) => ({ ...fallback })),
+      };
+      const previousEnabled = routeState.kimiApiEnabled;
       const previousProvider = modelProvider(routeState.kimiApiConfig);
       if (input.clearKey === true) routeState.kimiApiConfig.apiKey = '';
       else if (input.apiKey?.trim()) routeState.kimiApiConfig.apiKey = input.apiKey.trim();
@@ -89,9 +98,11 @@ export async function handleKimiRoutes({
       routeState.recomputeKimiEnabled();
       try {
         routeState.persistKimiConfig();
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err || 'unknown'));
-        sendJson(response, 500, { error: `Failed to persist Kimi config: ${error.message || 'unknown'}` });
+      } catch {
+        Object.assign(routeState.kimiApiConfig, previousConfig);
+        if (previousEnabled === undefined) delete routeState.kimiApiEnabled;
+        else routeState.kimiApiEnabled = previousEnabled;
+        sendJson(response, 500, { error: 'Failed to persist Kimi config' });
         return;
       }
       await sendKimiInfo(response, routeState);
@@ -117,7 +128,7 @@ export async function handleKimiRoutes({
         state: routeState,
         type: isPlan ? 'kimi-plan' : 'kimi-chat',
         mode: isPlan && input.mode === 'code' ? 'code' : isPlan ? 'cowork' : 'chat',
-        trustedRoot: routeState.safeTrustedRoot(input.trustedRoot),
+        trustedRoot: safeTrustedRoot(input.trustedRoot),
         prompt: input.prompt,
         summary: input.summary,
         runner: isPlan ? routeState.kimiPlanRunner : routeState.kimiChatRunner,
@@ -159,7 +170,7 @@ export async function handleKimiRoutes({
           requestContext,
           body: input,
           kimiConfig: routeState.kimiApiConfig,
-          trustedRoot: routeState.safeTrustedRoot(input.trustedRoot),
+          trustedRoot: safeTrustedRoot(input.trustedRoot),
           runStoreRoot: routeState.runStoreRoot,
           runsIndex: routeState.runsIndex,
           runEvents: routeState.runEvents,
@@ -194,9 +205,10 @@ export async function handleKimiRoutes({
         streamRunner: routeState.kimiChatStreamRunner,
         cancellation: routeState.cancellation,
         kimiConfig: routeState.kimiApiConfig,
-        trustedRoot: routeState.safeTrustedRoot(input.trustedRoot),
+        trustedRoot: safeTrustedRoot(input.trustedRoot),
         runStoreRoot: routeState.runStoreRoot,
         runsIndex: routeState.runsIndex,
+        fetchImpl: routeState.config.fetchImpl,
       } as unknown as Parameters<typeof streamChat>[0]);
     });
     return true;

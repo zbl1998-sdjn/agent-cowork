@@ -2,6 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:封装 OAuth 临时会话结构与创建逻辑,避免路由处理函数承载状态拼装细节。
 import type { OAuthPermission } from '../connectors/oauth-permissions.js';
+import { requireIdentityScopeFrom } from '../security/identity-scope.js';
 import type { RequestContext } from './connector-oauth-route-utils.js';
 
 export type ConnectorOAuthSession = {
@@ -10,8 +11,8 @@ export type ConnectorOAuthSession = {
   deviceCode: string;
   scopes: string[];
   permissions?: OAuthPermission[];
-  tenantId?: string;
-  userId?: string;
+  tenantId: string;
+  userId: string;
   expiresAtMs: number;
 };
 
@@ -30,8 +31,6 @@ export function createConnectorOAuthSession({
   requestContext: RequestContext;
   expiresAtMs: number;
 }): ConnectorOAuthSession {
-  const session: ConnectorOAuthSession = { provider: 'github', clientId, deviceCode, scopes, permissions, expiresAtMs };
-  if (requestContext.tenantId !== undefined) session.tenantId = requestContext.tenantId;
-  if (requestContext.userId !== undefined) session.userId = requestContext.userId;
-  return session;
+  const owner = requireIdentityScopeFrom(requestContext, { label: 'OAuth session identity' });
+  return { provider: 'github', clientId, deviceCode, scopes, permissions, ...owner, expiresAtMs };
 }

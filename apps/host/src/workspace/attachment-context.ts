@@ -29,19 +29,21 @@ export type AttachmentContextOptions = {
   maxSize?: unknown;
   maxItems?: number;
   excerptBytes?: number;
+  includeFile?: (fullPath: string) => boolean;
 };
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
 
 /** 把附件列表加工成 { items, counts }:图片记为引用,文档抽取摘录,失败项标 error(不中断)。 */
 export function buildAttachmentContext(
-  { files = [], trustedRoot, maxSize, maxItems = 12, excerptBytes = 2000 }: AttachmentContextOptions = {},
+  { files = [], trustedRoot, maxSize, maxItems = 12, excerptBytes = 2000, includeFile }: AttachmentContextOptions = {},
 ): AttachmentContext {
   const list = Array.isArray(files) ? files.slice(0, maxItems) : [];
   const items: AttachmentItem[] = [];
   for (const entry of list) {
     const filePath = typeof entry === 'string' ? entry : (entry && (entry.path || entry.fullPath || entry.relativePath));
     if (!filePath) continue;
+    if (includeFile && !includeFile(filePath)) continue;
     const ext = path.extname(String(filePath)).toLowerCase();
     if (IMAGE_EXT.has(ext)) {
       items.push({ path: filePath, kind: 'image', ext, note: '图片附件 (需视觉模型解析)' });

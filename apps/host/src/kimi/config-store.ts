@@ -1,21 +1,20 @@
 // Kimi 配置持久化(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:读写磁盘上的 kimiApi 配置(provider/apiKey/baseUrl/model/fallbacks),
-//       做字段清洗与归一,损坏文件时静默回退到环境变量派生的配置。
+//       做字段清洗与归一;仅缺失文件时回退到环境变量派生的配置。
 // 安全:apiKey(含 fallbacks 内的)写盘前经 CredentialProtector 封印
 //       (Windows=DPAPI / 其余 AES-GCM,与 credential-store 同一模式),磁盘不落明文;
 //       读侧兼容三种形态——封印密文(解封)、遗留明文(原样读入,下次写盘自动升级)、
 //       解封失败(如换机器/换用户 DPAPI 打不开)按"未配置"跳过该 key,不拖垮其他字段。
 // 依赖:node:fs / node:path + L0 security/credential-store。
 // 导出:applyPersistedKimiConfig(读入并写进目标对象)、persistKimiConfig(写盘)。
-import fs from 'node:fs';
-import path from 'node:path';
 import { composeFullModelId, normaliseModelProviderId, providerRequiresApiKey } from './provider/catalog.js';
 import {
   createDefaultCredentialProtector,
   isSealedCredential,
   type CredentialProtector,
 } from '../security/credential-store.js';
+import { createManagedSingleFileOperation } from '../security/managed-single-file.js';
 
 type KimiConfigRecord = Record<string, unknown>;
 type ConfigStoreOptions = { protector?: CredentialProtector };
@@ -76,38 +75,48 @@ function cleanFallbacks(value: unknown): KimiConfigRecord[] {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
-/** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);文件不存在或损坏则不动。 */
+/** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);仅文件不存在时不动。 */
 export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
+  let serialized: string;
   try {
-    if (!fs.existsSync(file)) return;
-    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const config = raw && typeof raw === 'object' ? raw as KimiConfigRecord : {};
-    const kimi = config.kimiApi || config.kimi || config;
-    if (!kimi || typeof kimi !== 'object') return;
-    const source = kimi as KimiConfigRecord;
-    if (typeof source.provider === 'string' && source.provider.trim()) target.provider = cleanProvider(source.provider);
-    if (Array.isArray(source.fallbacks)) {
-      // fallback 内的 apiKey 同样解封;解不开的按未配置丢弃该 key,保留其余路由字段。
-      target.fallbacks = cleanFallbacks(source.fallbacks).map((item) => {
-        if (typeof item.apiKey !== 'string' || !item.apiKey) return item;
-        const plain = unsealSecret(item.apiKey, activeProtector(options));
-        if (plain) return { ...item, apiKey: plain };
-        const { apiKey: _dropped, ...rest } = item;
-        return rest;
-      }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
-    }
-    if (typeof source.apiKey === 'string' && source.apiKey.trim()) {
-      const plain = unsealSecret(source.apiKey.trim(), activeProtector(options));
-      if (plain) target.apiKey = plain;
-    }
-    if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) {
-      target.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
-    }
-    if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
-    recomputeConfigured(target);
-  } catch {
-    // 配置文件损坏时忽略磁盘内容,回退到环境变量派生的配置。
+    const persisted = createManagedSingleFileOperation(file, 'Kimi config directory').readText();
+    if (persisted === null) return;
+    serialized = persisted;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read Kimi config file: ${file}: ${detail}`, { cause: error });
   }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(serialized);
+  } catch (error) {
+    throw new Error(`Failed to parse Kimi config file: ${file}`, { cause: error });
+  }
+  const config = raw && typeof raw === 'object' ? raw as KimiConfigRecord : {};
+  const kimi = config.kimiApi || config.kimi || config;
+  if (!kimi || typeof kimi !== 'object') return;
+  const source = kimi as KimiConfigRecord;
+  if (typeof source.provider === 'string' && source.provider.trim()) target.provider = cleanProvider(source.provider);
+  if (Array.isArray(source.fallbacks)) {
+    // fallback 内的 apiKey 同样解封;解不开的按未配置丢弃该 key,保留其余路由字段。
+    target.fallbacks = cleanFallbacks(source.fallbacks).map((item) => {
+      if (typeof item.apiKey !== 'string' || !item.apiKey) return item;
+      const plain = unsealSecret(item.apiKey, activeProtector(options));
+      if (plain) return { ...item, apiKey: plain };
+      const { apiKey: _dropped, ...rest } = item;
+      return rest;
+    }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
+  }
+  if (typeof source.apiKey === 'string' && source.apiKey.trim()) {
+    const plain = unsealSecret(source.apiKey.trim(), activeProtector(options));
+    if (plain) target.apiKey = plain;
+  }
+  if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) {
+    target.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
+  }
+  if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
+  recomputeConfigured(target);
 }
 
 /** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
@@ -126,6 +135,6 @@ export function persistKimiConfig(file: string, source: KimiConfigRecord, option
       )),
     },
   };
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(payload, null, 2), 'utf8');
+  const serialized = JSON.stringify(payload, null, 2);
+  createManagedSingleFileOperation(file, 'Kimi config directory').writeText(serialized);
 }

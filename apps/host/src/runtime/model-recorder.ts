@@ -3,9 +3,9 @@
 // 职责:把模型请求/响应「录制」落盘以便回放与评测(eval/replay)。落盘前剔除不可序列化键(fetchImpl/回调/signal)
 //       并对密钥字段脱敏,绝不写入明文凭据。依赖:L0 redaction。导出:模型录制器工厂。
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import { redactText } from '../security/redaction.js';
+import { appendValidatedJsonl, readValidatedJsonl } from './jsonl-file.js';
 
 const OMIT_KEYS = new Set(['fetchImpl', 'onContent', 'onReasoning', 'signal']);
 const SECRET_KEY_RE = /(?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|secret|password|passwd|authorization)/i;
@@ -31,8 +31,6 @@ export type ModelRecorder = {
 export type ModelReplayer = {
   wrap(modelCall?: ModelCall): ModelCall;
 };
-type FileError = { code?: string };
-
 function jsonClone<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
 }
@@ -50,6 +48,10 @@ function stableValue(value: unknown): unknown {
 
 function stableJson(value: unknown): string {
   return JSON.stringify(stableValue(value));
+}
+
+function sha256(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 function sanitizeValue(value: unknown, key = ''): unknown {
@@ -73,9 +75,56 @@ export function sanitizeModelCallInput(args: Record<string, unknown> = {}): Reco
   return sanitizeValue(args) as Record<string, unknown> || {};
 }
 
+function fingerprintValue(value: unknown, key = '', inModelConfig = false): unknown {
+  const isModelConfigValue = inModelConfig || key === 'kimiConfig';
+  if (OMIT_KEYS.has(key) || typeof value === 'function') return undefined;
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'string') {
+    if (SECRET_KEY_RE.test(key)) {
+      return isModelConfigValue
+        ? '[REDACTED]'
+        : `[REDACTED][sensitive-sha256:${sha256(value)}]`;
+    }
+    const redacted = redactText(value);
+    return redacted === value ? value : `${redacted}[sensitive-sha256:${sha256(value)}]`;
+  }
+  if (typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => fingerprintValue(item, '', isModelConfigValue))
+      .filter((item) => item !== undefined);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [childKey, childValue] of Object.entries(value)) {
+    const fingerprinted = fingerprintValue(childValue, childKey, isModelConfigValue);
+    if (fingerprinted !== undefined) out[childKey] = fingerprinted;
+  }
+  return out;
+}
+
 export function modelCallFingerprint(args: Record<string, unknown> = {}): string {
-  const request = sanitizeModelCallInput(args);
+  const request = fingerprintValue(args);
   return `sha256:${crypto.createHash('sha256').update(stableJson(request)).digest('hex')}`;
+}
+
+function validateModelRecord(value: unknown): ModelRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('model record must be an object');
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.fingerprint !== 'string'
+    || !record.fingerprint
+    || (record.status !== 'succeeded' && record.status !== 'failed')
+    || (record.kind !== undefined && record.kind !== 'model-call')) {
+    throw new Error('model record has an invalid fingerprint, status, or kind');
+  }
+  if (record.status === 'succeeded' && !Object.hasOwn(record, 'response')) {
+    throw new Error('succeeded model record must contain a response');
+  }
+  if (record.status === 'failed' && !Object.hasOwn(record, 'error')) {
+    throw new Error('failed model record must contain an error');
+  }
+  return record as ModelRecord;
 }
 
 export function createMemoryModelRecordStore(initialRecords: ModelRecord[] = []): ModelRecordStore {
@@ -99,24 +148,12 @@ export function createMemoryModelRecordStore(initialRecords: ModelRecord[] = [])
 export function createJsonlModelRecordStore(filePath: string): ModelRecordStore & { filePath: string } {
   const recordPath = path.resolve(filePath);
   function readRecords(): ModelRecord[] {
-    let raw = '';
-    try {
-      raw = fs.readFileSync(recordPath, 'utf8');
-    } catch (error) {
-      if ((error as FileError)?.code === 'ENOENT') return [];
-      throw error;
-    }
-    return raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as ModelRecord);
+    return readValidatedJsonl(recordPath, 'model record', validateModelRecord);
   }
   return {
     append(record: ModelRecord): ModelRecord {
-      const cloned = jsonClone(record);
-      fs.mkdirSync(path.dirname(recordPath), { recursive: true });
-      fs.appendFileSync(recordPath, `${JSON.stringify(cloned)}\n`, 'utf8');
+      const cloned = jsonClone(sanitizeValue(record)) as ModelRecord;
+      appendValidatedJsonl(recordPath, cloned, 'model record', validateModelRecord);
       return jsonClone(cloned);
     },
     list(): ModelRecord[] {
@@ -156,6 +193,7 @@ export function createModelRecorder({
         const startedAt = now();
         try {
           const response = await modelCall(args);
+          const sanitizedResponse = sanitizeValue(response);
           const record: ModelRecord = {
             kind: 'model-call',
             status: 'succeeded',
@@ -163,7 +201,7 @@ export function createModelRecorder({
             startedAt,
             finishedAt: now(),
             request,
-            response: jsonClone(response),
+            response: sanitizedResponse === undefined ? null : sanitizedResponse,
           };
           store.append(record);
           return response;

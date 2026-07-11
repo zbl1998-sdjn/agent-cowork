@@ -134,9 +134,10 @@ test('Shell captures stdout from quoted node -e commands on Windows local backen
 test('SearchMemory returns relevant active topic knowledge and is read-only', async () => {
   const { upsertKnowledgeItem } = await import('../src/memory/knowledge-store.js');
   const root = tempRoot('kcw-agent-mem-');
-  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7 });
-  upsertKnowledgeItem(root, { topic: '八卦', title: '待确认', content: '也许喜欢咖啡', confidence: 0.2 }, { confidenceThreshold: 0.7 });
-  const search = agentTool(createAgentTools({ trustedRoot: root }), 'SearchMemory');
+  const owner = { tenantId: 'tenant_test', userId: 'user_test' };
+  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
+  upsertKnowledgeItem(root, { topic: '八卦', title: '待确认', content: '也许喜欢咖啡', confidence: 0.2 }, { confidenceThreshold: 0.7, context: owner });
+  const search = agentTool(createAgentTools({ trustedRoot: root, context: owner }), 'SearchMemory');
 
   const hit = await search.handler({ query: '项目代号是什么' }) as { items: Array<{ content: string }> };
   assert.ok(hit.items.length >= 1);
@@ -177,15 +178,18 @@ test('native WebFetch tool honors egress policy (security regression: agent-tool
   );
   assert.equal(fetchCalled, false, 'local_strict 下原生 WebFetch 不得实际发起请求');
 
-  // 对照组:controlled_hybrid(多数用户的默认模式)不能被误伤,必须继续正常工作。
+  // controlled_hybrid 返回 needs_approval；原生 handler 没有审批回执消费接口，必须
+  // fail closed，不能仅因为 decision 不是 deny 就实际发起请求。
   const hybridWebFetch = agentTool(
     createAgentTools({ trustedRoot: root, context: { securityMode: 'controlled_hybrid' }, fetchImpl }),
     'WebFetch',
   );
   fetchCalled = false;
-  const ok = await hybridWebFetch.handler({ url: 'https://example.com' }) as { status: number };
-  assert.equal(fetchCalled, true, 'controlled_hybrid 下不能被误伤,应正常发起请求');
-  assert.equal(ok.status, 200);
+  await assert.rejects(
+    () => hybridWebFetch.handler({ url: 'https://example.com' }),
+    (err: unknown) => (err as { code?: string }).code === 'EGRESS_APPROVAL_REQUIRED',
+  );
+  assert.equal(fetchCalled, false, 'controlled_hybrid 未收到审批回执时原生 WebFetch 不得出网');
 
   // 风险元数据必须与已网关化的 web-builtin-tools.ts 版本对齐,而不是 mutating:false/risk:'safe'。
   assert.equal(hybridWebFetch.risk, 'high');

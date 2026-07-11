@@ -70,6 +70,16 @@ function emptyContextPack(task: AgentTask): ContextPack {
   };
 }
 
+function providerPromptCharacters(messages: unknown): number {
+  if (!Array.isArray(messages)) throw new TypeError('provider messages must be an array');
+  return messages.reduce<number>((sum: number, message: unknown) => {
+    if (!message || typeof message !== 'object') throw new TypeError('provider message must be an object');
+    const content = (message as { content?: unknown }).content;
+    if (typeof content !== 'string') throw new TypeError('provider message content must be a string');
+    return sum + content.length;
+  }, 0);
+}
+
 function makeResult(task: AgentTask, context: ContextPack, summary = `${task.agentId} ok`): AgentResult {
   return {
     taskId: task.taskId,
@@ -517,6 +527,7 @@ test('Subagent task runner executes bounded read-only SearchWorkspace tool plan'
 });
 
 test('Provider task runner converts typed provider output into AgentResult', async () => {
+  const root = tempRoot();
   const registry = createDefaultAgentRegistry();
   const agent = registry.get('writer');
   const task: AgentTask = {
@@ -555,12 +566,13 @@ test('Provider task runner converts typed provider output into AgentResult', asy
   };
   const seenSignals: Array<AbortSignal | null | undefined> = [];
   const runner = createProviderTaskRunner({
-    modelConfig: { provider: 'test-provider', apiKey: 'test-key', model: 'test-model' },
+    trustedRoot: root,
+    modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', apiKey: 'test-key', model: 'test-model' },
     modelCall: async (args) => {
       seenSignals.push(args.signal);
       return {
         content: 'Provider generated grounded summary.',
-        provider: 'test-provider',
+        provider: 'openai/local',
         model: 'test-model',
         usage: { prompt_tokens: 12, completion_tokens: 5 },
       };
@@ -572,7 +584,7 @@ test('Provider task runner converts typed provider output into AgentResult', asy
 
   assert.equal(result.status, 'succeeded');
   assert.equal(result.structured.runner, 'provider-adapter');
-  assert.equal(result.structured.provider, 'test-provider');
+  assert.equal(result.structured.provider, 'openai/local');
   assert.equal(result.usage.modelCalls, 1);
   assert.equal(result.usage.inputTokens, 12);
   assert.equal(result.usage.outputTokens, 5);
@@ -580,7 +592,130 @@ test('Provider task runner converts typed provider output into AgentResult', asy
   assert.equal(seenSignals[0], abort.signal);
 });
 
+test('Provider task runner preserves defensive content shapes and partial-result warnings', async () => {
+  const root = tempRoot();
+  const agent = createDefaultAgentRegistry().get('writer');
+  const task: AgentTask = {
+    taskId: 'task_provider_partial',
+    runId: 'run_provider_partial',
+    parentTaskId: '',
+    agentId: 'writer',
+    title: 'Summarize partial provider output',
+    instruction: 'Use the available evidence.',
+    inputRefs: [sampleRef()],
+    expectedOutput: 'Partial provider summary.',
+    outputSchemaName: agent.outputSchema.name,
+    priority: 'normal',
+    dependencies: [],
+    timeoutMs: agent.budget.maxRuntimeMs,
+    budget: agent.budget,
+    approvalPolicy: 'never',
+  };
+  const pack: ContextPack = {
+    contextPackId: 'ctx_provider_partial',
+    agentId: 'writer',
+    taskId: task.taskId,
+    userGoalSummary: 'Recover a partial provider result',
+    entries: [{ ...sampleRef({ text: 'Sanitized provider context.' }), truncated: false }],
+    forbidden: ['secret-source'],
+    redactionReport: { mode: 'secrets_only', redactedCount: 1, omittedRefs: 1, truncatedRefs: 0 },
+  };
+  const fetchImpl = () => undefined;
+  let seenFetch: unknown;
+  const runner = createProviderTaskRunner({
+    modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'test-model' },
+    fetchImpl,
+    trustedRoot: root,
+    modelCall: async (args) => {
+      seenFetch = args.fetchImpl;
+      return {
+        content: [
+          'First section',
+          { text: 'Second section' },
+          { content: 'Third section' },
+          null,
+          {},
+        ] as unknown as string,
+        finish_reason: 'length',
+        stream_interrupted: true,
+        usage: { input_tokens: 8, output_tokens: 3 },
+      };
+    },
+  });
+
+  const result = await runner(task, pack, agent);
+
+  assert.equal(result.status, 'partial');
+  assert.equal(result.summary, 'First section\nSecond section\nThird section');
+  assert.equal(result.structured.finishReason, 'length');
+  assert.equal(result.structured.provider, '');
+  assert.equal(result.structured.model, '');
+  assert.equal(result.usage.inputTokens, 8);
+  assert.equal(result.usage.outputTokens, 3);
+  assert.equal(result.confidence, 0.58);
+  assert.deepEqual(result.warnings, [
+    'Input contained redacted secret-like text.',
+    '1 context refs omitted by policy.',
+    'Provider stream was interrupted; output may be partial.',
+  ]);
+  assert.equal(seenFetch, fetchImpl);
+
+  const fallbackSummary = 'Fallback token estimate.';
+  let fallbackInputCharacters = 0;
+  const fallbackRunner = createProviderTaskRunner({
+    trustedRoot: root,
+    modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'test-model' },
+    modelCall: async (args) => {
+      fallbackInputCharacters = providerPromptCharacters(args.messages);
+      return {
+        content: fallbackSummary,
+        usage: { prompt_tokens: 0, input_tokens: 0, completion_tokens: -1, output_tokens: 0 },
+      };
+    },
+  });
+  const fallbackResult = await fallbackRunner(task, pack, agent);
+  const rawInputCharacters = pack.entries.reduce((sum, entry) => sum + entry.text.length, 0)
+    + task.instruction.length;
+  assert.ok(fallbackInputCharacters > rawInputCharacters, 'fallback must include the complete provider prompt');
+  assert.equal(fallbackResult.usage.inputTokens, Math.ceil(fallbackInputCharacters / 4));
+  assert.equal(fallbackResult.usage.outputTokens, Math.ceil(fallbackSummary.length / 4));
+
+  const oversizedEntry = pack.entries[0];
+  if (!oversizedEntry) throw new Error('provider test requires one context entry');
+  const oversizedPack: ContextPack = {
+    ...pack,
+    entries: [{ ...oversizedEntry, text: 'x'.repeat(20_000) }],
+  };
+  let truncatedInputCharacters = 0;
+  const truncatedRunner = createProviderTaskRunner({
+    trustedRoot: root,
+    modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'test-model' },
+    modelCall: async (args) => {
+      truncatedInputCharacters = providerPromptCharacters(args.messages);
+      return { content: fallbackSummary };
+    },
+  });
+  const truncatedResult = await truncatedRunner(task, oversizedPack, agent);
+  const oversizedSourceLength = oversizedPack.entries[0]?.text.length ?? 0;
+  assert.ok(
+    truncatedInputCharacters < oversizedSourceLength,
+    'fallback must count the 16k provider context, not the untruncated source text',
+  );
+  assert.equal(truncatedResult.usage.inputTokens, Math.ceil(truncatedInputCharacters / 4));
+
+  const emptyRunner = createProviderTaskRunner({
+    trustedRoot: root,
+    modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'test-model' },
+    modelCall: async () => ({ content: '' }),
+  });
+  await assert.rejects(
+    () => emptyRunner(task, pack, agent),
+    /Provider adapter returned empty output for task_provider_partial/,
+  );
+});
+
 test('Provider task runner honors air_gap/local_strict egress policy (security regression: orchestrator provider path bypassed the same gate model-recipe once did)', async () => {
+  const root = tempRoot();
   const registry = createDefaultAgentRegistry();
   const agent = registry.get('writer');
   const task: AgentTask = {
@@ -616,20 +751,22 @@ test('Provider task runner honors air_gap/local_strict egress policy (security r
   const spy = async () => { called = true; return { content: 'x', provider: 'kimi-api', model: 'kimi-k2.7-code' }; };
 
   called = false;
-  const airGapRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy });
+  const airGapRunner = createProviderTaskRunner({ trustedRoot: root, modelConfig: { ...cloudConfig, securityMode: 'air_gap' }, modelCall: spy });
   await assert.rejects(() => airGapRunner(task, pack, agent));
   assert.equal(called, false, 'air_gap 下 orchestrator provider runner 不得实际调用云端模型');
 
   called = false;
-  const strictRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy });
+  const strictRunner = createProviderTaskRunner({ trustedRoot: root, modelConfig: { ...cloudConfig, securityMode: 'local_strict' }, modelCall: spy });
   await assert.rejects(() => strictRunner(task, pack, agent));
   assert.equal(called, false, 'local_strict 下不得实际调用云端模型');
 
   called = false;
-  const hybridRunner = createProviderTaskRunner({ modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy });
-  const ok = await hybridRunner(task, pack, agent);
-  assert.equal(called, true, 'controlled_hybrid 下不能被误伤,应正常出网');
-  assert.equal(ok.status, 'succeeded');
+  const hybridRunner = createProviderTaskRunner({ trustedRoot: root, modelConfig: { ...cloudConfig, securityMode: 'controlled_hybrid' }, modelCall: spy });
+  await assert.rejects(
+    () => hybridRunner(task, pack, agent),
+    (error: unknown) => Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'EGRESS_APPROVAL_REQUIRED'),
+  );
+  assert.equal(called, false, 'controlled_hybrid 未审批时不得实际调用云端模型');
 });
 
 test('WorkflowRunner runs map-reduce map steps in parallel', async () => {

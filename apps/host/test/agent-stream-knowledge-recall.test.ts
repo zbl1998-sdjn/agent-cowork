@@ -6,6 +6,8 @@ import { writeMemorySettings } from '../src/memory/memory-control.js';
 import type { AgentModelCallInput } from './helpers/agent-stream.js';
 import { noopKimiChatRunner, postAgentStream, readAgentStream } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
+const owner = { tenantId: 'tenant_local', userId: 'user_local' };
 
 // 端到端:知识库里已有过往对话提炼出的主题知识,新对话按相关性把它召回进系统提示——
 // 这是「关掉 MASE 也能在新对话里想起之前说的」的读侧闭环(写侧由 consolidate/trigger 覆盖)。
@@ -23,9 +25,9 @@ function captureModelCall(): { call: (input: AgentModelCallInput) => Promise<{ c
 
 test('a new conversation recalls relevant active topic knowledge into the system prompt', async () => {
   const root = tempRoot('kcw-krecall-');
-  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7 });
+  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '我们项目代号是什么来着？', conversationId: 'fresh-conv' });
@@ -41,9 +43,9 @@ test('a new conversation recalls relevant active topic knowledge into the system
 
 test('an unrelated prompt does not pull in topic knowledge (relevance-gated, no pollution)', async () => {
   const root = tempRoot('kcw-krecall-none-');
-  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7 });
+  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '帮我把这两个数相加：18 加 24', conversationId: 'fresh-conv-2' }));
@@ -55,10 +57,10 @@ test('an unrelated prompt does not pull in topic knowledge (relevance-gated, no 
 
 test('paused memory does not recall topic knowledge', async () => {
   const root = tempRoot('kcw-krecall-paused-');
-  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7 });
-  writeMemorySettings(root, { paused: true });
+  upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
+  writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '项目代号是什么？', conversationId: 'fresh-conv-3' }));

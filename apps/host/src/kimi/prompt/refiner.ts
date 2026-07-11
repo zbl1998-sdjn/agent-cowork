@@ -6,6 +6,7 @@
 // 导出:refinePrompt(异步函数)、createPromptRefiner(工厂)。
 
 import { analyzePromptForRefine, type PromptAnalyzeOptions, type PromptIntent, type PromptMissing, type PromptPolicy } from './refine-policy.js';
+import { isEgressAuditFailure } from '../../security/egress-gateway.js';
 
 type ProfileLike = { terms?: unknown[]; project?: unknown; entries?: unknown[] };
 export type PromptContext = { profile?: ProfileLike | null; userProfile?: ProfileLike | null; project?: unknown; [key: string]: unknown };
@@ -107,7 +108,8 @@ export async function refinePrompt(raw: unknown, ctx: PromptContext = {}, option
       }
       // 模型认为无需改写(返回原文或空)→ 视为已足够明确,不再套模板兜底。
       return resultFromPolicy(policy);
-    } catch {
+    } catch (error) {
+      if (isEgressAuditFailure(error)) throw error;
       return resultFromPolicy(policy);
     }
   }

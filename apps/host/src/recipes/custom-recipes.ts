@@ -2,52 +2,34 @@
 // ---------------------------------------------------------------------------
 // 职责:把用户从一次运行「捕获」出来的自定义配方,按租户/用户隔离地持久化(增删查)。
 //       内容已脱敏(redacted)。供「把这次操作存成我的配方」能力使用。
-// 依赖:node:fs/path。导出:createCustomRecipeStore。
-import fs from 'node:fs';
+// 依赖:node:fs/path + L0 security。导出:createCustomRecipeStore。
 import path from 'node:path';
+import {
+  requireIdentityScopeFrom,
+  type IdentityScope,
+} from '../security/identity-scope.js';
+import {
+  createManagedSingleFileOperation,
+  type ManagedSingleFileOperation,
+} from '../security/managed-single-file.js';
 import { omitUndefined } from '../util/object.js';
+import {
+  cloneCustomRecipe,
+  decodeCustomRecipeSnapshot,
+  type DecodedCustomRecipeSnapshot,
+} from './custom-recipe-persistence.js';
+import { createCustomRecipeJsonCloner } from './custom-recipe-json.js';
+import type {
+  CapturedArtifact,
+  CapturedStep,
+  CustomRecipe,
+  CustomRecipeFormat,
+} from './custom-recipe-types.js';
+
+export type { CustomRecipe, CustomRecipeFormat } from './custom-recipe-types.js';
 
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
-
-type CapturedStep = {
-  index: number;
-  tool: string;
-  status?: string;
-  args?: unknown;
-  result?: unknown;
-  summary?: unknown;
-};
-
-type CapturedArtifact = {
-  path: string;
-  kind: string;
-  source?: unknown;
-};
-
-export type CustomRecipeFormat = {
-  kind: 'markdown';
-  body: string;
-};
-
-export type CustomRecipe = {
-  id: string;
-  name: string;
-  description: string;
-  output: string;
-  riskLevel: string;
-  requiresSources?: boolean;
-  format?: CustomRecipeFormat;
-  custom: true;
-  tenantId: string;
-  userId: string;
-  sourceRunId: string | null;
-  prompt: string;
-  steps: CapturedStep[];
-  artifacts: CapturedArtifact[];
-  redacted: true;
-  createdAt: string;
-  updatedAt: string;
-};
+const STORE_BYTE_LIMIT = 1_048_576;
 
 export type RecipeScope = {
   tenantId?: unknown;
@@ -103,11 +85,11 @@ function cleanSteps(value: unknown): CapturedStep[] {
 function cleanArtifacts(value: unknown): CapturedArtifact[] {
   return (Array.isArray(value) ? value : []).slice(0, 80).map((artifact) => {
     const record = artifact && typeof artifact === 'object' ? artifact as Record<string, unknown> : {};
-    return {
+    return omitUndefined({
       path: cleanText(record.path, 500),
       kind: cleanText(record.kind, 80) || 'file',
       source: record.source,
-    };
+    }) as CapturedArtifact;
   }).filter((artifact) => Boolean(artifact.path));
 }
 
@@ -115,78 +97,119 @@ function httpError(error: unknown): Error & { statusCode?: number } {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function sanitizedRecipeInput(input: unknown): Record<string, unknown> {
+  try {
+    const value = createCustomRecipeJsonCloner('sanitize')(input);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+    return value as Record<string, unknown>;
+  } catch {
+    const error = httpError(new Error('Recipe draft must be bounded plain JSON'));
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function recipeOwner(scope: RecipeScope | undefined): IdentityScope {
+  return requireIdentityScopeFrom(scope, {
+    allowLocalDefault: true,
+    label: 'custom recipe identity',
+  });
+}
+
+function isSameRecipe(value: CustomRecipe, id: string, owner: IdentityScope): boolean {
+  return value.tenantId === owner.tenantId && value.userId === owner.userId && value.id === id;
+}
+
+function assertWithinStoreByteLimit(size: number): void {
+  if (size > STORE_BYTE_LIMIT) {
+    throw new Error(`custom recipe store exceeds byte limit of ${STORE_BYTE_LIMIT}`);
+  }
+}
+
 /** 创建自定义配方存储(按 tenant/user 作用域增删查并持久化到 JSON)。 */
 export function createCustomRecipeStore({ storePath }: { storePath: string }): CustomRecipeStore {
   const filePath = path.resolve(storePath);
 
-  function readAll(): CustomRecipe[] {
+  function readAll(operation: ManagedSingleFileOperation): DecodedCustomRecipeSnapshot {
     try {
-      if (!fs.existsSync(filePath)) {
-        return [];
-      }
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { recipes?: unknown };
-      return Array.isArray(parsed.recipes) ? parsed.recipes as CustomRecipe[] : [];
-    } catch {
-      return [];
+      const content = operation.readText({ maxBytes: STORE_BYTE_LIMIT });
+      if (content === null) return { recipes: [], corrupt: false };
+      assertWithinStoreByteLimit(Buffer.byteLength(content, 'utf8'));
+      const parsed = JSON.parse(content) as unknown;
+      return decodeCustomRecipeSnapshot(parsed);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`custom recipe store is corrupt or unreadable: ${detail}`);
     }
   }
 
-  function writeAll(recipes: CustomRecipe[]): void {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify({ recipes }, null, 2)}\n`, 'utf8');
-    fs.renameSync(tmp, filePath);
+  function writeAll(recipes: CustomRecipe[], operation: ManagedSingleFileOperation): void {
+    const content = `${JSON.stringify({ recipes }, null, 2)}\n`;
+    assertWithinStoreByteLimit(Buffer.byteLength(content, 'utf8'));
+    operation.writeText(content);
   }
 
-  function list({ tenantId }: RecipeScope = {}): CustomRecipe[] {
-    const tenant = cleanText(tenantId || 'tenant_local', 96);
-    return readAll().filter((recipe) => recipe.tenantId === tenant).map((recipe) => ({ ...recipe }));
+  function list(scope?: RecipeScope): CustomRecipe[] {
+    const owner = recipeOwner(scope);
+    const operation = createManagedSingleFileOperation(filePath, 'Custom recipe store directory');
+    return readAll(operation).recipes
+      .filter((recipe) => recipe.tenantId === owner.tenantId && recipe.userId === owner.userId)
+      .map(cloneCustomRecipe);
   }
 
   return {
     list,
-    get(id: string, scope: RecipeScope = {}): CustomRecipe | null {
+    get(id: string, scope?: RecipeScope): CustomRecipe | null {
       if (!RECIPE_ID_RE.test(id || '')) {
         return null;
       }
       return list(scope).find((recipe) => recipe.id === id) || null;
     },
-    save(input: Record<string, unknown>, { tenantId, userId }: RecipeScope = {}): CustomRecipe {
-      if (input.redacted !== true) {
+    save(input: Record<string, unknown>, scope?: RecipeScope): CustomRecipe {
+      const safeInput = sanitizedRecipeInput(input);
+      if (safeInput.redacted !== true) {
         const err = httpError(new Error('Recipe draft must be redacted before saving'));
         err.statusCode = 400;
         throw err;
       }
-      const tenant = cleanText(tenantId || 'tenant_local', 96);
-      const user = cleanText(userId || 'user_local', 96);
+      const owner = recipeOwner(scope);
+      const operation = createManagedSingleFileOperation(filePath, 'Custom recipe store directory');
       const now = new Date().toISOString();
-      const name = cleanText(input.name, 120) || '自定义技能';
-      const existing = readAll();
-      const requestedId = cleanText(input.id, 120);
+      const name = cleanText(safeInput.name, 120) || '自定义技能';
+      const snapshot = readAll(operation);
+      if (snapshot.corrupt) {
+        throw new Error('custom recipe store is corrupt; refusing to overwrite invalid or duplicate records');
+      }
+      const existing = snapshot.recipes;
+      const requestedId = cleanText(safeInput.id, 120);
       const baseId = requestedId && RECIPE_ID_RE.test(requestedId) ? requestedId : `custom-${slug(name)}-${Date.now().toString(36)}`;
-      const previous = existing.find((recipe) => recipe.id === baseId && recipe.tenantId === tenant);
+      const previous = existing.find((recipe) => isSameRecipe(recipe, baseId, owner));
       const recipe: CustomRecipe = omitUndefined({
         ...(previous || {}),
         id: baseId,
         name,
-        description: cleanText(input.description || input.prompt, 500),
-        output: cleanText(input.output, 120) || 'DOCX + TXT',
-        riskLevel: cleanRiskLevel(input.riskLevel),
-        requiresSources: typeof input.requiresSources === 'boolean' ? input.requiresSources : false,
-        format: cleanFormat(input.format),
+        description: cleanText(safeInput.description || safeInput.prompt, 500),
+        output: cleanText(safeInput.output, 120) || 'DOCX + TXT',
+        riskLevel: cleanRiskLevel(safeInput.riskLevel),
+        requiresSources: typeof safeInput.requiresSources === 'boolean' ? safeInput.requiresSources : false,
+        format: cleanFormat(safeInput.format),
         custom: true as const,
-        tenantId: tenant,
-        userId: user,
-        sourceRunId: cleanText(input.sourceRunId, 120) || null,
-        prompt: cleanText(input.prompt, 4000),
-        steps: cleanSteps(input.steps),
-        artifacts: cleanArtifacts(input.artifacts),
+        tenantId: owner.tenantId,
+        userId: owner.userId,
+        sourceRunId: cleanText(safeInput.sourceRunId, 120) || null,
+        prompt: cleanText(safeInput.prompt, 4000),
+        steps: cleanSteps(safeInput.steps),
+        artifacts: cleanArtifacts(safeInput.artifacts),
         redacted: true as const,
         createdAt: previous?.createdAt || now,
         updatedAt: now,
       });
-      writeAll([...existing.filter((item) => !(item.id === recipe.id && item.tenantId === tenant)), recipe]);
-      return { ...recipe };
+      const validatedRecipe = cloneCustomRecipe(recipe);
+      writeAll([
+        ...existing.filter((item) => !isSameRecipe(item, recipe.id, owner)),
+        validatedRecipe,
+      ], operation);
+      return cloneCustomRecipe(validatedRecipe);
     },
   };
 }

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import { assertExternalWorkspacePath } from '../security/external-workspace-boundary.js';
 import { previewFileOperations } from './file-operations.js';
 import type { OperationPreview } from './file-operations.js';
 
@@ -21,13 +21,13 @@ function fileHash(file: string): string {
 
 function safeFile(root: string, file: string): string {
   const full = path.isAbsolute(file) ? path.resolve(file) : path.resolve(root, file);
-  const safe = assertTrustedPath(full, root);
+  const safe = assertExternalWorkspacePath(full, root);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) throw new Error(`file not found: ${file}`);
   return safe;
 }
 
 function safeTarget(root: string, targetDir: string | undefined, ...parts: string[]): string {
-  return assertTrustedPathForCreate(path.join(root, String(targetDir || 'organized'), ...parts), root);
+  return assertExternalWorkspacePath(path.join(root, String(targetDir || 'organized'), ...parts), root);
 }
 
 function targetWithSuffix(target: string, used: Set<string>): string {

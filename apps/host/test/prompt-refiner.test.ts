@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { createKimiRefineModelCall } from '../src/kimi/prompt/refine-model-call.js';
 import { analyzePromptForRefine } from '../src/kimi/prompt/refine-policy.js';
 import { createPromptRefiner, refinePrompt } from '../src/kimi/prompt/refiner.js';
+import { makeTestWorkspace } from './test-fixtures.js';
+
+const LOCAL_TRUSTED_ROOT = makeTestWorkspace('prompt-refiner');
+const LOCAL_MODEL = {
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+  securityMode: 'local_strict',
+} as const;
 
 test('refine policy asks for clarification when the prompt is too vague', () => {
   const result = analyzePromptForRefine('帮我处理一下');
@@ -110,8 +118,8 @@ test('createKimiRefineModelCall posts a bounded non-streaming refinement request
   };
   const modelCall = createKimiRefineModelCall({
     kimiConfig: {
+      ...LOCAL_MODEL,
       apiKey: 'dummy-refine-key',
-      baseUrl: 'https://kimi.example/v1/',
       model: 'kimi-refine',
       maxTokens: 256,
       timeoutMs: 2000,
@@ -124,14 +132,14 @@ test('createKimiRefineModelCall posts a bounded non-streaming refinement request
     prompt: '处理登录报错',
     intent: 'fix',
     missing: ['desiredOutput'],
-    context: { project: 'Agent Cowork', profile: { terms: ['鉴权'] } },
+    context: { trustedRoot: LOCAL_TRUSTED_ROOT, project: 'Agent Cowork', profile: { terms: ['鉴权'] } },
   });
 
   assert.equal(refined, '请修复登录报错，并说明验证步骤。');
   assert.equal(calls.length, 1);
   const call = calls[0];
   assert.ok(call);
-  assert.equal(call.url, 'https://kimi.example/v1/chat/completions');
+  assert.equal(call.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(call.init.method, 'POST');
   assert.deepEqual(call.init.headers, {
     authorization: 'Bearer dummy-refine-key',
@@ -161,20 +169,20 @@ test('createKimiRefineModelCall fails closed on missing key, HTTP errors, and ma
   assert.equal(await noKey({ prompt: 'x', intent: 'general', missing: [], context: {} }), '');
 
   const nonOk = createKimiRefineModelCall({
-    kimiConfig: { apiKey: 'dummy-refine-key' },
+    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => ({ ok: false, json: async () => ({}) })) as never,
   });
-  assert.equal(await nonOk({ prompt: 'x', intent: 'general', missing: [], context: {} }), '');
+  assert.equal(await nonOk({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');
 
   const malformed = createKimiRefineModelCall({
-    kimiConfig: { apiKey: 'dummy-refine-key' },
+    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 42 } }] }) })) as never,
   });
-  assert.equal(await malformed({ prompt: 'x', intent: 'general', missing: [], context: {} }), '');
+  assert.equal(await malformed({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');
 
   const thrown = createKimiRefineModelCall({
-    kimiConfig: { apiKey: 'dummy-refine-key' },
+    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => { throw new Error('network down'); }) as never,
   });
-  assert.equal(await thrown({ prompt: 'x', intent: 'general', missing: [], context: {} }), '');
+  assert.equal(await thrown({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');
 });

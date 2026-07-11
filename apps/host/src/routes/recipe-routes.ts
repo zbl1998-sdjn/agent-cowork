@@ -22,12 +22,11 @@ import type { Recipe } from '../recipes/registry.js';
 import type { RunEventsLike, RunsIndexLike } from '../recipes/run-recipe-types.js';
 
 const RECIPE_ID_RE = /^[a-z0-9_-]+$/i;
-
 type RouteRequest = HttpRequestLike & { method?: string };
 type RequestContext = { tenantId?: string; userId?: string; traceId?: string; idempotencyKey?: string; [key: string]: unknown };
 type RunIndexEntryLike = { runPath?: unknown };
 type CaptureRunsIndexLike = RunsIndexLike & {
-  get?(runId: string, options?: { tenantId?: unknown }): RunIndexEntryLike | null | Promise<RunIndexEntryLike | null>;
+  get?(runId: string, options?: { tenantId?: unknown; userId?: unknown }): RunIndexEntryLike | null | Promise<RunIndexEntryLike | null>;
 };
 type FileOperationApprovalsLike = { issue(input: unknown): string };
 type RecipeRouteOptions = {
@@ -38,6 +37,7 @@ type RecipeRouteOptions = {
   runStoreRoot: string;
   runEvents?: RunEventsLike | null;
   runsIndex?: CaptureRunsIndexLike | null;
+  recordReader: NonNullable<NonNullable<Parameters<typeof captureRun>[0]>['recordReader']>;
   cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string;
   requireIdempotencyKey(response: HttpResponseLike, context: RequestContext): boolean;
   sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): unknown;
@@ -140,7 +140,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
 
   if (request.method === 'GET' && pathname === '/api/recipes') {
     sendJson(response, 200, {
-      recipes: [...listRecipes(), ...customRecipes.list({ tenantId: requestContext.tenantId })],
+      recipes: [...listRecipes(), ...customRecipes.list(omitUndefined({ tenantId: requestContext.tenantId, userId: requestContext.userId }))],
     });
     return true;
   }
@@ -202,10 +202,10 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
       }
       const scopedRunsIndex = {
         get(id: string): RunIndexEntryLike | null | Promise<RunIndexEntryLike | null> {
-          return runsIndex.get?.(id, omitUndefined({ tenantId: requestContext.tenantId })) || null;
+          return runsIndex.get?.(id, omitUndefined({ tenantId: requestContext.tenantId, userId: requestContext.userId })) || null;
         },
       };
-      const result = await captureRun({ runId: parsed.data.runId, runsIndex: scopedRunsIndex });
+      const result = await captureRun({ runId: parsed.data.runId, runsIndex: scopedRunsIndex, recordReader: options.recordReader });
       sendJson(response, 200, {
         ...result,
         context: requestContext,
@@ -227,7 +227,7 @@ export async function handleRecipeRoutes(options: RecipeRouteOptions): Promise<b
         return;
       }
       const recipe = getRecipe(recipeId);
-      const customRecipe = recipe ? null : customRecipes.get(recipeId, omitUndefined({ tenantId: requestContext.tenantId }));
+      const customRecipe = recipe ? null : customRecipes.get(recipeId, omitUndefined({ tenantId: requestContext.tenantId, userId: requestContext.userId }));
       const selectedRecipe: Recipe | null = recipe || customRecipe;
       if (!selectedRecipe) {
         sendJson(response, 404, { error: 'Recipe not found' });

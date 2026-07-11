@@ -14,6 +14,7 @@ import {
   type AgentModelCallInput,
 } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('E2E /api/agent/chat/stream falls back through provider router without leaking secrets', async () => {
   const root = tempRoot('kcw-e2e-');
@@ -22,7 +23,7 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
   const seen: Array<{ baseUrl: string | undefined; apiKey: string | undefined }> = [];
   const agentModelCall = async ({ kimiConfig, messages }: AgentModelCallInput) => {
     seen.push({ baseUrl: kimiConfig?.baseUrl, apiKey: kimiConfig?.apiKey });
-    if (kimiConfig?.baseUrl === 'https://primary-router.example/v1') {
+    if (kimiConfig?.baseUrl === 'http://127.0.0.1:11440/v1') {
       throw new Error(`temporary outage ${primarySecret}`);
     }
     if (hasToolResult(messages, 'fallback_write')) {
@@ -40,14 +41,15 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiProvider: 'openai',
+    securityMode: 'controlled_hybrid',
+    kimiProvider: 'openai/local',
     kimiApiKey: primarySecret,
-    kimiBaseUrl: 'https://primary-router.example/v1',
+    kimiBaseUrl: 'http://127.0.0.1:11440/v1',
     kimiModel: 'gpt-primary-router',
     kimiFallbacks: [{
-      provider: 'openai',
+      provider: 'openai/local',
       apiKey: fallbackSecret,
-      baseUrl: 'https://fallback-router.example/v1',
+      baseUrl: 'http://127.0.0.1:11441/v1',
       model: 'gpt-fallback-router',
     }],
     kimiChatRunner: noopKimiChatRunner,
@@ -63,10 +65,10 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
     assert.ok(!all.includes(primarySecret), 'SSE leaked primary key');
     assert.ok(!all.includes(fallbackSecret), 'SSE leaked fallback key');
     assert.deepEqual(seen.map((item) => item.baseUrl), [
-      'https://primary-router.example/v1',
-      'https://fallback-router.example/v1',
-      'https://primary-router.example/v1',
-      'https://fallback-router.example/v1',
+      'http://127.0.0.1:11440/v1',
+      'http://127.0.0.1:11441/v1',
+      'http://127.0.0.1:11440/v1',
+      'http://127.0.0.1:11441/v1',
     ]);
     assert.equal(seen[1]?.apiKey, fallbackSecret);
     assert.equal(seen[3]?.apiKey, fallbackSecret);
@@ -96,6 +98,7 @@ test('E2E /api/agent/chat/stream applies session model config without persisting
     return { content: 'session provider recorded' };
   };
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
@@ -106,29 +109,29 @@ test('E2E /api/agent/chat/stream applies session model config without persisting
     const res = await postAgentStream(base, {
       prompt: '临时切 provider',
       modelConfig: {
-        provider: 'OPENAI',
+        provider: 'OPENAI/LOCAL',
         apiKey: sessionKey,
-        baseUrl: 'https://api.openai.test/v1/',
+        baseUrl: 'http://127.0.0.1:11442/v1/',
         model: 'gpt-session',
-        fallbacks: [{ provider: 'openai', apiKey: 'test-body-fallback-secret' }],
+        fallbacks: [{ provider: 'openai/local', apiKey: 'test-body-fallback-secret' }],
       },
     });
     assert.equal(res.status, 200);
     const all = await readAgentStream(res);
     assert.match(all, /event: done/);
     const sessionConfig = requireCapturedConfig();
-    assert.equal(sessionConfig.provider, 'openai');
+    assert.equal(sessionConfig.provider, 'openai/local');
     assert.equal(sessionConfig.model, 'gpt-session');
-    assert.equal(sessionConfig.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(sessionConfig.baseUrl, 'http://127.0.0.1:11442/v1');
     assert.equal(sessionConfig.apiKey, sessionKey);
     assert.ok(!JSON.stringify(sessionConfig.fallbacks || []).includes('test-body-fallback-secret'));
 
     const recordRaw = fs.readFileSync(path.join(root, '.AgentCowork', 'runs', `${startRunId(all)}.json`), 'utf8');
     const record = readRunRecord(root, startRunId(all));
-    assert.equal(record.provider, 'openai');
+    assert.equal(record.provider, 'openai/local');
     assert.equal(record.model, 'gpt-session');
-    assert.equal(record.configSnapshot.provider, 'openai');
-    assert.equal(record.configSnapshot.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(record.configSnapshot.provider, 'openai/local');
+    assert.equal(record.configSnapshot.baseUrl, 'http://127.0.0.1:11442/v1');
     assert.equal(record.configSnapshot.apiKey, undefined);
     assert.ok(!recordRaw.includes(sessionKey), 'session API key leaked into run record');
 

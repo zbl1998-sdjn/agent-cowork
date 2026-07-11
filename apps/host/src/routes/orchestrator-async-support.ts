@@ -11,11 +11,12 @@ import {
   runOrchestration,
   selectTaskRunner,
 } from './orchestrator-route-support.js';
+import { orchestratorOwner } from './orchestrator-owner-guard.js';
+import { resolveOrchestratorSecurityMode } from './orchestrator-security-mode.js';
 import { getOrchestrationRecipeDefinition } from '../orchestrator/recipe-registry.js';
 import type {
   OrchestrationEvent,
   OrchestrationRun,
-  SecurityMode,
 } from '../orchestrator/index.js';
 import type { OrchestrationRunnerKind } from '../orchestrator/recipe-registry.js';
 import type { RunRecord } from '../runtime/run-store.js';
@@ -29,6 +30,7 @@ export function startAsyncOrchestration(
   const runId = options.runId || createRunId();
   const workspaceRoot = options.safeTrustedRoot(input.workspaceRoot);
   const selected = selectTaskRunner(definition.runnerKind, options, workspaceRoot);
+  const securityMode = resolveOrchestratorSecurityMode(options.requestContext);
   const tracePath = path.join(options.runStoreRoot, `${runId}.events.jsonl`);
   const startedAt = new Date().toISOString();
   const checkpointStore = createOrchestrationCheckpointStore({ root: options.runStoreRoot });
@@ -40,7 +42,7 @@ export function startAsyncOrchestration(
     mode: definition.recipe.mode,
     status: 'running',
     workspaceRoot,
-    securityMode: input.securityMode as SecurityMode,
+    securityMode,
     agents: [...definition.recipe.agents],
     refs: input.refs.map(contextRefFromInput),
     tasks: [],
@@ -60,7 +62,7 @@ export function startAsyncOrchestration(
     mode: definition.recipe.mode,
     status: 'running',
     workspaceRoot,
-    securityMode: input.securityMode as SecurityMode,
+    securityMode,
     agents: [...definition.recipe.agents],
     tasks: [],
     results: [],
@@ -89,10 +91,11 @@ export function startAsyncOrchestration(
   writeRunRecord(options.runStoreRoot, record);
   indexRun(options.runsIndex, record, options.requestContext);
 
-  const controller = options.cancellation?.register?.(runId) || null;
+  const owner = orchestratorOwner(options.requestContext);
+  const controller = options.cancellation?.register?.(runId, owner) || null;
   const signal = controller?.signal || options.signal || null;
   void runOrchestration(input, { ...options, runId, signal }).finally(() => {
-    options.cancellation?.done?.(runId);
+    options.cancellation?.done?.(runId, owner);
   });
 
   return { record, runPath, events: [], runnerKind: selected.runnerKind };

@@ -10,6 +10,7 @@ import {
 } from './helpers/agent.js';
 import { createAgentApprovalRegistry } from './helpers/approvals.js';
 import { tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 
 test('plan mode blocks writes until ExitPlanMode is approved, then executes', async () => {
@@ -37,7 +38,7 @@ test('plan mode blocks writes until ExitPlanMode is approved, then executes', as
 
   const out = await runAgentChat({
     prompt: '写 out.txt',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,
@@ -77,7 +78,7 @@ test('plan mode: rejecting the plan keeps mutating tools blocked', async () => {
 
   const out = await runAgentChat({
     prompt: '改 out.txt',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,

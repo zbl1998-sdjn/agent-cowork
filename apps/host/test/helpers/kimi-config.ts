@@ -2,10 +2,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { createServer, type ServerConfig } from '../../src/server.js';
+import { createAesGcmProtector } from '../../src/security/credential-store.js';
 import { bind, close } from './host-http.js';
 
 export const CONFIG_SECRET = 'sk-config-test-DO-NOT-ECHO-123456';
 export const FALLBACK_SECRET = 'sk-fallback-secret-DO-NOT-ECHO-123456';
+export const TEST_LOCAL_MODEL_CONFIG = Object.freeze({
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+  model: 'fake',
+  securityMode: 'local_strict',
+});
+
+export const TEST_LOCAL_HOST_MODEL_CONFIG = Object.freeze({
+  kimiProvider: TEST_LOCAL_MODEL_CONFIG.provider,
+  kimiBaseUrl: TEST_LOCAL_MODEL_CONFIG.baseUrl,
+  kimiModel: TEST_LOCAL_MODEL_CONFIG.model,
+  securityMode: 'controlled_hybrid',
+});
+
+const KIMI_CONFIG_TEST_PROTECTOR = createAesGcmProtector({
+  keyMaterial: 'dummy-kimi-config-route-test-protector-key',
+});
 
 const fallbackStatusSchema = z.object({
   provider: z.string().optional(),
@@ -53,7 +71,11 @@ export async function withKimiConfigServer(
   config: ServerConfig,
   fn: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
-  const server = createServer({ requireAuth: false, ...config });
+  const server = createServer({
+    requireAuth: false,
+    kimiConfigProtector: KIMI_CONFIG_TEST_PROTECTOR,
+    ...config,
+  });
   const baseUrl = await bind(server);
   try {
     await fn(baseUrl);

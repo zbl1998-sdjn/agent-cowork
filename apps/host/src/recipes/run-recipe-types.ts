@@ -13,7 +13,10 @@ export type RecipeError = Error & {
 };
 
 export type RunEventsLike = {
-  publish(runId: string, event: Record<string, unknown>): Record<string, unknown>;
+  publish(
+    runId: string,
+    event: Record<string, unknown>,
+  ): Record<string, unknown> | Promise<Record<string, unknown>>;
 };
 
 export type RunsIndexLike = {

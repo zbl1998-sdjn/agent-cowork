@@ -17,6 +17,7 @@ export type SearchOptions = {
   maxResults?: number;
   includeContent?: boolean;
   maxContentBytes?: number;
+  includeFile?: (fullPath: string) => boolean;
 };
 export type SearchResult = {
   path: string;
@@ -47,6 +48,7 @@ export function searchWorkspace(options: SearchOptions = {}): { query: string; r
   const files = listWorkspaceTree(trustedRoot, {
     includeFiles: true,
     includeDirectories: false,
+    includeEntry: (fullPath, kind) => kind !== 'file' || !options.includeFile || options.includeFile(fullPath),
   }).filter((entry): entry is WorkspaceFileEntry => entry.kind === 'file');
 
   // 空 query:当「引用文件」选择器用——返回最近修改的前 N 个文件,而不是报错。

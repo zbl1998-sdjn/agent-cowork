@@ -20,6 +20,7 @@ export type ContextBundleInput = {
   maxTotalBytes?: number;
   maxFiles?: number;
   fsStatFn?: (candidate: string) => Stats;
+  includeFile?: (fullPath: string) => boolean;
 };
 export type ContextBundle = {
   root: string;
@@ -77,7 +78,10 @@ export function buildContextBundle(input: ContextBundleInput): ContextBundle {
     }
 
     if (stats.isDirectory()) {
-      const entries = listWorkspaceTree(resolved, { includeDirectories: false });
+      const entries = listWorkspaceTree(resolved, {
+        includeDirectories: false,
+        includeEntry: (fullPath, kind) => kind !== 'file' || !input.includeFile || input.includeFile(fullPath),
+      });
       for (const entry of entries) {
         if (entry.kind === 'file') {
           fileTargets.add(entry.fullPath);
@@ -86,7 +90,7 @@ export function buildContextBundle(input: ContextBundleInput): ContextBundle {
       continue;
     }
 
-    fileTargets.add(resolved);
+    if (!input.includeFile || input.includeFile(resolved)) fileTargets.add(resolved);
   }
 
   const files: BundledTextFile[] = [];

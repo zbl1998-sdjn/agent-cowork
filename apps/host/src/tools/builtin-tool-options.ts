@@ -1,6 +1,8 @@
 // 内置工具组装入参 schema(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:校验 createBuiltinTools 的依赖注入参数,并提供 handler 常用的 args/context 解析。
+import * as nodeUtil from 'node:util';
+
 import { z } from 'zod';
 import type { RunEventsLike, RunsIndexLike, SandboxLike } from '../sandbox/code-runner-types.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
@@ -32,6 +34,10 @@ export type BuiltinToolsOptionsInput = {
   resolveSecurityMode?: unknown;
 };
 
+const nodeUtilTypes = (nodeUtil as unknown as {
+  types: { isProxy(value: unknown): boolean };
+}).types;
+
 const sandboxSchema = z.custom<SandboxLike | null | undefined>(
   (value) => value == null || (typeof value === 'object' && typeof (value as { exec?: unknown }).exec === 'function'),
   { message: 'sandbox must expose exec(spec, ctx)' },
@@ -60,6 +66,12 @@ function inputError(message: string): Error & { statusCode?: number } {
   return error;
 }
 
+function toolArgsError(message: string): Error & { statusCode?: number } {
+  const error = new Error(`builtin tool arguments: ${message}`) as Error & { statusCode?: number };
+  error.statusCode = 400;
+  return error;
+}
+
 function zodIssueMessage(issue: z.core.$ZodIssue): string {
   const field = issue.path.length ? `${issue.path.join('.')}: ` : '';
   return `${field}${issue.message}`;
@@ -75,6 +87,46 @@ export function parseBuiltinToolsOptions(options: unknown): BuiltinToolsOptions 
 
 export function argsRecord(args: unknown): ArgsRecord {
   return args && typeof args === 'object' && !Array.isArray(args) ? args as ArgsRecord : {};
+}
+
+/** Project a plain argument object without reading through getters/proxies. */
+export function parseBuiltinToolArgs(rawArgs: unknown, allowedKeys: readonly string[]): ArgsRecord {
+  if (!rawArgs || typeof rawArgs !== 'object') {
+    throw toolArgsError('a plain object is required');
+  }
+  if (nodeUtilTypes.isProxy(rawArgs) || Array.isArray(rawArgs)) {
+    throw toolArgsError('a plain object is required');
+  }
+  try {
+    const prototype = Reflect.getPrototypeOf(rawArgs);
+    if (prototype !== Object.prototype && prototype !== null) throw toolArgsError('a plain object is required');
+    const allowed = new Set(allowedKeys);
+    const projected: ArgsRecord = {};
+    for (const key of allowed) {
+      Object.defineProperty(projected, key, { configurable: true, writable: true, value: undefined });
+    }
+    for (const key of Reflect.ownKeys(rawArgs)) {
+      if (typeof key !== 'string') throw toolArgsError('symbol properties are not allowed');
+      if (!allowed.has(key)) {
+        const boundary = ['trustedRoot', 'root', 'context', 'tenantId', 'userId'].includes(key);
+        throw toolArgsError(boundary ? `${key} is a protected boundary property` : `${key} is not allowed`);
+      }
+      const descriptor = Reflect.getOwnPropertyDescriptor(rawArgs, key);
+      if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw toolArgsError(`${key} must be an enumerable data property`);
+      }
+      Object.defineProperty(projected, key, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: descriptor.value,
+      });
+    }
+    return projected;
+  } catch (error) {
+    if ((error as { statusCode?: unknown }).statusCode === 400) throw error;
+    throw toolArgsError('invalid argument object');
+  }
 }
 
 export function contextRecord(ctx: unknown): ToolContext {

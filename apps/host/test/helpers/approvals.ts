@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { z } from 'zod';
 import { createApprovalRegistry } from '../../src/runtime/approvals.js';
+import { LOCAL_IDENTITY_SCOPE } from '../../src/security/identity-scope.js';
 import type { ApprovalRegistry as AgentApprovalRegistry } from '../../src/kimi/agent/approval-gate.js';
 import type { ModelCall } from '../../src/kimi/agent/model-resilience.js';
 import type { ApprovalRegistry as RuntimeApprovalRegistry } from '../../src/runtime/approvals.js';
@@ -73,7 +74,11 @@ export function mutatingTool(name: string, risk: string, onRun: () => void): Age
 }
 
 export function createAgentApprovalRegistry(): RuntimeApprovalRegistry & AgentApprovalRegistry {
-  return createApprovalRegistry() as RuntimeApprovalRegistry & AgentApprovalRegistry;
+  const registry = createApprovalRegistry();
+  return {
+    ...registry,
+    resolve: (id, decision, context = LOCAL_IDENTITY_SCOPE) => registry.resolve(id, decision, context),
+  } as RuntimeApprovalRegistry & AgentApprovalRegistry;
 }
 
 export function parseApprovalPayload(payload: unknown): z.infer<typeof approvalPayloadSchema> {

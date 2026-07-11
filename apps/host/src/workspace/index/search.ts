@@ -17,6 +17,7 @@ export type SearchWorkspaceOptions = {
   maxFileBytes?: unknown;
   maxChunkLines?: number;
   maxChunkBytes?: number;
+  includeFile?: (fullPath: string) => boolean;
 };
 export type SearchWorkspaceSource = {
   path: string;
@@ -63,6 +64,7 @@ export function searchWorkspaceIndex({
   maxFileBytes = DEFAULT_MAX_FILE_BYTES,
   maxChunkLines = 24,
   maxChunkBytes = 4096,
+  includeFile,
 }: SearchWorkspaceOptions = {}): SearchWorkspaceResult {
   const q = String(query || '').trim();
   if (!q) {
@@ -76,6 +78,7 @@ export function searchWorkspaceIndex({
     includeFiles: true,
     includeDirectories: false,
     maxEntries: fileLimit,
+    includeEntry: (fullPath, kind) => kind !== 'file' || !includeFile || includeFile(fullPath),
   }) as WorkspaceTreeFile[]).filter((entry) => entry.kind === 'file' && entry.size <= byteLimit && isExtractableDocument(entry.fullPath));
 
   let indexedFiles = 0;

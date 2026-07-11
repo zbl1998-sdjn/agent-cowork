@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createOrchestrationCheckpointStore, FileSummaryCache } from '../src/orchestrator/index.js';
 import { createCancellationRegistry } from '../src/runtime/cancellation.js';
+import { writeRunRecord } from '../src/runtime/run-store.js';
 import { handleOrchestratorRoutes } from '../src/routes/orchestrator-routes.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
 
@@ -196,6 +197,53 @@ test('orchestrator route starts a weekly report run, persists trace, and exposes
   assert.ok(timeline.some((event) => event.type === 'budget_updated' && event.budget));
 });
 
+test('orchestrator route rejects client securityMode overrides', async () => {
+  const root = tempRoot();
+  const context: RequestContext = {
+    tenantId: 'tenant_security_override',
+    userId: 'user_security_override',
+    traceId: 'trace_security_override',
+    idempotencyKey: 'idem-security-override',
+    securityMode: 'air_gap',
+  };
+  const harness = routeHarness(root, context);
+  const response = capturedResponse();
+
+  assert.equal(await handleOrchestratorRoutes(harness.options(new FakeJsonRequest('POST', {
+    workspaceRoot: root,
+    userGoal: 'Attempt to weaken the server security mode',
+    securityMode: 'cloud_opt_in',
+  }), response, '/api/orchestrator/run')), true);
+  assert.equal(response.status, 400);
+});
+
+test('orchestrator route derives run securityMode from server context', async () => {
+  const root = tempRoot();
+  const context: RequestContext = {
+    tenantId: 'tenant_server_security',
+    userId: 'user_server_security',
+    traceId: 'trace_server_security',
+    idempotencyKey: 'idem-server-security',
+    securityMode: 'enterprise_local',
+  };
+  const harness = routeHarness(root, context);
+  let response = capturedResponse();
+
+  assert.equal(await handleOrchestratorRoutes(harness.options(new FakeJsonRequest('POST', {
+    workspaceRoot: root,
+    userGoal: 'Use the server-owned security mode',
+  }), response, '/api/orchestrator/run')), true);
+  assert.equal(response.status, 200);
+  const runId = String(response.json().runId);
+
+  response = capturedResponse();
+  assert.equal(await handleOrchestratorRoutes(
+    harness.options(new FakeJsonRequest('GET'), response, `/api/orchestrator/runs/${runId}`),
+  ), true);
+  assert.equal(response.status, 200);
+  assert.equal(objectField(response.json(), 'run').securityMode, 'enterprise_hybrid');
+});
+
 test('orchestrator route reuses file summary cache across runs for the same tenant', async () => {
   const root = tempRoot();
   const fileSummaryCache = new FileSummaryCache();
@@ -297,6 +345,72 @@ test('orchestrator route enforces idempotency and tenant-scoped detail reads', a
   assert.match(String(response.json().error), /complete synchronously/);
 });
 
+test('orchestrator routes hide a run from sibling users before cancel or resume side effects', async () => {
+  const root = tempRoot();
+  const ownerContext: RequestContext = {
+    tenantId: 'tenant_shared',
+    userId: 'user_owner',
+    traceId: 'trace_owner',
+    idempotencyKey: 'idem-owner',
+  };
+  const ownerHarness = routeHarness(root, ownerContext);
+  let response = capturedResponse();
+
+  assert.equal(await handleOrchestratorRoutes(ownerHarness.options(
+    new FakeJsonRequest('POST', { workspaceRoot: root, userGoal: 'Create an owner-only report' }),
+    response,
+    '/api/orchestrator/run',
+  )), true);
+  assert.equal(response.status, 200);
+  const runId = String(response.json().runId);
+
+  const siblingHarness = routeHarness(root, {
+    tenantId: 'tenant_shared',
+    userId: 'user_sibling',
+    traceId: 'trace_sibling',
+    idempotencyKey: 'idem-sibling',
+  });
+
+  response = capturedResponse();
+  assert.equal(await handleOrchestratorRoutes(siblingHarness.options(
+    new FakeJsonRequest('GET'),
+    response,
+    `/api/orchestrator/runs/${runId}`,
+  )), true);
+  assert.equal(response.status, 404);
+
+  response = capturedResponse();
+  assert.equal(await handleOrchestratorRoutes(siblingHarness.options(
+    new FakeJsonRequest('GET'),
+    response,
+    `/api/orchestrator/runs/${runId}/checkpoint`,
+  )), true);
+  assert.equal(response.status, 404);
+
+  let cancelCalls = 0;
+  response = capturedResponse();
+  assert.equal(await handleOrchestratorRoutes({
+    ...siblingHarness.options(new FakeJsonRequest('POST', {}), response, `/api/orchestrator/runs/${runId}/cancel`),
+    cancellation: {
+      cancel: () => {
+        cancelCalls += 1;
+        return true;
+      },
+    },
+  }), true);
+  assert.equal(response.status, 404);
+  assert.equal(cancelCalls, 0);
+
+  response = capturedResponse();
+  assert.equal(await handleOrchestratorRoutes(siblingHarness.options(
+    new FakeJsonRequest('POST', {}),
+    response,
+    `/api/orchestrator/runs/${runId}/resume`,
+  )), true);
+  assert.equal(response.status, 404);
+  assert.match(String(response.json().error), /run not found/i);
+});
+
 
 test('orchestrator route resumes a non-terminal checkpoint and persists detail', async () => {
   const root = tempRoot();
@@ -338,6 +452,17 @@ test('orchestrator route resumes a non-terminal checkpoint and persists detail',
     artifacts: [],
     startedAt: '2026-07-05T00:00:00.000Z',
     updatedAt: '2026-07-05T00:00:00.000Z',
+  });
+  writeRunRecord(runStoreRoot, {
+    id: 'run_route_resume',
+    type: 'orchestrator',
+    status: 'running',
+    context: {
+      tenantId: context.tenantId,
+      userId: context.userId,
+      traceId: context.traceId,
+    },
+    startedAt: '2026-07-05T00:00:00.000Z',
   });
   const harness = routeHarness(root, context);
   let response = capturedResponse();
@@ -525,7 +650,13 @@ test('orchestrator async route can cancel an active provider-backed run', async 
       userGoal: 'Create an async provider-backed weekly report',
     }), response, '/api/orchestrator/run-async'),
     cancellation,
-    modelConfig: { configured: true, provider: 'test-provider', apiKey: 'test-key', model: 'test-model' },
+    modelConfig: {
+      configured: true,
+      provider: 'openai/local',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      apiKey: 'test-key',
+      model: 'test-model',
+    },
     modelCall,
   }), true);
   assert.equal(response.status, 202);
@@ -534,6 +665,8 @@ test('orchestrator async route can cancel an active provider-backed run', async 
   assert.equal(body.status, 'running');
   assert.equal(body.async, true);
   assert.equal(body.runnerKind, 'provider');
+  assert.ok(cancellation.signal(runId, context), 'async cancellation must register under tenant and user');
+  assert.equal(cancellation.signal(runId), null, 'async cancellation must not use the legacy unscoped slot');
 
   response = capturedResponse();
   assert.equal(await handleOrchestratorRoutes({

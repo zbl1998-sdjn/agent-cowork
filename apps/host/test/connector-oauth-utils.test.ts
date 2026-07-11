@@ -48,10 +48,12 @@ test('OAuth route utilities normalize identities, client id, and status codes', 
       accountId: 'octocat',
     });
     const noisyContext = { tenantId: 123, userId: 'user-a' } as unknown as Parameters<typeof oauthFilter>[0];
-    assert.deepEqual(oauthFilter(noisyContext, 'github'), {
-      userId: 'user-a',
-      provider: 'github',
-    });
+    assert.throws(() => oauthFilter(noisyContext, 'github'), /canonical tenantId and userId are required/i);
+    assert.throws(() => oauthIdentity({ tenantId: 'tenant-a' }, 'github'), /canonical tenantId and userId are required/i);
+    assert.throws(
+      () => oauthIdentity({ tenantId: 'tenant-a', userId: 'user-a' }, ' github'),
+      /credential provider/i,
+    );
     assert.equal(githubConnector().id, 'github');
     assert.equal(errorStatus({ statusCode: 418 }, 502), 418);
     assert.equal(errorStatus({ statusCode: '418' }, 502), 502);
@@ -124,21 +126,14 @@ test('OAuth session creation binds GitHub device sessions to the request identit
     expiresAtMs: 123456,
   });
 
-  assert.deepEqual(createConnectorOAuthSession({
+  assert.throws(() => createConnectorOAuthSession({
     clientId: 'client-id',
     deviceCode: 'device-code',
     scopes: [],
     permissions: [],
     requestContext: {},
     expiresAtMs: 1,
-  }), {
-    provider: 'github',
-    clientId: 'client-id',
-    deviceCode: 'device-code',
-    scopes: [],
-    permissions: [],
-    expiresAtMs: 1,
-  });
+  }), /canonical tenantId and userId are required/i);
 });
 
 test('OAuth status returns scoped account summaries and configuration hints without secrets', () => {
@@ -176,9 +171,47 @@ test('OAuth status returns scoped account summaries and configuration hints with
   assert.equal(body.configured, true);
   assert.equal(body.configurationMessage, 'GitHub OAuth client id 已配置。');
   assert.deepEqual(body.requiredEnv, GITHUB_CLIENT_ID_ENV_KEYS);
-  assert.deepEqual(body.accounts, accounts);
+  assert.deepEqual(body.accounts, [{
+    provider: 'github',
+    accountId: 'octocat',
+    tenantId: 'tenant-a',
+    userId: 'user-a',
+    scopes: ['read:user'],
+    account: { login: 'octocat' },
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }]);
   assert.ok(Array.isArray(body.permissions));
   assert.equal(response.body.includes('configured-client-id'), false);
+});
+
+test('OAuth status drops over-specified credential summaries instead of leaking fields', () => {
+  const response = new CapturingJsonResponse();
+  const credentialStore = {
+    list() {
+      return [{
+        provider: 'github',
+        accountId: 'octocat',
+        tenantId: 'tenant-a',
+        userId: 'user-a',
+        scopes: ['read:user'],
+        account: { login: 'octocat' },
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        accessToken: 'test-secret-marker',
+      }];
+    },
+  } as unknown as CredentialStore;
+
+  sendConnectorOAuthStatus({
+    response,
+    requestUrl: new URL('http://127.0.0.1/api/connectors/oauth/status?id=github'),
+    requestContext: { tenantId: 'tenant-a', userId: 'user-a' },
+    credentialStore,
+  });
+
+  const body = response.json();
+  assert.equal(body.connected, false);
+  assert.deepEqual(body.accounts, []);
+  assert.equal(response.body.includes('test-secret-marker'), false);
 });
 
 test('OAuth status fails closed for unsupported connectors or missing credential store', () => {

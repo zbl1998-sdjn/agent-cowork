@@ -10,6 +10,7 @@ import { createRunId } from '../src/runtime/run-store.js';
 import { createUlid } from '../src/runtime/runs-index.js';
 import { createSeededIdSource } from '../src/util/ids.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-seeded-ids-'));
@@ -48,9 +49,11 @@ test('seeded id source makes run ids and ULIDs reproducible', () => {
 test('agent stream runSeed emits a deterministic start runId', async () => {
   const root = tempRoot();
   const seed = 'agent-replay-1';
-  const expectedSource = createSeededIdSource(seed);
+  const expectedSource = createSeededIdSource(JSON.stringify(['tenant_local', 'user_local', seed]));
   const expectedRunId = createRunId(expectedSource.date(), { randomHex: expectedSource.randomHex });
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
+    requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
     kimiChatRunner: fakeKimiChatRunner,

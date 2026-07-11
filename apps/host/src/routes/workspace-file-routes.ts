@@ -13,6 +13,8 @@ import { searchWorkspace } from '../workspace/file-search.js';
 import { buildContextBundle } from '../workspace/context-bundle.js';
 import { importUploadedFiles } from '../workspace/uploads.js';
 import { buildAttachmentContext } from '../workspace/attachment-context.js';
+import { createArtifactAccessGuards } from '../artifacts/artifact-access-guards.js';
+import { assertExternalWorkspaceRoot } from '../security/external-workspace-boundary.js';
 import { assertTrustedPath } from '../security/path-policy.js';
 import { sendJson } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
@@ -68,9 +70,11 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, treeBodySchema, 'invalid file tree request', async (body) => {
       const requestedRoot = path.resolve(body.root);
       const trustedRoot = assertTrustedPath(requestedRoot, trustedRootDefault);
+      const access = createArtifactAccessGuards(trustedRoot, requestContext);
       const tree = listWorkspaceTree(trustedRoot, {
         includeFiles: body.includeFiles !== false,
         includeDirectories: body.includeDirectories !== false,
+        includeEntry: access.includeEntry,
       });
       sendJson(response, 200, { root: trustedRoot, files: tree });
     });
@@ -80,7 +84,9 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/uploads/import') {
     await withParsedWorkspaceBody(request, response, uploadBodySchema, 'invalid upload import request', async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
-      const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
+      const safeRoot = assertExternalWorkspaceRoot(
+        assertTrustedPath(trustedRoot, trustedRootDefault),
+      );
       const imported = importUploadedFiles({
         trustedRoot: safeRoot,
         files: body.files,
@@ -93,7 +99,8 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/files/read') {
     await withParsedWorkspaceBody(request, response, readBodySchema, 'invalid file read request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const file = readTextFile(body.path, omitUndefined({
+      const safePath = createArtifactAccessGuards(trustedRoot, requestContext).readPath(body.path);
+      const file = readTextFile(safePath, omitUndefined({
         trustedRoot,
         maxSize: body.maxSize,
       }));
@@ -106,7 +113,8 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, previewBodySchema, 'invalid file preview request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
       try {
-        const preview = readFilePreview(body.path, omitUndefined({ trustedRoot, maxBytes: body.maxBytes }));
+        const safePath = createArtifactAccessGuards(trustedRoot, requestContext).readPath(body.path);
+        const preview = readFilePreview(safePath, omitUndefined({ trustedRoot, maxBytes: body.maxBytes }));
         sendJson(response, 200, preview);
       } catch (err) {
         const error = err as Error & { statusCode?: number };
@@ -120,7 +128,8 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, extractBodySchema, 'invalid file extract request', async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
-      const extracted = extractDocumentText(body.path, {
+      const safePath = createArtifactAccessGuards(safeRoot, requestContext).readPath(body.path);
+      const extracted = extractDocumentText(safePath, {
         trustedRoot: safeRoot,
         maxSize: body.maxSize,
       });
@@ -133,12 +142,14 @@ export async function handleWorkspaceFileRoutes({
     await withParsedWorkspaceBody(request, response, searchBodySchema, 'invalid file search request', async (body) => {
       const trustedRoot = path.resolve(body.trustedRoot || trustedRootDefault);
       const safeRoot = assertTrustedPath(trustedRoot, trustedRootDefault);
+      const access = createArtifactAccessGuards(safeRoot, requestContext);
       const results = searchWorkspace(omitUndefined({
         trustedRoot: safeRoot,
         query: body.query,
         maxResults: body.maxResults,
         includeContent: body.includeContent,
         maxContentBytes: body.maxContentBytes,
+        includeFile: (fullPath: string) => access.includeEntry(fullPath, 'file'),
       }));
       sendJson(response, 200, results);
     });
@@ -148,12 +159,14 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/context/bundle') {
     await withParsedWorkspaceBody(request, response, contextBundleBodySchema, 'invalid context bundle request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
+      const access = createArtifactAccessGuards(trustedRoot, requestContext);
       const bundle = buildContextBundle(omitUndefined({
         root: trustedRoot,
         paths: body.paths,
         maxTextSize: body.maxTextSize,
+        includeFile: (fullPath: string) => access.includeEntry(fullPath, 'file'),
         fsStatFn: (candidate: string) => {
-          const safe = assertTrustedPath(candidate, trustedRoot);
+          const safe = access.readPath(candidate);
           return fs.statSync(safe);
         },
       }));
@@ -180,7 +193,13 @@ export async function handleWorkspaceFileRoutes({
   if (request.method === 'POST' && pathname === '/api/attachments/context') {
     await withParsedWorkspaceBody(request, response, attachmentContextBodySchema, 'invalid attachment context request', async (body) => {
       const trustedRoot = safeTrustedRoot(body.trustedRoot);
-      const result = buildAttachmentContext(omitUndefined({ files: body.files, trustedRoot, maxSize: body.maxSize }));
+      const access = createArtifactAccessGuards(trustedRoot, requestContext);
+      const result = buildAttachmentContext(omitUndefined({
+        files: body.files,
+        trustedRoot,
+        maxSize: body.maxSize,
+        includeFile: (fullPath: string) => access.includeEntry(fullPath, 'file'),
+      }));
       sendJson(response, 200, { context: requestContext, ...result });
     });
     return true;

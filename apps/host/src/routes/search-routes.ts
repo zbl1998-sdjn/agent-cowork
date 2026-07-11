@@ -3,6 +3,7 @@
 // 职责:处理 /api/search/* —— 在可信工作区内做文件名/内容或 RAG 检索,返回命中与摘录。
 // 依赖:L0 request-utils + L1 workspace 检索(经 state 注入)。导出:handleSearchRoutes。
 import { z } from 'zod';
+import { createArtifactAccessGuards } from '../artifacts/artifact-access-guards.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { searchWorkspaceIndex } from '../workspace/index/search.js';
@@ -71,7 +72,12 @@ export async function handleSearchRoutes({
   }
 
   await withJsonBody(request, response, async (body) => {
-    const result = searchWorkspaceIndex(parseWorkspaceSearchBody(body, state));
+    const input = parseWorkspaceSearchBody(body, state);
+    const access = createArtifactAccessGuards(String(input.root || ''), requestContext);
+    const result = searchWorkspaceIndex({
+      ...input,
+      includeFile: (fullPath: string) => access.includeEntry(fullPath, 'file'),
+    });
     sendJson(response, 200, {
       ...result,
       context: requestContext,

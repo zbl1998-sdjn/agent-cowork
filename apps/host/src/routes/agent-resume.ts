@@ -8,13 +8,18 @@ import { createRunResumer } from '../runtime/run-resume.js';
 import { createRunId } from '../runtime/run-store.js';
 import { createSeededIdSource } from '../util/ids.js';
 import { omitUndefined } from '../util/object.js';
+import { normalizeRunOwner, type RunOwner } from '../util/run-owner.js';
 
 type RunCheckpointer = ReturnType<typeof createRunCheckpointer>;
 type RunResumer = ReturnType<typeof createRunResumer>;
 type ResumeState = ReturnType<RunResumer['load']>;
 type AgentRunIdentity = { runId: string; startedAt: Date; resumed: boolean };
 type AgentRunStartBody = { resumeRunId?: string; runSeed?: string | number | true; seed?: string | number | true };
-type AgentRunStartOptions = { body?: Record<string, unknown> | null; runStoreRoot?: string | null };
+type AgentRunStartOptions = {
+  body?: Record<string, unknown> | null;
+  runStoreRoot?: string | null;
+  requestContext: RunOwner;
+};
 export type AgentRunStart = AgentRunIdentity & { checkpointer: RunCheckpointer | null; resumeState: ResumeState };
 
 const optionalTrimmedString = z.preprocess((value) => {
@@ -46,7 +51,11 @@ function normalizeAgentRunStartBody(body: unknown): AgentRunStartBody {
   return omitUndefined(agentRunStartBodySchema.parse(body));
 }
 
-function createAgentRunIdentity(body: AgentRunStartBody): AgentRunIdentity {
+function namespacedRunSeed(seed: string | number | true, owner: RunOwner): string {
+  return JSON.stringify([owner.tenantId, owner.userId, seed]);
+}
+
+function createAgentRunIdentity(body: AgentRunStartBody, owner: RunOwner): AgentRunIdentity {
   if (body.resumeRunId) {
     return { runId: body.resumeRunId, startedAt: new Date(), resumed: true };
   }
@@ -55,16 +64,17 @@ function createAgentRunIdentity(body: AgentRunStartBody): AgentRunIdentity {
     const startedAt = new Date();
     return { runId: createRunId(startedAt), startedAt, resumed: false };
   }
-  const ids = createSeededIdSource(seed);
+  const ids = createSeededIdSource(namespacedRunSeed(seed, owner));
   const startedAt = ids.date();
   return { runId: createRunId(startedAt, { randomHex: ids.randomHex }), startedAt, resumed: false };
 }
 
-export function resolveAgentRunStart({ body, runStoreRoot }: AgentRunStartOptions): AgentRunStart {
-  const identity = createAgentRunIdentity(normalizeAgentRunStartBody(body));
+export function resolveAgentRunStart({ body, runStoreRoot, requestContext }: AgentRunStartOptions): AgentRunStart {
+  const owner = normalizeRunOwner(requestContext, { label: 'Agent run owner' });
+  const identity = createAgentRunIdentity(normalizeAgentRunStartBody(body), owner);
   const checkpointer = runStoreRoot ? createRunCheckpointer({ root: runStoreRoot }) : null;
   const resumeState = identity.resumed && checkpointer
-    ? createRunResumer({ checkpointer }).load(identity.runId)
+    ? createRunResumer({ checkpointer }).loadOwned(identity.runId, owner)
     : null;
   return { ...identity, checkpointer, resumeState };
 }
