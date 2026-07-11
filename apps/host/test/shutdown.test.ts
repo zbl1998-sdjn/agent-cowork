@@ -9,6 +9,7 @@ import { createServer } from '../src/server.js';
 import { createCancellationRegistry } from '../src/runtime/cancellation.js';
 import { createApprovalRegistry } from '../src/runtime/approvals.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-sd-'));
@@ -42,6 +43,7 @@ test('shutdown drains: refuses new agent streams (503) and unblocks approvals', 
   const cancellation = createCancellationRegistry();
   const approvalRegistry = createApprovalRegistry();
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
     kimiChatRunner: fakeKimiChatRunner,
@@ -74,6 +76,7 @@ test('draining server replies 503 to new agent streams (listener still open)', a
   const root = tmp();
   // inject a concurrency limiter so the route reaches the draining check after acquire? no: draining is checked first.
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
     kimiChatRunner: fakeKimiChatRunner,

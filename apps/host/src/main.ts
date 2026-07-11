@@ -11,6 +11,10 @@ import { getSessionPath } from './storage/app-home.js';
 import { JsonlWriter } from './storage/jsonl-writer.js';
 import { omitUndefined } from './util/object.js';
 import { startParentWatchdog } from './util/parent-watchdog.js';
+import {
+  resolvePublicHost,
+  withPublicHostSecurity,
+} from './security/public-host-policy.js';
 
 const envSchema = z.object({
   HOST: z.string().trim().min(1).catch('127.0.0.1'),
@@ -23,7 +27,6 @@ const envSchema = z.object({
   KIMI_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(60_000),
   KIMI_API_MAX_TOKENS: z.coerce.number().int().positive().catch(2048),
   KIMI_MODEL: z.string().optional(),
-  KCW_TRUST_IDENTITY_HEADERS: z.string().optional(),
   KCW_PARENT_PID: z.coerce.number().int().positive().optional().catch(undefined),
   MASE_MCP_ENABLED: z.string().optional(),
   MASE_REPO: z.string().optional(),
@@ -32,7 +35,7 @@ const envSchema = z.object({
 }).loose();
 
 const env = envSchema.parse(process.env);
-const host = env.HOST;
+const host = resolvePublicHost(env.HOST);
 const port = env.PORT;
 const trustedRoot = path.resolve(env.TRUSTED_ROOT || process.cwd());
 
@@ -67,27 +70,7 @@ function buildMaseMcpServers(): McpServerSpec[] {
   ];
 }
 
-// CFG-1:host 被设计为仅回环 sidecar;绑定可路由地址会把文件/沙箱/API 面暴露到网络。
-// 因此对 HOST=0.0.0.0 这类配置大声告警,避免误开远程入口。
-const isLoopbackBind = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host.toLowerCase());
-if (!isLoopbackBind) {
-  console.warn(
-    `[host] WARNING: binding to non-loopback address "${host}" exposes the local agent API to the network. ` +
-    'Ensure authentication is enforced and set KCW_VALIDATE_HOST=false only if you intend remote access.',
-  );
-}
-
-// CFG-2:信任客户端身份头会允许任何能连到服务的调用者冒充任意 tenant/user。
-// 默认关闭;只有在会剥离外部身份头的反向代理之后才可开启,开启时必须告警。
-if (env.KCW_TRUST_IDENTITY_HEADERS === 'true') {
-  console.warn(
-    '[host] WARNING: KCW_TRUST_IDENTITY_HEADERS=true trusts client-supplied x-tenant-id/x-user-id headers ' +
-    '(any caller can impersonate any tenant). Only enable this behind a reverse proxy that strips these ' +
-    'headers from external clients; never expose such an instance directly.',
-  );
-}
-
-const server = createServer(omitUndefined({
+const server = createServer(withPublicHostSecurity(omitUndefined({
   trustedRoot,
   kimiApiKey: firstNonEmpty(env.KIMI_API_KEY, env.MOONSHOT_API_KEY),
   kimiBaseUrl: firstNonEmpty(env.KIMI_BASE_URL, env.MOONSHOT_BASE_URL),
@@ -98,10 +81,24 @@ const server = createServer(omitUndefined({
   journalWriter: new JsonlWriter(
     path.join(getSessionPath('default'), 'events.jsonl'),
   ),
-}));
+})));
 
-server.listen(port, host, () => {
-  console.log(`Agent cowork host listening on http://${host}:${port}`);
+async function start(): Promise<void> {
+  try {
+    await server.ready();
+  } catch (error) {
+    console.error('Agent cowork host dependencies failed to start:', error);
+    process.exit(1);
+  }
+
+  server.listen(port, host, () => {
+    console.log(`Agent cowork host listening on http://${host}:${port}`);
+  });
+}
+
+void start().catch((error: unknown) => {
+  console.error('Agent cowork host failed to start:', error);
+  process.exit(1);
 });
 
 server.on('error', (error) => {

@@ -36,11 +36,15 @@ const optionalText = (max: number) => z.preprocess(
 );
 const selectedIdsSchema = z.preprocess(
   (value) => (value == null ? undefined : value),
-  z.array(z.string().trim().min(1).max(96), 'selectedIds must be an array of ids').optional(),
+  z.array(z.string().trim().min(1).max(96), 'selectedIds must be an array of ids')
+    .max(64, 'selectedIds must contain at most 64 ids')
+    .optional(),
 );
 const packIdsSchema = z.preprocess(
   (value) => (value == null ? undefined : value),
-  z.array(z.string().trim().min(1).max(96), 'packIds must be an array of ids').optional(),
+  z.array(z.string().trim().min(1).max(96), 'packIds must be an array of ids')
+    .max(64, 'packIds must contain at most 64 ids')
+    .optional(),
 );
 const freeBytesSchema = z.preprocess(
   (value) => (value == null || value === '' ? undefined : Number(value)),

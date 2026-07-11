@@ -1,16 +1,15 @@
 // 主机运行时状态装配(host · L2 运行时 · runtime)
-// ---------------------------------------------------------------------------
 // 职责:把 host 运行所需的各类「单例状态/服务」装配到一处——运行索引、调度器、事件总线、会话/记忆存储、
 //       沙箱、Kimi API 配置等(文件 or Postgres 后端按配置择一)。供 server.js 在组装根注入路由使用。
 // 注:这是 L2 内的「运行时状态聚合」,仍只依赖 L0/L1 与同层;真正的 HTTP 装配在 L4 server.js。
 // 依赖:kimi/api-runner、storage/*、memory、sandbox 及同层 runs-index/scheduler/run-events 等。导出:host 状态工厂。
 import path from 'node:path';
 import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../kimi/api-runner.js';
-import { createRunsIndex, summariseRunForIndex } from './runs-index.js';
+import { createRunsIndex } from './runs-index.js';
 import { createPostgresRunsIndex, withSafeWrites } from '../storage/postgres-runs-index.js';
 import { RunEventBus } from './run-events.js';
 import { createMemoryStore } from '../memory/memory-store.js';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertTrustedPathForCreate } from '../security/path-policy.js';
 import { createConversationStore } from '../storage/conversation-store.js';
 import { createPostgresConversationStore } from '../storage/postgres-conversation-store.js';
 import { createSandbox, DEFAULT_ALLOW_TOOLS } from '../sandbox/index.js';
@@ -29,6 +28,7 @@ import { createOAuthPermissionApprovalStore } from './oauth-permission-approvals
 import { createClarificationStore } from './clarifications.js';
 import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
+import { resolveGlobalMutationAdmins } from '../auth/global-mutation-admin.js';
 import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
@@ -44,6 +44,11 @@ import {
 } from '../http/static-assets.js';
 import { createProjectStoreResolver } from './project-stores.js';
 import { configureHostScheduler } from './host-scheduler.js';
+import { indexHostRun } from './host-run-indexing.js';
+import { idempotencyCacheKey } from './idempotency-key.js';
+import { createHostStatePathResolvers } from './host-state-paths.js';
+import { createFolderGrantStore } from '../workspace/folder-grant-store.js';
+import { createFolderGrantRegistry } from './folder-grants.js';
 import type {
   ApprovalRegistryLike,
   CancellationRegistryLike,
@@ -53,22 +58,24 @@ import type {
   RequestContextLike,
   RunEventsState,
 } from './host-state-types.js';
-
 export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
-  // 配置优先级统一在装配根处理:测试/嵌入式调用传入 config,本地运行再读环境变量,最后落到安全默认值。
-  // 这样面试或部署排查时只需从 HostConfig + `.env.example` 两个入口追配置来源。
+  // 配置优先级在装配根统一处理:config→环境变量→安全默认值,排查只需看 HostConfig 与 `.env.example`。
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
   const staticRoot = config.staticRoot === false
     ? null
     : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
   const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
-  const kimiConfigFile = path.resolve(
-    config.kimiConfigFile || path.join(trustedRootDefault, '.AgentCowork', 'config.json'),
-  );
+  const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
+  const kimiConfigFile = statePaths.kimiConfigFile();
   const kimiApiConfig = resolveKimiApiConfig(config);
-  applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig);
+  const kimiConfigStoreOptions = omitUndefined({ protector: config.kimiConfigProtector });
+  applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig, kimiConfigStoreOptions);
   const securityMode = kimiApiConfig.securityMode;
-
+  const folderGrantStore = config.folderGrantStore || createFolderGrantStore(omitUndefined({
+    filePath: statePaths.folderGrantStoreFile(),
+    protector: config.folderGrantProtector,
+  }));
+  const folderGrants = config.folderGrants || createFolderGrantRegistry({ trustedRootDefault, store: folderGrantStore });
   const state: HostState = {
     config,
     hostSrcDir,
@@ -82,43 +89,41 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     kimiPlanRunner: config.kimiPlanRunner || runKimiApiPlan,
     kimiChatRunner: config.kimiChatRunner || runKimiApiChat,
     kimiChatStreamRunner: config.kimiChatStreamRunner || runKimiApiChatStream,
-    runStoreRoot: path.resolve(config.runStoreRoot || path.join(trustedRootDefault, '.AgentCowork', 'runs')),
+    runStoreRoot: config.runStoreRoot ? path.resolve(config.runStoreRoot) : assertTrustedPathForCreate(path.join(trustedRootDefault, '.AgentCowork', 'runs'), trustedRootDefault),
     idempotencyStore: config.idempotencyStore instanceof Map
       ? config.idempotencyStore as Map<string, IdempotencyEntry>
       : new Map<string, IdempotencyEntry>(),
     draining: false,
+    startupReady: Promise.resolve(),
     approvalRegistry: config.approvalRegistry as ApprovalRegistryLike,
     authStore: config.authStore as HostState['authStore'],
     cancellation: config.cancellation as CancellationRegistryLike,
     runEvents: config.runEventBus as RunEventsState,
     runsIndex: config.runsIndex as HostState['runsIndex'],
     sandboxStartup: config.sandboxStartup as HostState['sandboxStartup'],
-    safeTrustedRoot: (requestedRoot: unknown = trustedRootDefault) => (
-      assertTrustedPath(path.resolve(String(requestedRoot || trustedRootDefault)), trustedRootDefault)
-    ),
-    toolRegistry: config.toolRegistry as HostState['toolRegistry'],
+    folderGrantStore, folderGrants,
+    safeTrustedRoot: folderGrants.safeTrustedRoot,
+    toolRegistry: config.toolRegistry as HostState['toolRegistry'], globalMutationAdmins: resolveGlobalMutationAdmins(config.globalMutationAdmins, process.env),
   };
-
   state.recomputeKimiEnabled = () => {
     state.kimiApiEnabled = config.enableKimiApi !== false
       && (kimiApiConfig.configured || Boolean(config.kimiPlanRunner) || Boolean(config.kimiChatRunner));
     return state.kimiApiEnabled;
   };
   state.recomputeKimiEnabled();
-  state.persistKimiConfig = () => persistKimiConfig(kimiConfigFile, kimiApiConfig);
-
+  state.persistKimiConfig = () => persistKimiConfig(statePaths.kimiConfigFile(), kimiApiConfig, kimiConfigStoreOptions);
   // 提示词改写(/api/prompt/refine)默认接入当前模型:未显式注入且已配置 API Key 时,
   // 用当前 Kimi 配置造一个 refine 专用的非流式模型调用;否则保持空,refiner 走本地兜底。
   if (!config.promptRefineModelCall && !config.promptRefiner && kimiApiConfig.configured) {
     config.promptRefineModelCall = createKimiRefineModelCall({
-      kimiConfig: kimiApiConfig as unknown as Record<string, unknown>,
+      kimiConfig: kimiApiConfig as unknown as Record<string, unknown>, ...(typeof config.fetchImpl === 'function' ? { fetchImpl: config.fetchImpl as typeof fetch } : {}),
     });
     if (config.promptRefineTimeoutMs == null) {
       config.promptRefineTimeoutMs = 20_000;
     }
   }
 
-  const runsIndexRoot = path.resolve(config.runsIndexRoot || path.join(trustedRootDefault, '.AgentCowork', 'index'));
+  const runsIndexRoot = config.runsIndexRoot ? path.resolve(config.runsIndexRoot) : assertTrustedPathForCreate(path.join(trustedRootDefault, '.AgentCowork', 'index'), trustedRootDefault);
   // 存储后端在此分流:file/sqlite 适合单机演示,postgres 才启用跨实例 approvals/run-events/memory。
   Object.assign(state, resolveStoreBackendConfig(config, trustedRootDefault));
   state.runsIndex = config.runsIndex || (state.storeBackend === 'postgres'
@@ -179,8 +184,10 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     ttlMs: config.oauthPermissionApprovalTtlMs,
   }));
   if (state.usePostgresState) {
-    if (state.approvalRegistry?.start) Promise.resolve(state.approvalRegistry.start()).catch(() => undefined);
-    if (state.runEvents?.start) Promise.resolve(state.runEvents.start()).catch(() => undefined);
+    const startupTasks: Array<Promise<unknown>> = [];
+    if (state.approvalRegistry?.start) startupTasks.push(Promise.resolve(state.approvalRegistry.start()));
+    if (state.runEvents?.start) startupTasks.push(Promise.resolve(state.runEvents.start()));
+    state.startupReady = Promise.all(startupTasks).then(() => undefined);
   }
   state.agentConcurrency = config.agentConcurrency || createConcurrencyLimiter({
     maxConcurrent: Number(process.env.KCW_MAX_CONCURRENT_RUNS || 64),
@@ -192,7 +199,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   }));
   state.clarifications = config.clarifications || createClarificationStore();
   state.authStore = config.authStore || ((config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false'))
-    ? createSqliteUserStore({ dbPath: path.resolve(config.authDbPath || process.env.KCW_AUTH_DB || path.join(trustedRootDefault, '.AgentCowork', 'auth.sqlite')) })
+    ? createSqliteUserStore({ dbPath: statePaths.authDbPath() })
     : createUserStore());
   // 凭证仓库是 OAuth/API token 的唯一持久入口;前端只拿脱敏状态,不接触明文凭证。
   state.credentialStore = config.credentialStore || createCredentialStore({
@@ -207,21 +214,12 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   // Host 头白名单用于抵御 DNS rebinding,默认开启;只有明确绑定非回环地址时才关闭。
   state.validateHost = config.validateHost ?? (process.env.KCW_VALIDATE_HOST !== 'false');
 
-  state.safeTrustedRoot = (requestedRoot: unknown = trustedRootDefault) => (
-    assertTrustedPath(path.resolve(String(requestedRoot || trustedRootDefault)), trustedRootDefault)
-  );
-  state.indexRun = (record: Record<string, unknown>, ctx?: Record<string, unknown>): void => {
-    try {
-      const rawContext = record.context;
-      const context = ctx || (rawContext && typeof rawContext === 'object' ? rawContext as Record<string, unknown> : {});
-      state.runsIndex.upsert(summariseRunForIndex({ ...record, runPath: record.runPath }, context), context);
-    } catch {
-      // 索引失败不应打断请求主路径。
-    }
-  };
-  state.cacheKeyFor = (context: RequestContextLike, method: string, pathname: string): string => (
-    context.idempotencyKey ? `${context.tenantId}:${context.userId}:${method}:${pathname}:${context.idempotencyKey}` : ''
-  );
+  // 状态对象保留原接口；索引归一化与失败隔离由同层 helper 负责。
+  state.indexRun = (
+    record: Record<string, unknown>,
+    context?: Record<string, unknown>,
+  ): void => indexHostRun(state.runsIndex, record, context);
+  state.cacheKeyFor = idempotencyCacheKey;
   state.requireIdempotencyKey = (response: HttpResponseLike, context: RequestContextLike): boolean => {
     if (context.idempotencyKey) return true;
     sendJson(response, 428, { error: 'Idempotency-Key header is required for this write operation' });

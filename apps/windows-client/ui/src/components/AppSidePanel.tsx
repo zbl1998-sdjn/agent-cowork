@@ -1,7 +1,7 @@
 // 主区面板容器(UI · 组件层 · components)
 // ---------------------------------------------------------------------------
 // 对标 Claude:面板不再是右侧抽屉,而是切换到主区显示(替代对话/首页),顶部给「返回对话」。
-// 按当前选中标签 lazy 加载并挂载对应面板(工具/可视化/连接器/产物/项目/定时/记忆/可观测),ErrorBoundary 隔离。
+// 按当前选中标签 lazy 加载并挂载对应面板(任务/工具/可视化/连接器/产物/项目/定时/记忆/可观测),ErrorBoundary 隔离。
 import { lazy, Suspense } from 'react';
 import type { SubagentStep } from '../lib/api';
 import type { SidePanel } from '../lib/app-types';
@@ -17,6 +17,7 @@ const ProjectsPanel = lazy(() => import('./panels/ProjectsPanel').then((module) 
 const SchedulesPanel = lazy(() => import('./panels/SchedulesPanel').then((module) => ({ default: module.SchedulesPanel })));
 const MemoryPanel = lazy(() => import('./panels/MemoryPanel').then((module) => ({ default: module.MemoryPanel })));
 const ObservabilityPanel = lazy(() => import('./panels/ObservabilityPanel').then((module) => ({ default: module.ObservabilityPanel })));
+const TasksPanel = lazy(() => import('./panels/TasksPanel').then((module) => ({ default: module.TasksPanel })));
 
 interface AppSidePanelProps {
   panel: SidePanel;
@@ -27,6 +28,7 @@ interface AppSidePanelProps {
 }
 
 const PANEL_LABELS: Record<Exclude<SidePanel, 'none'>, string> = {
+  tasks: '任务中心',
   tools: '工具',
   viz: '可视化',
   connectors: '连接器',
@@ -43,12 +45,13 @@ function panelContent(
   onRunSubagent: AppSidePanelProps['onRunSubagent'],
   workbenchPreview?: WorkbenchPreviewState,
 ) {
+  if (panel === 'tasks') return <TasksPanel />;
   if (panel === 'tools') return <ToolsPanel trustedRoot={trustedRoot} onRunPlan={onRunSubagent} />;
   if (panel === 'viz') return <VizPanel trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} />;
   if (panel === 'connectors') return <ConnectorsPanel trustedRoot={trustedRoot} />;
   if (panel === 'artifacts') return <ArtifactsPanel trustedRoot={trustedRoot} />;
   if (panel === 'projects') return <ProjectsPanel trustedRoot={trustedRoot} />;
-  if (panel === 'schedules') return <SchedulesPanel />;
+  if (panel === 'schedules') return <SchedulesPanel trustedRoot={trustedRoot} />;
   if (panel === 'memory') return <MemoryPanel trustedRoot={trustedRoot} />;
   return <ObservabilityPanel />;
 }

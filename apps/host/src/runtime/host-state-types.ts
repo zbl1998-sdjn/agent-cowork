@@ -10,15 +10,29 @@ import type { RunsIndexLike as RecipeRunsIndexLike } from '../recipes/run-recipe
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
 import type { SandboxStartupOptions, SandboxStartupResult, SpawnSyncLike } from '../sandbox/startup-probe.js';
 import type { SecurityMode } from '../security/security-mode.js';
+import type { CredentialProtector } from '../security/credential-store.js';
 import type { ProjectStore, ProjectStoreContext } from './project-stores.js';
 import type { ScheduleStore, Scheduler, SchedulerExecutor } from './scheduler.js';
+import type { ScheduleRecipeValidator } from './host-scheduler.js';
 import type { StoreBackend, StoreBackendConfigInput } from './store-backend-config.js';
+import type { CancellationScope } from './cancellation.js';
+import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
+import type { FolderGrantStore } from '../workspace/folder-grant-store.js';
+import type { FolderGrantRegistry } from './folder-grants.js';
 
 export type IdempotencyEntry = { status: number; payload: unknown; fingerprint?: string };
 export type Startable = { start?: () => unknown | Promise<unknown> };
 export type RunEventsState = Startable & { publish?: (...args: unknown[]) => unknown };
-export type ApprovalRegistryLike = Startable & { cancelAll?: (decision?: unknown) => void };
-export type CancellationRegistryLike = { cancelAll(reason?: unknown): void };
+export type ApprovalRegistryLike = Startable & { stop?: () => unknown | Promise<unknown>; cancelAll?: (decision?: unknown) => void };
+export type CancellationRegistryLike = {
+  register(runId: string, context?: CancellationScope | null): AbortController;
+  signal(runId: string, context?: CancellationScope | null): AbortSignal | null;
+  isCancelled(runId: string, context?: CancellationScope | null): boolean;
+  cancel(runId: string, reason?: string, context?: CancellationScope | null): boolean;
+  done(runId: string, context?: CancellationScope | null): boolean;
+  cancelAll(reason?: string): number;
+  pending(): string[];
+};
 export type AuthStoreLike = {
   resolveToken(token: string): { userId?: string | null; tenantId?: string | null } | null;
 };
@@ -28,6 +42,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   staticRoot?: string | false;
   uiDistRoot?: string;
   kimiConfigFile?: string;
+  kimiConfigProtector?: CredentialProtector;
   securityMode?: SecurityMode;
   kimiPlanRunner?: typeof runKimiApiPlan;
   kimiChatRunner?: typeof runKimiApiChat;
@@ -70,12 +85,17 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   authDbPath?: string;
   credentialStore?: unknown;
   credentialStorePath?: string;
+  folderGrantStore?: FolderGrantStore;
+  folderGrantStorePath?: string;
+  folderGrantProtector?: CredentialProtector;
+  folderGrants?: FolderGrantRegistry;
   oauthSessions?: unknown;
   oauthFetch?: typeof fetch;
   oauthConfig?: unknown;
   jwtSecret?: string | null;
   requireAuth?: boolean;
   trustIdentityHeaders?: boolean;
+  globalMutationAdmins?: readonly GlobalMutationAdminIdentity[];
   validateHost?: boolean;
   uiDist?: boolean;
   projectStores?: Map<string, ProjectStore>;
@@ -110,6 +130,7 @@ export type HostState = Record<string, unknown> & {
   runStoreRoot: string;
   idempotencyStore: Map<string, IdempotencyEntry>;
   draining: boolean;
+  startupReady: Promise<void>;
   databaseUrl?: string | null;
   storeBackend?: StoreBackend;
   sqliteDbPath?: string;
@@ -118,6 +139,7 @@ export type HostState = Record<string, unknown> & {
   approvalRegistry: ApprovalRegistryLike;
   runEvents: RunEventsState;
   activeScheduler?: Scheduler | null;
+  scheduleRecipeValidator?: ScheduleRecipeValidator | null;
   authStore: AuthStoreLike;
   cancellation: CancellationRegistryLike;
   jwtSecret?: string | null;
@@ -129,10 +151,17 @@ export type HostState = Record<string, unknown> & {
   sandboxStartup: SandboxStartupResult;
   toolRegistry: McpRegistry;
   trustIdentityHeaders?: boolean;
+  globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
   validateHost?: boolean;
   recomputeKimiEnabled?: () => boolean;
   persistKimiConfig?: () => void;
-  safeTrustedRoot: (requestedRoot?: unknown) => string;
+  folderGrantStore: FolderGrantStore;
+  folderGrants: FolderGrantRegistry;
+  safeTrustedRoot: (
+    requestedRoot?: unknown,
+    context?: { tenantId?: unknown; userId?: unknown },
+    grantId?: unknown,
+  ) => string;
   indexRun?: (record: Record<string, unknown>, ctx?: Record<string, unknown>) => void;
   requireIdempotencyKey?: (response: HttpResponseLike, context: RequestContextLike) => boolean;
   sendCachedOrStore?: (

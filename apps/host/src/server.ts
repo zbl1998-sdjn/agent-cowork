@@ -37,6 +37,7 @@ export type HostServer = HttpServer & {
   _mcpClients: ConnectedMcpClient[];
   connectMcpServers(servers?: unknown): Promise<ConnectMcpResult>;
   closeMcp(): void;
+  ready(): Promise<void>;
   isDraining(): boolean;
   shutdown(options?: { timeoutMs?: number }): Promise<void>;
 };
@@ -51,6 +52,7 @@ export function createServer(config: ServerConfig = {}): HostServer {
 
   const server = http.createServer(async (request: IncomingMessage, response: ServerResponse) => {
     try {
+      await state.startupReady;
       const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
       const pathname = requestUrl.pathname;
       const requestContext = createRequestContext(request);
@@ -107,11 +109,13 @@ export function createServer(config: ServerConfig = {}): HostServer {
     server._mcpClients = [];
   };
 
+  server.ready = () => state.startupReady;
   server.isDraining = () => state.draining;
   server.shutdown = async ({ timeoutMs = 10000 } = {}) => {
     state.draining = true;
     try { state.cancellation.cancelAll('shutdown'); } catch { /* 停机取消失败时继续收尾 */ }
     try { state.approvalRegistry.cancelAll?.('reject'); } catch { /* 审批取消失败时继续收尾 */ }
+    try { await state.approvalRegistry.stop?.(); } catch { /* 审批后台清理停止失败时继续收尾 */ }
     try { server.closeMcp(); } catch { /* MCP 关闭失败时继续收尾 */ }
     try {
       if (state.activeScheduler && typeof state.activeScheduler.stop === 'function') state.activeScheduler.stop();

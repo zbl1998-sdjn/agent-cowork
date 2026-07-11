@@ -5,10 +5,12 @@
 // 依赖:同层全部 handleXRoutes。导出:handleRouteChain。
 import path from 'node:path';
 import { handleArtifactRoutes } from './artifact-routes.js';
+import { handleArtifactVersionRoutes } from './artifact-version-routes.js';
 import { handleAuthRoutes } from './auth-routes.js';
 import { handleClarifyRoutes } from './clarify-routes.js';
 import { handleConnectorRoutes } from './connector-routes.js';
 import { handleConversationRoutes } from './conversation-routes.js';
+import { handleFolderGrantRoutes } from './folder-grant-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
 import { handleMemoryKnowledgeRoutes } from './memory-knowledge-routes.js';
 import { handleOnboardingRoutes } from './onboarding-routes.js';
@@ -29,7 +31,8 @@ import { handleWorkspaceFileRoutes } from './workspace-file-routes.js';
 import { handleApprovalRoutes } from './approval-routes.js';
 import { handleKimiRoutes } from './kimi-routes.js';
 import { omitUndefined } from '../util/object.js';
-import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
+import { readRunRecord } from '../runtime/run-store.js';
+import { headerValue, type HttpRequestLike, type HttpResponseLike, type RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
 
 type RouteHandlerOptions<T> = T extends (options: infer Options) => Promise<boolean> ? Options : never;
@@ -61,9 +64,22 @@ export async function handleRouteChain({
   server,
 }: RouteChainOptions): Promise<boolean> {
   const base = { request, response, pathname, requestContext };
+  const workspaceGrantId = headerValue(request, 'x-workspace-grant-id');
+  const safeTrustedRoot = (requestedRoot?: unknown): string => (
+    state.safeTrustedRoot(requestedRoot, requestContext, workspaceGrantId)
+  );
+  const requestState = { ...state, safeTrustedRoot } as HostState;
   if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, requestUrl, state }))) return true;
   if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore }))) return true;
   if (await handleApprovalRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRoutes>>({ ...base, approvalRegistry: state.approvalRegistry }))) return true;
+  if (await handleFolderGrantRoutes(routeOptions<RouteHandlerOptions<typeof handleFolderGrantRoutes>>({
+    ...base,
+    requestUrl,
+    folderGrants: state.folderGrants,
+    cacheKeyFor: state.cacheKeyFor,
+    requireIdempotencyKey: state.requireIdempotencyKey,
+    sendCachedOrStore: state.sendCachedOrStore,
+  }))) return true;
   if (await handleRunRoutes(routeOptions<RouteHandlerOptions<typeof handleRunRoutes>>({
     ...base,
     requestUrl,
@@ -83,17 +99,18 @@ export async function handleRouteChain({
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
   }))) return true;
   if (await handleRecipeRoutes(routeOptions<RouteHandlerOptions<typeof handleRecipeRoutes>>({
     ...base,
     runStoreRoot: state.runStoreRoot,
     runEvents: state.runEvents,
     runsIndex: state.runsIndex,
+    recordReader: (runId: string) => readRunRecord(state.runStoreRoot, runId),
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     fileOperationApprovals: state.fileOperationApprovals,
     // 模型已配置时,支持 AI 路径的 recipe(如会议纪要)走模型提取,否则回退模板。
     resolveModelConfig: () => (state.kimiApiConfig?.configured ? state.kimiApiConfig as unknown as Record<string, unknown> : null),
@@ -101,19 +118,19 @@ export async function handleRouteChain({
   if (await handleMemoryKnowledgeRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryKnowledgeRoutes>>({
     ...base,
     requestUrl,
-    trustedRootDefault: state.trustedRootDefault,
+    safeTrustedRoot,
   }))) return true;
   if (await handleMemoryRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryRoutes>>({
     ...base,
     requestUrl,
-    trustedRootDefault: state.trustedRootDefault,
+    safeTrustedRoot,
     memoryStore: state.memoryStore,
   }))) return true;
   if (await handleProjectRoutes(routeOptions<RouteHandlerOptions<typeof handleProjectRoutes>>({
     ...base,
     requestUrl,
     trustedRootDefault: state.trustedRootDefault,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     getProjectStore: state.getProjectStore,
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
@@ -123,20 +140,24 @@ export async function handleRouteChain({
     ...base,
     requestUrl,
     trustedRootDefault: state.trustedRootDefault,
+    safeTrustedRoot,
     conversationStore: state.conversationStore,
   }))) return true;
   if (await handleArtifactRoutes(routeOptions<RouteHandlerOptions<typeof handleArtifactRoutes>>({
     ...base,
     requestUrl,
     trustedRootDefault: state.trustedRootDefault,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
   }))) return true;
-  if (await handlePromptRoutes(routeOptions<RouteHandlerOptions<typeof handlePromptRoutes>>({ ...base, state }))) return true;
-  if (await handleSearchRoutes(routeOptions<RouteHandlerOptions<typeof handleSearchRoutes>>({ ...base, state }))) return true;
-  if (await handleKimiRoutes({ ...base, state })) return true;
+  if (await handleArtifactVersionRoutes(routeOptions<RouteHandlerOptions<typeof handleArtifactVersionRoutes>>({
+    ...base, requestUrl, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor, requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore, fileOperationApprovals: state.fileOperationApprovals, resolveSecurityMode: () => state.kimiApiConfig?.securityMode,
+  }))) return true;
+  if (await handlePromptRoutes(routeOptions<RouteHandlerOptions<typeof handlePromptRoutes>>({ ...base, state: requestState }))) return true;
+  if (await handleSearchRoutes(routeOptions<RouteHandlerOptions<typeof handleSearchRoutes>>({ ...base, state: requestState }))) return true;
+  if (await handleKimiRoutes({ ...base, state, safeTrustedRoot })) return true;
   if (await handleOnboardingRoutes(routeOptions<RouteHandlerOptions<typeof handleOnboardingRoutes>>({ request, response, pathname }))) return true;
   if (await handleWorkspaceFileRoutes(routeOptions<RouteHandlerOptions<typeof handleWorkspaceFileRoutes>>({
     ...base,
@@ -145,7 +166,7 @@ export async function handleRouteChain({
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     fileOperationApprovals: state.fileOperationApprovals,
   }))) return true;
   if (await handleSandboxRoutes(routeOptions<RouteHandlerOptions<typeof handleSandboxRoutes>>({
@@ -160,7 +181,7 @@ export async function handleRouteChain({
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     allowUnsafeDirectSandboxRoutes: state.config.allowUnsafeDirectSandboxRoutes === true,
   }))) return true;
   if (await handleToolRoutes(routeOptions<RouteHandlerOptions<typeof handleToolRoutes>>({
@@ -173,13 +194,13 @@ export async function handleRouteChain({
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
   }))) return true;
   if (await handleVizRoutes(routeOptions<RouteHandlerOptions<typeof handleVizRoutes>>({
     ...base,
     requestUrl,
     trustedRootDefault: state.trustedRootDefault,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
@@ -187,7 +208,11 @@ export async function handleRouteChain({
     fileOperationApprovals: state.fileOperationApprovals,
     resolveSecurityMode: () => state.kimiApiConfig?.securityMode,
   }))) return true;
-  if (await handleSkillRoutes(routeOptions<RouteHandlerOptions<typeof handleSkillRoutes>>({ ...base, skillRegistry: state.skillRegistry }))) return true;
+  if (await handleSkillRoutes(routeOptions<RouteHandlerOptions<typeof handleSkillRoutes>>({
+    ...base,
+    globalMutationAdmins: state.globalMutationAdmins,
+    skillRegistry: state.skillRegistry,
+  }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({
     ...base,
     toolRegistry: state.toolRegistry,
@@ -197,13 +222,14 @@ export async function handleRouteChain({
   if (await handleConnectorRoutes(routeOptions<RouteHandlerOptions<typeof handleConnectorRoutes>>({
     ...base,
     requestUrl,
+    globalMutationAdmins: state.globalMutationAdmins,
     toolRegistry: state.toolRegistry,
     credentialStore: state.credentialStore,
     oauthPermissionApprovals: state.oauthPermissionApprovals,
     oauthSessions: state.oauthSessions,
     oauthFetch: state.oauthFetch,
     oauthConfig: state.oauthConfig,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
     fsServerPath: path.join(state.hostSrcDir, '../mcp-servers/fs-server.ts'),
     fsServerRunnerPath: path.join(state.hostSrcDir, '../../../scripts/run-host-node.mjs'),
     connectMcp: (servers: Parameters<ConnectMcp>[0]) => server.connectMcpServers(servers),
@@ -212,10 +238,12 @@ export async function handleRouteChain({
     ...base,
     requestUrl,
     activeScheduler: state.activeScheduler,
+    validateRecipeSchedule: state.scheduleRecipeValidator,
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
-    safeTrustedRoot: state.safeTrustedRoot,
+    safeTrustedRoot,
+    workspaceGrantId,
   }))) return true;
   return false;
 }

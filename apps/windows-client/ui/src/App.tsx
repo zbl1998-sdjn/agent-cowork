@@ -8,13 +8,13 @@ import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importRecipeTemp
 import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
-import type { RunEvent } from './lib/types';
+import type { AgentMode, RunEvent } from './lib/types';
 import { buildChatStreamCallbacks, humanizeChatTurnError } from './lib/chat-stream-callbacks';
 import { humanizeError } from './lib/friendly-error';
 import { isImagePath } from './lib/conversations';
 import { Login } from './components/Login';
 import { ConversationRail } from './components/ConversationRail';
-import { AppHeader, type AgentMode } from './components/AppHeader';
+import { AppHeader } from './components/AppHeader';
 import { SecurityStatusBar } from './components/SecurityStatusBar';
 import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
@@ -44,8 +44,7 @@ export function App() {
   const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0]?.messages || []);
   const [panel, setPanel] = useState<SidePanel>('none');
   const [mode, setMode] = useState<AgentMode>('execute');
-  const planMode = mode === 'plan';
-  const autoApprove = mode === 'yolo';
+  const permissionMode = mode === 'plan' ? 'plan' : mode === 'auto' ? 'guarded_auto' : 'manual';
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -140,7 +139,7 @@ export function App() {
   const handleRefinePrompt = useCallback((prompt: string) => refinePrompt(prompt, { trustedRoot }), [trustedRoot]);
   const wireEvents = useCallback((assistantId: string, runId: string) => subscribeRunEvents(runId, (event: RunEvent) => {
     patchAssistant(assistantId, (m) => reduceAssistantRunEvent(m, event));
-  }), [patchAssistant]);
+  }, { onError: (error) => patchAssistant(assistantId, (m) => m.status === 'done' ? m : ({ ...m, status: 'failed', text: m.text || humanizeError(error, { action: '恢复运行事件' }) })) }), [patchAssistant]);
   const uploadAttachments = useCallback(async (files: File[]): Promise<string[]> => {
     if (!files.length) return [];
     const payload = await Promise.all(files.map((f) => fileToUpload(f)));
@@ -211,7 +210,7 @@ export function App() {
     if (!enabled) {
       // 未配置对话模型时,不要盲跑第一个技能(此前固定跑 recipes[0]=会议纪要,任何输入都撞
       // "需要来源材料"报错);给出清晰引导——配模型,或点技能卡片显式选一个再发。
-      patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: '通用对话需要先配置模型:在设置里填入 Kimi API Key,或把模型指向本地端点(如 Ollama)。想直接跑办公技能,请点上方的技能卡片选一个再发。' }));
+      patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: '通用对话需要先配置本机模型：请在设置里选择 Ollama/LM Studio（回环地址），或使用管理员明确放行的客户模型网关。当前 beta 不支持公网云模型直连。想直接跑办公技能，请点上方技能卡片后再发送。' }));
       return;
     }
 
@@ -226,15 +225,14 @@ export function App() {
         model: meta.model,
         modelConfig: meta.modelConfig,
         thinking: meta.thinking,
-        autoApprove,
-        planMode,
+        permissionMode,
         images: contextFiles.filter((p) => isImagePath(p)),
         resumeRunId,
         conversationId: conversations.activeConvId,
         autoContextCompaction,
-      }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId, mode }));
+      }), buildChatStreamCallbacks({ assistantId, patchAssistant, setStreamingId }));
     } catch (error) { setStreamingId(null); patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeChatTurnError(error) })); }
-  }, [autoApprove, autoContextCompaction, chatEnabled, conversations.activeConvId, mode, patchAssistant, planMode, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
+  }, [autoContextCompaction, chatEnabled, conversations.activeConvId, patchAssistant, permissionMode, runRecipeTurn, selectedRecipe, setChatEnabled, trustedRoot, uploadAttachments]);
 
   const quickSend = useCallback((text: string) => void handleSend(text, { files: [], model: defaultModel, thinking: 'standard' }), [handleSend, defaultModel]);
   const resumeRun = useCallback((runId: string) => void handleSend('继续', { files: [], model: defaultModel, thinking: 'standard', resumeRunId: runId }), [handleSend, defaultModel]);
@@ -289,10 +287,10 @@ export function App() {
 
   const commands = useMemo<Command[]>(() => [
     { id: 'new', label: '新建对话', run: startNewConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
-    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-yolo', label: '模式：YOLO（自动批准一切）', run: () => setMode('yolo') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
-    { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
+    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-auto', label: '模式：安全自动（高风险仍需批准）', run: () => setMode('auto') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
+    { id: 'p-tasks', label: '面板：任务中心', run: () => setPanel('tasks') }, { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
-    { id: 'settings', label: 'API 设置', run: () => openSettings('api') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
+    { id: 'settings', label: '模型设置', run: () => openSettings('model') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
   ], [autoClarify, startNewConversation, doLogout, openSettings, setAutoClarify, theme, toggleTheme]);
 
   if (!authReady) return <div className="auth-boot"><span className="brand-dot" aria-hidden="true" /> 正在启动 Agent Cowork…</div>;
@@ -318,7 +316,7 @@ export function App() {
           <Icon name="sidebar" size={16} />
         </button>
       ) : (
-        <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} agentTeamView={agentTeamTimeline.view} agentTeamLoading={agentTeamTimeline.loading} agentTeamError={agentTeamTimeline.error} onRefreshAgentTeam={agentTeamTimeline.refresh} onOpenRuns={() => setPanel('observability')} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
+        <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} agentTeamView={agentTeamTimeline.view} agentTeamLoading={agentTeamTimeline.loading} agentTeamError={agentTeamTimeline.error} onRefreshAgentTeam={agentTeamTimeline.refresh} onOpenRuns={() => setPanel('tasks')} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
       ))}
       <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} autoContextCompaction={autoContextCompaction} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetAutoContextCompaction={setAutoContextCompaction} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>

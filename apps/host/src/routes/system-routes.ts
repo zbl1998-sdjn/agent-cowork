@@ -11,6 +11,7 @@ import { getRuntimeDependencyStatus } from '../runtime/dependencies.js';
 import { readMemorySettings } from '../memory/memory-control.js';
 import { readEgressAuditRecords, summariseEgressAudit } from '../security/egress-audit.js';
 import { isConfidentialMode } from '../security/confidential.js';
+import { AtRestKeyError } from '../security/at-rest.js';
 import { handleSecurityDataRoutes } from './security-data-routes.js';
 import { buildTrustReport } from '../security/trust-report.js';
 import {
@@ -33,14 +34,13 @@ import {
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { KimiApiConfig } from '../kimi/api-runner-config.js';
 import type { CircuitBreakerStats } from '../runtime/circuit-breaker.js';
-
 type RouteRequest = HttpRequestLike & { method?: string };
 type ConcurrencyStats = { active: number; maxConcurrent: number; tenants: number; [key: string]: unknown };
 type RateLimitStats = { tenants: number; ratePerSec?: unknown; burst?: unknown; [key: string]: unknown };
 type AgentConcurrencyLike = { stats(): ConcurrencyStats };
 type RateLimiterLike = { stats(): RateLimitStats };
-type CancellationLike = { cancel(id: string): boolean };
-type ApprovalRegistryLike = { cancelByRun?: (runId: string, decision?: unknown) => number | Promise<number> };
+type CancellationLike = { cancel(id: string, reason: string, context: SystemRequestContext): boolean };
+type ApprovalRegistryLike = { cancelByRun?: (runId: string, context?: SystemRequestContext | null) => number | Promise<number> };
 type SystemRequestContext = {
   traceId: string;
   tenantId: string;
@@ -75,7 +75,7 @@ type HostStateLike = {
   config: SystemRouteConfig;
   trustedRootDefault: string;
   cancellation: CancellationLike;
-  approvalRegistry?: ApprovalRegistryLike | null;
+  approvalRegistry?: ApprovalRegistryLike | null; globalMutationAdmins: readonly Readonly<{ tenantId: string; userId: string }>[];
 };
 export type SystemRouteOptions = {
   request: RouteRequest;
@@ -97,7 +97,6 @@ function safeModelBreakerStats(): CircuitBreakerStats[] {
     return [];
   }
 }
-
 function runtimeDependencyStatus(state: HostStateLike) {
   return getRuntimeDependencyStatus(omitUndefined({
     env: state.config.runtimeDependencyEnv || process.env,
@@ -106,10 +105,11 @@ function runtimeDependencyStatus(state: HostStateLike) {
   }));
 }
 
-function safeMemorySettings(state: HostStateLike) {
+function safeMemorySettings(state: HostStateLike, context: SystemRequestContext) {
   try {
-    return readMemorySettings(state.trustedRootDefault);
-  } catch {
+    return readMemorySettings(state.trustedRootDefault, context);
+  } catch (error) {
+    if (error instanceof AtRestKeyError) throw error;
     return null;
   }
 }
@@ -314,7 +314,7 @@ export async function handleSystemRoutes({
         modelConfigured: state.kimiApiConfig.configured,
         sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
         sandboxMessage: state.sandboxStartup?.info?.userMessage,
-        memorySettings: safeMemorySettings(state),
+        memorySettings: safeMemorySettings(state, requestContext),
         dependencies,
       })),
       dependencies,
@@ -350,7 +350,7 @@ export async function handleSystemRoutes({
   }
 
   // 数据销毁/保留(切片 2d)拆到独立模块,避免 system-routes 变上帝文件。
-  if (await handleSecurityDataRoutes({ request, response, pathname, requestContext, trustedRoot: state.trustedRootDefault })) {
+  if (await handleSecurityDataRoutes({ request, response, pathname, requestContext, globalMutationAdmins: state.globalMutationAdmins, trustedRoot: state.trustedRootDefault })) {
     return true;
   }
 
@@ -376,12 +376,12 @@ export async function handleSystemRoutes({
   if (request.method === 'POST' && cancelMatch) {
     const id = parseCancelRunId(response, cancelMatch[1] ?? '');
     if (!id) return true;
-    const cancelled = state.cancellation.cancel(id);
+    const cancelled = state.cancellation.cancel(id, 'cancelled', requestContext);
     // 取消必须同时吊销该 run 的待决审批:否则审批 await 吊死 SSE 流,
     // 且取消后点到残留审批按钮仍会真实执行高危工具(P1)。
     const registry = state.approvalRegistry;
     const revokedApprovals = registry && typeof registry.cancelByRun === 'function'
-      ? Number(await registry.cancelByRun(id)) || 0
+      ? Number(await registry.cancelByRun(id, requestContext)) || 0
       : 0;
     sendJson(response, 200, { context: requestContext, runId: id, cancelled, revokedApprovals });
     return true;
