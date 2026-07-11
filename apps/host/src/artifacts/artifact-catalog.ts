@@ -6,7 +6,13 @@
 // 导出:listArtifacts(列目录)、renameArtifact(改名)、renderArtifactHtml(预览页)
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertTrustedPath } from '../security/path-policy.js';
+import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
+import {
+  authorizeCatalogArtifactFile,
+  renameCatalogArtifactWithOwner,
+} from './artifact-catalog-security.js';
+import { isAuthorizedLiveArtifactPair } from './artifact-catalog-manifest.js';
+import { renderArtifactPreviewPage } from './artifact-catalog-render.js';
 
 const ARTIFACT_ROOT_PARTS = ['.AgentCowork', 'artifacts'];
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.json', '.html', '.htm', '.log']);
@@ -23,10 +29,11 @@ export type ArtifactItem = {
   size: number;
   mtime: string;
   viewable: boolean;
+  liveArtifactId?: string;
 };
-export type ListArtifactsOptions = { trustedRoot?: string; limit?: number };
-export type RenameArtifactOptions = { trustedRoot?: string; artifactPath?: string; newName?: unknown };
-export type RenderArtifactOptions = { trustedRoot?: string; artifactPath?: string; maxBytes?: number };
+export type ListArtifactsOptions = { trustedRoot?: string; limit?: number; context?: unknown };
+export type RenameArtifactOptions = { trustedRoot?: string; artifactPath?: string; newName?: unknown; context?: unknown };
+export type RenderArtifactOptions = { trustedRoot?: string; artifactPath?: string; maxBytes?: number; context?: unknown };
 
 /** 构造带 HTTP 状态码的错误(供路由层映射成响应)。 */
 function httpError(message: string, statusCode: number): HttpStatusError {
@@ -58,16 +65,6 @@ function safeArtifactPath(trustedRoot: string, artifactPath: string): { root: st
   return { root, safe };
 }
 
-/** HTML 转义,防止制品内容在预览页里被当作标签注入。 */
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 /** 按扩展名把制品归类成前端可识别的 kind(html/markdown/word/...)。 */
 function artifactKind(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
@@ -90,7 +87,7 @@ function artifactRelativePath(root: string, filePath: string): string {
 }
 
 /** 读取文件 stat,组装成对外的制品条目(含大小、修改时间、kind 等)。 */
-function artifactItem(root: string, filePath: string): ArtifactItem {
+function artifactItem(root: string, filePath: string, liveArtifactId?: string): ArtifactItem {
   const stat = fs.statSync(filePath);
   const name = path.basename(filePath);
   return {
@@ -102,51 +99,88 @@ function artifactItem(root: string, filePath: string): ArtifactItem {
     size: stat.size,
     mtime: stat.mtime.toISOString(),
     viewable: true,
+    ...(liveArtifactId ? { liveArtifactId } : {}),
   };
 }
 
 /** 校验重命名目标只能是纯文件名(禁止含路径分隔符或 . / ..),防止目录穿越。 */
 function safeArtifactName(newName: unknown): string {
-  const name = String(newName || '').trim();
+  const name = typeof newName === 'string' ? newName : '';
   if (!name) throw new Error('artifact newName is required');
   if (name !== path.basename(name) || /[\\/]/.test(name)) {
     throw new Error('artifact newName must be a file name only');
   }
-  if (name === '.' || name === '..') throw new Error('artifact newName is invalid');
+  const deviceStem = (name.split('.')[0] || '').replace(/[. ]+$/u, '');
+  if (name === '.'
+    || name === '..'
+    || /[\u0000-\u001f\u007f<>:"|?*]/u.test(name)
+    || /[. ]$/u.test(name)
+    || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(deviceStem)) {
+    throw new Error('artifact newName is invalid');
+  }
   return name;
 }
 
 /** 递归收集制品文件至 limit 条;跳过符号链接以避免越权读到目录外。 */
-function collectFiles(root: string, current: string, files: ArtifactItem[], limit: number): void {
+function collectFiles(
+  trustedRoot: string,
+  root: string,
+  current: string,
+  files: ArtifactItem[],
+  limit: number,
+  context: unknown,
+): void {
   if (files.length >= limit || !fs.existsSync(current)) {
     return;
   }
   for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
     if (files.length >= limit || entry.isSymbolicLink()) continue;
+    if (current === root && entry.name.toLowerCase() === '.owners') continue;
     const fullPath = path.join(current, entry.name);
     if (entry.isDirectory()) {
-      collectFiles(root, fullPath, files, limit);
+      collectFiles(trustedRoot, root, fullPath, files, limit, context);
       continue;
     }
-    if (entry.isFile()) files.push(artifactItem(root, fullPath));
+    if (!entry.isFile()) continue;
+    try {
+      const authorization = authorizeCatalogArtifactFile(trustedRoot, fullPath, context);
+      const extension = path.extname(fullPath).toLowerCase();
+      const liveArtifactId = ['.html', '.htm'].includes(extension)
+        && isAuthorizedLiveArtifactPair({
+          trustedRoot,
+          filePath: fullPath,
+          context,
+          authorization,
+        })
+        ? path.basename(fullPath, extension)
+        : undefined;
+      files.push(artifactItem(root, fullPath, liveArtifactId));
+    } catch (error) {
+      if ((error as HttpStatusError).statusCode !== 404) throw error;
+    }
   }
 }
 
 /** 列出制品目录下的文件,按修改时间倒序返回(limit 夹在 1..100)。 */
-export function listArtifacts({ trustedRoot, limit = 20 }: ListArtifactsOptions = {}): ArtifactItem[] {
+export function listArtifacts({ trustedRoot, limit = 20, context }: ListArtifactsOptions = {}): ArtifactItem[] {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
   const { root } = safeArtifactRoot(trustedRoot);
   const files: ArtifactItem[] = [];
-  collectFiles(root, root, files, Math.max(1, Math.min(Number(limit) || 20, 100)));
+  collectFiles(trustedRoot, root, root, files, Math.max(1, Math.min(Number(limit) || 20, 100)), context);
   return files
     .sort((a, b) => b.mtime.localeCompare(a.mtime))
     .slice(0, Math.max(1, Math.min(Number(limit) || 20, 100)));
 }
 
 /** 在制品目录内重命名一个文件;目标已存在或越界都会报错。 */
-export function renameArtifact({ trustedRoot, artifactPath, newName }: RenameArtifactOptions = {}): ArtifactItem {
+export function renameArtifact({
+  trustedRoot,
+  artifactPath,
+  newName,
+  context,
+}: RenameArtifactOptions = {}): ArtifactItem {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
@@ -154,25 +188,37 @@ export function renameArtifact({ trustedRoot, artifactPath, newName }: RenameArt
     throw new Error('artifact path is required');
   }
   const { root, safe } = safeArtifactPath(trustedRoot, artifactPath);
+  const authorization = authorizeCatalogArtifactFile(trustedRoot, safe, context);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
     throw httpError('artifact not found', 404);
   }
-  const target = path.join(path.dirname(safe), safeArtifactName(newName));
+  const target = assertTrustedPathForCreate(
+    path.join(path.dirname(safe), safeArtifactName(newName)),
+    root,
+  );
   if (!isInside(root, target)) {
     throw new Error('artifact rename target must stay inside .AgentCowork/artifacts');
   }
   if (target === safe) {
     return artifactItem(root, safe);
   }
-  if (fs.existsSync(target)) {
-    throw httpError('artifact target already exists', 409);
-  }
-  fs.renameSync(safe, target);
+  renameCatalogArtifactWithOwner({
+    trustedRoot,
+    source: safe,
+    target,
+    context,
+    authorization,
+  });
   return artifactItem(root, target);
 }
 
 /** 把单个制品渲染成只读 HTML 预览页;文本类才内联内容,二进制/超大只展示元数据。 */
-export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 * 1024 }: RenderArtifactOptions = {}): string {
+export function renderArtifactHtml({
+  trustedRoot,
+  artifactPath,
+  maxBytes = 512 * 1024,
+  context,
+}: RenderArtifactOptions = {}): string {
   if (!trustedRoot) {
     throw new Error('trustedRoot is required');
   }
@@ -180,6 +226,7 @@ export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 *
     throw new Error('artifact path is required');
   }
   const { root, safe } = safeArtifactPath(trustedRoot, artifactPath);
+  authorizeCatalogArtifactFile(trustedRoot, safe, context);
   if (!fs.existsSync(safe) || !fs.statSync(safe).isFile()) {
     throw httpError('artifact not found', 404);
   }
@@ -192,38 +239,11 @@ export function renderArtifactHtml({ trustedRoot, artifactPath, maxBytes = 512 *
   const content = canReadText
     ? fs.readFileSync(safe, 'utf8')
     : `Binary or large artifact preview is metadata-only.\nPath: ${relativePath}\nSize: ${stat.size} bytes`;
-  const escaped = escapeHtml(content);
-
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${escapeHtml(name)} · Artifact Live Page</title>
-    <style>
-      :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif; }
-      body { margin: 0; background: #f5f6f2; color: #20211f; }
-      main { max-width: 980px; margin: 0 auto; padding: 32px 24px 48px; }
-      header { margin-bottom: 20px; }
-      h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
-      .meta { display: flex; flex-wrap: wrap; gap: 8px; color: #646860; font-size: 13px; }
-      .meta span { border: 1px solid #d9ded5; background: #fff; border-radius: 8px; padding: 6px 9px; }
-      pre { overflow: auto; white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #d9ded5; border-radius: 8px; padding: 18px; line-height: 1.55; font-size: 14px; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <header>
-        <h1>Artifact Live Page</h1>
-        <div class="meta">
-          <span>${escapeHtml(name)}</span>
-          <span>${escapeHtml(relativePath)}</span>
-          <span>${stat.size} bytes</span>
-          <span>${escapeHtml(stat.mtime.toISOString())}</span>
-        </div>
-      </header>
-      <pre>${escaped}</pre>
-    </main>
-  </body>
-</html>`;
+  return renderArtifactPreviewPage({
+    name,
+    relativePath,
+    size: stat.size,
+    mtime: stat.mtime.toISOString(),
+    content,
+  });
 }

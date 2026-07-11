@@ -9,22 +9,20 @@
 import fs from 'node:fs';
 
 import { omitUndefined } from '../util/object.js';
+import { createArtifactAccessGuards } from './artifact-access-guards.js';
+import { readArtifactManifest, readLiveArtifactHtml } from './live-artifact-reader.js';
 import { renderViz } from './viz.js';
 import {
-  artifactPaths,
   fail,
   normalizeLiveArtifactDataSource,
   resolveLiveArtifactDataSourcePath,
 } from './live-spec.js';
+import type { ArtifactManifest } from './live-artifact-reader.js';
 import type { LiveArtifactDataSource } from './live-spec.js';
 import type { VizSpec } from './viz.js';
 
-export type ArtifactManifest = {
-  id: string;
-  title: string;
-  viz: VizSpec;
-  dataSource?: unknown;
-};
+export { readArtifactManifest, readLiveArtifactHtml };
+export type { ArtifactManifest };
 export type ArtifactData = {
   id: string;
   title: string;
@@ -44,23 +42,7 @@ export type ToolRegistryLike = {
   call(name: string, args: Record<string, unknown>, ctx: { trustedRoot: string; context?: unknown }): unknown | Promise<unknown>;
 };
 
-/** 读取并解析制品 manifest(JSON);文件不存在抛 404。 */
-export function readArtifactManifest({ trustedRoot, id }: { trustedRoot: string; id: string }): ArtifactManifest {
-  const { manifestPath } = artifactPaths({ trustedRoot, id });
-  if (!fs.existsSync(manifestPath)) {
-    throw fail('artifact not found', 404);
-  }
-  return JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as ArtifactManifest;
-}
-
-/** 读取制品已落盘的活页 HTML 快照;文件不存在抛 404。 */
-export function readLiveArtifactHtml({ trustedRoot, id }: { trustedRoot: string; id: string }): string {
-  const { htmlPath } = artifactPaths({ trustedRoot, id });
-  if (!fs.existsSync(htmlPath)) {
-    throw fail('artifact not found', 404);
-  }
-  return fs.readFileSync(htmlPath, 'utf8');
-}
+const LOW_RISK_CONNECTOR_LEVELS = new Set(['safe', 'low']);
 
 /** 读取并解析 JSON 文件;区分「文件缺失(404)」与「内容非法 JSON(400)」两类错误。 */
 function readJsonFile(filePath: string): unknown {
@@ -92,15 +74,19 @@ function refreshFromFileJson({
   trustedRoot,
   manifest,
   dataSource,
+  context,
 }: {
   trustedRoot: string;
   manifest: ArtifactManifest;
   dataSource: Extract<LiveArtifactDataSource, { type: 'file-json' }>;
+  context?: unknown;
 }): ArtifactData {
-  const filePath = resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource });
-  if (!filePath || !fs.existsSync(filePath)) {
+  const resolvedPath = resolveLiveArtifactDataSourcePath({ trustedRoot, dataSource });
+  if (!resolvedPath) {
     throw fail('artifact data source not found', 404);
   }
+  const filePath = createArtifactAccessGuards(trustedRoot, context).readPath(resolvedPath);
+  if (!fs.existsSync(filePath)) throw fail('artifact data source not found', 404);
   const payload = readJsonFile(filePath);
   const viz = vizFromSourcePayload(payload);
   renderViz(viz);
@@ -112,18 +98,27 @@ function refreshFromFileJson({
   };
 }
 
-/** 判定某 MCP 工具能否当实时数据源:放行只读 fs 读取,否则要求非变更、免审批、风险不高。 */
-function connectorDataSourceAllowed(descriptor: ToolDescriptor | null | undefined): boolean {
+/** 判定某 MCP 工具能否当实时数据源:描述符须绑定请求工具；精确 fs-read 之外均要求完整低风险声明。 */
+function connectorDataSourceAllowed(
+  requestedTool: string,
+  descriptor: ToolDescriptor | null | undefined,
+): boolean {
   if (!descriptor) {
     return false;
   }
-  if (descriptor.source === 'mcp:fs' && descriptor.name === 'mcp__fs__read_text') {
+  const server = /^mcp__([A-Za-z0-9_-]+)__/.exec(requestedTool)?.[1];
+  if (!server
+    || descriptor.name !== requestedTool
+    || descriptor.source !== `mcp:${server}`) {
+    return false;
+  }
+  if (requestedTool === 'mcp__fs__read_text') {
     return true;
   }
-  const risk = String(descriptor.risk || '').toLowerCase();
-  return descriptor.mutating !== true
-    && descriptor.requiresApproval !== true
-    && !['high', 'critical'].includes(risk);
+  const risk = typeof descriptor.risk === 'string' ? descriptor.risk.toLowerCase() : '';
+  return descriptor.mutating === false
+    && descriptor.requiresApproval === false
+    && LOW_RISK_CONNECTOR_LEVELS.has(risk);
 }
 
 /** 解析 MCP 工具返回:若是 content 数组则取其中的 text 片段当 JSON 解析,否则直接当对象。 */
@@ -170,7 +165,7 @@ async function refreshFromConnectorTool({
   if (!descriptor) {
     throw fail('artifact connector tool is not connected', 409);
   }
-  if (!connectorDataSourceAllowed(descriptor)) {
+  if (!connectorDataSourceAllowed(dataSource.tool, descriptor)) {
     throw fail('artifact connector tool is not allowed as a live data source', 403);
   }
   const payload = parseConnectorToolPayload(await toolRegistry.call(dataSource.tool, dataSource.args || {}, omitUndefined({
@@ -188,14 +183,24 @@ async function refreshFromConnectorTool({
 }
 
 /** 同步刷新制品数据:connector-tool 需异步刷新故在此拒绝(503),file-json 读文件,无数据源回退 manifest 自带 viz。 */
-export function refreshLiveArtifactData({ trustedRoot, id, now = new Date() }: { trustedRoot: string; id: string; now?: Date }): ArtifactData {
-  const manifest = readArtifactManifest({ trustedRoot, id });
+export function refreshLiveArtifactData({
+  trustedRoot,
+  id,
+  now = new Date(),
+  context,
+}: {
+  trustedRoot: string;
+  id: string;
+  now?: Date;
+  context?: unknown;
+}): ArtifactData {
+  const manifest = readArtifactManifest({ trustedRoot, id, context });
   const dataSource = normalizeLiveArtifactDataSource(manifest.dataSource);
   if (dataSource?.type === 'connector-tool') {
     throw fail('artifact connector data source requires async refresh', 503);
   }
   const base = dataSource
-    ? refreshFromFileJson({ trustedRoot, manifest, dataSource })
+    ? refreshFromFileJson({ trustedRoot, manifest, dataSource, context })
     : {
         id: manifest.id,
         title: manifest.title,
@@ -221,12 +226,12 @@ export async function refreshLiveArtifactDataAsync({
   toolRegistry?: ToolRegistryLike | null;
   context?: unknown;
 }): Promise<ArtifactData> {
-  const manifest = readArtifactManifest({ trustedRoot, id });
+  const manifest = readArtifactManifest({ trustedRoot, id, context });
   const dataSource = normalizeLiveArtifactDataSource(manifest.dataSource);
   const base = dataSource?.type === 'connector-tool'
     ? await refreshFromConnectorTool(omitUndefined({ trustedRoot, manifest, dataSource, toolRegistry, context }))
     : dataSource
-      ? refreshFromFileJson({ trustedRoot, manifest, dataSource })
+      ? refreshFromFileJson({ trustedRoot, manifest, dataSource, context })
       : {
           id: manifest.id,
           title: manifest.title,

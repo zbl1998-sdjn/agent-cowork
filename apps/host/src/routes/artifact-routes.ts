@@ -81,7 +81,7 @@ export async function handleArtifactRoutes({
       const limit = normalizeLimit(requestUrl.searchParams.get('limit'));
       const trustedRoot = safeTrustedRoot(requestUrl.searchParams.get('trustedRoot') || trustedRootDefault);
       sendJson(response, 200, {
-        artifacts: listArtifacts({ trustedRoot, limit }),
+        artifacts: listArtifacts({ trustedRoot, limit, context: requestContext }),
         context: requestContext,
       });
     } catch (err) {
@@ -94,7 +94,11 @@ export async function handleArtifactRoutes({
     try {
       const input = artifactViewQuerySchema.parse(Object.fromEntries(requestUrl.searchParams.entries()));
       const trustedRoot = safeTrustedRoot(input.trustedRoot || trustedRootDefault);
-      const html = renderArtifactHtml({ trustedRoot, artifactPath: input.path });
+      const html = renderArtifactHtml({
+        trustedRoot,
+        artifactPath: input.path,
+        context: requestContext,
+      });
       sendHtml(response, 200, html);
     } catch (err) {
       sendJson(response, errorStatus(err, 400), { error: errorMessage(err) });
@@ -123,6 +127,7 @@ export async function handleArtifactRoutes({
         trustedRoot,
         artifactPath: input.path,
         newName: input.newName,
+        context: requestContext,
       });
       sendCachedOrStore(response, cacheKey, fingerprint, 200, {
         artifact,

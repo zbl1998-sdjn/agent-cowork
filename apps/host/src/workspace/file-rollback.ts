@@ -8,11 +8,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { assertExternalWorkspacePath } from '../security/external-workspace-boundary.js';
 import { assertTrustedPath, assertTrustedPathForCreate } from '../security/path-policy.js';
 import { fileExists, hashFile, pathExists, requiredPath } from './file-operation-utils.js';
 
 export type JournalWriter = { append(event: unknown): unknown };
-export type RollbackOptions = { trustedRoot?: string; rollbackBatchId?: string; journalWriter?: JournalWriter };
+export type RollbackPreparation = Readonly<{
+  beforeMutation?(): void;
+  commit(): void;
+  abort(): void;
+}>;
+export type RollbackOptions = {
+  trustedRoot?: string;
+  rollbackBatchId?: string;
+  journalWriter?: JournalWriter;
+  prepareDeleteCreated?: (path: string) => RollbackPreparation | null;
+  prepareRestoreBackup?: (path: string, backupPath: string) => RollbackPreparation | null;
+  prepareRenameBack?: (source: string, target: string) => RollbackPreparation | null;
+};
 export type OperationPreview = {
   type: string;
   path: string;
@@ -124,18 +137,43 @@ function assertExpectedHash(filePath: string, expectedHash: string | null | unde
   }
 }
 
-function rollbackCreatedFile(entry: RollbackEntry, trustedRoot: string): RollbackResult {
-  const target = assertTrustedPath(path.resolve(requiredPath(entry.path, 'path')), trustedRoot);
-  if (!fileExists(target)) {
-    return { type: entry.type, path: target, status: 'already-absent' };
+function applyPrepared<T>(preparation: RollbackPreparation | null, effect: () => T): T {
+  try {
+    preparation?.beforeMutation?.();
+    const result = effect();
+    preparation?.commit();
+    return result;
+  } catch (error) {
+    try {
+      preparation?.abort();
+    } catch (abortError) {
+      throw new AggregateError([error, abortError], 'rollback mutation and ownership recovery failed');
+    }
+    throw error;
   }
-  assertExpectedHash(target, entry.expectedHash);
-  fs.unlinkSync(target);
-  return { type: entry.type, path: target, status: 'rolled_back' };
 }
 
-function rollbackBackupRestore(entry: RollbackEntry, trustedRoot: string): RollbackResult {
-  const target = assertTrustedPath(path.resolve(requiredPath(entry.path, 'path')), trustedRoot);
+function rollbackCreatedFile(
+  entry: RollbackEntry,
+  trustedRoot: string,
+  prepare?: RollbackOptions['prepareDeleteCreated'],
+): RollbackResult {
+  const target = assertExternalWorkspacePath(path.resolve(requiredPath(entry.path, 'path')), trustedRoot);
+  const exists = fileExists(target);
+  if (exists) assertExpectedHash(target, entry.expectedHash);
+  return applyPrepared(prepare?.(target) ?? null, () => {
+    if (!exists) return { type: entry.type, path: target, status: 'already-absent' };
+    fs.unlinkSync(target);
+    return { type: entry.type, path: target, status: 'rolled_back' };
+  });
+}
+
+function rollbackBackupRestore(
+  entry: RollbackEntry,
+  trustedRoot: string,
+  prepare?: RollbackOptions['prepareRestoreBackup'],
+): RollbackResult {
+  const target = assertExternalWorkspacePath(path.resolve(requiredPath(entry.path, 'path')), trustedRoot);
   const backupPath = assertTrustedPath(path.resolve(requiredPath(entry.backupPath, 'backupPath')), trustedRoot);
   if (!fileExists(backupPath)) {
     throw new Error(`Rollback backup not found: ${backupPath}`);
@@ -143,14 +181,20 @@ function rollbackBackupRestore(entry: RollbackEntry, trustedRoot: string): Rollb
   if (fileExists(target)) {
     assertExpectedHash(target, entry.expectedHash);
   }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(backupPath, target);
-  return { type: entry.type, path: target, backupPath, status: 'rolled_back' };
+  return applyPrepared(prepare?.(target, backupPath) ?? null, () => {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(backupPath, target);
+    return { type: entry.type, path: target, backupPath, status: 'rolled_back' };
+  });
 }
 
-function rollbackRenameBack(entry: RollbackEntry, trustedRoot: string): RollbackResult {
-  const from = assertTrustedPath(path.resolve(requiredPath(entry.from, 'from')), trustedRoot);
-  const to = assertTrustedPathForCreate(path.resolve(requiredPath(entry.to, 'to')), trustedRoot);
+function rollbackRenameBack(
+  entry: RollbackEntry,
+  trustedRoot: string,
+  prepare?: RollbackOptions['prepareRenameBack'],
+): RollbackResult {
+  const from = assertExternalWorkspacePath(path.resolve(requiredPath(entry.from, 'from')), trustedRoot);
+  const to = assertExternalWorkspacePath(path.resolve(requiredPath(entry.to, 'to')), trustedRoot);
   if (!fileExists(from)) {
     throw new Error(`Rollback source not found: ${from}`);
   }
@@ -158,9 +202,13 @@ function rollbackRenameBack(entry: RollbackEntry, trustedRoot: string): Rollback
     throw new Error(`Rollback target already exists: ${to}`);
   }
   assertExpectedHash(from, entry.expectedHash);
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.renameSync(from, to);
-  return { type: entry.type, from, to, status: 'rolled_back' };
+  const preparation = prepare?.(from, to) ?? null;
+  return applyPrepared(preparation, () => {
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    preparation?.beforeMutation?.();
+    fs.renameSync(from, to);
+    return { type: entry.type, from, to, status: 'rolled_back' };
+  });
 }
 
 /** 逆序回滚一批操作条目(删新建/还原备份/移回);逐条校验哈希并记 journal,返回回滚结果。 */
@@ -179,11 +227,11 @@ export function rollbackFileOperations(entries: unknown, options: RollbackOption
     const entry = normalizeRollbackEntry(raw);
     let result: RollbackResult;
     if (entry.type === 'delete-created-file') {
-      result = rollbackCreatedFile(entry, trustedRoot);
+      result = rollbackCreatedFile(entry, trustedRoot, options.prepareDeleteCreated);
     } else if (entry.type === 'restore-backup') {
-      result = rollbackBackupRestore(entry, trustedRoot);
+      result = rollbackBackupRestore(entry, trustedRoot, options.prepareRestoreBackup);
     } else if (entry.type === 'rename-back') {
-      result = rollbackRenameBack(entry, trustedRoot);
+      result = rollbackRenameBack(entry, trustedRoot, options.prepareRenameBack);
     } else {
       throw new Error(`Unsupported rollback type: ${entry.type}`);
     }

@@ -14,10 +14,11 @@ export type RunSummary = {
   finishedAt?: string;
   durationMs?: number;
   summary?: string;
+  error?: string;
 };
 
 export type TaskSummary = RunSummary & {
-  status: 'done' | 'failed' | 'in_progress';
+  status: 'done' | 'failed' | 'in_progress' | 'awaiting_approval' | 'cancelled';
   activeForm: string;
 };
 
@@ -26,11 +27,24 @@ export function taskFromRun(run: RunSummary): TaskSummary {
     ? 'done'
     : run.status === 'failed'
       ? 'failed'
-      : 'in_progress';
+      : run.status === 'awaiting_approval'
+        ? 'awaiting_approval'
+        : run.status === 'cancelled'
+          ? 'cancelled'
+          : 'in_progress';
+  const activeForm = status === 'in_progress'
+    ? '任务运行中'
+    : status === 'failed'
+      ? '需要查看错误'
+      : status === 'awaiting_approval'
+        ? '等待审批'
+        : status === 'cancelled'
+          ? '已取消'
+          : '已完成';
   const task: TaskSummary = {
     id: run.id,
     status,
-    activeForm: status === 'in_progress' ? '任务运行中' : status === 'failed' ? '需要查看错误' : '已完成',
+    activeForm,
   };
   if (run.prompt !== undefined) task.prompt = run.prompt;
   if (run.mode !== undefined) task.mode = run.mode;
@@ -40,5 +54,6 @@ export function taskFromRun(run: RunSummary): TaskSummary {
   if (run.finishedAt !== undefined) task.finishedAt = run.finishedAt;
   if (run.durationMs !== undefined) task.durationMs = run.durationMs;
   if (run.summary !== undefined) task.summary = run.summary;
+  if (run.error !== undefined) task.error = run.error;
   return task;
 }

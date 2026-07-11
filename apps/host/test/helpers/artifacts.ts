@@ -36,9 +36,14 @@ export const artifactDataResponseSchema = z.object({
   }).loose(),
 }).loose();
 
-export async function approveVizRender(base: string, body: VizRenderBody): Promise<VizRenderBody> {
+export async function approveVizRender(
+  base: string,
+  body: VizRenderBody,
+  headers: Record<string, string> = {},
+): Promise<VizRenderBody> {
   const preview = await jsonRequest(base, '/api/viz/render/preview', {
     method: 'POST',
+    headers,
     body,
   });
   assert.equal(preview.status, 200);

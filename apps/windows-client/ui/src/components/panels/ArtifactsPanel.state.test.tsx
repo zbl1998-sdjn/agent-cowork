@@ -123,4 +123,31 @@ describe('ArtifactsPanel state views', () => {
 
     expect(buttons[0]!.props.disabled).toBe(true);
   });
+
+  it('exposes an explicit create-version action only for live artifacts', () => {
+    const onCreateVersion = vi.fn();
+    const element = ArtifactPanelItem({
+      item: {
+        path: 'C:/work/.AgentCowork/artifacts/viz_report_v1.html',
+        name: 'viz_report_v1.html',
+        liveArtifactId: 'viz_report_v1',
+      },
+      busy: false,
+      renaming: false,
+      renameText: '',
+      onRenameTextChange: () => {},
+      onCommitRename: () => {},
+      onCancelRename: () => {},
+      onOpen: () => {},
+      onBeginRename: () => {},
+      onCreateVersion,
+    });
+    const buttons = collectByType(element, Button);
+    const create = buttons.find((button) => button.props.children === '创建新版本');
+
+    expect(create).toBeTruthy();
+    expect(buttons.some((button) => button.props.children === '重命名')).toBe(false);
+    create!.props.onClick();
+    expect(onCreateVersion).toHaveBeenCalledWith('viz_report_v1');
+  });
 });

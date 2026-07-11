@@ -1,4 +1,5 @@
 import { runSubagent } from '../runtime/subagent.js';
+import { LOCAL_IDENTITY_SCOPE } from '../security/identity-scope.js';
 import type {
   AgentDefinition,
   AgentResult,
@@ -132,14 +133,18 @@ function jsonObject(value: unknown): JsonObject {
   return JSON.parse(JSON.stringify(value ?? {})) as JsonObject;
 }
 
-export function createSubagentTaskRunner({
+export function createSubagentTaskRunner(options: SubagentTaskRunnerOptions) {
+  const {
   registry,
   trustedRoot,
   runStoreRoot,
   runEvents = null,
   runsIndex = null,
-  context = {},
-}: SubagentTaskRunnerOptions) {
+  context: suppliedContext,
+  } = options;
+  const context = Object.hasOwn(options, 'context')
+    ? (suppliedContext ?? {})
+    : LOCAL_IDENTITY_SCOPE;
   return async function subagentTaskRunner(
     task: AgentTask,
     pack: ContextPack,

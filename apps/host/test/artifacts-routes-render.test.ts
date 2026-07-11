@@ -66,7 +66,18 @@ test('POST /api/viz/render persistent writes require a scoped approval receipt',
       kind: 'table',
       data: { columns: ['a'], rows: [['2']] },
     };
-    const approvedChild = await approveVizRender(base, childBody);
+    const childGrantResponse = await jsonRequest(base, '/api/folder-grants', {
+      method: 'POST',
+      headers: { 'idempotency-key': 'viz-child-folder-grant' },
+      body: { path: childRoot, displayName: 'Viz child root' },
+    });
+    assert.equal(childGrantResponse.status, 201);
+    const childGrant = childGrantResponse.body.grant;
+    assert.ok(childGrant && typeof childGrant === 'object' && !Array.isArray(childGrant));
+    const childGrantId = String((childGrant as Record<string, unknown>).id || '');
+    assert.match(childGrantId, /^grant_/);
+    const childGrantHeaders = { 'x-workspace-grant-id': childGrantId };
+    const approvedChild = await approveVizRender(base, childBody, childGrantHeaders);
     const wrongRoot = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
       headers: { 'idempotency-key': 'viz-wrong-root' },
@@ -77,7 +88,7 @@ test('POST /api/viz/render persistent writes require a scoped approval receipt',
 
     const accepted = await jsonRequest(base, '/api/viz/render', {
       method: 'POST',
-      headers: { 'idempotency-key': 'viz-with-approval' },
+      headers: { 'idempotency-key': 'viz-with-approval', ...childGrantHeaders },
       body: approvedChild,
     });
     const acceptedBody = parsePersistedRenderResponse(accepted.body);

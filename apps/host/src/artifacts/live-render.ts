@@ -9,6 +9,7 @@
 //       禁止内联脚本执行,已用 Playwright 实测确认子文档自带 <meta CSP> 无法放宽这一限制)。
 // 导出:renderLivePage(生成活页 HTML 字符串)
 import { CHART_KINDS } from './live-spec.js';
+import { LIVE_ARTIFACT_HTML_SENTINEL } from './live-artifact-contract.js';
 import type { VizSpec } from './viz.js';
 
 const CHART_VENDOR_SRC = '/vendor/chart.umd.min.js';
@@ -70,6 +71,7 @@ export function renderLivePage({ title, viz, dataUrl, securityMode }: RenderLive
     ? `<p class="notice">${escapeHtml(AIR_GAP_NOTICE)}</p>\n      `
     : '';
   return `<!doctype html>
+${LIVE_ARTIFACT_HTML_SENTINEL}
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8">

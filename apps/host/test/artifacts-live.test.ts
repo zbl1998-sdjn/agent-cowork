@@ -53,6 +53,142 @@ test('buildLiveArtifact writes a live page + manifest with a Refresh hook', () =
   assert.equal(recordValue(manifest, 'artifact manifest').dataUrl, `/api/artifacts/data/${out.id}`);
 });
 
+test('owned live artifacts clean partial file writes and owner claims before retry', () => {
+  const owner = { tenantId: 'tenant_atomic', userId: 'user_atomic' };
+  for (const [failureIndex, failedPart] of [[3, 'html'], [4, 'manifest']] as const) {
+    const root = tempRoot(`kcw-art-partial-${failedPart}-`);
+    const id = `viz_partial_${failedPart}`;
+    const artifactDir = path.join(root, '.AgentCowork', 'artifacts');
+    const htmlPath = path.join(artifactDir, `${id}.html`);
+    const manifestPath = path.join(artifactDir, `${id}.json`);
+    const originalWriteFileSync = fs.writeFileSync;
+    let privateWrites = 0;
+
+    fs.writeFileSync = ((...args: unknown[]) => {
+      privateWrites += 1;
+      if (privateWrites === failureIndex) {
+        const [destination] = args;
+        if (typeof destination === 'number') {
+          const writeDescriptor = originalWriteFileSync as unknown as (
+            descriptor: number,
+            data: string,
+            encoding: string,
+          ) => void;
+          writeDescriptor(destination, `${failedPart}-partial`, 'utf8');
+        } else {
+          originalWriteFileSync(String(destination), `${failedPart}-partial`, 'utf8');
+        }
+        throw new Error(`injected partial ${failedPart} write`);
+      }
+      return Reflect.apply(originalWriteFileSync, fs, args);
+    }) as typeof fs.writeFileSync;
+
+    try {
+      assert.throws(
+        () => buildLiveArtifact({
+          trustedRoot: root,
+          id,
+          title: 'Atomic live artifact',
+          viz: { kind: 'table', data: { columns: ['value'], rows: [['safe']] } },
+          owner,
+        }),
+        new RegExp(`injected partial ${failedPart} write`),
+      );
+    } finally {
+      fs.writeFileSync = originalWriteFileSync;
+    }
+
+    assert.equal(fs.existsSync(htmlPath), false, `${failedPart}: html must roll back`);
+    assert.equal(fs.existsSync(manifestPath), false, `${failedPart}: manifest must roll back`);
+    const ownerDir = path.join(artifactDir, '.owners');
+    assert.deepEqual(fs.existsSync(ownerDir) ? fs.readdirSync(ownerDir) : [], []);
+    assert.doesNotThrow(() => buildLiveArtifact({
+      trustedRoot: root,
+      id,
+      title: 'Atomic live artifact retry',
+      viz: { kind: 'table', data: { columns: ['value'], rows: [['safe']] } },
+      owner,
+    }));
+  }
+});
+
+test('legacy live artifacts clean partial pair writes before retry', () => {
+  const root = tempRoot('kcw-art-legacy-partial-');
+  const id = 'viz_legacy_partial';
+  const artifactDir = path.join(root, '.AgentCowork', 'artifacts');
+  const htmlPath = path.join(artifactDir, `${id}.html`);
+  const manifestPath = path.join(artifactDir, `${id}.json`);
+  const originalWriteFileSync = fs.writeFileSync;
+  let privateWrites = 0;
+
+  fs.writeFileSync = ((...args: unknown[]) => {
+    privateWrites += 1;
+    if (privateWrites === 2) {
+      const [destination] = args;
+      if (typeof destination === 'number') {
+        const writeDescriptor = originalWriteFileSync as unknown as (
+          descriptor: number,
+          data: string,
+          encoding: string,
+        ) => void;
+        writeDescriptor(destination, 'manifest-partial', 'utf8');
+      } else {
+        originalWriteFileSync(String(destination), 'manifest-partial', 'utf8');
+      }
+      throw new Error('injected legacy manifest write');
+    }
+    return Reflect.apply(originalWriteFileSync, fs, args);
+  }) as typeof fs.writeFileSync;
+
+  try {
+    assert.throws(
+      () => buildLiveArtifact({
+        trustedRoot: root,
+        id,
+        title: 'Legacy atomic live artifact',
+        viz: { kind: 'table', data: { columns: ['value'], rows: [['safe']] } },
+      }),
+      /injected legacy manifest write/,
+    );
+  } finally {
+    fs.writeFileSync = originalWriteFileSync;
+  }
+
+  assert.equal(fs.existsSync(htmlPath), false);
+  assert.equal(fs.existsSync(manifestPath), false);
+  assert.doesNotThrow(() => buildLiveArtifact({
+    trustedRoot: root,
+    id,
+    title: 'Legacy atomic live artifact retry',
+    viz: { kind: 'table', data: { columns: ['value'], rows: [['safe']] } },
+  }));
+});
+
+test('legacy live artifacts never overwrite an existing id', () => {
+  const root = tempRoot('kcw-art-legacy-collision-');
+  const id = 'viz_legacy_collision';
+  const first = buildLiveArtifact({
+    trustedRoot: root,
+    id,
+    title: 'First',
+    viz: { kind: 'table', data: { columns: ['value'], rows: [['first']] } },
+  });
+  const originalHtml = fs.readFileSync(first.htmlPath, 'utf8');
+  const originalManifest = fs.readFileSync(first.manifestPath, 'utf8');
+
+  assert.throws(
+    () => buildLiveArtifact({
+      trustedRoot: root,
+      id,
+      title: 'Second',
+      viz: { kind: 'table', data: { columns: ['value'], rows: [['second']] } },
+    }),
+    (error: unknown) => assertHttpError(error, 409, /artifact already exists/),
+  );
+  assert.equal(fs.readFileSync(first.htmlPath, 'utf8'), originalHtml);
+  assert.equal(fs.readFileSync(first.manifestPath, 'utf8'), originalManifest);
+});
+
 test('renderLivePage escapes title and script-sensitive data while preserving refresh wiring', () => {
   const html = renderLivePage({
     title: '<script>alert(1)</script>',
@@ -228,6 +364,11 @@ test('refreshLiveArtifactDataAsync calls an allowed connector data source with t
     dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: { report: 'daily' } },
   });
   const calls: Array<{ name: string; args: Record<string, unknown>; ctx: unknown }> = [];
+  const context = {
+    tenantId: 'tenant_local',
+    userId: 'user_local',
+    requestId: 'req-1',
+  };
   const toolRegistry: ToolRegistryLike = {
     descriptor(name) {
       assert.equal(name, 'mcp__demo__read_report');
@@ -246,14 +387,14 @@ test('refreshLiveArtifactDataAsync calls an allowed connector data source with t
     id: out.id,
     now: new Date('2026-03-04T05:06:07.000Z'),
     toolRegistry,
-    context: { requestId: 'req-1' },
+    context,
   });
 
   assert.equal(data.refreshedAt, '2026-03-04T05:06:07.000Z');
   assert.deepEqual(calls, [{
     name: 'mcp__demo__read_report',
     args: { report: 'daily' },
-    ctx: { trustedRoot: root, context: { requestId: 'req-1' } },
+    ctx: { trustedRoot: root, context },
   }]);
   const vizData = recordValue(data.viz.data, 'connector viz data');
   assert.deepEqual(vizData.rows, [['from tool']]);
@@ -293,13 +434,6 @@ test('refreshLiveArtifactDataAsync allows only read-only connector tools as live
     );
   }
 
-  const fsRegistry = makeRegistry({ source: 'mcp:fs', name: 'mcp__fs__read_text', risk: 'critical', mutating: true, requiresApproval: true });
-  fsRegistry.call = () => ({
-    content: [{ type: 'text', text: JSON.stringify({ viz: { kind: 'table', data: { columns: ['name'], rows: [['fs text']] } } }) }],
-  });
-  const data = await refreshLiveArtifactDataAsync({ trustedRoot: root, id: out.id, toolRegistry: fsRegistry });
-  const vizData = recordValue(data.viz.data, 'fs connector viz data');
-  assert.deepEqual(vizData.rows, [['fs text']]);
 });
 
 test('refreshLiveArtifactDataAsync rejects malformed connector payloads before rendering', async () => {
@@ -311,7 +445,7 @@ test('refreshLiveArtifactDataAsync rejects malformed connector payloads before r
     dataSource: { type: 'connector-tool', tool: 'mcp__demo__read_report', args: {} },
   });
   const makeRegistry = (result: unknown): ToolRegistryLike => ({
-    descriptor: () => ({ source: 'mcp:demo', name: 'mcp__demo__read_report', risk: 'low' }),
+    descriptor: () => ({ source: 'mcp:demo', name: 'mcp__demo__read_report', risk: 'low', mutating: false, requiresApproval: false }),
     call: () => result,
   });
 

@@ -85,6 +85,50 @@ export interface ArtifactItem {
   mtime?: string;
   modifiedAt?: string;
   viewable?: boolean;
+  liveArtifactId?: string;
+}
+
+export interface ArtifactVersionSummary {
+  id: string;
+  lineageId: string;
+  parentVersionId?: string;
+  contentSha256: string;
+  hashVerified: boolean;
+  title: string;
+  createdAt: string;
+  viewUrl: string;
+}
+
+export interface ArtifactVersionDraft {
+  id?: string;
+  title?: string;
+  viz?: VizSpec;
+  dataSource?: unknown;
+}
+
+export interface ArtifactVersionPreview {
+  id: string;
+  parentVersionId: string;
+  relativePath: string;
+  dataUrl: string;
+  viewUrl: string;
+  title: string;
+  vizKind: string;
+  dataSourceType: string;
+  parentContentSha256: string;
+  approvalPlanSha256: string;
+  operationCount: number;
+  fileOperationApprovalId: string;
+}
+
+export interface PublishedArtifactVersion {
+  id: string;
+  parentVersionId: string;
+  lineageId: string;
+  relativePath: string;
+  dataUrl: string;
+  viewUrl: string;
+  idempotentReplay?: boolean;
 }
 
 export async function listArtifacts(trustedRoot?: string, limit = 30): Promise<ArtifactItem[]> {
@@ -93,6 +137,48 @@ export async function listArtifacts(trustedRoot?: string, limit = 30): Promise<A
   params.set('limit', String(limit));
   const res = await getJson<{ artifacts: ArtifactItem[] }>(`/api/artifacts?${params.toString()}`);
   return res.artifacts || [];
+}
+
+export async function listArtifactVersions(
+  artifactId: string,
+  trustedRoot?: string,
+): Promise<ArtifactVersionSummary[]> {
+  const params = new URLSearchParams();
+  if (trustedRoot) params.set('trustedRoot', trustedRoot);
+  const query = params.toString();
+  const res = await getJson<{ versions?: ArtifactVersionSummary[] }>(
+    `/api/artifacts/live/${encodeURIComponent(artifactId)}/history${query ? `?${query}` : ''}`,
+  );
+  return Array.isArray(res.versions) ? res.versions : [];
+}
+
+export async function previewArtifactVersion(
+  parentVersionId: string,
+  draft: ArtifactVersionDraft,
+  trustedRoot?: string,
+): Promise<ArtifactVersionPreview> {
+  return postJson(
+    `/api/artifacts/live/${encodeURIComponent(parentVersionId)}/versions/preview`,
+    { ...draft, trustedRoot },
+  );
+}
+
+export async function publishArtifactVersion(
+  parentVersionId: string,
+  draft: ArtifactVersionDraft,
+  preview: ArtifactVersionPreview,
+  trustedRoot?: string,
+): Promise<PublishedArtifactVersion> {
+  return postJson(
+    `/api/artifacts/live/${encodeURIComponent(parentVersionId)}/versions`,
+    {
+      ...draft,
+      id: preview.id,
+      trustedRoot,
+      fileOperationApprovalId: preview.fileOperationApprovalId,
+      idempotencyKey: newIdempotencyKey('artifact-version'),
+    },
+  );
 }
 
 export function artifactViewUrl(path: string, trustedRoot?: string): string {

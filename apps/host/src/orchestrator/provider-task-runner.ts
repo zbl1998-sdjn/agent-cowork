@@ -1,6 +1,6 @@
 import { callProviderChatCompletion } from '../kimi/provider/index.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/index.js';
-import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
+import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 import type {
   AgentDefinition,
   AgentResult,
@@ -21,17 +21,21 @@ const ZERO_USAGE: AgentUsage = {
 };
 
 type ProviderModelCall = (args: ProviderChatArgs) => Promise<ProviderChatResult>;
+type ProviderPromptMessage = {
+  role: 'system' | 'user';
+  content: string;
+};
 
 export type ProviderTaskRunnerOptions = {
   modelConfig: ModelConfig;
   modelCall?: ProviderModelCall | undefined;
   fetchImpl?: unknown;
-  // 出站策略检查用;不传时(如测试直接构造 runner)不记审计,但策略判断仍生效。
+  // 出站策略与审计根；缺失时在任何真实 provider 调用前 fail-closed。
   trustedRoot?: unknown;
 };
 
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+function estimateTokens(characterCount: number): number {
+  return Math.ceil(characterCount / 4);
 }
 
 function numberField(source: unknown, keys: string[]): number {
@@ -46,8 +50,8 @@ function numberField(source: unknown, keys: string[]): number {
 
 function usageFrom(result: ProviderChatResult, fallbackInputChars: number, output: string, runtimeMs: number): AgentUsage {
   const usage = result.usage;
-  const inputTokens = numberField(usage, ['prompt_tokens', 'input_tokens']) || estimateTokens(String(fallbackInputChars));
-  const outputTokens = numberField(usage, ['completion_tokens', 'output_tokens']) || estimateTokens(output);
+  const inputTokens = numberField(usage, ['prompt_tokens', 'input_tokens']) || estimateTokens(fallbackInputChars);
+  const outputTokens = numberField(usage, ['completion_tokens', 'output_tokens']) || estimateTokens(output.length);
   return {
     ...ZERO_USAGE,
     modelCalls: 1,
@@ -68,6 +72,10 @@ function stringContent(value: unknown): string {
   }).filter(Boolean).join('\n');
 }
 
+function messageContentCharacters(messages: readonly ProviderPromptMessage[]): number {
+  return messages.reduce((sum, message) => sum + stringContent(message.content).length, 0);
+}
+
 function messageText(result: ProviderChatResult): string {
   const direct = stringContent(result.content);
   if (direct) return direct;
@@ -82,7 +90,7 @@ function contextText(pack: ContextPack): string {
   ].filter(Boolean).join('\n')).join('\n\n').slice(0, 16_000);
 }
 
-function buildMessages(task: AgentTask, pack: ContextPack, agent: AgentDefinition): ProviderChatArgs['messages'] {
+function buildMessages(task: AgentTask, pack: ContextPack, agent: AgentDefinition): ProviderPromptMessage[] {
   return [
     {
       role: 'system',
@@ -134,17 +142,19 @@ export function createProviderTaskRunner({
     controls: { signal?: AbortSignal | null | undefined } = {},
   ): Promise<AgentResult> {
     const startedAt = Date.now();
+    const messages = buildMessages(task, pack, agent);
     const args: ProviderChatArgs = {
       kimiConfig: modelConfig,
-      messages: buildMessages(task, pack, agent) || [],
+      messages,
       tools: [],
       promptCacheKey: task.runId,
     };
     if (fetchImpl !== undefined) args.fetchImpl = fetchImpl;
     if (controls.signal) args.signal = controls.signal;
+    const inputCharacters = messageContentCharacters(messages);
     // 与对话路径(model-resilience.ts)同一出站闸门:此前这里直接裸调模型,air_gap/
     // local_strict 下配了云端 provider 时,orchestrator 任务(Agent Team)会绕过安全模式
-    // 实际出网。deny 就抛错——由调用方(orchestrator 任务失败处理)呈现,不静默继续。
+    // 实际出网。非 allow(含 needs_approval)就抛错——由调用方呈现,不静默继续。
     const egress = decideEgressPolicy({
       kind: 'model_inference',
       provider: modelConfig?.provider,
@@ -154,16 +164,12 @@ export function createProviderTaskRunner({
       content: args.messages,
       trustedRoot,
     });
-    if (trustedRoot) {
-      try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
-    }
-    if (egress.decision === 'deny') throw egressPolicyError(egress);
+    enforceRecordedEgressDecision(trustedRoot, egress);
     const response = await modelCall(args);
     const summary = messageText(response).trim();
     if (!summary) {
       throw new Error(`Provider adapter returned empty output for ${task.taskId}`);
     }
-    const inputChars = pack.entries.reduce((sum, entry) => sum + entry.text.length, 0) + task.instruction.length;
     const warnings = [
       ...(pack.redactionReport.redactedCount > 0 ? ['Input contained redacted secret-like text.'] : []),
       ...(pack.forbidden.length > 0 ? [`${pack.forbidden.length} context refs omitted by policy.`] : []),
@@ -180,7 +186,7 @@ export function createProviderTaskRunner({
       proposedOps: [],
       confidence: response.stream_interrupted ? 0.58 : 0.82,
       warnings,
-      usage: usageFrom(response, inputChars, summary, Math.max(1, Date.now() - startedAt)),
+      usage: usageFrom(response, inputCharacters, summary, Math.max(1, Date.now() - startedAt)),
       nextSuggestedTasks: [],
     };
   };

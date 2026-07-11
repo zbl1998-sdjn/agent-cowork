@@ -14,6 +14,7 @@ export type DataChartArtifactOptions = {
   maxRows?: number;
   id?: string;
   title?: string;
+  context?: unknown;
 };
 export type DataChartSpec = {
   kind: string;
@@ -62,6 +63,7 @@ export function createDataChartArtifact(options: DataChartArtifactOptions = {}):
     id: cleanText(options.id) || undefined,
     title,
     viz,
+    owner: options.context,
   }));
   return {
     kind: 'data-chart-artifact',

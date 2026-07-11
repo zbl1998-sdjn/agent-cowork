@@ -8,6 +8,8 @@ import { listArtifacts, openPath, renameArtifact, type ArtifactItem } from '../.
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Empty, ErrorState } from '../ui/StateViews';
+import { ArtifactVersionCreate } from './ArtifactVersionCreate';
+import { ArtifactVersionHistory } from './ArtifactVersionHistory';
 
 interface ArtifactsPanelProps { trustedRoot: string }
 
@@ -62,6 +64,8 @@ export interface ArtifactPanelItemProps {
   onCancelRename: () => void;
   onOpen: (path: string) => void;
   onBeginRename: (item: ArtifactItem) => void;
+  onCreateVersion?: (artifactId: string) => void;
+  onViewHistory?: (artifactId: string) => void;
 }
 
 export function ArtifactPanelItem({
@@ -74,7 +78,10 @@ export function ArtifactPanelItem({
   onCancelRename,
   onOpen,
   onBeginRename,
+  onCreateVersion,
+  onViewHistory,
 }: ArtifactPanelItemProps) {
+  const liveArtifactId = item.liveArtifactId;
   const onRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       onCommitRename(item);
@@ -101,7 +108,19 @@ export function ArtifactPanelItem({
       )}
       <div className="panel-row">
         <Button variant="secondary" onClick={() => onOpen(item.path)}>打开</Button>
-        <Button variant="secondary" disabled={busy} onClick={() => onBeginRename(item)}>重命名</Button>
+        {!liveArtifactId && (
+          <Button variant="secondary" disabled={busy} onClick={() => onBeginRename(item)}>重命名</Button>
+        )}
+        {liveArtifactId && onCreateVersion && (
+          <Button variant="secondary" disabled={busy} onClick={() => onCreateVersion(liveArtifactId)}>
+            创建新版本
+          </Button>
+        )}
+        {liveArtifactId && onViewHistory && (
+          <Button variant="secondary" disabled={busy} onClick={() => onViewHistory(liveArtifactId)}>
+            版本历史
+          </Button>
+        )}
       </div>
     </li>
   );
@@ -113,6 +132,8 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [busy, setBusy] = useState(false);
   const [renamingPath, setRenamingPath] = useState('');
   const [renameText, setRenameText] = useState('');
+  const [versionParentId, setVersionParentId] = useState('');
+  const [historyId, setHistoryId] = useState('');
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -177,6 +198,8 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
             onCancelRename={() => { setRenamingPath(''); setRenameText(''); }}
             onOpen={(targetPath) => void openPath(targetPath)}
             onBeginRename={beginRename}
+            onCreateVersion={(artifactId) => { setHistoryId(''); setVersionParentId(artifactId); }}
+            onViewHistory={setHistoryId}
           />
         ))}
         {items.length === 0 && !error && (
@@ -185,6 +208,25 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
           </li>
         )}
       </ul>
+      {versionParentId && (
+        <ArtifactVersionCreate
+          parentVersionId={versionParentId}
+          trustedRoot={trustedRoot}
+          onPublished={(artifactId) => {
+            setVersionParentId('');
+            setHistoryId(artifactId);
+            void refresh();
+          }}
+          onCancel={() => setVersionParentId('')}
+        />
+      )}
+      {historyId && (
+        <ArtifactVersionHistory
+          artifactId={historyId}
+          trustedRoot={trustedRoot}
+          onClose={() => setHistoryId('')}
+        />
+      )}
       {error && <ArtifactsPanelStateViews error={error} onRetry={() => void refresh()} />}
     </section>
   );
