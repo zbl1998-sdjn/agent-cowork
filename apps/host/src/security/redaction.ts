@@ -1,8 +1,10 @@
 // 脱敏(host · L0 基础层,无内部依赖)
+import { types as utilTypes } from 'node:util';
+
 // ---------------------------------------------------------------------------
 // 职责:在「写日志 / 返回错误体 / 落审计证据」之前,把密钥与敏感文件路径从文本中
 //       抹掉。这是纵深防御的「最后一道网」——调用方仍应首先避免打印密钥。
-// 依赖:无(纯正则)。导出:redactText(单值) / redactValue(递归对象/数组)。
+// 依赖:node:util(仅 Proxy 判定)。导出:redactText(单值) / redactValue(递归对象/数组)。
 // 设计要点:
 //   * 调用方仍应首先避免打印密钥;这里是「万一漏出也要兜住」的后备网。
 //   * 规则有意偏宽且全部全局应用。日志被多抹一点是可接受的,密钥漏出不可接受;
@@ -14,7 +16,7 @@
 // 1) `label: value` / `label=value` 密钥:保留 label、替换 value。
 //    覆盖 api_key/api_token/access_token/refresh_token/client_secret/secret/password 等;
 //    value 截止到空白、引号、逗号、分号或右括号。
-const ASSIGNMENT_RE = /\b((?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd)\s*[:=]\s*)"?[^\s"',;)]+/gi;
+const ASSIGNMENT_RE = /\b((?:(?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|credential|token|cookie|set[_-]?cookie|private[_-]?key)\s*[:=]\s*|authorization\s*[:=]\s*(?:bearer\s+)?))"?[^\s"',;)]+/gi;
 //    Authorization 头与裸 bearer token 也按同一原则只保留结构、不保留密钥。
 const AUTH_HEADER_RE = /\b(authorization\s*:\s*bearer\s+)[A-Za-z0-9._-]+/gi;
 const BEARER_RE = /\bbearer\s+[A-Za-z0-9._-]{8,}/gi;
@@ -66,13 +68,39 @@ export function redactText(value: unknown): string | null | undefined {
 
 type RedactableRecord = Record<string, unknown>;
 
+export const REDACTED_VALUE = '[REDACTED]';
+
+const SENSITIVE_FIELD_KEYS = new Set([
+  'apikey',
+  'apitoken',
+  'accesstoken',
+  'refreshtoken',
+  'clientsecret',
+  'secret',
+  'password',
+  'passwd',
+  'authorization',
+  'credential',
+  'token',
+  'cookie',
+  'setcookie',
+  'privatekey',
+]);
+
+export function isSensitiveFieldName(key: string): boolean {
+  return SENSITIVE_FIELD_KEYS.has(key.toLowerCase().replace(/[^a-z0-9]/g, ''));
+}
+
 export function redactValue(value: unknown): unknown {
+  if (utilTypes.isProxy(value)) throw new Error('cannot redact proxy values');
   if (typeof value === 'string') return redactText(value);
   if (Array.isArray(value)) return value.map(redactValue);
   if (value && typeof value === 'object') {
     const source = value as RedactableRecord;
     const out: RedactableRecord = {};
-    for (const key of Object.keys(source)) out[key] = redactValue(source[key]);
+    for (const key of Object.keys(source)) {
+      out[key] = isSensitiveFieldName(key) ? REDACTED_VALUE : redactValue(source[key]);
+    }
     return out;
   }
   return value;

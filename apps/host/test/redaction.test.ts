@@ -22,9 +22,9 @@ test('masks sk- API keys and every occurrence', () => {
 });
 
 test('masks the VALUE of label=value secrets, keeps the label', () => {
-  const out = redactString('api_key=sk-LIVEKEY1234567890');
+  const out = redactString('api_key=sk-test-dummy-0000000000');
   assert.ok(out.startsWith('api_key='), 'label should be kept for debuggability');
-  assert.ok(!out.includes('LIVEKEY'), 'value must be masked');
+  assert.ok(!out.includes('sk-test-dummy'), 'value must be masked');
   assert.match(out, /\[REDACTED\]/);
 });
 
@@ -61,4 +61,39 @@ test('redactValue recurses into objects and arrays', () => {
   assert.equal(out.name, 'ok');
   assert.ok(!JSON.stringify(out).includes('DEEPSECRET'), 'nested secret leaked');
   assert.ok(!JSON.stringify(out).includes('LISTKEY'), 'array secret leaked');
+});
+
+test('redactValue masks normalized sensitive keys regardless of value shape', () => {
+  const out = redactValue({
+    nested: {
+      apiKey: 'short-value',
+      ACCESS_TOKEN: { nested: 'must-not-survive' },
+      'set-cookie': 'session=short',
+      ordinaryTokenCount: 'kept',
+    },
+  });
+
+  assert.deepEqual(out, {
+    nested: {
+      apiKey: '[REDACTED]',
+      ACCESS_TOKEN: '[REDACTED]',
+      'set-cookie': '[REDACTED]',
+      ordinaryTokenCount: 'kept',
+    },
+  });
+});
+
+test('redactValue rejects revoked proxies before array introspection', () => {
+  const revocable = Proxy.revocable<unknown[]>([], {});
+  revocable.revoke();
+
+  assert.throws(
+    () => redactValue(revocable.proxy),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, 'Error');
+      assert.equal(error.message, 'cannot redact proxy values');
+      return true;
+    },
+  );
 });

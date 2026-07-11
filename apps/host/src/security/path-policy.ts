@@ -206,16 +206,16 @@ export function assertTrustedPathForCreate(candidatePath: string, trustedRoot: s
     guard += 1;
   }
   const parentReal = canonicalizePath(cur);
+  const finalPath = missing.length ? path.join(parentReal, ...missing) : parentReal;
 
   const normRoot = normalizeForCompare(rootReal);
-  const normParent = normalizeForCompare(parentReal);
+  const normCandidate = normalizeForCompare(finalPath);
   const rootWithSep = normRoot.endsWith('/') ? normRoot : `${normRoot}/`;
-  const inside = normParent === normRoot || normParent.startsWith(rootWithSep);
+  const inside = normCandidate === normRoot || normCandidate.startsWith(rootWithSep);
   if (!inside) {
     throw new Error(`Path escaped trusted root: ${candidatePath}`);
   }
 
-  const finalPath = missing.length ? path.join(parentReal, ...missing) : parentReal;
   if (isSensitivePath(finalPath, rootReal)) {
     throw new Error(`Sensitive path blocked by policy: ${candidatePath}`);
   }
