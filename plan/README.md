@@ -1,6 +1,6 @@
 # Agent Cowork v1.0 计划总览(导航 + 决策记录)
 
-基线 = **v0.1.0**(历史 `VERSION.txt` / bundle 仍在 `releases/v0.1.0/`,旧安装包体已清理)；当前可试安装包 = `releases/Agent-Cowork-Setup-v0.2.0-internal-beta.exe`。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
+基线 = **v0.1.0**(历史 `VERSION.txt` / bundle 仍在 `releases/v0.1.0/`,旧安装包体已清理)；当前候选版本 = **v0.4.0 Internal Beta**，本地 NSIS 候选仍须通过安装态 smoke，且在可信签名与正式 updater 验收前不得作为生产分发件。北极星:**一个你敢每天用、能干复杂活、能发给别人用、不被单一模型锁死的本地办公智能体。**
 
 ## 文档导航(每份小而专)
 | 文档 | 作用 | 何时看 |
@@ -71,7 +71,7 @@ P0-T0 安全网 → P0-T1 看护脚本 → P0-T3 拆 api.ts → P0-T2 拆 server
 - [x] 04-S3:新增 `check:secrets` 离线静态密钥扫描并接入 `npm run check`;聚焦单测与静态门禁通过。
 - [x] 04-R5(本机 source-build 窗口级验收):`smoke-windows-client.ps1` 已在真实 Windows GUI 可执行文件上通过,覆盖窗口启动、计划生成、审批、产物写入、文件移动、审计、回滚和开发者模式;证据见 `reports/windows-client-smoke/windows-client-smoke-20260524T203537Z.json` 与 `reports/windows-client-smoke/windows-client-smoke-20260524T203616Z.json`。`node scripts/run-host-node.mjs scripts/verify-mvp.ts --windows-client` 与 `npm run audit:mvp -- --strict` 已通过。
 - [x] 04-R5(安装版 Tauri 外壳/sidecar 验收):新增 `npm run smoke:installed-tauri`;2026-05-25 已重新打包、静默安装 v0.2.0 安装包,并对已安装 `agent-cowork-desktop.exe` 通过主窗口、安装目录 sidecar、自启动 `127.0.0.1:3017`、`/health`、guest auth、`/api/auth/me`、`/api/kimi/info` 与退出后 sidecar 清理验证;证据见 `reports/windows-client-smoke/installed-tauri-smoke-20260524T223355Z.json`。
-- [x] P2-A 启动探测真隔离:Host 启动探测 Docker/WSL;设置 `KCW_SANDBOX_DOCKER_IMAGE` 且 Docker daemon + 本地镜像可用时默认选择 `vm:docker` 并通过 `--network=none` 执行;否则回退 local 并在 `/api/sandbox/info` 与设置页自检中提示"本地不隔离网络"。新增 gated 集成测试 `sandbox-docker-integration.test.js`;本机用 `KCW_SANDBOX_REAL_DOCKER_IMAGE=postgres:16-alpine` 真实通过 Docker 联网阻断验收。
+- [x] P2-A 启动探测真隔离:Host 启动探测 Docker/WSL;只有 `KCW_SANDBOX_DOCKER_IMAGE` 指向本地不可变 image ID 或 repo digest 时才允许选择 `vm:docker`,并通过 `--network=none`、只读根/工作区、非 root 与资源上限执行;否则回退 local 并在 `/api/sandbox/info` 与设置页自检中明确提示。真实 Docker 集成测试由 CI 预载 `alpine@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1` 后以本地 image ID 运行;2026-05-25 基于可变 tag 的历史证据已被当前安全策略取代,不再计入当前验收,新 CI 证据待 workflow 实跑留档。
 - [x] 06-A1 WebView2 安装器引导:Tauri Windows bundle 显式配置 `webviewInstallMode.type=embedBootstrapper`,安装包会内置 WebView2 Evergreen bootstrapper,在缺失 WebView2 的 Windows 机器上由安装器补齐运行时;scaffold 单测与安装版 smoke dry-run 均校验该配置。
 - [x] 06-A2 内嵌 Python 运行器接入(代码+单测完成):`runCode` 在本地 sandbox 后端检测 `KCW_EMBEDDED_PYTHON`/`KCW_PYTHON_HOME` 后优先通过内嵌解释器目录运行 `python/python3`,同时先校验原始请求工具在 sandbox allowlist 内,避免配置绕过;VM/docker 后端继续使用容器内裸 `python/python3`。新增单测覆盖本地优先、VM 不改写、allowlist 不放宽。
 - [x] 06-A3 CJK 字体包预检:运行时依赖状态识别 `KCW_CJK_FONT_DIR`/`KCW_CJK_FONT`,目录或文件中存在 `.ttf/.otf/.ttc/.woff2` 字体文件才标记可用;缺失时提示安装器补齐字体包。新增 host 单测覆盖字体目录可用与缺失路径拒绝;真实字体资产打包仍留给安装器阶段。
