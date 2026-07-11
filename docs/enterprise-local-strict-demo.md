@@ -12,8 +12,12 @@ $env:KCW_MODEL_PROVIDER = 'openai/local'
 $env:KIMI_BASE_URL = 'http://127.0.0.1:11434/v1'
 $env:KIMI_MODEL = 'local-demo-model'
 $env:KCW_SANDBOX_BACKEND = 'auto'
-# Optional, only when the image already exists locally:
-# $env:KCW_SANDBOX_DOCKER_IMAGE = 'agent-cowork-sandbox:local'
+# Optional Docker backend: pull a fixed manifest digest and pass its local immutable image ID.
+# $pinnedRef = 'alpine@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1'
+# docker pull $pinnedRef
+# $imageId = docker image inspect --format='{{.Id}}' $pinnedRef
+# if ($imageId -notmatch '^sha256:[0-9a-f]{64}$') { throw "non-immutable image ID: $imageId" }
+# $env:KCW_SANDBOX_DOCKER_IMAGE = $imageId
 ```
 
 ## Expected Behavior

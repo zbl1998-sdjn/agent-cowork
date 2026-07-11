@@ -1,6 +1,6 @@
 # Agent Cowork 图文上手指南
 
-面向首次使用的用户。Agent Cowork 是一个**本地办公智能体**:它能在你电脑上读写文件、运行代码、连接你的工具,所有操作都在本机完成,关键的写操作会先征得你同意。
+面向首次使用的用户。Agent Cowork 是一个**本地宿主办公智能体**:文件与执行能力由本机 Host 控制。当前 Internal Beta 的模型执行限本机 Ollama/LM Studio 或管理员明确放行的客户网关；公网云模型只展示配置目录，审批回执消费链完成验收前不会出站。关键写操作和高风险操作会先征得你同意。
 
 > 适用范围:个人电脑本地使用。请勿暴露到公网或当作多人共享的服务器。
 
@@ -8,17 +8,17 @@
 
 ## 一、安装
 
-在 `installers\` 目录里任选其一:
+当前项目只构建 NSIS `setup.exe`，不再声明 MSI 产物。只安装版本匹配且 Authenticode 状态为 `Valid`、发布者与你的分发方一致的安装包:
 
-- **`Agent Cowork_0.2.0_x64-setup.exe`** —— 双击安装(NSIS,普通用户首选)。
-- **`Agent Cowork_0.2.0_x64_en-US.msi`** —— 企业/批量部署用。
+```powershell
+Get-AuthenticodeSignature -LiteralPath <安装包.exe> | Format-List Status,SignerCertificate
+```
 
-双击后按提示下一步完成,桌面 / 开始菜单会出现 **Agent Cowork** 图标。
+仓库中的本地构建或自签名安装包只是开发证据，不是可绕过 SmartScreen 的生产分发件；不要按“仍要运行”绕过未知发布者。正式构建必须由发布脚本在 Tauri 打包期间使用可信 CA 证书签署全部运行时与安装器:
 
-> **关于安全提示**:内部测试安装包在接入真实 CA 证书前会显示"未知发布者"或未签名提示。确认来源可信后点 **"更多信息 → 仍要运行"** 即可。
-> 要彻底消除这个提示,需用真实 CA 代码签名证书(OV/EV)重新签名;优先使用已导入证书库的 thumbprint:
 > ```powershell
-> pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\sign-windows.ps1 -Thumbprint <证书指纹> -Files <安装包.exe>
+> $env:KCW_CODESIGN_THUMBPRINT = '<可信证书指纹>'
+> npm run release -- --version <semver> --execute
 > ```
 
 ---
@@ -40,13 +40,13 @@
 
 ## 三、配置模型(按需)
 
-不填 API Key 也能用:本地文件读写、写入 preview、审批、产物生成等大部分能力离线可用；只有需要模型对话/生成时才要配置一个 provider。
+不填 API Key 也能用:本地文件读写、写入 preview、审批、产物生成等大部分能力离线可用；需要模型对话/生成时，配置本机 Ollama/LM Studio 或管理员放行的客户网关。
 
 - 最简单:本机装了 Ollama 的话,设置里选 `ollama` provider、填一个已拉取的本地模型名(如 `qwen2.5:7b`),不需要 API Key。
-- 用云端模型:点右上角 **⚙ 设置 → API**，在 **API Key** 填入你的 key(形如 `sk-...`)。默认 provider 是 **Kimi / Moonshot**（Base URL 默认 `https://api.moonshot.cn/v1`，模型默认 `kimi-k2.7-code`），也可以切换到 DeepSeek、通义千问、智谱 GLM、OpenAI、Anthropic/Claude 等内置 provider，或填自定义 OpenAI-compatible 地址。
-- 点 **保存**。会话内也可以临时切换 provider/model/自带 key，不会覆盖全局默认配置。
+- 当前 beta 不支持公网云模型直连:Kimi/Moonshot、DeepSeek、OpenAI、Anthropic/Claude 等条目用于目录/配置发现，即使填入 key 也会被统一出站策略明确拒绝，不能作为当前可用功能宣传。
+- 点 **保存**。会话内可以临时切换本地 provider/model；客户网关必须先由管理员加入 `KCW_CUSTOMER_MODEL_GATEWAY_HOSTS` 精确 allowlist。
 
-> **安全说明**:你的 key 只会保存在本机的 `<用户主目录>\.AgentCowork\config.json`,**永远不会显示明文、也不会上传**。界面只显示"已配置"状态。换 key 时直接覆盖,清除时点"清除密钥"。
+> **安全说明**:已保存的凭据在 Windows 上通过当前用户 DPAPI 封印后写入 `<用户主目录>\.AgentCowork\config.json`，界面与日志不回显明文。当前 beta 仅允许本地端点或管理员 allowlist 内的客户网关；公网云端点在凭据发送前即被拒绝。
 
 ---
 
@@ -58,7 +58,7 @@ Agent 只能在你授权的"工作区根目录"内读写,其外的文件会被�
 
 ## 五、开始使用
 
-配置好之后,在底部输入框直接说需求即可。下图是一轮**真实对话**——问它"用三句话介绍你能帮我做什么",`kimi-k2.6` 模型流式返回了真实回复(回复上方还能展开"思考过程"):
+配置好本地模型或客户网关后,在底部输入框直接说需求即可。下图是历史版本的一轮真实对话截图，用来说明界面布局；其中的公网 `kimi-k2.6` 调用不代表当前 beta 的公网能力已开放:
 
 ![主界面与真实对话](images/05-chat.png)
 
@@ -91,7 +91,7 @@ Agent 只能在你授权的"工作区根目录"内读写,其外的文件会被�
 
 ![可视化面板](images/panel-viz.png)
 
-**设置**——账户 / 外观 / 模型 / API / 自检 五个标签页(API Key 在这里填,只存本机):
+**设置**——账户 / 外观 / 模型 / API / 自检 五个标签页(本地模型与客户网关在这里配置；凭据只存本机):
 
 ![设置面板](images/panel-settings.png)
 
@@ -103,16 +103,18 @@ Agent 只能在你授权的"工作区根目录"内读写,其外的文件会被�
 
 ## 六、常见问题
 
-- **一直转圈 / 没反应**:多半是没配置 API Key,或 key 无效。去"设置 → API"检查;"设置 → 自检"里 `api-key` 应为绿色。
+- **一直转圈 / 没反应**:先确认 Ollama/LM Studio 已启动、Base URL 是回环地址且模型名存在；客户网关还需管理员 allowlist。公网 provider 当前会返回明确的 fail-closed 错误，而不是可用路径。
 - **提示"模型服务暂时不可用,已启用熔断保护"**:上游模型接口连续失败触发了保护,稍等片刻再试。
 - **数据存在哪**:对话 / 账户在 `<用户主目录>\.AgentCowork\`,工作产物在你选择的工作区目录里。
 - **想换工作目录**:在设置或主界面重新选择工作区根目录即可。
 
 ---
 
-## 七、真实运行验证(已实测)
+## 七、历史运行证据(不可替代当前版本验收)
 
-本版已用真实 Kimi API Key 跑通一轮端到端对话(`kimi-k2.6` 模型,Moonshot 端点):
+以下截图与数据是 2026-05 的历史验证快照，只证明当时指定构建的路径；它们不等于当前 `0.4.0` 源码、可信签名安装包、生产 updater 或完整业务旅程已验收。当前结论必须以最新 `reports/windows-client-smoke/`、发布 manifest 和本次完整质量门禁为准。
+
+历史版本曾用真实 Kimi API Key 跑通一轮端到端对话(`kimi-k2.6` 模型,Moonshot 端点)；这不代表当前 fail-closed 出站策略下公网云模型可用:
 
 | 项 | 结果 |
 | --- | --- |
@@ -134,7 +136,7 @@ Agent 只能在你授权的"工作区根目录"内读写,其外的文件会被�
 1. **安装版卡在"正在启动"闪屏(根本进不去)**:内置 host 没能在生产环境被拉起,前端启动流程一直等待、永不进入登录页。改为在原生层(Tauri `setup`)用 `std::process::Command` 直接拉起紧邻可执行文件的 host 二进制(不再依赖 webview 的 invoke),并把 host 的工作目录回退到用户主目录,保证安装版每次启动都能把后台服务跑起来。
 2. **登录后聊天误报"需要配置 Kimi API"**:本机 HTTP 服务的 CORS 响应头 `access-control-allow-headers` 漏了 `authorization`。结果是登录(不带令牌)能成功,但登录后每个带 `Bearer` 令牌的请求都被 WebView 的 CORS 预检拦掉,`/api/kimi/info` 取不到、聊天就误报。补上 `authorization` 后恢复正常,并已加单测防回归。
 
-> 注:这两个缺陷已修复并重新打包;`installers\` 下的安装包即为修复后的版本。
+> 注:这些是历史缺陷记录；不得据此把当前 `installers\` 文件认定为可信签名或生产可发布版本。
 
 ---
 

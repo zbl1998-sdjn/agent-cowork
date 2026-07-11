@@ -1,5 +1,7 @@
 # Agent Cowork 合并执行基线
 
+> **已归档的 2026-05 决策快照。** 其中“Windows C + 云后端 + Kimi-only”为旧方向，已被当前 `Tauri 2 + React + Node SEA` 本地优先架构替代。请以 `plan/00-架构基线与模块依赖.md`、`README.md` 与当前门禁为准；本文不得再作为实现或验收依据。
+>
 > 生成时间：2026-05-20  
 > 适用目录：`C:\Users\Administrator\Desktop\agent cowork`  
 > 当前结论：原 Node/Electron/Kimi CLI 计划只能作为 MVP-0 本地 PoC；正式 MVP-1 必须转向 Windows C 前端 + 本地 Agent + 可扩展多用户云端后端 + 长期千万级 QPS 架构。

@@ -1,5 +1,7 @@
 # MVP-1 Windows C Client + Cloud Backend Implementation Plan
 
+> **Archived plan.** This Windows C/cloud/Kimi-only plan is retained for history and is not the current architecture baseline. Current work follows `plan/00-架构基线与模块依赖.md` and `README.md` (Tauri 2 + React + Node SEA, local-first, public-cloud model egress fail-closed in the Internal Beta).
+>
 > **Goal:** 把 Agent Cowork 从本地 PoC 升级为正式 Windows 产品架构：C-first Windows 客户端、本地 Agent、多用户云端后端、任务编排、Kimi Gateway，并保留长期千万级 QPS 演进路径。
 
 ## 1. Product Scope

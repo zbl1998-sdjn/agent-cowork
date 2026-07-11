@@ -93,19 +93,20 @@
 
 - **P0 进程内加固** ✅：审批注册表 TTL+容量+`cancelByRun`、客户端断连即清理、步间中断+用量、工具懒加载。
 - **P1 优雅停机** ✅：`server.shutdown()`（draining→新流 503、`cancellation.cancelAll`、`approvals.cancelAll`、`closeMcp`、限时 `close`）+ main.js 接 SIGTERM/SIGINT。测试 `shutdown.test.js`。
-- **P3 PostgreSQL 适配器** ✅（runs-index + memory + schedules 全部完成）：`storage/postgres-runs-index.js`、`postgres-memory-store.js`(facts/notes/system-block)、`postgres-schedule-store.js`(list/get/save/remove)；均异步、惰性可选 `pg`、可注入 pool、租户隔离；`migrations-postgres/0001_init.sql` 含 5 张对齐表；`KCW_STORE=postgres` + `DATABASE_URL` 启用；runs-index 读路由已 `await`。mock-pool 单测：`postgres-runs-index`(4) + `postgres-memory-schedule`(4) + HTTP `runs-index-async`(1)。
+- **P3 PostgreSQL 适配器** ✅（runs-index + memory + schedules 全部完成）：`storage/postgres-runs-index.js`、`postgres-memory-store.js`(facts/notes/system-block)、`postgres-schedule-store.js`(list/get/save/remove)；均异步、惰性可选 `pg`、可注入 pool、租户隔离；schema 由 `migrations-postgres/0001` 至 `0004` 连续迁移维护，`npm run postgres:migrations:plan` 只读校验顺序和哈希；`KCW_STORE=postgres` + `DATABASE_URL` 启用；runs-index 读路由已 `await`。mock-pool 单测覆盖适配器和异步路由。
 - **P4 鉴权（JWT/HS256）** ✅：`auth/jwt.js`（零依赖、验签/exp/nbf、claim 映射 tenant/user），Bearer 优先按 JWT 解析、回落不透明 session；`KCW_JWT_SECRET` 配置。测试 `jwt.test.js`。**租户配额**由每租户并发上限（`concurrency.js`，`KCW_MAX_RUNS_PER_TENANT`）兜底。
 - **P5 抗泄漏/浸泡 + 实测基准** ✅（可跑部分）：`concurrency-soak.test.js`(40 路并发集体断开 → 注册表归零)；`apps/host/scripts/bench-local.ts` 单实例实测——150 并发 920 流/s p99≈147ms、500 并发 1064 流/s p99≈432ms,**0 错误且 approvals/runs/slots 全部归零(无泄漏)**;`apps/host/scripts/load-sse.ts` 多实例集群压测脚手架。**1万→10万** 需多实例 + 负载均衡(由 P2 跨实例机制支撑),按 500/实例 线性外推。
 - **P2 状态外置 + 跨实例 SSE** ✅（机制 + server 接线已落地，差真库联调）：server 按 `KCW_STORE=postgres`+`DATABASE_URL` 选用 PG 审批/事件总线并启动 LISTEN,审批路由改 `await`(`postgres-wiring.test.js` 验证选用与 start);
   - **跨实例审批** `storage/postgres-approvals.js`：pending 入 `pending_approvals` 表，`request()` 仍同步(本地生成 id + INSERT fire-and-forget，几乎不动 agent 调用点)，resolve/respond/cancelByRun 经 `pg_notify` 跨实例投递；`postgres-approvals.test.js` 用「共享 mock pg 集群」验证 A 实例请求→B 实例解决/答题/cancelByRun 全部跨实例生效。
   - **跨实例 SSE pub/sub** `storage/postgres-event-bus.js`：保持 RunEventBus 的 publish/subscribe/replay 接口，`publish` 只发 `pg_notify`，LISTEN 收到后注入本地 bus(发布者自身 LISTEN 也收到→单次投递)；`postgres-event-bus.test.js` 验证 B 发布→A 订阅者收到、无重复投递、replay。
-  - 迁移新增 `pending_approvals` 表。**剩余**：把这两个适配器经 `KCW_STORE=postgres` 接入 server(替换内存 approvals/RunEventBus)并在真实多实例 + Postgres 上联调。
+  - 迁移包含 `pending_approvals` 表及 `0004` tenant/user 作用域加固，server 已按 `KCW_STORE=postgres` 接入 PG approvals/RunEventBus。**剩余**：在获授权的真实多实例 + PostgreSQL 环境验证迁移锁影响、LISTEN 断连恢复和负载行为。
 
 ## 8. 环境前置（启用 PostgreSQL 多实例）
 1. `npm i pg`（在 `apps/host`，使可选依赖可解析）。
-2. 用 `migrations-postgres/0001_init.sql` 初始化数据库。
-3. 设 `KCW_STORE=postgres`、`DATABASE_URL=postgres://...`、`KCW_JWT_SECRET=...`、`PGPOOL_MAX=...`。
-4. 多实例置于负载均衡之后；P2 落地后即可水平扩展。
+2. 运行 `npm run postgres:migrations:plan`，确认输出为 plan-only 且 `0001` 至 `0004` 连续、哈希符合审批记录。
+3. 停止接收新请求并排空/停止旧 host，完成备份后，由数据库管理员按文件名升序应用全部尚未执行的迁移；`0004` 与旧 host 非滚动兼容。
+4. 设 `KCW_STORE=postgres`、`DATABASE_URL=postgres://...`、`KCW_JWT_SECRET=...`、`PGPOOL_MAX=...`，启动并确认 readiness。
+5. 多实例置于负载均衡之后；真实迁移、断连恢复与负载验收完成前不得标记生产可用。
 
 ## 9. 数据层全量 PostgreSQL
 

@@ -1,5 +1,7 @@
 # Agent Cowork ↔ Claude Cowork 对照体系 · 索引
 
+> **历史演进档案，不是当前事实源。** 本文主体是 2026-05 的追加式实现日志，包含当时的 Win32/静态前端、Kimi 公网调用与旧审批语义。当前架构与验收边界以 `README.md`、`plan/00-架构基线与模块依赖.md`、`docs/testing.md` 和本次完整质量门禁为准；当前 Internal Beta 的公网云模型路径会 fail-closed。
+>
 > 日期: 2026-05-20
 > 用途: 这一组 doc 的入口。先看本页, 再按需跳到下面 4 份详 doc。
 
