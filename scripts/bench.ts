@@ -1,183 +1,207 @@
-// 本地离线性能基准(scripts · 评测)
-// ---------------------------------------------------------------------------
-// 职责:离线起本地 Host server,测量启动耗时、/health 与 / 首屏的首字节/总耗时、
-//       合成 SSE 帧解析吞吐,以及进程内存(rss/heap)快照;对照可由环境变量覆盖的
-//       阈值(BENCH_STARTUP_MS / FIRST_SCREEN_MS / FRAME_PROCESSING_MS / RSS_MB /
-//       HEAP_USED_MB)评定 pass/warn/fail,结果带时间戳写入 reports/bench/。
-// 用法:npm run bench(经 run-host-node.mjs 跑本 .ts);默认超阈值只 warn;
-//       设 BENCH_FAIL_ON_REGRESSION=1 时超阈值判 fail 并 exit 1 阻断。
-// 依赖:apps/host/src/server.ts 的 createServer;纯本地、无外部网络。
+#!/usr/bin/env node
+// 可重复离线性能基准:多轮测量 Host 启动、HTTP 首屏和真实 Agent SSE 路由。
+// 模型响应在装配边界注入;状态后端强制 file;HTTP 只允许 127.0.0.1。
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { createServer } from '../apps/host/src/server.js';
-import type { AddressInfo } from 'node:http';
-import type { HostServer } from '../apps/host/src/server.js';
+import {
+  collectMeasuredSamples,
+  parseBenchmarkConfig,
+  summarizeSamples,
+  type BenchmarkConfig,
+  type SampleSummary,
+} from './bench-metrics.js';
+import {
+  buildBenchmarkBudgetChecks,
+  overallBenchmarkStatus,
+} from './bench-report.js';
+import {
+  closeOfflineBenchmarkServer,
+  startOfflineBenchmarkServer,
+  type OfflineServerContext,
+} from './bench-server.js';
+import { runAgentWorkload } from './bench-workloads.js';
+import {
+  createBenchmarkWorkspace,
+  removeBenchmarkWorkspace,
+} from './bench-workspace.js';
+
+type FetchResult = { status: number; firstByteMs: number; totalMs: number; bytes: number };
+type FetchSummary = {
+  status: number;
+  firstByteMs: SampleSummary;
+  totalMs: SampleSummary;
+  bytes: SampleSummary;
+};
+type MemoryMetrics = { rssMb: number; heapUsedMb: number; heapTotalMb: number; externalMb: number };
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const reportRoot = path.resolve(process.env.BENCH_REPORT_DIR || path.join(repoRoot, 'reports', 'bench'));
-const workspaceRoot = path.resolve(process.env.BENCH_WORKSPACE || path.join(reportRoot, 'workspace'));
-const failOnRegression = process.env.BENCH_FAIL_ON_REGRESSION === '1';
-
-const thresholds = {
-  startupMs: numberEnv('BENCH_STARTUP_MS', 2500),
-  firstScreenMs: numberEnv('BENCH_FIRST_SCREEN_MS', 3000),
-  frameProcessingMs: numberEnv('BENCH_FRAME_PROCESSING_MS', 500),
-  rssMb: numberEnv('BENCH_RSS_MB', 512),
-  heapUsedMb: numberEnv('BENCH_HEAP_USED_MB', 192),
-};
-
-type MemoryMetrics = {
-  rssMb: number;
-  heapUsedMb: number;
-  heapTotalMb: number;
-  externalMb: number;
-};
-
-type FetchMetrics = {
-  status: number;
-  firstByteMs: number;
-  totalMs: number;
-  bytes: number;
-};
-
-type SseFrameMetrics = {
-  frameCount: number;
-  parsed: number;
-  elapsedMs: number;
-  framesPerSecond: number;
-};
-
-type BenchMetrics = {
-  startupMs: number;
-  health: FetchMetrics;
-  firstScreen: FetchMetrics;
-  streamingFrames: SseFrameMetrics;
-  memory: MemoryMetrics;
-};
-
-function numberEnv(name: string, fallback: number): number {
-  const parsed = Number(process.env[name]);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 function nowStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-async function bindMeasured(server: HostServer): Promise<{ baseUrl: string; startupMs: number }> {
-  const started = performance.now();
-  await new Promise<void>((resolve, reject) => {
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('bench server did not bind to a TCP port');
+async function fetchMeasured(url: string): Promise<FetchResult> {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1') {
+    throw new Error(`benchmark fetch must stay on loopback, received ${parsed.origin}`);
   }
-  return {
-    baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`,
-    startupMs: performance.now() - started,
-  };
-}
-
-async function fetchMeasured(url: string): Promise<FetchMetrics> {
   const started = performance.now();
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   const firstByteMs = performance.now() - started;
-  const text = await response.text();
-  return { status: response.status, firstByteMs, totalMs: performance.now() - started, bytes: Buffer.byteLength(text) };
+  const body = await response.text();
+  if (response.status !== 200) throw new Error(`benchmark fetch ${parsed.pathname} returned ${response.status}`);
+  return {
+    status: response.status,
+    firstByteMs,
+    totalMs: performance.now() - started,
+    bytes: Buffer.byteLength(body),
+  };
 }
 
-function syntheticSseFrameBenchmark(frameCount = 2000): SseFrameMetrics {
-  const frames: string[] = [];
-  for (let index = 0; index < frameCount; index += 1) {
-    frames.push(`event: token\ndata: {"delta":"${index % 10}"}\n\n`);
-  }
-  const payload = frames.join('');
-  const started = performance.now();
-  let parsed = 0;
-  for (const raw of payload.split(/\n\n/)) {
-    if (!raw) continue;
-    if (raw.includes('event: token') && raw.includes('data:')) parsed += 1;
-  }
-  const elapsedMs = performance.now() - started;
+async function collectFetchSummary(url: string, config: BenchmarkConfig): Promise<FetchSummary> {
+  const measured: FetchResult[] = [];
+  await collectMeasuredSamples({
+    warmupRounds: config.warmupRounds,
+    sampleRounds: config.sampleRounds,
+    run: async (phase) => {
+      const result = await fetchMeasured(url);
+      if (phase === 'sample') measured.push(result);
+      return result.firstByteMs;
+    },
+  });
+  const first = measured[0];
+  if (!first) throw new Error('benchmark fetch produced no measured samples');
   return {
-    frameCount,
-    parsed,
-    elapsedMs,
-    framesPerSecond: Math.round((parsed / Math.max(elapsedMs, 0.001)) * 1000),
+    status: first.status,
+    firstByteMs: summarizeSamples(measured.map((result) => result.firstByteMs)),
+    totalMs: summarizeSamples(measured.map((result) => result.totalMs)),
+    bytes: summarizeSamples(measured.map((result) => result.bytes)),
   };
+}
+
+async function collectStartupSummary(workspaceRoot: string, config: BenchmarkConfig): Promise<SampleSummary> {
+  const samples = await collectMeasuredSamples({
+    warmupRounds: config.warmupRounds,
+    sampleRounds: config.sampleRounds,
+    run: async (phase, index) => {
+      const context = await startOfflineBenchmarkServer(
+        path.join(workspaceRoot, `startup-${phase}-${index}`),
+        config,
+      );
+      try {
+        return context.startupMs;
+      } finally {
+        await closeOfflineBenchmarkServer(context);
+      }
+    },
+  });
+  return summarizeSamples(samples);
 }
 
 function memorySnapshot(): MemoryMetrics {
   const memory = process.memoryUsage();
+  const mb = (value: number): number => Math.round((value / 1024 / 1024) * 10) / 10;
   return {
-    rssMb: Math.round((memory.rss / 1024 / 1024) * 10) / 10,
-    heapUsedMb: Math.round((memory.heapUsed / 1024 / 1024) * 10) / 10,
-    heapTotalMb: Math.round((memory.heapTotal / 1024 / 1024) * 10) / 10,
-    externalMb: Math.round((memory.external / 1024 / 1024) * 10) / 10,
+    rssMb: mb(memory.rss),
+    heapUsedMb: mb(memory.heapUsed),
+    heapTotalMb: mb(memory.heapTotal),
+    externalMb: mb(memory.external),
   };
 }
 
-function evaluateThresholds(metrics: BenchMetrics): Array<{ name: string; actual: number; threshold: number; status: 'pass' | 'warn' | 'fail' }> {
-  const checks = [
-    { name: 'startupMs', actual: metrics.startupMs, threshold: thresholds.startupMs },
-    { name: 'firstScreenMs', actual: metrics.firstScreen.firstByteMs, threshold: thresholds.firstScreenMs },
-    { name: 'frameProcessingMs', actual: metrics.streamingFrames.elapsedMs, threshold: thresholds.frameProcessingMs },
-    { name: 'rssMb', actual: metrics.memory.rssMb, threshold: thresholds.rssMb },
-    { name: 'heapUsedMb', actual: metrics.memory.heapUsedMb, threshold: thresholds.heapUsedMb },
-  ];
-  return checks.map((check) => ({
-    ...check,
-    status: check.actual <= check.threshold ? 'pass' : failOnRegression ? 'fail' : 'warn',
-  }));
-}
-
 async function main(): Promise<void> {
+  const config = parseBenchmarkConfig();
   fs.mkdirSync(reportRoot, { recursive: true });
-  fs.mkdirSync(workspaceRoot, { recursive: true });
-  fs.writeFileSync(path.join(workspaceRoot, 'bench-fixture.txt'), 'bench fixture', 'utf8');
-
-  const server = createServer({
-    trustedRoot: workspaceRoot,
-    requireAuth: false,
-    enableScheduler: false,
-  });
-
   const reportPath = path.join(reportRoot, `bench-${nowStamp()}.json`);
+  const workspace = createBenchmarkWorkspace(process.env.BENCH_WORKSPACE);
   try {
-    const { baseUrl, startupMs } = await bindMeasured(server);
-    const health = await fetchMeasured(`${baseUrl}/health`);
-    const firstScreen = await fetchMeasured(`${baseUrl}/`);
-    const streamingFrames = syntheticSseFrameBenchmark(Number(process.env.BENCH_FRAME_COUNT || 2000));
-    const memory = memorySnapshot();
-    const metrics = { startupMs, health, firstScreen, streamingFrames, memory };
-    const thresholdChecks = evaluateThresholds(metrics);
-    const failed = thresholdChecks.filter((check) => check.status === 'fail');
-    const warned = thresholdChecks.filter((check) => check.status === 'warn');
-    const report = {
-      ok: failed.length === 0,
-      generatedAt: new Date().toISOString(),
-      mode: 'local-offline',
-      workspace: workspaceRoot,
-      baseUrl,
-      metrics,
-      thresholds,
-      failOnRegression,
-      thresholdChecks,
-    };
-    fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    console.log(JSON.stringify({ ok: report.ok, reportPath, metrics, warned, failed }, null, 2));
-    if (failed.length) process.exit(1);
-  } finally {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error?: Error) => {
-        if (error) reject(error);
-        else resolve();
+    const startupMs = await collectStartupSummary(workspace.root, config);
+    const context: OfflineServerContext = await startOfflineBenchmarkServer(
+      path.join(workspace.root, 'workload'),
+      config,
+    );
+    try {
+      const health = await collectFetchSummary(`${context.baseUrl}/health`, config);
+      const firstScreen = await collectFetchSummary(`${context.baseUrl}/`, config);
+      const agentStream = await runAgentWorkload(context, config);
+      const expectedModelCalls = (config.warmupRounds + config.sampleRounds) * config.taskCount * 2;
+      if (agentStream.injectedModelCalls !== expectedModelCalls) {
+        throw new Error(`injected model call count ${agentStream.injectedModelCalls} != ${expectedModelCalls}`);
+      }
+      const memory = memorySnapshot();
+      const budgetChecks = buildBenchmarkBudgetChecks(config, {
+        startupMs,
+        firstScreenFirstByteMs: firstScreen.firstByteMs,
+        parallelRequestLatencyMs: agentStream.parallel.requestLatencyMs,
+        parallelThroughputPerSecond: agentStream.parallel.throughputPerSecond,
+        parallelSpeedup: agentStream.parallelSpeedup,
+        memory,
       });
-    });
+      const status = overallBenchmarkStatus(budgetChecks);
+      const inconclusive = budgetChecks.filter((item) => item.status === 'inconclusive');
+      const failed = budgetChecks.filter((item) => item.status === 'fail');
+      const blocking = failed.length > 0 || (config.failOnRegression && inconclusive.length > 0);
+      const report = {
+        schemaVersion: 2,
+        ok: !blocking,
+        baselineUsable: status === 'pass',
+        status,
+        generatedAt: new Date().toISOString(),
+        mode: 'local-offline-deterministic',
+        boundary: {
+          externalNetwork: false,
+          loopbackHttpOnly: true,
+          realModel: false,
+          database: false,
+          production: false,
+          details: 'Injected model; outbound fetch rejects; file state backend; memory paused.',
+        },
+        sampling: {
+          seed: config.seed,
+          warmupRounds: config.warmupRounds,
+          sampleRounds: config.sampleRounds,
+          percentile: 'nearest-rank',
+          maxCvPct: config.maxCvPct,
+        },
+        workload: {
+          taskCount: config.taskCount,
+          concurrency: config.taskConcurrency,
+          promptBytes: config.promptBytes,
+          promptSha256: agentStream.promptSha256,
+          mockModelDelayMs: config.mockModelDelayMs,
+        },
+        machine: {
+          platform: process.platform,
+          arch: process.arch,
+          node: process.version,
+        },
+        metrics: { startupMs, health, firstScreen, agentStream, memory },
+        budgets: config.budgets,
+        failOnRegression: config.failOnRegression,
+        budgetChecks,
+      };
+      fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+      console.log(JSON.stringify({
+        ok: report.ok,
+        baselineUsable: report.baselineUsable,
+        status,
+        reportPath,
+        startupP95Ms: startupMs.p95,
+        firstScreenP95Ms: firstScreen.firstByteMs.p95,
+        agentP95Ms: agentStream.parallel.requestLatencyMs.p95,
+        parallelThroughputP50: agentStream.parallel.throughputPerSecond.p50,
+        parallelSpeedupP50: agentStream.parallelSpeedup.p50,
+        budgetChecks,
+      }, null, 2));
+      if (blocking) process.exitCode = 1;
+    } finally {
+      await closeOfflineBenchmarkServer(context);
+    }
+  } finally {
+    removeBenchmarkWorkspace(workspace);
   }
 }
 
@@ -190,9 +214,9 @@ main().catch((error: unknown) => {
   const reportPath = path.join(reportRoot, `bench-${nowStamp()}-failed.json`);
   fs.writeFileSync(
     reportPath,
-    `${JSON.stringify({ ok: false, generatedAt: new Date().toISOString(), error: errorMessage(error) }, null, 2)}\n`,
+    `${JSON.stringify({ schemaVersion: 2, ok: false, generatedAt: new Date().toISOString(), error: errorMessage(error) }, null, 2)}\n`,
     'utf8',
   );
   console.error(errorMessage(error));
-  process.exit(1);
+  process.exitCode = 1;
 });
