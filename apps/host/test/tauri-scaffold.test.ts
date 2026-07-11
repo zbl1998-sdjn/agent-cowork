@@ -37,12 +37,13 @@ function permissionIds(value: unknown): string[] {
 }
 
 test('Tauri scaffold keeps host npm dependencies allowlisted and points at the Node host/static resources', () => {
-  assert.deepEqual(Object.keys(recordValue(packageJson.dependencies, 'package dependencies')).sort(), ['zod']);
+  assert.deepEqual(Object.keys(recordValue(packageJson.dependencies, 'package dependencies')).sort(), ['pg', 'zod']);
   assert.deepEqual(Object.keys(recordValue(packageJson.devDependencies, 'package devDependencies')).sort(), [
     '@eslint/js',
     'eslint',
     'eslint-plugin-react-hooks',
     'jiti',
+    'postject',
     'typescript',
     'typescript-eslint',
   ]);
@@ -89,12 +90,12 @@ test('embedded Python staging script pins the official embeddable archive and ve
   assert.match(script, /Lib\\site-packages/);
 });
 
-test('Tauri scaffold exposes sidecar, safe opener and notification integration points', () => {
+test('Tauri scaffold exposes sidecar and safe opener without unused shell or notification plugins', () => {
   const cargoToml = fs.readFileSync(path.join(tauriRoot, 'Cargo.toml'), 'utf8');
   assert.match(cargoToml, /tauri\s*=/);
-  assert.match(cargoToml, /tauri-plugin-shell/);
+  assert.doesNotMatch(cargoToml, /tauri-plugin-shell/);
   assert.match(cargoToml, /tauri-plugin-opener/);
-  assert.match(cargoToml, /tauri-plugin-notification/);
+  assert.doesNotMatch(cargoToml, /tauri-plugin-notification/);
   assert.match(cargoToml, /tauri-plugin-updater/);
 
   // Integration points live across src/*.rs, so scan the whole crate source.
@@ -123,7 +124,6 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
     'current_exe',
     '.setup',
     'tauri_plugin_opener::init',
-    'tauri_plugin_notification::init',
     'tauri_plugin_updater::Builder',
     'assert_trusted_path',
     'assert_openable_path',
@@ -134,6 +134,8 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   }
   // The packaged app must spawn the bundled host binary, never a PATH node.
   assert.equal(rust.includes('Command::new("node")'), false, 'must not spawn PATH node');
+  assert.equal(rust.includes('tauri_plugin_shell::init'), false, 'unused shell plugin must not be registered');
+  assert.equal(rust.includes('tauri_plugin_notification::init'), false, 'unused notification plugin must not be registered');
 
   const capability = recordValue(JSON.parse(fs.readFileSync(path.join(tauriRoot, 'capabilities', 'default.json'), 'utf8')) as unknown, 'tauri default capability');
   // Hardened: broad opener:default / shell:allow-open / shell:default grants are
@@ -142,6 +144,46 @@ test('Tauri scaffold exposes sidecar, safe opener and notification integration p
   assert.equal(permissions.includes('opener:default'), false);
   assert.equal(permissions.includes('shell:default'), false);
   assert.equal(permissions.includes('shell:allow-open'), false);
+  assert.equal(permissions.some((permission) => permission.startsWith('shell:')), false);
+  assert.equal(permissions.some((permission) => permission.startsWith('notification:')), false);
+});
+
+test('Tauri library target stays distinct from the binary target and main calls that library', () => {
+  const cargoToml = fs.readFileSync(path.join(tauriRoot, 'Cargo.toml'), 'utf8');
+  const packageName = cargoToml.match(/\[package\][\s\S]*?\nname\s*=\s*"([^"]+)"/)?.[1];
+  const libraryName = cargoToml.match(/\[lib\][\s\S]*?\nname\s*=\s*"([^"]+)"/)?.[1];
+  assert.ok(packageName, 'Cargo.toml must declare a package name for the binary target');
+  assert.ok(libraryName, 'Cargo.toml must declare an explicit library target name');
+  assert.notEqual(
+    libraryName,
+    packageName.replaceAll('-', '_'),
+    'library and binary Rust identifiers must differ to avoid MSVC PDB output collisions',
+  );
+
+  const main = fs.readFileSync(path.join(tauriRoot, 'src', 'main.rs'), 'utf8');
+  assert.ok(main.includes(`${libraryName}::run();`), 'binary entrypoint must call the declared library target');
+});
+
+test('Tauri open_path policy stays limited to passive document types', () => {
+  const security = fs.readFileSync(path.join(tauriRoot, 'src', 'security.rs'), 'utf8');
+  const allowlistBody = security.match(
+    /const PASSIVE_DOCUMENT_EXTENSIONS: &\[&str\] = &\[([\s\S]*?)\];/,
+  )?.[1] ?? '';
+  assert.ok(allowlistBody, 'open_path must declare an explicit passive-document allowlist');
+
+  const allowedExtensions = new Set(
+    [...allowlistBody.matchAll(/"([a-z0-9]+)"/g)].map((match) => match[1]),
+  );
+  for (const extension of ['txt', 'md', 'csv', 'json', 'pdf', 'docx', 'xlsx', 'pptx', 'png']) {
+    assert.ok(allowedExtensions.has(extension), `passive document extension should remain allowed: ${extension}`);
+  }
+  for (const extension of ['exe', 'msi', 'cmd', 'ps1', 'js', 'lnk', 'url', 'docm', 'html', 'svg']) {
+    assert.equal(allowedExtensions.has(extension), false, `active file extension must stay blocked: ${extension}`);
+  }
+
+  assert.match(security, /if !has_passive_document_extension\(&safe\)/);
+  assert.match(security, /file type is not allowed for system opening/);
+  assert.match(security, /directory opening is blocked; use a dedicated reveal command/);
 });
 
 test('component manifest covers the React rewrite component contract', () => {

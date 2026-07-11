@@ -66,12 +66,6 @@ function run(cmd: string, args: readonly string[], options: SpawnOptions = {}): 
   if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmd}`);
 }
 
-function runShell(cmdline: string, options: SpawnOptions = {}): void {
-  log(`$ ${cmdline}`);
-  const result = spawnSync(cmdline, { stdio: 'inherit', shell: true, ...options });
-  if (result.status !== 0) die(`command failed (exit ${result.status}): ${cmdline}`);
-}
-
 function cleanCompiledHostDir(): void {
   const relative = path.relative(path.join(repoRoot, 'build'), compiledHostDir);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
@@ -127,6 +121,8 @@ if (process.platform !== 'win32') {
 }
 
 const esbuild = findEsbuild();
+const postjectCli = path.join(repoRoot, 'node_modules', 'postject', 'dist', 'cli.js');
+if (!fs.existsSync(postjectCli)) die('postject not found. Run `npm ci` before building the host.');
 const signtool = findSigntoolWindows();
 if (!signtool) die('signtool.exe not found in Windows Kits — install Windows 10 SDK.');
 
@@ -149,7 +145,6 @@ run(process.execPath, [
   '--platform=node',
   '--format=cjs',
   `--outfile=${path.relative(repoRoot, bundlePath)}`,
-  '--external:pg', // optional postgres backend; loaded via dynamic import at runtime
   '--target=node22',
   // The bundle keeps `createRequire(import.meta.url)` and `fileURLToPath(import.meta.url)`
   // calls; under SEA there is no import.meta, so define a valid file URL here.
@@ -166,13 +161,9 @@ log('5/6 strip signature + postject inject NODE_SEA_BLOB');
 run(signtool, ['remove', '/s', exePath]);
 const fuse = extractFuse(exePath);
 log(`    fuse: ${fuse}`);
-// With `shell: true` on Windows, child_process re-tokenises args via cmd.exe and
-// strips internal whitespace — so a path like `C:\Users\…\agent cowork\…\.exe`
-// splits at the space and postject sees "agent" + "cowork\…\.exe" as separate
-// resources, surfacing as "Can't read resource file". Manually double-quote any
-// arg with whitespace so cmd.exe leaves it intact.
-const quoteForShell = (arg: string): string => (/\s/.test(arg) ? `"${arg}"` : arg);
-runShell(['npx', '-y', 'postject', quoteForShell(exePath), 'NODE_SEA_BLOB', quoteForShell(blobPath), '--sentinel-fuse', fuse].join(' '), { cwd: repoRoot });
+// Use the lockfile-installed CLI through Node directly. shell:false preserves paths
+// containing spaces and prevents npx from downloading a drifting build dependency.
+run(process.execPath, [postjectCli, exePath, 'NODE_SEA_BLOB', blobPath, '--sentinel-fuse', fuse], { cwd: repoRoot });
 
 log('6/6 deploy to binaries/ and target/release/');
 fs.mkdirSync(binariesDir, { recursive: true });

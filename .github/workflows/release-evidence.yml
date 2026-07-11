@@ -1,0 +1,271 @@
+name: Release Supply Chain Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Exact SemVer already present in every project manifest and CHANGELOG.md
+        required: true
+        type: string
+      acknowledge_attestation_upload:
+        description: I understand that GitHub attestations are external repository records
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  attest-unsigned-source-build:
+    name: Attest unsigned source build (not a release)
+    runs-on: windows-2025
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      EXPECTED_VERSION: ${{ inputs.expected_version }}
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+    steps:
+      - name: Require explicit external-attestation acknowledgement
+        shell: pwsh
+        env:
+          ATTESTATION_UPLOAD_ACKNOWLEDGED: ${{ inputs.acknowledge_attestation_upload }}
+        run: |
+          if ($env:ATTESTATION_UPLOAD_ACKNOWLEDGED -ne 'true') {
+            throw 'Refusing to create external GitHub attestations without explicit acknowledgement.'
+          }
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.1
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.1.0
+        with:
+          node-version: "22.23.1"
+          cache: npm
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.5"
+          cache: false
+
+      - name: Install locked JavaScript dependencies
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'root npm ci failed' }
+          npm ci --prefix apps/windows-client/ui
+          if ($LASTEXITCODE -ne 0) { throw 'UI npm ci failed' }
+
+      - name: Pin Rust and Tauri CLI
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { throw 'Rust toolchain install failed' }
+          rustup default 1.96.0
+          if ($LASTEXITCODE -ne 0) { throw 'Rust toolchain selection failed' }
+          cargo install tauri-cli --locked --version 2.11.2
+          if ($LASTEXITCODE -ne 0) { throw 'pinned Tauri CLI install failed' }
+
+      - name: Install the pinned full-gate audit tools
+        shell: pwsh
+        timeout-minutes: 25
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          cargo install cargo-audit --locked --version 0.22.2
+          if ($LASTEXITCODE -ne 0) { throw 'pinned cargo-audit install failed' }
+
+          $goBin = Join-Path $env:RUNNER_TEMP 'go-tools-v1.6.0'
+          New-Item -ItemType Directory -Path $goBin -Force | Out-Null
+          $env:GOBIN = $goBin
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          if ($LASTEXITCODE -ne 0) { throw 'pinned govulncheck install failed' }
+          $goBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+          if ($LASTEXITCODE -ne 0) { throw 'Python 3.10 or newer is required' }
+          $pipAuditVenv = Join-Path $env:RUNNER_TEMP 'pip-audit-2.10.1'
+          python -m venv $pipAuditVenv
+          if ($LASTEXITCODE -ne 0) { throw 'pip-audit virtual environment creation failed' }
+          $pipAuditBin = Join-Path $pipAuditVenv 'Scripts'
+          $pipAuditPython = Join-Path $pipAuditBin 'python.exe'
+          & $pipAuditPython -m pip install --disable-pip-version-check "pip-audit==2.10.1"
+          if ($LASTEXITCODE -ne 0) { throw 'pinned pip-audit install failed' }
+          $pipAuditBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify the pinned full-gate toolchain on PATH
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          $npmVersion = (npm --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $npmVersion -ne '10.9.8') {
+            throw "npm version mismatch: required 10.9.8, observed $npmVersion"
+          }
+          $goVersion = (go version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $goVersion -notmatch '\bgo1\.26\.5\b') {
+            throw "Go version mismatch: required go1.26.5, observed $goVersion"
+          }
+          $cargoAuditVersion = (cargo audit --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $cargoAuditVersion -ne 'cargo-audit 0.22.2') {
+            throw "cargo-audit version mismatch: required cargo-audit 0.22.2, observed $cargoAuditVersion"
+          }
+          $govulncheckVersion = (& govulncheck -version 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $govulncheckVersion -notmatch 'govulncheck' -or $govulncheckVersion -notmatch 'v1\.6\.0') {
+            throw "govulncheck version mismatch: required v1.6.0, observed $govulncheckVersion"
+          }
+          $pipAuditVersion = (pip-audit --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $pipAuditVersion -ne 'pip-audit 2.10.1') {
+            throw "pip-audit version mismatch: required pip-audit 2.10.1, observed $pipAuditVersion"
+          }
+
+      - name: Validate exact release version without mutating release state
+        shell: pwsh
+        run: |
+          node scripts/run-host-node.mjs scripts/release.ts --version $env:EXPECTED_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'release version validation failed' }
+
+      - name: Run the full local-source quality gate
+        shell: pwsh
+        timeout-minutes: 120
+        run: |
+          python -X utf8 scripts/quality_gate.py --level full
+          if ($LASTEXITCODE -ne 0) { throw 'full local-source quality gate failed' }
+
+      - name: Rebuild one canonical unsigned NSIS subject
+        shell: pwsh
+        timeout-minutes: 30
+        run: |
+          $bundleRoot = Join-Path $env:GITHUB_WORKSPACE 'apps/windows-client/src-tauri/target/release/bundle'
+          if (Test-Path -LiteralPath $bundleRoot) {
+            Remove-Item -LiteralPath $bundleRoot -Recurse -Force
+          }
+          Push-Location 'apps/windows-client/src-tauri'
+          try {
+            cargo tauri build --ci --bundles nsis --no-sign -- --locked
+            if ($LASTEXITCODE -ne 0) { throw 'canonical unsigned Tauri build failed' }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Stage the exact-version attestation subject
+        id: stage
+        shell: pwsh
+        run: |
+          $nsisRoot = Join-Path $env:GITHUB_WORKSPACE 'apps/windows-client/src-tauri/target/release/bundle/nsis'
+          $installers = @(Get-ChildItem -LiteralPath $nsisRoot -File -Filter '*-setup.exe')
+          $escapedVersion = [regex]::Escape($env:EXPECTED_VERSION)
+          $installers = @($installers | Where-Object { $_.Name -match "(?:^|[^0-9A-Za-z])$escapedVersion(?:[^0-9A-Za-z]|$)" })
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer for $env:EXPECTED_VERSION; found $($installers.Count)."
+          }
+          $stagingRoot = Join-Path $env:GITHUB_WORKSPACE 'release-evidence'
+          if (Test-Path -LiteralPath $stagingRoot) {
+            throw "Refusing pre-existing evidence staging directory: $stagingRoot"
+          }
+          New-Item -ItemType Directory -Path $stagingRoot | Out-Null
+          $installer = Join-Path $stagingRoot $installers[0].Name
+          Copy-Item -LiteralPath $installers[0].FullName -Destination $installer
+          $sbomInputRoot = Join-Path $stagingRoot 'sbom-input'
+          $shippedDependencyFiles = @(
+            'package.json'
+            'package-lock.json'
+            'apps/windows-client/ui/package.json'
+            'apps/windows-client/ui/package-lock.json'
+            'apps/windows-client/src-tauri/Cargo.toml'
+            'apps/windows-client/src-tauri/Cargo.lock'
+            'apps/windows-client/resources/python-packages.lock'
+            'apps/windows-client/resources/python-bootstrap.lock'
+          )
+          foreach ($relativePath in $shippedDependencyFiles) {
+            $source = Join-Path $env:GITHUB_WORKSPACE $relativePath
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+              throw "Missing shipped dependency input: $relativePath"
+            }
+            $destination = Join-Path $sbomInputRoot $relativePath
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $source -Destination $destination
+          }
+          $pythonLockSource = Join-Path $env:GITHUB_WORKSPACE 'apps/windows-client/resources/python-packages.lock'
+          $syftPythonRequirements = Join-Path $sbomInputRoot 'apps/windows-client/resources/requirements-windows.txt'
+          Copy-Item -LiteralPath $pythonLockSource -Destination $syftPythonRequirements
+          $bootstrapLockSource = Join-Path $env:GITHUB_WORKSPACE 'apps/windows-client/resources/python-bootstrap.lock'
+          $syftBootstrapRequirements = Join-Path $sbomInputRoot 'apps/windows-client/resources/requirements-bootstrap.txt'
+          Copy-Item -LiteralPath $bootstrapLockSource -Destination $syftBootstrapRequirements
+          "installer=$installer" >> $env:GITHUB_OUTPUT
+          "sbom=$(Join-Path $stagingRoot 'agent-cowork-source.cdx.json')" >> $env:GITHUB_OUTPUT
+          "report=$(Join-Path $stagingRoot 'release-evidence-report.json')" >> $env:GITHUB_OUTPUT
+
+      - name: Generate a local CycloneDX SBOM without artifact or release upload
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0, Syft v1.42.3
+        timeout-minutes: 15
+        with:
+          path: release-evidence/sbom-input
+          format: cyclonedx-json
+          output-file: release-evidence/agent-cowork-source.cdx.json
+          syft-version: v1.42.3
+          dependency-snapshot: false
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Validate local evidence and record the external acceptance boundary
+        shell: pwsh
+        env:
+          INSTALLER_PATH: ${{ steps.stage.outputs.installer }}
+          SBOM_PATH: ${{ steps.stage.outputs.sbom }}
+          REPORT_PATH: ${{ steps.stage.outputs.report }}
+        run: |
+          node scripts/run-host-node.mjs scripts/release-evidence.ts `
+            --version $env:EXPECTED_VERSION `
+            --release-dir release-evidence `
+            --installer $env:INSTALLER_PATH `
+            --sbom $env:SBOM_PATH `
+            --report $env:REPORT_PATH
+          if ($LASTEXITCODE -ne 0) { throw 'local release evidence validation failed' }
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        timeout-minutes: 5
+        with:
+          subject-path: ${{ steps.stage.outputs.installer }}
+
+      - name: Associate the CycloneDX SBOM with the build subject
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        timeout-minutes: 5
+        with:
+          subject-path: ${{ steps.stage.outputs.installer }}
+          sbom-path: ${{ steps.stage.outputs.sbom }}
+
+      - name: Verify that GitHub can resolve the new attestation
+        shell: pwsh
+        timeout-minutes: 5
+        env:
+          INSTALLER_PATH: ${{ steps.stage.outputs.installer }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify $env:INSTALLER_PATH --repo $env:GITHUB_REPOSITORY --predicate-type https://slsa.dev/provenance/v1
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub SLSA provenance attestation verification failed' }
+          gh attestation verify $env:INSTALLER_PATH --repo $env:GITHUB_REPOSITORY --predicate-type https://cyclonedx.org/bom
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub CycloneDX SBOM attestation verification failed' }
+
+      - name: Preserve the acceptance boundary in the run summary
+        shell: pwsh
+        run: |
+          @'
+          ## Result: PENDING_EXTERNAL
+
+          This workflow attested an ephemeral unsigned source build and did not upload a workflow artifact or create a release.
+          Trusted Authenticode signing, a production updater round trip, installed-client acceptance, and human signoff remain independent requirements.
+          '@ >> $env:GITHUB_STEP_SUMMARY

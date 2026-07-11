@@ -2,6 +2,9 @@
 param(
     [string]$InstalledExePath = $env:KCW_INSTALLED_EXE,
     [string]$InstallerPath = $env:KCW_INSTALLER_PATH,
+    [string]$ExpectedVersion = $env:KCW_EXPECTED_VERSION,
+    [string]$ExpectedDesktopSha256 = $env:KCW_EXPECTED_DESKTOP_SHA256,
+    [string]$ExpectedSidecarSha256 = $env:KCW_EXPECTED_SIDECAR_SHA256,
     [string]$ReportPath = $env:KCW_WINDOWS_SMOKE_REPORT_PATH,
     [switch]$DryRun,
     [switch]$KeepOpen,
@@ -239,6 +242,7 @@ function Get-EmbeddedPythonProbe {
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
+. (Join-Path $scriptDir "installed-artifact-evidence.ps1")
 $workspace = Join-Path $repoRoot "build\installed-tauri-smoke-workspace"
 $baseUrl = "http://127.0.0.1:3017"
 
@@ -253,6 +257,7 @@ $report = [ordered]@{
     ok = $false
     mode = if ($DryRun) { "dry-run" } else { "installed-tauri" }
     generatedAt = (Get-Date).ToUniversalTime().ToString("o")
+    expectedVersion = $ExpectedVersion
     installedExe = $InstalledExePath
     installer = $InstallerPath
     workspace = $workspace
@@ -279,6 +284,15 @@ try {
     $report.installerCleanupHook = $nsisCleanupHook
     $report.checks.nsisCleanupHook = "passed"
 
+    $ExpectedVersion = Resolve-KcwExpectedVersion -RepoRoot $repoRoot -RequestedVersion $ExpectedVersion
+    $report.expectedVersion = $ExpectedVersion
+    Assert-True (-not [string]::IsNullOrWhiteSpace($InstallerPath)) "InstallerPath is required for installed artifact verification"
+    $installerEvidence = Get-KcwArtifactEvidence -Path $InstallerPath
+    Assert-KcwArtifactVersion -Evidence $installerEvidence -ExpectedVersion $ExpectedVersion -Label "Installer"
+    $expectedInstallerToken = "_" + $ExpectedVersion + "_"
+    Assert-True ([System.IO.Path]::GetFileName($installerEvidence.path).Contains($expectedInstallerToken)) "Installer filename does not contain expected version token $expectedInstallerToken"
+    $sourceCommit = Get-KcwSourceCommit -RepoRoot $repoRoot
+
     $exeExists = Test-Path -LiteralPath $InstalledExePath
     Assert-True $exeExists "Installed Tauri executable not found: $InstalledExePath"
     $exe = (Resolve-Path -LiteralPath $InstalledExePath).Path
@@ -286,6 +300,23 @@ try {
     $sidecar = Join-Path $installDir "agent-cowork-host.exe"
     $sidecarExists = Test-Path -LiteralPath $sidecar
     Assert-True $sidecarExists "Installed host sidecar not found: $sidecar"
+    $installedDesktopEvidence = Get-KcwArtifactEvidence -Path $exe
+    $installedSidecarEvidence = Get-KcwArtifactEvidence -Path $sidecar
+    Assert-KcwArtifactVersion -Evidence $installedDesktopEvidence -ExpectedVersion $ExpectedVersion -Label "Installed desktop"
+    $releaseRoot = Join-Path $repoRoot "apps\windows-client\src-tauri\target\release"
+    $buildDesktopEvidence = Get-KcwArtifactEvidence -Path (Join-Path $releaseRoot "agent-cowork-desktop.exe")
+    $buildSidecarEvidence = Get-KcwArtifactEvidence -Path (Join-Path $releaseRoot "agent-cowork-host.exe")
+    Assert-KcwArtifactVersion -Evidence $buildDesktopEvidence -ExpectedVersion $ExpectedVersion -Label "Built desktop"
+    if ([string]::IsNullOrWhiteSpace($ExpectedDesktopSha256)) {
+        $ExpectedDesktopSha256 = $buildDesktopEvidence.sha256
+    }
+    if ([string]::IsNullOrWhiteSpace($ExpectedSidecarSha256)) {
+        $ExpectedSidecarSha256 = $buildSidecarEvidence.sha256
+    }
+    Assert-KcwArtifactSha256 -Actual $buildDesktopEvidence.sha256 -Expected $ExpectedDesktopSha256 -Label "Built desktop"
+    Assert-KcwArtifactSha256 -Actual $installedDesktopEvidence.sha256 -Expected $ExpectedDesktopSha256 -Label "Installed desktop"
+    Assert-KcwArtifactSha256 -Actual $buildSidecarEvidence.sha256 -Expected $ExpectedSidecarSha256 -Label "Built sidecar"
+    Assert-KcwArtifactSha256 -Actual $installedSidecarEvidence.sha256 -Expected $ExpectedSidecarSha256 -Label "Installed sidecar"
     $embeddedPythonHome = Join-Path $installDir "python-embedded"
     $embeddedPythonExe = Join-Path $embeddedPythonHome "python.exe"
     $embeddedPythonHomeExists = Test-Path -LiteralPath $embeddedPythonHome
@@ -302,6 +333,25 @@ try {
     $hklmUninstallEntry = Get-AgentCoworkUninstallEntry -Hive HKLM
     Assert-True ($null -ne $hkcuUninstallEntry) "Per-user HKCU uninstall entry not found for Agent Cowork"
     Assert-True ($null -eq $hklmUninstallEntry) "All-machine HKLM uninstall entry found for Agent Cowork; installer must default to currentUser"
+    Assert-True ([string]$hkcuUninstallEntry.DisplayVersion -eq $ExpectedVersion) "Registry DisplayVersion does not match ExpectedVersion '$ExpectedVersion'"
+
+    $report.artifactIdentity = [ordered]@{
+        expectedVersion = $ExpectedVersion
+        sourceCommit = $sourceCommit
+        installer = $installerEvidence
+        buildDesktop = $buildDesktopEvidence
+        installedDesktop = $installedDesktopEvidence
+        buildSidecar = $buildSidecarEvidence
+        installedSidecar = $installedSidecarEvidence
+        ExpectedDesktopSha256 = $ExpectedDesktopSha256
+        ExpectedSidecarSha256 = $ExpectedSidecarSha256
+    }
+    $report.checks.installerExists = "passed"
+    $report.checks.installerVersion = "passed"
+    $report.checks.installedVersion = "passed"
+    $report.checks.registryVersion = "passed"
+    $report.checks.desktopBuildHash = "passed"
+    $report.checks.sidecarBuildHash = "passed"
 
     $report.installedExe = $exe
     $report.installDir = $installDir

@@ -1,40 +1,42 @@
-$ErrorActionPreference = 'Continue'
-$root = 'C:\Users\Administrator\Desktop\agent cowork'
-$log = "$root\build2.log"; $done = "$root\build2.done"
-Remove-Item $log,$done -Force -ErrorAction SilentlyContinue
-function Log($m) { "$([DateTime]::Now.ToString('HH:mm:ss')) $m" | Out-File $log -Append -Encoding utf8 }
-function Fail($s){ Log "FAIL: $s"; "FAIL_$s" | Out-File $done -Encoding ascii; exit 1 }
+# Legacy compatibility wrapper for the canonical local source gate and desktop build.
+# It intentionally does not sign, archive, install, or claim release acceptance.
+[CmdletBinding()]
+param()
 
-Log 'STEP 1 vite ui-dist (chatEnabled self-heal)'
-Set-Location $root; node scripts/run-host-node.mjs scripts/build-ui.ts *>> $log; if($LASTEXITCODE -ne 0){Fail 'ui'}
-Log 'STEP 2 esbuild + SEA blob (CORS tauri.localhost)'
-Set-Location "$root\apps\windows-client\ui"; node "$root\scripts\run-host-node.mjs" "$root\apps\windows-client\ui\build-host-sea.ts" *>> $log; if($LASTEXITCODE -ne 0){Fail 'esbuild'}
-Set-Location "$root\apps\host"; node --experimental-sea-config sea-config.json *>> $log
-if (-not (Test-Path "$root\apps\host\dist\host.blob")){Fail 'blob'}
-Log 'STEP 3 postject'
-$target = "$root\apps\windows-client\src-tauri\binaries\agent-cowork-host-x86_64-pc-windows-msvc.exe"
-Copy-Item 'C:\Program Files\nodejs\node.exe' $target -Force
-Set-Location "$root\apps\windows-client\ui"
-npx --no-install postject $target NODE_SEA_BLOB "$root\apps\host\dist\host.blob" --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --overwrite *>> $log
-Log 'STEP 4 cargo tauri build'
-# cwd 必须是 src-tauri(tauri.conf.json 所在目录),因为 beforeBuildCommand 里的
-# "../../scripts/prepare-embedded-python.ps1" 是相对 src-tauri 写的两级相对路径;
-# 之前 cwd 停在上一级 apps\windows-client,少了一级,导致该相对路径解析不到文件。
-Set-Location "$root\apps\windows-client\src-tauri"; cargo tauri build *>> $log; if($LASTEXITCODE -ne 0){Fail 'tauri'}
-Log 'STEP 5 copy + sign NSIS per-user installer'
-$base="$root\apps\windows-client\src-tauri\target\release\bundle"; $dest="$root\installers"
-New-Item -ItemType Directory -Path $dest -Force | Out-Null
-Remove-Item "$dest\*" -Force -ErrorAction SilentlyContinue
-$nsis = Get-ChildItem -LiteralPath "$base\nsis" -Filter 'Agent Cowork_*_x64-setup.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if(-not $nsis){Fail 'nsis'}
-Copy-Item $nsis.FullName $dest -Force
-& pwsh -NoProfile -ExecutionPolicy Bypass -File "$root\scripts\sign-windows.ps1" -SelfSigned *>> $log
-Log 'STEP 6 host test suite'
-Set-Location "$root\apps\host"
-node --test --test-isolation=process --test-timeout=60000 --import ../../test-setup.mjs "test/*.test.js" > "$root\build2-host.log" 2>&1
-Log "host exit=$LASTEXITCODE"
-Log 'STEP 7 ui test suite'
-Set-Location "$root\apps\windows-client\ui"; npm test > "$root\build2-ui.log" 2>&1
-Log "ui exit=$LASTEXITCODE"
-Log 'BUILD OK'
-"DONE" | Out-File $done -Encoding ascii
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$root = Split-Path -Parent $PSCommandPath
+$tauriRoot = Join-Path $root 'apps\windows-client\src-tauri'
+
+function Assert-NativeSuccess {
+    param(
+        [Parameter(Mandatory = $true)][string]$Step,
+        [Parameter(Mandatory = $true)][int]$ExitCode
+    )
+    if ($ExitCode -ne 0) {
+        throw "$Step failed with exit code $ExitCode"
+    }
+}
+
+Set-Location -LiteralPath $root
+
+Write-Host '[build2] 1/3 canonical full local source gate'
+& python -X utf8 scripts/quality_gate.py --level full
+Assert-NativeSuccess -Step 'full local source gate' -ExitCode $LASTEXITCODE
+
+Write-Host '[build2] 2/3 canonical Host SEA build'
+& npm run build:host
+Assert-NativeSuccess -Step 'npm run build:host' -ExitCode $LASTEXITCODE
+
+Write-Host '[build2] 3/3 canonical Tauri package build'
+Push-Location -LiteralPath $tauriRoot
+try {
+    & cargo tauri build --ci --bundles nsis --no-sign -- --locked
+    Assert-NativeSuccess -Step 'cargo tauri build --ci --bundles nsis --no-sign -- --locked' -ExitCode $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+
+Write-Host '[build2] Local source gate and unsigned desktop package build completed.'
+Write-Warning '[build2] Release acceptance remains pending: installed-tauri smoke and trusted signing verification.'

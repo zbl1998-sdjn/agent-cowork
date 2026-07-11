@@ -20,10 +20,6 @@ const tauriRoot = path.join(repoRoot, 'apps', 'windows-client', 'src-tauri');
 
 interface TauriPermissionGrant {
   identifier?: string;
-  allow?: Array<{
-    name?: string;
-    sidecar?: boolean;
-  }>;
 }
 
 type TauriPermission = string | TauriPermissionGrant;
@@ -52,11 +48,13 @@ function commandAvailable(command: string, args: readonly string[] = ['--version
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 const runtimeDependencies = Object.keys(packageJson.dependencies || {}).sort();
 const devDependencies = Object.keys(packageJson.devDependencies || {}).sort();
-assert(JSON.stringify(runtimeDependencies) === JSON.stringify(['zod']), 'package.json runtime dependencies must stay allowlisted');
+assert(JSON.stringify(runtimeDependencies) === JSON.stringify(['pg', 'zod']), 'package.json runtime dependencies must stay allowlisted');
 assert(JSON.stringify(devDependencies) === JSON.stringify([
   '@eslint/js',
   'eslint',
   'eslint-plugin-react-hooks',
+  'jiti',
+  'postject',
   'typescript',
   'typescript-eslint',
 ]), 'package.json dev dependencies must stay allowlisted');
@@ -83,7 +81,7 @@ assert((config.build?.beforeBuildCommand || '').includes('prepare-embedded-pytho
 assert(config.app?.windows?.[0]?.label === 'main', 'Tauri main window label missing');
 assert(Boolean(config.app?.security?.csp), 'Tauri CSP must not be null');
 assert(config.bundle?.active === true, 'Tauri bundle must be active');
-assert(config.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be enabled');
+assert(config.bundle?.createUpdaterArtifacts === false, 'Tauri app builds must not create updater artifacts outside the canonical release flow');
 assert(config.bundle?.useLocalToolsDir === true, 'Tauri bundler tools must stay in target/.tauri for reproducible local builds');
 assert(config.bundle?.resources?.['../resources/python-embedded'] === 'python-embedded', 'Tauri bundle must package embedded Python resources');
 assert(JSON.stringify(config.bundle?.externalBin || []) === JSON.stringify(['binaries/agent-cowork-host']), 'Tauri bundle must declare host sidecar');
@@ -107,9 +105,11 @@ for (const token of [
 }
 
 const cargoToml = fs.readFileSync(cargoPath, 'utf8');
-for (const crate of ['tauri =', 'tauri-plugin-shell', 'tauri-plugin-opener', 'tauri-plugin-notification', 'tauri-plugin-updater']) {
+for (const crate of ['tauri =', 'tauri-plugin-opener', 'tauri-plugin-updater']) {
   assert(cargoToml.includes(crate), `Cargo.toml missing ${crate}`);
 }
+assert(!cargoToml.includes('tauri-plugin-shell'), 'Cargo.toml must not include the unused shell plugin');
+assert(!cargoToml.includes('tauri-plugin-notification'), 'Cargo.toml must not include the unused notification plugin');
 
 const lib = fs
   .readdirSync(path.join(tauriRoot, 'src'))
@@ -129,24 +129,21 @@ for (const symbol of [
   'python-embedded',
   'Command::new',
   'assert_trusted_path',
-  'tauri_plugin_shell::init()',
   'tauri_plugin_opener::init()',
-  'tauri_plugin_notification::init()',
   'tauri_plugin_updater::Builder',
 ]) {
   assert(lib.includes(symbol), `Tauri Rust entry missing ${symbol}`);
 }
 assert(!lib.includes('Command::new("node")'), 'Tauri Rust entry must use packaged sidecar instead of PATH node');
+assert(!lib.includes('tauri_plugin_shell::init'), 'Tauri Rust entry must not register the unused shell plugin');
+assert(!lib.includes('tauri_plugin_notification::init'), 'Tauri Rust entry must not register the unused notification plugin');
 
 const capability = JSON.parse(fs.readFileSync(capabilityPath, 'utf8')) as { permissions?: TauriPermission[] };
-assert(!(capability.permissions || []).includes('opener:default'), 'Tauri capability must not include broad opener:default');
-assert(!(capability.permissions || []).includes('shell:allow-open'), 'Tauri capability must not grant broad shell open');
-assert((capability.permissions || []).some((permission) => (
-  typeof permission === 'object'
-  && permission !== null
-  && permission.identifier === 'shell:allow-execute'
-  && (permission.allow || []).some((item) => item.name === 'binaries/agent-cowork-host' && item.sidecar === true)
-)), 'Tauri capability must allow only the packaged host sidecar');
+const permissionIds = (capability.permissions || []).map((permission) => (
+  typeof permission === 'string' ? permission : String(permission.identifier || '')
+));
+assert(!permissionIds.includes('opener:default'), 'Tauri capability must not include broad opener:default');
+assert(!permissionIds.some((permission) => permission.startsWith('shell:')), 'Tauri capability must not grant any shell permission');
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as ComponentManifest;
 const requiredComponents = [
