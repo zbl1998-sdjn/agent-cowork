@@ -19,7 +19,7 @@ export interface OnboardingRecommendationItem {
   reason: string;
 }
 
-export type OnboardingSettingsTab = 'api' | 'runtime' | 'selfcheck' | 'input';
+export type OnboardingSettingsTab = 'model' | 'api' | 'runtime' | 'selfcheck' | 'input';
 
 export interface OnboardingSetupAction {
   label: string;
@@ -79,7 +79,7 @@ const FALLBACK_BY_ROLE: Record<OnboardingRole, OnboardingRecommendations> = {
       { id: 'local-files', label: '本地文件', reason: '先从当前工作区读取资料，不需要额外配置。' },
     ],
     setup: [
-      { id: 'api-key', label: '配置 Kimi API', reason: '启用通用聊天和更完整的协作能力。' },
+      { id: 'api-key', label: '配置本地模型', reason: '通过 Ollama 或 LM Studio 启用通用聊天。' },
       { id: 'trusted-root', label: '确认工作目录', reason: '让文件检索和产物打开更准确。' },
     ],
   },
@@ -93,7 +93,7 @@ const FALLBACK_BY_ROLE: Record<OnboardingRole, OnboardingRecommendations> = {
       { id: 'terminal', label: '本地终端', reason: '运行测试、构建和 smoke 命令。' },
     ],
     setup: [
-      { id: 'api-key', label: '配置 Kimi API', reason: '启用长上下文开发协作。' },
+      { id: 'api-key', label: '配置本地模型', reason: '通过本机模型启用开发协作。' },
       { id: 'repo-root', label: '固定仓库根目录', reason: '减少误操作到错误目录的风险。' },
     ],
   },
@@ -107,7 +107,7 @@ const FALLBACK_BY_ROLE: Record<OnboardingRole, OnboardingRecommendations> = {
     ],
     setup: [
       { id: 'workspace-index', label: '索引工作区', reason: '让资料检索更快。' },
-      { id: 'api-key', label: '配置 Kimi API', reason: '提升长文档理解质量。' },
+      { id: 'api-key', label: '配置本地模型', reason: '通过本机模型处理长文档。' },
     ],
   },
   operations: {
@@ -120,14 +120,14 @@ const FALLBACK_BY_ROLE: Record<OnboardingRole, OnboardingRecommendations> = {
       { id: 'memory', label: '本地记忆', reason: '保留项目偏好和常用术语。' },
     ],
     setup: [
-      { id: 'api-key', label: '配置 Kimi API', reason: '启用更完整的任务理解。' },
+      { id: 'api-key', label: '配置本地模型', reason: '通过本机模型启用任务理解。' },
       { id: 'notifications', label: '检查提醒策略', reason: '避免关键任务无声失败。' },
     ],
   },
 };
 
 const SETUP_ACTIONS: Record<string, OnboardingSetupAction> = {
-  'api-key': { label: '进入 API 设置', settingsTab: 'api' },
+  'api-key': { label: '进入模型设置', settingsTab: 'model' },
   'trusted-root': { label: '运行自检', settingsTab: 'selfcheck' },
   'repo-root': { label: '运行自检', settingsTab: 'selfcheck' },
   'workspace-index': { label: '打开依赖体检', settingsTab: 'runtime' },

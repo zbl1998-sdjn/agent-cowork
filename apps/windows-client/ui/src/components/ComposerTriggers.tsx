@@ -2,8 +2,9 @@
 // 对标 Claude:纯线性图标 + tooltip,不堆文字。纯展示+回调。
 import { Button } from './ui/Button';
 import { Icon } from './ui/Icon';
+import type { ComposerTriggerChar } from '../lib/types/composer';
 
-export type ComposerTriggerChar = '/' | '@' | '#';
+export type { ComposerTriggerChar } from '../lib/types/composer';
 
 interface ComposerTriggersProps {
   onTrigger: (char: ComposerTriggerChar) => void;

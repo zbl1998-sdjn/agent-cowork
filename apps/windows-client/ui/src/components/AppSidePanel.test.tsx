@@ -33,6 +33,17 @@ describe('AppSidePanel', () => {
     expect((boundary?.props as { label?: string }).label).toBe('工具');
   });
 
+  it('labels the task center as a review surface', () => {
+    const element = renderPanel('tasks');
+    const props = element?.props as { children: unknown };
+    const children = Children.toArray(props.children as ReactNode);
+    const boundary = children.find(
+      (child) => isValidElement(child) && child.type === ErrorBoundary,
+    ) as ReactElement | undefined;
+
+    expect((boundary?.props as { label?: string }).label).toBe('任务中心');
+  });
+
   it('renders lazy panel fallback while the selected panel chunk loads', () => {
     const html = renderToStaticMarkup(
       <AppSidePanel panel="schedules" trustedRoot="C:/work" onClose={vi.fn()} onRunSubagent={vi.fn()} />,

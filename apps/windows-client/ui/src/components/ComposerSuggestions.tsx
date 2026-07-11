@@ -1,14 +1,8 @@
 // ComposerSuggestions(UI · components):输入框建议弹窗——渲染候选列表(模板/提及/历史/起步)并支持键鼠选择。纯展示+回调。
 import { ListboxOptionButton } from './ui/MenuItemButton';
+import type { ComposerSuggestionItem, ComposerSuggestionMode } from '../lib/types/composer';
 
-export type ComposerSuggestionMode = 'template' | 'mention' | 'history';
-
-export interface ComposerSuggestionItem {
-  key: string;
-  title: string;
-  detail?: string | undefined;
-  apply: () => void;
-}
+export type { ComposerSuggestionItem, ComposerSuggestionMode } from '../lib/types/composer';
 
 interface ComposerSuggestionsProps {
   mode: ComposerSuggestionMode;

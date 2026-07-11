@@ -4,15 +4,14 @@
 // 依赖/对应路由:POST /api/kimi/chat(/stream)、/api/agent/chat/stream、/api/approvals/:id、/api/approvals/batch、/api/runs/:id/cancel;经 ./sse(streamSse)。导出:chat / chatStream / agentChatStream / respondApproval(s) / answerQuestion / cancelRun + 相关类型。
 import { authHeaders, hostReady, postJson, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse, type SsePayload } from './sse';
-import type { TodoItem, TodoStatus } from '../types';
-
+import { approvalRequestMeta, type ApprovalRequestMeta } from './approval-event';
+import type { PermissionMode, TodoItem, TodoStatus } from '../types';
 export interface ChatResult {
   ok: boolean;
   text: string;
   model?: string | undefined;
   runId?: string | undefined;
 }
-
 export async function chat(
   prompt: string,
   opts: { trustedRoot?: string | undefined; model?: string | undefined; thinking?: string | undefined } = {},
@@ -31,7 +30,6 @@ export interface ChatStreamHandlers {
   onDone?: ((full: { text: string; runId?: string | undefined; model?: string | undefined }) => void) | undefined;
   onError?: ((message: string) => void) | undefined;
 }
-
 function str(data: SsePayload, key: string): string | undefined {
   const value = data[key];
   return typeof value === 'string' ? value : undefined;
@@ -78,7 +76,7 @@ export interface ContextCompactionStats {
 
 export interface AgentStreamHandlers {
   onToken?: ((delta: string) => void) | undefined;
-  onApprovalRequest?: ((id: string, name: string, args: unknown) => void) | undefined;
+  onApprovalRequest?: ((id: string, name: string, args: unknown, meta?: ApprovalRequestMeta) => void) | undefined;
   onPlanProposed?: ((id: string, plan: string) => void) | undefined;
   onTodoSnapshot?: ((todos: TodoItem[]) => void) | undefined;
   onTodoUpdate?: ((todo: TodoItem) => void) | undefined;
@@ -167,6 +165,7 @@ export async function agentChatStream(
     model?: string | undefined;
     modelConfig?: ModelRunConfig | undefined;
     thinking?: string | undefined;
+    permissionMode?: PermissionMode | undefined;
     autoApprove?: boolean | undefined;
     planMode?: boolean | undefined;
     images?: string[] | undefined;
@@ -186,6 +185,7 @@ export async function agentChatStream(
       model: opts.model,
       modelConfig: opts.modelConfig,
       thinking: opts.thinking,
+      permissionMode: opts.permissionMode,
       autoApprove: opts.autoApprove,
       planMode: opts.planMode,
       images: opts.images,
@@ -210,7 +210,7 @@ export async function agentChatStream(
       if (item) handlers.onTodoUpdate?.(item);
     }
     else if (type === 'approval_request') {
-      handlers.onApprovalRequest?.(str(data, 'id') || '', str(data, 'name') || '', data.args);
+      handlers.onApprovalRequest?.(str(data, 'id') || '', str(data, 'name') || '', data.args, approvalRequestMeta(data));
     } else if (type === 'tool_result') {
       handlers.onToolResult?.(str(data, 'name') || '', str(data, 'status') || 'succeeded', data.result, { durationMs: num(data, 'durationMs') });
     } else if (type === 'file_written') handlers.onFileWritten?.(str(data, 'path') || '');

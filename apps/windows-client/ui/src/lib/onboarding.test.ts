@@ -24,6 +24,8 @@ describe('onboarding fallback view model', () => {
     expect(fallback.recommendations.setup.map((item) => item.id)).toContain('api-key');
     expect(fallback.dependencyCheck.route).toBe('/api/runtime/dependencies');
     expect(fallback.dependencyCheck.recommendedIds).toContain('node');
+    expect(JSON.stringify(fallback.recommendations.setup)).toContain('配置本地模型');
+    expect(JSON.stringify(fallback.recommendations.setup)).not.toContain('配置 Kimi API');
   });
 
   it('groups recommendations into display sections', () => {
@@ -56,7 +58,7 @@ describe('onboarding fallback view model', () => {
   });
 
   it('maps setup recommendations to concrete settings actions', () => {
-    expect(getOnboardingSetupAction('api-key')).toEqual({ label: '进入 API 设置', settingsTab: 'api' });
+    expect(getOnboardingSetupAction('api-key')).toEqual({ label: '进入模型设置', settingsTab: 'model' });
     expect(getOnboardingSetupAction('repo-root')).toEqual({ label: '运行自检', settingsTab: 'selfcheck' });
     expect(getOnboardingSetupAction('workspace-index')).toEqual({ label: '打开依赖体检', settingsTab: 'runtime' });
     expect(getOnboardingSetupAction('unknown')).toBeNull();

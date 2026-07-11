@@ -55,9 +55,10 @@ describe('SettingsTabsContent provider catalog', () => {
     const html = render('model');
 
     expect(html).toContain('value="deepseek"');
-    expect(html).toContain('DeepSeek');
+    expect(html).toContain('DeepSeek（目录/当前受限）');
     expect(html).toContain('value="deepseek-v4-flash"');
     expect(html).toContain('provider_id/model_id');
+    expect(html).toContain('当前 Internal Beta 仅执行本地模型');
   });
 
   it('shows provider-specific API configuration metadata without keys', () => {
@@ -65,7 +66,8 @@ describe('SettingsTabsContent provider catalog', () => {
 
     expect(html).toContain('DEEPSEEK_API_KEY');
     expect(html).toContain('https://api.deepseek.com');
-    expect(html).toContain('粘贴 API Key');
+    expect(html).toContain('仅保存配置（当前不启用公网出站）');
+    expect(html).toContain('公网 provider 只提供目录/配置发现');
     expect(html).not.toContain('test-secret');
   });
 

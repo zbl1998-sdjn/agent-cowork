@@ -6,15 +6,15 @@ import { referencedFilePaths } from '../lib/composer-trigger';
 import { useComposerRefine } from '../hooks/useComposerRefine';
 import { useComposerSuggestions } from '../hooks/useComposerSuggestions';
 import { ComposerAttachments } from './ComposerAttachments';
-import { ComposerFooter, type ThinkingLevel } from './ComposerFooter';
+import { ComposerFooter } from './ComposerFooter';
 import { ComposerSuggestions } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
-import type { ComposerProps } from './composer-types';
-// AppComposerDock 与 Composer.test 仍从本模块导入 ComposerMeta;类型实际在 composer-types,
+import type { ComposerProps, ThinkingLevel } from '../lib/types/composer';
+// AppComposerDock 与 Composer.test 仍从本模块导入 ComposerMeta;类型实际在 lib/types/composer,
 // 这里再导出以保持旧 import path 稳定。
-export type { ComposerDraftPreview, ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe, WorkbenchPreviewState } from './composer-types';
-export type { ThinkingLevel } from './ComposerFooter';
+export type { ComposerDraftPreview, ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe, WorkbenchPreviewState } from '../lib/types/composer';
+export type { ThinkingLevel } from '../lib/types/composer';
 
 const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
   ollama: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'],

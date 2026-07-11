@@ -69,7 +69,7 @@ function formatFileSize(size: number): string {
 
 function modeLabel(mode: WorkbenchPreviewState['mode']): string {
   if (mode === 'plan') return '计划';
-  if (mode === 'yolo') return '自动执行';
+  if (mode === 'auto') return '安全自动';
   return '执行';
 }
 

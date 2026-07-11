@@ -1,18 +1,4 @@
-// 设置标签类型(UI · 类型层 · lib)
+// 设置类型兼容入口(UI · components)
 // ---------------------------------------------------------------------------
-// 职责:SettingsTab 联合类型的单一来源——供 Settings.tsx(模态外框)与 SettingsTabsContent.tsx(各标签内容)共享;独立成文件避免两半互相 import 形成依赖环。
-// 导出:SettingsTab。
-
-export type SettingsTab =
-  | 'account'
-  | 'appearance'
-  | 'model'
-  | 'input'
-  | 'api'
-  | 'runtime'
-  | 'updates'
-  | 'selfcheck';
-
-export type AppFontScale = 'small' | 'normal' | 'large' | 'xlarge';
-
-export type AppFontFamily = 'system' | 'chinese' | 'serif' | 'mono';
+// 职责:保留既有组件 import 路径;类型事实来源在 lib/types/settings。
+export type { AppFontFamily, AppFontScale, SettingsTab } from '../lib/types/settings';

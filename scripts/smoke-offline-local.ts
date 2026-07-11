@@ -4,7 +4,7 @@
 //       验证断网场景下本地文件能力仍可用——健康检查、工作区、文件树/读取、file-ops
 //       preview→apply 写入、运行时依赖(含 on-demand 安装模式)与审计 JSONL;同时断言
 //       模型类接口(/api/kimi/plan)在 enableKimiApi:false 下返回 503 且给出"本地文件
-//       功能仍可离线使用 / 需要模型回复时请联网"的边界提示。报告落地 reports/offline-local。
+//       功能仍可离线使用 / 请配置本地模型"的边界提示。报告落地 reports/offline-local。
 // 用法:npm run smoke:offline-local(即 node scripts/run-host-node.mjs scripts/smoke-offline-local.ts);
 //       断言失败即 exit 1 阻断。
 // 依赖:apps/host 的 createServer 与 JsonlWriter 审计写入;顶层 await 直接执行(无 main 包装)。
@@ -166,7 +166,9 @@ try {
     503,
   );
   assert.match(String(kimi.error), /本地文件功能仍可离线使用/);
-  assert.match(String(kimi.error), /需要模型回复时请联网/);
+  assert.match(String(kimi.error), /请配置 Ollama\/LM Studio/);
+  assert.match(String(kimi.error), /当前 Internal Beta 不允许公网云模型直接出站/);
+  assert.doesNotMatch(String(kimi.error), /联网并配置 KIMI_API_KEY/);
   report.checks.modelNetworkBoundary = 'passed';
 
   const audit = fs.readFileSync(auditPath, 'utf8');

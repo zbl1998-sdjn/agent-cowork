@@ -1,8 +1,17 @@
 // 应用态类型(UI · lib):App 编排层用到的视图模型/会话/UI 状态类型聚合,补充 lib/types 的领域类型。
-import type { ProgressLineProps } from '../components/ProgressLine';
 import type { ApprovalState, FileOperation, SourceRef, SubtaskGroupItem, TodoItem } from './types';
+import type { ProgressLineProps } from './types/progress';
 
-export interface PendingApproval { id: string; name: string }
+export interface PendingApproval {
+  id: string;
+  name: string;
+  risk?: string | undefined;
+  preview?: unknown;
+  /** Host 明确声明该批准可以按工具名复用于本会话；缺失时失败关闭。 */
+  sessionReusable?: boolean | undefined;
+  /** 批量回传部分失败时持久化到剩余单卡，避免批量条卸载后丢失错误。 */
+  error?: string | undefined;
+}
 
 export interface ToolCallItem {
   name: string;
@@ -65,7 +74,7 @@ export interface Conversation {
   branches?: ConversationBranch[] | undefined;
 }
 
-export type SidePanel = 'none' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'projects' | 'schedules' | 'memory' | 'observability';
+export type SidePanel = 'none' | 'tasks' | 'tools' | 'viz' | 'connectors' | 'artifacts' | 'projects' | 'schedules' | 'memory' | 'observability';
 
 export interface WorkspaceInfo { trustedRoot: string }
 export interface RecipeRunResponse {

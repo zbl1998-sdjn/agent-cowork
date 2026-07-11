@@ -219,6 +219,7 @@ describe('buildAgentChatStreamOptions', () => {
       },
       thinking: 'deep',
       autoApprove: true,
+      permissionMode: 'guarded_auto',
       planMode: false,
       images: [],
     })).toMatchObject({
@@ -232,6 +233,7 @@ describe('buildAgentChatStreamOptions', () => {
       },
       thinking: 'deep',
       autoApprove: true,
+      permissionMode: 'guarded_auto',
       planMode: false,
       images: [],
     });

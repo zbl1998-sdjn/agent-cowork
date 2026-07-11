@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:伴随对话常驻右侧,分区显示「运行状态 / Agent Team / 工作文件夹 / 技能·模板」,可收起。
 // 仅用 App 已有数据(trustedRoot / recipes / streamingId / mode / model / 轮次 / agentTeamView),不新增网络请求。
-import type { AgentMode } from './AppHeader';
+import type { AgentMode } from '../lib/types';
 import type { Recipe } from './Composer';
 import { AgentTeamTimeline } from './AgentTeamTimeline';
 import { Icon } from './ui/Icon';
@@ -24,7 +24,7 @@ interface AppContextRailProps {
   onToggle: () => void;
 }
 
-const MODE_LABEL: Record<AgentMode, string> = { plan: '计划', execute: '执行', yolo: 'YOLO' };
+const MODE_LABEL: Record<AgentMode, string> = { plan: '计划', execute: '执行', auto: '安全自动' };
 
 export function AppContextRail({ trustedRoot, recipes, streamingId, mode, model, messageCount, agentTeamView = null, agentTeamLoading = false, agentTeamError = '', onRefreshAgentTeam, onOpenRuns, onPickRecipe, onToggle }: AppContextRailProps) {
   const folder = trustedRoot.split(/[\\/]/).filter(Boolean).pop() || trustedRoot;

@@ -5,17 +5,14 @@ import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
 import type { AppFontFamily, AppFontScale, SettingsTab } from './settings-types';
+import {
+  FALLBACK_MODEL_PROVIDERS,
+  isLocalProviderOption, providerDisplayName,
+} from './settings-provider-options';
 
 // 懒加载较重的运行时/更新子面板,避免打开账户标签时把这些 bundle 一起拖进来。
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((m) => ({ default: m.RuntimeDependenciesPanel })));
 const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((m) => ({ default: m.UpdatePanel })));
-
-const FALLBACK_MODEL_PROVIDERS: ModelProviderOption[] = [
-  { id: 'kimi-api', displayName: 'Kimi(月之暗面)', region: 'cn', protocol: 'openai-chat', defaultModel: 'kimi-k2.7-code', models: ['kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6', 'kimi-k2.5'], defaultBaseUrl: 'https://api.moonshot.ai/v1', apiKeyEnv: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'], requiresApiKey: true, source: 'builtin' },
-  { id: 'ollama', displayName: 'Ollama', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen3', models: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
-  { id: 'openai/local', displayName: '本机 OpenAI-compatible', region: 'local', protocol: 'openai-chat', defaultModel: 'qwen3', models: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'local-model'], defaultBaseUrl: 'http://127.0.0.1:11434/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
-  { id: 'lmstudio', displayName: 'LM Studio', region: 'local', protocol: 'openai-chat', defaultModel: 'local-model', models: ['local-model', 'qwen3', 'qwen3-coder', 'gpt-oss-20b', 'deepseek-r1', 'llama-3.1-8b-instruct'], defaultBaseUrl: 'http://127.0.0.1:1234/v1', apiKeyEnv: [], requiresApiKey: false, allowCustomBaseUrl: true, allowCustomModel: true, source: 'builtin' },
-];
 
 const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
   { value: 'light', label: '浅色' },
@@ -104,6 +101,7 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
   } = props;
   const providerOptions = providers?.length ? providers : FALLBACK_MODEL_PROVIDERS;
   const selectedProvider = providerOptions.find((item) => item.id === provider) || providerOptions[0];
+  const selectedIsLocal = isLocalProviderOption(selectedProvider);
   const knownModels = [...new Set([selectedProvider?.defaultModel, ...(selectedProvider?.models || [])].filter(Boolean))] as string[];
   const isCustomModel = Boolean(model) && !knownModels.includes(model);
   const providerLabel = selectedProvider?.displayName || provider || '模型提供商';
@@ -146,7 +144,7 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
           <label className="auth-field">
             <span>默认用哪家</span>
             <select value={provider} onChange={(e) => selectProvider(e.target.value)}>
-              {providerOptions.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}
+              {providerOptions.map((item) => <option key={item.id} value={item.id}>{providerDisplayName(item)}</option>)}
             </select>
           </label>
           <label className="auth-field">
@@ -163,10 +161,11 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
           {isCustomModel && (
             <label className="auth-field">
               <span>自定义 model id</span>
-              <input value={model} onChange={(e) => setModel(e.target.value)} placeholder={selectedProvider?.defaultModel || '如 kimi-k2-0905-preview'} autoFocus />
+              <input value={model} onChange={(e) => setModel(e.target.value)} placeholder={selectedProvider?.defaultModel || '如 local-model'} autoFocus />
             </label>
           )}
           <p className="modal-note">模型按 provider_id/model_id 管理；换厂商会自动带出它的推荐模型。这里存默认值，每轮对话仍可临时切换。</p>
+          <p className="modal-note">当前 Internal Beta 仅执行本地模型或管理员明确放行的客户网关；公网 provider 只提供目录/配置发现。</p>
           <div className="modal-actions">
             <span className="modal-actions-spacer" />
             <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
@@ -179,7 +178,7 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
             <span className="set-label">发送前澄清</span>
             <SegmentedControl ariaLabel="发送前澄清" className="seg" value={autoClarify} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoClarify} />
           </div>
-          <p className="modal-note">开启后,模糊请求(如「整理一下」)发出去之前,Kimi 会先反问一两个具体问题,确认要做什么,再开始干活。多花 3 秒,少返工一轮。</p>
+          <p className="modal-note">开启后,模糊请求(如「整理一下」)发出去之前,模型会先反问一两个具体问题,确认要做什么,再开始干活。多花 3 秒,少返工一轮。</p>
           <div className="set-row">
             <span className="set-label">自动压缩上下文</span>
             <SegmentedControl ariaLabel="自动压缩上下文" className="seg" value={autoContextCompaction} options={AUTO_CLARIFY_OPTIONS} onChange={onSetAutoContextCompaction} />
@@ -193,13 +192,14 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
             <label className="auth-field">
               <span>提供商</span>
               <select value={provider} onChange={(e) => selectProvider(e.target.value)}>
-                {providerOptions.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}
+                {providerOptions.map((item) => <option key={item.id} value={item.id}>{providerDisplayName(item)}</option>)}
               </select>
             </label>
             <p className="modal-note">当前配置:{providerLabel}。环境变量:{apiKeyNames}。</p>
+            <p className="modal-note">当前 Internal Beta 仅执行本地模型或管理员明确放行的客户网关；公网 provider 只提供目录/配置发现。</p>
             <label className="auth-field">
               <span>API Key {hasKey && <em className="key-set">已配置</em>}</span>
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置(留空保持不变)' : (selectedProvider?.requiresApiKey ? '粘贴 API Key' : '本地模型可留空')} autoComplete="off" />
+              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置(留空保持不变)' : (selectedIsLocal ? '本地模型可留空' : selectedProvider?.region === 'custom' || selectedProvider?.region === 'enterprise' ? '保存网关凭据（启用需管理员 allowlist）' : '仅保存配置（当前不启用公网出站）')} autoComplete="off" />
             </label>
             <details className="api-advanced">
               <summary>高级:接口地址(一般不用改)</summary>

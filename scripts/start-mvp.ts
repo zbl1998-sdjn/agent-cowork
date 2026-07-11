@@ -5,13 +5,17 @@
 //       写入 build/mvp-runtime.json 运行时状态(pid/host/port/url/审计路径等),
 //       并自动打开浏览器;收到 SIGINT/SIGTERM 时优雅关闭并清理运行时文件。
 // 用法:npm run start:mvp(即 node scripts/run-host-node.mjs scripts/start-mvp.ts);
-//       可用环境变量 PORT/HOST/TRUSTED_ROOT/MVP_RUNTIME_FILE、NO_OPEN=1 覆盖默认行为;
+//       可用环境变量 PORT/TRUSTED_ROOT/MVP_RUNTIME_FILE、NO_OPEN=1 覆盖默认行为;HOST 仅接受回环地址;
 //       配置 KIMI_API_KEY/MOONSHOT_API_KEY 后启用 Kimi 计划能力(默认仅会议纪要演示)。
 // 依赖:apps/host 的 createServer 与 JsonlWriter;与 stop-mvp.ts/status-mvp.ts 共享运行时文件契约。
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  resolvePublicHost,
+  withPublicHostSecurity,
+} from '../apps/host/src/security/public-host-policy.js';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 
@@ -63,7 +67,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(scriptDir);
 const buildDir = path.join(repoRoot, 'build');
 const workspace = path.resolve(process.env.TRUSTED_ROOT || path.join(repoRoot, 'build', 'mvp-workspace'));
-const host = process.env.HOST || '127.0.0.1';
+const host = resolvePublicHost(process.env.HOST);
 const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
 const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
@@ -73,7 +77,7 @@ const kimiApiPlanEnabled = Boolean(process.env.KIMI_API_KEY || process.env.MOONS
 ensureDemoWorkspace(workspace);
 fs.mkdirSync(path.dirname(runtimeFile), { recursive: true });
 
-const server = createServer({
+const server = createServer(withPublicHostSecurity({
   trustedRoot: workspace,
   kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
   kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
@@ -81,7 +85,7 @@ const server = createServer({
   kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
   kimiModel: process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(auditPath),
-});
+}));
 
 function writeRuntimeFile(): void {
   const runtime = {

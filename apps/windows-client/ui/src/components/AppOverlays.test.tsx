@@ -55,7 +55,7 @@ describe('AppOverlays', () => {
     expect(html).toContain('首启引导');
     expect(html).toContain('先按你的工作方式配一下');
     expect(html).toContain('建议设置');
-    expect(html).toContain('配置 Kimi API');
-    expect(html).toContain('进入 API 设置');
+    expect(html).toContain('配置本地模型');
+    expect(html).toContain('进入模型设置');
   });
 });

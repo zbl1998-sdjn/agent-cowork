@@ -1,5 +1,5 @@
 // ConversationRail(UI · components):左侧栏——对标 Claude 桌面的「导航中心」。
-// 品牌 → 新建对话 → 面板导航(工具/连接器/产物/记忆/可观测/定时/项目/可视化)→ 搜索 → 最近对话。
+// 品牌 → 新建对话 → 面板导航(任务/工具/连接器/产物/记忆/可观测/定时/项目/可视化)→ 搜索 → 最近对话。
 // 对齐 Claude:侧栏底部保持极简(设置/主题/安全下沉到顶栏「更多」与命令面板,不再放侧栏 footer)。
 import type { Conversation, SidePanel } from '../lib/app-types';
 import { conversationBranchOptions } from '../lib/conversation-branches';
@@ -8,6 +8,7 @@ import { Icon, type IconName } from './ui/Icon';
 type PanelId = Exclude<SidePanel, 'none'>;
 
 const NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
+  { id: 'tasks', icon: 'history', label: '任务' },
   { id: 'tools', icon: 'tools', label: '工具' },
   { id: 'connectors', icon: 'connectors', label: '连接器' },
   { id: 'artifacts', icon: 'artifacts', label: '产物' },

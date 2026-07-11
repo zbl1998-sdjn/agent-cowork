@@ -576,3 +576,13 @@
 .viz-form-submit { margin-top: 4px; }
 [data-theme="dark"] .viz-form-grid label { color: #b8bcb1; }
 [data-theme="dark"] .viz-form-grid input, [data-theme="dark"] .viz-form-grid select { background: #1a1a17; color: var(--text); border-color: #3a3a35; }
+
+/* 定时任务创建器:显式绑定技能,避免创建到点无执行器的 prompt-only 任务。 */
+.schedule-create-form { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.schedule-create-form h3 { margin: 0 0 8px; font-size: 14px; }
+.schedule-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.schedule-form-grid label { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.schedule-form-grid input, .schedule-form-grid select, .schedule-form-grid textarea { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--control-bg); color: var(--text); font: inherit; }
+.schedule-form-grid textarea { resize: vertical; }
+.schedule-form-wide { grid-column: 1 / -1; }
+@media (max-width: 760px) { .schedule-form-grid { grid-template-columns: 1fr; } .schedule-form-wide { grid-column: auto; } }

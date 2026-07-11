@@ -12,9 +12,14 @@ import {
   findComposerTrigger,
   mentionInsertText,
 } from '../lib/composer-trigger';
-import type { ComposerSuggestionItem, ComposerSuggestionMode } from '../components/ComposerSuggestions';
-import type { ComposerTriggerChar } from '../components/ComposerTriggers';
-import type { FileHit, HistoryRun, Recipe } from '../components/composer-types';
+import type {
+  ComposerSuggestionItem,
+  ComposerSuggestionMode,
+  ComposerTriggerChar,
+  FileHit,
+  HistoryRun,
+  Recipe,
+} from '../lib/types/composer';
 
 export interface UseComposerSuggestionsOptions {
   /** 当前受控 textarea 值。 */

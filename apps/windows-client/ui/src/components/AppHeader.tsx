@@ -3,6 +3,7 @@
 // 仅触发 App 传入的回调。同文件导出 AppHeaderActions。
 import type { AuthIdentity } from '../lib/api';
 import { invokeDesktop, isDesktop } from '../lib/api/transport';
+import type { AgentMode } from '../lib/types';
 import { Icon } from './ui/Icon';
 import { Button } from './ui/Button';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -17,12 +18,10 @@ async function revealInstaller(): Promise<void> {
   }
 }
 
-export type AgentMode = 'plan' | 'execute' | 'yolo';
-
 const MODE_OPTIONS: Array<{ value: AgentMode; label: string; title: string }> = [
   { value: 'plan', label: '计划', title: '计划模式:先只读研究并提交计划草案,待你批准后再执行写操作' },
   { value: 'execute', label: '执行', title: '执行模式:正常执行,文件改动需逐次批准(推荐)' },
-  { value: 'yolo', label: 'YOLO', title: 'YOLO 模式:自动批准一切操作(含高风险命令/连接器),放手跑——请谨慎使用' },
+  { value: 'auto', label: '安全自动', title: '安全自动:低风险操作可自动执行;高风险操作仍需你批准' },
 ];
 
 interface AppHeaderProps {

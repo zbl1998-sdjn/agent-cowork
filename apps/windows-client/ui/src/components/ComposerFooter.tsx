@@ -2,10 +2,11 @@
 // 右组推到最右(模型 · 思考 · 发送),中间留白,一行疏朗。纯展示+回调。
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerModelControls } from './ComposerModelControls';
-import { ComposerTriggers, type ComposerTriggerChar } from './ComposerTriggers';
+import { ComposerTriggers } from './ComposerTriggers';
 import type { ModelProviderOption } from '../lib/api/kimiConfig';
+import type { ComposerTriggerChar, ThinkingLevel } from '../lib/types/composer';
 
-export type ThinkingLevel = 'fast' | 'standard' | 'deep';
+export type { ThinkingLevel } from '../lib/types/composer';
 
 const THINKING_OPTIONS: Array<{ value: ThinkingLevel; label: string }> = [
   { value: 'fast', label: '快速' },

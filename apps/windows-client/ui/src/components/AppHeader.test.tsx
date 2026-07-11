@@ -55,7 +55,8 @@ describe('AppHeader', () => {
     expect(html).toContain('class="mode-select"');
     expect(html).toContain('模式·计划');
     expect(html).toContain('模式·执行');
-    expect(html).toContain('模式·YOLO');
+    expect(html).toContain('模式·安全自动');
+    expect(html).not.toContain('自动批准一切');
     expect(html).toContain('header-cmdk');
     expect(html).toContain('header-more');
     expect(html).toContain('header-more-user');
@@ -84,9 +85,17 @@ describe('AppHeader', () => {
     const selects = collectByType(tree, 'select');
     const modeSelect = selects.find((s) => s.props.className === 'mode-select');
     expect(modeSelect).toBeDefined();
-    modeSelect?.props.onChange({ target: { value: 'yolo' } });
+    modeSelect?.props.onChange({ target: { value: 'auto' } });
     modeSelect?.props.onChange({ target: { value: 'plan' } });
-    expect(onSetMode).toHaveBeenCalledWith('yolo');
+    expect(onSetMode).toHaveBeenCalledWith('auto');
     expect(onSetMode).toHaveBeenCalledWith('plan');
+  });
+
+  it('describes automatic mode as guarded and keeps high-risk actions explicit', () => {
+    const html = renderToStaticMarkup(<AppHeader {...props({ mode: 'auto' })} />);
+
+    expect(html).toContain('低风险操作可自动执行');
+    expect(html).toContain('高风险操作仍需你批准');
+    expect(html).not.toContain('YOLO');
   });
 });

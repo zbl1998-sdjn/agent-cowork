@@ -53,7 +53,7 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
 }
 
 describe('ConversationRail', () => {
-  it('renders a Claude-style nav center: brand, new chat, 8 panels, search, recents', () => {
+  it('renders a Claude-style nav center: brand, new chat, 9 panels, search, recents', () => {
     const html = renderToStaticMarkup(<ConversationRail {...props()} />);
 
     expect(html).toContain('rail-brand');
@@ -62,7 +62,8 @@ describe('ConversationRail', () => {
     expect(html).toContain('Beta');
     expect(html).toContain('rail-new');
     expect(html).toContain('新建对话');
-    expect(html.match(/rail-nav-item/g)?.length).toBe(8);
+    expect(html.match(/rail-nav-item/g)?.length).toBe(9);
+    expect(html).toContain('任务');
     expect(html).toContain('工具');
     expect(html).toContain('连接器');
     expect(html).toContain('记忆');

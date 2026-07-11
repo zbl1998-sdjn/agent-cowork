@@ -18,9 +18,9 @@ import { buildContextualStarters } from '../lib/starter-suggestions';
 import type { WorkspaceInfo } from '../lib/app-types';
 import { ONBOARDING_DONE_KEY } from '../lib/onboarding';
 import type { RunSummary } from '../lib/types';
-import type { HistoryRun, Recipe } from '../components/Composer';
-import type { AppFontFamily, AppFontScale, SettingsTab } from '../components/settings-types';
-import type { SecurityStatus } from '../components/SecurityStatusBar';
+import type { HistoryRun, Recipe } from '../lib/types/composer';
+import type { SecurityStatus } from '../lib/types/security';
+import type { AppFontFamily, AppFontScale, SettingsTab } from '../lib/types/settings';
 
 interface RuntimeDefaults {
   chatEnabled: boolean;

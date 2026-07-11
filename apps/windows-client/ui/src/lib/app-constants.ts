@@ -2,7 +2,7 @@
 import type { Conversation } from './app-types';
 
 export const GUEST_KEY = 'kcw.guest';
-export const CONV_KEY = 'kcw.conversations.v1';
+export const CONV_KEY = 'kcw.conversations.v1'; // gitleaks:allow -- public localStorage key
 export const AUTO_CLARIFY_KEY = 'kcw.autoClarify';
 export const AUTO_CONTEXT_COMPACTION_KEY = 'kcw.autoContextCompaction';
 export const STARTERS = [
