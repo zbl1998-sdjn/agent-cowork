@@ -3,7 +3,9 @@
 // 职责:并发执行多个子代理计划(受并发上限约束),各自独立产出 run 记录与事件;用于把可并行的子任务一次性铺开。
 //       与 subagent.js(单计划顺序执行)互补。依赖:L0 path-policy + 同层 run-store/runs-index。
 import path from 'node:path';
+import { LOCAL_IDENTITY_SCOPE } from '../security/identity-scope.js';
 import { assertTrustedPath } from '../security/path-policy.js';
+import { bindRunEventPublisher } from '../util/run-event-publisher.js';
 import { createRunId, writeRunRecord } from './run-store.js';
 import { summariseRunForIndex } from './runs-index.js';
 import {
@@ -30,7 +32,9 @@ export type ToolRegistryLike = {
     context: { trustedRoot: string; context: Record<string, unknown> },
   ): unknown | Promise<unknown>;
 };
-export type RunEventsLike = { publish(runId: string, payload: Record<string, unknown>): ParallelEvent };
+export type RunEventsLike = {
+  publish(runId: string, payload: Record<string, unknown>): ParallelEvent | Promise<ParallelEvent>;
+};
 export type RunsIndexLike = { upsert(record: unknown, context?: Record<string, unknown>): unknown };
 export type ParallelEvent = { seq?: number; ts?: string; type: string; [key: string]: unknown };
 export type ChildResult = {
@@ -68,7 +72,8 @@ export type RunSubagentsParallelResult = {
 };
 type RunSubagentResult = { ok: boolean; runId: string; steps?: unknown };
 
-export async function runSubagentsParallel({
+export async function runSubagentsParallel(options: RunSubagentsParallelOptions): Promise<RunSubagentsParallelResult> {
+  const {
   goal = '',
   agents = [],
   registry,
@@ -76,13 +81,16 @@ export async function runSubagentsParallel({
   runStoreRoot,
   runEvents = null,
   runsIndex = null,
-  context = {},
+  context: suppliedContext,
   stopOnError = true,
   contextBudgetBytes = DEFAULT_CONTEXT_BUDGET_BYTES,
   maxSteps = DEFAULT_MAX_STEPS,
   maxAgents = DEFAULT_MAX_PARALLEL_AGENTS,
   maxConcurrency = DEFAULT_MAX_CONCURRENCY,
-}: RunSubagentsParallelOptions): Promise<RunSubagentsParallelResult> {
+  } = options;
+  const context = Object.hasOwn(options, 'context')
+    ? (suppliedContext ?? {})
+    : LOCAL_IDENTITY_SCOPE;
   if (!registry) {
     throw new Error('runSubagentsParallel: registry is required');
   }
@@ -116,17 +124,18 @@ export async function runSubagentsParallel({
   const runId = createRunId();
   const startedAt = new Date();
   const events: ParallelEvent[] = [];
-  const emit = (type: string, payload: Record<string, unknown> = {}): ParallelEvent => {
-    const enriched = runEvents
-      ? runEvents.publish(runId, { type, ...payload })
+  const scopedRunEvents = bindRunEventPublisher(runEvents, context);
+  const emit = async (type: string, payload: Record<string, unknown> = {}): Promise<ParallelEvent> => {
+    const enriched: ParallelEvent = scopedRunEvents
+      ? await Promise.resolve(scopedRunEvents.publish(runId, { type, ...payload }))
       : { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
     events.push(enriched);
     return enriched;
   };
 
   const concurrency = Math.max(1, Math.min(Number(maxConcurrency) || DEFAULT_MAX_CONCURRENCY, childPlans.length));
-  emit('user_message', { text: String(goal || '').slice(0, 2000) || `并行子任务 (${childPlans.length} 个)` });
-  emit('assistant_start', { status: 'running', childCount: childPlans.length, maxConcurrency: concurrency });
+  await emit('user_message', { text: String(goal || '').slice(0, 2000) || `并行子任务 (${childPlans.length} 个)` });
+  await emit('assistant_start', { status: 'running', childCount: childPlans.length, maxConcurrency: concurrency });
 
   const children: (ChildResult | undefined)[] = new Array(childPlans.length);
   let next = 0;
@@ -142,7 +151,7 @@ export async function runSubagentsParallel({
       if (!child || !limits) {
         return;
       }
-      emit('child_start', { index, goal: child.goal, stepCount: child.steps.length });
+      await emit('child_start', { index, goal: child.goal, stepCount: child.steps.length });
       try {
         const out = await runSubagent({
           goal: child.goal,
@@ -150,7 +159,7 @@ export async function runSubagentsParallel({
           registry,
           trustedRoot: safeRoot,
           runStoreRoot,
-          runEvents,
+          runEvents: scopedRunEvents,
           runsIndex,
           context: { ...context, parentRunId: runId, childIndex: index },
           stopOnError,
@@ -167,7 +176,7 @@ export async function runSubagentsParallel({
           limits,
         };
         children[index] = childResult;
-        emit('child_end', { index, runId: out.runId, status: childResult.status });
+        await emit('child_end', { index, runId: out.runId, status: childResult.status });
       } catch (err) {
         const childResult: ChildResult = {
           index,
@@ -178,7 +187,7 @@ export async function runSubagentsParallel({
           limits,
         };
         children[index] = childResult;
-        emit('child_end', { index, status: 'failed', error: childResult.error });
+        await emit('child_end', { index, status: 'failed', error: childResult.error });
       }
     }
   }
@@ -188,7 +197,7 @@ export async function runSubagentsParallel({
   const ok = childResults.every((child) => child && child.ok);
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
-  emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
+  await emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
 
   const record = {
     id: runId,

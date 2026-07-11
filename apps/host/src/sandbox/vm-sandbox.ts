@@ -4,8 +4,9 @@
 //       与 LocalSubprocessSandbox 共享 exec(spec,ctx) 契约,换后端不动路由与调用点。
 //       支持 wsl / docker / hyperv(在部署期 provision,不在此处);未就绪时 exec 快速失败(501)
 //       而非静默退回无隔离进程——隔离保证正是本适配器的全部意义。
-// 依赖:同层 sandbox-spec(类型)。导出:VmSandbox。
+// 依赖:同层 sandbox-spec(类型)+wsl-docker-runner(Docker 安全基线)。导出:VmSandbox。
 import type { SandboxSpec } from './sandbox-spec.js';
+import { dockerSandboxFlags } from './wsl-docker-runner.js';
 
 type HttpError = Error & { statusCode?: number };
 export type SandboxExecContext = { trustedRoot?: string; context?: Record<string, unknown> };
@@ -19,9 +20,7 @@ function buildPlan(backend: string, spec: SandboxSpec, mountRoot: string): VmPla
       return {
         argv: [
           'docker', 'run', '--rm',
-          spec.network ? '--network=bridge' : '--network=none',
-          '-v', `${mountRoot}:/work`,
-          '-w', '/work',
+          ...dockerSandboxFlags(spec, mountRoot),
           // image + tool + args appended by the real implementation
         ],
         networkIsolated: !spec.network,

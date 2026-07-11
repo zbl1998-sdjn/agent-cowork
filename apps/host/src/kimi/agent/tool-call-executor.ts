@@ -22,7 +22,7 @@ import type { ApprovalRegistry, HookEngine, RequestContext } from './approval-ga
 
 export type ToolArgs = Record<string, unknown>;
 export type ToolCall = { id?: unknown; function?: { name?: string; arguments?: string } };
-export type AgentTool = { name: string; description?: string; mutating?: boolean; risk?: string; requiresApproval?: boolean; parameters?: unknown; handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> };
+export type AgentTool = { name: string; description?: string; mutating?: boolean; risk?: string; requiresApproval?: boolean; parameters?: unknown; approvalPreview?: (args: ToolArgs) => Record<string, unknown>; handler?: (args?: ToolArgs, context?: Record<string, unknown>) => unknown | Promise<unknown> };
 export type FormattedToolResult = { content: string; summarized?: boolean; beforeTokens?: unknown; afterTokens?: unknown; sources?: unknown[]; injectionFlagged?: boolean; injectionReasons?: unknown[] };
 export type ContextManager = { formatToolResult(result: unknown, context: { toolName: string }): FormattedToolResult };
 export type RetryPolicy = {

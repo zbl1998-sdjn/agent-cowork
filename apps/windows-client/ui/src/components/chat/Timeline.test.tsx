@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AssistantMessage, Message, UserMessage } from '../../lib/app-types';
 import {
   Timeline,
+  partitionApprovalAcknowledgements,
   assistantContinueRunId,
   assistantTurnPropsEqual,
   computeTimelineWindow,
@@ -158,11 +159,11 @@ describe('Timeline', () => {
       id: 'a3',
       status: 'awaiting_approval',
       text: undefined,
-      approval: { id: 'apr_one', name: 'Shell' },
+      approval: { id: 'apr_one', name: 'Write', sessionReusable: true },
     });
     const batch = renderTimeline([
-      { ...baseAssistant, id: 'a4', status: 'awaiting_approval', text: undefined, approval: { id: 'apr_one', name: 'Shell' } },
-      { ...baseAssistant, id: 'a5', status: 'awaiting_approval', text: undefined, approval: { id: 'apr_two', name: 'Write' } },
+      { ...baseAssistant, id: 'a4', status: 'awaiting_approval', text: undefined, approval: { id: 'apr_one', name: 'Write', sessionReusable: true } },
+      { ...baseAssistant, id: 'a5', status: 'awaiting_approval', text: undefined, approval: { id: 'apr_two', name: 'Move', sessionReusable: true } },
     ]);
 
     expect(single).not.toContain('批准当前 2 个');
@@ -171,6 +172,16 @@ describe('Timeline', () => {
     expect(batch).toContain('本会话批准当前 2 个');
     expect(batch).toContain('ui-btn--primary');
     expect(batch).toContain('ui-btn--secondary');
+  });
+
+  it('clears only batch items explicitly acknowledged by the host', () => {
+    expect(partitionApprovalAcknowledgements(
+      [{ messageId: 'a1', id: 'apr_one', sessionReusable: true }, { messageId: 'a2', id: 'apr_two', sessionReusable: true }],
+      { ok: false, resolved: 1, results: [{ id: 'apr_one', ok: true }, { id: 'apr_two', ok: false }] },
+    )).toEqual({
+      acknowledged: [{ messageId: 'a1', id: 'apr_one', sessionReusable: true }],
+      failed: [{ messageId: 'a2', id: 'apr_two', sessionReusable: true }],
+    });
   });
 
   it('renders plan and approval bars with Button primitives', () => {
@@ -186,7 +197,7 @@ describe('Timeline', () => {
       id: 'a-approval',
       status: 'awaiting_approval',
       text: undefined,
-      approval: { id: 'apr_one', name: 'Shell' },
+      approval: { id: 'apr_one', name: 'Write', sessionReusable: true },
     });
 
     expect(plan).toContain('计划待批准');
@@ -198,6 +209,39 @@ describe('Timeline', () => {
     expect(approval).toContain('本次批准');
     expect(approval).toContain('本会话批准');
     expect(approval).toContain('ui-btn--danger');
+  });
+
+  it('does not offer reusable session approval for explicit high-risk requests', () => {
+    const approval = renderTimeline({
+      ...baseAssistant,
+      id: 'a-explicit-approval',
+      status: 'awaiting_approval',
+      text: undefined,
+      approval: { id: 'apr_shell', name: 'Shell', risk: 'high', preview: { command: 'npm test' }, sessionReusable: false },
+    });
+
+    expect(approval).toContain('本次批准');
+    expect(approval).not.toContain('本会话批准');
+    expect(approval).toContain('风险级别');
+    expect(approval).toContain('npm test');
+  });
+
+  it('keeps a batch failure visible on the remaining single approval card', () => {
+    const approval = renderTimeline({
+      ...baseAssistant,
+      id: 'a-batch-failure',
+      status: 'awaiting_approval',
+      text: undefined,
+      approval: {
+        id: 'apr_failed',
+        name: 'Write',
+        sessionReusable: true,
+        error: '本地服务未确认 1 个审批，失败项已保留，请重试',
+      },
+    });
+
+    expect(approval).toContain('本地服务未确认 1 个审批');
+    expect(approval).toContain('role="alert"');
   });
 
   it('renders clarification question options with ChoiceButton primitives', () => {

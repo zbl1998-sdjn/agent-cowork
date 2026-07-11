@@ -5,7 +5,8 @@ import type { SkillDescriptor } from '../system-prompt.js';
 import type { ApprovalRegistry, AuditBus, HookEngine, RequestContext } from './approval-gate.js';
 import type { Checkpointer } from './checkpoint-state.js';
 import type { Message as FinalizeMessage, Usage, UsageTotals } from './finalize.js';
-import type { ModelCall } from './model-resilience.js';
+import type { TrustedInProcessModelCallCapability } from './model-call-capability.js';
+import type { ModelCall } from './model-call-types.js';
 import type { RunTraceLike } from './run-trace-events.js';
 import type { AgentTool, ContextManager as ToolResultContextManager, LoopGuard, RetryPolicy, ToolCall } from './tool-call-executor.js';
 
@@ -39,7 +40,8 @@ export type ContextManagerLike = {
 };
 export type ResumeState = { usage?: Usage; messages?: ChatMessage[]; approvedTools?: string[]; todos?: unknown[] };
 export type RunAgentChatOptions = {
-  prompt?: unknown; kimiConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall; maxSteps?: number;
+  prompt?: unknown; kimiConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall;
+  inProcessModelCallCapability?: TrustedInProcessModelCallCapability; maxSteps?: number;
   approvals?: ApprovalRegistry | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
   memoryText?: string; skills?: SkillDescriptor[]; emit?: EmitFn; sandbox?: unknown; sandboxLimits?: unknown; runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknown;
   context?: RequestContext; fetchImpl?: unknown; lazyTools?: AgentTool[]; verify?: boolean; maxVerifySteps?: number; signal?: AbortSignal | null; runId?: string | null; cacheKey?: string | null;

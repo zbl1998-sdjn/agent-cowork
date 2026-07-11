@@ -6,6 +6,7 @@ import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createContextManager } from '../src/kimi/context/context-manager.js';
 import { HeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { ChatMessage, ContextManagerLike } from '../src/kimi/agent/tool-loop-types.js';
 
@@ -69,7 +70,7 @@ test('runAgentChat summarizes oversized tool results before the next model turn'
 
   const out = await runAgentChat({
     prompt: 'search',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -129,7 +130,7 @@ test('runAgentChat marks tool output as untrusted data before the next model tur
 
   const out = await runAgentChat({
     prompt: 'search notes safely',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -167,7 +168,7 @@ test('runAgentChat auto-compacts long resumed history and emits token stats', as
 
   const out = await runAgentChat({
     prompt: 'ignored on resume',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [],
     modelCall,

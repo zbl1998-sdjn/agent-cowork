@@ -2,6 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:沙箱「绝不」接受裸 shell 字符串。调用方以结构化数据描述要运行什么:工具名、argv
 //       数组、限定在可信根内的 cwd、必填时间预算、env 白名单、显式网络开关(默认关)。
+//       workspace 默认只读;只有可信调用方在 limits 中授予能力后,请求才能显式开启写入。
 //       配合 spawn 层 shell:false,argv 无法注入 shell 语法,故校验聚焦工具名与资源上限。
 // 导出:normalizeSandboxSpec(校验+补默认) / SANDBOX_DEFAULTS(默认值常量)。
 
@@ -17,6 +18,7 @@ export type HttpError = Error & { statusCode?: number };
 export type SandboxLimits = {
   allowTools?: readonly string[] | null;
   allowEnv?: readonly string[];
+  allowWorkspaceWrite?: boolean;
   maxTimeoutMs?: number;
   defaultMaxOutputBytes?: number;
 };
@@ -26,6 +28,7 @@ export type RawSandboxSpec = {
   cwd?: unknown;
   timeoutMs?: unknown;
   network?: unknown;
+  workspaceWrite?: unknown;
   env?: unknown;
 };
 export type SandboxSpec = {
@@ -34,6 +37,7 @@ export type SandboxSpec = {
   cwd: string;
   timeoutMs: number;
   network: boolean;
+  workspaceWrite: boolean;
   env: Record<string, string>;
   maxOutputBytes: number;
 };
@@ -120,9 +124,16 @@ export function normalizeSandboxSpec(input: RawSandboxSpec, limits: SandboxLimit
   }
 
   const network = spec.network === true; // 默认关网。
+  if (spec.workspaceWrite != null && typeof spec.workspaceWrite !== 'boolean') {
+    throw fail('workspaceWrite must be a boolean');
+  }
+  const workspaceWrite = spec.workspaceWrite === true;
+  if (workspaceWrite && limits.allowWorkspaceWrite !== true) {
+    throw fail('workspaceWrite requires an explicit capability');
+  }
   const env = cleanEnv(spec.env, limits.allowEnv);
 
-  return { tool, args, cwd, timeoutMs, network, env, maxOutputBytes };
+  return { tool, args, cwd, timeoutMs, network, workspaceWrite, env, maxOutputBytes };
 }
 
 export const SANDBOX_DEFAULTS = Object.freeze({

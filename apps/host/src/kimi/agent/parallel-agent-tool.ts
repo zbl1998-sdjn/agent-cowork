@@ -40,6 +40,7 @@ type AgentDeps = {
   modelCall?: unknown;
   approvals?: unknown;
   autoApprove?: unknown;
+  planMode?: unknown;
   auditBus?: unknown;
   hooks?: unknown;
   emit?: (type: string, payload: Record<string, unknown>) => void;
@@ -136,6 +137,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
               maxSteps,
               approvals: agentDeps.approvals,
               autoApprove: agentDeps.autoApprove,
+              planMode: agentDeps.planMode,
               auditBus: agentDeps.auditBus,
               hooks: agentDeps.hooks,
               emit: agentDeps.emit,

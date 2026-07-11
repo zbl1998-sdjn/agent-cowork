@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 type EmittedEvent = {
   type: string;
@@ -33,7 +34,7 @@ test('runAgentChat aborts a hung model call when the run wall-clock timeout expi
 
   const out = await runAgentChat({
     prompt: 'hang',
-    kimiConfig: { model: 'fake', timeoutMs: 5_000 },
+    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, timeoutMs: 5_000 },
     trustedRoot: root,
     modelCall,
     runTimeoutMs: 20,

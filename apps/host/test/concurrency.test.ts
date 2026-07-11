@@ -9,6 +9,7 @@ import { createConcurrencyLimiter } from '../src/runtime/concurrency.js';
 import type { HostServer } from '../src/server.js';
 import { createServer } from '../src/server.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -68,6 +69,7 @@ test('E2E: agent stream returns 429 when the limiter is full', async () => {
     stats: () => ({ active: 0, tenants: 0, maxConcurrent: 0, maxPerTenant: 0 }),
   };
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
@@ -92,6 +94,7 @@ test('E2E: a normal run acquires then releases its slot (capacity restored)', as
   const root = tmp();
   const lim = createConcurrencyLimiter({ maxConcurrent: 2, maxPerTenant: 2 });
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,

@@ -41,6 +41,8 @@ const record: RunRecord = {
     config: {
       maxSteps: 8,
       developerMode: true,
+      permissionMode: 'guarded_auto',
+      fallbacks: [{ provider: 'openai', model: 'gpt-fallback', hasKey: true }],
       apiKey: '[REDACTED]',
     },
   },
@@ -71,6 +73,8 @@ describe('run observability view model', () => {
     expect(view.configRows).toEqual([
       { label: 'maxSteps', value: '8' },
       { label: 'developerMode', value: 'true' },
+      { label: 'permissionMode', value: 'guarded_auto' },
+      { label: 'fallbacks', value: '[{"provider":"openai","model":"gpt-fallback","hasKey":true}]' },
       { label: 'apiKey', value: '[REDACTED]' },
     ]);
   });

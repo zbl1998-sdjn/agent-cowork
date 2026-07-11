@@ -4,6 +4,7 @@
 //       执行委派 L1 code-runner,落 run 记录。依赖:L0 request-utils + L1 sandbox + L2 run-store/runs-index。
 // 导出:handleSandboxRoutes。
 import { bodyFingerprint, sendJson, withJsonBody } from '../http/request-utils.js';
+import { bindRunEventPublisher } from '../util/run-event-publisher.js';
 import { normalizeSandboxSpec } from '../sandbox/index.js';
 import { runCode } from '../sandbox/code-runner.js';
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
@@ -75,6 +76,7 @@ export async function handleSandboxRoutes({
   safeTrustedRoot,
   allowUnsafeDirectSandboxRoutes = false,
 }: SandboxRouteOptions): Promise<boolean> {
+  const requestRunEvents = bindRunEventPublisher(runEvents, requestContext);
   if (request.method === 'GET' && pathname === '/api/sandbox/info') {
     sendJson(response, 200, {
       context: requestContext,
@@ -129,7 +131,7 @@ export async function handleSandboxRoutes({
         context: requestContext,
         input: { prompt: promptPreview(spec), tool: spec.tool, args: spec.args },
       };
-      runEvents.publish(runId, { type: 'sandbox_start', tool: spec.tool, args: spec.args });
+      requestRunEvents.publish(runId, { type: 'sandbox_start', tool: spec.tool, args: spec.args });
 
       let result;
       try {
@@ -145,7 +147,7 @@ export async function handleSandboxRoutes({
         };
         const runPath = writeRunRecord(runStoreRoot, failRecord);
         safeUpsertRunIndex(runsIndex, failRecord, runPath, requestContext);
-        runEvents.publish(runId, { type: 'sandbox_end', status: 'failed', error: errorMessage(err) });
+        requestRunEvents.publish(runId, { type: 'sandbox_end', status: 'failed', error: errorMessage(err) });
         sendJson(response, errorStatus(err, 502), { error: errorMessage(err), runId, runPath });
         return;
       }
@@ -165,7 +167,7 @@ export async function handleSandboxRoutes({
       };
       const runPath = writeRunRecord(runStoreRoot, record);
       safeUpsertRunIndex(runsIndex, record, runPath, requestContext);
-      runEvents.publish(runId, {
+      requestRunEvents.publish(runId, {
         type: 'sandbox_end',
         status: 'succeeded',
         exitCode: result.exitCode,
@@ -217,7 +219,7 @@ export async function handleSandboxRoutes({
           network: input.network === true,
           trustedRoot,
           runStoreRoot,
-          runEvents,
+          runEvents: requestRunEvents,
           runsIndex,
           context: requestContext,
         });

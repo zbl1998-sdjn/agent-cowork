@@ -7,8 +7,25 @@ test('normalizeSandboxSpec applies safe defaults for a valid spec', () => {
   assert.equal(spec.tool, 'node');
   assert.deepEqual(spec.args, ['-e', 'process.stdout.write("a b")']);
   assert.equal(spec.network, false, 'network defaults off');
+  assert.equal(spec.workspaceWrite, false, 'workspace mount defaults read-only');
   assert.ok(spec.timeoutMs > 0);
   assert.ok(spec.maxOutputBytes > 0);
+});
+
+test('normalizeSandboxSpec grants workspace writes only for an explicit true capability', () => {
+  assert.throws(
+    () => normalizeSandboxSpec({ tool: 'node', workspaceWrite: true }),
+    /workspaceWrite requires an explicit capability/,
+  );
+  assert.equal(
+    normalizeSandboxSpec({ tool: 'node', workspaceWrite: true }, { allowWorkspaceWrite: true }).workspaceWrite,
+    true,
+  );
+  assert.equal(normalizeSandboxSpec({ tool: 'node', workspaceWrite: false }).workspaceWrite, false);
+  assert.throws(
+    () => normalizeSandboxSpec({ tool: 'node', workspaceWrite: 'true' }),
+    /workspaceWrite must be a boolean/,
+  );
 });
 
 test('normalizeSandboxSpec rejects unsafe / malformed specs', () => {

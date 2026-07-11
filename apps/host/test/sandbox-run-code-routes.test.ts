@@ -33,7 +33,9 @@ test('POST /api/sandbox/run-code runs inline code, writes the script, records a 
     const scriptPath = path.join(trustedRoot, ...script.split('/'));
     assert.equal(fs.existsSync(scriptPath), true, 'script file should be written under the trusted root');
 
-    const index = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_carol' } });
+    const index = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_carol', 'x-user-id': 'user_carol' },
+    });
     const runs = arrayField(index.body, 'runs', 'run-code runs');
     assert.equal(runs.length, 1);
     assert.equal(runs[0]?.type, 'sandbox-code');
@@ -42,7 +44,9 @@ test('POST /api/sandbox/run-code runs inline code, writes the script, records a 
     assert.equal(second.status, 200);
     assert.equal(second.body.idempotentReplay, true);
     assert.equal(second.body.runId, first.body.runId);
-    const indexAfter = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_carol' } });
+    const indexAfter = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_carol', 'x-user-id': 'user_carol' },
+    });
     assert.equal(arrayField(indexAfter.body, 'runs', 'run-code replayed runs').length, 1, 'replay must not create a second run');
   } finally {
     await close(server);

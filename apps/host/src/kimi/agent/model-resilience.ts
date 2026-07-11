@@ -3,29 +3,27 @@
 // 职责:把一次模型调用包上熔断器与超时控制,并在主模型不可用时按 fallbacks 顺序
 //      回退到备用模型;区分"可回退"(超时/熔断/5xx)与"不可回退"(鉴权/4xx)错误;
 //      对外暴露脱敏后的友好错误文案。
-// 依赖:L0 security/redaction(脱敏)、L2 runtime/model-breakers(熔断器),同层 provider/router(回退编排)。
+// 依赖:L0 security/redaction(脱敏)、同领域 model-breakers、provider/router(回退编排)。
 // 导出:callModelResilient / friendlyAgentError / modelBreakerStats(再导出)
 import { redactText } from '../../security/redaction.js';
-import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../../security/egress-gateway.js';
+import {
+  decideEgressPolicy,
+  enforceRecordedEgressDecision,
+  recordEgressDecisionOrThrow,
+} from '../../security/egress-gateway.js';
 import { filterModelCandidatesBySecurityMode, modelProviderPolicyError } from '../../security/security-mode.js';
-import { modelBreaker, modelBreakerStats, modelProvider } from '../../runtime/model-breakers.js';
+import { modelBreaker, modelBreakerStats, modelProvider } from '../model-breakers.js';
 import { runWithFallback } from '../provider/router.js';
+import { grantsTrustedInProcessModelCall, type TrustedInProcessModelCallCapability } from './model-call-capability.js';
+import type { ModelCall, ModelCallArgs, ModelConfig } from './model-call-types.js';
 
 export { modelBreakerStats };
-
-export type ModelConfig = Record<string, unknown> & {
-  apiKey?: unknown;
-  fallbacks?: unknown;
-  provider?: unknown;
-  baseUrl?: unknown;
-  model?: unknown;
-};
-export type ModelCallArgs = Record<string, unknown> & { signal?: AbortSignal };
-export type ModelCall = (args: ModelCallArgs & { kimiConfig: ModelConfig; signal: AbortSignal }) => unknown | Promise<unknown>;
+export type { ModelCall, ModelCallArgs, ModelConfig } from './model-call-types.js';
 type ModelError = Error & { code?: string; errors?: unknown[] };
 type FallbackError = Error & { attempts?: Array<{ error: unknown }> };
 type ResilienceOptions = {
   kimiConfig?: unknown;
+  inProcessModelCallCapability?: TrustedInProcessModelCallCapability;
   timeoutMs?: number;
   onFallback?: (event: { failed: unknown; next: unknown; error: string }) => void;
 };
@@ -67,6 +65,10 @@ function errorMessage(err: unknown): string {
 
 function shouldFallbackModelError(err: unknown): boolean {
   const error = err as Partial<ModelError> | undefined;
+  if (error?.code === 'EGRESS_APPROVAL_REQUIRED'
+    || error?.code === 'EGRESS_POLICY_DENIED'
+    || error?.code === 'EGRESS_AUDIT_FAILED'
+    || error?.code === 'MODEL_PROVIDER_POLICY_DENIED') return false;
   if (error?.code === 'CIRCUIT_OPEN') return true;
   if (error?.code === 'ETIMEDOUT') return true;
   const message = errorMessage(err);
@@ -89,8 +91,8 @@ function fallbackExhausted(errors: unknown[]): ModelError {
   return agg;
 }
 
-async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiConfig: ModelConfig, timeoutMs: number): Promise<unknown> {
-  return modelBreaker(kimiConfig).run(async () => {
+async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiConfig: ModelConfig, timeoutMs: number, inProcess: boolean): Promise<unknown> {
+  if (!inProcess) {
     const egress = decideEgressPolicy({
       kind: 'model_inference',
       provider: kimiConfig.provider,
@@ -100,10 +102,9 @@ async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiC
       content: callArgs.messages,
       trustedRoot: callArgs.trustedRoot,
     });
-    if (callArgs.trustedRoot) {
-      try { recordEgressDecision(callArgs.trustedRoot, egress); } catch { /* audit failure must not leak or mask model policy */ }
-    }
-    if (egress.decision === 'deny') throw egressPolicyError(egress);
+    enforceRecordedEgressDecision(callArgs.trustedRoot, egress);
+  }
+  return modelBreaker(kimiConfig).run(async () => {
     const controller = new AbortController();
     const upstreamSignal = callArgs && callArgs.signal;
     const abortFromUpstream = () => {
@@ -127,19 +128,37 @@ async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiC
 export async function callModelResilient(
   modelCall: ModelCall,
   callArgs: ModelCallArgs,
-  { kimiConfig, timeoutMs = 60000, onFallback }: ResilienceOptions = {},
+  { kimiConfig, inProcessModelCallCapability, timeoutMs = 60000, onFallback }: ResilienceOptions = {},
 ): Promise<unknown> {
   const candidates = modelCandidates(kimiConfig);
-  const policy = filterModelCandidatesBySecurityMode(candidates, {
+  const inProcess = grantsTrustedInProcessModelCall(inProcessModelCallCapability, modelCall);
+  const governed = inProcess ? [] : candidates;
+  const policy = filterModelCandidatesBySecurityMode(governed, {
     securityMode: objectConfig(kimiConfig).securityMode,
   });
-  if (policy.candidates.length === 0) {
+  if (!inProcess) {
+    for (const denied of policy.denied) {
+      const candidate = denied.config as ModelConfig;
+      const decision = decideEgressPolicy({
+        kind: 'model_inference',
+        provider: candidate.provider,
+        model: candidate.model,
+        baseUrl: candidate.baseUrl,
+        securityMode: candidate.securityMode,
+        content: callArgs.messages,
+        trustedRoot: callArgs.trustedRoot,
+      });
+      recordEgressDecisionOrThrow(callArgs.trustedRoot, decision);
+    }
+  }
+  const runnable = inProcess ? candidates : policy.candidates;
+  if (runnable.length === 0) {
     throw modelProviderPolicyError(policy.denied);
   }
-  if (policy.candidates.length <= 1) return callOneModel(modelCall, callArgs, policy.candidates[0] as ModelConfig, timeoutMs);
+  if (runnable.length <= 1) return callOneModel(modelCall, callArgs, runnable[0] as ModelConfig, timeoutMs, inProcess);
   try {
-    const routed = await runWithFallback(policy.candidates, (candidate) => (
-      callOneModel(modelCall, callArgs, candidate as ModelConfig, timeoutMs)
+    const routed = await runWithFallback(runnable, (candidate) => (
+      callOneModel(modelCall, callArgs, candidate as ModelConfig, timeoutMs, inProcess)
     ), {
       shouldFallback: (err) => shouldFallbackModelError(err),
       onFallback: ({ failed, next, error }) => {

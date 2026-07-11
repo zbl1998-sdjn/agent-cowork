@@ -13,6 +13,7 @@ import {
   type AgentModelCallInput,
 } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden until search_tools activates them', async () => {
   const root = tempRoot('kcw-e2e-');
@@ -25,7 +26,7 @@ test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden unti
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'search_tools', arguments: JSON.stringify({ query: 'fs list dir' }) } }] };
     return { content: '已检索到可用工具。' };
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const conn = await fetch(`${base}/api/connectors/connect`, {
@@ -77,7 +78,7 @@ test('E2E /api/agent/chat/stream: resumeRunId continues from checkpoint without 
       }],
     };
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const first = await postAgentStream(base, { prompt: '写入后模拟崩溃', autoApprove: true });

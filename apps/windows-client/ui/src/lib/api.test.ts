@@ -677,6 +677,103 @@ describe('SSE streams', () => {
       { type: 'todo_update', id: 'tool-1', text: '调用 Read', status: 'running' },
       { type: 'assistant_end', text: '完成' },
     ]);
+    expect(calls.filter((call) => call.url.includes('/api/runs/run%201/events'))).toHaveLength(1);
+  });
+
+  it('reconnects run events with Last-Event-ID and drops replayed frames', async () => {
+    let streamAttempt = 0;
+    const { api, calls } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.includes('/api/runs/')) {
+        streamAttempt += 1;
+        if (streamAttempt === 1) {
+          return sseResponse([
+            'id: 1',
+            'event: progress',
+            'data: {"seq":1,"text":"第一步"}',
+            '',
+          ].join('\n'));
+        }
+        return sseResponse([
+          'id: 1',
+          'event: progress',
+          'data: {"seq":1,"text":"第一步"}',
+          '',
+          'id: 2',
+          'event: assistant_end',
+          'data: {"seq":2,"text":"完成"}',
+          '',
+        ].join('\n'));
+      }
+      return jsonResponse({ ok: true });
+    });
+    const events: unknown[] = [];
+    const errors: Error[] = [];
+
+    const unsubscribe = api.subscribeRunEvents(
+      'run-reconnect',
+      (event) => events.push(event),
+      { maxReconnects: 2, baseDelayMs: 0, onError: (error) => errors.push(error) },
+    );
+
+    await waitFor(() => expect(events).toHaveLength(2));
+    unsubscribe();
+    const streamCalls = calls.filter((call) => call.url.includes('/api/runs/run-reconnect/events'));
+    expect(streamCalls).toHaveLength(2);
+    expect(streamCalls[1]?.init?.headers).toMatchObject({ 'last-event-id': '1' });
+    expect(events).toEqual([
+      { type: 'progress', seq: 1, text: '第一步' },
+      { type: 'assistant_end', seq: 2, text: '完成' },
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  it('reports a run-event disconnect after the bounded reconnect budget is exhausted', async () => {
+    let streamAttempts = 0;
+    const { api } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.includes('/api/runs/')) {
+        streamAttempts += 1;
+        return sseResponse('');
+      }
+      return jsonResponse({ ok: true });
+    });
+    const errors: Error[] = [];
+
+    const unsubscribe = api.subscribeRunEvents(
+      'run-offline',
+      () => {},
+      { maxReconnects: 2, baseDelayMs: 0, onError: (error) => errors.push(error) },
+    );
+
+    await waitFor(() => expect(errors).toHaveLength(1));
+    unsubscribe();
+    expect(streamAttempts).toBe(3);
+    expect(errors[0]?.message).toMatch(/重连.*耗尽/);
+  });
+
+  it('fails closed without retrying an inaccessible run-event stream', async () => {
+    let streamAttempts = 0;
+    const { api } = await importApi((url) => {
+      if (url.endsWith('/health')) return jsonResponse({ ok: true });
+      if (url.includes('/api/runs/')) {
+        streamAttempts += 1;
+        return jsonResponse({ error: 'Run record not found' }, 404);
+      }
+      return jsonResponse({ ok: true });
+    });
+    const errors: Error[] = [];
+
+    const unsubscribe = api.subscribeRunEvents(
+      'run-missing',
+      () => {},
+      { maxReconnects: 4, baseDelayMs: 0, onError: (error) => errors.push(error) },
+    );
+
+    await waitFor(() => expect(errors).toHaveLength(1));
+    unsubscribe();
+    expect(streamAttempts).toBe(1);
+    expect(errors[0]?.message).toBe('Run record not found');
   });
 
   it('streams chat tokens, reasoning, and done frames from a POST body', async () => {

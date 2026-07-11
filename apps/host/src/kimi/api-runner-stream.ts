@@ -15,6 +15,8 @@ import {
 } from './api-runner-config.js';
 import { buildKimiApiChatPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
+import { createModelEndpointFetch } from '../security/model-endpoint-request.js';
+import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 
 type KimiPayload = {
   choices?: Array<{ delta?: { content?: unknown; reasoning_content?: unknown } }>;
@@ -42,6 +44,8 @@ export type KimiStreamOptions = PromptOptions & {
   timeoutMs?: unknown;
   maxTokens?: unknown;
   fetchImpl?: FetchLike;
+  trustedRoot?: unknown;
+  securityMode?: unknown;
   onToken?: (delta: string) => void;
   onReasoning?: (delta: string) => void;
   signal?: AbortSignal;
@@ -66,6 +70,8 @@ export async function runKimiApiChatStream({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxTokens = DEFAULT_MAX_TOKENS,
   fetchImpl = globalThis.fetch as unknown as FetchLike,
+  trustedRoot,
+  securityMode,
   onToken,
   onReasoning,
   signal,
@@ -78,11 +84,27 @@ export async function runKimiApiChatStream({
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
   }
+  const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
+  const apiPrompt = buildKimiApiChatPrompt({ prompt, summary, memory });
+  const messages = systemMessage
+    ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
+    : [{ role: 'user', content: apiPrompt }];
+  enforceRecordedEgressDecision(trustedRoot, decideEgressPolicy({
+    kind: 'model_inference',
+    destination: endpoint,
+    provider,
+    model,
+    baseUrl,
+    securityMode,
+    content: messages,
+  }));
+
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-  const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
-  const apiPrompt = buildKimiApiChatPrompt({ prompt, summary, memory });
+  const modelFetch = createModelEndpointFetch({ provider, baseUrl, model }, {
+    fetchImpl: fetchImpl as never,
+  });
   if (signal) {
     if (signal.aborted) controller.abort();
     else signal.addEventListener('abort', () => controller.abort(), { once: true });
@@ -96,15 +118,13 @@ export async function runKimiApiChatStream({
     };
     if (userAgent) headers['user-agent'] = String(userAgent);
     const numericTemperature = Number(temperature);
-    const response = await fetchImpl(endpoint, {
+    const response = await modelFetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
         // 简单 chat 也前置 env/date grounding,确保时间敏感问题按真实环境回答。
-        messages: systemMessage
-          ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
-          : [{ role: 'user', content: apiPrompt }],
+        messages,
         ...(Number.isFinite(numericTemperature) ? { temperature: numericTemperature } : {}),
         max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         stream: true,

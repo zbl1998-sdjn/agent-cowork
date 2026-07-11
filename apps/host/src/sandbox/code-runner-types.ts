@@ -21,7 +21,10 @@ export type SandboxLike = {
   ): Promise<SandboxExecResult> | SandboxExecResult;
 };
 export type RunEventsLike = {
-  publish(runId: string, event: Record<string, unknown>): Record<string, unknown>;
+  publish(
+    runId: string,
+    event: Record<string, unknown>,
+  ): Record<string, unknown> | Promise<Record<string, unknown>>;
 };
 export type RunsIndexLike = {
   upsert(summary: unknown, context?: Record<string, unknown>): unknown;

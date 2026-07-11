@@ -1,9 +1,14 @@
 // TimelineTurns(UI · components/chat):把一个「回合」(用户消息 + 助手响应/工具调用/进度)渲染成一组气泡;memo 优化。
 import { memo, type CSSProperties } from 'react';
+import { usePendingAction } from '../../hooks/usePendingAction';
 import { answerQuestion, openPath, respondApproval } from '../../lib/api';
 import { joinWorkspacePath } from '../../lib/app-logic';
 import type { AssistantMessage, UserMessage } from '../../lib/app-types';
 import { extractSuggestions } from '../../lib/md';
+import {
+  clearAcknowledgedAssistantRequest,
+  requireAcknowledgement,
+} from '../../lib/pending-action';
 import { ApprovalActions } from '../ApprovalActions';
 import { ArtifactCard } from '../ArtifactCard';
 import { MessageActions } from '../MessageActions';
@@ -19,6 +24,7 @@ import { TodoList } from '../TodoList';
 import { ToolCallCard } from '../ToolCallCard';
 import { Button } from '../ui/Button';
 import { ChoiceButton } from '../ui/ChoiceButton';
+import { ApprovalDecisionBar } from './ApprovalDecisionBar';
 
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
 
@@ -152,7 +158,7 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
       {message.tools && message.tools.length > 0 && <div className="toolcalls">{message.tools.map((t, i) => <ToolCallCard key={i} call={t} />)}</div>}
       {message.plan && <PlanCard message={message} trustedRoot={trustedRoot} onPatchAssistant={onPatchAssistant} />}
       {message.question && <QuestionCard message={message} onPatchAssistant={onPatchAssistant} />}
-      {message.approval && <ApprovalBar message={message} onPatchAssistant={onPatchAssistant} />}
+      {message.approval && <ApprovalDecisionBar message={message} onPatchAssistant={onPatchAssistant} />}
       {message.text && <AssistantText message={message} streamingId={streamingId} trustedRoot={trustedRoot} onQuickSend={onQuickSend} />}
       {message.recipeDraft && <RecipeDraftCard draft={message.recipeDraft} />}
       {message.recipeCaptureStatus === 'failed' && message.recipeCaptureError && <div className="panel-error">{message.recipeCaptureError}</div>}
@@ -170,10 +176,18 @@ export const AssistantTurn = memo(function AssistantTurn({ message, streamingId,
 
 function PlanCard({ message, trustedRoot, onPatchAssistant }: { message: AssistantMessage; trustedRoot: string; onPatchAssistant: PatchAssistant }) {
   const plan = message.plan;
+  const { pending, error, run } = usePendingAction('提交计划决定');
   const respondToPlan = (approve: boolean) => {
     if (!plan) return;
-    void respondApproval(plan.id, approve ? 'once' : 'reject');
-    onPatchAssistant(message.id, (m) => ({ ...m, plan: undefined, status: approve ? 'applying' : 'running' }));
+    void run(() => requireAcknowledgement(
+      () => respondApproval(plan.id, approve ? 'once' : 'reject'),
+      () => onPatchAssistant(message.id, (m) => clearAcknowledgedAssistantRequest(
+        m,
+        'plan',
+        plan.id,
+        { status: approve ? 'applying' : 'running' },
+      )),
+    ));
   };
   if (!plan) return null;
   return (
@@ -181,19 +195,28 @@ function PlanCard({ message, trustedRoot, onPatchAssistant }: { message: Assista
       <div className="plan-card-head">计划待批准</div>
       <MessageText text={plan.text} trustedRoot={trustedRoot} />
       <div className="plan-card-actions">
-        <Button variant="primary" onClick={() => respondToPlan(true)}>批准并执行</Button>
-        <Button variant="secondary" onClick={() => respondToPlan(false)}>继续完善</Button>
+        <Button variant="primary" disabled={pending} onClick={() => respondToPlan(true)}>{pending ? '提交中…' : '批准并执行'}</Button>
+        <Button variant="secondary" disabled={pending} onClick={() => respondToPlan(false)}>继续完善</Button>
       </div>
+      {error && <div className="panel-error" role="alert">{error}</div>}
     </div>
   );
 }
 
 function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
   const question = message.question;
+  const { pending, error, run } = usePendingAction('提交问题答案');
   const respondToQuestion = (answer: string) => {
     if (!question) return;
-    void answerQuestion(question.id, answer);
-    onPatchAssistant(message.id, (m) => ({ ...m, question: undefined, status: 'running' }));
+    void run(() => requireAcknowledgement(
+      () => answerQuestion(question.id, answer),
+      () => onPatchAssistant(message.id, (m) => clearAcknowledgedAssistantRequest(
+        m,
+        'question',
+        question.id,
+        { status: 'running' },
+      )),
+    ));
   };
   if (!question) return null;
   return (
@@ -201,31 +224,12 @@ function QuestionCard({ message, onPatchAssistant }: { message: AssistantMessage
       <div className="question-q">{question.question}</div>
       <div className="question-options">
         {question.options.length > 0 ? question.options.map((opt, i) => (
-          <ChoiceButton key={i} tone="warm" label={opt.label} detail={opt.description} onClick={() => respondToQuestion(opt.label)} />
+          <ChoiceButton key={i} tone="warm" disabled={pending} label={opt.label} detail={opt.description} onClick={() => respondToQuestion(opt.label)} />
         )) : (
-          <ChoiceButton tone="warm" label="继续" onClick={() => respondToQuestion('继续')} />
+          <ChoiceButton tone="warm" disabled={pending} label={pending ? '提交中…' : '继续'} onClick={() => respondToQuestion('继续')} />
         )}
       </div>
-    </div>
-  );
-}
-
-function ApprovalBar({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
-  const approval = message.approval;
-  const respondToApproval = (decision: 'once' | 'session' | 'reject') => {
-    if (!approval) return;
-    void respondApproval(approval.id, decision);
-    onPatchAssistant(message.id, (m) => ({ ...m, approval: undefined }));
-  };
-  if (!approval) return null;
-  return (
-    <div className="approval-bar">
-      <span className="approval-q">需要批准操作：<code>{approval.name}</code></span>
-      <div className="approval-actions">
-        <Button variant="primary" onClick={() => respondToApproval('once')}>本次批准</Button>
-        <Button variant="secondary" onClick={() => respondToApproval('session')}>本会话批准</Button>
-        <Button variant="danger" onClick={() => respondToApproval('reject')}>拒绝</Button>
-      </div>
+      {error && <div className="panel-error" role="alert">{error}</div>}
     </div>
   );
 }

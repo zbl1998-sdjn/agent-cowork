@@ -1,12 +1,9 @@
 // 聊天流回调(UI · lib):构建 Agent SSE 流的事件回调集——把后端事件(消息/工具/审批/进度/收尾)映射成
-// 对前端状态的更新与对审批的应答。是 App/hooks 与 api/chat 流之间的胶水。依赖:lib/api + api/chat 类型。
-import { respondApproval } from './api';
+// 对前端状态的更新。是 App/hooks 与 api/chat 流之间的胶水。依赖:api/chat 类型。
 import type { AgentStreamHandlers, ContextCompactionStats } from './api/chat';
 import { mergeTodoUpdate } from './app-logic';
 import { humanizeError } from './friendly-error';
 import type { AssistantMessage, ToolCallItem } from './app-types';
-
-export type AgentMode = 'plan' | 'execute' | 'yolo';
 
 function formatTokenCount(value?: number): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '';
@@ -26,14 +23,12 @@ export interface ChatStreamCallbackDeps {
   patchAssistant: (id: string, fn: (m: AssistantMessage) => AssistantMessage) => void;
   /** 控制「正在流式输出」状态与停止按钮。 */
   setStreamingId: (id: string | null) => void;
-  /** 当前 Agent 模式;YOLO 会在审批请求流入时自动批准。 */
-  mode: AgentMode;
 }
 
 // 纯函数构造 App.tsx 交给 agentChatStream 的 SSE 事件处理器集合。
 // 所有状态改写都经 patchAssistant/setStreamingId,因此可独立测试,也不会把 App 再次撑大。
 export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStreamHandlers {
-  const { assistantId, patchAssistant, setStreamingId, mode } = deps;
+  const { assistantId, patchAssistant, setStreamingId } = deps;
 
   const patch = (fn: (m: AssistantMessage) => AssistantMessage) => patchAssistant(assistantId, fn);
 
@@ -57,10 +52,18 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
 
     onTodoUpdate: (todo) => patch((m) => ({ ...m, todos: mergeTodoUpdate(m.todos, todo) })),
 
-    onApprovalRequest: (id, name) => {
-      // YOLO 模式:审批请求一到达即自动批准;host 仍会保留其自身高风险审批门语义。
-      if (mode === 'yolo') { void respondApproval(id, 'once'); return; }
-      patch((m) => ({ ...m, approval: { id, name } }));
+    onApprovalRequest: (id, name, _args, meta) => {
+      // host 只有在操作必须由人决定时才发 approval_request；UI 不得自动代答。
+      patch((m) => ({
+        ...m,
+        approval: {
+          id,
+          name,
+          risk: meta?.risk,
+          preview: meta?.preview,
+          sessionReusable: meta?.sessionReusable === true,
+        },
+      }));
     },
 
     onFileWritten: (p) => patch((m) => ({

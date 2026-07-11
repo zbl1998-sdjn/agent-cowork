@@ -6,6 +6,7 @@ import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createLoopGuard } from '../src/kimi/agent/loop-guard.js';
 import { createRetryPolicy } from '../src/kimi/agent/tool-retry.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
 
@@ -74,7 +75,7 @@ test('runAgentChat retries retryable tool failures before sending the tool resul
 
   const out = await runAgentChat({
     prompt: 'fetch',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -116,7 +117,7 @@ test('runAgentChat stops repeated identical tool calls through LoopGuard before 
 
   const out = await runAgentChat({
     prompt: 'ping loop',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -156,7 +157,7 @@ test('runAgentChat stops consecutive identical tool failures through LoopGuard b
 
   const out = await runAgentChat({
     prompt: 'read loop',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -208,7 +209,7 @@ test('runAgentChat does not retry permanent tool errors', async () => {
 
   const out = await runAgentChat({
     prompt: 'read',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -243,7 +244,7 @@ test('runAgentChat emits model_fallback when the primary provider fails and fall
     kimiConfig: {
       provider: 'openai',
       apiKey: 'sk-primary-secret-DO-NOT-ECHO-123456',
-      baseUrl: 'https://primary.example/v1',
+      baseUrl: 'http://127.0.0.1:11440/v1',
       model: 'primary-model',
       fallbacks: [{ provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1', model: 'local-model' }],
     },

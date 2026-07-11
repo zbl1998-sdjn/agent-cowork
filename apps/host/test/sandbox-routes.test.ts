@@ -13,6 +13,8 @@ import {
 } from './helpers/host-http.js';
 import { fakeProbeSpawnSync } from './helpers/sandbox.js';
 
+const immutableImage = `python@sha256:${'b'.repeat(64)}`;
+
 test('GET /api/sandbox/info reports capabilities', async () => {
   const trustedRoot = tempRoot('kcw-sbx-');
   const server = createServer({ trustedRoot, enableScheduler: false });
@@ -33,10 +35,10 @@ test('GET /api/sandbox/info exposes the startup isolation probe and docker selec
   const server = createServer({
     trustedRoot,
     enableScheduler: false,
-    sandboxOptions: { image: 'python:3.12-slim' },
+    sandboxOptions: { image: immutableImage },
     sandboxProbeSpawnSync: fakeProbeSpawnSync({
       'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
-      'docker image inspect python:3.12-slim': { stdout: '[]\n' },
+      [`docker image inspect ${immutableImage}`]: { stdout: '[]\n' },
       'wsl.exe --status': { status: 1, stderr: 'not installed' },
     }),
   });
@@ -94,7 +96,9 @@ test('POST /api/sandbox/exec runs a tool, records a run, and is idempotent', asy
     assert.equal(objectField(first.body, 'result', 'sandbox exec result').stdout, 'ok');
     assert.match(stringField(first.body, 'runId', 'sandbox run id'), /^run_/);
 
-    const index = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_alice' } });
+    const index = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+    });
     const runs = arrayField(index.body, 'runs', 'sandbox exec runs');
     assert.equal(runs.length, 1);
     assert.equal(runs[0]?.type, 'sandbox-exec');
@@ -103,7 +107,9 @@ test('POST /api/sandbox/exec runs a tool, records a run, and is idempotent', asy
     assert.equal(second.status, 200);
     assert.equal(second.body.idempotentReplay, true);
     assert.equal(second.body.runId, first.body.runId);
-    const indexAfter = await jsonRequest(base, '/api/runs/index', { headers: { 'x-tenant-id': 'tenant_alice' } });
+    const indexAfter = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+    });
     assert.equal(arrayField(indexAfter.body, 'runs', 'sandbox exec replayed runs').length, 1, 'replay must not create a second run');
   } finally {
     await close(server);

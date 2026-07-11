@@ -7,6 +7,7 @@
 import childProcess from 'node:child_process';
 import { omitUndefined } from '../util/object.js';
 import { isStrictLocalMode, resolveSecurityMode, type SecurityMode } from '../security/security-mode.js';
+import { dockerImageFrom, probeDocker } from './startup-probe-docker.js';
 import type {
   BackendProbe,
   RuntimeEnv,
@@ -27,7 +28,6 @@ export type {
   StartupBackends,
 } from './startup-probe-types.js';
 
-const DOCKER_INFO_ARGS = Object.freeze(['info', '--format', '{{.ServerVersion}}']);
 const WSL_STATUS_ARGS = Object.freeze(['--status']);
 const DEFAULT_PROBE_TIMEOUT_MS = 1500;
 const LOCAL_WARNING = '本地不隔离网络: local sandbox runs on the host and cannot enforce network isolation.';
@@ -64,50 +64,6 @@ function runProbe(
   }
 }
 
-function dockerImageFrom({
-  sandboxOptions = {},
-  env = {},
-}: { sandboxOptions?: SandboxStartupOptions; env?: RuntimeEnv }): string | null {
-  return sandboxOptions.image
-    || env.KCW_SANDBOX_DOCKER_IMAGE
-    || env.KCW_SANDBOX_IMAGE
-    || null;
-}
-
-function probeDocker({
-  spawnSync,
-  timeoutMs,
-  image,
-}: { spawnSync: SpawnSyncLike; timeoutMs: number; image?: string | null }): BackendProbe {
-  const docker: BackendProbe = {
-    available: false,
-    usable: false,
-    networkIsolated: true,
-    image: image || null,
-    imagePresent: false,
-    detail: '',
-    reason: '',
-  };
-  const info = runProbe(spawnSync, 'docker', DOCKER_INFO_ARGS, timeoutMs);
-  docker.available = info.ok;
-  docker.detail = info.detail;
-  if (!info.ok) {
-    docker.reason = info.detail || 'docker daemon unavailable';
-    return docker;
-  }
-  if (!image) {
-    docker.reason = 'docker image is not configured';
-    return docker;
-  }
-  const imageCheck = runProbe(spawnSync, 'docker', ['image', 'inspect', image], timeoutMs);
-  docker.imagePresent = imageCheck.ok;
-  docker.usable = imageCheck.ok;
-  if (!imageCheck.ok) {
-    docker.reason = `docker image is not present locally: ${imageCheck.detail || image}`;
-  }
-  return docker;
-}
-
 function probeWsl({
   spawnSync,
   timeoutMs,
@@ -132,7 +88,9 @@ function probeWsl({
 function fallbackReason(backends: StartupBackends): string {
   const docker = backends.docker;
   if (docker.available && docker.image && !docker.imagePresent) {
-    return `Docker is available, but image "${docker.image}" is not present locally.`;
+    return docker.reason.includes('immutable') || docker.reason.includes('sha256')
+      ? `Docker is available, but ${docker.reason}.`
+      : `Docker is available, but image "${docker.image}" is not present locally.`;
   }
   if (docker.available && !docker.image) {
     return 'Docker is available, but KCW_SANDBOX_DOCKER_IMAGE is not configured.';
@@ -160,10 +118,13 @@ function explicitStartup({
   securityMode: SecurityMode;
 }): SandboxStartupResult {
   const backend = String(requestedBackend || '').toLowerCase();
-  const networkIsolated = backend === 'docker' || backend === 'vm' || backend === 'hyperv';
+  const dockerUnavailable = backend === 'docker' && !docker.usable;
+  const networkIsolated = backend === 'docker'
+    ? docker.usable
+    : backend === 'vm' || backend === 'hyperv';
   // 覆盖 local_demo/local_strict/air_gap 三种「严格本地」模式,不只 local_strict——
   // 此前只写 `=== 'local_strict'` 漏掉了更严格的 air_gap(机密档强制模式)。
-  const policyBlocked = isStrictLocalMode(securityMode) && !networkIsolated;
+  const policyBlocked = dockerUnavailable || (isStrictLocalMode(securityMode) && !networkIsolated);
   return {
     options: { ...sandboxOptions, backend },
     info: {
@@ -174,8 +135,10 @@ function explicitStartup({
       fallback: false,
       policyBlocked,
       fallbackReason: null,
-      userMessage: policyBlocked
-        ? `${securityMode}: explicit non-isolated sandbox backend requested; high-risk execution tools are blocked.`
+      userMessage: dockerUnavailable
+        ? `Explicit Docker sandbox is unavailable; high-risk execution tools are blocked. ${docker.reason}`
+        : policyBlocked
+          ? `${securityMode}: explicit non-isolated sandbox backend requested; high-risk execution tools are blocked.`
         : (networkIsolated ? 'explicit VM sandbox backend requested' : LOCAL_WARNING),
       backends: {
         docker,
@@ -207,7 +170,7 @@ export function resolveSandboxStartup({
   const mode = resolveSecurityMode({ configuredMode: securityMode, env });
   const image = dockerImageFrom({ sandboxOptions, env });
   const normalizedOptions = { ...sandboxOptions, ...(image ? { image } : {}) };
-  const docker = probeDocker({ spawnSync, timeoutMs, image });
+  const docker = probeDocker({ spawnSync, timeoutMs, image, runProbe });
   const wsl = probeWsl(omitUndefined({ spawnSync, timeoutMs, distro: normalizedOptions.distro }));
   const requested = String(requestedBackend || 'auto').toLowerCase();
 

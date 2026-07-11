@@ -5,7 +5,31 @@ import type { SpawnSyncLike } from '../src/sandbox/startup-probe.js';
 import { objectField } from './helpers/host-http.js';
 import { fakeProbeSpawnSync } from './helpers/sandbox.js';
 
+const immutableImage = `python@sha256:${'a'.repeat(64)}`;
+
 test('resolveSandboxStartup selects docker by default when daemon and local image are available', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'auto',
+    sandboxOptions: { image: immutableImage },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      [`docker image inspect ${immutableImage}`]: { stdout: '[]\n' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'docker');
+  assert.equal(startup.options.image, immutableImage);
+  assert.equal(startup.info.selectedBackend, 'docker');
+  assert.equal(startup.info.networkIsolated, true);
+  assert.equal(startup.info.fallback, false);
+  const backends = objectField(startup.info, 'backends', 'startup backends');
+  const docker = objectField(backends, 'docker', 'docker backend probe');
+  assert.equal(docker.usable, true);
+  assert.equal(docker.imagePresent, true);
+});
+
+test('resolveSandboxStartup rejects a mutable Docker tag even when it is present locally', () => {
   const startup = resolveSandboxStartup({
     requestedBackend: 'auto',
     sandboxOptions: { image: 'python:3.12-slim' },
@@ -16,24 +40,40 @@ test('resolveSandboxStartup selects docker by default when daemon and local imag
     }),
   });
 
-  assert.equal(startup.options.backend, 'docker');
-  assert.equal(startup.options.image, 'python:3.12-slim');
-  assert.equal(startup.info.selectedBackend, 'docker');
-  assert.equal(startup.info.networkIsolated, true);
-  assert.equal(startup.info.fallback, false);
+  assert.equal(startup.options.backend, 'local');
+  assert.equal(startup.info.networkIsolated, false);
+  assert.equal(startup.info.fallback, true);
+  assert.match(startup.info.fallbackReason || '', /immutable|sha256/i);
   const backends = objectField(startup.info, 'backends', 'startup backends');
   const docker = objectField(backends, 'docker', 'docker backend probe');
-  assert.equal(docker.usable, true);
-  assert.equal(docker.imagePresent, true);
+  assert.equal(docker.available, true);
+  assert.equal(docker.imagePresent, false);
+  assert.equal(docker.usable, false);
+});
+
+test('resolveSandboxStartup policy-blocks an explicitly requested Docker backend with a mutable image', () => {
+  const startup = resolveSandboxStartup({
+    requestedBackend: 'docker',
+    sandboxOptions: { image: 'python:3.12-slim' },
+    spawnSync: fakeProbeSpawnSync({
+      'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
+      'wsl.exe --status': { status: 1, stderr: 'not installed' },
+    }),
+  });
+
+  assert.equal(startup.options.backend, 'docker');
+  assert.equal(startup.info.networkIsolated, false);
+  assert.equal(startup.info.policyBlocked, true);
+  assert.match(startup.info.userMessage, /blocked|immutable|sha256/i);
 });
 
 test('resolveSandboxStartup falls back to local when no true isolated backend is usable', () => {
   const startup = resolveSandboxStartup({
     requestedBackend: 'auto',
-    sandboxOptions: { image: 'python:3.12-slim' },
+    sandboxOptions: { image: immutableImage },
     spawnSync: fakeProbeSpawnSync({
       'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
-      'docker image inspect python:3.12-slim': { status: 1, stderr: 'No such image' },
+      [`docker image inspect ${immutableImage}`]: { status: 1, stderr: 'No such image' },
       'wsl.exe --status': { stdout: 'Default Version: 2\n' },
     }),
   });
@@ -55,10 +95,10 @@ test('resolveSandboxStartup falls back to local when no true isolated backend is
 test('resolveSandboxStartup marks local strict high-risk execution as policy blocked instead of safe fallback', () => {
   const startup = resolveSandboxStartup({
     requestedBackend: 'auto',
-    env: { SECURITY_MODE: 'local_strict', KCW_SANDBOX_DOCKER_IMAGE: 'python:3.12-slim' },
+    env: { SECURITY_MODE: 'local_strict', KCW_SANDBOX_DOCKER_IMAGE: immutableImage },
     spawnSync: fakeProbeSpawnSync({
       'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
-      'docker image inspect python:3.12-slim': { status: 1, stderr: 'No such image' },
+      [`docker image inspect ${immutableImage}`]: { status: 1, stderr: 'No such image' },
       'wsl.exe --status': { status: 1, stderr: 'not installed' },
     }),
   });
@@ -165,15 +205,15 @@ test('resolveSandboxStartup keeps probe failures and explicit backend isolation 
   const envImage = resolveSandboxStartup({
     requestedBackend: 'auto',
     sandboxOptions: {},
-    env: { KCW_SANDBOX_IMAGE: 'node:20-slim' },
+    env: { KCW_SANDBOX_IMAGE: immutableImage },
     spawnSync: fakeProbeSpawnSync({
       'docker info --format {{.ServerVersion}}': { stdout: '26.1.0\n' },
-      'docker image inspect node:20-slim': { status: 1, stderr: 'No such image' },
+      [`docker image inspect ${immutableImage}`]: { status: 1, stderr: 'No such image' },
       'wsl.exe --status': { status: 1, stderr: 'not installed' },
     }),
   });
-  assert.equal(envImage.options.image, 'node:20-slim');
-  assert.match(envImage.info.fallbackReason || '', /image "node:20-slim" is not present locally/);
+  assert.equal(envImage.options.image, immutableImage);
+  assert.match(envImage.info.fallbackReason || '', /image .* is not present locally/);
 
   const explicitWsl = resolveSandboxStartup({
     requestedBackend: 'wsl',

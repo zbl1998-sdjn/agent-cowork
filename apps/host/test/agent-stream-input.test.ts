@@ -14,6 +14,7 @@ test('agent stream input schema keeps known route flags and unknown extension fi
   const body = parseAgentStreamBody({
     prompt: ' hello ',
     autoApprove: true,
+    permissionMode: 'guarded_auto',
     maxSteps: 3,
     thinking: 'deep',
     planMode: false,
@@ -22,9 +23,17 @@ test('agent stream input schema keeps known route flags and unknown extension fi
 
   assert.equal(body.prompt, ' hello ');
   assert.equal(body.autoApprove, true);
+  assert.equal(body.permissionMode, 'guarded_auto');
   assert.equal(body.maxSteps, 3);
   assert.equal(body.thinking, 'deep');
   assert.deepEqual(body.customExtension, { enabled: true });
+});
+
+test('agent stream input schema rejects unknown permission modes', () => {
+  assert.throws(
+    () => parseAgentStreamBody({ prompt: 'hello', permissionMode: 'skip_all' }),
+    /agent stream body: permissionMode/,
+  );
 });
 
 test('agent stream input schema keeps context compaction controls', () => {

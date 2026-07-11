@@ -14,13 +14,13 @@ function emptyAssistant(): AssistantMessage {
   };
 }
 
-function makeHarness(mode: 'plan' | 'execute' | 'yolo' = 'execute') {
+function makeHarness() {
   let state = emptyAssistant();
   const patchAssistant = vi.fn((_id: string, fn: (m: AssistantMessage) => AssistantMessage) => {
     state = fn(state);
   });
   const setStreamingId = vi.fn();
-  const cb = buildChatStreamCallbacks({ assistantId: 'a1', patchAssistant, setStreamingId, mode });
+  const cb = buildChatStreamCallbacks({ assistantId: 'a1', patchAssistant, setStreamingId });
   return { cb, patchAssistant, setStreamingId, getState: () => state };
 }
 
@@ -76,7 +76,7 @@ describe('buildChatStreamCallbacks', () => {
   });
 
   it('onDone marks leftover plan todos done so the checklist does not stay stuck at 待处理', () => {
-    const { cb, getState } = makeHarness('plan');
+    const { cb, getState } = makeHarness();
     cb.onTodoSnapshot?.([
       { id: 'plan-1', text: '提取合同要点', status: 'pending', kind: 'plan' },
       { id: 'plan-2', text: '汇总发票数据', status: 'pending', kind: 'plan' },
@@ -98,7 +98,7 @@ describe('buildChatStreamCallbacks', () => {
   });
 
   it('onCancelled clears parked approval/plan/question and marks running tools cancelled', () => {
-    const { cb, getState } = makeHarness('execute');
+    const { cb, getState } = makeHarness();
     cb.onToolCall?.('Shell', { command: 'dir' });
     cb.onApprovalRequest?.('appr-9', 'Shell', undefined);
     cb.onPlanProposed?.('plan-1', '步骤一');
@@ -120,17 +120,15 @@ describe('buildChatStreamCallbacks', () => {
   });
 
   it('onApprovalRequest in execute mode parks an approval on the message', () => {
-    const { cb, getState } = makeHarness('execute');
-    cb.onApprovalRequest?.('appr-1', 'Bash', undefined);
-    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash' });
+    const { cb, getState } = makeHarness();
+    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { risk: 'high', preview: { command: 'npm test' }, sessionReusable: false });
+    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', risk: 'high', preview: { command: 'npm test' }, sessionReusable: false });
   });
 
-  it('onApprovalRequest in YOLO mode auto-approves without parking the request', () => {
-    // hook 通过 fire-and-forget 的 void 调用 respondApproval;这里仅断言消息上不会堆积审批,
-    // API 客户端调用由独立测试覆盖。
-    const { cb, getState } = makeHarness('yolo');
-    cb.onApprovalRequest?.('appr-1', 'Bash', undefined);
-    expect(getState().approval).toBeUndefined();
+  it('onApprovalRequest in guarded auto mode still parks an explicit host approval', () => {
+    const { cb, getState } = makeHarness();
+    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { sessionReusable: true });
+    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', sessionReusable: true });
   });
 });
 

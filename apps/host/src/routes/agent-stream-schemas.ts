@@ -28,6 +28,7 @@ export const agentStreamBodySchema = z.object({
   runSeed: z.union([z.string(), z.number(), z.literal(true)]).optional(),
   seed: z.union([z.string(), z.number(), z.literal(true)]).optional(),
   images: z.array(z.string()).max(12).optional(),
+  permissionMode: z.enum(['plan', 'manual', 'guarded_auto']).optional(),
   autoApprove: z.boolean().optional(),
   maxSteps: numericLimitSchema.optional(),
   verify: z.boolean().optional(),

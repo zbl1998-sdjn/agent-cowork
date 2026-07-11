@@ -3,19 +3,23 @@
 // 职责:本地与 VM(WSL/Docker)后端共用的子进程启动方式——无 shell、argv 数组、硬超时(SIGKILL)、
 //       输出字节上限。集中在此,保证各后端的安全行为一致。
 // 亮点:CappedBuffer 在「写入时」即限内存(超额只计数不保留),避免高产出命令在超时前耗尽堆。
-// 依赖:node:child_process(仅 Windows 下 taskkill 终止进程树)。导出:createCappedBuffer / runConstrainedChild。
+// 依赖:node:child_process(仅 Windows 下有界 taskkill 终止进程树)。导出:createCappedBuffer / runConstrainedChild。
 import childProcess from 'node:child_process';
 
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024; // 1 MiB per stream
+const PROCESS_TREE_KILL_TIMEOUT_MS = 5_000;
+const PROCESS_TREE_EXIT_GRACE_MS = 5_000;
 
 export type StreamLike = {
   on(event: 'data', listener: (chunk: unknown) => void): unknown;
+  destroy?(): void;
 };
 export type ChildLike = {
   pid?: number;
   stdout: StreamLike;
   stderr: StreamLike;
   kill(signal?: string): void;
+  unref?(): void;
   on(event: 'error', listener: (error: Error) => void): unknown;
   on(event: 'close', listener: (code: number | null, signal: string | null) => void): unknown;
 };
@@ -77,17 +81,42 @@ export function createCappedBuffer(maxBytes: number): CappedBuffer {
  * 杀「整棵进程树」。Windows 关键:本地 Shell 是 `powershell.exe -Command "<cmd>"`,
  * child.kill 只终止 powershell 壳,长命令(如 ping)是其孙进程会成孤儿继续跑、
  * 其继承的 stdout/stderr 管道不关 → 'close' 迟迟不触发 → 取消对在跑 shell 无效。
- * 故 Windows 用 `taskkill /PID <pid> /T /F` 连子孙一起终止;其余平台回退 child.kill。
+ * 故 Windows 用有界 `taskkill /PID <pid> /T /F` 连子孙一起终止;其余平台回退 child.kill。
  */
-function killProcessTree(child: ChildLike): void {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function directKill(child: ChildLike): string | null {
+  try {
+    child.kill('SIGKILL');
+    return null;
+  } catch (cause) {
+    return `direct child kill failed: ${errorMessage(cause)}`;
+  }
+}
+
+function killProcessTree(child: ChildLike): string | null {
   const pid = child.pid;
   if (process.platform === 'win32' && pid) {
-    try {
-      childProcess.spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-      return;
-    } catch { /* 回退到直接 kill */ }
+    const killed = childProcess.spawnSync(
+      'taskkill.exe',
+      ['/PID', String(pid), '/T', '/F'],
+      {
+        shell: false,
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: PROCESS_TREE_KILL_TIMEOUT_MS,
+      },
+    );
+    if (!killed.error && killed.status === 0) return null;
+    const taskkillError = killed.error
+      ? `taskkill failed for PID ${pid}: ${killed.error.message}`
+      : `taskkill exited with status ${String(killed.status)} for PID ${pid}`;
+    const fallbackError = directKill(child);
+    return fallbackError ? `${taskkillError}; ${fallbackError}` : taskkillError;
   }
-  try { child.kill('SIGKILL'); } catch { /* 进程可能已退出 */ }
+  return directKill(child);
 }
 
 /** 在资源限制下运行子进程:无 shell、限时(到点杀整棵进程树)、stdout/stderr 各自限额,返回结构化结果。 */
@@ -104,29 +133,50 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
   const out = createCappedBuffer(maxOutputBytes);
   const err = createCappedBuffer(maxOutputBytes);
   let timedOut = false;
+  let terminationStarted = false;
+  let cleanupError: string | null = null;
+  let closeGraceTimer: ReturnType<typeof setTimeout> | undefined;
+  let rejectClosed: (error: Error) => void = () => undefined;
 
   child.stdout.on('data', (chunk) => out.push(chunk));
   child.stderr.on('data', (chunk) => err.push(chunk));
 
+  const closed: Promise<{ code: number | null; signal: string | null }> = new Promise((resolve, reject) => {
+    rejectClosed = reject;
+    child.on('error', (err2) => reject(err2));
+    child.on('close', (code, signal) => resolve({ code, signal }));
+  });
+
+  const requestTermination = (): void => {
+    if (terminationStarted) return;
+    terminationStarted = true;
+    cleanupError = killProcessTree(child);
+    closeGraceTimer = setTimeout(() => {
+      child.stdout.destroy?.();
+      child.stderr.destroy?.();
+      child.unref?.();
+      const detail = cleanupError ? `; cleanup error: ${cleanupError}` : '';
+      rejectClosed(new Error(
+        `process tree did not close within ${PROCESS_TREE_EXIT_GRACE_MS}ms${detail}`,
+      ));
+    }, PROCESS_TREE_EXIT_GRACE_MS);
+  };
+
   const timer = setTimeout(() => {
     timedOut = true;
-    killProcessTree(child);
+    requestTermination();
   }, timeoutMs);
 
   // 取消/超时信号到达即杀整棵进程树——治"UI 已停止后 shell 仍在跑/写文件"(Windows 须连 shell 壳的子孙一起杀)。
-  const onAbort = () => killProcessTree(child);
+  const onAbort = () => requestTermination();
   if (abortSignal) {
     if (abortSignal.aborted) onAbort();
     else abortSignal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const closed: Promise<{ code: number | null; signal: string | null }> = new Promise((resolve, reject) => {
-    child.on('error', (err2) => reject(err2));
-    child.on('close', (code, signal) => resolve({ code, signal }));
-  });
-
   try {
     const { code, signal } = await closed;
+    if (cleanupError) throw new Error(`process-tree termination failed: ${cleanupError}`);
     return {
       exitCode: code === null ? -1 : code,
       signal,
@@ -140,6 +190,7 @@ export async function runConstrainedChild({ spawn, command, args, cwd, env, time
     };
   } finally {
     clearTimeout(timer);
+    if (closeGraceTimer) clearTimeout(closeGraceTimer);
     if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
   }
 }

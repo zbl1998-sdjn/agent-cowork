@@ -11,6 +11,7 @@ import {
   startRunId,
 } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('E2E /api/agent/chat/stream: file_written + verify_start + done (deep thinking)', async () => {
   const root = tempRoot('kcw-e2e-');
@@ -22,7 +23,7 @@ test('E2E /api/agent/chat/stream: file_written + verify_start + done (deep think
     if (n === 3) return { content: '', tool_calls: [{ id: 'c3', function: { name: 'Read', arguments: JSON.stringify({ path: 'report.md' }) } }] };
     return { content: '已核对，report.md 无误。' };
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '写报告', autoApprove: true, thinking: 'deep' });
@@ -43,7 +44,7 @@ test('E2E /api/agent/chat/stream: inline chart fenced block streams through to t
   const root = tempRoot('kcw-e2e-');
   const chart = '```chart\n{"kind":"bar","data":{"labels":["A","B"],"datasets":[{"data":[1,2]}]}}\n```';
   const agentModelCall = async () => ({ content: `这是结果：\n${chart}` });
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '画个图' });
@@ -62,9 +63,10 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiProvider: 'openai',
+    securityMode: 'controlled_hybrid',
+    kimiProvider: 'openai/local',
     kimiApiKey: 'test-key-provider',
-    kimiBaseUrl: 'https://api.openai.test/v1',
+    kimiBaseUrl: 'http://127.0.0.1:11434/v1',
     kimiModel: 'gpt-test',
     kimiChatRunner: noopKimiChatRunner,
     agentModelCall,
@@ -76,9 +78,9 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
     const all = await readAgentStream(res);
     assert.match(all, /event: done/);
     const record = readRunRecord(root, startRunId(all));
-    assert.equal(record.provider, 'openai');
+    assert.equal(record.provider, 'openai/local');
     assert.equal(record.model, 'gpt-test');
-    assert.equal(record.configSnapshot.provider, 'openai');
+    assert.equal(record.configSnapshot.provider, 'openai/local');
     assert.equal(record.configSnapshot.apiKey, undefined);
   } finally {
     await close(server);

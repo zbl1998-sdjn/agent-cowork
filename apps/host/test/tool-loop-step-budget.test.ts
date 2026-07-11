@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { stepBudgetNudgeMessage } from '../src/kimi/agent/tool-loop-support.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
 
@@ -62,7 +63,7 @@ test('runAgentChat injects the wrap-up reminder once when the model keeps callin
 
   await runAgentChat({
     prompt: 'keep going',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

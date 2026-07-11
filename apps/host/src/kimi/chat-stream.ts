@@ -2,11 +2,11 @@
 // ---------------------------------------------------------------------------
 // 职责:把一次非 agent 的简单对话以 text/event-stream 推给前端,逐 token 下发,
 //       并把整次对话落盘成一条 kimi-chat run 记录(成功/取消/失败三态)。
-// 依赖:runtime/run-store(落盘)、runtime/runs-index(索引)、
+// 依赖:storage/run-store(落盘)、storage/runs-index(索引)、
 //       ./system-prompt(env 块)、./agent-env(环境事实);模型调用由外部注入的 streamRunner 提供。
 // 导出:streamChat —— 单一入口,被 routes 层装配。
-import { createRunId, writeRunRecord } from '../runtime/run-store.js';
-import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { createRunId, writeRunRecord } from '../storage/run-store.js';
+import { summariseRunForIndex } from '../storage/runs-index.js';
 import { omitUndefined } from '../util/object.js';
 import { buildEnvBlock } from './system-prompt.js';
 import { resolveAgentEnvFacts } from './agent-env.js';
@@ -30,6 +30,7 @@ type KimiConfig = {
   maxTokens?: unknown;
   userAgent?: unknown;
   temperature?: unknown;
+  securityMode?: unknown;
 };
 type StreamResult = { text?: string; model?: unknown; usage?: unknown };
 type StreamRunnerInput = {
@@ -45,13 +46,19 @@ type StreamRunnerInput = {
   maxTokens?: unknown;
   userAgent?: unknown;
   temperature?: unknown;
+  trustedRoot?: unknown;
+  securityMode?: unknown;
+  fetchImpl?: unknown;
   signal?: AbortSignal;
   onToken(delta: string): void;
   onReasoning(delta: string): void;
 };
 type StreamRunner = (input: StreamRunnerInput) => Promise<StreamResult> | StreamResult;
 type RunsIndexLike = { upsert(summary: unknown, context?: RequestContext): unknown };
-type CancellationLike = { register(runId: string): AbortController; done(runId: string): unknown };
+type CancellationLike = {
+  register(runId: string, context: RequestContext): AbortController;
+  done(runId: string, context: RequestContext): unknown;
+};
 type StreamChatOptions = {
   response: StreamResponse;
   requestContext: RequestContext;
@@ -62,6 +69,7 @@ type StreamChatOptions = {
   runStoreRoot: string;
   runsIndex: RunsIndexLike;
   cancellation?: CancellationLike | null;
+  fetchImpl?: unknown;
 };
 
 /** 把任意抛出物归一成可展示的错误字符串。 */
@@ -93,6 +101,7 @@ export async function streamChat({
   runStoreRoot,
   runsIndex,
   cancellation = null,
+  fetchImpl,
 }: StreamChatOptions): Promise<void> {
   response.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
@@ -101,7 +110,7 @@ export async function streamChat({
   });
   const runId = createRunId();
   const startedAt = new Date();
-  const controller = cancellation ? cancellation.register(runId) : null;
+  const controller = cancellation ? cancellation.register(runId, requestContext) : null;
   const signal = controller ? controller.signal : undefined;
   sse(response, 'start', { runId });
 
@@ -150,6 +159,9 @@ export async function streamChat({
       maxTokens: kimiConfig.maxTokens,
       userAgent: kimiConfig.userAgent,
       temperature: kimiConfig.temperature,
+      trustedRoot,
+      securityMode: kimiConfig.securityMode,
+      fetchImpl,
       signal,
       onToken: (delta: string) => { text += String(delta); sse(response, 'token', { delta }); },
       onReasoning: (delta: string) => sse(response, 'reasoning', { delta }),
@@ -174,7 +186,7 @@ export async function streamChat({
       sse(response, 'error', { error: errorMessage(err) });
     }
   } finally {
-    if (cancellation) cancellation.done(runId);
+    if (cancellation) cancellation.done(runId, requestContext);
     response.end();
   }
 }

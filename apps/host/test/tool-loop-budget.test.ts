@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createBudgetGuard } from '../src/runtime/budget-guard.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { AgentTool } from '../src/kimi/agent-tools.js';
 
 type EmittedEvent = {
@@ -44,7 +45,7 @@ test('runAgentChat stops safely when model usage exceeds the run token budget be
 
   const out = await runAgentChat({
     prompt: 'write',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

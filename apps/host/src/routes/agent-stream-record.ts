@@ -7,6 +7,8 @@ import { writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
 import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
 import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
+import { AtRestKeyError } from '../security/at-rest.js';
+import { redactValue } from '../security/redaction.js';
 
 export type RunsIndexLike = { upsert(summary: unknown, context?: RequestContext): unknown };
 export type RequestContext = { tenantId?: unknown; userId?: unknown; traceId?: unknown; [key: string]: unknown };
@@ -71,6 +73,14 @@ function modelProvider(kimiConfig: ModelConfig): string {
   return String(kimiConfig.provider || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
+function safeDiagnosticValue(value: unknown, fallback: unknown): unknown {
+  try {
+    return redactValue(value);
+  } catch {
+    return fallback;
+  }
+}
+
 export function recordAgentRun(options: unknown): void {
   const parsed = parseRecordOptions(options);
   if (!parsed) return;
@@ -107,12 +117,18 @@ export function recordAgentRun(options: unknown): void {
       status,
       context: requestContext,
       input: { prompt: String(prompt || '') },
-      result: { ok: status === 'succeeded', text: outcome.text, steps: outcome.steps, usage: outcome.usage },
-      events,
+      result: {
+        ok: status === 'succeeded',
+        text: outcome.text,
+        steps: safeDiagnosticValue(outcome.steps, [{ error: 'step diagnostics omitted after redaction failure' }]),
+        usage: outcome.usage,
+      },
+      events: safeDiagnosticValue(events, [{ type: 'redaction_failed' }]),
     };
     const runPath = writeRunRecord(runStoreRoot, record);
     runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
-  } catch {
+  } catch (error) {
+    if (error instanceof AtRestKeyError) throw error;
     // 记录仅用于诊断;run 记录或索引失败不能打断主响应。
   }
 }

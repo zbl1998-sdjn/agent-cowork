@@ -51,6 +51,14 @@ test('VmSandbox fails fast (501) when not provisioned, but can plan', () => {
   const plan = sandbox.plan(spec, { trustedRoot: '/work/root' });
   assert.ok(plan, 'docker sandbox should build a plan');
   assert.ok(plan.argv.includes('--network=none'), 'docker plan defaults to no network');
+  assert.ok(plan.argv.includes('--read-only'), 'docker plan has a read-only root filesystem');
+  assert.ok(plan.argv.includes('--cap-drop=ALL'), 'docker plan drops all capabilities');
+  assert.ok(plan.argv.includes('--security-opt=no-new-privileges=true'), 'docker plan blocks privilege escalation');
+  assert.match(plan.argv.find((arg) => arg.startsWith('--user=')) || '', /^--user=[1-9][0-9]*:[1-9][0-9]*$/, 'docker plan uses a non-root user');
+  assert.ok(plan.argv.includes('--pids-limit=128'), 'docker plan bounds processes');
+  assert.ok(plan.argv.includes('--memory=512m'), 'docker plan bounds memory');
+  assert.ok(plan.argv.includes('--cpus=1'), 'docker plan bounds CPU');
+  assert.ok(plan.argv.includes('/work/root:/work:ro'), 'docker plan mounts the workspace read-only by default');
   assert.equal(plan.networkIsolated, true);
 });
 

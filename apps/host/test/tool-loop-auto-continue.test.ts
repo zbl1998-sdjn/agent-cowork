@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 
 function tmp(): string {
@@ -42,7 +43,7 @@ test('auto-continue extends the step budget up to the hard cap when the model ke
   const c = toolRoundCounter();
   const out = await runAgentChat({
     prompt: 'big task',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall: c.modelCall,
@@ -64,7 +65,7 @@ test('maxAutoContinues=0 keeps the old single-window behavior', async () => {
   const c = toolRoundCounter();
   const out = await runAgentChat({
     prompt: 'big task',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall: c.modelCall,
@@ -91,7 +92,7 @@ test('a naturally finishing run does not auto-continue and is not marked exhaust
   };
   const out = await runAgentChat({
     prompt: 'small task',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall,

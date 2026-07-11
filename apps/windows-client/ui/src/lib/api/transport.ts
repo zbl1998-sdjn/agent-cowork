@@ -20,6 +20,9 @@ export function defaultHostBase(): string {
 
 const HOST_BASE = defaultHostBase();
 const AUTH_TOKEN_KEY = 'kcw.authToken';
+const WORKSPACE_GRANT_KEY = 'kcw.workspaceGrantId';
+const LEGACY_RECENT_WORKSPACES_KEY = 'kcw.recentWorkspaces';
+const WORKSPACE_GRANT_ID_PATTERN = /^grant_[A-Za-z0-9-]{1,72}$/;
 
 export function resolveUrl(route: string): string {
   if (/^https?:\/\//i.test(route)) return route;
@@ -70,6 +73,21 @@ function readStoredToken(): string | null {
 
 let authToken: string | null = readStoredToken();
 
+function readStoredWorkspaceGrantId(): string | null {
+  try {
+    // One-time privacy migration: previous builds persisted raw workspace paths.
+    globalThis.localStorage?.removeItem(LEGACY_RECENT_WORKSPACES_KEY);
+    const value = globalThis.localStorage?.getItem(WORKSPACE_GRANT_KEY) || null;
+    if (value && WORKSPACE_GRANT_ID_PATTERN.test(value)) return value;
+    if (value) globalThis.localStorage?.removeItem(WORKSPACE_GRANT_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+let workspaceGrantId: string | null = readStoredWorkspaceGrantId();
+
 export function getAuthToken(): string | null {
   return authToken;
 }
@@ -84,8 +102,29 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
+export function getWorkspaceGrantId(): string | null {
+  return workspaceGrantId;
+}
+
+export function setWorkspaceGrantId(grantId: string | null): void {
+  if (grantId !== null && !WORKSPACE_GRANT_ID_PATTERN.test(grantId)) {
+    throw new Error('invalid workspace grant id');
+  }
+  workspaceGrantId = grantId;
+  try {
+    if (workspaceGrantId) globalThis.localStorage?.setItem(WORKSPACE_GRANT_KEY, workspaceGrantId);
+    else globalThis.localStorage?.removeItem(WORKSPACE_GRANT_KEY);
+    globalThis.localStorage?.removeItem(LEGACY_RECENT_WORKSPACES_KEY);
+  } catch {
+    /* 测试/SSR 下 storage 可能不可用,此时仅保留内存 grant id */
+  }
+}
+
 export function authHeaders(base: Record<string, string> = {}): Record<string, string> {
-  return authToken ? { ...base, authorization: `Bearer ${authToken}` } : { ...base };
+  const headers = { ...base };
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
+  if (workspaceGrantId) headers['x-workspace-grant-id'] = workspaceGrantId;
+  return headers;
 }
 
 async function parse<T>(response: Response, route: string): Promise<T> {

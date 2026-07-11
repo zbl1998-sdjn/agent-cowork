@@ -1,7 +1,14 @@
 // Timeline(UI · components/chat):聊天主时间线容器——渲染消息/事件流、驱动滚动粘底与虚拟化,按回合分组。纯展示+回调。
 import { useCallback, useMemo, useState, type CSSProperties, type Ref, type UIEvent } from 'react';
+import { usePendingAction } from '../../hooks/usePendingAction';
 import { respondApprovals } from '../../lib/api';
 import type { AssistantMessage, Message } from '../../lib/app-types';
+import {
+  clearAcknowledgedAssistantRequest,
+  partitionApprovalAcknowledgements,
+  setPendingApprovalError,
+  type PendingApprovalRef,
+} from '../../lib/pending-action';
 import { computeVirtualWindow } from '../../hooks/useVirtualWindow';
 import { Button } from '../ui/Button';
 import { AssistantTurn, UserEditTurn, UserTurn } from './TimelineTurns';
@@ -16,7 +23,7 @@ export {
   type UserEditTurnProps,
   type UserTurnProps,
 } from './TimelineTurns';
-
+export { partitionApprovalAcknowledgements } from '../../lib/pending-action';
 interface TimelineProps {
   editText: string;
   editingMsgId: string | null;
@@ -41,11 +48,6 @@ interface TimelineProps {
   onSetEditingMsgId: (id: string | null) => void;
   onSetEditText: (text: string) => void;
   onSubmitEdit: (messageId: string) => void;
-}
-
-interface PendingApprovalRef {
-  messageId: string;
-  id: string;
 }
 
 const TIMELINE_VIRTUALIZE_AFTER = 120;
@@ -157,7 +159,7 @@ export function Timeline({
     const id = message.approval.id.trim();
     if (!id || pendingApprovalIds.has(id)) return [];
     pendingApprovalIds.add(id);
-    return [{ messageId: message.id, id }];
+    return [{ messageId: message.id, id, sessionReusable: message.approval.sessionReusable === true }];
   });
   return (
     <>
@@ -214,18 +216,34 @@ export function Timeline({
 }
 
 function BatchApprovalBar({ pendingApprovals, onPatchAssistant }: { pendingApprovals: PendingApprovalRef[]; onPatchAssistant: TimelineProps['onPatchAssistant'] }) {
+  const { pending, error, run } = usePendingAction('提交批量审批决定');
   const respondToBatch = (decision: 'once' | 'session') => {
     const ids = pendingApprovals.map((item) => item.id);
-    void respondApprovals(ids, decision);
-    pendingApprovals.forEach((item) => onPatchAssistant(item.messageId, (m) => ({ ...m, approval: undefined })));
+    void run(async () => {
+      const result = await respondApprovals(ids, decision);
+      const partitioned = partitionApprovalAcknowledgements(pendingApprovals, result);
+      partitioned.acknowledged.forEach((item) => onPatchAssistant(
+        item.messageId,
+        (m) => clearAcknowledgedAssistantRequest(m, 'approval', item.id),
+      ));
+      if (partitioned.failed.length > 0) {
+        const failure = `本地服务未确认 ${partitioned.failed.length} 个审批，失败项已保留，请重试`;
+        partitioned.failed.forEach((item) => onPatchAssistant(
+          item.messageId,
+          (m) => setPendingApprovalError(m, item.id, failure),
+        ));
+        throw new Error(failure);
+      }
+    });
   };
   return (
     <div className="approval-bar">
       <span className="approval-q">待批准操作：<strong>{pendingApprovals.length}</strong> 个</span>
       <div className="approval-actions">
-        <Button variant="primary" onClick={() => respondToBatch('once')}>批准当前 {pendingApprovals.length} 个</Button>
-        <Button variant="secondary" onClick={() => respondToBatch('session')}>本会话批准当前 {pendingApprovals.length} 个</Button>
+        <Button variant="primary" disabled={pending} onClick={() => respondToBatch('once')}>{pending ? '提交中…' : `批准当前 ${pendingApprovals.length} 个`}</Button>
+        {pendingApprovals.every((item) => item.sessionReusable) && <Button variant="secondary" disabled={pending} onClick={() => respondToBatch('session')}>本会话批准当前 {pendingApprovals.length} 个</Button>}
       </div>
+      {error && <div className="panel-error" role="alert">{error}</div>}
     </div>
   );
 }

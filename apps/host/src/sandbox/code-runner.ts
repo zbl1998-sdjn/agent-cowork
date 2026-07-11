@@ -2,16 +2,16 @@
 // ---------------------------------------------------------------------------
 // 职责:把一段内联代码(node/python)物化为可信根内的脚本文件,在沙箱里执行,并全程产出
 //       run 事件与 run 记录(可观测/可回放)。写盘前先校验 spec,失败也落 run 记录、不留残脚本。
-// 依赖:L0 path-policy + 同层 sandbox-spec/local-runtime-tools/code-runner-utils;按既有架构
-//       豁免直接向 runtime/run-store、runs-index 记账。导出:runCode。
+// 依赖:L0 path-policy + 同层 sandbox-spec/local-runtime-tools/code-runner-utils/storage 持久化。导出:runCode。
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertTrustedPath } from '../security/path-policy.js';
+import { bindRunEventPublisher } from '../util/run-event-publisher.js';
 import { normalizeSandboxSpec } from './index.js';
 import { resolveLocalRuntimeTool, withLocalRuntimeToolLimits } from './local-runtime-tools.js';
 import { MAX_CODE_BYTES, SCRIPT_DIR_SEGMENTS, fail, pickExt, preview, toHttpError } from './code-runner-utils.js';
-import { createRunId, writeRunRecord } from '../runtime/run-store.js';
-import { summariseRunForIndex } from '../runtime/runs-index.js';
+import { createRunId, writeRunRecord } from '../storage/run-store.js';
+import { summariseRunForIndex } from '../storage/runs-index.js';
 import type { SandboxSpec } from './sandbox-spec.js';
 import type { RunCodeOptions, RunCodeResult, SandboxExecResult } from './code-runner-types.js';
 
@@ -112,10 +112,11 @@ export async function runCode({
   }
 
   const events: Record<string, unknown>[] = [];
-  const emit = (type: string, payload: Record<string, unknown> = {}): Record<string, unknown> => {
+  const scopedRunEvents = bindRunEventPublisher(runEvents, context);
+  const emit = async (type: string, payload: Record<string, unknown> = {}): Promise<Record<string, unknown>> => {
     let enriched;
-    if (runEvents) {
-      enriched = runEvents.publish(runId, { type, ...payload });
+    if (scopedRunEvents) {
+      enriched = await scopedRunEvents.publish(runId, { type, ...payload });
     } else {
       enriched = { seq: events.length + 1, ts: new Date().toISOString(), type, ...payload };
     }
@@ -124,8 +125,8 @@ export async function runCode({
   };
 
   const promptText = String(prompt || '').slice(0, 2000);
-  emit('user_message', { text: promptText || `${toolName} ${scriptRelative}` });
-  emit('assistant_start', { status: 'running', tool: toolName });
+  await emit('user_message', { text: promptText || `${toolName} ${scriptRelative}` });
+  await emit('assistant_start', { status: 'running', tool: toolName });
 
   const baseRecord = {
     id: runId,
@@ -156,7 +157,7 @@ export async function runCode({
     fs.writeFileSync(scriptPath, code, 'utf8');
   } catch (err) {
     const error = toHttpError(err);
-    emit('assistant_end', { status: 'failed', error: error.message });
+    await emit('assistant_end', { status: 'failed', error: error.message });
     const finishedAt = new Date();
     const runPath = finalize({
       ...baseRecord,
@@ -169,16 +170,16 @@ export async function runCode({
     throw error;
   }
 
-  emit('progress', { icon: 'check', text: `已写入脚本 ${scriptRelative}` });
-  emit('sandbox_start', { tool: spec.tool, args: spec.args, timeoutMs: spec.timeoutMs });
+  await emit('progress', { icon: 'check', text: `已写入脚本 ${scriptRelative}` });
+  await emit('sandbox_start', { tool: spec.tool, args: spec.args, timeoutMs: spec.timeoutMs });
 
   let result: SandboxExecResult;
   try {
     result = await sandbox.exec(spec, { trustedRoot: safeRoot, context });
   } catch (err) {
     const error = toHttpError(err, 502);
-    emit('sandbox_end', { status: 'failed', error: error.message });
-    emit('assistant_end', { status: 'failed', error: error.message });
+    await emit('sandbox_end', { status: 'failed', error: error.message });
+    await emit('assistant_end', { status: 'failed', error: error.message });
     const finishedAt = new Date();
     const runPath = finalize({
       ...baseRecord,
@@ -194,12 +195,12 @@ export async function runCode({
   const finishedAt = new Date();
   const durationMs = result.durationMs ?? finishedAt.getTime() - startedAt.getTime();
   const ok = result.exitCode === 0 && !result.timedOut;
-  emit('sandbox_end', {
+  await emit('sandbox_end', {
     status: ok ? 'succeeded' : 'failed',
     exitCode: result.exitCode,
     timedOut: result.timedOut,
   });
-  emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
+  await emit('assistant_end', { status: ok ? 'succeeded' : 'failed', durationMs });
 
   const runPath = finalize({
     ...baseRecord,

@@ -2,8 +2,16 @@
 // ---------------------------------------------------------------------------
 // 职责:为工具循环提供三件小工具——按需激活的 search_tools(懒加载扩展工具/MCP)、
 //      解析模型返回的工具调用(JSON 参数容错)、以及无预算限制时的空预算守卫占位。
-// 依赖:仅标准库。
-// 导出:addLazySearchTool / parseToolCall / createNoopBudgetGuard
+// 依赖:L0 identity-scope。
+// 导出:addLazySearchTool / parseToolCall / defaultAgentContext / createNoopBudgetGuard
+import { LOCAL_IDENTITY_SCOPE } from '../../security/identity-scope.js';
+
+export function defaultAgentContext(
+  options: Readonly<{ context?: Record<string, unknown> }>,
+): Record<string, unknown> {
+  return Object.hasOwn(options, 'context') ? {} : LOCAL_IDENTITY_SCOPE;
+}
+
 export type ToolArgs = Record<string, unknown>;
 export type AgentTool = {
   name: string;

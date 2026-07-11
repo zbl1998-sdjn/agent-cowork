@@ -108,7 +108,7 @@ test('POST /api/kimi/chat/stream emits start/token/done SSE frames and records a
   }
 });
 
-test('POST /api/kimi/chat/stream returns 503 when Kimi API is not configured', async () => {
+test('POST /api/kimi/chat/stream returns a truthful local-first 503 when no model is configured', async () => {
   const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
   const base = await bind(server);
   try {
@@ -117,7 +117,9 @@ test('POST /api/kimi/chat/stream returns 503 when Kimi API is not configured', a
     });
     assert.equal(res.status, 503);
     const body = recordValue(await res.json(), 'error response body');
-    assert.match(String(body.error), /需要模型回复时请联网/);
+    assert.match(String(body.error), /请配置 Ollama\/LM Studio/);
+    assert.match(String(body.error), /当前 Internal Beta 不允许公网云模型直接出站/);
+    assert.doesNotMatch(String(body.error), /联网并配置 KIMI_API_KEY/);
   } finally {
     await closeTestServer(server);
   }
@@ -129,6 +131,7 @@ test('streamChat emits cancelled when the cancellation signal aborts after parti
   const response = new CapturingStreamResponse();
   const controller = new AbortController();
   const doneRuns: string[] = [];
+  const cancellationContexts: unknown[] = [];
 
   await streamChat({
     response,
@@ -139,11 +142,13 @@ test('streamChat emits cancelled when the cancellation signal aborts after parti
     runStoreRoot,
     runsIndex: { upsert: () => undefined },
     cancellation: {
-      register() {
+      register(_runId, context?: unknown) {
+        cancellationContexts.push(context);
         return controller;
       },
-      done(runId) {
+      done(runId, context?: unknown) {
         doneRuns.push(runId);
+        cancellationContexts.push(context);
       },
     },
     streamRunner: ({ prompt, model, provider, signal, onToken, onReasoning }) => {
@@ -168,6 +173,7 @@ test('streamChat emits cancelled when the cancellation signal aborts after parti
   assert.equal(cancelled.runId, start.runId);
   assert.equal(cancelled.text, 'partial');
   assert.equal(doneRuns[0], start.runId);
+  assert.deepEqual(cancellationContexts, [streamContext(), streamContext()]);
   assert.equal(response.ended, true);
 });
 
