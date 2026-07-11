@@ -5,11 +5,13 @@
 // 依赖:storage/sqlite + 同层 user-store(复用哈希/身份助手)。导出:createSqliteUserStore。
 import { openSqliteDatabase } from '../storage/sqlite.js';
 import {
-  createUserStore,
   newUserRecord,
   passwordMatches,
   newGuestIdentity,
   newSessionToken,
+  DEFAULT_GUEST_SESSION_TTL_MS,
+  DEFAULT_SESSION_TTL_MS,
+  normaliseSessionTtlMs,
 } from './user-store.js';
 import type { AuthError, Identity, SessionIdentity, UserStore } from './user-store.js';
 
@@ -20,10 +22,12 @@ type AuthRow = {
   salt: string;
   hash: string;
   is_guest?: number;
+  expires_at?: string | null;
   n?: number;
 };
 type AuthStatement = {
   get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
   run(...params: unknown[]): { changes?: number };
 };
 type AuthDatabase = {
@@ -31,11 +35,16 @@ type AuthDatabase = {
   prepare(sql: string): AuthStatement;
   close?: () => unknown;
 };
-type SqliteUserStoreOptions = { dbPath?: string };
+type SqliteUserStoreOptions = {
+  dbPath?: string;
+  sessionTtlMs?: unknown;
+  guestSessionTtlMs?: unknown;
+  now?: () => number;
+};
 
 // 本适配器与 createUserStore() 暴露完全相同接口,但把注册用户、会话和访客租户持久化到 SQLite。
 // 表使用独立 DB 句柄幂等创建,不耦合 state.sqlite 的迁移顺序。
-// 若 node:sqlite 不可用或打开失败,优雅降级到内存存储:本次会话仍可登录,只是不会跨重启保留。
+// 持久化身份库初始化失败必须阻止启动:切换到空内存库会制造一套新的身份边界。
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS auth_users (
@@ -52,21 +61,52 @@ const SCHEMA = `
     tenant_id  TEXT NOT NULL,
     username   TEXT NOT NULL,
     is_guest   INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    expires_at TEXT
   );
 `;
 
-export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): UserStore & { close?: () => void } {
-  let db: AuthDatabase;
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function initialiseAuthDatabase(dbPath: string | undefined): AuthDatabase {
+  let db: AuthDatabase | undefined;
   try {
     db = openSqliteDatabase(dbPath as string) as AuthDatabase;
     db.exec(SCHEMA);
-  } catch (err) {
-    // 持久化不可用时仍保持 host 可用,退回本进程内存会话。
-    const error = (err || {}) as { message?: string };
-    console.error('[auth] sqlite user store unavailable, falling back to in-memory:', error.message);
-    return createUserStore();
+    const sessionColumns = db.prepare('PRAGMA table_info(auth_sessions)').all() as Array<{ name?: string }>;
+    if (!sessionColumns.some((column) => column.name === 'expires_at')) {
+      db.exec('ALTER TABLE auth_sessions ADD COLUMN expires_at TEXT');
+    }
+    return db;
+  } catch (error) {
+    if (db?.close) {
+      try {
+        db.close();
+      } catch (closeError) {
+        throw new AggregateError(
+          [error, closeError],
+          `Persistent SQLite auth store initialization and cleanup failed: ${errorMessage(error)}`,
+        );
+      }
+    }
+    throw new Error(
+      `Persistent SQLite auth store initialization failed: ${errorMessage(error)}`,
+      { cause: error },
+    );
   }
+}
+
+export function createSqliteUserStore({
+  dbPath,
+  sessionTtlMs = DEFAULT_SESSION_TTL_MS,
+  guestSessionTtlMs = DEFAULT_GUEST_SESSION_TTL_MS,
+  now = Date.now,
+}: SqliteUserStoreOptions = {}): UserStore & { close?: () => void } {
+  const db = initialiseAuthDatabase(dbPath);
+  const userTtlMs = normaliseSessionTtlMs(sessionTtlMs, DEFAULT_SESSION_TTL_MS);
+  const guestTtlMs = normaliseSessionTtlMs(guestSessionTtlMs, DEFAULT_GUEST_SESSION_TTL_MS);
 
   const insertUser = db.prepare(
     'INSERT INTO auth_users (username, user_id, tenant_id, salt, hash, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -74,7 +114,7 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
   const selectUser = db.prepare('SELECT * FROM auth_users WHERE username = ?');
   const countUsers = db.prepare('SELECT COUNT(*) AS n FROM auth_users');
   const insertSession = db.prepare(
-    'INSERT INTO auth_sessions (token, user_id, tenant_id, username, is_guest, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO auth_sessions (token, user_id, tenant_id, username, is_guest, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   const selectSession = db.prepare('SELECT * FROM auth_sessions WHERE token = ?');
   const deleteSession = db.prepare('DELETE FROM auth_sessions WHERE token = ?');
@@ -100,13 +140,15 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
 
   function createSession(identity: Identity): string {
     const token = newSessionToken();
+    const createdAtMs = now();
     insertSession.run(
       token,
       identity.userId,
       identity.tenantId,
       identity.username,
       identity.guest ? 1 : 0,
-      new Date().toISOString(),
+      new Date(createdAtMs).toISOString(),
+      new Date(createdAtMs + (identity.guest ? guestTtlMs : userTtlMs)).toISOString(),
     );
     return token;
   }
@@ -122,8 +164,14 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
   }
 
   function resolveToken(token: unknown): Identity | null {
-    const row = selectSession.get(String(token || '')) as AuthRow | undefined;
+    const normalized = String(token || '');
+    const row = selectSession.get(normalized) as AuthRow | undefined;
     if (!row) return null;
+    const expiresAt = Date.parse(String(row.expires_at || ''));
+    if (!Number.isFinite(expiresAt) || expiresAt <= now()) {
+      deleteSession.run(normalized);
+      return null;
+    }
     return { userId: row.user_id, tenantId: row.tenant_id, username: row.username, guest: row.is_guest === 1 };
   }
 
@@ -150,7 +198,7 @@ export function createSqliteUserStore({ dbPath }: SqliteUserStoreOptions = {}): 
       return row ? Number(row.n) : 0;
     },
     close: () => {
-      try { if (db.close) db.close(); } catch { /* 已关闭 */ }
+      if (db.close) db.close();
     },
   };
 }

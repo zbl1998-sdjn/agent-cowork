@@ -48,7 +48,8 @@ test('expired tokens are rejected', () => {
 test('resolveJwtIdentity maps common claim names', () => {
   assert.equal(resolveJwtIdentity(signJwtHS256({ tenant_id: 'acme', user_id: 'u1' }, SECRET), SECRET)?.tenantId, 'acme');
   assert.equal(resolveJwtIdentity(signJwtHS256({ tid: 'org9', sub: 'u2' }, SECRET), SECRET)?.tenantId, 'org9');
-  assert.equal(resolveJwtIdentity(signJwtHS256({ sub: 'u3' }, SECRET), SECRET)?.userId, 'u3');
+  assert.equal(resolveJwtIdentity(signJwtHS256({ sub: 'u3' }, SECRET), SECRET), null);
+  assert.equal(resolveJwtIdentity(signJwtHS256({ tenant_id: 'acme' }, SECRET), SECRET), null);
   assert.equal(resolveJwtIdentity('garbage', SECRET), null);
 });
 
@@ -64,6 +65,47 @@ test('E2E: a valid JWT sets the request context tenant/user (echoed in response 
     // a request without a token keeps the local defaults
     const res2 = await fetch(`${base}/api/workspace`);
     assert.equal(res2.headers.get('x-tenant-id'), 'tenant_local');
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('E2E: trusted JWTs missing either owner claim are rejected without mixed local identity', async () => {
+  const root = tmp();
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    persistAuth: false,
+    requireAuth: true,
+    jwtSecret: SECRET,
+    trustIdentityHeaders: false,
+  });
+  const base = await bind(server);
+  try {
+    for (const claims of [
+      { tenant_id: 'tenant-only' },
+      { user_id: 'user-only' },
+    ]) {
+      const token = signJwtHS256(claims, SECRET, { expiresInSec: 600 });
+      const response = await fetch(`${base}/api/workspace`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get('x-tenant-id'), 'tenant_local');
+      assert.equal(response.headers.get('x-user-id'), 'user_local');
+    }
+
+    const complete = signJwtHS256(
+      { tenant_id: 'tenant-complete', user_id: 'user-complete' },
+      SECRET,
+      { expiresInSec: 600 },
+    );
+    const response = await fetch(`${base}/api/workspace`, {
+      headers: { authorization: `Bearer ${complete}` },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-tenant-id'), 'tenant-complete');
+    assert.equal(response.headers.get('x-user-id'), 'user-complete');
   } finally {
     await closeTestServer(server);
   }

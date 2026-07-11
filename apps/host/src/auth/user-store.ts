@@ -32,11 +32,25 @@ export type UserStore = {
   createGuest(): SessionIdentity;
   count(): number;
 };
+export type UserStoreOptions = {
+  sessionTtlMs?: unknown;
+  guestSessionTtlMs?: unknown;
+  now?: () => number;
+};
+type SessionRecord = { identity: Identity; expiresAt: number };
 
 // 登录层只决定请求以哪个 tenant/user 身份运行;下游数据层已经按该身份隔离。
 // 这里保留内存与 SQLite 两个可互换适配器,并集中哈希/校验助手以保证行为一致。
 
 const USERNAME_RE = /^[a-z0-9_.-]{3,40}$/;
+export const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_GUEST_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+export function normaliseSessionTtlMs(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(30 * 24 * 60 * 60 * 1000, Math.max(1_000, Math.floor(parsed)));
+}
 
 /** 用 scrypt(password,salt) 生成十六进制哈希;两个适配器必须共用以保持兼容。 */
 export function hashPassword(password: unknown, salt: string): string {
@@ -93,9 +107,15 @@ export function newSessionToken(): string {
   return crypto.randomBytes(24).toString('hex');
 }
 
-export function createUserStore(): UserStore {
+export function createUserStore({
+  sessionTtlMs = DEFAULT_SESSION_TTL_MS,
+  guestSessionTtlMs = DEFAULT_GUEST_SESSION_TTL_MS,
+  now = Date.now,
+}: UserStoreOptions = {}): UserStore {
   const users = new Map<string, UserRecord>();    // username -> { username, userId, tenantId, salt, hash }
-  const sessions = new Map<string, Identity>(); // token -> { userId, tenantId, username }
+  const sessions = new Map<string, SessionRecord>();
+  const userTtlMs = normaliseSessionTtlMs(sessionTtlMs, DEFAULT_SESSION_TTL_MS);
+  const guestTtlMs = normaliseSessionTtlMs(guestSessionTtlMs, DEFAULT_GUEST_SESSION_TTL_MS);
 
   function register(username: unknown, password: unknown): Identity {
     const record = newUserRecord(username, password);
@@ -116,11 +136,15 @@ export function createUserStore(): UserStore {
 
   function createSession(identity: Identity): string {
     const token = newSessionToken();
-    sessions.set(token, {
+    const sessionIdentity = {
       userId: identity.userId,
       tenantId: identity.tenantId,
       username: identity.username,
       guest: Boolean(identity.guest),
+    };
+    sessions.set(token, {
+      identity: sessionIdentity,
+      expiresAt: now() + (identity.guest ? guestTtlMs : userTtlMs),
     });
     return token;
   }
@@ -136,7 +160,14 @@ export function createUserStore(): UserStore {
   }
 
   function resolveToken(token: unknown): Identity | null {
-    return sessions.get(String(token || '')) || null;
+    const normalized = String(token || '');
+    const session = sessions.get(normalized);
+    if (!session) return null;
+    if (session.expiresAt <= now()) {
+      sessions.delete(normalized);
+      return null;
+    }
+    return session.identity;
   }
 
   function logout(token: unknown): boolean {

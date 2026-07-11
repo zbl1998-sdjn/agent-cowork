@@ -12,6 +12,8 @@ import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js
 import type { CredentialStore } from '../security/credential-store.js';
 import type { OAuthPermissionApprovalStore } from '../runtime/oauth-permission-approvals.js';
 import type { ConnectorOAuthSession } from './connector-oauth-session.js';
+import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
+import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type RouteError = Error & { statusCode?: number };
@@ -28,6 +30,7 @@ type ConnectorRouteOptions = {
   pathname: string;
   requestUrl: URL;
   requestContext: RequestContext;
+  globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
   connectMcp?: (servers: ConnectorSpec[]) => Promise<ConnectMcpResult>;
   toolRegistry?: ToolRegistryLike | null;
   credentialStore?: CredentialStore;
@@ -93,6 +96,7 @@ export async function handleConnectorRoutes({
   pathname,
   requestUrl,
   requestContext,
+  globalMutationAdmins,
   connectMcp,
   toolRegistry,
   credentialStore,
@@ -142,6 +146,7 @@ export async function handleConnectorRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/connectors/connect') {
+    if (!requireGlobalMutationAdmin(response, requestContext, globalMutationAdmins)) return true;
     await withJsonBody(request, response, async (body) => {
       const parsed = connectBodySchema.safeParse(body);
       if (!parsed.success) {
@@ -176,6 +181,7 @@ export async function handleConnectorRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/connectors/disconnect') {
+    if (!requireGlobalMutationAdmin(response, requestContext, globalMutationAdmins)) return true;
     await withJsonBody(request, response, async (body) => {
       const parsed = disconnectBodySchema.safeParse(body);
       if (!parsed.success) {

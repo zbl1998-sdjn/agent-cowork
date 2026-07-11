@@ -5,6 +5,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { createSqliteUserStore } from '../src/auth/sqlite-user-store.js';
 import type { AuthError, Identity } from '../src/auth/user-store.js';
+import { openSqliteDatabase } from '../src/storage/sqlite.js';
+
+type InspectableDatabase = ReturnType<typeof openSqliteDatabase> & { close?: () => void };
 
 function tmpDb(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-authdb-'));
@@ -68,15 +71,95 @@ test('sqlite user store: users + sessions survive a restart (reopen same db)', (
   second.close?.();
 });
 
-test('sqlite user store: falls back to in-memory when db cannot be opened', () => {
+test('sqlite user store: fails closed when the persistent database cannot be opened', () => {
   // Make the parent path a FILE, so mkdir of the db directory fails (ENOTDIR);
-  // the store must still return a working (in-memory) implementation.
+  // persistent-auth startup must fail instead of issuing a fresh in-memory identity.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-authdb-bad-'));
   const blocker = path.join(dir, 'blocker');
   fs.writeFileSync(blocker, 'i am a file, not a directory');
   const dbPath = path.join(blocker, 'auth.sqlite'); // parent is a file → open throws
 
+  assert.throws(
+    () => createSqliteUserStore({ dbPath }),
+    /persistent SQLite auth store initialization failed/i,
+  );
+});
+
+test('sqlite user store: fails closed when the session schema cannot be migrated', () => {
+  const dbPath = tmpDb();
+  const incompatibleDb = openSqliteDatabase(dbPath) as InspectableDatabase;
+  incompatibleDb.exec(`
+    CREATE VIEW auth_sessions AS
+    SELECT 'legacy-token' AS token, 'user_legacy' AS user_id, 'tenant_legacy' AS tenant_id;
+  `);
+  incompatibleDb.close?.();
+
+  assert.throws(
+    () => createSqliteUserStore({ dbPath }),
+    /persistent SQLite auth store initialization failed/i,
+  );
+});
+
+test('sqlite user store: creates expires_at on sessions only and schema setup is idempotent', () => {
+  const dbPath = tmpDb();
+  createSqliteUserStore({ dbPath }).close?.();
+  createSqliteUserStore({ dbPath }).close?.();
+
+  const db = openSqliteDatabase(dbPath) as InspectableDatabase;
+  const userColumns = db.prepare('PRAGMA table_info(auth_users)').all() as Array<{ name?: string }>;
+  const sessionColumns = db.prepare('PRAGMA table_info(auth_sessions)').all() as Array<{ name?: string }>;
+  assert.equal(userColumns.some((column) => column.name === 'expires_at'), false);
+  assert.equal(sessionColumns.filter((column) => column.name === 'expires_at').length, 1);
+  db.close?.();
+});
+
+test('sqlite user store: migrates legacy sessions and revokes null-expiry tokens', () => {
+  const dbPath = tmpDb();
+  const legacyDb = openSqliteDatabase(dbPath) as InspectableDatabase;
+  legacyDb.exec(`
+    CREATE TABLE auth_users (
+      username TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE auth_sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      is_guest INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    INSERT INTO auth_sessions (token, user_id, tenant_id, username, is_guest, created_at)
+    VALUES ('legacy-token', 'user_legacy', 'tenant_legacy', 'legacy', 0, '2026-07-09T00:00:00.000Z');
+  `);
+  legacyDb.close?.();
+
   const store = createSqliteUserStore({ dbPath });
-  const id = store.register('bob', 'passw0rd');
-  assert.equal(requireIdentity(store.verify('bob', 'passw0rd'), 'fallback user').userId, id.userId);
+  assert.equal(store.resolveToken('legacy-token'), null);
+  store.close?.();
+
+  const inspected = openSqliteDatabase(dbPath) as InspectableDatabase;
+  const migratedColumns = inspected.prepare('PRAGMA table_info(auth_sessions)').all() as Array<{ name?: string }>;
+  assert.equal(migratedColumns.filter((column) => column.name === 'expires_at').length, 1);
+  const revoked = inspected.prepare('SELECT COUNT(*) AS n FROM auth_sessions WHERE token = ?')
+    .get('legacy-token') as { n?: number };
+  assert.equal(Number(revoked.n), 0);
+  inspected.close?.();
+});
+
+test('sqlite user store expires persisted sessions after the bounded TTL', () => {
+  const dbPath = tmpDb();
+  let now = Date.parse('2026-07-10T00:00:00.000Z');
+  const store = createSqliteUserStore({ dbPath, sessionTtlMs: 1_000, now: () => now });
+  const identity = store.register('expiryuser', 'secret123');
+  const token = store.createSession(identity);
+  assert.equal(requireIdentity(store.resolveToken(token), 'fresh session').userId, identity.userId);
+  now += 1_001;
+  assert.equal(store.resolveToken(token), null);
+  assert.equal(store.logout(token), false, 'expired row is deleted when resolved');
+  store.close?.();
 });

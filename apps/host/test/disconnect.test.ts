@@ -9,6 +9,7 @@ import type { HostServer } from '../src/server.js';
 import { createApprovalRegistry } from '../src/runtime/approvals.js';
 import { createCancellationRegistry } from '../src/runtime/cancellation.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp(): string { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-dc-')); }
 
@@ -32,7 +33,7 @@ test('E2E: client disconnect mid-question cancels the run and frees the approval
   // The agent keeps asking the user a question; the user never answers — instead
   // the client disconnects. The server must not leak the pending question.
   const agentModelCall = async () => ({ content: '', tool_calls: [{ id: 'c1', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '继续吗?', options: ['是', '否'] }) } }] });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: fakeKimiChatRunner, agentModelCall, approvalRegistry, cancellation });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, kimiChatRunner: fakeKimiChatRunner, agentModelCall, approvalRegistry, cancellation });
   const base = await bind(server);
   try {
     const ac = new AbortController();

@@ -98,6 +98,7 @@ test('connector route fails closed when MCP connect is unavailable or backend co
     pathname: '/api/connectors/connect',
     requestUrl: new URL('http://local/api/connectors/connect'),
     requestContext: { tenantId: 'tenant-route', userId: 'user-route' },
+    globalMutationAdmins: [{ tenantId: 'tenant-route', userId: 'user-route' }],
     toolRegistry: null,
     oauthSessions: new Map(),
     safeTrustedRoot: () => root,
@@ -146,6 +147,7 @@ test('connector route rejects unsupported disconnects and ignores unrelated path
   const baseOptions = {
     requestUrl: new URL('http://local/api/connectors/disconnect'),
     requestContext: { tenantId: 'tenant-route', userId: 'user-route' },
+    globalMutationAdmins: [{ tenantId: 'tenant-route', userId: 'user-route' }],
     oauthSessions: new Map(),
     safeTrustedRoot: () => root,
   };

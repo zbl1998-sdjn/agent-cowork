@@ -6,12 +6,15 @@
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { applyRetention, buildPurgePlan, executePurgePlan, PURGE_SCOPES, type PurgeScope } from '../security/data-purge.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
+import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
 
 export type SecurityDataRouteOptions = {
   request: HttpRequestLike & { method?: string };
   response: HttpResponseLike;
   pathname: string;
   requestContext: unknown;
+  globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
   trustedRoot: string;
 };
 
@@ -20,9 +23,12 @@ export async function handleSecurityDataRoutes({
   response,
   pathname,
   requestContext,
+  globalMutationAdmins,
   trustedRoot,
 }: SecurityDataRouteOptions): Promise<boolean> {
   if (request.method === 'POST' && (pathname === '/api/security/data/purge-plan' || pathname === '/api/security/data/purge')) {
+    if (pathname === '/api/security/data/purge'
+      && !requireGlobalMutationAdmin(response, requestContext as Record<string, unknown>, globalMutationAdmins)) return true;
     await withJsonBody(request, response, (body) => {
       const raw = body && typeof body === 'object' ? body as Record<string, unknown> : {};
       const scope = String(raw.scope || 'content').toLowerCase() as PurgeScope;
@@ -46,6 +52,7 @@ export async function handleSecurityDataRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/security/data/retention') {
+    if (!requireGlobalMutationAdmin(response, requestContext as Record<string, unknown>, globalMutationAdmins)) return true;
     await withJsonBody(request, response, (body) => {
       const raw = body && typeof body === 'object' ? body as Record<string, unknown> : {};
       const maxAgeDays = Math.max(1, Math.floor(Number(raw.maxAgeDays) || 0));

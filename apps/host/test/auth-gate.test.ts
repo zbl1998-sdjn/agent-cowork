@@ -50,6 +50,33 @@ test('unauthenticated /api is blocked; spoofed identity headers do not authentic
   });
 });
 
+test('trusted identity headers require a complete valid tenant and user pair', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-authgate-trusted-pair');
+  await withServer({ trustedRoot, requireAuth: true, trustIdentityHeaders: true }, async (base) => {
+    const incompleteCases: ReadonlyArray<readonly [string, Record<string, string>]> = [
+      ['no identity headers', {}],
+      ['tenant only', { 'x-tenant-id': 'tenant_trusted' }],
+      ['user only', { 'x-user-id': 'user_trusted' }],
+      ['invalid tenant', { 'x-tenant-id': 'tenant invalid', 'x-user-id': 'user_trusted' }],
+      ['invalid user', { 'x-tenant-id': 'tenant_trusted', 'x-user-id': 'user invalid' }],
+    ];
+
+    for (const [label, headers] of incompleteCases) {
+      const response = await fetch(`${base}/api/workspace`, { headers });
+      assert.equal(response.status, 401, `${label} must not authenticate`);
+      assert.equal(response.headers.get('x-tenant-id'), 'tenant_local', `${label} must not partially override tenant`);
+      assert.equal(response.headers.get('x-user-id'), 'user_local', `${label} must not partially override user`);
+    }
+
+    const complete = await fetch(`${base}/api/workspace`, {
+      headers: { 'x-tenant-id': 'tenant_trusted', 'x-user-id': 'user_trusted' },
+    });
+    assert.equal(complete.status, 200);
+    assert.equal(complete.headers.get('x-tenant-id'), 'tenant_trusted');
+    assert.equal(complete.headers.get('x-user-id'), 'user_trusted');
+  });
+});
+
 test('new file and route surfaces are covered by the auth gate', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-surfaces');
   await withServer({ trustedRoot, requireAuth: true, trustIdentityHeaders: false }, async (base) => {

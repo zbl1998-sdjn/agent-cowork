@@ -80,7 +80,7 @@ export function resolveJwtIdentity(token: unknown, secret: string, opts?: Verify
   if (!payload) return null;
   const tenant = payload.tenant_id || payload.tid || payload.org || null;
   const user = payload.user_id || payload.uid || payload.sub || null;
-  if (!tenant && !user) return null;
+  if (!tenant || !user) return null;
   return {
     tenantId: tenant ? String(tenant) : null,
     userId: user ? String(user) : null,

@@ -1,7 +1,7 @@
 // 请求身份附着(host · L1 领域层 · auth)
 // ---------------------------------------------------------------------------
 // 职责:从请求里「安全地」解析身份并写入 requestContext。仅认可 Bearer:先验 JWT、再查会话 token;
-//       x-tenant-id/x-user-id 头默认「不信任」,仅当显式开启 trustIdentityHeaders(反代后)才采用。
+//       x-tenant-id/x-user-id 头默认「不信任」,仅当显式开启 trustIdentityHeaders(反代后)且二者均合法时才成对采用。
 // 安全:默认不信客户端身份头(防伪冒,见 http/request-utils 的说明)。依赖:L0 request-utils + 同层 jwt。
 // 导出:attachRequestIdentity。
 import { headerValue, stableHeader } from '../http/request-utils.js';
@@ -21,7 +21,7 @@ type AttachRequestIdentityOptions = {
   trustIdentityHeaders?: boolean;
 };
 
-/** 解析并把身份写入 requestContext:Bearer(JWT 或会话 token)优先;仅 trustIdentityHeaders 时才采纳身份头。 */
+/** 解析并把身份写入 requestContext:Bearer(JWT 或会话 token)优先;仅 trustIdentityHeaders 时才成对采纳合法身份头。 */
 export function attachRequestIdentity({
   request,
   requestContext,
@@ -43,8 +43,10 @@ export function attachRequestIdentity({
   if (!requestContext.authenticated && trustIdentityHeaders) {
     const tenantId = stableHeader(headerValue(request, 'x-tenant-id'), '');
     const userId = stableHeader(headerValue(request, 'x-user-id'), '');
-    if (tenantId) requestContext.tenantId = tenantId;
-    if (userId) requestContext.userId = userId;
-    requestContext.authenticated = true;
+    if (tenantId && userId) {
+      requestContext.tenantId = tenantId;
+      requestContext.userId = userId;
+      requestContext.authenticated = true;
+    }
   }
 }

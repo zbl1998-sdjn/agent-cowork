@@ -5,6 +5,8 @@
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
+import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type SkillRegistryLike = {
@@ -18,6 +20,7 @@ type SkillRouteOptions = {
   response: HttpResponseLike;
   pathname: string;
   requestContext?: Record<string, unknown>;
+  globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
   skillRegistry?: SkillRegistryLike | null;
 };
 
@@ -40,6 +43,7 @@ export async function handleSkillRoutes({
   response,
   pathname,
   requestContext,
+  globalMutationAdmins,
   skillRegistry,
 }: SkillRouteOptions): Promise<boolean> {
   if (!skillRegistry) {
@@ -53,6 +57,7 @@ export async function handleSkillRoutes({
 
   const match = pathname.match(TOGGLE_RE);
   if (request.method === 'POST' && match) {
+    if (!requireGlobalMutationAdmin(response, requestContext || {}, globalMutationAdmins)) return true;
     await withJsonBody(request, response, async (body) => {
       try {
         const input = skillToggleBodySchema.parse(body);

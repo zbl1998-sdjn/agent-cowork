@@ -70,6 +70,17 @@ test('user store: register, verify, sessions', () => {
   assert.throws(() => store.register('x', 'short'), (error) => assertStatusCode(error, 400));
 });
 
+test('user store expires and revokes sessions after the bounded TTL', () => {
+  let now = Date.parse('2026-07-10T00:00:00.000Z');
+  const store = createUserStore({ sessionTtlMs: 1_000, now: () => now });
+  const identity = store.register('expiryuser', 'secret123');
+  const token = store.createSession(identity);
+  assert.equal(store.resolveToken(token)?.userId, identity.userId);
+  now += 1_001;
+  assert.equal(store.resolveToken(token), null);
+  assert.equal(store.logout(token), false, 'expired token is removed when resolved');
+});
+
 test('auth routes: register -> login -> me, and token sets request identity', async () => {
   const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
   const base = await bind(server);

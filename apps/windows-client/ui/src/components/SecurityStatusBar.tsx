@@ -1,20 +1,7 @@
 // SecurityStatusBar(UI components):显示本地安全模式、模型出口和今日出站字节数。
+import type { SecurityStatus } from '../lib/types/security';
 
-export type SecurityStatus = {
-  securityMode: string;
-  model?: {
-    provider?: string;
-    model?: string;
-    providerClass?: string;
-    decision?: string;
-  };
-  egress?: {
-    todayContentBytes?: number;
-    todayExternalModelCalls?: number;
-    deniedCount?: number;
-    needsApprovalCount?: number;
-  };
-};
+export type { SecurityStatus } from '../lib/types/security';
 
 function formatBytes(value: unknown): string {
   const bytes = Number(value || 0);
