@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
+import { createSkillRegistry } from '../src/skills/skill-registry.js';
+import type { ScheduleStore } from '../src/runtime/scheduler.js';
 import {
   arrayField,
   bind,
@@ -30,7 +32,7 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
   const base = await bind(server);
   try {
     const listEmpty = await jsonRequest(base, '/api/schedules', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     assert.equal(listEmpty.status, 200);
     assert.equal(listEmpty.body.enabled, true);
@@ -48,12 +50,13 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
     assert.equal(createCronSchedule.tenantId, 'tenant_alice');
 
     const listOne = await jsonRequest(base, '/api/schedules', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     const schedules = arrayField(listOne.body, 'schedules', 'one schedule list');
     const firstSchedule = present(schedules[0], 'first listed schedule');
     assert.equal(schedules.length, 1);
     assert.equal(firstSchedule.name, 'weekly');
+    assert.deepEqual(firstSchedule.attempts, []);
 
     const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
     const raw = recordValue(JSON.parse(fs.readFileSync(file, 'utf8')) as unknown, 'schedule file');
@@ -62,26 +65,38 @@ test('schedules: create cron + list + cancel + manual tick', async () => {
 
     const tick = await jsonRequest(base, '/api/schedules/_tick', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-tick' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-weekly-tick' },
     });
     assert.equal(tick.status, 200);
     assert.equal(tick.body.fired, 1);
     assert.equal(fired.length, 1);
 
+    const afterTick = await jsonRequest(base, '/api/schedules', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+    });
+    const firedSchedule = present(arrayField(afterTick.body, 'schedules', 'schedules after tick')[0], 'fired schedule');
+    const attempts = arrayField(firedSchedule, 'attempts', 'schedule attempt history');
+    const latestAttempt = present(attempts[0], 'latest schedule attempt');
+    assert.match(String(latestAttempt.attemptId), /^attempt_/);
+    assert.equal(latestAttempt.status, 'succeeded');
+    assert.equal(latestAttempt.runId, `run_for_${scheduleId}`);
+    assert.equal(latestAttempt.error, null);
+    assert.equal(latestAttempt.trigger, 'scheduled');
+
     const cancel = await jsonRequest(base, `/api/schedules/${scheduleId}/cancel`, {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-cancel' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-weekly-cancel' },
     });
     assert.equal(cancel.status, 200);
     assert.equal(objectField(cancel.body, 'schedule', 'cancelled schedule').status, 'cancelled');
 
     const remove = await jsonRequest(base, `/api/schedules/${scheduleId}`, {
       method: 'DELETE',
-      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-weekly-remove' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-weekly-remove' },
     });
     assert.equal(remove.status, 200);
     const afterRemove = await jsonRequest(base, '/api/schedules', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     assert.equal(arrayField(afterRemove.body, 'schedules', 'schedules after remove').length, 0);
   } finally {
@@ -172,6 +187,127 @@ test('schedules: one-shot fireAt creates schedule', async () => {
   }
 });
 
+test('default schedules route rejects prompt-only, unknown, and disabled recipes before persisting', async () => {
+  const trustedRoot = tempRoot();
+  let saveCalls = 0;
+  const scheduleStore: ScheduleStore = {
+    list: () => [],
+    get: () => null,
+    save: (record) => {
+      saveCalls += 1;
+      return record;
+    },
+    remove: () => false,
+  };
+  const skillRegistry = createSkillRegistry({ initialDisabled: ['meeting-actions'] });
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    scheduleStore,
+    skillRegistry,
+  });
+  const base = await bind(server);
+  try {
+    const cases = [
+      {
+        key: 'sched-missing-recipe',
+        payload: { prompt: '只有提示词' },
+        code: 'RECIPE_REQUIRED',
+      },
+      {
+        key: 'sched-unknown-recipe',
+        payload: { recipeId: 'not-installed' },
+        code: 'RECIPE_UNAVAILABLE',
+      },
+      {
+        key: 'sched-disabled-recipe',
+        payload: { recipeId: 'meeting-actions' },
+        code: 'RECIPE_UNAVAILABLE',
+      },
+    ] as const;
+
+    for (const item of cases) {
+      const response = await jsonRequest(base, '/api/schedules', {
+        method: 'POST',
+        headers: { 'idempotency-key': item.key },
+        body: { name: item.key, cron: '* * * * *', payload: item.payload },
+      });
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, item.code);
+    }
+    assert.equal(saveCalls, 0, 'invalid default recipe schedules must not reach scheduler.create/store.save');
+  } finally {
+    await close(server);
+  }
+});
+
+test('default scheduler revalidates recipe enabled state immediately before firing', async () => {
+  const trustedRoot = tempRoot();
+  const sourcePath = path.join(trustedRoot, 'meeting-notes.md');
+  fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同\n', 'utf8');
+  const skillRegistry = createSkillRegistry();
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: true,
+    startScheduler: false,
+    skillRegistry,
+  });
+  const base = await bind(server);
+  try {
+    const created = await jsonRequest(base, '/api/schedules', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'sched-disable-after-create',
+      },
+      body: {
+        name: '禁用前创建',
+        fireAt: new Date(Date.now() + 60_000).toISOString(),
+        payload: { recipeId: 'meeting-actions', files: [sourcePath] },
+      },
+    });
+    assert.equal(created.status, 200);
+    const scheduleId = stringField(objectField(created.body, 'schedule', 'created schedule'), 'id', 'schedule id');
+
+    skillRegistry.setEnabled('meeting-actions', false);
+    const file = path.join(trustedRoot, '.AgentCowork', 'schedules', `${scheduleId}.json`);
+    const raw = recordValue(JSON.parse(fs.readFileSync(file, 'utf8')) as unknown, 'schedule file');
+    raw.nextFireAt = new Date(Date.now() - 60_000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(raw, null, 2), 'utf8');
+
+    const tick = await jsonRequest(base, '/api/schedules/_tick', {
+      method: 'POST',
+      headers: {
+        'x-tenant-id': 'tenant_alice',
+        'x-user-id': 'user_alice',
+        'idempotency-key': 'sched-disable-before-tick',
+      },
+    });
+    assert.equal(tick.status, 200);
+    assert.equal(tick.body.fired, 1);
+    const tickResult = present(arrayField(tick.body, 'results', 'tick results')[0], 'tick result');
+    assert.equal(tickResult.ok, false);
+
+    const failed = recordValue(JSON.parse(fs.readFileSync(file, 'utf8')) as unknown, 'failed schedule');
+    assert.equal(failed.status, 'failed');
+    assert.match(String(failed.lastError), /recipe.*not available|配方.*不可用/i);
+    const attempts = arrayField(failed, 'attempts', 'failed schedule attempts');
+    const latestAttempt = present(attempts[0], 'failed schedule attempt');
+    assert.equal(latestAttempt.status, 'failed');
+    assert.equal(latestAttempt.runId, null);
+    assert.match(String(latestAttempt.error), /recipe.*not available|配方.*不可用/i);
+    assert.equal(latestAttempt.trigger, 'scheduled');
+    const index = await jsonRequest(base, '/api/runs/index', {
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
+    });
+    assert.equal(arrayField(index.body, 'runs', 'runs after disabled recipe tick').length, 0);
+  } finally {
+    await close(server);
+  }
+});
+
 test('schedules disabled returns 503 when enableScheduler:false', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({ trustedRoot, enableScheduler: false });
@@ -249,7 +385,7 @@ test('scheduler default executor runs a recipe and records a run', async () => {
 
     const tick = await jsonRequest(base, '/api/schedules/_tick', {
       method: 'POST',
-      headers: { 'x-tenant-id': 'tenant_alice', 'idempotency-key': 'sched-default-tick' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sched-default-tick' },
     });
     assert.equal(tick.status, 200);
     assert.equal(tick.body.fired, 1);
@@ -257,13 +393,13 @@ test('scheduler default executor runs a recipe and records a run', async () => {
     assert.ok(firstTickResult.runId, 'executor produced a runId');
 
     const index = await jsonRequest(base, '/api/runs/index', {
-      headers: { 'x-tenant-id': 'tenant_alice' },
+      headers: { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice' },
     });
     const indexedRuns = arrayField(index.body, 'runs', 'default executor indexed runs');
     const indexedScheduledRun = present(indexedRuns[0], 'first scheduled run');
     assert.equal(indexedRuns.length, 1);
     assert.equal(indexedScheduledRun.recipeId, 'meeting-actions');
-    assert.equal(indexedScheduledRun.status, 'succeeded');
+    assert.equal(indexedScheduledRun.status, 'awaiting_approval');
   } finally {
     await close(server);
   }

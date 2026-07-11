@@ -2,16 +2,26 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/schedules/* —— 创建/列出/暂停/删除计划任务(cron 或定时),交由 L2 调度器执行。
 // 依赖:L0 request-utils + L2 scheduler/scheduler-store(经参数注入)。导出:handleScheduleRoutes。
-import { z } from 'zod';
 import {
   bodyFingerprint,
   decodePathSegment,
   sendJson,
-  stableHeader,
   withJsonBody,
 } from '../http/request-utils.js';
+import {
+  canonicalIdentityPart,
+  type IdentityScope,
+} from '../security/identity-scope.js';
 import { omitUndefined } from '../util/object.js';
+import {
+  emptyBodyFingerprint,
+  scheduleCreateBodySchema,
+  scheduleOwner,
+  scheduleVisibleToContext,
+  zodMessage,
+} from './schedule-route-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
+import type { ScheduleRecipeValidator } from '../runtime/host-scheduler.js';
 import type { ScheduleCreateInput, ScheduleRecord, SchedulerFireResult } from '../runtime/scheduler.js';
 
 const SCHEDULE_ID_RE = /^[a-z0-9_-]+$/i;
@@ -27,9 +37,9 @@ type RequestContext = {
 type SchedulerLike = {
   list(options?: { tenantId?: unknown; userId?: unknown }): ScheduleRecord[];
   create(input: ScheduleCreateInput): ScheduleRecord;
-  get(id: string): ScheduleRecord | null;
-  cancel(id: string): boolean;
-  remove(id: string): boolean;
+  get(id: string, options?: { tenantId?: unknown; userId?: unknown }): ScheduleRecord | null;
+  cancel(id: string, options?: { tenantId?: unknown; userId?: unknown }): boolean;
+  remove(id: string, options?: { tenantId?: unknown; userId?: unknown }): boolean;
   tickOnce(filter?: { tenantId?: unknown; userId?: unknown }): Promise<SchedulerFireResult[]>;
 };
 type ScheduleRouteOptions = {
@@ -39,41 +49,13 @@ type ScheduleRouteOptions = {
   requestUrl: URL;
   requestContext: RequestContext;
   activeScheduler?: SchedulerLike | null;
+  validateRecipeSchedule?: ScheduleRecipeValidator | null;
   cacheKeyFor(context: RequestContext, method?: string, pathname?: string): string;
   requireIdempotencyKey(response: HttpResponseLike, context: RequestContext): boolean;
   sendCachedOrStore(response: HttpResponseLike, cacheKey: string, fingerprint: string, status: number, payload?: unknown): unknown;
   safeTrustedRoot(input?: unknown): string;
+  workspaceGrantId?: string;
 };
-
-const objectBody = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-);
-const stringOrNullSchema = z.preprocess(
-  (value) => (value === '' ? undefined : value),
-  z.string().nullable().optional(),
-);
-const payloadSchema = z.preprocess(
-  (value) => (value == null ? {} : value),
-  z.object({}).loose(),
-);
-const scheduleCreateBodySchema = z.preprocess(objectBody, z.object({
-  name: z.string().trim().min(1, 'name is required'),
-  cron: stringOrNullSchema,
-  fireAt: stringOrNullSchema,
-  payload: payloadSchema,
-}).loose());
-
-function scheduleVisibleToContext(record: ScheduleRecord | null | undefined, context: RequestContext): boolean {
-  return Boolean(record) && stableHeader(record?.tenantId, 'tenant_local') === context.tenantId;
-}
-
-function emptyBodyFingerprint(): string {
-  return bodyFingerprint({});
-}
-
-function zodMessage(err: z.ZodError, fallback: string): string {
-  return err.issues[0]?.message || fallback;
-}
 
 export async function handleScheduleRoutes({
   request,
@@ -82,17 +64,31 @@ export async function handleScheduleRoutes({
   requestUrl,
   requestContext,
   activeScheduler,
+  validateRecipeSchedule,
   cacheKeyFor,
   requireIdempotencyKey,
   sendCachedOrStore,
   safeTrustedRoot,
+  workspaceGrantId,
 }: ScheduleRouteOptions): Promise<boolean> {
+  if (pathname !== '/api/schedules' && !pathname.startsWith('/api/schedules/')) {
+    return false;
+  }
+  let owner: IdentityScope;
+  try {
+    owner = scheduleOwner(requestContext);
+  } catch {
+    sendJson(response, 401, { error: 'Unauthorized' });
+    return true;
+  }
+
   if (request.method === 'GET' && pathname === '/api/schedules') {
-    const userId = requestUrl.searchParams.get('userId') || undefined;
-    const list = activeScheduler ? activeScheduler.list(omitUndefined({
-      tenantId: requestContext.tenantId,
-      userId,
-    })) : [];
+    const requestedUserId = requestUrl.searchParams.get('userId');
+    if (requestedUserId && canonicalIdentityPart(requestedUserId) !== owner.userId) {
+      sendJson(response, 403, { error: 'Schedule user scope cannot be overridden' });
+      return true;
+    }
+    const list = activeScheduler ? activeScheduler.list(owner) : [];
     sendJson(response, 200, {
       context: requestContext,
       schedules: list,
@@ -115,23 +111,43 @@ export async function handleScheduleRoutes({
         sendJson(response, 400, { error: zodMessage(parsed.error, 'invalid schedule request') });
         return;
       }
-      const fingerprint = bodyFingerprint(body);
+      const fingerprint = bodyFingerprint({ body, workspaceGrantId: workspaceGrantId || null });
       const cacheKey = cacheKeyFor(requestContext, request.method, pathname);
       if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
         return;
       }
       const input = parsed.data;
       const payload = { ...input.payload };
-      if (payload.trustedRoot) {
+      const requestedGrantId = payload.folderGrantId;
+      const activeGrantId = typeof workspaceGrantId === 'string' ? workspaceGrantId.trim() : '';
+      if (requestedGrantId !== undefined && (typeof requestedGrantId !== 'string' || !requestedGrantId.trim())) {
+        sendJson(response, 400, { error: 'payload.folderGrantId must be a non-empty string' });
+        return;
+      }
+      if (requestedGrantId && requestedGrantId !== activeGrantId) {
+        sendJson(response, 403, { error: 'schedule folder grant does not match the active workspace grant' });
+        return;
+      }
+      delete payload.folderGrantId;
+      if (payload.trustedRoot || activeGrantId) {
         payload.trustedRoot = safeTrustedRoot(payload.trustedRoot);
+      }
+      if (activeGrantId) payload.folderGrantId = activeGrantId;
+      if (validateRecipeSchedule) {
+        const validation = validateRecipeSchedule(payload);
+        if (!validation.ok) {
+          sendJson(response, validation.status, { error: validation.error, code: validation.code });
+          return;
+        }
+        payload.recipeId = validation.recipeId;
       }
       const record = activeScheduler.create(omitUndefined({
         name: input.name,
         cron: input.cron,
         fireAt: input.fireAt,
         payload,
-        tenantId: requestContext.tenantId,
-        userId: requestContext.userId,
+        tenantId: owner.tenantId,
+        userId: owner.userId,
         traceId: requestContext.traceId,
         idempotencyKey: requestContext.idempotencyKey,
       }));
@@ -158,17 +174,17 @@ export async function handleScheduleRoutes({
       sendCachedOrStore(response, cacheKey, fingerprint, 400, { error: 'Invalid schedule id' });
       return true;
     }
-    const before = activeScheduler.get(id);
-    if (!scheduleVisibleToContext(before, requestContext)) {
+    const before = activeScheduler.get(id, owner);
+    if (!scheduleVisibleToContext(before, owner)) {
       sendCachedOrStore(response, cacheKey, fingerprint, 404, { error: 'Schedule not found' });
       return true;
     }
-    const ok = activeScheduler.cancel(id);
+    const ok = activeScheduler.cancel(id, owner);
     if (!ok) {
       sendCachedOrStore(response, cacheKey, fingerprint, 404, { error: 'Schedule not found' });
       return true;
     }
-    sendCachedOrStore(response, cacheKey, fingerprint, 200, { ok: true, schedule: activeScheduler.get(id) });
+    sendCachedOrStore(response, cacheKey, fingerprint, 200, { ok: true, schedule: activeScheduler.get(id, owner) });
     return true;
   }
 
@@ -190,12 +206,12 @@ export async function handleScheduleRoutes({
       sendCachedOrStore(response, cacheKey, fingerprint, 400, { error: 'Invalid schedule id' });
       return true;
     }
-    const before = activeScheduler.get(id);
-    if (!scheduleVisibleToContext(before, requestContext)) {
+    const before = activeScheduler.get(id, owner);
+    if (!scheduleVisibleToContext(before, owner)) {
       sendCachedOrStore(response, cacheKey, fingerprint, 404, { error: 'Schedule not found' });
       return true;
     }
-    const ok = activeScheduler.remove(id);
+    const ok = activeScheduler.remove(id, owner);
     if (!ok) {
       sendCachedOrStore(response, cacheKey, fingerprint, 404, { error: 'Schedule not found' });
       return true;
@@ -217,7 +233,7 @@ export async function handleScheduleRoutes({
     if (sendCachedOrStore(response, cacheKey, fingerprint, 200)) {
       return true;
     }
-    const results = await activeScheduler.tickOnce({ tenantId: requestContext.tenantId });
+    const results = await activeScheduler.tickOnce(owner);
     sendCachedOrStore(response, cacheKey, fingerprint, 200, {
       ok: true,
       fired: results.length,

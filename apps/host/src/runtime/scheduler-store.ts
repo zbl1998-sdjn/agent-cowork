@@ -6,80 +6,54 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createSqliteDatabase, type SqliteDatabase } from '../storage/sqlite.js';
+import { canonicalIdentityFilter, requireIdentityScopeFrom } from '../security/identity-scope.js';
+import { writePrivateFileAtomically } from '../security/private-atomic-file.js';
+import {
+  createManagedDirectoryBoundary,
+  type ManagedDirectoryBoundary,
+} from '../security/managed-directory-boundary.js';
+import {
+  ensureRunOwnerClaim,
+  runOwnerClaimPath,
+  sameRunOwner,
+} from '../util/run-owner.js';
 import { omitUndefined } from '../util/object.js';
+import {
+  parseScheduleRow,
+  readScheduleFile,
+  scheduleMatchesScope,
+  sqliteScheduleScope,
+  type ScheduleRow,
+} from './scheduler-store-utils.js';
+import type {
+  CreateScheduleStoreOptions,
+  FileScheduleStoreOptions,
+  ScheduleListOptions,
+  ScheduleRecord,
+  SqliteScheduleStoreOptions,
+} from './scheduler-store-types.js';
+
+export { normaliseTenantId, normaliseUserId } from './scheduler-store-utils.js';
+export type {
+  CreateScheduleStoreOptions,
+  FileScheduleStoreOptions,
+  ScheduleListOptions,
+  ScheduleRecord,
+  SqliteScheduleStoreOptions,
+} from './scheduler-store-types.js';
 
 const SCHEDULE_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 
-export type ScheduleRecord = {
-  id: string;
-  tenantId: string;
-  userId?: string;
-  traceId?: string | null;
-  name: string;
-  kind: string;
-  status: string;
-  cron?: string | null;
-  cronHuman?: string | null;
-  fireAt?: string | null;
-  nextFireAt?: string | null;
-  lastFiredAt?: string | null;
-  lastRunId?: string | null;
-  lastError?: string | null;
-  idempotencyKey?: string | null;
-  payload?: unknown;
-  version?: number;
-  runs?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: unknown;
-};
-export type FileScheduleStoreOptions = { storeDir?: string };
-export type SqliteScheduleStoreOptions = { dbPath?: string; db?: SqliteDatabase | null };
-export type CreateScheduleStoreOptions = {
-  backend?: string;
-  storeDir?: string;
-  dbPath?: string;
-  db?: SqliteDatabase | null;
-};
-export type ScheduleListOptions = { tenantId?: unknown; userId?: unknown };
-type ScheduleRow = { schedule_json: string };
-
-function ensureDirSync(dir: string): string {
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function clampString(value: unknown, maxLength: number): string {
-  const text = String(value || '');
-  return text.length > maxLength ? text.slice(0, maxLength) : text;
-}
-
-export function normaliseTenantId(value: unknown): string {
-  return clampString(value || 'tenant_local', 96).trim() || 'tenant_local';
-}
-
-export function normaliseUserId(value: unknown): string {
-  return clampString(value || 'user_local', 96).trim() || 'user_local';
-}
-
-function readScheduleFile(file: string): ScheduleRecord | null {
-  try {
-    const raw = fs.readFileSync(file, 'utf8');
-    return JSON.parse(raw) as ScheduleRecord;
-  } catch {
-    return null;
-  }
-}
-
 export class FileScheduleStore {
   readonly storeDir: string;
+  private readonly boundary: ManagedDirectoryBoundary;
 
   constructor({ storeDir }: FileScheduleStoreOptions = {}) {
     if (!storeDir) {
       throw new Error('FileScheduleStore: storeDir required');
     }
-    this.storeDir = storeDir;
-    ensureDirSync(this.storeDir);
+    this.storeDir = path.resolve(storeDir);
+    this.boundary = createManagedDirectoryBoundary(this.storeDir, { label: 'Schedule store' });
   }
 
   _file(id: string): string {
@@ -89,38 +63,70 @@ export class FileScheduleStore {
     return path.join(this.storeDir, `${id}.json`);
   }
 
-  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
-    if (!fs.existsSync(this.storeDir)) {
-      return [];
-    }
-    const wantTenant = tenantId ? normaliseTenantId(tenantId) : null;
-    const wantUser = userId ? normaliseUserId(userId) : null;
+  private readFile(file: string, expectedId: string): ScheduleRecord | null {
+    const before = this.boundary.inspectPath(file, { allowMissing: true, kind: 'file' });
+    if (!before) return null;
+    const record = readScheduleFile(before.canonicalPath, expectedId);
+    this.boundary.revalidatePath(file, before, { kind: 'file' });
+    return record;
+  }
+
+  list(options: ScheduleListOptions = {}): ScheduleRecord[] {
+    canonicalIdentityFilter(options);
+    const rootBefore = this.boundary.inspectPath(this.storeDir, { allowMissing: true, kind: 'directory' });
+    if (!rootBefore) return [];
     const out: ScheduleRecord[] = [];
-    for (const name of fs.readdirSync(this.storeDir)) {
+    const names = fs.readdirSync(rootBefore.canonicalPath);
+    this.boundary.revalidatePath(this.storeDir, rootBefore, { kind: 'directory' });
+    for (const name of names) {
       if (!name.endsWith('.json')) continue;
-      const record = readScheduleFile(path.join(this.storeDir, name));
+      const record = this.readFile(path.join(this.storeDir, name), name.slice(0, -5));
       if (!record) continue;
-      if (wantTenant && record.tenantId !== wantTenant) continue;
-      if (wantUser && record.userId !== wantUser) continue;
+      if (!scheduleMatchesScope(record, options)) continue;
       out.push(record);
     }
     out.sort((a, b) => String(a.nextFireAt || '').localeCompare(String(b.nextFireAt || '')));
     return out;
   }
 
-  get(id: string): ScheduleRecord | null {
-    return readScheduleFile(this._file(id));
+  get(id: string, options: ScheduleListOptions = {}): ScheduleRecord | null {
+    const record = this.readFile(this._file(id), id);
+    return record && scheduleMatchesScope(record, options) ? record : null;
   }
 
   save(record: ScheduleRecord): ScheduleRecord {
-    fs.writeFileSync(this._file(record.id), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+    const owner = requireIdentityScopeFrom(record, { label: 'schedule record identity' });
+    const file = this._file(record.id);
+    const guardMutation = this.boundary.createMutationGuard();
+    if (this.boundary.inspectPath(file, { allowMissing: true, kind: 'file' })) {
+      const existing = this.readFile(file, record.id);
+      if (!existing) throw new Error('Schedule owner could not be verified');
+      const existingOwner = requireIdentityScopeFrom(existing, { label: 'stored schedule identity' });
+      if (!sameRunOwner(existingOwner, owner)) throw new Error('Schedule owner mismatch');
+    }
+    const claimPath = runOwnerClaimPath(this.storeDir, record.id);
+    ensureRunOwnerClaim({
+      claimPath,
+      owner,
+      label: 'Schedule',
+      beforeFilesystemMutation: guardMutation,
+      boundary: this.boundary,
+    });
+    guardMutation(claimPath);
+    writePrivateFileAtomically(file, `${JSON.stringify(record, null, 2)}\n`, {
+      beforeFilesystemMutation: guardMutation,
+    });
     return record;
   }
 
-  remove(id: string): boolean {
+  remove(id: string, options: ScheduleListOptions = {}): boolean {
     const file = this._file(id);
-    if (!fs.existsSync(file)) return false;
-    fs.unlinkSync(file);
+    const before = this.boundary.inspectPath(file, { allowMissing: true, kind: 'file' });
+    if (!before) return false;
+    const record = this.readFile(file, id);
+    if (!record || !scheduleMatchesScope(record, options)) return false;
+    this.boundary.revalidatePath(file, before, { kind: 'file' });
+    fs.unlinkSync(before.canonicalPath);
     return true;
   }
 }
@@ -135,35 +141,30 @@ export class SqliteScheduleStore {
     this.db = db || createSqliteDatabase(dbPath as string);
   }
 
-  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
-    const where: string[] = [];
-    const params: unknown[] = [];
-    if (tenantId) {
-      where.push('tenant_id = ?');
-      params.push(normaliseTenantId(tenantId));
-    }
-    if (userId) {
-      where.push('user_id = ?');
-      params.push(normaliseUserId(userId));
-    }
+  list(options: ScheduleListOptions = {}): ScheduleRecord[] {
+    const { where, params } = sqliteScheduleScope(options);
     const rows = this.db.prepare(`
       SELECT schedule_json
       FROM schedules
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY COALESCE(next_fire_at, '')
     `).all(...params);
-    return rows.map((row) => JSON.parse((row as ScheduleRow).schedule_json) as ScheduleRecord);
+    return rows.map(parseScheduleRow).filter((record): record is ScheduleRecord => Boolean(record));
   }
 
-  get(id: string): ScheduleRecord | null {
+  get(id: string, options: ScheduleListOptions = {}): ScheduleRecord | null {
+    const { where, params } = sqliteScheduleScope(options);
+    where.unshift('id = ?');
+    params.unshift(id);
     const row = this.db
-      .prepare('SELECT schedule_json FROM schedules WHERE id = ?')
-      .get(id) as ScheduleRow | null | undefined;
-    return row ? JSON.parse(row.schedule_json) as ScheduleRecord : null;
+      .prepare(`SELECT schedule_json FROM schedules WHERE ${where.join(' AND ')}`)
+      .get(...params) as ScheduleRow | null | undefined;
+    return parseScheduleRow(row);
   }
 
   save(record: ScheduleRecord): ScheduleRecord {
-    this.db.prepare(`
+    const owner = requireIdentityScopeFrom(record, { label: 'schedule record identity' });
+    const result = this.db.prepare(`
       INSERT INTO schedules (
         id, tenant_id, user_id, trace_id, name, kind, status, cron, fire_at,
         next_fire_at, last_fired_at, last_run_id, version, runs,
@@ -186,10 +187,12 @@ export class SqliteScheduleStore {
         runs = excluded.runs,
         updated_at = excluded.updated_at,
         schedule_json = excluded.schedule_json
+      WHERE schedules.tenant_id = excluded.tenant_id
+        AND schedules.user_id = excluded.user_id
     `).run(
       record.id,
-      record.tenantId,
-      record.userId,
+      owner.tenantId,
+      owner.userId,
       record.traceId,
       record.name,
       record.kind,
@@ -205,11 +208,17 @@ export class SqliteScheduleStore {
       record.updatedAt,
       JSON.stringify(record),
     );
+    if (Number(result.changes) !== 1) {
+      throw new Error('Scheduler: id already belongs to another owner');
+    }
     return record;
   }
 
-  remove(id: string): boolean {
-    const result = this.db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
+  remove(id: string, options: ScheduleListOptions = {}): boolean {
+    const { where, params } = sqliteScheduleScope(options);
+    where.unshift('id = ?');
+    params.unshift(id);
+    const result = this.db.prepare(`DELETE FROM schedules WHERE ${where.join(' AND ')}`).run(...params);
     return Number(result.changes) > 0;
   }
 }

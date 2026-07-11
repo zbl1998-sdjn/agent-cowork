@@ -4,6 +4,7 @@
 // 依赖:同层 scheduler + storage/cached-pg-schedule-store + L1 recipes。
 import path from 'node:path';
 import { runRecipe } from '../recipes/run-recipe.js';
+import { assertTrustedPathForCreate } from '../security/path-policy.js';
 import { createCachedPostgresScheduleStore } from '../storage/cached-pg-schedule-store.js';
 import { omitUndefined } from '../util/object.js';
 import { Scheduler, createScheduleStore } from './scheduler.js';
@@ -23,10 +24,16 @@ type HostSchedulerConfig = Record<string, unknown> & {
 type HostSchedulerState = Record<string, unknown> & {
   activeScheduler?: Scheduler | null;
   databaseUrl?: string | null;
+  skillRegistry?: unknown;
+  scheduleRecipeValidator?: ScheduleRecipeValidator | null;
   runEvents?: unknown;
   runsIndex?: unknown;
   runStoreRoot: string;
-  safeTrustedRoot(requestedRoot?: unknown): string;
+  safeTrustedRoot(
+    requestedRoot?: unknown,
+    context?: { tenantId?: unknown; userId?: unknown },
+    grantId?: unknown,
+  ): string;
   sqliteDbPath?: string;
   storeBackend?: StoreBackend;
   usePostgresState?: boolean;
@@ -48,10 +55,65 @@ type RecipeSchedulePayload = {
   prompt?: unknown;
   files?: unknown;
   maxSize?: unknown;
+  folderGrantId?: unknown;
 };
+export type ScheduleRecipeDescriptor = {
+  enabled?: boolean;
+  kind?: string;
+};
+export type ScheduleRecipeRegistryLike = {
+  get(id: string): ScheduleRecipeDescriptor | null | undefined;
+};
+export type ScheduleRecipeValidation =
+  | { ok: true; recipeId: string }
+  | { ok: false; status: 400 | 503; code: string; error: string };
+export type ScheduleRecipeValidator = (payload: unknown) => ScheduleRecipeValidation;
 
 function schedulePayload(value: unknown): RecipeSchedulePayload {
-  return value && typeof value === 'object' ? value as RecipeSchedulePayload : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as RecipeSchedulePayload : {};
+}
+
+export function createScheduleRecipeValidator(registry: unknown): ScheduleRecipeValidator {
+  return (payload: unknown): ScheduleRecipeValidation => {
+    const rawRecipeId = schedulePayload(payload).recipeId;
+    const recipeId = typeof rawRecipeId === 'string' ? rawRecipeId.trim() : '';
+    if (!recipeId) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'RECIPE_REQUIRED',
+        error: 'scheduled recipeId is required',
+      };
+    }
+    if (!registry || typeof (registry as { get?: unknown }).get !== 'function') {
+      return {
+        ok: false,
+        status: 503,
+        code: 'RECIPE_VALIDATION_UNAVAILABLE',
+        error: 'scheduled recipe validation is unavailable',
+      };
+    }
+    let recipe: ScheduleRecipeDescriptor | null | undefined;
+    try {
+      recipe = (registry as ScheduleRecipeRegistryLike).get(recipeId);
+    } catch {
+      return {
+        ok: false,
+        status: 503,
+        code: 'RECIPE_VALIDATION_UNAVAILABLE',
+        error: 'scheduled recipe validation is unavailable',
+      };
+    }
+    if (!recipe || recipe.enabled !== true || (recipe.kind && recipe.kind !== 'recipe')) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'RECIPE_UNAVAILABLE',
+        error: `scheduled recipe is not available: ${recipeId}`,
+      };
+    }
+    return { ok: true, recipeId };
+  };
 }
 
 export function configureHostScheduler({
@@ -63,24 +125,30 @@ export function configureHostScheduler({
   state: HostSchedulerState;
   trustedRootDefault: string;
 }): void {
+  state.scheduleRecipeValidator = null;
   state.activeScheduler = config.scheduler || null;
   if (state.activeScheduler || config.enableScheduler === false) {
     return;
   }
 
-  const scheduleStoreDir = path.resolve(
-    config.scheduleStoreDir || path.join(trustedRootDefault, '.AgentCowork', 'schedules'),
-  );
+  const scheduleStoreDir = config.scheduleStoreDir
+    ? path.resolve(config.scheduleStoreDir)
+    : assertTrustedPathForCreate(
+      path.join(trustedRootDefault, '.AgentCowork', 'schedules'),
+      trustedRootDefault,
+    );
+  const validateRecipeSchedule = createScheduleRecipeValidator(state.skillRegistry);
   const defaultScheduleExecutor = async (record: ScheduleRecordLike) => {
     const payload = schedulePayload(record.payload);
-    if (!payload.recipeId) {
-      // 不静默 no-op:prompt-only 定时任务没有可执行动作,抛清晰错误,由 Scheduler 记为
-      // failed(而非假"completed"),用户才能在历史里看到它并没真正执行。
-      throw new Error(`定时任务 ${record.id} 未绑定可执行动作(缺 recipeId),无法自动执行;请改为绑定一个配方/动作再设定。`);
-    }
+    const validation = validateRecipeSchedule(payload);
+    if (!validation.ok) throw new Error(`${validation.code}: ${validation.error}`);
     const result = await runRecipe(omitUndefined({
-      recipeId: String(payload.recipeId),
-      trustedRoot: state.safeTrustedRoot(payload.trustedRoot || trustedRootDefault),
+      recipeId: validation.recipeId,
+      trustedRoot: state.safeTrustedRoot(
+        payload.trustedRoot || trustedRootDefault,
+        { tenantId: record.tenantId, userId: record.userId },
+        payload.folderGrantId,
+      ),
       prompt: payload.prompt || '',
       files: Array.isArray(payload.files) ? payload.files : [],
       maxSize: payload.maxSize,
@@ -107,5 +175,6 @@ export function configureHostScheduler({
     executor,
     tickIntervalMs: config.schedulerTickMs || 30_000,
   });
+  if (!config.scheduleExecutor) state.scheduleRecipeValidator = validateRecipeSchedule;
   if (config.startScheduler !== false) state.activeScheduler.start();
 }

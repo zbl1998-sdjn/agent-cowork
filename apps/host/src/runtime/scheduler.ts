@@ -3,25 +3,34 @@
 // 职责:管理计划任务(cron 周期 / 定时 fireAt):创建/列出/删除日程,按 tick 到点触发注入的 executor
 //       (通常是跑配方),记录上次/下次触发与错误。多租户隔离,幂等键防重复触发。
 // 依赖:同层 cron(解析/算下次)、runs-index(ULID)、scheduler-store(持久化)。导出:Scheduler 及存储转出。
-import { nextFireAt, parseCron, describeCron } from './cron.js';
+import { nextFireAt } from './cron.js';
 import { omitUndefined } from '../util/object.js';
-import { createUlid } from './runs-index.js';
+import {
+  canonicalIdentityFilter,
+  canonicalRequiredIdentityScope,
+} from '../security/identity-scope.js';
 import {
   FileScheduleStore,
-  normaliseTenantId,
-  normaliseUserId,
   type ScheduleListOptions,
   type ScheduleRecord,
 } from './scheduler-store.js';
+import {
+  appendScheduleAttempt,
+  createScheduleAttempt,
+  createSchedulerRecord,
+  normaliseScheduleRecordAttempts,
+  type ScheduleCreateInput,
+} from './scheduler-records.js';
 
 export { FileScheduleStore, SqliteScheduleStore, createScheduleStore } from './scheduler-store.js';
 export type { ScheduleListOptions, ScheduleRecord } from './scheduler-store.js';
+export type { ScheduleCreateInput } from './scheduler-records.js';
 
 export type ScheduleStore = {
   list(options?: ScheduleListOptions): ScheduleRecord[];
-  get(id: string): ScheduleRecord | null;
+  get(id: string, options?: ScheduleListOptions): ScheduleRecord | null;
   save(record: ScheduleRecord): ScheduleRecord;
-  remove(id: string): boolean;
+  remove(id: string, options?: ScheduleListOptions): boolean;
   storeDir?: string;
 };
 export type SchedulerExecutorResult = { runId?: string | null; id?: string | null; [key: string]: unknown } | null | undefined;
@@ -35,25 +44,9 @@ export type SchedulerOptions = {
   logger?: SchedulerLogger | null;
   now?: () => Date;
 };
-export type ScheduleCreateInput = {
-  name?: unknown;
-  cron?: string | null;
-  fireAt?: string | null;
-  payload?: unknown;
-  tenantId?: unknown;
-  userId?: unknown;
-  traceId?: unknown;
-  idempotencyKey?: unknown;
-};
 export type SchedulerFireResult =
   | { ok: true; schedule: ScheduleRecord; result: SchedulerExecutorResult }
   | { ok: false; schedule: ScheduleRecord; error: unknown };
-
-function isPositiveFutureIso(value: string): boolean {
-  if (!value) return false;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) && parsed > Date.now();
-}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -86,67 +79,45 @@ export class Scheduler {
     this.tickInFlight = false;
   }
 
-  list({ tenantId, userId }: ScheduleListOptions = {}): ScheduleRecord[] {
-    return this.store.list(omitUndefined({ tenantId, userId }));
+  private _safeLog(event: string, payload?: Record<string, unknown>): void {
+    if (!this.logger) return;
+    try {
+      this.logger(event, payload);
+    } catch {
+      // Diagnostics must never disrupt the scheduler.
+    }
   }
 
-  get(id: string): ScheduleRecord | null {
-    return this.store.get(id);
+  list(options: ScheduleListOptions = {}): ScheduleRecord[] {
+    canonicalIdentityFilter(options);
+    const records: ScheduleRecord[] = [];
+    for (const record of this.store.list(options)) {
+      const normalised = normaliseScheduleRecordAttempts(record);
+      if (!normalised || !canonicalRequiredIdentityScope(normalised.tenantId, normalised.userId)) continue;
+      records.push(normalised);
+    }
+    return records;
   }
 
-  create({
-    name,
-    cron,
-    fireAt,
-    payload = {},
-    tenantId,
-    userId,
-    traceId,
-    idempotencyKey,
-  }: ScheduleCreateInput): ScheduleRecord {
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      throw new Error('Scheduler: name is required');
-    }
-    if (!cron && !fireAt) {
-      throw new Error('Scheduler: cron or fireAt is required');
-    }
-    if (cron) {
-      parseCron(cron);
-    }
-    if (fireAt && !isPositiveFutureIso(fireAt)) {
-      throw new Error('Scheduler: fireAt must be a future ISO timestamp');
-    }
-    const id = createUlid().replace(/^run_/, 'sched_');
+  get(id: string, options: ScheduleListOptions = {}): ScheduleRecord | null {
+    canonicalIdentityFilter(options);
+    const record = this.store.get(id, options);
+    if (!record) return null;
+    const normalised = normaliseScheduleRecordAttempts(record);
+    return normalised && canonicalRequiredIdentityScope(normalised.tenantId, normalised.userId)
+      ? normalised
+      : null;
+  }
+
+  create(input: ScheduleCreateInput): ScheduleRecord {
     const now = this.now();
-    const next = fireAt ? new Date(fireAt) : nextFireAt(cron as string, now);
-    const record: ScheduleRecord = {
-      id,
-      version: 1,
-      name: name.trim().slice(0, 200),
-      kind: fireAt ? 'one-shot' : 'cron',
-      cron: cron || null,
-      cronHuman: cron ? describeCron(cron) : null,
-      fireAt: fireAt || null,
-      payload,
-      tenantId: normaliseTenantId(tenantId),
-      userId: normaliseUserId(userId),
-      traceId: traceId ? String(traceId).slice(0, 96) : null,
-      idempotencyKey: idempotencyKey ? String(idempotencyKey).slice(0, 96) : null,
-      status: 'pending',
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      nextFireAt: next.toISOString(),
-      lastFiredAt: null,
-      lastRunId: null,
-      lastError: null,
-      runs: 0,
-    };
+    const record = createSchedulerRecord(input, now);
     this.store.save(record);
     return record;
   }
 
-  cancel(id: string): boolean {
-    const record = this.get(id);
+  cancel(id: string, options: ScheduleListOptions = {}): boolean {
+    const record = this.get(id, options);
     if (!record) return false;
     record.status = 'cancelled';
     record.updatedAt = nowIso();
@@ -155,8 +126,8 @@ export class Scheduler {
     return true;
   }
 
-  remove(id: string): boolean {
-    return this.store.remove(id);
+  remove(id: string, options: ScheduleListOptions = {}): boolean {
+    return this.store.remove(id, options);
   }
 
   pickDue(filterOrAsOf: ScheduleListOptions | Date = {}, maybeAsOf: Date = this.now()): ScheduleRecord[] {
@@ -173,37 +144,56 @@ export class Scheduler {
     const startedAt = this.now();
     try {
       const result = await this.executor(record);
-      const lastRunId = result?.runId || result?.id || null;
+      const finishedAt = this.now();
+      const runId = result?.runId || result?.id || null;
       const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron as string, startedAt);
       const updated: ScheduleRecord = {
         ...record,
         status: record.kind === 'one-shot' ? 'completed' : 'pending',
         nextFireAt: next ? next.toISOString() : null,
         lastFiredAt: startedAt.toISOString(),
-        lastRunId,
+        lastRunId: runId || record.lastRunId || null,
         lastError: null,
         runs: (Number(record.runs) || 0) + 1,
-        updatedAt: nowIso(),
+        attempts: appendScheduleAttempt(record, createScheduleAttempt({
+          startedAt: startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          status: 'succeeded',
+          runId,
+          error: null,
+          trigger: 'scheduled',
+        })),
+        updatedAt: finishedAt.toISOString(),
         version: (Number(record.version) || 1) + 1,
       };
       this.store.save(updated);
       return { ok: true, schedule: updated, result };
     } catch (err) {
+      const finishedAt = this.now();
+      const error = (err instanceof Error ? err.message : String(err)).slice(0, 1024)
+        || 'Scheduler executor failed';
       const next = record.kind === 'one-shot' ? null : nextFireAt(record.cron as string, startedAt);
       const updated: ScheduleRecord = {
         ...record,
         status: record.kind === 'one-shot' ? 'failed' : 'pending',
         nextFireAt: next ? next.toISOString() : null,
         lastFiredAt: startedAt.toISOString(),
-        lastError: (err instanceof Error ? err.message : String(err)).slice(0, 1024),
+        lastRunId: record.lastRunId || null,
+        lastError: error,
         runs: (Number(record.runs) || 0) + 1,
-        updatedAt: nowIso(),
+        attempts: appendScheduleAttempt(record, createScheduleAttempt({
+          startedAt: startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          status: 'failed',
+          runId: null,
+          error,
+          trigger: 'scheduled',
+        })),
+        updatedAt: finishedAt.toISOString(),
         version: (Number(record.version) || 1) + 1,
       };
       this.store.save(updated);
-      if (this.logger) {
-        this.logger('scheduler.fire_failed', { id: record.id, error: err instanceof Error ? err.message : String(err) });
-      }
+      this._safeLog('scheduler.fire_failed', { id: record.id, error: err instanceof Error ? err.message : String(err) });
       return { ok: false, schedule: updated, error: err };
     }
   }
@@ -226,7 +216,7 @@ export class Scheduler {
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.tickOnce().catch(() => undefined);
+      this.tickOnce().catch(() => this._safeLog('scheduler.tick_failed'));
     }, this.tickIntervalMs);
     const timer = this.timer as ReturnType<typeof setInterval> & { unref?: () => void };
     if (typeof timer.unref === 'function') {
