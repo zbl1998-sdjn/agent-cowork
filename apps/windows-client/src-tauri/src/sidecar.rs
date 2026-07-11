@@ -8,9 +8,9 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
 #[cfg(windows)]
 use tauri::Manager;
+use tauri::{AppHandle, Emitter};
 
 use crate::config::{HOST, HOST_URL, PORT};
 use crate::error::{DesktopError, DesktopResult};
@@ -76,7 +76,9 @@ fn embedded_python_paths(app: &AppHandle) -> Option<(PathBuf, PathBuf)> {
 #[cfg(windows)]
 fn configure_embedded_python_env(command: &mut Command, app: &AppHandle) {
     if let Some((home, exe)) = embedded_python_paths(app) {
-        command.env("KCW_PYTHON_HOME", home).env("KCW_EMBEDDED_PYTHON", exe);
+        command
+            .env("KCW_PYTHON_HOME", home)
+            .env("KCW_EMBEDDED_PYTHON", exe);
     }
 }
 

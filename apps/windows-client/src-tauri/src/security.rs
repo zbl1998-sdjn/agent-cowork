@@ -5,6 +5,13 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::error::{DesktopError, DesktopResult};
 
+// 只允许交给系统默认程序打开明确的被动文档/图片格式。执行文件、脚本、快捷方式、
+// HTML/SVG 等主动内容以及未知扩展均 fail-closed；扩展比较不区分大小写。
+const PASSIVE_DOCUMENT_EXTENSIONS: &[&str] = &[
+    "bmp", "csv", "docx", "gif", "jpeg", "jpg", "json", "jsonl", "log", "markdown", "md", "pdf",
+    "png", "pptx", "tif", "tiff", "tsv", "txt", "webp", "xlsx", "yaml", "yml",
+];
+
 /// 规范化一个预期已存在的路径;失败时转成可读的 DesktopError::Path。
 pub fn canonicalize_existing(path: &Path) -> DesktopResult<PathBuf> {
     path.canonicalize().map_err(|error| {
@@ -88,25 +95,55 @@ fn is_artifact_path(root: &Path, safe: &Path) -> bool {
     safe == artifact_root || safe.starts_with(artifact_root)
 }
 
+fn has_passive_document_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .is_some_and(|extension| PASSIVE_DOCUMENT_EXTENSIONS.contains(&extension.as_str()))
+}
+
 /// 解析可由系统打开的路径;比 assert_trusted_path 更严格,避免 renderer IPC 借 open_path 打开隐藏状态或密钥文件。
 /// 已保存 artifact 仍可打开,因为产品有显式产物面板入口。
 pub fn assert_openable_path(root: &Path, requested: &str) -> DesktopResult<PathBuf> {
     let root = canonicalize_existing(root)?;
     let safe = assert_trusted_path(&root, requested)?;
-    if is_artifact_path(&root, &safe) {
-        return Ok(safe);
-    }
     if safe == root {
         return Err(DesktopError::Path(
             "opening the workspace root is blocked; open a file or artifact instead".to_string(),
         ));
     }
+    let artifact_path = is_artifact_path(&root, &safe);
     let relative = safe.strip_prefix(&root).map_err(|_| {
         DesktopError::Path(format!("path escaped trusted root: {}", safe.display()))
     })?;
-    if has_blocked_workspace_segment(relative) || has_sensitive_filename(&safe) {
+    if !artifact_path && (has_blocked_workspace_segment(relative) || has_sensitive_filename(&safe))
+    {
         return Err(DesktopError::Path(format!(
             "hidden or sensitive path blocked: {}",
+            safe.display()
+        )));
+    }
+    // 保留产物面板“打开产物目录”的既有能力；其他目录必须走专用 reveal command，
+    // 不能把通用 open_path 扩成任意 Explorer 跳转入口。
+    if safe.is_dir() {
+        return if artifact_path {
+            Ok(safe)
+        } else {
+            Err(DesktopError::Path(format!(
+                "directory opening is blocked; use a dedicated reveal command: {}",
+                safe.display()
+            )))
+        };
+    }
+    if !safe.is_file() {
+        return Err(DesktopError::Path(format!(
+            "only regular files can be opened: {}",
+            safe.display()
+        )));
+    }
+    if !has_passive_document_extension(&safe) {
+        return Err(DesktopError::Path(format!(
+            "file type is not allowed for system opening: {}",
             safe.display()
         )));
     }
@@ -159,6 +196,79 @@ mod tests {
 
         assert!(assert_openable_path(&root, artifact_dir.to_str().unwrap()).is_ok());
         assert!(assert_openable_path(&root, artifact.to_str().unwrap()).is_ok());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn openable_path_allows_only_passive_document_types() {
+        let root = temp_root("open-passive-documents");
+        for name in [
+            "notes.txt",
+            "report.md",
+            "table.csv",
+            "data.json",
+            "REPORT.PDF",
+            "brief.docx",
+            "workbook.xlsx",
+            "slides.pptx",
+            "diagram.png",
+        ] {
+            write(&root.join(name), "safe");
+            assert!(
+                assert_openable_path(&root, name).is_ok(),
+                "expected passive document to be openable: {name}"
+            );
+        }
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn openable_path_rejects_executables_scripts_shortcuts_and_active_documents() {
+        let root = temp_root("open-active-files");
+        let artifact_dir = root.join(".AgentCowork").join("artifacts");
+        for name in [
+            "program.exe",
+            "setup.msi",
+            "command.cmd",
+            "script.ps1",
+            "script.js",
+            "shortcut.lnk",
+            "website.url",
+            "report.docm",
+            "page.html",
+            "image.svg",
+            "report.pdf.exe",
+        ] {
+            let workspace_file = root.join(name);
+            let artifact_file = artifact_dir.join(name);
+            write(&workspace_file, "active");
+            write(&artifact_file, "active");
+            assert!(
+                assert_openable_path(&root, workspace_file.to_str().unwrap()).is_err(),
+                "expected active workspace file to be blocked: {name}"
+            );
+            assert!(
+                assert_openable_path(&root, artifact_file.to_str().unwrap()).is_err(),
+                "expected active artifact file to be blocked: {name}"
+            );
+        }
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn openable_path_rejects_unknown_files_and_non_artifact_directories() {
+        let root = temp_root("open-unknown");
+        let regular_dir = root.join("documents");
+        fs::create_dir_all(&regular_dir).unwrap();
+        write(&root.join("README"), "no extension");
+        write(&root.join("archive.zip"), "unknown container");
+
+        assert!(assert_openable_path(&root, "README").is_err());
+        assert!(assert_openable_path(&root, "archive.zip").is_err());
+        assert!(assert_openable_path(&root, regular_dir.to_str().unwrap()).is_err());
 
         fs::remove_dir_all(root).unwrap();
     }

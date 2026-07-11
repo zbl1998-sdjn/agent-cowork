@@ -484,9 +484,9 @@ async function main() {
 
     const artifactsDir = path.join(workspace, '.AgentCowork', 'artifacts');
     const artifacts = fs.existsSync(artifactsDir)
-      ? fs.readdirSync(artifactsDir).filter((name) => name.endsWith('.md'))
+      ? fs.readdirSync(artifactsDir).filter((name) => /\.(?:md|txt)$/iu.test(name))
       : [];
-    assert(artifacts.length > 0, 'browser interaction did not write an artifact');
+    assert(artifacts.length > 0, 'browser interaction did not write a readable text artifact');
     const firstArtifact = artifacts[0];
     assert(firstArtifact, 'browser interaction did not write a readable artifact');
     const artifactContent = fs.readFileSync(path.join(artifactsDir, firstArtifact), 'utf8');

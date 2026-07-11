@@ -40,9 +40,7 @@ pub fn run() {
     }
     tauri::Builder::default()
         .manage(HostSidecar::default())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -57,7 +55,8 @@ pub fn run() {
         .setup(|app| {
             if let Some(state) = app.try_state::<HostSidecar>() {
                 if let Ok(root) = config::trusted_root() {
-                    if let Err(error) = state.start(&app.handle().clone(), &root.to_string_lossy()) {
+                    if let Err(error) = state.start(&app.handle().clone(), &root.to_string_lossy())
+                    {
                         eprintln!("host sidecar autostart failed: {error}");
                     }
                 }

@@ -4,10 +4,14 @@
 //       以 TRUSTED_ROOT(默认仓库根)为受信根拉起 Host HTTP 服务(默认 127.0.0.1:3017),
 //       审计事件写入应用主目录 tauri 会话的 events.jsonl;监听 SIGINT/SIGTERM 优雅关闭。
 // 用法:npm run start:tauri-host;开发态由 start-tauri-dev.ts 作为子进程启动,
-//       供 Tauri React UI 调用其后端 API;可用 HOST/PORT/TRUSTED_ROOT 及 KIMI_* 环境变量调整。
+//       供 Tauri React UI 调用其后端 API;HOST 仅接受回环地址,其余参数可由 PORT/TRUSTED_ROOT/KIMI_* 调整。
 // 依赖:apps/host 的 createServer、JsonlWriter 与 getSessionPath(应用主目录会话路径)。
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  resolvePublicHost,
+  withPublicHostSecurity,
+} from '../apps/host/src/security/public-host-policy.js';
 import { createServer } from '../apps/host/src/server.js';
 import { JsonlWriter } from '../apps/host/src/storage/jsonl-writer.js';
 import { getSessionPath } from '../apps/host/src/storage/app-home.js';
@@ -24,11 +28,11 @@ try {
 } catch {
   // No .env: fall back to the process environment provided by Tauri/dev shell.
 }
-const host = process.env.HOST || '127.0.0.1';
+const host = resolvePublicHost(process.env.HOST);
 const port = Number(process.env.PORT || 3017);
 const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || repoRoot);
 
-const server = createServer({
+const server = createServer(withPublicHostSecurity({
   trustedRoot,
   kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
   kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
@@ -38,7 +42,7 @@ const server = createServer({
   kimiUserAgent: process.env.KIMI_USER_AGENT,
   kimiTemperature: process.env.KIMI_TEMPERATURE,
   journalWriter: new JsonlWriter(path.join(getSessionPath('tauri'), 'events.jsonl')),
-});
+}));
 
 server.listen(port, host, () => {
   console.log(`Agent Cowork Tauri host listening on http://${host}:${port}`);

@@ -37,7 +37,12 @@ pub async fn check_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpdate
         ));
     }
     let current_version = app.package_info().version.to_string();
-    let update = app.updater().map_err(update_error)?.check().await.map_err(update_error)?;
+    let update = app
+        .updater()
+        .map_err(update_error)?
+        .check()
+        .await
+        .map_err(update_error)?;
     Ok(match update {
         Some(update) => DesktopUpdateStatus {
             available: true,
@@ -63,7 +68,12 @@ pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpda
         ));
     }
     let current_version = app.package_info().version.to_string();
-    let update = app.updater().map_err(update_error)?.check().await.map_err(update_error)?;
+    let update = app
+        .updater()
+        .map_err(update_error)?
+        .check()
+        .await
+        .map_err(update_error)?;
     let Some(update) = update else {
         return Ok(DesktopUpdateInstallResult {
             installed: false,
@@ -73,7 +83,10 @@ pub async fn install_desktop_update(app: AppHandle) -> DesktopResult<DesktopUpda
     };
 
     let version = update.version.to_string();
-    update.download_and_install(|_, _| {}, || {}).await.map_err(update_error)?;
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(update_error)?;
     Ok(DesktopUpdateInstallResult {
         installed: true,
         current_version,

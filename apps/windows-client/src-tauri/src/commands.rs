@@ -28,7 +28,8 @@ pub fn stop_node_host(app: AppHandle, state: State<'_, HostSidecar>) -> DesktopR
     state.stop(&app)
 }
 
-/// 用系统默认程序打开路径,但必须先通过可信根与敏感路径校验。
+/// 用系统默认程序打开被动文档,但必须先通过可信根、敏感路径与文件类型 allowlist 校验。
+/// 执行文件/脚本/快捷方式/未知类型拒绝；目录仅保留产物目录例外，其他场景走专用 reveal command。
 #[tauri::command]
 pub fn open_path(app: AppHandle, path: String) -> DesktopResult<()> {
     use tauri_plugin_opener::OpenerExt;
@@ -68,7 +69,9 @@ pub fn reveal_bundled_installer(app: AppHandle) -> DesktopResult<String> {
     let mut newest: Option<(PathBuf, SystemTime)> = None;
     for sub in ["nsis", "msi"] {
         let dir = bundle_root.join(sub);
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             let ext = path
