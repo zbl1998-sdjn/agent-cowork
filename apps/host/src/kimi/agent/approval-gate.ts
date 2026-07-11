@@ -7,87 +7,10 @@
 // 导出:ensureExitPlanModeTool / makeAudit / toolNeedsApproval /
 //      runPreToolHook / handleExitPlanMode / blockUntilPlanApproved / requestToolApproval
 import { todoItemsFromPlan } from './todo-state.js';
+import { approvalScope, recordUnavailableApproval } from './approval-support.js';
+import type { AgentTool, ApprovalRegistry, AuditBus, AuditFn, ExitPlanOptions, PlanBlockOptions, PreToolHookOptions, RequestContext, ToolApprovalOptions } from './approval-gate-types.js';
 
-export type ToolArgs = Record<string, unknown>;
-export type AgentTool = {
-  name: string;
-  mutating?: boolean;
-  risk?: string;
-  requiresApproval?: boolean;
-  description?: string;
-  parameters?: unknown;
-  handler?: (args?: ToolArgs) => unknown | Promise<unknown>;
-};
-export type AuditBus = { publish(payload: Record<string, unknown>): unknown };
-export type AuditFn = (kind: string, extra?: Record<string, unknown>) => void;
-export type EmitFn = (type: string, payload: Record<string, unknown>) => void;
-export type ToolCall = { id?: unknown };
-export type StepList = Array<Record<string, unknown>>;
-export type MessageList = Array<Record<string, unknown>>;
-export type RequestContext = { tenantId?: unknown; userId?: unknown; [key: string]: unknown };
-export type HookBlock = { reason?: string };
-export type HookEngine = {
-  run(event: string, payload: Record<string, unknown>): unknown | Promise<unknown>;
-  blocked(result: unknown): false | HookBlock;
-};
-export type ApprovalRegistry = {
-  request(payload: Record<string, unknown>): { id: string; promise: Promise<string> };
-};
-export type PreToolHookOptions = {
-  hooks?: HookEngine | null;
-  name: string;
-  args: ToolArgs;
-  steps: StepList;
-  audit: AuditFn;
-  emit: EmitFn;
-  messages: MessageList;
-  call: ToolCall;
-};
-export type ExitPlanOptions = {
-  name: string;
-  args: ToolArgs;
-  hasApprovals: boolean;
-  autoApprove: boolean;
-  approvals?: ApprovalRegistry | null;
-  runId?: unknown;
-  emit: EmitFn;
-  audit: AuditFn;
-  steps: StepList;
-  messages: MessageList;
-  call: ToolCall;
-  context?: RequestContext;
-};
-export type PlanBlockOptions = {
-  planMode: boolean;
-  planApproved: boolean;
-  needsApproval: boolean;
-  name: string;
-  tool?: AgentTool | null;
-  steps: StepList;
-  audit: AuditFn;
-  emit: EmitFn;
-  messages: MessageList;
-  call: ToolCall;
-};
-export type ToolApprovalOptions = {
-  needsApproval: boolean;
-  hasApprovals: boolean;
-  approvals?: ApprovalRegistry | null;
-  sessionApproved: Set<string>;
-  name: string;
-  args: ToolArgs;
-  tool: AgentTool;
-  runId?: unknown;
-  emit: EmitFn;
-  audit: AuditFn;
-  steps: StepList;
-  messages: MessageList;
-  call: ToolCall;
-  autoApprove: boolean;
-  planMode: boolean;
-  planApproved: boolean;
-  context?: RequestContext;
-};
+export type { AgentTool, ApprovalRegistry, AuditBus, AuditFn, EmitFn, ExitPlanOptions, HookBlock, HookEngine, MessageList, PlanBlockOptions, PreToolHookOptions, RequestContext, StepList, ToolApprovalOptions, ToolArgs, ToolCall } from './approval-gate-types.js';
 
 /** 计划模式下确保工具集里存在 ExitPlanMode 工具(只读,供模型提交计划草案)。 */
 export function ensureExitPlanModeTool(agentTools: AgentTool[], planMode: boolean): void {
@@ -116,11 +39,8 @@ export function toolNeedsApproval(tool: AgentTool | null | undefined): boolean {
   return !!(tool && (tool.requiresApproval === true || tool.mutating === true || risk === 'high' || risk === 'critical'));
 }
 
-function approvalScope(context: RequestContext = {}): Record<string, unknown> {
-  return {
-    ...(context.tenantId ? { tenantId: context.tenantId } : {}),
-    ...(context.userId ? { userId: context.userId } : {}),
-  };
+function isApprovedDecision(decision: unknown): decision is 'once' | 'session' {
+  return decision === 'once' || decision === 'session';
 }
 
 /** 运行 pre_tool 钩子:若钩子判定阻止则写回阻止结果并返回 true(调用方据此跳过执行)。 */
@@ -153,12 +73,39 @@ export async function handleExitPlanMode({
 }: ExitPlanOptions): Promise<{ handled: boolean; planApproved: boolean }> {
   if (name !== 'ExitPlanMode') return { handled: false, planApproved: false };
   const plan = String((args && (args.plan || args.text)) || '').trim();
-  let approved = true;
-  if (hasApprovals && !autoApprove && approvals) {
-    const { id, promise } = approvals.request({ kind: 'plan', plan, runId, ...approvalScope(context) });
+  if (!autoApprove && (!hasApprovals || !approvals)) {
+    recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+      '计划必须经过显式审批，但当前审批服务不可用', 'plan.approval_unavailable', { chars: plan.length });
+    return { handled: true, planApproved: false };
+  }
+  let approved = autoApprove;
+  if (!autoApprove && approvals) {
+    let approvalRequest: ReturnType<ApprovalRegistry['request']>;
+    try {
+      approvalRequest = approvals.request({ kind: 'plan', plan, runId, ...approvalScope(context) });
+    } catch {
+      recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+        '计划审批未能持久化，已失败关闭', 'plan.approval_persistence_failed', { chars: plan.length });
+      return { handled: true, planApproved: false };
+    }
+    const { id, ready, promise } = approvalRequest;
+    void promise.catch(() => undefined);
+    try {
+      if (ready) await ready;
+    } catch {
+      recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+        '计划审批未能持久化，已失败关闭', 'plan.approval_persistence_failed', { chars: plan.length });
+      return { handled: true, planApproved: false };
+    }
     emit('plan_proposed', { id, plan });
     audit('plan.proposed', { chars: plan.length });
-    approved = await promise !== 'reject';
+    try {
+      approved = isApprovedDecision(await promise);
+    } catch {
+      recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+        '计划审批未能持久化，已失败关闭', 'plan.approval_persistence_failed', { chars: plan.length });
+      return { handled: true, planApproved: false };
+    }
   }
   const result = approved
     ? { approved: true, note: '计划已批准，现在按计划执行。' }
@@ -216,19 +163,75 @@ export async function requestToolApproval({
   planApproved,
   context,
 }: ToolApprovalOptions): Promise<boolean> {
-  if (!needsApproval || !hasApprovals || !approvals || sessionApproved.has(name)) return false;
-  const planAuthorized = planMode && planApproved;
+  if (!needsApproval) return false;
   const risk = String(tool.risk || '').toLowerCase();
-  if ((autoApprove || planAuthorized) && risk !== 'high' && risk !== 'critical') {
+  const requiresExplicitApproval = tool.requiresApproval === true || risk === 'high' || risk === 'critical';
+  if (!requiresExplicitApproval && sessionApproved.has(name)) return false;
+  const planAuthorized = planMode && planApproved;
+  if ((autoApprove || planAuthorized) && !requiresExplicitApproval) {
     audit('tool.auto_approved', { tool: name, risk: tool.risk, via: autoApprove ? 'auto' : 'plan' });
     return false;
   }
-  const { id, promise } = approvals.request({ name, args, risk: tool.risk, runId, ...approvalScope(context) });
-  emit('approval_request', { id, name, args, risk: tool.risk });
-  const decision = await promise;
-  if (decision === 'session') sessionApproved.add(name);
-  if (decision !== 'reject') {
-    audit('tool.approved', { tool: name, risk: tool.risk, decision });
+  if (!hasApprovals || !approvals) {
+    const error = requiresExplicitApproval
+      ? '该操作必须经过显式审批，但当前审批服务不可用'
+      : '该变更操作需要审批，但当前审批服务不可用';
+    recordUnavailableApproval({ name, steps, audit, emit, messages, call }, error,
+      'tool.approval_unavailable', { tool: name, risk: tool.risk });
+    return true;
+  }
+  const preview = tool.approvalPreview?.(args);
+  const previewPayload = preview ? { preview } : {};
+  let approvalRequest: ReturnType<ApprovalRegistry['request']>;
+  try {
+    approvalRequest = approvals.request({
+      kind: 'tool',
+      name,
+      args,
+      risk: tool.risk,
+      runId,
+      ...previewPayload,
+      ...approvalScope(context),
+    });
+  } catch {
+    recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+      '该操作的审批未能持久化，已阻止执行', 'tool.approval_persistence_failed', { tool: name, risk: tool.risk });
+    return true;
+  }
+  const { id, ready, promise } = approvalRequest;
+  void promise.catch(() => undefined);
+  try {
+    if (ready) await ready;
+  } catch {
+    recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+      '该操作的审批未能持久化，已阻止执行', 'tool.approval_persistence_failed', { tool: name, risk: tool.risk });
+    return true;
+  }
+  emit('approval_request', {
+    id,
+    name,
+    args,
+    risk: tool.risk,
+    sessionReusable: !requiresExplicitApproval,
+    ...previewPayload,
+  });
+  let decision: string;
+  try {
+    decision = await promise;
+  } catch {
+    recordUnavailableApproval({ name, steps, audit, emit, messages, call },
+      '该操作的审批未能持久化，已阻止执行', 'tool.approval_persistence_failed', { tool: name, risk: tool.risk });
+    return true;
+  }
+  if (isApprovedDecision(decision)) {
+    const effectiveDecision = decision === 'session' && requiresExplicitApproval ? 'once' : decision;
+    if (effectiveDecision === 'session') sessionApproved.add(name);
+    audit('tool.approved', {
+      tool: name,
+      risk: tool.risk,
+      decision: effectiveDecision,
+      ...(effectiveDecision !== decision ? { requestedDecision: decision } : {}),
+    });
     return false;
   }
   const rejected = { error: '用户拒绝了该操作' };

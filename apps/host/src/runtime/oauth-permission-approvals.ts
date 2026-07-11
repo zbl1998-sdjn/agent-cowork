@@ -3,6 +3,11 @@
 // 职责:连接器 OAuth 授权前的「权限审批」待决登记——把待授予的权限项交给用户确认/勾选,带 TTL 清理。
 //       与 approvals.js 类似但专用于连接器授权范围。依赖:node:crypto。导出:OAuth 权限审批登记表。
 import crypto from 'node:crypto';
+import {
+  LOCAL_IDENTITY_SCOPE,
+  requireIdentityScopeFrom,
+  type IdentityScope,
+} from '../security/identity-scope.js';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
@@ -13,10 +18,7 @@ export type ApprovalContext = {
   userId?: unknown;
 };
 
-export type ApprovalScope = {
-  tenantId: string;
-  userId: string;
-};
+export type ApprovalScope = IdentityScope;
 
 export type ApprovalHashInput = {
   connectorId: string;
@@ -77,11 +79,15 @@ function makeHttpError(statusCode: number, message: string): HttpError {
   return err;
 }
 
-function scopeFromContext(context: ApprovalContext = {}): ApprovalScope {
-  return {
-    tenantId: String(context.tenantId || 'tenant_local'),
-    userId: String(context.userId || 'user_local'),
-  };
+function scopeFromRequest(request: OAuthPermissionRequest): ApprovalScope {
+  const descriptor = Object.getOwnPropertyDescriptor(request, 'context');
+  if (!descriptor) return LOCAL_IDENTITY_SCOPE;
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new Error('OAuth permission approval identity is invalid');
+  }
+  return requireIdentityScopeFrom(descriptor.value, {
+    label: 'OAuth permission approval identity',
+  });
 }
 
 function approvalHash({ connectorId, provider, scopes }: ApprovalHashInput): string {
@@ -110,10 +116,11 @@ export function createOAuthPermissionApprovalStore({
     }
   }
 
-  function issue({ connectorId, provider, scopes, context }: OAuthPermissionRequest): {
+  function issue(request: OAuthPermissionRequest): {
     id: string;
     expiresAt: number;
   } {
+    const { connectorId, provider, scopes } = request;
     cleanup();
     const id = generateId();
     const expiresAt = now() + ttlMs;
@@ -122,7 +129,7 @@ export function createOAuthPermissionApprovalStore({
       connectorId,
       provider,
       scopesHash: approvalHash({ connectorId, provider, scopes }),
-      scope: scopeFromContext(context),
+      scope: scopeFromRequest(request),
       expiresAt,
       used: false,
     });
@@ -131,8 +138,9 @@ export function createOAuthPermissionApprovalStore({
 
   function consume(
     id: unknown,
-    { connectorId, provider, scopes, context }: OAuthPermissionRequest,
+    request: OAuthPermissionRequest,
   ): OAuthPermissionApproval {
+    const { connectorId, provider, scopes } = request;
     cleanup();
     if (!id || typeof id !== 'string') {
       throw makeHttpError(428, 'OAuth permission approval is required');
@@ -141,7 +149,7 @@ export function createOAuthPermissionApprovalStore({
     if (!approval) {
       throw makeHttpError(403, 'OAuth permission approval is invalid or expired');
     }
-    const scope = scopeFromContext(context);
+    const scope = scopeFromRequest(request);
     if (
       approval.used
       || approval.connectorId !== connectorId

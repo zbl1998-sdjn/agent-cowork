@@ -47,6 +47,90 @@ test('CancellationRegistry register/signal/cancel/done semantics', () => {
   assert.deepEqual(reg.pending(), []);
 });
 
+test('CancellationRegistry isolates identical run ids by exact tenant and user scope', () => {
+  const reg = new CancellationRegistry();
+  const alice = { tenantId: 'tenant_shared', userId: 'user_alice' };
+  const bob = { tenantId: 'tenant_shared', userId: 'user_bob' };
+  const wrongTenant = { tenantId: 'tenant_other', userId: 'user_alice' };
+  const aliceController = reg.register('run_shared', alice);
+  const bobController = reg.register('run_shared', bob);
+
+  assert.equal(reg.signal('run_shared', alice), aliceController.signal);
+  assert.equal(reg.signal('run_shared', bob), bobController.signal);
+  assert.equal(reg.signal('run_shared', wrongTenant), null);
+  assert.equal(reg.signal('run_shared'), null, 'legacy lookup must not expose a scoped controller');
+
+  assert.equal(reg.cancel('run_shared', 'cancelled', wrongTenant), false);
+  assert.equal(reg.done('run_shared', wrongTenant), false);
+  assert.equal(aliceController.signal.aborted, false);
+  assert.equal(bobController.signal.aborted, false);
+
+  assert.equal(reg.cancel('run_shared', 'cancelled', alice), true);
+  assert.equal(aliceController.signal.aborted, true);
+  assert.equal(bobController.signal.aborted, false);
+  assert.equal(reg.done('run_shared', alice), true);
+  assert.equal(reg.signal('run_shared', alice), null);
+  assert.equal(reg.signal('run_shared', bob), bobController.signal);
+});
+
+test('CancellationRegistry rejects every provided invalid scope without normalizing it', () => {
+  const reg = new CancellationRegistry();
+  assert.ok(reg.register('legacy_run', null));
+  for (const scope of [
+    { tenantId: 'tenant_a' },
+    { userId: 'user_a' },
+    { tenantId: ' tenant_a', userId: 'user_a' },
+    { tenantId: 'tenant_a', userId: '用户' },
+  ]) {
+    assert.throws(
+      () => reg.register('run_invalid', scope as { tenantId: string; userId: string }),
+      /canonical tenantId and userId/i,
+    );
+    assert.throws(
+      () => reg.signal('run_invalid', scope as { tenantId: string; userId: string }),
+      /canonical tenantId and userId/i,
+    );
+  }
+
+  const left = { tenantId: 'a:b', userId: 'c' };
+  const right = { tenantId: 'a', userId: 'b:c' };
+  const leftController = reg.register('run_collision', left);
+  const rightController = reg.register('run_collision', right);
+  assert.equal(reg.signal('run_collision', left), leftController.signal);
+  assert.equal(reg.signal('run_collision', right), rightController.signal);
+});
+
+test('POST /api/runs/:id/cancel cannot cancel the same run id owned by a sibling user', async () => {
+  const cancellation = new CancellationRegistry();
+  const alice = { tenantId: 'tenant_shared', userId: 'user_alice' };
+  const controller = cancellation.register('run_shared_scope', alice);
+  const server = createServer({
+    trustedRoot: tmp(),
+    enableScheduler: false,
+    trustIdentityHeaders: true,
+    cancellation,
+  });
+  const base = await bind(server);
+  try {
+    const siblingResponse = await fetch(`${base}/api/runs/run_shared_scope/cancel`, {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_shared', 'x-user-id': 'user_bob' },
+    });
+    assert.equal(requireJsonRecord(await siblingResponse.json(), 'sibling cancel response').cancelled, false);
+    assert.equal(controller.signal.aborted, false);
+    assert.equal(cancellation.signal('run_shared_scope', alice), controller.signal);
+
+    const ownerResponse = await fetch(`${base}/api/runs/run_shared_scope/cancel`, {
+      method: 'POST',
+      headers: { 'x-tenant-id': 'tenant_shared', 'x-user-id': 'user_alice' },
+    });
+    assert.equal(requireJsonRecord(await ownerResponse.json(), 'owner cancel response').cancelled, true);
+    assert.equal(controller.signal.aborted, true);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('POST /api/runs/:id/cancel returns cancelled:false for an unknown run', async () => {
   const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
   const base = await bind(server);

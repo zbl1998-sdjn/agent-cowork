@@ -48,3 +48,26 @@ test('file operation approvals reject mismatched operation scope', () => {
   );
   assert.equal(store.pendingCount(), 1);
 });
+
+test('file operation approval scope defaults only when context is omitted', () => {
+  let next = 0;
+  const store = createFileOperationApprovalStore({ generateId: () => `fop_${++next}` });
+  const base = { kind: 'file-ops:apply', trustedRoot: '/tmp/root', operations: [] };
+  const legacyId = store.issue(base);
+  assert.doesNotThrow(() => store.consume(legacyId, base));
+
+  const invalidContexts = [
+    {},
+    { tenantId: 'tenant_a' },
+    { userId: 'user_a' },
+    { tenantId: ' tenant_a', userId: 'user_a' },
+  ];
+  for (const context of invalidContexts) {
+    assert.throws(() => store.issue({ ...base, context }), /canonical tenantId and userId are required/i);
+  }
+  const explicitUndefined = Object.defineProperty({ ...base }, 'context', {
+    enumerable: true,
+    value: undefined,
+  });
+  assert.throws(() => store.issue(explicitUndefined), /canonical tenantId and userId are required/i);
+});

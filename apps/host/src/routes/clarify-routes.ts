@@ -84,7 +84,7 @@ export async function handleClarifyRoutes({
     await withJsonBody(request, response, async (body) => {
       try {
         const input = answerClarificationBodySchema.parse(body);
-        const clarification = clarifications.answer(answerMatch[1] ?? '', input.value);
+        const clarification = clarifications.answer(answerMatch[1] ?? '', input.value, requestContext);
         sendJson(response, 200, { context: requestContext, clarification });
       } catch (err) {
         const error = errorPayload(err);
@@ -96,7 +96,7 @@ export async function handleClarifyRoutes({
 
   const getMatch = pathname.match(GET_RE);
   if (request.method === 'GET' && getMatch) {
-    const clarification = clarifications.get(getMatch[1] ?? '');
+    const clarification = clarifications.get(getMatch[1] ?? '', requestContext);
     if (!clarification) {
       sendJson(response, 404, { error: 'clarification not found' });
       return true;

@@ -27,26 +27,34 @@ type ApprovalRouteOptions = {
 
 const approvalIdSchema = z.string().regex(APPROVAL_ID_RE, 'approval id contains unsupported characters');
 
-const approvalBodySchema = z.object({
+const approvalDecisionSchema = z.enum(['once', 'session', 'reject']);
+
+const approvalEnvelopeSchema = z.object({
   decision: z.unknown().optional(),
   answer: z.unknown().optional(),
 }).loose();
 
-const batchApprovalBodySchema = approvalBodySchema.extend({
+const batchApprovalBodySchema = z.object({
   ids: z.array(approvalIdSchema)
     .min(1, 'ids must be a non-empty array of approval IDs')
     .max(MAX_BATCH_APPROVALS, `ids must contain at most ${MAX_BATCH_APPROVALS} approval IDs`)
     .transform((ids) => [...new Set(ids)]),
+  decision: approvalDecisionSchema,
 }).loose();
 
-function parseBody(body: unknown): z.infer<typeof approvalBodySchema> {
-  const result = approvalBodySchema.safeParse(body && typeof body === 'object' && !Array.isArray(body) ? body : {});
-  return result.success ? result.data : {};
-}
+type ParsedApprovalBody =
+  | { channel: 'decision'; decision: z.infer<typeof approvalDecisionSchema> }
+  | { channel: 'answer'; answer: unknown };
 
-function approvalIds(body: unknown): string[] | null {
-  const result = batchApprovalBodySchema.safeParse(body && typeof body === 'object' && !Array.isArray(body) ? body : {});
-  return result.success ? result.data.ids : null;
+function parseApprovalBody(body: unknown): ParsedApprovalBody | null {
+  const result = approvalEnvelopeSchema.safeParse(body && typeof body === 'object' && !Array.isArray(body) ? body : {});
+  if (!result.success) return null;
+  const hasDecision = Object.prototype.hasOwnProperty.call(result.data, 'decision');
+  const hasAnswer = Object.prototype.hasOwnProperty.call(result.data, 'answer');
+  if (hasDecision === hasAnswer) return null;
+  if (hasAnswer) return { channel: 'answer', answer: result.data.answer };
+  const decision = approvalDecisionSchema.safeParse(result.data.decision);
+  return decision.success ? { channel: 'decision', decision: decision.data } : null;
 }
 
 async function resolveMany(
@@ -71,13 +79,13 @@ export async function handleApprovalRoutes({ request, response, pathname, reques
   }
   if (pathname === '/api/approvals/batch') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseBody(body);
-      const ids = approvalIds(body);
-      if (!ids) {
-        sendJson(response, 400, { error: 'ids must be a non-empty array of approval IDs' });
+      const input = batchApprovalBodySchema.safeParse(body && typeof body === 'object' && !Array.isArray(body) ? body : {});
+      if (!input.success) {
+        sendJson(response, 400, { error: 'ids and decision must contain valid approval values' });
         return;
       }
-      const results = await resolveMany(approvalRegistry, ids, input.decision, requestContext);
+      const { ids, decision } = input.data;
+      const results = await resolveMany(approvalRegistry, ids, decision, requestContext);
       const resolved = results.filter((item) => item.ok).length;
       sendJson(response, resolved > 0 ? 200 : 404, {
         context: requestContext,
@@ -85,16 +93,20 @@ export async function handleApprovalRoutes({ request, response, pathname, reques
         ok: resolved === ids.length,
         resolved,
         results,
-        decision: input.decision,
+        decision,
       });
     });
     return true;
   }
   if (!/^\/api\/approvals\/[a-zA-Z0-9_-]+$/.test(pathname)) return false;
   await withJsonBody(request, response, async (body) => {
-    const input = parseBody(body);
+    const input = parseApprovalBody(body);
+    if (!input) {
+      sendJson(response, 400, { error: 'request must contain exactly one valid decision or answer' });
+      return;
+    }
     const id = pathname.split('/')[3] ?? '';
-    const hasAnswer = typeof input.answer !== 'undefined';
+    const hasAnswer = input.channel === 'answer';
     const ok = hasAnswer
       ? await approvalRegistry.respond(id, input.answer, requestContext)
       : await approvalRegistry.resolve(id, input.decision, requestContext);
@@ -102,8 +114,8 @@ export async function handleApprovalRoutes({ request, response, pathname, reques
       context: requestContext,
       id,
       ok,
-      decision: input.decision,
-      answer: hasAnswer ? input.answer : undefined,
+      decision: input.channel === 'decision' ? input.decision : undefined,
+      answer: input.channel === 'answer' ? input.answer : undefined,
     });
   });
   return true;

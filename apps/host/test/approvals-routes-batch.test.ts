@@ -5,6 +5,7 @@ import { createServer } from '../src/server.js';
 import {
   approvalBatchResponseSchema,
   approvalErrorResponseSchema,
+  approvalOkResponseSchema,
   parseJson,
   scopedJsonHeaders,
 } from './helpers/approvals.js';
@@ -63,7 +64,7 @@ test('POST /api/approvals/batch resolves only exact IDs in the caller scope', as
 test('POST /api/approvals/batch rejects invalid ids', async () => {
   const root = tempRoot('kcw-apr-');
   const approvalRegistry = createApprovalRegistry();
-  const server = createServer({ trustedRoot: root, enableScheduler: false, approvalRegistry });
+  const server = createServer({ trustedRoot: root, enableScheduler: false, requireAuth: false, approvalRegistry });
   const base = await bind(server);
   try {
     const invalid = await fetch(`${base}/api/approvals/batch`, {
@@ -74,12 +75,81 @@ test('POST /api/approvals/batch rejects invalid ids', async () => {
     assert.equal(invalid.status, 400);
     assert.match((await parseJson(invalid, approvalErrorResponseSchema)).error, /ids/i);
 
+    const invalidDecision = await fetch(`${base}/api/approvals/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['apr_ok'], decision: 'approve' }),
+    });
+    assert.equal(invalidDecision.status, 400);
+    assert.match((await parseJson(invalidDecision, approvalErrorResponseSchema)).error, /decision/i);
+
     const empty = await fetch(`${base}/api/approvals/batch`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ids: [], decision: 'once' }),
     });
     assert.equal(empty.status, 400);
+  } finally {
+    await close(server);
+  }
+});
+
+test('POST /api/approvals/:id separates question answers from approval decisions', async () => {
+  const root = tempRoot('kcw-apr-');
+  const approvalRegistry = createApprovalRegistry();
+  const server = createServer({ trustedRoot: root, enableScheduler: false, requireAuth: false, approvalRegistry });
+  const base = await bind(server);
+  try {
+    const tool = approvalRegistry.request({
+      kind: 'tool',
+      name: 'Shell',
+      tenantId: 'tenant_local',
+      userId: 'user_local',
+    });
+    const answerTool = await fetch(`${base}/api/approvals/${tool.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answer: 'arbitrary answer' }),
+    });
+    assert.equal(answerTool.status, 404);
+    assert.equal((await parseJson(answerTool, approvalOkResponseSchema)).ok, false);
+
+    const invalidDecision = await fetch(`${base}/api/approvals/${tool.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'approve' }),
+    });
+    assert.equal(invalidDecision.status, 400);
+    assert.match((await parseJson(invalidDecision, approvalErrorResponseSchema)).error, /decision/i);
+
+    const approveTool = await fetch(`${base}/api/approvals/${tool.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'once' }),
+    });
+    assert.equal(approveTool.status, 200);
+    assert.equal(await tool.promise, 'once');
+
+    const question = approvalRegistry.request({
+      kind: 'question',
+      question: 'Which format?',
+      tenantId: 'tenant_local',
+      userId: 'user_local',
+    });
+    const decideQuestion = await fetch(`${base}/api/approvals/${question.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'once' }),
+    });
+    assert.equal(decideQuestion.status, 404);
+
+    const answerQuestion = await fetch(`${base}/api/approvals/${question.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answer: 'Excel' }),
+    });
+    assert.equal(answerQuestion.status, 200);
+    assert.equal(await question.promise, 'Excel');
   } finally {
     await close(server);
   }

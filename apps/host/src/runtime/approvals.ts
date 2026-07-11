@@ -7,6 +7,7 @@
 // 依赖:node:crypto。导出:审批登记表工厂。
 
 import crypto from 'node:crypto';
+import { requireIdentityScopeFrom, type IdentityScope } from '../security/identity-scope.js';
 
 export type ApprovalDecision = 'once' | 'session' | 'reject';
 
@@ -26,6 +27,7 @@ type PendingApproval = {
   resolve: (value: unknown) => void;
   meta: ApprovalMeta;
   ts: number;
+  expiryTimer: ReturnType<typeof setTimeout> | null;
 };
 
 export type ApprovalRegistryOptions = {
@@ -39,7 +41,7 @@ export type ApprovalResult = {
 };
 
 export type ApprovalRegistry = {
-  request(meta?: ApprovalMeta): { id: string; promise: Promise<unknown> };
+  request(meta?: ApprovalMeta): { id: string; ready: Promise<void>; promise: Promise<unknown> };
   resolve(id: string, decision: unknown, context?: ApprovalContext | null): boolean;
   resolveMany(
     ids: unknown,
@@ -47,7 +49,7 @@ export type ApprovalRegistry = {
     context?: ApprovalContext | null,
   ): ApprovalResult[];
   respond(id: string, value: unknown, context?: ApprovalContext | null): boolean;
-  cancelByRun(runId: unknown, decision?: unknown): number;
+  cancelByRun(runId: unknown, context?: ApprovalContext | null): number;
   cancelAll(decision?: unknown): void;
   pendingCount(): number;
   prune(now?: number): number;
@@ -55,20 +57,41 @@ export type ApprovalRegistry = {
 
 const DECISIONS = new Set<ApprovalDecision>(['once', 'session', 'reject']);
 
-function sameScope(meta: ApprovalMeta = {}, context: ApprovalContext | null = null): boolean {
-  const tenantId = meta.tenantId || '';
-  const userId = meta.userId || '';
-  if (!tenantId && !userId) return true;
-  if (!context) return false;
-  if (tenantId && context.tenantId !== tenantId) return false;
-  if (userId && context.userId !== userId) return false;
-  return true;
+function hasOwnIdentity(meta: ApprovalMeta): boolean {
+  return Boolean(
+    Object.getOwnPropertyDescriptor(meta, 'tenantId')
+    || Object.getOwnPropertyDescriptor(meta, 'userId'),
+  );
 }
 
-function normalizeDecision(decision: unknown): ApprovalDecision {
+function approvalOwner(meta: ApprovalMeta): IdentityScope | null {
+  return hasOwnIdentity(meta)
+    ? requireIdentityScopeFrom(meta, { label: 'approval identity' })
+    : null;
+}
+
+function normalizeApprovalMeta(meta: ApprovalMeta): ApprovalMeta {
+  const owner = approvalOwner(meta);
+  return owner ? { ...meta, ...owner } : meta;
+}
+
+function sameScope(meta: ApprovalMeta = {}, context: ApprovalContext | null = null): boolean {
+  const owner = approvalOwner(meta);
+  if (context === null) return owner === null;
+  const caller = requireIdentityScopeFrom(context, { label: 'approval caller identity' });
+  if (!owner) return false;
+  return owner.tenantId === caller.tenantId
+    && owner.userId === caller.userId;
+}
+
+function normalizeDecision(decision: unknown): ApprovalDecision | null {
   return typeof decision === 'string' && DECISIONS.has(decision as ApprovalDecision)
     ? decision as ApprovalDecision
-    : 'reject';
+    : null;
+}
+
+function isQuestion(meta: ApprovalMeta): boolean {
+  return meta.kind === 'question';
 }
 
 export function createApprovalRegistry({
@@ -77,14 +100,23 @@ export function createApprovalRegistry({
 }: ApprovalRegistryOptions = {}): ApprovalRegistry {
   // id -> { resolve, meta, ts };ts 用于 TTL 清理,meta 用于租户/用户/run 作用域校验。
   const pending = new Map<string, PendingApproval>();
+  const expiryDelayMs = Number.isFinite(ttlMs) ? Math.max(0, Math.floor(ttlMs)) : 15 * 60 * 1000;
+
+  function settle(id: string, value: unknown): boolean {
+    const entry = pending.get(id);
+    if (!entry) return false;
+    pending.delete(id);
+    if (entry.expiryTimer) clearTimeout(entry.expiryTimer);
+    entry.expiryTimer = null;
+    entry.resolve(value);
+    return true;
+  }
 
   function prune(now = Date.now()): number {
     let n = 0;
     for (const [id, entry] of pending) {
       if (now - entry.ts > ttlMs) {
-        pending.delete(id);
-        entry.resolve('reject'); // unblock any awaiter so abandoned turns never hang
-        n += 1;
+        if (settle(id, 'reject')) n += 1; // unblock any awaiter so abandoned turns never hang
       }
     }
     return n;
@@ -93,67 +125,70 @@ export function createApprovalRegistry({
   return {
     request(meta = {}) {
       prune();
+      const normalizedMeta = normalizeApprovalMeta(meta);
       // 容量闸门:持续高负载下丢弃最旧待决项并 resolve 为 reject,保证 map 不会无界增长。
       while (pending.size >= maxPending) {
         const oldest = pending.keys().next().value;
         if (!oldest) break;
-        const entry = pending.get(oldest);
-        pending.delete(oldest);
-        if (entry) entry.resolve('reject');
+        settle(oldest, 'reject');
       }
-      const id = `apr_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      const id = `apr_${crypto.randomUUID().replace(/-/g, '')}`;
       let resolve: (value: unknown) => void = () => undefined;
       const promise = new Promise<unknown>((resolver) => { resolve = resolver; });
-      pending.set(id, { resolve, meta, ts: Date.now() });
-      return { id, promise };
+      const entry: PendingApproval = {
+        resolve,
+        meta: normalizedMeta,
+        ts: Date.now(),
+        expiryTimer: null,
+      };
+      pending.set(id, entry);
+      entry.expiryTimer = setTimeout(() => {
+        settle(id, 'reject');
+      }, expiryDelayMs);
+      const timer = entry.expiryTimer as unknown as { unref?: () => void };
+      timer.unref?.();
+      return { id, ready: Promise.resolve(), promise };
     },
     resolve(id, decision, context = null) {
       const entry = pending.get(id);
       if (!entry) return false;
       if (!sameScope(entry.meta, context)) return false;
-      pending.delete(id);
-      entry.resolve(normalizeDecision(decision));
-      return true;
+      const normalizedDecision = normalizeDecision(decision);
+      if (!normalizedDecision || isQuestion(entry.meta)) return false;
+      return settle(id, normalizedDecision);
     },
     resolveMany(ids, decision, context = null) {
       const uniqueIds = [...new Set(Array.isArray(ids) ? ids : [])];
       const normalizedDecision = normalizeDecision(decision);
       return uniqueIds.map((id) => {
         const entry = typeof id === 'string' ? pending.get(id) : undefined;
-        if (!entry || !sameScope(entry.meta, context)) return { id, ok: false };
-        pending.delete(id);
-        entry.resolve(normalizedDecision);
-        return { id, ok: true };
+        if (!entry || !normalizedDecision || isQuestion(entry.meta) || !sameScope(entry.meta, context)) {
+          return { id, ok: false };
+        }
+        return { id, ok: settle(id, normalizedDecision) };
       });
     },
-    // 用任意自由值解决待决请求。AskUserQuestion 走这里:答案是用户选择/输入的文本,
-    // 不是固定 approve/reject 决策。
+    // 仅 question 请求可用自由值回答。工具/计划必须走 resolve 的枚举决策通道。
     respond(id, value, context = null) {
       const entry = pending.get(id);
       if (!entry) return false;
       if (!sameScope(entry.meta, context)) return false;
-      pending.delete(id);
-      entry.resolve(value);
-      return true;
+      if (!isQuestion(entry.meta)) return false;
+      return settle(id, value);
     },
     // 释放指定 runId 下全部待决请求;SSE 断开时调用,让等待中的 agent loop 解阻并干净退出。
-    cancelByRun(runId, decision = 'reject') {
+    cancelByRun(runId, context = null) {
       if (!runId) return 0;
       let n = 0;
       for (const [id, entry] of pending) {
-        if (entry.meta && entry.meta.runId === runId) {
-          pending.delete(id);
-          entry.resolve(decision);
-          n += 1;
+        if (entry.meta && entry.meta.runId === runId && sameScope(entry.meta, context)) {
+          if (settle(id, 'reject')) n += 1;
         }
       }
       return n;
     },
     cancelAll(decision = 'reject') {
-      for (const [id, entry] of pending) {
-        entry.resolve(decision);
-        pending.delete(id);
-      }
+      for (const id of [...pending.keys()]) settle(id, decision);
     },
     pendingCount() {
       return pending.size;

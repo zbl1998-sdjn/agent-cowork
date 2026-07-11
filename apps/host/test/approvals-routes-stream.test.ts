@@ -11,11 +11,12 @@ import {
 } from './helpers/approvals.js';
 import { noopKimiChatRunner } from './helpers/agent-stream.js';
 import { bind, close, readableBody, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('POST /api/agent/chat/stream gates Shell, proceeds after POST /api/approvals/:id', async () => {
   const root = tempRoot('kcw-apr-');
   const agentModelCall = callThenAnswer('Shell', { command: 'node -e "process.stdout.write(String(1+1))"' });
-  const server = createServer({ trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, requireAuth: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const response = await fetch(`${base}/api/agent/chat/stream`, {
@@ -45,6 +46,7 @@ test('POST /api/approvals/:id rejects a different tenant before resolving a tool
   const root = tempRoot('kcw-apr-');
   const agentModelCall = callThenAnswer('Shell', { command: 'node -e "process.stdout.write(String(1+1))"' });
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
     requireAuth: true,

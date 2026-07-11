@@ -5,6 +5,11 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { stableJsonStringify } from '../http/request-utils.js';
+import {
+  LOCAL_IDENTITY_SCOPE,
+  requireIdentityScopeFrom,
+  type IdentityScope,
+} from '../security/identity-scope.js';
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
@@ -13,10 +18,7 @@ export type FileOperationApprovalContext = {
   userId?: unknown;
 };
 
-export type FileOperationApprovalScope = {
-  tenantId: string;
-  userId: string;
-};
+export type FileOperationApprovalScope = IdentityScope;
 
 export type FileOperationApprovalRequest = {
   kind: string;
@@ -53,11 +55,15 @@ function makeHttpError(statusCode: number, message: string): Error & { statusCod
   return err;
 }
 
-function scopeFromContext(context: FileOperationApprovalContext = {}): FileOperationApprovalScope {
-  return {
-    tenantId: String(context.tenantId || 'tenant_local'),
-    userId: String(context.userId || 'user_local'),
-  };
+function scopeFromRequest(request: FileOperationApprovalRequest): FileOperationApprovalScope {
+  const descriptor = Object.getOwnPropertyDescriptor(request, 'context');
+  if (!descriptor) return LOCAL_IDENTITY_SCOPE;
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new Error('file operation approval identity is invalid');
+  }
+  return requireIdentityScopeFrom(descriptor.value, {
+    label: 'file operation approval identity',
+  });
 }
 
 function hashApproval({
@@ -91,7 +97,8 @@ export function createFileOperationApprovalStore({
     }
   }
 
-  function issue({ kind, trustedRoot, operations, context }: FileOperationApprovalRequest): string {
+  function issue(request: FileOperationApprovalRequest): string {
+    const { kind, trustedRoot, operations } = request;
     cleanup();
     if (!kind) throw new Error('approval kind is required');
     if (!trustedRoot) throw new Error('trustedRoot is required');
@@ -101,7 +108,7 @@ export function createFileOperationApprovalStore({
       kind,
       trustedRoot: path.resolve(trustedRoot),
       operationsHash: hashApproval({ kind, trustedRoot, operations }),
-      scope: scopeFromContext(context),
+      scope: scopeFromRequest(request),
       expiresAt: now() + ttlMs,
       used: false,
     });
@@ -110,8 +117,9 @@ export function createFileOperationApprovalStore({
 
   function consume(
     id: unknown,
-    { kind, trustedRoot, operations, context }: FileOperationApprovalRequest,
+    request: FileOperationApprovalRequest,
   ): FileOperationApproval {
+    const { kind, trustedRoot, operations } = request;
     cleanup();
     if (!id || typeof id !== 'string') {
       throw makeHttpError(428, 'file operation approval is required');
@@ -120,7 +128,7 @@ export function createFileOperationApprovalStore({
     if (!approval) {
       throw makeHttpError(403, 'file operation approval is invalid or expired');
     }
-    const scope = scopeFromContext(context);
+    const scope = scopeFromRequest(request);
     const expectedHash = hashApproval({ kind, trustedRoot, operations });
     const expectedRoot = path.resolve(trustedRoot);
     if (

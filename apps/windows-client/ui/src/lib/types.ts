@@ -8,6 +8,8 @@ export type MessageRole = 'user' | 'assistant';
 export type ApprovalState = 'idle' | 'awaiting' | 'approved' | 'rejected';
 export type TodoStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected';
 export type SubtaskStatus = 'running' | 'done' | 'failed';
+export type PermissionMode = 'plan' | 'manual' | 'guarded_auto';
+export type AgentMode = 'plan' | 'execute' | 'auto';
 
 export interface FileOperation {
   type: 'write' | 'rename' | 'move' | string;

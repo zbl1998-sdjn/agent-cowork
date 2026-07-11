@@ -65,23 +65,46 @@ async function jsonRequest(base: string, route: string, options: JsonRequestOpti
 
 test('clarification store normalizes options and answers', () => {
   const store = createClarificationStore();
-  const q = store.create({ question: '选哪个格式?', options: ['Word', { label: 'PDF', description: '便携' }] });
+  const context = { tenantId: 'tenant_test', userId: 'user_test' };
+  const q = store.create({ question: '选哪个格式?', options: ['Word', { label: 'PDF', description: '便携' }], context });
   assert.match(q.id, /^clr_/);
   assert.equal(q.options.length, 2);
   assert.equal(present(q.options[0], 'first clarification option').label, 'Word');
   assert.equal(present(q.options[1], 'second clarification option').description, '便携');
   assert.equal(q.status, 'pending');
-  const a = store.answer(q.id, 'PDF');
+  const a = store.answer(q.id, 'PDF', context);
   assert.equal(a.status, 'answered');
   assert.equal(a.answer, 'PDF');
-  assert.throws(() => store.create({ question: '' }), (error) => {
+  assert.throws(() => store.create({ question: '', context }), (error) => {
     assert.equal(recordValue(error, 'empty question error').statusCode, 400);
     return true;
   });
-  assert.throws(() => store.answer('ghost', 'x'), (error) => {
+  assert.throws(() => store.answer('ghost', 'x', context), (error) => {
     assert.equal(recordValue(error, 'missing clarification error').statusCode, 404);
     return true;
   });
+});
+
+test('clarification store snapshots canonical owners and fails closed for invalid readers', () => {
+  const store = createClarificationStore();
+  const context = { tenantId: 'tenant_a', userId: 'user_a', traceId: 'trace_secret' };
+  const created = store.create({ question: '继续吗?', context });
+  assert.deepEqual(created.context, { tenantId: 'tenant_a', userId: 'user_a' });
+  context.tenantId = 'tenant_b';
+  assert.ok(store.get(created.id, { tenantId: 'tenant_a', userId: 'user_a' }));
+  assert.equal(store.get(created.id, { tenantId: ' tenant_a', userId: 'user_a' }), null);
+  assert.deepEqual(store.list({ tenantId: 'tenant_a' }), []);
+  assert.throws(
+    () => store.answer(created.id, 'yes', { tenantId: 'tenant_a' }),
+    (error) => recordValue(error, 'invalid reader error').statusCode === 404,
+  );
+  assert.throws(
+    () => store.create({
+      question: 'bad owner',
+      context: { tenantId: ' tenant_a', userId: 'user_a' },
+    }),
+    (error) => recordValue(error, 'invalid owner error').statusCode === 400,
+  );
 });
 
 test('clarify routes: create -> get -> answer round-trip', async () => {

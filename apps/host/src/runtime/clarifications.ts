@@ -3,6 +3,10 @@
 // 职责:AskUserQuestion / 澄清协议的传输原语。需要消歧的回合创建一个带选项的待决问题,UI 渲染并回传答案。
 //       这是「结构化澄清」背后的待决登记(带 TTL)。依赖:node:crypto。导出:澄清登记表。
 import crypto from 'node:crypto';
+import {
+  requireIdentityScopeFrom,
+  type IdentityScope,
+} from '../security/identity-scope.js';
 
 export type ClarificationOption = { label: string; description: string };
 type ClarificationEntry = {
@@ -16,11 +20,12 @@ type ClarificationEntry = {
   _ts: number;
 };
 export type PublicClarification = Omit<ClarificationEntry, '_ts'>;
+type ClarificationContext = Record<string, unknown>;
 export type ClarificationStore = {
-  create(input: { question?: unknown; options?: unknown; context?: Record<string, unknown> }): PublicClarification;
-  get(id: string): PublicClarification | null;
-  answer(id: string, value: unknown): PublicClarification;
-  list(): PublicClarification[];
+  create(input: { question?: unknown; options?: unknown; context: ClarificationContext }): PublicClarification;
+  get(id: string, context: ClarificationContext): PublicClarification | null;
+  answer(id: string, value: unknown, context: ClarificationContext): PublicClarification;
+  list(context: ClarificationContext): PublicClarification[];
 };
 
 /**
@@ -28,6 +33,25 @@ export type ClarificationStore = {
  */
 export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: number } = {}): ClarificationStore {
   const map = new Map<string, ClarificationEntry>();
+
+  function owner(context: ClarificationContext): IdentityScope | null {
+    try {
+      return requireIdentityScopeFrom(context, { label: 'clarification identity' });
+    } catch {
+      return null;
+    }
+  }
+
+  function ownedEntry(id: string, context: ClarificationContext): ClarificationEntry | null {
+    const entry = map.get(id);
+    const expected = entry ? owner(entry.context) : null;
+    const actual = owner(context);
+    return entry && expected && actual
+      && expected.tenantId === actual.tenantId
+      && expected.userId === actual.userId
+      ? entry
+      : null;
+  }
 
   function toPublic(entry: ClarificationEntry): PublicClarification {
     const { _ts, ...rest } = entry;
@@ -56,9 +80,15 @@ export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: n
   }
 
   return {
-    create({ question, options = [], context = {} }) {
+    create({ question, options = [], context }) {
       if (!question || !String(question).trim()) {
         const err = new Error('clarification question is required') as Error & { statusCode?: number };
+        err.statusCode = 400;
+        throw err;
+      }
+      const entryOwner = owner(context);
+      if (!entryOwner) {
+        const err = new Error('clarification owner context is required') as Error & { statusCode?: number };
         err.statusCode = 400;
         throw err;
       }
@@ -70,21 +100,22 @@ export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: n
         options: normalizeOptions(options),
         status: 'pending',
         answer: null,
-        context: context && typeof context === 'object' && !Array.isArray(context)
-          ? context
-          : {},
+        context: Object.freeze({
+          tenantId: entryOwner.tenantId,
+          userId: entryOwner.userId,
+        }),
         createdAt: new Date().toISOString(),
         _ts: Date.now(),
       };
       map.set(id, entry);
       return toPublic(entry);
     },
-    get(id) {
-      const entry = map.get(id);
+    get(id, context) {
+      const entry = ownedEntry(id, context);
       return entry ? toPublic(entry) : null;
     },
-    answer(id, value) {
-      const entry = map.get(id);
+    answer(id, value, context) {
+      const entry = ownedEntry(id, context);
       if (!entry) {
         const err = new Error(`clarification not found: ${id}`) as Error & { statusCode?: number };
         err.statusCode = 404;
@@ -95,9 +126,11 @@ export function createClarificationStore({ ttlMs = 30 * 60 * 1000 }: { ttlMs?: n
       entry._ts = Date.now();
       return toPublic(entry);
     },
-    list() {
+    list(context) {
       prune();
-      return [...map.values()].map(toPublic);
+      return [...map.values()]
+        .filter((entry) => ownedEntry(entry.id, context))
+        .map(toPublic);
     },
   };
 }

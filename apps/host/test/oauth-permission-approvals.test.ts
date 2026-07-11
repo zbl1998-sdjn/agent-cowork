@@ -116,3 +116,24 @@ test('OAuth permission approvals expire and reject missing receipt ids', () => {
     expectedHttpError(428, /required/i),
   );
 });
+
+test('OAuth permission approval scope defaults only when context is omitted', () => {
+  const { store } = createStore();
+  const base = { connectorId: 'github', provider: 'github', scopes: ['read:user'] };
+  const legacy = store.issue(base);
+  assert.equal(store.consume(legacy.id, base).id, legacy.id);
+
+  for (const context of [
+    {},
+    { tenantId: 'tenant-a' },
+    { userId: 'user-a' },
+    { tenantId: ' tenant-a', userId: 'user-a' },
+  ]) {
+    assert.throws(() => store.issue({ ...base, context }), /canonical tenantId and userId are required/i);
+  }
+  const explicitUndefined = Object.defineProperty({ ...base }, 'context', {
+    enumerable: true,
+    value: undefined,
+  });
+  assert.throws(() => store.issue(explicitUndefined), /canonical tenantId and userId are required/i);
+});

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { callThenAnswer, createAgentApprovalRegistry, mutatingTool, parseApprovalPayload, tool } from './helpers/approvals.js';
 import { tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('high-risk tool is gated behind approval (approve once)', async () => {
   let executed = false;
@@ -12,7 +13,7 @@ test('high-risk tool is gated behind approval (approve once)', async () => {
   const root = tempRoot('kcw-apr-');
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [tool('Shell', 'high', () => { executed = true; })],
@@ -36,7 +37,7 @@ test('rejected high-risk tool does not run', async () => {
   const root = tempRoot('kcw-apr-');
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [tool('Shell', 'high', () => { executed = true; })],
@@ -58,7 +59,7 @@ test('requiresApproval and critical risk tools are gated even when not mutating'
   let asked = 0;
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [
@@ -82,7 +83,7 @@ test('requiresApproval and critical risk tools are gated even when not mutating'
   const approvals2 = createAgentApprovalRegistry();
   await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs2'),
     tools: [
@@ -104,7 +105,7 @@ test('low-risk tool runs without approval', async () => {
   const root = tempRoot('kcw-apr-');
   await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [tool('Write', 'low', () => { executed = true; })],
@@ -125,7 +126,7 @@ test('autoApprove auto-approves non-high mutations but high-risk stays explicit'
   const root = tempRoot('kcw-apr-');
   await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [mutatingTool('SaveDraft', 'write', () => { writeRan = true; })],
@@ -144,7 +145,7 @@ test('autoApprove auto-approves non-high mutations but high-risk stays explicit'
   let asked = 0;
   await runAgentChat({
     prompt: 'x',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: path.join(root, 'runs'),
     tools: [mutatingTool('Shell', 'high', () => { shellRan = true; })],

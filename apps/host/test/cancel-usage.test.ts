@@ -8,6 +8,7 @@ import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
 import type { AgentTool } from '../src/kimi/agent/tool-loop-support.js';
 import { createServer } from '../src/server.js';
 import { bind, close, readableBody, recordValue, stringField, tempRoot } from './helpers/host-http.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG, TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 const noop: AgentTool = {
   name: 'noop',
@@ -119,7 +120,7 @@ test('runAgentChat accumulates token usage across model calls', async () => {
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: {},
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [noop],
     modelCall,
@@ -143,7 +144,7 @@ test('runAgentChat stops between steps when the abort signal fires', async () =>
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: {},
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [noop],
     modelCall,
@@ -163,7 +164,7 @@ test('E2E /api/agent/chat/stream: POST /api/runs/:id/cancel stops the run with a
     await new Promise((resolve) => setTimeout(resolve, 30));
     return { content: '', tool_calls: [{ id: `c${n}`, function: { name: 'Glob', arguments: JSON.stringify({ pattern: '*' }) } }] };
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, {
@@ -195,7 +196,7 @@ test('E2E /api/agent/chat/stream: POST /api/runs/:id/cancel revokes pending appr
     content: '',
     tool_calls: [{ id: 'w1', function: { name: 'Write', arguments: JSON.stringify({ path: 'late-approve.txt', content: 'leaked' }) } }],
   });
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, {
@@ -265,7 +266,7 @@ test('E2E /api/agent/chat/stream: cancelled run resumes from checkpoint without 
       signal.addEventListener('abort', onAbort, { once: true });
     });
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: okKimiChat, agentModelCall });
   const base = await bind(server);
   try {
     const first = await fetch(`${base}/api/agent/chat/stream`, {

@@ -10,6 +10,7 @@ import type { ApprovalRegistry as AgentApprovalRegistry } from '../src/kimi/agen
 import type { ModelCall, ModelCallArgs } from '../src/kimi/agent/model-resilience.js';
 import type { KimiTextResult } from '../src/kimi/api-runner.js';
 import type { HostServer } from '../src/server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG, TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 type ChatMessage = Record<string, unknown> & { role?: unknown; content?: unknown };
 type QuestionPayload = { id: string; question: string; options: Array<{ label: string }> };
@@ -59,7 +60,7 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
     events.push({ t, d: payload });
     if (t === 'question' && typeof payload.id === 'string') approvals.respond(payload.id, '方案B');
   };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: {}, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
   assert.ok(tools.some((t) => t.name === 'AskUserQuestion'), 'AskUserQuestion tool present');
 
   const captured: { message: ChatMessage | undefined } = { message: undefined };
@@ -73,7 +74,7 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
   };
   const out = await runAgentChat({
     prompt: '请在 README.md 里的方案A和方案B之间帮我选择一个导出方案',
-    kimiConfig: {},
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -102,7 +103,7 @@ test('clarification-first preflights vague prompts before the first model call',
     events.push({ t, d: payload });
     if (t === 'question' && typeof payload.id === 'string') approvals.respond(payload.id, '请审查 README.md 并列出风险');
   };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: {}, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
 
   const capture: { firstUserMessage: ChatMessage | undefined } = { firstUserMessage: undefined };
   const modelCall: ModelCall = async (args) => {
@@ -112,7 +113,7 @@ test('clarification-first preflights vague prompts before the first model call',
   };
   const out = await runAgentChat({
     prompt: '帮我处理一下',
-    kimiConfig: {},
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -137,7 +138,7 @@ test('clarification-first skips already explicit prompts', async () => {
   const approvals = createApprovalRegistry();
   const events: UiEvent[] = [];
   const emit = (t: string, d: unknown) => { events.push({ t, d: recordPayload(d) }); };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: {}, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
 
   const capture: { firstUserMessage: ChatMessage | undefined } = { firstUserMessage: undefined };
   const modelCall: ModelCall = async (args) => {
@@ -147,7 +148,7 @@ test('clarification-first skips already explicit prompts', async () => {
   };
   await runAgentChat({
     prompt: '请审查 README.md 的安装说明并列出具体问题',
-    kimiConfig: {},
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -162,6 +163,60 @@ test('clarification-first skips already explicit prompts', async () => {
   assert.doesNotMatch(String(capture.firstUserMessage.content), /用户澄清/);
 });
 
+test('AskUserQuestion fails closed when approval persistence fails', async () => {
+  const root = tmp();
+  const events: UiEvent[] = [];
+  const tools = buildAgentToolset({
+    ctx: { trustedRoot: root, context: { tenantId: 'tenant-a', userId: 'user-a' } },
+    agentDeps: {
+      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelCall: async () => ({}),
+      approvals: {
+        request: () => ({
+          id: 'question_persistence_failed',
+          promise: Promise.reject(new Error('postgres persistence unavailable')),
+        }),
+      },
+      emit: (t, d) => events.push({ t, d: recordPayload(d) }),
+    },
+  });
+  const questionTool = tools.find((tool) => tool.name === 'AskUserQuestion');
+  assert.ok(questionTool?.handler);
+
+  const result = await questionTool.handler({ question: '继续吗?', options: ['是', '否'] });
+  assert.deepEqual(result, {
+    error: '审批问题未能持久化，已失败关闭',
+    code: 'APPROVAL_REQUIRED',
+  });
+  assert.equal(events.some((event) => event.t === 'question'), true);
+  assert.doesNotMatch(JSON.stringify(result), /postgres/i);
+});
+
+test('AskUserQuestion does not publish the question before durable readiness', async () => {
+  const root = tmp();
+  const events: UiEvent[] = [];
+  let markReady: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => { markReady = resolve; });
+  const tools = buildAgentToolset({
+    ctx: { trustedRoot: root, context: { tenantId: 'tenant-a', userId: 'user-a' } },
+    agentDeps: {
+      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelCall: async () => ({}),
+      approvals: {
+        request: () => ({ id: 'question_ready', ready, promise: Promise.resolve('是') }),
+      },
+      emit: (t, d) => events.push({ t, d: recordPayload(d) }),
+    },
+  });
+  const questionTool = tools.find((tool) => tool.name === 'AskUserQuestion');
+  assert.ok(questionTool?.handler);
+  const result = questionTool.handler({ question: '继续吗?', options: ['是', '否'] });
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  assert.equal(events.some((event) => event.t === 'question'), false);
+  markReady?.();
+  assert.deepEqual(await result, { answer: '是' });
+});
+
 test('E2E /api/agent/chat/stream: question frame over SSE, POST { answer } resumes the run', async () => {
   const root = tmp();
   let n = 0;
@@ -170,7 +225,7 @@ test('E2E /api/agent/chat/stream: question frame over SSE, POST { answer } resum
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '导出什么格式?', options: ['PDF', 'Excel'] }) } }] };
     return { content: '已按所选格式导出。' };
   };
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => fakeKimiTextResult(), agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => fakeKimiTextResult(), agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '导出报告' }) });

@@ -76,7 +76,7 @@ test('pre-tool hook writes a blocked tool result and leaves allowed tools untouc
       blocked: () => false,
     },
     name: 'Read',
-    args: { path: 'a.txt' },
+    args: { command: 'npm test' },
     steps,
     audit: auditTo(events),
     emit: emitTo(events),
@@ -189,6 +189,35 @@ test('ExitPlanMode auto approval still writes the tool response and todo snapsho
   assert.match(String(messages[0]?.content), /计划已批准/);
 });
 
+test('ExitPlanMode fails closed when the approval registry is unavailable', async () => {
+  const events: Event[] = [];
+  const steps: Record<string, unknown>[] = [];
+  const messages: Record<string, unknown>[] = [];
+
+  const result = await handleExitPlanMode({
+    name: 'ExitPlanMode',
+    args: { plan: '- 修改安全配置' },
+    hasApprovals: false,
+    autoApprove: false,
+    approvals: null,
+    emit: emitTo(events),
+    audit: auditTo(events),
+    steps,
+    messages,
+    call: { id: 'call_missing_registry' },
+  });
+
+  assert.deepEqual(result, { handled: true, planApproved: false });
+  assert.deepEqual(steps[0], { tool: 'ExitPlanMode', ok: false, approvalUnavailable: true });
+  assert.equal(events.at(-2)?.payload.kind, 'plan.approval_unavailable');
+  assert.deepEqual(events.at(-1)?.payload, {
+    name: 'ExitPlanMode',
+    status: 'blocked',
+    result: { error: '计划必须经过显式审批，但当前审批服务不可用', code: 'APPROVAL_REQUIRED' },
+  });
+  assert.match(String(messages[0]?.content), /APPROVAL_REQUIRED/);
+});
+
 test('plan-mode block writes a tool result only before approval', () => {
   const events: Event[] = [];
   const steps: Record<string, unknown>[] = [];
@@ -247,6 +276,16 @@ test('tool approval handles early exits, auto approval, session approval, and re
   assert.equal(await requestToolApproval({ ...base, needsApproval: true, planMode: true, planApproved: true }), false);
   assert.equal(events.at(-1)?.payload.via, 'plan');
 
+  const lowRiskRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({
+    ...base,
+    needsApproval: true,
+    approvals: approval('session', lowRiskRequests),
+  }), false);
+  assert.equal(sessionApproved.has('Write'), true);
+  assert.equal(lowRiskRequests.length, 1);
+  sessionApproved.clear();
+
   const requests: Record<string, unknown>[] = [];
   assert.equal(await requestToolApproval({
     ...base,
@@ -254,18 +293,36 @@ test('tool approval handles early exits, auto approval, session approval, and re
     approvals: approval('session', requests),
     tool: { name: 'Shell', risk: 'high', mutating: true },
     name: 'Shell',
+    args: { command: 'npm test' },
   }), false);
   assert.deepEqual(requests[0], {
+    kind: 'tool',
     name: 'Shell',
-    args: { path: 'a.txt' },
+    args: { command: 'npm test' },
     risk: 'high',
     runId: 'run_1',
     tenantId: 'tenant-a',
     userId: 'user-a',
   });
-  assert.equal(sessionApproved.has('Shell'), true);
+  assert.equal(sessionApproved.has('Shell'), false, 'high-risk approvals must never enter the reusable session cache');
   assert.equal(events.at(-2)?.type, 'approval_request');
+  assert.equal(events.at(-2)?.payload.sessionReusable, false);
   assert.equal(events.at(-1)?.payload.kind, 'tool.approved');
+  assert.equal(events.at(-1)?.payload.decision, 'once');
+  assert.equal(events.at(-1)?.payload.requestedDecision, 'session');
+
+  sessionApproved.add('Shell'); // legacy checkpoint/cache entry must not bypass an explicit approval.
+  assert.equal(await requestToolApproval({
+    ...base,
+    needsApproval: true,
+    approvals: approval('once', requests),
+    tool: { name: 'Shell', risk: 'high', mutating: true },
+    name: 'Shell',
+    args: { command: 'npm publish' },
+  }), false);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[1]?.args, { command: 'npm publish' });
+  sessionApproved.delete('Shell');
 
   const rejectedMessages: Record<string, unknown>[] = [];
   const rejectedSteps: Record<string, unknown>[] = [];
@@ -344,4 +401,316 @@ test('high-risk and critical tools still require approval requests despite auto 
   assert.equal(requests.length, 2);
   assert.equal(requests[1]?.name, 'VaultWrite');
   assert.equal(requests[1]?.risk, 'critical');
+});
+
+test('explicit requiresApproval metadata cannot be bypassed by auto or plan approval', async () => {
+  const requests: Record<string, unknown>[] = [];
+  const events: Event[] = [];
+  const base = {
+    needsApproval: true,
+    hasApprovals: true,
+    approvals: approval('once', requests),
+    sessionApproved: new Set<string>(),
+    name: 'ExportPreview',
+    args: { destination: 'report.pdf' },
+    tool: { name: 'ExportPreview', risk: 'low', requiresApproval: true },
+    emit: emitTo(events),
+    audit: auditTo(events),
+    steps: [] as Record<string, unknown>[],
+    messages: [] as Record<string, unknown>[],
+    call: { id: 'call_explicit' },
+  };
+
+  assert.equal(await requestToolApproval({
+    ...base,
+    autoApprove: true,
+    planMode: false,
+    planApproved: false,
+  }), false);
+  assert.equal(requests.length, 1, 'autoApprove must still request explicit approval');
+
+  assert.equal(await requestToolApproval({
+    ...base,
+    autoApprove: false,
+    planMode: true,
+    planApproved: true,
+  }), false);
+  assert.equal(requests.length, 2, 'an approved plan must still request explicit tool approval');
+  assert.equal(events.filter((event) => event.type === 'approval_request').length, 2);
+});
+
+test('approval gate treats unknown registry values as rejection', async () => {
+  const planSteps: Record<string, unknown>[] = [];
+  const planMessages: Record<string, unknown>[] = [];
+  const planEvents: Event[] = [];
+  assert.deepEqual(await handleExitPlanMode({
+    name: 'ExitPlanMode',
+    args: { plan: 'write files' },
+    hasApprovals: true,
+    autoApprove: false,
+    approvals: approval('unexpected'),
+    emit: emitTo(planEvents),
+    audit: auditTo(planEvents),
+    steps: planSteps,
+    messages: planMessages,
+    call: { id: 'call_plan_unknown' },
+  }), { handled: true, planApproved: false });
+  assert.equal(planEvents.some((event) => event.payload.kind === 'plan.rejected'), true);
+
+  const toolSteps: Record<string, unknown>[] = [];
+  const toolMessages: Record<string, unknown>[] = [];
+  const toolEvents: Event[] = [];
+  assert.equal(await requestToolApproval({
+    needsApproval: true,
+    hasApprovals: true,
+    approvals: approval('unexpected'),
+    sessionApproved: new Set<string>(),
+    name: 'Shell',
+    args: { command: 'npm test' },
+    tool: { name: 'Shell', risk: 'high', mutating: true },
+    emit: emitTo(toolEvents),
+    audit: auditTo(toolEvents),
+    steps: toolSteps,
+    messages: toolMessages,
+    call: { id: 'call_tool_unknown' },
+    autoApprove: false,
+    planMode: false,
+    planApproved: false,
+  }), true);
+  assert.deepEqual(toolSteps[0], { tool: 'Shell', ok: false, rejected: true });
+  assert.equal(toolEvents.some((event) => event.payload.kind === 'tool.rejected'), true);
+});
+
+test('approval persistence failures fail closed for plan and tool requests', async () => {
+  const planEvents: Event[] = [];
+  const planSteps: Record<string, unknown>[] = [];
+  const planMessages: Record<string, unknown>[] = [];
+  const failedPlanApprovals: ApprovalRegistry = {
+    request: () => ({
+      id: 'approval_plan_failed',
+      promise: Promise.reject(new Error('postgres persistence unavailable')),
+    }),
+  };
+
+  assert.deepEqual(await handleExitPlanMode({
+    name: 'ExitPlanMode',
+    args: { plan: '修改安全配置' },
+    hasApprovals: true,
+    autoApprove: false,
+    approvals: failedPlanApprovals,
+    emit: emitTo(planEvents),
+    audit: auditTo(planEvents),
+    steps: planSteps,
+    messages: planMessages,
+    call: { id: 'call_plan_persistence_failed' },
+    context: { tenantId: 'tenant-a', userId: 'user-a' },
+  }), { handled: true, planApproved: false });
+  assert.deepEqual(planSteps, [{ tool: 'ExitPlanMode', ok: false, approvalUnavailable: true }]);
+  assert.equal(planEvents.some((event) => event.payload.kind === 'plan.approval_persistence_failed'), true);
+  assert.match(String(planMessages[0]?.content), /APPROVAL_REQUIRED/);
+  assert.doesNotMatch(String(planMessages[0]?.content), /postgres/i);
+
+  const toolEvents: Event[] = [];
+  const toolSteps: Record<string, unknown>[] = [];
+  const toolMessages: Record<string, unknown>[] = [];
+  const failedToolApprovals: ApprovalRegistry = {
+    request: () => { throw new Error('postgres request failed'); },
+  };
+  assert.equal(await requestToolApproval({
+    needsApproval: true,
+    hasApprovals: true,
+    approvals: failedToolApprovals,
+    sessionApproved: new Set<string>(),
+    name: 'Shell',
+    args: { command: 'npm test' },
+    tool: { name: 'Shell', risk: 'high', mutating: true },
+    emit: emitTo(toolEvents),
+    audit: auditTo(toolEvents),
+    steps: toolSteps,
+    messages: toolMessages,
+    call: { id: 'call_tool_persistence_failed' },
+    autoApprove: false,
+    planMode: false,
+    planApproved: false,
+    context: { tenantId: 'tenant-a', userId: 'user-a' },
+  }), true);
+  assert.deepEqual(toolSteps, [{ tool: 'Shell', ok: false, approvalUnavailable: true }]);
+  assert.equal(toolEvents.some((event) => event.payload.kind === 'tool.approval_persistence_failed'), true);
+  assert.match(String(toolMessages[0]?.content), /APPROVAL_REQUIRED/);
+  assert.doesNotMatch(String(toolMessages[0]?.content), /postgres/i);
+});
+
+test('approval request and readiness failures stay fail closed at every durable boundary', async () => {
+  const planRegistries: Array<{ stage: string; registry: ApprovalRegistry }> = [
+    {
+      stage: 'request',
+      registry: { request: () => { throw new Error('request failed'); } },
+    },
+    {
+      stage: 'ready',
+      registry: {
+        request: () => ({
+          id: 'approval_plan_not_ready',
+          ready: Promise.reject(new Error('ready failed')),
+          promise: Promise.resolve('once'),
+        }),
+      },
+    },
+  ];
+
+  for (const { stage, registry } of planRegistries) {
+    const events: Event[] = [];
+    const steps: Record<string, unknown>[] = [];
+    const messages: Record<string, unknown>[] = [];
+    assert.deepEqual(await handleExitPlanMode({
+      name: 'ExitPlanMode',
+      args: {},
+      hasApprovals: true,
+      autoApprove: false,
+      approvals: registry,
+      emit: emitTo(events),
+      audit: auditTo(events),
+      steps,
+      messages,
+      call: { id: `call_plan_${stage}` },
+    }), { handled: true, planApproved: false });
+    assert.deepEqual(steps, [{ tool: 'ExitPlanMode', ok: false, approvalUnavailable: true }]);
+    assert.equal(events.some((event) => event.type === 'plan_proposed'), false);
+    assert.equal(events.some((event) => event.payload.kind === 'plan.approval_persistence_failed'), true);
+    assert.match(String(messages[0]?.content), /APPROVAL_REQUIRED/);
+  }
+
+  const toolRegistries: Array<{ stage: string; registry: ApprovalRegistry }> = [
+    {
+      stage: 'ready',
+      registry: {
+        request: () => ({
+          id: 'approval_tool_not_ready',
+          ready: Promise.reject(new Error('ready failed')),
+          promise: Promise.resolve('once'),
+        }),
+      },
+    },
+    {
+      stage: 'decision',
+      registry: {
+        request: () => ({
+          id: 'approval_tool_decision_failed',
+          promise: Promise.reject(new Error('decision failed')),
+        }),
+      },
+    },
+  ];
+
+  for (const { stage, registry } of toolRegistries) {
+    const events: Event[] = [];
+    const steps: Record<string, unknown>[] = [];
+    const messages: Record<string, unknown>[] = [];
+    assert.equal(await requestToolApproval({
+      needsApproval: true,
+      hasApprovals: true,
+      approvals: registry,
+      sessionApproved: new Set<string>(),
+      name: 'Shell',
+      args: { command: 'npm test' },
+      tool: { name: 'Shell', risk: 'high', mutating: true },
+      emit: emitTo(events),
+      audit: auditTo(events),
+      steps,
+      messages,
+      call: { id: `call_tool_${stage}` },
+      autoApprove: false,
+      planMode: false,
+      planApproved: false,
+    }), true);
+    assert.deepEqual(steps, [{ tool: 'Shell', ok: false, approvalUnavailable: true }]);
+    assert.equal(events.some((event) => event.payload.kind === 'tool.approval_persistence_failed'), true);
+    assert.match(String(messages[0]?.content), /APPROVAL_REQUIRED/);
+  }
+});
+
+test('tool approval includes an explicit preview in the durable request and event', async () => {
+  const events: Event[] = [];
+  const requests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({
+    needsApproval: true,
+    hasApprovals: true,
+    approvals: approval('once', requests),
+    sessionApproved: new Set<string>(),
+    name: 'Write',
+    args: { path: 'report.md' },
+    tool: {
+      name: 'Write',
+      risk: 'low',
+      mutating: true,
+      approvalPreview: (args) => ({ path: args.path, operation: 'write' }),
+    },
+    emit: emitTo(events),
+    audit: auditTo(events),
+    steps: [],
+    messages: [],
+    call: { id: 'call_preview' },
+    autoApprove: false,
+    planMode: false,
+    planApproved: false,
+  }), false);
+
+  const preview = { path: 'report.md', operation: 'write' };
+  assert.deepEqual(requests[0]?.preview, preview);
+  assert.deepEqual(events.find((event) => event.type === 'approval_request')?.payload.preview, preview);
+});
+
+test('approval events are not published before durable readiness', async () => {
+  let markReady: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => { markReady = resolve; });
+  const registry = {
+    request: () => ({ id: 'approval_ready', ready, promise: Promise.resolve('once') }),
+  } as ApprovalRegistry;
+
+  const planEvents: Event[] = [];
+  const planResult = handleExitPlanMode({
+    name: 'ExitPlanMode',
+    args: { plan: '修改配置' },
+    hasApprovals: true,
+    autoApprove: false,
+    approvals: registry,
+    emit: emitTo(planEvents),
+    audit: auditTo(planEvents),
+    steps: [],
+    messages: [],
+    call: { id: 'call_plan_ready' },
+    context: { tenantId: 'tenant-a', userId: 'user-a' },
+  });
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  assert.equal(planEvents.some((event) => event.type === 'plan_proposed'), false);
+  markReady?.();
+  assert.deepEqual(await planResult, { handled: true, planApproved: true });
+
+  let markToolReady: (() => void) | undefined;
+  const toolReady = new Promise<void>((resolve) => { markToolReady = resolve; });
+  const toolEvents: Event[] = [];
+  const toolResult = requestToolApproval({
+    needsApproval: true,
+    hasApprovals: true,
+    approvals: {
+      request: () => ({ id: 'tool_ready', ready: toolReady, promise: Promise.resolve('once') }),
+    } as ApprovalRegistry,
+    sessionApproved: new Set<string>(),
+    name: 'Shell',
+    args: { command: 'npm test' },
+    tool: { name: 'Shell', risk: 'high', mutating: true },
+    emit: emitTo(toolEvents),
+    audit: auditTo(toolEvents),
+    steps: [],
+    messages: [],
+    call: { id: 'call_tool_ready' },
+    autoApprove: false,
+    planMode: false,
+    planApproved: false,
+    context: { tenantId: 'tenant-a', userId: 'user-a' },
+  });
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  assert.equal(toolEvents.some((event) => event.type === 'approval_request'), false);
+  markToolReady?.();
+  assert.equal(await toolResult, false);
 });
