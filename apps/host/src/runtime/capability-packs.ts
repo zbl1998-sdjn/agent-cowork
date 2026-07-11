@@ -5,158 +5,51 @@
 import { buildRuntimeDependencyInstallPlan } from './dependency-install-plan.js';
 import { RUNTIME_DEPENDENCY_CATALOG } from './dependencies-catalog.js';
 import type { RuntimeDependencyInstallPlanOptions } from './dependency-install-plan-types.js';
+import {
+  auditCapabilityPacks,
+  type CapabilityPackManifest,
+  type GovernedCapabilityPack,
+} from '../skills/capability-pack-governance.js';
+import { CAPABILITY_PACK_CATALOG } from '../skills/capability-pack-catalog.js';
 
-export type CapabilityPackCategory = 'capability' | 'role' | 'connector' | 'model' | 'design';
-export type CapabilityPack = {
-  schemaVersion: 'agent-cowork.pack.v1';
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  category: CapabilityPackCategory;
-  publisher: string;
-  license: string;
-  capabilities: string[];
-  dependencyIds: string[];
-  requiredPackIds: string[];
-  recommendedForRoles: string[];
-  permissions: Array<{ kind: string; scope: string; reason: string; default: 'deny' | 'ask' | 'allow' }>;
-  installMode: 'bundled' | 'plan-only';
-  security: {
-    signed: boolean;
-    sandboxRequired: boolean;
-    networkDuringRuntime: 'none' | 'ask' | 'required';
-  };
-};
+export type {
+  CapabilityPackAuditOptions,
+  CapabilityPackCategory,
+  CapabilityPackGovernance,
+  CapabilityPackManifest,
+  GovernedCapabilityPack,
+} from '../skills/capability-pack-governance.js';
+export type CapabilityPack = CapabilityPackManifest;
 
-export type CapabilityRecommendation = CapabilityPack & {
+export type CapabilityRecommendation = GovernedCapabilityPack & {
   reason: string;
   missingDependencyIds: string[];
 };
 
-const PACKS: readonly CapabilityPack[] = Object.freeze([
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'core-text-pack',
-    name: 'Core Text Pack',
-    version: '0.1.0',
-    description: 'Markdown、TXT、JSON、CSV 等基础本地文本处理能力,随主包可用。',
-    category: 'capability',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['text.read', 'markdown.write', 'json.read', 'csv.read'],
-    dependencyIds: ['node', 'sqlite'],
-    requiredPackIds: [],
-    recommendedForRoles: ['developer', 'pm', 'legal', 'finance', 'hr', 'sales', 'design'],
-    permissions: [{ kind: 'filesystem', scope: 'trustedRoot', reason: '读取和写入用户批准的工作区文件。', default: 'ask' }],
-    installMode: 'bundled',
-    security: { signed: true, sandboxRequired: false, networkDuringRuntime: 'none' },
-  },
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'browser-automation-pack',
-    name: 'Browser Automation Pack',
-    version: '0.1.0',
-    description: '按需补齐 Chromium 截图、网页交互 smoke 与前端视觉验收能力。',
-    category: 'capability',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['browser.screenshot', 'web.smoke', 'ui.visual-check'],
-    dependencyIds: ['playwright-chromium'],
-    requiredPackIds: [],
-    recommendedForRoles: ['developer', 'design', 'pm'],
-    permissions: [{ kind: 'shell', scope: 'local-browser', reason: '启动本地浏览器执行截图和 smoke。', default: 'ask' }],
-    installMode: 'plan-only',
-    security: { signed: false, sandboxRequired: false, networkDuringRuntime: 'ask' },
-  },
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'frontend-design-pack',
-    name: 'Frontend Design Pack',
-    version: '0.1.0',
-    description: '前端 UI 编码的 design brief、组件扫描、静态审查与可选截图验收。',
-    category: 'design',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['design.brief', 'design.static-review', 'design.visual-smoke'],
-    dependencyIds: ['playwright-chromium'],
-    requiredPackIds: ['browser-automation-pack'],
-    recommendedForRoles: ['developer', 'design'],
-    permissions: [
-      { kind: 'filesystem', scope: 'trustedRoot', reason: '读取组件和样式以生成设计上下文。', default: 'ask' },
-      { kind: 'shell', scope: 'local-browser', reason: '可选启动本地浏览器生成截图。', default: 'ask' },
-    ],
-    installMode: 'plan-only',
-    security: { signed: false, sandboxRequired: false, networkDuringRuntime: 'ask' },
-  },
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'pdf-ocr-pack',
-    name: 'PDF OCR Pack',
-    version: '0.1.0',
-    description: '扫描件 PDF 和图片文字识别能力;缺失时应降级为文本页摘要。',
-    category: 'capability',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['pdf.read', 'ocr.scan'],
-    dependencyIds: ['tesseract-ocr', 'pandoc'],
-    requiredPackIds: [],
-    recommendedForRoles: ['legal', 'finance', 'hr', 'pm'],
-    permissions: [{ kind: 'filesystem', scope: 'trustedRoot', reason: '读取用户选择的 PDF/图片文件。', default: 'ask' }],
-    installMode: 'plan-only',
-    security: { signed: false, sandboxRequired: false, networkDuringRuntime: 'none' },
-  },
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'data-analysis-pack',
-    name: 'Data Analysis Pack',
-    version: '0.1.0',
-    description: 'CSV、Excel、统计和本地数据分析增强能力。',
-    category: 'capability',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['data.profile', 'data.analyze', 'chart.write'],
-    dependencyIds: ['data-science'],
-    requiredPackIds: [],
-    recommendedForRoles: ['finance', 'developer', 'pm'],
-    permissions: [{ kind: 'filesystem', scope: 'trustedRoot', reason: '读取用户批准的数据文件并写入产物。', default: 'ask' }],
-    installMode: 'plan-only',
-    security: { signed: false, sandboxRequired: true, networkDuringRuntime: 'none' },
-  },
-  {
-    schemaVersion: 'agent-cowork.pack.v1',
-    id: 'developer-role-pack',
-    name: 'Developer Role Pack',
-    version: '0.1.0',
-    description: '开发者岗位推荐包:代码理解、Git、浏览器验收和前端设计审查。',
-    category: 'role',
-    publisher: 'Agent Cowork',
-    license: 'internal',
-    capabilities: ['role.developer'],
-    dependencyIds: ['mingit', 'playwright-chromium'],
-    requiredPackIds: ['frontend-design-pack'],
-    recommendedForRoles: ['developer'],
-    permissions: [
-      { kind: 'filesystem', scope: 'trustedRoot', reason: '读取代码仓库和写入用户批准的补丁。', default: 'ask' },
-      { kind: 'shell', scope: 'git', reason: '运行只读 Git 检查或用户批准的仓库命令。', default: 'ask' },
-    ],
-    installMode: 'plan-only',
-    security: { signed: false, sandboxRequired: true, networkDuringRuntime: 'ask' },
-  },
-]);
-
-const packById = new Map(PACKS.map((pack) => [pack.id, pack]));
+const knownDependencyIds = new Set(RUNTIME_DEPENDENCY_CATALOG.map((item) => item.id));
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function dependencyExists(id: string): boolean {
-  return RUNTIME_DEPENDENCY_CATALOG.some((item) => item.id === id);
+function normalizeIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? unique(value.map((item) => String(item || '').trim()).filter(Boolean))
+    : [];
 }
 
-export function listCapabilityPacks(): CapabilityPack[] {
-  return PACKS.map((pack) => ({ ...pack, dependencyIds: [...pack.dependencyIds], requiredPackIds: [...pack.requiredPackIds] }));
+function dependencyExists(id: string): boolean {
+  return knownDependencyIds.has(id);
+}
+
+function governCapabilityPacks(
+  manifests: readonly CapabilityPackManifest[],
+): GovernedCapabilityPack[] {
+  return auditCapabilityPacks(manifests, { knownDependencyIds });
+}
+
+export function listCapabilityPacks(): GovernedCapabilityPack[] {
+  return governCapabilityPacks(CAPABILITY_PACK_CATALOG);
 }
 
 export function recommendCapabilityPacks(options: { role?: unknown; taskIntent?: unknown } = {}): CapabilityRecommendation[] {
@@ -173,37 +66,123 @@ export function recommendCapabilityPacks(options: { role?: unknown; taskIntent?:
     .map((pack) => ({
       ...pack,
       reason: role && pack.recommendedForRoles.includes(role) ? `匹配岗位 ${role}` : '匹配当前任务意图',
-      missingDependencyIds: pack.dependencyIds.filter(dependencyExists),
+      // “missing” means absent from the managed dependency catalog; installed
+      // state is intentionally not inferred from catalog membership.
+      missingDependencyIds: pack.dependencyIds.filter((id) => !dependencyExists(id)),
     }));
 }
 
-export function dependencyIdsForPacks(packIds: unknown): { dependencyIds: string[]; unknownPackIds: string[] } {
-  const ids = Array.isArray(packIds) ? packIds.map((item) => String(item || '').trim()).filter(Boolean) : [];
+function resolveCapabilityPacks(
+  packs: readonly GovernedCapabilityPack[],
+  packIds: unknown,
+): {
+  requestedPackIds: string[];
+  resolvedPacks: GovernedCapabilityPack[];
+  unknownPackIds: string[];
+  missingRequiredPackIds: string[];
+} {
+  const requestedPackIds = normalizeIds(packIds);
+  const packById = new Map(packs.map((pack) => [pack.id, pack]));
   const unknownPackIds: string[] = [];
-  const dependencyIds: string[] = [];
-  for (const id of ids) {
-    const pack = packById.get(id);
-    if (!pack) {
+  const missingRequiredPackIds: string[] = [];
+  const resolvedPacks: GovernedCapabilityPack[] = [];
+  const state = new Map<string, 'visiting' | 'visited'>();
+  for (const id of requestedPackIds) {
+    const rootPack = packById.get(id);
+    if (!rootPack) {
       unknownPackIds.push(id);
       continue;
     }
-    dependencyIds.push(...pack.dependencyIds);
+    if (state.has(id)) continue;
+    const stack = [{ pack: rootPack, requiredIds: normalizeIds(rootPack.requiredPackIds), nextRequiredIndex: 0 }];
+    state.set(id, 'visiting');
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      if (!frame) throw new Error('capability pack resolution stack invariant violated');
+      if (frame.nextRequiredIndex >= frame.requiredIds.length) {
+        state.set(frame.pack.id, 'visited');
+        resolvedPacks.push(frame.pack);
+        stack.pop();
+        continue;
+      }
+      const requiredId = frame.requiredIds[frame.nextRequiredIndex];
+      frame.nextRequiredIndex += 1;
+      if (!requiredId) continue;
+      const requiredPack = packById.get(requiredId);
+      if (!requiredPack) {
+        missingRequiredPackIds.push(requiredId);
+        continue;
+      }
+      if (state.has(requiredId)) continue;
+      state.set(requiredId, 'visiting');
+      stack.push({
+        pack: requiredPack,
+        requiredIds: normalizeIds(requiredPack.requiredPackIds),
+        nextRequiredIndex: 0,
+      });
+    }
   }
-  return { dependencyIds: unique(dependencyIds), unknownPackIds };
+
+  return {
+    requestedPackIds,
+    resolvedPacks,
+    unknownPackIds: unique(unknownPackIds),
+    missingRequiredPackIds: unique(missingRequiredPackIds),
+  };
 }
 
-export function buildCapabilityInstallPlan(options: RuntimeDependencyInstallPlanOptions & { packIds?: unknown } = {}) {
-  const fromPacks = dependencyIdsForPacks(options.packIds);
+export function dependencyIdsForPacks(packIds: unknown): { dependencyIds: string[]; unknownPackIds: string[] } {
+  const resolved = resolveCapabilityPacks(listCapabilityPacks(), packIds);
+  return {
+    dependencyIds: unique(resolved.resolvedPacks.flatMap((pack) => pack.dependencyIds)),
+    unknownPackIds: resolved.unknownPackIds,
+  };
+}
+
+export function buildCapabilityInstallPlan(
+  options: RuntimeDependencyInstallPlanOptions & { packIds?: unknown } = {},
+  manifests: readonly CapabilityPackManifest[] = CAPABILITY_PACK_CATALOG,
+) {
+  const resolved = resolveCapabilityPacks(governCapabilityPacks(manifests), options.packIds);
   const selectedIds = unique([
-    ...(Array.isArray(options.selectedIds) ? options.selectedIds.map((item) => String(item || '').trim()) : []),
-    ...fromPacks.dependencyIds,
+    ...normalizeIds(options.selectedIds),
+    ...resolved.resolvedPacks.flatMap((pack) => pack.dependencyIds),
   ]);
   const runtimePlan = buildRuntimeDependencyInstallPlan({ ...options, selectedIds });
+  const blockedPackIds = resolved.resolvedPacks
+    .filter((pack) => pack.governance.status === 'blocked')
+    .map((pack) => pack.id);
   return {
-    ok: runtimePlan.ok && fromPacks.unknownPackIds.length === 0,
-    packIds: Array.isArray(options.packIds) ? options.packIds.map((item) => String(item || '').trim()).filter(Boolean) : [],
-    unknownPackIds: fromPacks.unknownPackIds,
+    ok: runtimePlan.ok
+      && resolved.unknownPackIds.length === 0
+      && resolved.missingRequiredPackIds.length === 0
+      && blockedPackIds.length === 0,
+    packIds: resolved.requestedPackIds,
+    requestedPackIds: resolved.requestedPackIds,
+    resolvedPackIds: resolved.resolvedPacks.map((pack) => pack.id),
+    unknownPackIds: resolved.unknownPackIds,
+    missingRequiredPackIds: resolved.missingRequiredPackIds,
+    blockedPackIds,
     dependencyIds: selectedIds,
+    inheritedPermissions: resolved.resolvedPacks.flatMap((pack) => (
+      pack.permissions.map((permission) => ({
+        packId: pack.id,
+        packName: pack.name,
+        ...permission,
+      }))
+    )),
+    packGovernance: resolved.resolvedPacks.map((pack) => ({
+      id: pack.id,
+      name: pack.name,
+      version: pack.version,
+      installMode: pack.installMode,
+      requiredPackIds: [...pack.requiredPackIds],
+      security: { ...pack.security },
+      governance: {
+        ...pack.governance,
+        reasons: [...pack.governance.reasons],
+      },
+    })),
     runtimePlan,
   };
 }

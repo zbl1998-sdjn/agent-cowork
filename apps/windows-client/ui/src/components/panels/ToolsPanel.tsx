@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { searchTools, callTool, type ToolDescriptor, type SubagentStep } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Empty, ErrorState } from '../ui/StateViews';
+import { CapabilityPacksSection } from './CapabilityPacksSection';
 
 interface ToolsPanelProps {
   trustedRoot: string;
@@ -172,6 +173,7 @@ export function ToolsPanel({ trustedRoot, onRunPlan }: ToolsPanelProps) {
           <ToolsPanelPlanActions onRun={onRun} onClear={() => setPlan([])} />
         </div>
       )}
+      <CapabilityPacksSection />
     </section>
   );
 }
