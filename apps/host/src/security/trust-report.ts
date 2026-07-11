@@ -1,6 +1,7 @@
 // 信任报告(host L0 security).
 // 职责:汇总本地模式、模型出站、审计和安全检查,生成可给企业/用户查看的本地证据。
 import { readEgressAuditRecords, summariseEgressAudit } from './egress-audit.js';
+import { MODEL_EGRESS_APPROVAL_CAPABILITY } from './model-egress-approval.js';
 import { classifyModelProvider, decideModelProviderPolicy, resolveSecurityMode } from './security-mode.js';
 
 export type TrustReport = {
@@ -14,6 +15,7 @@ export type TrustReport = {
     providerClass: string;
     decision: string;
     reasonCode: string;
+    approvalCapability: 'unavailable' | 'not_required';
   };
   egress: ReturnType<typeof summariseEgressAudit>;
   checks: Array<{ id: string; status: 'pass' | 'warn' | 'fail'; detail: string }>;
@@ -38,11 +40,14 @@ export function buildTrustReport({
   const config = modelConfig || {};
   const policy = decideModelProviderPolicy(config, { securityMode: mode });
   const egress = summariseEgressAudit(readEgressAuditRecords(trustedRoot));
+  const approvalPending = policy.decision === 'needs_approval';
   const checks: TrustReport['checks'] = [
     {
       id: 'local-model-policy',
-      status: policy.allowed ? 'pass' : 'fail',
-      detail: policy.reasonCode,
+      status: policy.decision === 'allow' ? 'pass' : (approvalPending ? 'warn' : 'fail'),
+      detail: approvalPending
+        ? `${policy.reasonCode}; approval capability unavailable (${MODEL_EGRESS_APPROVAL_CAPABILITY.reasonCode})`
+        : policy.reasonCode,
     },
     {
       id: 'webfetch-local-strict',
@@ -61,7 +66,7 @@ export function buildTrustReport({
     },
   ];
   return {
-    ok: !checks.some((check) => check.status === 'fail'),
+    ok: !approvalPending && !checks.some((check) => check.status === 'fail'),
     generatedAt: new Date().toISOString(),
     securityMode: mode,
     trustedRoot: clean(trustedRoot),
@@ -71,9 +76,9 @@ export function buildTrustReport({
       providerClass: classifyModelProvider(config),
       decision: policy.decision,
       reasonCode: policy.reasonCode,
+      approvalCapability: approvalPending ? MODEL_EGRESS_APPROVAL_CAPABILITY.status : 'not_required',
     },
     egress,
     checks,
   };
 }
-
