@@ -24,7 +24,7 @@ export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 export const DEFAULT_TIMEOUT_MS = 60_000;
 export const DEFAULT_MAX_TOKENS = 2048;
 export const MAX_PROMPT_LENGTH = 8000;
-export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置 Kimi/Moonshot API Key。本地文件功能仍可离线使用；需要模型回复时请联网并配置 KIMI_API_KEY 或 MOONSHOT_API_KEY。';
+export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置当前安全策略允许的模型端点。本地文件功能仍可离线使用；需要模型回复时请配置 Ollama/LM Studio，或使用管理员明确放行的客户模型网关。当前 Internal Beta 不允许公网云模型直接出站。';
 
 export type ModelFallback = {
   provider?: string;

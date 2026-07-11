@@ -3,7 +3,6 @@ import http from 'node:http';
 import test from 'node:test';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { webFetch } from '../src/tools/web-fetch.js';
-import type { WebFetchResult } from '../src/tools/web-fetch.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 
@@ -23,11 +22,6 @@ async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
-}
-
-function requireWebFetchResult(value: unknown): WebFetchResult {
-  assert.ok(value && typeof value === 'object', 'tool result must be an object');
-  return value as WebFetchResult;
 }
 
 test('webFetch retrieves a page body with status + content-type', async () => {
@@ -76,23 +70,11 @@ test('webFetch rejects unknown option keys before network access', async () => {
   );
 });
 
-test('web.fetch is exposed as a built-in tool', async () => {
-  const { server, port } = await startServer((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end('{"k":1}');
-  });
-  try {
-    const registry = new ToolRegistry().registerMany(createBuiltinTools({}));
-    assert.equal(registry.has('web.fetch'), true);
-    const descriptor = registry.descriptor('web.fetch');
-    assert.ok(descriptor, 'web.fetch descriptor exists');
-    assert.equal(descriptor.requiresApproval, true);
-    const res = requireWebFetchResult(
-      await registry.call('web.fetch', { url: `http://127.0.0.1:${port}/`, allowInternal: true }),
-    );
-    assert.equal(res.status, 200);
-    assert.match(res.text, /"k":1/);
-  } finally {
-    await closeServer(server);
-  }
+test('web.fetch is exposed as an approval-gated built-in tool', () => {
+  const registry = new ToolRegistry().registerMany(createBuiltinTools({}));
+  assert.equal(registry.has('web.fetch'), true);
+  const descriptor = registry.descriptor('web.fetch');
+  assert.ok(descriptor, 'web.fetch descriptor exists');
+  assert.equal(descriptor.risk, 'high');
+  assert.equal(descriptor.requiresApproval, true);
 });

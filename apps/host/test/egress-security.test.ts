@@ -5,7 +5,13 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { classifyData } from '../src/security/data-classifier.js';
-import { decideEgressPolicy, recordEgressDecision } from '../src/security/egress-gateway.js';
+import {
+  decideEgressPolicy,
+  egressPolicyError,
+  enforceRecordedEgressDecision,
+  isEgressAuditFailure,
+  recordEgressDecision,
+} from '../src/security/egress-gateway.js';
 import { readEgressAuditRecords, summariseEgressAudit } from '../src/security/egress-audit.js';
 import { buildOutboundPreview } from '../src/security/outbound-preview.js';
 import { buildTrustReport } from '../src/security/trust-report.js';
@@ -17,7 +23,7 @@ function tempRoot(): string {
 }
 
 test('data classifier tags secrets without returning raw content', () => {
-  const result = classifyData({ text: 'api_key=sk-test-secret-1234567890 payroll customer list' });
+  const result = classifyData({ text: 'api_key=sk-test-dummy-0000000000 payroll customer list' });
   assert.equal(result.sensitivity, 'restricted');
   assert.ok(result.tags.some((tag) => tag.kind === 'credential_secret'));
   assert.equal(result.allowCloudByDefault, false);
@@ -66,6 +72,32 @@ test('egress gateway blocks cloud model and web fetch in local strict, while all
   assert.equal(web.decision, 'deny');
 });
 
+test('controlled hybrid model egress is fail-closed until approval has been validated', () => {
+  const pending = decideEgressPolicy({
+    kind: 'model_inference',
+    provider: 'kimi-api',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    model: 'kimi-k2.7-code',
+    securityMode: 'controlled_hybrid',
+    content: 'customer prompt',
+  });
+  assert.equal(pending.decision, 'needs_approval');
+  assert.equal(pending.allowed, false);
+  assert.equal(egressPolicyError(pending).code, 'EGRESS_APPROVAL_REQUIRED');
+
+  const forgedBoolean = decideEgressPolicy({
+    kind: 'model_inference',
+    provider: 'kimi-api',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    model: 'kimi-k2.7-code',
+    securityMode: 'controlled_hybrid',
+    approved: true,
+  });
+  assert.equal(forgedBoolean.decision, 'needs_approval');
+  assert.equal(forgedBoolean.allowed, false);
+  assert.equal(forgedBoolean.audit.approved, false);
+});
+
 test('egress audit and trust report summarize local evidence', () => {
   const trustedRoot = tempRoot();
   const decision = decideEgressPolicy({
@@ -89,6 +121,25 @@ test('egress audit and trust report summarize local evidence', () => {
   });
   assert.equal(report.ok, true);
   assert.equal(report.egress.recordCount, 1);
+});
+
+test('trust report marks pending model approval as unavailable and not overall ok', () => {
+  const report = buildTrustReport({
+    trustedRoot: tempRoot(),
+    securityMode: 'controlled_hybrid',
+    modelConfig: {
+      provider: 'kimi-api',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      model: 'kimi-k2.7-code',
+    },
+  });
+
+  const modelPolicy = report.checks.find((check) => check.id === 'local-model-policy');
+  assert.equal(report.model.decision, 'needs_approval');
+  assert.equal(report.model.approvalCapability, 'unavailable');
+  assert.equal(modelPolicy?.status, 'warn');
+  assert.match(modelPolicy?.detail || '', /unavailable/i);
+  assert.equal(report.ok, false);
 });
 
 test('egress summary counts only allowed non-local content as actual outbound bytes', () => {
@@ -140,4 +191,59 @@ test('memory DLP denies credentials before long-term write', () => {
 
   assert.equal(decision.action, 'deny_write');
   assert.equal(decision.sensitivity, 'secret');
+});
+
+test('egress audit rejects a malformed middle record instead of undercounting evidence', () => {
+  const trustedRoot = tempRoot();
+  const first = decideEgressPolicy({
+    kind: 'model_inference',
+    provider: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'local-one',
+    securityMode: 'local_strict',
+  }).audit;
+  const second = { ...first, id: 'second', model: 'local-two' };
+  const file = path.join(trustedRoot, '.AgentCowork', 'security', 'egress-audit.jsonl');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(first)}\n{"broken":\n${JSON.stringify(second)}\n`, 'utf8');
+
+  assert.throws(() => readEgressAuditRecords(trustedRoot), /egress audit.*(?:integrity|invalid)/i);
+});
+
+test('egress enforcement fails closed when its required audit sink is unavailable', () => {
+  const trustedRoot = tempRoot();
+  fs.writeFileSync(path.join(trustedRoot, '.AgentCowork'), 'blocks audit directory', 'utf8');
+  const allowed = decideEgressPolicy({
+    kind: 'model_inference',
+    provider: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'local-model',
+    securityMode: 'local_strict',
+  });
+
+  assert.throws(
+    () => enforceRecordedEgressDecision(trustedRoot, allowed),
+    (error: unknown) => isEgressAuditFailure(error)
+      && (error as { code?: unknown }).code === 'EGRESS_AUDIT_FAILED',
+  );
+});
+
+test('denied egress preserves its policy code when audit persistence also fails', () => {
+  const trustedRoot = tempRoot();
+  fs.writeFileSync(path.join(trustedRoot, '.AgentCowork'), 'blocks audit directory', 'utf8');
+  const denied = decideEgressPolicy({
+    kind: 'web_fetch',
+    destination: 'https://example.com',
+    securityMode: 'local_strict',
+  });
+
+  assert.throws(
+    () => enforceRecordedEgressDecision(trustedRoot, denied),
+    (error: unknown) => {
+      const failure = error as { code?: unknown; auditFailure?: { code?: unknown } };
+      return failure.code === 'EGRESS_POLICY_DENIED'
+        && failure.auditFailure?.code === 'EGRESS_AUDIT_FAILED'
+        && !Object.keys(failure).includes('auditFailure');
+    },
+  );
 });

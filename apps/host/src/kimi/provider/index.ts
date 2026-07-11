@@ -10,6 +10,7 @@ import { createAnthropicProvider } from './anthropic.js';
 import { createKimiProvider } from './kimi.js';
 import { createLocalOpenAiCompatibleProvider, createOpenAiCompatibleProvider, createOpenAiProvider } from './openai-compatible.js';
 import { MODEL_PROVIDER_CATALOG } from './catalog.js';
+import { createModelEndpointFetch } from '../../security/model-endpoint-request.js';
 import type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult } from './types.js';
 
 export type { ModelConfig, Provider, ProviderChatArgs, ProviderChatResult } from './types.js';
@@ -79,5 +80,13 @@ export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
 // 统一发起一次对话补全,让调用方无需感知具体 provider 实现。
 export async function callProviderChatCompletion(args: ProviderChatArgs): Promise<ProviderChatResult> {
   const provider = resolveModelProvider(args?.kimiConfig);
-  return provider.chatCompletion(args);
+  const kimiConfig = args?.kimiConfig || {};
+  const fetchOptions = typeof args?.fetchImpl === 'function'
+    ? { fetchImpl: args.fetchImpl as never }
+    : {};
+  // Every built-in provider shares one network boundary: real requests use a
+  // DNS-validated, address-pinned socket and never follow redirects. A custom
+  // fetchImpl is an explicit in-process dependency-injection capability.
+  const fetchImpl = createModelEndpointFetch(kimiConfig, fetchOptions);
+  return provider.chatCompletion({ ...args, fetchImpl });
 }

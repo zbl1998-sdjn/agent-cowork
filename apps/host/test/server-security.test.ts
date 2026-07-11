@@ -333,7 +333,11 @@ test('critical writes require Idempotency-Key and reject same key with different
     const scheduled = await jsonRequest(base, '/api/schedules', {
       method: 'POST',
       headers: { 'idempotency-key': 'schedule-for-mutations' },
-      body: { name: 'cancel target', fireAt: new Date(Date.now() + 60_000).toISOString(), payload: {} },
+      body: {
+        name: 'cancel target',
+        fireAt: new Date(Date.now() + 60_000).toISOString(),
+        payload: { recipeId: 'email-draft' },
+      },
     });
     assert.equal(scheduled.status, 200);
     const scheduledRecord = recordValue(scheduled.body.schedule, 'scheduled record');

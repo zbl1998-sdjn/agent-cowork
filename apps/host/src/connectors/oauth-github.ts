@@ -4,19 +4,29 @@
 //       适合桌面端无回调 URL 的场景;凭据最终经 credential-store 加密保存。
 // 依赖:无内部依赖(直连 GitHub API)。导出:device flow 各步骤函数。
 //
+import {
+  asJsonObject,
+  githubViewerDto,
+  stringField,
+  type GitHubViewer,
+  type JsonObject,
+} from './oauth-github-viewer-dto.js';
+export { githubViewerDto } from './oauth-github-viewer-dto.js';
+export type { GitHubViewer } from './oauth-github-viewer-dto.js';
+
 const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';
 
 type OAuthError = Error & { statusCode?: number; payload?: unknown };
 type FetchImpl = typeof fetch;
-type JsonObject = Record<string, unknown>;
 
 export type StartGitHubDeviceFlowOptions = {
   clientId?: unknown;
   scopes?: unknown;
   fetchImpl?: FetchImpl;
   deviceCodeUrl?: string;
+  timeoutMs?: unknown;
 };
 
 export type GitHubDeviceFlowStart = {
@@ -34,6 +44,7 @@ export type CompleteGitHubDeviceFlowOptions = {
   deviceCode?: unknown;
   fetchImpl?: FetchImpl;
   accessTokenUrl?: string;
+  timeoutMs?: unknown;
 };
 
 export type GitHubDeviceFlowPending = {
@@ -53,13 +64,7 @@ export type FetchGitHubViewerOptions = {
   accessToken?: unknown;
   fetchImpl?: FetchImpl;
   userUrl?: string;
-};
-
-export type GitHubViewer = {
-  login: string;
-  id: unknown;
-  name: unknown;
-  email: unknown;
+  timeoutMs?: unknown;
 };
 
 function requireClientId(clientId: unknown): string {
@@ -76,15 +81,6 @@ function normalizeScopes(scopes: unknown): string[] {
   const list = Array.isArray(scopes) ? scopes : String(scopes || 'read:user').split(/\s+/);
   const clean = list.map((s) => String(s).trim()).filter(Boolean);
   return clean.length ? clean : ['read:user'];
-}
-
-function asJsonObject(value: unknown): JsonObject {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {};
-}
-
-function stringField(payload: JsonObject, key: string): string {
-  const value = payload[key];
-  return typeof value === 'string' ? value : '';
 }
 
 async function jsonFrom(response: Response, label: string): Promise<JsonObject> {
@@ -122,18 +118,49 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
   };
 }
 
+function normalizeTimeoutMs(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 10_000;
+  return Math.min(60_000, Math.max(1, Math.floor(parsed)));
+}
+
+async function fetchWithTimeout(
+  fetchImpl: FetchImpl,
+  url: string,
+  init: RequestInit,
+  timeoutMs: unknown,
+  label: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const boundedTimeoutMs = normalizeTimeoutMs(timeoutMs);
+  const timer = setTimeout(() => controller.abort(), boundedTimeoutMs);
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error(label + ' timed out after ' + boundedTimeoutMs + 'ms') as OAuthError;
+      timeoutError.statusCode = 504;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function startGitHubDeviceFlow({
   clientId,
   scopes,
   fetchImpl = fetch,
   deviceCodeUrl = GITHUB_DEVICE_CODE_URL,
+  timeoutMs,
 }: StartGitHubDeviceFlowOptions = {}): Promise<GitHubDeviceFlowStart> {
   const scopeList = normalizeScopes(scopes);
-  const response = await fetchImpl(deviceCodeUrl, {
+  const response = await fetchWithTimeout(fetchImpl, deviceCodeUrl, {
     method: 'POST',
     headers: headers(),
     body: formBody({ client_id: requireClientId(clientId), scope: scopeList.join(' ') }),
-  });
+  }, timeoutMs, 'GitHub device flow start');
   const payload = await jsonFrom(response, 'GitHub device flow start');
   if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
     const err = new Error('GitHub device flow start returned an incomplete response') as OAuthError;
@@ -156,8 +183,9 @@ export async function completeGitHubDeviceFlow({
   deviceCode,
   fetchImpl = fetch,
   accessTokenUrl = GITHUB_ACCESS_TOKEN_URL,
+  timeoutMs,
 }: CompleteGitHubDeviceFlowOptions = {}): Promise<GitHubDeviceFlowPending | GitHubDeviceFlowConnected> {
-  const response = await fetchImpl(accessTokenUrl, {
+  const response = await fetchWithTimeout(fetchImpl, accessTokenUrl, {
     method: 'POST',
     headers: headers(),
     body: formBody({
@@ -165,7 +193,7 @@ export async function completeGitHubDeviceFlow({
       device_code: deviceCode,
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
     }),
-  });
+  }, timeoutMs, 'GitHub device flow complete');
   const payload = await jsonFrom(response, 'GitHub device flow complete');
   if (payload.error === 'authorization_pending' || payload.error === 'slow_down') {
     return {
@@ -198,20 +226,16 @@ export async function fetchGitHubViewer({
   accessToken,
   fetchImpl = fetch,
   userUrl = GITHUB_USER_URL,
+  timeoutMs,
 }: FetchGitHubViewerOptions = {}): Promise<GitHubViewer> {
-  const response = await fetchImpl(userUrl, {
+  const response = await fetchWithTimeout(fetchImpl, userUrl, {
     method: 'GET',
     headers: {
       accept: 'application/vnd.github+json',
       authorization: `Bearer ${accessToken}`,
       'user-agent': 'Agent-Cowork',
     },
-  });
+  }, timeoutMs, 'GitHub user lookup');
   const payload = await jsonFrom(response, 'GitHub user lookup');
-  return {
-    login: String(payload.login || 'github-user'),
-    id: payload.id,
-    name: payload.name,
-    email: payload.email,
-  };
+  return githubViewerDto(payload);
 }

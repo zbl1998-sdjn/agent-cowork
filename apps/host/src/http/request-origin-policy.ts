@@ -10,17 +10,35 @@ export function isLoopbackHostname(hostname: unknown): boolean {
   return value === 'localhost' || value === '127.0.0.1' || value === '::1' || value === '[::1]';
 }
 
-/** CORS 来源白名单:无 Origin(同源/非浏览器)放行,回环与 Tauri webview 放行,其余拒绝。 */
-export function isAllowedOrigin(origin: unknown): boolean {
+const ALLOWED_BROWSER_ORIGINS = new Set([
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  'http://tauri.localhost',
+  'https://tauri.localhost',
+  'tauri://localhost',
+]);
+
+/**
+ * CORS 来源白名单:无 Origin(同源/非浏览器)放行;浏览器允许产品/开发服务器的精确
+ * Origin,以及与当前 Host 完全相同的 HTTP 回环 Origin。后者覆盖 host 自带 UI 的动态
+ * 端口,但不会把其他回环端口一并提升为可信来源。
+ */
+export function isAllowedOrigin(origin: unknown, hostHeader?: unknown): boolean {
   const value = String(origin || '').trim();
   if (!value) return true;
   if (value === 'null') return false;
   try {
     const parsed = new URL(value);
-    if (parsed.protocol === 'tauri:') return true;
-    const host = String(parsed.hostname || '').toLowerCase();
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && (isLoopbackHostname(host) || host === 'tauri.localhost');
+    const canonical = parsed.protocol === 'tauri:'
+      ? value.toLowerCase().replace(/\/$/u, '')
+      : parsed.origin.toLowerCase();
+    if (ALLOWED_BROWSER_ORIGINS.has(canonical)) return true;
+
+    const requestHost = String(hostHeader || '').trim().toLowerCase();
+    return parsed.protocol === 'http:'
+      && isLoopbackHostname(parsed.hostname)
+      && requestHost.length > 0
+      && parsed.host.toLowerCase() === requestHost;
   } catch {
     return false;
   }

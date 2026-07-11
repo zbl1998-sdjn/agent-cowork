@@ -34,6 +34,22 @@ test('host reflects CORS headers for a loopback origin (browser preview at :5173
   }
 });
 
+test('the host-served UI may write back to the exact same loopback origin', async () => {
+  const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const res = await fetch(`${base}/api/auth/guest`, {
+      method: 'POST',
+      headers: { origin: base, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('access-control-allow-origin'), base);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('OPTIONS preflight from a loopback origin returns 204 with allow headers', async () => {
   const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
   const base = await bind(server);
@@ -80,6 +96,24 @@ test('a non-loopback origin is not reflected and its preflight is rejected', asy
     assert.equal(res.headers.get('access-control-allow-origin'), null);
     const pre = await fetch(`${base}/api/tools/call`, { method: 'OPTIONS', headers: { origin } });
     assert.equal(pre.status, 403);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('an unconfigured loopback port is not trusted as a browser origin', async () => {
+  const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const origin = 'http://127.0.0.1:43123';
+    const health = await fetch(`${base}/health`, { headers: { origin } });
+    assert.equal(health.headers.get('access-control-allow-origin'), null);
+    const write = await fetch(`${base}/api/auth/guest`, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(write.status, 403);
   } finally {
     await closeTestServer(server);
   }

@@ -6,12 +6,20 @@ import {
   successfulPlanFetch,
   type CapturedKimiRequestSlot,
 } from './helpers/api-runner.js';
+import { makeTestWorkspace } from './test-fixtures.js';
+
+const LOCAL_EGRESS = {
+  trustedRoot: makeTestWorkspace('api-runner-plan'),
+  securityMode: 'local_strict',
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+} as const;
 
 test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
   const captured: CapturedKimiRequestSlot = {};
   const result = kimiTextResultSchema.parse(await runKimiApiPlan({
     apiKey: 'test-key-plan',
-    baseUrl: 'https://api.example.test/v1',
+    ...LOCAL_EGRESS,
     model: 'kimi-test',
     prompt: '生成计划',
     summary: '本地摘要',
@@ -22,13 +30,13 @@ test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
   }));
 
   assert.ok(captured.request, 'fetch request should be captured');
-  assert.equal(captured.request.url, 'https://api.example.test/v1/chat/completions');
+  assert.equal(captured.request.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.request.authorization, 'Bearer test-key-plan');
   assert.equal(captured.request.body.model, 'kimi-test');
   assert.equal(captured.request.body.stream, false);
   assert.equal(captured.request.body.max_tokens, 100);
   assert.match(captured.request.body.messages[0]?.content ?? '', /本地摘要/);
-  assert.equal(result.provider, 'kimi-api');
+  assert.equal(result.provider, 'openai/local');
   assert.equal(result.model, 'kimi-test');
   assert.equal(result.text, 'API 计划输出');
   assert.equal(result.usage?.total_tokens, 7);

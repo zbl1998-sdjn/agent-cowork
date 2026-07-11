@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import dns from 'node:dns';
 import test from 'node:test';
 import { isBlockedIp, numericHostToV4, assertPublicHost } from '../src/tools/ssrf-guard.js';
 
@@ -54,6 +55,23 @@ test('assertPublicHost rejects when ANY resolved address is internal', async () 
 test('assertPublicHost allows a name that resolves only to public IPs', async () => {
   const lookupImpl = async () => [{ address: '93.184.216.34' }];
   await assertPublicHost('example.com', { lookupImpl });
+});
+
+test('assertPublicHost uses the system DNS adapter when no seam is injected', async () => {
+  const promises = dns.promises as unknown as {
+    lookup: (hostname: string, options?: unknown) => Promise<unknown>;
+  };
+  const originalLookup = promises.lookup;
+  promises.lookup = async (hostname, options) => {
+    assert.equal(hostname, 'public.example.test');
+    assert.deepEqual(options, { all: true, verbatim: true });
+    return [{ address: '93.184.216.34', family: 4 }];
+  };
+  try {
+    await assertPublicHost('public.example.test');
+  } finally {
+    promises.lookup = originalLookup;
+  }
 });
 
 test('assertPublicHost blocks a literal IPv6 ULA host', async () => {

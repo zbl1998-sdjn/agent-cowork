@@ -13,8 +13,8 @@
 import { webFetch } from './web-fetch.js';
 import { webSearch } from './web-search.js';
 import { omitUndefined } from '../util/object.js';
-import { decideEgressPolicy, egressPolicyError, recordEgressDecision } from '../security/egress-gateway.js';
-import { contextRecord } from './builtin-tool-options.js';
+import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
+import { contextRecord, parseBuiltinToolArgs } from './builtin-tool-options.js';
 import type { WebFetchLike } from './web-fetch.js';
 import type { WebSearchFetchLike } from './web-search.js';
 
@@ -35,7 +35,7 @@ type CreateWebBuiltinToolsOptions = {
   resolveSecurityMode?: () => unknown;
 };
 
-/** 出站前置检查:deny 就抛错(由工具循环统一转成失败的 tool_result,不静默放行)。 */
+/** 出站前置检查:非 allow(含 needs_approval)就抛错；本层没有审批回执消费接口。 */
 function assertWebEgressAllowed(destination: unknown, ctx: unknown, resolveSecurityMode?: () => unknown): void {
   const trustedRoot = contextRecord(ctx).trustedRoot;
   const egress = decideEgressPolicy({
@@ -44,10 +44,7 @@ function assertWebEgressAllowed(destination: unknown, ctx: unknown, resolveSecur
     securityMode: resolveSecurityMode?.(),
     trustedRoot,
   });
-  if (trustedRoot) {
-    try { recordEgressDecision(trustedRoot, egress); } catch { /* 审计失败不能掩盖/放行策略结果 */ }
-  }
-  if (egress.decision === 'deny') throw egressPolicyError(egress);
+  enforceRecordedEgressDecision(trustedRoot, egress);
 }
 
 /** 组装联网工具描述符;当前日期注入只用于提示模型搜索「最新/今天」时带年份。 */
@@ -64,14 +61,15 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date(), resolveSecu
         type: 'object',
         properties: { url: { type: 'string' }, maxBytes: { type: 'number' }, timeoutMs: { type: 'number' } },
         required: ['url'],
+        additionalProperties: false,
       },
       handler: async (args = {}, ctx) => {
-        assertWebEgressAllowed(args.url, ctx, resolveSecurityMode);
+        const input = parseBuiltinToolArgs(args, ['url', 'timeoutMs', 'maxBytes']);
+        assertWebEgressAllowed(input.url, ctx, resolveSecurityMode);
         return webFetch(omitUndefined({
-          url: args.url,
-          timeoutMs: args.timeoutMs,
-          maxBytes: args.maxBytes,
-          allowInternal: args.allowInternal === true,
+          url: input.url,
+          timeoutMs: input.timeoutMs,
+          maxBytes: input.maxBytes,
           fetchImpl: fetchImpl as WebFetchLike | undefined,
         }));
       },
@@ -90,13 +88,15 @@ export function createWebBuiltinTools({ fetchImpl, now = new Date(), resolveSecu
           provider: { type: 'string', description: 'auto(默认,先 DDG 失败回退 Bing)/ddg/bing/tavily(需 API key)' },
         },
         required: ['query'],
+        additionalProperties: false,
       },
       handler: async (args = {}, ctx) => {
-        assertWebEgressAllowed(`search:${String(args.query || '')}`, ctx, resolveSecurityMode);
+        const input = parseBuiltinToolArgs(args, ['query', 'maxResults', 'provider']);
+        assertWebEgressAllowed(`search:${String(input.query || '')}`, ctx, resolveSecurityMode);
         return webSearch(omitUndefined({
-          query: args.query,
-          maxResults: args.maxResults,
-          provider: args.provider || 'auto',
+          query: input.query,
+          maxResults: input.maxResults,
+          provider: input.provider || 'auto',
           fetchImpl: fetchImpl as WebSearchFetchLike | undefined,
         }));
       },

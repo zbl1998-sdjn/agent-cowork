@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runKimiApiChat } from '../src/kimi/api-runner.js';
+import { makeTestWorkspace } from './test-fixtures.js';
+
+const LOCAL_EGRESS = {
+  trustedRoot: makeTestWorkspace('api-runner-chat'),
+  securityMode: 'local_strict',
+  provider: 'openai/local',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+} as const;
 
 type ChatRequestBody = {
   model?: unknown;
@@ -39,9 +47,8 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
 
   const result = await runKimiApiChat({
     apiKey: 'test-key-chat',
-    baseUrl: 'https://api.example.test/v1/',
+    ...LOCAL_EGRESS,
     model: 'kimi-chat-test',
-    provider: 'KIMI-API',
     prompt: '直接回答',
     summary: '当前摘要',
     memory: '长期记忆',
@@ -53,7 +60,7 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
     fetchImpl,
   });
 
-  assert.equal(captured.url, 'https://api.example.test/v1/chat/completions');
+  assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.headers?.authorization, 'Bearer test-key-chat');
   assert.equal(captured.headers?.accept, 'application/json');
   assert.equal(captured.headers?.['user-agent'], 'AgentCowork-Test');
@@ -66,7 +73,7 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
   assert.equal(captured.body?.messages?.[1]?.role, 'user');
   assert.match(String(captured.body?.messages?.[1]?.content), /当前摘要/);
   assert.match(String(captured.body?.messages?.[1]?.content), /长期记忆/);
-  assert.equal(result.provider, 'kimi-api');
+  assert.equal(result.provider, 'openai/local');
   assert.equal(result.model, 'kimi-chat-test');
   assert.equal(result.mode, 'chat');
   assert.equal(result.text, '第一段\n第二段');
@@ -78,6 +85,7 @@ test('runKimiApiChat rejects empty successful responses and abort-shaped failure
   await assert.rejects(
     () => runKimiApiChat({
       apiKey: 'test-key-chat',
+      ...LOCAL_EGRESS,
       prompt: 'empty',
       fetchImpl: async () => ({
         ok: true,
@@ -95,6 +103,7 @@ test('runKimiApiChat rejects empty successful responses and abort-shaped failure
   await assert.rejects(
     () => runKimiApiChat({
       apiKey: 'test-key-chat',
+      ...LOCAL_EGRESS,
       prompt: 'abort',
       timeoutMs: 5000,
       fetchImpl: async () => {

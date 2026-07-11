@@ -436,7 +436,7 @@ test('Kimi provider fails closed before or after fetch when configuration or HTT
         throw new Error('must not call fetch without key');
       },
     }),
-    /Kimi\/Moonshot API Key/,
+    /未配置当前安全策略允许的模型端点/,
   );
   await assert.rejects(
     () => provider.chatCompletion({

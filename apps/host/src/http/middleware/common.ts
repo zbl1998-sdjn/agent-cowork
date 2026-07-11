@@ -84,7 +84,8 @@ export function applyRequestMiddleware({
 }: RequestMiddlewareOptions): boolean {
   // 防 DNS rebinding:Host 必须是回环 host 或 Tauri webview;该检查先于所有路径/方法执行。
   // Origin 校验只覆盖会改状态的 /api/* 请求,所以 GET 也必须过 Host 闸门。
-  if (validateHost !== false && !isAllowedHost(headerValue(request, 'host'))) {
+  const requestHost = headerValue(request, 'host');
+  if (validateHost !== false && !isAllowedHost(requestHost)) {
     sendJson(response, 403, { error: 'Host not allowed' });
     return true;
   }
@@ -97,7 +98,7 @@ export function applyRequestMiddleware({
   }
 
   const requestOrigin = headerValue(request, 'origin');
-  const originOk = isAllowedOrigin(requestOrigin);
+  const originOk = isAllowedOrigin(requestOrigin, requestHost);
   if (requestOrigin && originOk) {
     response.setHeader('access-control-allow-origin', requestOrigin);
     response.setHeader('vary', 'Origin');
@@ -114,7 +115,7 @@ export function applyRequestMiddleware({
     return true;
   }
 
-  if (requiresOriginCheck(request.method, pathname) && !isAllowedOrigin(headerValue(request, 'origin'))) {
+  if (requiresOriginCheck(request.method, pathname) && !originOk) {
     sendJson(response, 403, { error: 'Origin not allowed' });
     return true;
   }

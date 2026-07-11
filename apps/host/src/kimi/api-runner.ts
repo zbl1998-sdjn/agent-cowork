@@ -13,6 +13,8 @@ import {
 import { extractMessageText } from './api-runner-payload.js';
 import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
+import { createModelEndpointFetch } from '../security/model-endpoint-request.js';
+import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 
 export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
 export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
@@ -40,6 +42,8 @@ export type KimiTextOptions = PromptOptions & {
   timeoutMs?: unknown;
   maxTokens?: unknown;
   fetchImpl?: FetchLike;
+  trustedRoot?: unknown;
+  securityMode?: unknown;
   userAgent?: unknown;
   temperature?: unknown;
   promptBuilder?: (options: PromptOptions) => string;
@@ -64,6 +68,8 @@ async function runKimiApiText({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxTokens = DEFAULT_MAX_TOKENS,
   fetchImpl = globalThis.fetch as unknown as FetchLike,
+  trustedRoot,
+  securityMode,
   userAgent,
   temperature,
   promptBuilder,
@@ -79,11 +85,27 @@ async function runKimiApiText({
     throw new Error('promptBuilder is required');
   }
 
+  const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
+  const apiPrompt = promptBuilder({ prompt, summary, mode, memory });
+  const messages = systemMessage
+    ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
+    : [{ role: 'user', content: apiPrompt }];
+  enforceRecordedEgressDecision(trustedRoot, decideEgressPolicy({
+    kind: 'model_inference',
+    destination: endpoint,
+    provider,
+    model,
+    baseUrl,
+    securityMode,
+    content: messages,
+  }));
+
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-  const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
-  const apiPrompt = promptBuilder({ prompt, summary, mode, memory });
+  const modelFetch = createModelEndpointFetch({ provider, baseUrl, model }, {
+    fetchImpl: fetchImpl as never,
+  });
 
   try {
     const headers: Record<string, string> = {
@@ -93,14 +115,12 @@ async function runKimiApiText({
     };
     if (userAgent) headers['user-agent'] = String(userAgent);
     const numericTemperature = Number(temperature);
-    const response = await fetchImpl(endpoint, {
+    const response = await modelFetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: String(model || DEFAULT_MODEL),
-        messages: systemMessage
-          ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
-          : [{ role: 'user', content: apiPrompt }],
+        messages,
         ...(Number.isFinite(numericTemperature) ? { temperature: numericTemperature } : {}),
         max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         stream: false,

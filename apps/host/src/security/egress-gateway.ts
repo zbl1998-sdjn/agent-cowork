@@ -12,6 +12,7 @@ import {
 } from './security-mode.js';
 import { writeEgressAuditRecord } from './egress-audit.js';
 import type { EgressAuditDecision, EgressAuditRecord } from './egress-audit.js';
+import { MODEL_EGRESS_APPROVAL_CAPABILITY } from './model-egress-approval.js';
 
 export type EgressDecision = {
   decision: EgressAuditDecision;
@@ -35,6 +36,20 @@ export type EgressRequest = {
   approved?: unknown;
   trustedRoot?: unknown;
   env?: RuntimeEnv;
+};
+
+export type EgressAuditFailure = Error & {
+  code: 'EGRESS_AUDIT_FAILED';
+  statusCode: 500;
+  cause?: unknown;
+};
+
+export type EgressPolicyFailure = Error & {
+  code: 'EGRESS_APPROVAL_REQUIRED' | 'EGRESS_POLICY_DENIED';
+  egressDecision: EgressDecision;
+  approvalCapability?: 'unavailable';
+  approvalReceiptRequirements?: readonly string[];
+  auditFailure?: EgressAuditFailure;
 };
 
 function clean(value: unknown): string {
@@ -68,7 +83,10 @@ export function decideEgressPolicy(input: EgressRequest): EgressDecision {
   };
   const mode = resolveSecurityMode({ configuredMode: input.securityMode, env });
   const providerClass = classifyModelProvider(config, { env });
-  const approved = input.approved === true;
+  // A bare boolean is not a scoped, expiring, single-use approval receipt.
+  // No model-egress receipt consumer exists yet, so model inference stays
+  // fail-closed even if an untrusted caller supplies approved=true.
+  const approved = input.kind !== 'model_inference' && input.approved === true;
   const preview = buildOutboundPreview({
     purpose: input.kind,
     destination: input.destination ?? input.baseUrl,
@@ -80,9 +98,6 @@ export function decideEgressPolicy(input: EgressRequest): EgressDecision {
   const baseDecision = input.kind === 'model_inference'
     ? (() => {
       const policy = decideModelProviderPolicy(config, { securityMode: mode, env });
-      if (policy.decision === 'needs_approval' && approved) {
-        return { decision: 'allow' as const, reasonCode: 'approved_controlled_hybrid_model_egress', reason: 'external model egress was explicitly approved' };
-      }
       return { decision: policy.decision, reasonCode: policy.reasonCode, reason: policy.reason };
     })()
     : decisionForNonModel(input.kind, mode, approved);
@@ -104,7 +119,7 @@ export function decideEgressPolicy(input: EgressRequest): EgressDecision {
   };
   return {
     ...baseDecision,
-    allowed: baseDecision.decision !== 'deny',
+    allowed: baseDecision.decision === 'allow',
     securityMode: mode,
     providerClass,
     preview,
@@ -116,14 +131,62 @@ export function recordEgressDecision(trustedRoot: unknown, decision: EgressDecis
   return writeEgressAuditRecord(trustedRoot, decision.audit);
 }
 
-export function egressPolicyError(decision: EgressDecision): Error & { code: string; egressDecision: EgressDecision } {
-  const error = new Error(`egress blocked by ${decision.securityMode}: ${decision.reason}`) as Error & {
-    code: string;
-    egressDecision: EgressDecision;
-  };
-  error.name = 'EgressPolicyError';
-  error.code = decision.decision === 'needs_approval' ? 'EGRESS_APPROVAL_REQUIRED' : 'EGRESS_POLICY_DENIED';
-  error.egressDecision = decision;
+function egressAuditFailure(cause: unknown): EgressAuditFailure {
+  if (isEgressAuditFailure(cause) && (cause as { code?: unknown }).code === 'EGRESS_AUDIT_FAILED') {
+    return cause as EgressAuditFailure;
+  }
+  const error = new Error('egress blocked because its audit record could not be persisted') as EgressAuditFailure;
+  error.name = 'EgressAuditFailure';
+  error.code = 'EGRESS_AUDIT_FAILED';
+  error.statusCode = 500;
+  error.cause = cause;
   return error;
 }
 
+export function recordEgressDecisionOrThrow(trustedRoot: unknown, decision: EgressDecision): string {
+  try {
+    return recordEgressDecision(trustedRoot, decision);
+  } catch (cause) {
+    throw egressAuditFailure(cause);
+  }
+}
+
+export function egressPolicyError(decision: EgressDecision): EgressPolicyFailure {
+  const error = new Error(`egress blocked by ${decision.securityMode}: ${decision.reason}`) as EgressPolicyFailure;
+  error.name = 'EgressPolicyError';
+  error.code = decision.decision === 'needs_approval' ? 'EGRESS_APPROVAL_REQUIRED' : 'EGRESS_POLICY_DENIED';
+  error.egressDecision = decision;
+  if (decision.decision === 'needs_approval') {
+    error.approvalCapability = MODEL_EGRESS_APPROVAL_CAPABILITY.status;
+    error.approvalReceiptRequirements = MODEL_EGRESS_APPROVAL_CAPABILITY.requiredBindings;
+  }
+  return error;
+}
+
+export function isEgressAuditFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; auditFailure?: { code?: unknown } };
+  return candidate.code === 'EGRESS_AUDIT_FAILED'
+    || candidate.auditFailure?.code === 'EGRESS_AUDIT_FAILED';
+}
+
+export function enforceRecordedEgressDecision(trustedRoot: unknown, decision: EgressDecision): string {
+  let auditPath: string;
+  try {
+    auditPath = recordEgressDecisionOrThrow(trustedRoot, decision);
+  } catch (cause) {
+    const auditFailure = egressAuditFailure(cause);
+    if (!decision.allowed) {
+      const policyFailure = egressPolicyError(decision);
+      Object.defineProperty(policyFailure, 'auditFailure', {
+        value: auditFailure,
+        enumerable: false,
+        configurable: false,
+      });
+      throw policyFailure;
+    }
+    throw auditFailure;
+  }
+  if (!decision.allowed) throw egressPolicyError(decision);
+  return auditPath;
+}
