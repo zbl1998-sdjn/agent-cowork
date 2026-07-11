@@ -10,6 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const EMBEDDED_DIR = 'python-embedded';
+type PathFlavor = Pick<typeof path, 'dirname' | 'join'>;
+const pathFlavors = path as typeof path & { win32: PathFlavor; posix: PathFlavor };
 
 export type EnvLike = Record<string, string | undefined>;
 export type ExistsFs = { existsSync(path: string): boolean };
@@ -57,11 +59,13 @@ export function detectEmbeddedPython(
     return { status: 'configured', source: configured.key, detail: '内置 Python 路径已配置' };
   }
   // env 未设:实地探测 host 可执行文件同级的随包 python-embedded 目录(安装版布局)。
-  const execDir = path.dirname(String(execPath || ''));
+  // 测试与跨平台打包检查可注入目标平台;路径语义必须跟随目标平台,不能跟随当前 Node 宿主。
+  const platformPath = platform === 'win32' ? pathFlavors.win32 : pathFlavors.posix;
+  const execDir = platformPath.dirname(String(execPath || ''));
   if (execDir && execDir !== '.') {
-    const home = path.join(execDir, EMBEDDED_DIR);
+    const home = platformPath.join(execDir, EMBEDDED_DIR);
     for (const rel of pythonExeRelPaths(platform)) {
-      if (exists(fsImpl, path.join(home, rel))) {
+      if (exists(fsImpl, platformPath.join(home, rel))) {
         return { status: 'available', detail: '随包内置 Python(安装目录)' };
       }
     }

@@ -109,12 +109,17 @@ test('runtime dependency status reports CJK missing when neither env nor system 
 // KCW_PYTHON_HOME env,env 缺失即误报缺失;实际上安装版里 python-embedded/python.exe 就在
 // host exe 同级目录,应实地探测回落。
 test('runtime dependency status detects bundled python-embedded beside the host exe when no env var is set', () => {
+  const bundledPython = 'C:\\Program Files\\Agent Cowork\\python-embedded\\python.exe';
+  const probedPaths = new Set<string>();
   const status = getRuntimeDependencyStatus({
     env: { ...installedSystemEnv },
     platform: 'win32',
     execPath: 'C:\\Program Files\\Agent Cowork\\agent-cowork-host.exe',
     fsImpl: {
-      existsSync: (target: string) => /python-embedded[\\/]python\.exe$/i.test(target),
+      existsSync: (target: string) => {
+        probedPaths.add(target);
+        return target === bundledPython;
+      },
       statSync: () => { throw new Error('ENOENT'); },
       readdirSync: () => [],
     } as never,
@@ -122,6 +127,7 @@ test('runtime dependency status detects bundled python-embedded beside the host 
   const python = dependencyById(status, 'python-embedded');
   assert.equal(python.status, 'available');
   assert.match(String(python.detail), /随包内置 Python/);
+  assert.ok(probedPaths.has(bundledPython));
 });
 
 test('runtime dependency status still honors the injected KCW_EMBEDDED_PYTHON env over disk probing', () => {
