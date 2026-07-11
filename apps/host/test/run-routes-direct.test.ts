@@ -202,6 +202,48 @@ test('run routes expose tenant-scoped lists, indexed filters, and detail records
   assert.equal(response.status, 400);
 });
 
+test('run routes reject incomplete request identities and hide invalid stored owners', async () => {
+  const root = path.join(tempRoot(), 'runs');
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'run_corrupt.json'),
+    JSON.stringify({
+      id: 'run_corrupt',
+      status: 'succeeded',
+      context: { tenantId: 'tenant_runs' },
+    }),
+    'utf8',
+  );
+  const runsIndex = createRunsIndex();
+  const runEvents = new RunEventBus();
+
+  let response = capturedResponse();
+  assert.equal(await handleRunRoutes({
+    request: new FakeRequest('GET'),
+    response,
+    pathname: '/api/runs',
+    requestUrl: new URL('http://local.test/api/runs'),
+    requestContext: { tenantId: 'tenant_runs', traceId: 'trace_runs' },
+    runStoreRoot: root,
+    runsIndex,
+    runEvents,
+  }), true);
+  assert.equal(response.status, 401);
+
+  response = capturedResponse();
+  assert.equal(await handleRunRoutes({
+    request: new FakeRequest('GET'),
+    response,
+    pathname: '/api/runs/run_corrupt',
+    requestUrl: new URL('http://local.test/api/runs/run_corrupt'),
+    requestContext: { tenantId: 'tenant_runs', userId: 'user_runs', traceId: 'trace_runs' },
+    runStoreRoot: root,
+    runsIndex,
+    runEvents,
+  }), true);
+  assert.equal(response.status, 404);
+});
+
 test('run events route replays visible history once and unsubscribes on close', async () => {
   const root = path.join(tempRoot(), 'runs');
   const context = { tenantId: 'tenant_events', userId: 'user_events', traceId: 'trace_events' };
@@ -233,16 +275,16 @@ test('run events route replays visible history once and unsubscribes on close', 
 
   assert.equal(response.status, 200);
   assert.equal(response.headers['x-trace-id'], 'trace_events');
-  assert.equal(runEvents.subscriberCount(runId), 1);
+  assert.equal(runEvents.subscriberCount(runId, context), 1);
   const initialStream = response.writes.join('');
   assert.match(initialStream, /retry: 3000/);
   assert.doesNotMatch(initialStream, /event: start/);
   assert.match(initialStream, /event: done/);
 
-  runEvents.publish(runId, { type: 'live_update', message: 'after subscribe' });
+  runEvents.publish(runId, { type: 'live_update', message: 'after subscribe' }, context);
   assert.match(response.writes.join(''), /event: live_update/);
   request.emitClose();
-  assert.equal(runEvents.subscriberCount(runId), 0);
-  runEvents.publish(runId, { type: 'after_close' });
+  assert.equal(runEvents.subscriberCount(runId, context), 0);
+  runEvents.publish(runId, { type: 'after_close' }, context);
   assert.doesNotMatch(response.writes.join(''), /event: after_close/);
 });

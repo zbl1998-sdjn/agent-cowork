@@ -6,6 +6,7 @@
 //       (零依赖、CJK 友好),接口预留可后续替换为嵌入检索。
 // 依赖:同层 knowledge-store。导出:recallRelevantKnowledge / formatKnowledgeForInjection。
 import { listKnowledgeItems, type KnowledgeItem } from './knowledge-store.js';
+import type { MemoryOwnerContext } from './memory-owner.js';
 
 const DEFAULT_LIMIT = 6;
 
@@ -39,10 +40,10 @@ function scoreItem(item: KnowledgeItem, tokens: string[]): number {
 export function recallRelevantKnowledge(
   trustedRoot: unknown,
   query: string,
-  options: { limit?: number } = {},
+  options: { limit?: number; context?: MemoryOwnerContext } = {},
 ): KnowledgeItem[] {
   const limit = Math.max(1, Number(options.limit) || DEFAULT_LIMIT);
-  const active = listKnowledgeItems(trustedRoot, { status: 'active' });
+  const active = listKnowledgeItems(trustedRoot, { status: 'active', context: options.context || {} });
   if (!active.length) return [];
   const tokens = queryTokens(query);
   if (!tokens.length) {

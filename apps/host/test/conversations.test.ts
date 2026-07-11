@@ -5,6 +5,7 @@ import test from 'node:test';
 import { handleConversationRoutes } from '../src/routes/conversation-routes.js';
 import { createServer } from '../src/server.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
+import { assertTrustedPath } from '../src/security/path-policy.js';
 import { bind, close, recordArray, recordValue, stringField } from './helpers/host-http.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
@@ -274,6 +275,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/missing'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), true);
   assert.equal(response.status, 404);
@@ -287,6 +289,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/throws'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), true);
   assert.equal(response.status, 400);
@@ -300,6 +303,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/save-fails'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), true);
   assert.equal(response.status, 400);
@@ -313,6 +317,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/root-escape'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), true);
   assert.equal(response.status, 400);
@@ -326,6 +331,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/remove-fails'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), true);
   assert.equal(response.status, 400);
@@ -339,6 +345,7 @@ test('conversation route error paths fail closed for missing records and store f
     requestUrl: new URL('http://local/api/conversations/remove-fails'),
     requestContext,
     trustedRootDefault: trustedRoot,
+    safeTrustedRoot: (value) => assertTrustedPath(path.resolve(String(value || trustedRoot)), trustedRoot),
     conversationStore: store,
   }), false);
   assert.equal(response.status, 0);
@@ -353,5 +360,79 @@ test('FileConversationStore rejects path-traversal ids and isolates by tenant', 
   assert.deepEqual(store.list(trustedRoot, { tenantId: 't1', userId: 'u2' }), []);
   assert.equal(store.list(trustedRoot, { tenantId: 't1', userId: 'u1' }).length, 1);
   const base = path.join(trustedRoot, '.AgentCowork', 'conversations');
-  assert.ok(fs.existsSync(path.join(base, 't1', 'u1', 'k.json')));
+  const ownerDirectories = fs.readdirSync(base);
+  assert.equal(ownerDirectories.length, 1);
+  assert.match(ownerDirectories[0] || '', /^v1-[a-f0-9]{64}$/);
+  assert.ok(fs.existsSync(path.join(base, ownerDirectories[0] || '', 'k.json')));
+});
+
+test('FileConversationStore owner keys do not collide after sanitizing or truncation', () => {
+  const trustedRoot = makeTestWorkspace('kcw-conv-owner-collision');
+  const store = new FileConversationStore();
+  const pairs = [
+    [
+      { tenantId: 'tenant-collision', userId: 'alice/slash' },
+      { tenantId: 'tenant-collision', userId: 'alice_slash' },
+    ],
+    [
+      { tenantId: 'tenant/slash', userId: 'same-user' },
+      { tenantId: 'tenant_slash', userId: 'same-user' },
+    ],
+    [
+      { tenantId: 'tenant-long', userId: `${'u'.repeat(96)}A` },
+      { tenantId: 'tenant-long', userId: `${'u'.repeat(96)}B` },
+    ],
+  ] as const;
+
+  for (const [ownerA, ownerB] of pairs) {
+    store.save(trustedRoot, { id: 'shared', title: 'Alice secret', messages: [{ role: 'user', text: 'secret' }] }, ownerA);
+    assert.equal(store.get(trustedRoot, 'shared', ownerB), null);
+    assert.deepEqual(store.list(trustedRoot, ownerB), []);
+    assert.deepEqual(store.listFull(trustedRoot, ownerB), []);
+    assert.equal(store.query(trustedRoot, ownerB, { q: 'Alice' }).total, 0);
+    assert.equal(store.remove(trustedRoot, 'shared', ownerB), false);
+
+    store.save(trustedRoot, { id: 'shared', title: 'Bob private', messages: [] }, ownerB);
+    assert.equal(store.get(trustedRoot, 'shared', ownerA)?.title, 'Alice secret');
+    assert.equal(store.get(trustedRoot, 'shared', ownerB)?.title, 'Bob private');
+    assert.equal(store.remove(trustedRoot, 'shared', ownerB), true);
+    assert.equal(store.get(trustedRoot, 'shared', ownerA)?.title, 'Alice secret');
+    assert.equal(store.remove(trustedRoot, 'shared', ownerA), true);
+  }
+});
+
+test('FileConversationStore delete failure cannot revive a legacy local copy', () => {
+  const trustedRoot = makeTestWorkspace('kcw-conv-legacy-delete');
+  const store = new FileConversationStore();
+  const context = { tenantId: 'tenant_local', userId: 'user_local' };
+  const base = path.join(trustedRoot, '.AgentCowork', 'conversations');
+  const legacyDirectory = path.join(base, 'tenant_local', 'user_local');
+  const legacyFile = path.join(legacyDirectory, 'shared.json');
+  fs.mkdirSync(legacyDirectory, { recursive: true });
+  fs.writeFileSync(legacyFile, JSON.stringify({
+    id: 'shared',
+    title: 'Legacy body',
+    pinned: false,
+    messages: [],
+    createdAt: '2026-07-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  }), 'utf8');
+  store.save(trustedRoot, { id: 'shared', title: 'Current body', messages: [] }, context);
+  const currentDirectory = fs.readdirSync(base).find((name) => /^v1-[a-f0-9]{64}$/.test(name));
+  assert.ok(currentDirectory);
+  const currentFile = path.join(base, currentDirectory, 'shared.json');
+  assert.ok(fs.existsSync(currentFile));
+
+  const originalUnlinkSync = fs.unlinkSync;
+  fs.unlinkSync = ((filePath: string) => {
+    if (path.resolve(String(filePath)) === path.resolve(legacyFile)) throw new Error('legacy file is locked');
+    return originalUnlinkSync(filePath);
+  }) as typeof fs.unlinkSync;
+  try {
+    assert.throws(() => store.remove(trustedRoot, 'shared', context), /legacy file is locked/);
+    assert.equal(store.get(trustedRoot, 'shared', context)?.title, 'Current body');
+    assert.ok(fs.existsSync(currentFile), 'current copy must remain authoritative after a legacy delete failure');
+  } finally {
+    fs.unlinkSync = originalUnlinkSync;
+  }
 });

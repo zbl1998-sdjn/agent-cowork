@@ -30,6 +30,13 @@ function withEncryption<T>(fn: () => T): T {
 
 const SECRET_PROMPT = '机密:季度并购目标是 Acme, 出价上限 8.8 亿';
 
+function currentConversationFile(root: string, id: string): string {
+  const base = path.join(root, '.AgentCowork', 'conversations');
+  const ownerDirectory = fs.readdirSync(base).find((name) => /^v1-[a-f0-9]{64}$/.test(name));
+  assert.ok(ownerDirectory, 'current conversation owner directory exists');
+  return path.join(base, ownerDirectory, `${id}.json`);
+}
+
 test('run-store: with encryption on, run body is sealed on disk but round-trips', () => {
   const root = tmp();
   const runStoreRoot = path.join(root, '.AgentCowork', 'runs');
@@ -70,7 +77,10 @@ test('conversation-store: with encryption on, message bodies are sealed on disk 
   const ctx = { tenantId: 'tenant_a', userId: 'user_a' };
   withEncryption(() => {
     store.save(root, { id: 'c1', title: 'M&A', messages: [{ role: 'user', content: SECRET_PROMPT }] }, ctx);
-    const file = path.join(root, '.AgentCowork', 'conversations', 'tenant_a', 'user_a', 'c1.json');
+    const base = path.join(root, '.AgentCowork', 'conversations');
+    const [ownerDirectory] = fs.readdirSync(base);
+    assert.match(ownerDirectory || '', /^v1-[a-f0-9]{64}$/);
+    const file = path.join(base, ownerDirectory || '', 'c1.json');
     const raw = fs.readFileSync(file, 'utf8');
     assert.ok(!raw.includes(SECRET_PROMPT), 'plaintext conversation leaked to disk');
     assert.match(raw, /^aesgcm:v1:/);
@@ -80,14 +90,86 @@ test('conversation-store: with encryption on, message bodies are sealed on disk 
   });
 });
 
-test('conversation-store: legacy plaintext conversations still read after encryption is enabled', () => {
+test('conversation-store: legacy local plaintext conversations still read after encryption is enabled', () => {
   const root = tmp();
   const store = createConversationStore();
-  const ctx = { tenantId: 'tenant_a', userId: 'user_a' };
-  const dir = path.join(root, '.AgentCowork', 'conversations', 'tenant_a', 'user_a');
+  const ctx = { tenantId: 'tenant_local', userId: 'user_local' };
+  const dir = path.join(root, '.AgentCowork', 'conversations', 'tenant_local', 'user_local');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'c-legacy.json'), JSON.stringify({ id: 'c-legacy', title: 'old', messages: [{ role: 'user', content: 'legacy body' }], updatedAt: '2026-07-06T00:00:00Z' }), 'utf8');
   withEncryption(() => {
     assert.equal((store.get(root, 'c-legacy', ctx)?.messages?.[0] as { content?: string })?.content, 'legacy body');
+    assert.equal(store.get(root, 'c-legacy', { tenantId: 'tenant_a', userId: 'user_a' }), null);
   });
+});
+
+test('conversation-store: save refuses to overwrite unreadable or invalid existing bytes', async (t) => {
+  const nestedContext = t as unknown as {
+    test(name: string, fn: () => void): Promise<void>;
+  };
+  const cases = [
+    ['ciphertext cannot be decrypted', 'aesgcm:v1:AAAA:BBBB:CCCC'],
+    ['plaintext cannot be parsed as JSON', '{'],
+    ['parsed JSON is not a conversation record', '{}'],
+    [
+      'parsed conversation id does not match its file name',
+      JSON.stringify({ id: 'c-other', title: 'before', messages: [] }),
+    ],
+  ] as const;
+
+  for (const [name, unreadableBody] of cases) {
+    await nestedContext.test(name, () => {
+      const root = tmp();
+      const store = createConversationStore();
+      const ctx = { tenantId: 'tenant_a', userId: 'user_a' };
+      withEncryption(() => {
+        store.save(root, { id: 'c-corrupt', title: 'before', messages: [] }, ctx);
+        const file = currentConversationFile(root, 'c-corrupt');
+        const originalBytes = Buffer.from(unreadableBody, 'utf8');
+        fs.writeFileSync(file, originalBytes);
+
+        assert.equal(store.get(root, 'c-corrupt', ctx), null, 'precondition: existing document is unreadable');
+        assert.throws(
+          () => store.save(root, { id: 'c-corrupt', title: 'after', messages: [] }, ctx),
+          /cannot be decrypted or parsed; refusing to overwrite/i,
+        );
+        assert.deepEqual(fs.readFileSync(file), originalBytes, 'failed save preserves the original bytes');
+      });
+    });
+  }
+});
+
+test('conversation-store: an atomic update failure preserves the prior record and removes its temp file', () => {
+  const root = tmp();
+  const store = createConversationStore();
+  const ctx = { tenantId: 'tenant_a', userId: 'user_a' };
+  store.save(root, { id: 'c-atomic', title: 'before', messages: [] }, ctx);
+  const file = currentConversationFile(root, 'c-atomic');
+  const originalBytes = fs.readFileSync(file);
+  const originalCloseSync = fs.closeSync;
+  let injected = false;
+  fs.closeSync = ((descriptor: number) => {
+    if (!injected) {
+      injected = true;
+      throw new Error('simulated close failure before atomic rename');
+    }
+    return originalCloseSync(descriptor);
+  }) as typeof fs.closeSync;
+  try {
+    assert.throws(
+      () => store.save(root, { id: 'c-atomic', title: 'after', messages: [] }, ctx),
+      /simulated close failure/,
+    );
+  } finally {
+    fs.closeSync = originalCloseSync;
+  }
+
+  assert.equal(injected, true, 'the atomic writer reached its pre-rename close step');
+  assert.deepEqual(fs.readFileSync(file), originalBytes);
+  assert.equal(store.get(root, 'c-atomic', ctx)?.title, 'before');
+  const basename = path.basename(file);
+  assert.deepEqual(
+    fs.readdirSync(path.dirname(file)).filter((name) => name.startsWith(`.${basename}.`) && name.endsWith('.tmp')),
+    [],
+  );
 });

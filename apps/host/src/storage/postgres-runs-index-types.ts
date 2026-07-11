@@ -42,8 +42,8 @@ export type RunRecord = {
   version: number;
   updatedAt: string;
 };
-export type RunContext = { traceId?: unknown };
-export type RunsGetOptions = { tenantId?: unknown };
+export type RunContext = { tenantId?: unknown; userId?: unknown; traceId?: unknown };
+export type RunsGetOptions = { tenantId?: unknown; userId?: unknown };
 export type RunsListOptions = {
   tenantId?: unknown;
   userId?: unknown;
@@ -52,7 +52,7 @@ export type RunsListOptions = {
   type?: unknown;
   recipeId?: unknown;
 };
-export type RunsStatsOptions = { tenantId?: unknown };
+export type RunsStatsOptions = { tenantId?: unknown; userId?: unknown };
 export type RunsStats = { total: number; byStatus: Record<string, number>; byType: Record<string, number> };
 export type PostgresRunsIndexOptions = {
   pool?: PgPool | null;
@@ -62,7 +62,7 @@ export type PostgresRunsIndexOptions = {
 };
 export type AsyncRunsIndex = {
   upsert(record: RunRecordInput, context?: RunContext): Promise<RunRecord>;
-  remove(id: string): Promise<boolean>;
+  remove(id: string, context?: RunContext): Promise<boolean>;
   get(id: string, options?: RunsGetOptions): Promise<RunRecord | null>;
   list(options?: RunsListOptions): Promise<RunRecord[]>;
   size(): Promise<number>;

@@ -2,11 +2,17 @@
 // ---------------------------------------------------------------------------
 // 职责:仿 Claude Code 的 CLAUDE.md 层级,从五个来源读取记忆文本,按"低→高"优先级
 //       拼成一段带标签的合并块,供注入到 agent 的 system 段;同时返回各层存在性/字节数。
-// 依赖:仅标准库(node:fs / node:os / node:path)。
+// 依赖:标准库(node:fs / node:os / node:path)、同层 memory-filesystem-boundary。
 // 导出:loadLayeredMemory。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+import {
+  beginMemoryFilesystemOperation,
+  readManagedMemoryFile,
+  type MemoryFilesystemOperation,
+} from './memory-filesystem-boundary.js';
 
 // 五层按低→高优先级拼接:enterprise/user/project/local/session;越后的层可以修正前层。
 // 合并后的块注入 agent system prompt,同时保留每层来源与字节数便于 UI 展示。
@@ -37,14 +43,19 @@ const LAYER_LABELS: Record<LayerName, string> = {
   session: '会话记忆',
 };
 
-function readIfFile(filePath: string | null | undefined, maxBytes: number): string {
+function clipLayer(text: string, maxBytes: number): string {
+  return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+}
+
+// enterprisePath 是管理员显式配置的外部只读来源，不属于 userHome/trustedRoot
+// 管理目录；保留原有“不可用即不注入”的可选来源语义，与受管本地记忆严格区分。
+function readOptionalExternalFile(filePath: string | null | undefined, maxBytes: number): string {
   try {
     if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      const text = fs.readFileSync(filePath, 'utf8');
-      return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+      return clipLayer(fs.readFileSync(filePath, 'utf8'), maxBytes);
     }
   } catch {
-    // 不可读层按不存在处理,避免记忆文件损坏阻断运行。
+    // 显式外部企业来源沿用可选配置语义；受管本地来源不得走此降级分支。
   }
   return '';
 }
@@ -66,8 +77,24 @@ export function loadLayeredMemory({
     session: '(session)',
   };
   const order: LayerName[] = ['enterprise', 'user', 'project', 'local', 'session'];
+  const operations = new Map<string, MemoryFilesystemOperation>();
+  const readManagedLayer = (root: string, file: string): string => {
+    const resolvedRoot = path.resolve(root);
+    let operation = operations.get(resolvedRoot);
+    if (!operation) {
+      operation = beginMemoryFilesystemOperation(root);
+      operations.set(operation.root, operation);
+    }
+    return clipLayer(readManagedMemoryFile(operation, file).body, perLayerBytes);
+  };
   const layers = order.map((layer) => {
-    const text = layer === 'session' ? String(sessionMemory || '') : readIfFile(sources[layer], perLayerBytes);
+    const source = sources[layer];
+    let text = '';
+    if (layer === 'session') text = String(sessionMemory || '');
+    else if (layer === 'enterprise') text = readOptionalExternalFile(source, perLayerBytes);
+    else if (source && (layer === 'user' || trustedRoot)) {
+      text = readManagedLayer(layer === 'user' ? userHome : String(trustedRoot), source);
+    }
     return { layer, label: LAYER_LABELS[layer], source: sources[layer], text, present: Boolean(text && text.trim()) };
   });
   const combined = layers

@@ -9,6 +9,7 @@
 import { clearConversationBuffer, readRecentTurns } from './conversation-buffer.js';
 import { buildKnowledgeExtractionPrompt, formatConversationForExtraction, normalizeKnowledgeItems } from './knowledge-extractor.js';
 import { upsertKnowledgeItem } from './knowledge-store.js';
+import type { MemoryOwnerContext } from './memory-owner.js';
 
 const DEFAULT_MIN_TURNS = 4;
 
@@ -18,6 +19,7 @@ export type ConsolidateOptions = {
   conversationId: unknown;
   modelConfig: unknown;
   callJson: ConsolidateCallJson;
+  context: MemoryOwnerContext;
   minTurns?: number;
   confidenceThreshold?: number;
   maxActivePerScope?: number;
@@ -32,10 +34,10 @@ export type ConsolidateResult = {
 
 /** 提炼一段结束的对话为主题知识:太短则跳过;提取失败保留缓冲以便重试;成功(含空提取)清理缓冲。 */
 export async function consolidateConversation(options: ConsolidateOptions): Promise<ConsolidateResult> {
-  const { trustedRoot, conversationId, modelConfig, callJson } = options;
+  const { trustedRoot, conversationId, modelConfig, callJson, context } = options;
   const minTurns = Number.isFinite(options.minTurns) ? Number(options.minTurns) : DEFAULT_MIN_TURNS;
 
-  const turns = readRecentTurns(trustedRoot, conversationId, { maxTurns: 200 });
+  const turns = readRecentTurns(trustedRoot, conversationId, { maxTurns: 200, context });
   if (turns.length < Math.max(1, minTurns)) {
     return { consolidated: false, reason: 'too short' };
   }
@@ -57,6 +59,7 @@ export async function consolidateConversation(options: ConsolidateOptions): Prom
   for (const candidate of candidates) {
     const res = upsertKnowledgeItem(trustedRoot, candidate, {
       sourceConversationId: String(conversationId ?? ''),
+      context,
       ...(Number.isFinite(options.confidenceThreshold) ? { confidenceThreshold: Number(options.confidenceThreshold) } : {}),
       ...(Number.isFinite(options.maxActivePerScope) ? { maxActivePerScope: Number(options.maxActivePerScope) } : {}),
     });
@@ -66,6 +69,6 @@ export async function consolidateConversation(options: ConsolidateOptions): Prom
   }
 
   // 成功一轮提取(即便没有可存条目)即视为该对话已消化,清缓冲避免重复提炼。
-  clearConversationBuffer(trustedRoot, conversationId);
+  clearConversationBuffer(trustedRoot, conversationId, context);
   return { consolidated: true, stored: active + pending, active, pending };
 }

@@ -62,10 +62,42 @@ test('storeBackend=postgres starts the PG approval store + event bus LISTEN conn
     publish: () => undefined, subscribe: () => (() => undefined), replay: () => [], subscriberCount: () => 0,
   };
   const server = createServer({ trustedRoot: root, enableScheduler: false, storeBackend: 'postgres', databaseUrl: 'postgres://example/db', approvalRegistry, runEventBus });
-  await new Promise((r) => setTimeout(r, 20));
+  await server.ready();
   try {
     assert.equal(aStarted, 1, 'approval store LISTEN started');
     assert.equal(eStarted, 1, 'event bus LISTEN started');
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
+test('storeBackend=postgres exposes startup LISTEN failures instead of serving silently', async () => {
+  const root = tmp();
+  const approvalRegistry = {
+    start: async () => { throw new Error('approval LISTEN unavailable'); },
+    request: approvalRequest,
+    resolve: async () => true,
+    respond: async () => true,
+    cancelByRun: async () => 0,
+    pendingCount: async () => 0,
+  };
+  const runEventBus = {
+    start: async () => undefined,
+    publish: () => undefined,
+    subscribe: () => (() => undefined),
+    replay: () => [],
+    subscriberCount: () => 0,
+  };
+  const server = createServer({
+    trustedRoot: root,
+    enableScheduler: false,
+    storeBackend: 'postgres',
+    databaseUrl: 'postgres://example/db',
+    approvalRegistry,
+    runEventBus,
+  });
+  try {
+    await assert.rejects(() => server.ready(), /approval LISTEN unavailable/);
   } finally {
     await closeTestServer(server);
   }

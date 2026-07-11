@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import test from 'node:test';
 import { createProjectStoreResolver } from '../src/runtime/project-stores.js';
 import { createProjectStore } from '../src/storage/projects.js';
@@ -79,6 +80,41 @@ test('project store resolver isolates cache by tenant, user, and root', () => {
 
   const local = resolver.getProjectStore('root-local');
   assert.equal(resolver.getProjectStore('root-local', { tenantId: 'tenant_local', userId: 'user_local' }), local);
+});
+
+test('project store resolver rejects provided malformed scopes and canonicalizes roots', () => {
+  const resolver = createProjectStoreResolver();
+  const canonicalRoot = path.resolve('root-a');
+  const canonical = resolver.getProjectStore(canonicalRoot, { tenantId: 'tenant_a', userId: 'user_a' });
+  assert.equal(
+    resolver.getProjectStore(path.join(canonicalRoot, '..', path.basename(canonicalRoot)), {
+      tenantId: 'tenant_a',
+      userId: 'user_a',
+    }),
+    canonical,
+  );
+
+  const ownUndefined = Object.defineProperty({ userId: 'user_a' }, 'tenantId', {
+    enumerable: true,
+    value: undefined,
+  });
+  const invalidScopes: Array<{ tenantId?: string; userId?: string }> = [
+    {},
+    { tenantId: 'tenant_a' },
+    { userId: 'user_a' },
+    { tenantId: ' tenant_a', userId: 'user_a' },
+    ownUndefined,
+  ];
+  for (const scope of invalidScopes) {
+    assert.throws(() => resolver.getProjectStore('root-a', scope), /canonical tenantId and userId are required/i);
+  }
+});
+
+test('project store resolver uses collision-safe identity tuples', () => {
+  const resolver = createProjectStoreResolver();
+  const first = resolver.getProjectStore('root-a', { tenantId: 'tenant:a', userId: 'user' });
+  const second = resolver.getProjectStore('root-a', { tenantId: 'tenant', userId: 'a:user' });
+  assert.equal(first === second, false);
 });
 
 test('project store resolver honors an injected factory without mutating cache semantics', () => {

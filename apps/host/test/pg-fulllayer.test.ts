@@ -25,7 +25,7 @@ async function bind(server: HostServer): Promise<string> {
 test('CachedPostgresScheduleStore hydrates from PG, serves sync, writes through', async () => {
   const saved: ScheduleRecord[] = [];
   const removed: string[] = [];
-  const initialSchedule: ScheduleRecord = { id: 's1', tenantId: 't1', nextFireAt: '2026-05-24T06:00:00Z' };
+  const initialSchedule: ScheduleRecord = { id: 's1', tenantId: 't1', userId: 'u1', nextFireAt: '2026-05-24T06:00:00Z' };
   const fakePg = {
     list: async (_options: ScheduleListOptions = {}): Promise<ScheduleRecord[]> => [initialSchedule],
     get: async (id: string): Promise<ScheduleRecord | null> => (id === initialSchedule.id ? initialSchedule : null),
@@ -44,7 +44,7 @@ test('CachedPostgresScheduleStore hydrates from PG, serves sync, writes through'
   assert.equal(store.list({}).length, 1);
   assert.equal(store.get('s1')?.tenantId, 't1');
   assert.equal(store.list({ tenantId: 't2' }).length, 0, 'tenant filter');
-  store.save({ id: 's2', tenantId: 't1', nextFireAt: '2026-05-25T06:00:00Z' });
+  store.save({ id: 's2', tenantId: 't1', userId: 'u1', nextFireAt: '2026-05-25T06:00:00Z' });
   assert.ok(store.get('s2'), 'cache updated synchronously');
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.ok(saved.some((record) => record.id === 's2'), 'written through to PG');
@@ -52,6 +52,43 @@ test('CachedPostgresScheduleStore hydrates from PG, serves sync, writes through'
   assert.equal(store.get('s1'), null);
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.deepEqual(removed, ['s1']);
+});
+
+test('CachedPostgresScheduleStore exposes hydrate failures and reports background write failures safely', async () => {
+  const events: Array<{ operation: string; recordId?: string }> = [];
+  const pg = {
+    list: async (): Promise<ScheduleRecord[]> => [],
+    get: async (): Promise<ScheduleRecord | null> => null,
+    save: async (): Promise<ScheduleRecord> => { throw new Error('secret payload must not leak'); },
+    remove: async (): Promise<boolean> => { throw new Error('secret payload must not leak'); },
+  };
+  const store = new CachedPostgresScheduleStore({
+    pg,
+    onBackgroundError: (event) => {
+      events.push(event);
+      if (event.operation === 'save') throw new Error('reporter failed');
+    },
+  });
+  await store.hydrate();
+  store.save({ id: 's_fail', tenantId: 't1', userId: 'u1' });
+  assert.equal(store.remove('s_fail', { tenantId: 't1', userId: 'u1' }), true);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(events, [
+    { operation: 'save', recordId: 's_fail' },
+    { operation: 'remove', recordId: 's_fail' },
+  ]);
+
+  const hydrateEvents: Array<{ operation: string; recordId?: string }> = [];
+  const broken = new CachedPostgresScheduleStore({
+    pg: {
+      ...pg,
+      list: async () => { throw new Error('database credentials must not leak'); },
+    },
+    onBackgroundError: (event) => hydrateEvents.push(event),
+  });
+  await assert.rejects(() => broken.hydrate(), /database credentials/);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(hydrateEvents, [{ operation: 'hydrate' }]);
 });
 
 test('E2E: /api/memory works with an async (Postgres-style) memory store', async () => {

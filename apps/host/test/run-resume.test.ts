@@ -6,6 +6,7 @@ import test from 'node:test';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
 import { RunResumer, resumeStateFromCheckpoint } from '../src/runtime/run-resume.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ChatMessage, ResumeState as AgentResumeState } from '../src/kimi/agent/tool-loop-types.js';
 import type { AgentTool, ToolArgs } from '../src/kimi/agent/tool-call-executor.js';
 
@@ -31,6 +32,7 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   const runId = 'run_resume_1';
   const effectPath = path.join(root, 'effect.txt');
   const checkpointer = new RunCheckpointer({ root: runStoreRoot });
+  const approvals = { request: () => ({ id: 'append_approval', promise: Promise.resolve('once') }) };
   let executions = 0;
   const tools: AgentTool[] = [{
     name: 'AppendOnce',
@@ -61,10 +63,11 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   await assert.rejects(
     () => runAgentChat({
       prompt: 'append',
-      kimiConfig: { model: 'fake' },
+      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
       trustedRoot: root,
       tools,
       modelCall: crashingModelCall,
+      approvals,
       runId,
       runStoreRoot,
       checkpointer,
@@ -87,7 +90,7 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   let resumedMessages: ChatMessage[] = [];
   const out = await runAgentChat({
     prompt: 'append',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     runId,

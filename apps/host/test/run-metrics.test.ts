@@ -8,6 +8,7 @@ import { createServer } from '../src/server.js';
 import { buildRunMetrics } from '../src/runtime/run-metrics.js';
 import { readRunRecord, writeRunRecord } from '../src/runtime/run-store.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-run-metrics-'));
@@ -103,6 +104,7 @@ test('agent stream persists token usage metrics from the run outcome', async () 
     return { content: '已读取 note.md。', usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } };
   };
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
     kimiChatRunner: async () => ({
@@ -137,7 +139,7 @@ test('agent stream persists token usage metrics from the run outcome', async () 
     const metrics = expectRecord(record.metrics, 'agent run metrics');
     const steps = expectRecord(metrics.steps, 'agent run metrics steps');
     const tools = expectRecord(metrics.tools, 'agent run metrics tools');
-    assert.equal(metrics.provider, 'kimi-api');
+    assert.equal(metrics.provider, 'openai/local');
     assert.deepEqual(metrics.tokens, { prompt_tokens: 15, completion_tokens: 3, total_tokens: 18 });
     assert.equal(steps.total, 1);
     assert.equal(tools.calls, 1);

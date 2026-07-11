@@ -6,15 +6,16 @@ import { listKnowledgeItems } from '../src/memory/knowledge-store.js';
 import { tempRoot } from './helpers/host-http.js';
 
 const modelConfig = { provider: 'kimi-api', model: 'kimi-k2.6' } as unknown as Record<string, unknown>;
+const owner = { tenantId: 't1', userId: 'u1' };
 const cannedCallJson = async () => ([
   { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 },
 ]);
 
 function seed(root: string, convId: string): void {
-  appendConversationTurn(root, convId, { role: 'user', text: '我的项目代号是 Phoenix-7。' });
-  appendConversationTurn(root, convId, { role: 'assistant', text: '已记住 Phoenix-7。' });
-  appendConversationTurn(root, convId, { role: 'user', text: '继续。' });
-  appendConversationTurn(root, convId, { role: 'assistant', text: '好的。' });
+  appendConversationTurn(root, convId, { role: 'user', text: '我的项目代号是 Phoenix-7。' }, { context: owner });
+  appendConversationTurn(root, convId, { role: 'assistant', text: '已记住 Phoenix-7。' }, { context: owner });
+  appendConversationTurn(root, convId, { role: 'user', text: '继续。' }, { context: owner });
+  appendConversationTurn(root, convId, { role: 'assistant', text: '好的。' }, { context: owner });
 }
 
 test('first turn in a conversation triggers no consolidation (no previous)', async () => {
@@ -40,7 +41,7 @@ test('switching to a new conversation consolidates the previous one', async () =
   await done;
   assert.equal(triggeredConversationId, 'conv-A');
   // conv-A 已被提炼成主题知识
-  assert.match(String(listKnowledgeItems(root, { status: 'active' })[0]?.content), /Phoenix-7/);
+  assert.match(String(listKnowledgeItems(root, { status: 'active', context: owner })[0]?.content), /Phoenix-7/);
 });
 
 test('staying in the same conversation does not re-consolidate', async () => {
@@ -63,4 +64,98 @@ test('different users do not cross-trigger each other', async () => {
     trustedRoot: root, tenantId: 't1', userId: 'u2', conversationId: 'conv-Z', modelConfig, callJson: cannedCallJson,
   });
   assert.equal(triggeredConversationId, null);
+});
+
+test('background consolidation exposes a generic rejection and reports no sensitive details', async () => {
+  __resetConsolidateTriggerState();
+  const root = tempRoot('kcw-trig-');
+  seed(root, 'conv-secret');
+  const reports: unknown[] = [];
+  const callJson = async () => {
+    throw new Error('provider leaked conversation secret Phoenix-7');
+  };
+  await maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-secret',
+    modelConfig,
+    callJson,
+    onError: (event) => reports.push(event),
+  }).done;
+
+  const { done } = maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-next',
+    modelConfig,
+    callJson,
+    onError: (event) => reports.push(event),
+  });
+  await assert.rejects(() => done, /^Error: Memory consolidation failed$/);
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  assert.deepEqual(reports, [{ operation: 'consolidate' }]);
+  assert.doesNotMatch(JSON.stringify(reports), /Phoenix-7|conv-secret|provider leaked/i);
+});
+
+test('background consolidation contains reporter failures but keeps done rejected', async () => {
+  __resetConsolidateTriggerState();
+  const root = tempRoot('kcw-trig-');
+  seed(root, 'conv-A');
+  const callJson = async () => {
+    throw new Error('private provider detail');
+  };
+  await maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-A',
+    modelConfig,
+    callJson,
+  }).done;
+  const { done } = maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-B',
+    modelConfig,
+    callJson,
+    onError: () => {
+      throw new Error('reporter failed');
+    },
+  });
+  await assert.rejects(() => done, /^Error: Memory consolidation failed$/);
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+});
+
+test('too-short consolidation is a successful no-op and malformed owners fail closed', async () => {
+  __resetConsolidateTriggerState();
+  const root = tempRoot('kcw-trig-');
+  await maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-A',
+    modelConfig,
+    callJson: cannedCallJson,
+  }).done;
+  const result = maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: 't1',
+    userId: 'u1',
+    conversationId: 'conv-B',
+    modelConfig,
+    callJson: cannedCallJson,
+  });
+  await result.done;
+
+  assert.throws(() => maybeConsolidatePreviousConversation({
+    trustedRoot: root,
+    tenantId: ' t1',
+    userId: 'u1',
+    conversationId: 'conv-C',
+    modelConfig,
+    callJson: cannedCallJson,
+  }), /canonical tenantId and userId are required/i);
 });

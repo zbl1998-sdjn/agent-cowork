@@ -3,7 +3,9 @@
 // Responsibilities: create deterministic per-line hashes for JSONL audit
 // records and verify that a chain has not been modified after writing.
 import crypto from 'node:crypto';
-import fs from 'node:fs';
+import path from 'node:path';
+import { createManagedDirectoryBoundary } from '../security/managed-directory-boundary.js';
+import { readPrivateManagedFile } from '../security/managed-private-file.js';
 
 export const AUDIT_CHAIN_VERSION = 1;
 export const AUDIT_HASH_ALGORITHM = 'sha256';
@@ -28,8 +30,43 @@ export type VerifyAuditHashChainOptions = {
   allowLegacyPrefix?: boolean;
 };
 
+export type AuditTextReader = () => string | null;
+
+export class AuditIntegrityError extends Error {
+  readonly code = 'AUDIT_INTEGRITY_ERROR';
+  readonly statusCode = 500;
+
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'AuditIntegrityError';
+    if (typeof cause !== 'undefined') {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNotFound(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === 'ENOENT';
+}
+
+function readAuditText(filePath: string): string | null {
+  const resolved = path.resolve(filePath);
+  let boundary;
+  try {
+    boundary = createManagedDirectoryBoundary(path.dirname(resolved), {
+      create: false,
+      label: 'audit log directory',
+    });
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+  const guard = boundary.createMutationGuard();
+  return readPrivateManagedFile(boundary, resolved, guard);
 }
 
 function normaliseForHash(value: unknown): unknown {
@@ -71,23 +108,34 @@ export function createAuditChainRecord(event: Record<string, unknown>, previousH
   };
 }
 
-export function readLastAuditHash(filePath: string): string | null {
-  let text = '';
-  try {
-    text = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return null;
-  }
-
-  for (const line of text.trimEnd().split('\n').reverse()) {
+export function readLastAuditHash(
+  filePath: string,
+  readText: AuditTextReader = () => readAuditText(filePath),
+): string | null {
+  const text = readText();
+  if (text === null) return null;
+  const records: unknown[] = [];
+  for (const [index, line] of text.split(/\r?\n/g).entries()) {
     if (!line.trim()) continue;
     try {
-      const parsed = JSON.parse(line) as unknown;
-      if (isRecord(parsed) && typeof parsed.event_hash === 'string' && parsed.event_hash.length > 0) {
-        return parsed.event_hash;
-      }
-    } catch {
-      return null;
+      records.push(JSON.parse(line) as unknown);
+    } catch (cause) {
+      throw new AuditIntegrityError(`audit log contains invalid JSON at line ${index + 1}`, cause);
+    }
+  }
+
+  const verification = verifyAuditHashChain(records, {
+    allowExternalPreviousHash: true,
+    allowLegacyPrefix: true,
+  });
+  if (!verification.ok) {
+    throw new AuditIntegrityError(
+      `audit log integrity check failed at record ${(verification.failureIndex ?? 0) + 1}: ${verification.reason || 'invalid chain'}`,
+    );
+  }
+  for (const record of records.slice().reverse()) {
+    if (isRecord(record) && typeof record.event_hash === 'string' && record.event_hash) {
+      return record.event_hash;
     }
   }
   return null;
@@ -145,4 +193,3 @@ export function verifyAuditHashChain(
 
   return { ok: true, checked };
 }
-

@@ -7,7 +7,9 @@
 //       loadMemoryContextFromStore。
 
 import { MAX_MEMORY_BYTES } from './memory-constants.js';
+import { MemoryOwnerError } from './memory-owner.js';
 import { clipUtf8 } from './memory-utils.js';
+import { AtRestKeyError } from '../security/at-rest.js';
 
 export type MemoryNote = { name: string; size: number; modifiedAt: string; path?: string };
 export type MemoryQueryOptions = { maxBytes?: number; context?: Record<string, unknown> };
@@ -40,7 +42,8 @@ export function buildMemorySystemBlockFromText(main: string, { maxBytes = 4096 }
 export function buildMemorySystemBlockFromStore(store: SyncMemoryStoreLike, trustedRoot: unknown, options: MemoryQueryOptions = {}): string {
   try {
     return buildMemorySystemBlockFromText(store.readMainMemory(trustedRoot, options.context || {}), options);
-  } catch {
+  } catch (error) {
+    if (error instanceof MemoryOwnerError || error instanceof AtRestKeyError) throw error;
     return '';
   }
 }

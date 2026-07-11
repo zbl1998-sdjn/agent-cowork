@@ -10,6 +10,7 @@ import {
   readRunRecord,
   writeRunRecord,
 } from '../src/runtime/run-store.js';
+import { AtRestKeyError } from '../src/security/at-rest.js';
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-run-store-'));
@@ -30,6 +31,31 @@ test('run store validates ids before resolving persisted run paths', () => {
   assert.throws(() => getRunPath(root, '../escape'), /Invalid run id/);
   assert.throws(() => readRunRecord(root, 'bad/path'), /Invalid run id/);
   assert.equal(readRunRecord(root, 'run_missing'), null);
+});
+
+test('writeRunRecord refuses unverifiable stored records without changing their bytes', () => {
+  const cases = [
+    ['cipher', 'aesgcm:v1:AAAA:BBBB:CCCC'],
+    ['json', '{'],
+    ['missing-id', '{}'],
+    ['mismatched-id', JSON.stringify({ id: 'run_other' })],
+  ] as const;
+
+  for (const [label, persisted] of cases) {
+    const root = path.join(tempRoot(), `runs-${label}`);
+    const runId = `run_${label}`;
+    const runPath = getRunPath(root, runId);
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(runPath, persisted, 'utf8');
+
+    assert.throws(
+      () => writeRunRecord(root, { id: runId, status: 'succeeded' }),
+      (error: unknown) => label === 'cipher'
+        ? error instanceof AtRestKeyError
+        : /could not be verified|corrupt|mismatch/i.test(String(error)),
+    );
+    assert.equal(fs.readFileSync(runPath, 'utf8'), persisted);
+  }
 });
 
 test('listRunRecords summarizes persisted runs, skips corrupt files, and keeps newest first', () => {

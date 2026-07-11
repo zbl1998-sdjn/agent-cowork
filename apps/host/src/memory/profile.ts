@@ -81,20 +81,34 @@ function normalizeEntry(entry: ProfileEntryInput | null | undefined, now?: NowPr
 
 function isStoredEntry(value: unknown): value is ProfileEntry {
   const entry = value && typeof value === 'object' ? value as Partial<ProfileEntry> : null;
-  return Boolean(entry?.key && entry?.value);
+  return Boolean(entry
+    && ALLOWED_TYPES.has(entry.type as ProfileType)
+    && typeof entry.key === 'string' && entry.key.trim()
+    && typeof entry.value === 'string' && entry.value.trim()
+    && typeof entry.evidence === 'string' && entry.evidence.trim()
+    && typeof entry.scope === 'string' && entry.scope.trim()
+    && typeof entry.updatedAt === 'string' && entry.updatedAt.trim());
 }
 
 function parseProfile(body: unknown): UserProfileData {
   if (!body || !String(body).trim()) return emptyProfile();
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(String(body)) as { entries?: unknown };
-    if (parsed && Array.isArray(parsed.entries)) {
-      return { version: 1, entries: parsed.entries.filter(isStoredEntry) };
-    }
+    parsed = JSON.parse(String(body));
   } catch {
-    // 画像笔记损坏时降级为空画像,让用户仍能重新编辑保存。
+    throw new Error('profile note is corrupt or conflicting');
   }
-  return emptyProfile();
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('profile note is corrupt or conflicting');
+  }
+  const stored = parsed as { version?: unknown; entries?: unknown };
+  if (stored.version !== 1 || !Array.isArray(stored.entries) || !stored.entries.every(isStoredEntry)) {
+    throw new Error('profile note is corrupt or conflicting');
+  }
+  const entries = stored.entries as ProfileEntry[];
+  const ids = new Set(entries.map(entryId));
+  if (ids.size !== entries.length) throw new Error('profile note is corrupt or conflicting');
+  return { version: 1, entries };
 }
 
 function entryId(entry: ProfileEntry): string {
@@ -126,7 +140,7 @@ export class UserProfile {
     this.now = now;
   }
 
-  /** 读取并解析画像笔记;不存在或损坏时返回空画像。 */
+  /** 读取并解析画像笔记;仅不存在/空内容返回空画像,非空损坏或冲突内容显式失败。 */
   async load(trustedRoot: string, context: Record<string, unknown> = {}): Promise<UserProfileData> {
     const body = await this.memoryStore.readMemoryNote(trustedRoot, PROFILE_NOTE, context);
     return parseProfile(body);

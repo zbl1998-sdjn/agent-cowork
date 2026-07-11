@@ -1,10 +1,16 @@
 // 跨会话记忆(事实 + 笔记)的 PostgreSQL 适配(host · L1 领域层 · storage)
 // ---------------------------------------------------------------------------
-// 职责:SqliteMemoryStore 的多实例 PG 镜像——按租户读写 memory_facts/memory_notes,
+// 职责:SqliteMemoryStore 的多实例 PG 镜像——按精确 tenant+user 读写 memory_facts/memory_notes,
 //       渲染主记忆文本与 system 注入块,做 key/value/scope 清洗、UTF-8 字节封顶。
 // 依赖:仅标准库(crypto);pg 运行时按需 import。后端:PostgreSQL(memory_facts/notes 表)。
 // 导出:PostgresMemoryStore(类) · createPostgresMemoryStore(工厂)。
 import crypto from 'node:crypto';
+import {
+  isLegacyLocalMemoryOwner,
+  memoryLogicalNoteName,
+  memoryStorageNoteName,
+  requireMemoryOwner,
+} from '../memory/memory-owner.js';
 
 export type MemoryScope = 'project' | 'user' | 'session';
 export type MemoryFactInput = { key?: unknown; value?: unknown; scope?: unknown };
@@ -33,9 +39,6 @@ const MAX_FACT_KEY_LENGTH = 96;
 const MAX_FACT_VALUE_LENGTH = 4 * 1024;
 const NOTE_NAME_RE = /^[a-z0-9_.-]{1,96}\.md$/i;
 
-function clampId(v: unknown, fb: string): string { const t = String(v || '').trim(); return t ? (t.length > 96 ? t.slice(0, 96) : t) : fb; }
-const normTenant = (v: unknown): string => clampId(v, 'tenant_local');
-const normUser = (v: unknown): string => clampId(v, 'user_local');
 /** 生成带前缀的记忆条目 id。 */
 function memId(prefix: string): string { return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`; }
 
@@ -75,7 +78,7 @@ function parseCol(row: unknown, col: string): unknown {
   return typeof r === 'string' ? JSON.parse(r) : r;
 }
 
-/** 跨会话记忆的 PG 后端:按租户存取事实/笔记,并渲染 system 注入用的记忆块。 */
+/** 跨会话记忆的 PG 后端:按精确 tenant+user 存取事实/笔记,并渲染 system 注入用的记忆块。 */
 export class PostgresMemoryStore {
   private _pool: PgPool | null;
   private _connectionString: string | null;
@@ -105,10 +108,10 @@ export class PostgresMemoryStore {
 
   /** 把该租户全部事实渲染成主记忆 Markdown 文本(带头部,字节封顶)。 */
   async readMainMemory(_trustedRoot: unknown, context: MemoryContext = {}): Promise<string> {
-    const tenantId = normTenant(context.tenantId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const r = await this._query(
-      `SELECT fact_json FROM memory_facts WHERE tenant_id=$1 ORDER BY created_at ASC, id ASC`,
-      [tenantId],
+      `SELECT fact_json FROM memory_facts WHERE tenant_id=$1 AND user_id=$2 ORDER BY created_at ASC, id ASC`,
+      [tenantId, userId],
     );
     if (!r.rows || !r.rows.length) return '';
     const lines = r.rows.map((row) => {
@@ -120,37 +123,56 @@ export class PostgresMemoryStore {
 
   /** 列出该租户的记忆笔记元信息(name/size/modifiedAt/虚拟 path)。 */
   async listMemoryNotes(_trustedRoot: unknown, context: MemoryContext = {}): Promise<MemoryNoteSummary[]> {
-    const tenantId = normTenant(context.tenantId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const r = await this._query(
-      `SELECT id, name, size, created_at, updated_at FROM memory_notes WHERE tenant_id=$1 ORDER BY name ASC`,
-      [tenantId],
+      `SELECT id, name, size, created_at, updated_at FROM memory_notes WHERE tenant_id=$1 AND user_id=$2 ORDER BY name ASC`,
+      [tenantId, userId],
     );
-    return (r.rows || []).map((row) => {
+    const byName = new Map<string, MemoryNoteSummary>();
+    for (const row of r.rows || []) {
       const note = row as MemoryNoteRow;
-      return {
-        name: note.name,
+      const name = memoryLogicalNoteName(note.name, context);
+      if (!name) continue;
+      const summary = {
+        name,
         size: Number(note.size) || 0,
         modifiedAt: note.updated_at || note.created_at,
         path: `postgres://memory_notes/${note.id}`,
       };
-    });
+      if (!byName.has(name) || note.name !== name) byName.set(name, summary);
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /** 读取单篇笔记正文(校验文件名),不存在返回 null。 */
   async readMemoryNote(_trustedRoot: unknown, noteName: string, context: MemoryContext = {}): Promise<string | null> {
     if (!NOTE_NAME_RE.test(String(noteName || ''))) throw new Error('Invalid memory note name');
-    const tenantId = normTenant(context.tenantId);
-    const r = await this._query(`SELECT body FROM memory_notes WHERE tenant_id=$1 AND name=$2`, [tenantId, noteName]);
-    const row = r.rows && r.rows[0];
+    const { tenantId, userId } = requireMemoryOwner(context);
+    const storageName = memoryStorageNoteName(noteName, context);
+    let r = await this._query(
+      `SELECT body FROM memory_notes WHERE tenant_id=$1 AND user_id=$2 AND name=$3`,
+      [tenantId, userId, storageName],
+    );
+    let row = r.rows && r.rows[0];
+    if (!row && isLegacyLocalMemoryOwner(context)) {
+      r = await this._query(
+        `SELECT body FROM memory_notes WHERE tenant_id=$1 AND user_id=$2 AND name=$3`,
+        [tenantId, userId, noteName],
+      );
+      row = r.rows && r.rows[0];
+    }
     return row ? (row as MemoryBodyRow).body : null;
   }
 
   /** upsert 单篇笔记(正文字节封顶、保留首次 createdAt),返回其虚拟路径。 */
   async writeMemoryNote(_trustedRoot: unknown, noteName: string, body: unknown, context: MemoryContext = {}): Promise<string> {
     if (!NOTE_NAME_RE.test(String(noteName || ''))) throw new Error('Invalid memory note name');
-    const tenantId = normTenant(context.tenantId);
-    const userId = normUser(context.userId);
-    const existing = await this._query(`SELECT id, created_at FROM memory_notes WHERE tenant_id=$1 AND name=$2`, [tenantId, noteName]);
+    const { tenantId, userId } = requireMemoryOwner(context);
+    const storageName = memoryStorageNoteName(noteName, context);
+    const existing = await this._query(
+      `SELECT id, created_at FROM memory_notes WHERE tenant_id=$1 AND user_id=$2 AND name=$3`,
+      [tenantId, userId, storageName],
+    );
     const prev = (existing.rows && existing.rows[0]) as MemoryExistingNoteRow | undefined;
     const id = (prev && prev.id) || memId('memnote');
     const now = this._now().toISOString();
@@ -162,7 +184,7 @@ export class PostgresMemoryStore {
        ON CONFLICT (tenant_id, name) DO UPDATE SET
          user_id=EXCLUDED.user_id, trace_id=EXCLUDED.trace_id, body=EXCLUDED.body,
          size=EXCLUDED.size, updated_at=EXCLUDED.updated_at, note_json=EXCLUDED.note_json`,
-      [id, tenantId, userId, context.traceId || null, noteName, safeBody, note.size, note.createdAt, note.updatedAt, JSON.stringify(note)],
+      [id, tenantId, userId, context.traceId || null, storageName, safeBody, note.size, note.createdAt, note.updatedAt, JSON.stringify(note)],
     );
     return `postgres://memory_notes/${id}`;
   }
@@ -172,8 +194,7 @@ export class PostgresMemoryStore {
     const key = cleanFactKey(fact && fact.key);
     const value = cleanFactValue(fact && fact.value);
     const scope = cleanScope(fact && fact.scope);
-    const tenantId = normTenant(context.tenantId);
-    const userId = normUser(context.userId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const id = memId('memfact');
     const now = this._now().toISOString();
     const stored = { id, key, value, scope, createdAt: now };

@@ -2,13 +2,22 @@
 // ---------------------------------------------------------------------------
 // 职责:把长任务运行的中间「检查点」(已完成步骤、累计用量、上下文)落盘,使任务可「继续(resume)」而非从头再来。
 //       配合 run-resume 实现可取消、可继续(plan/01 健壮性原则)。依赖:node:fs/path。导出:检查点读写函数。
-
-import fs from 'node:fs';
 import path from 'node:path';
 import { openAtRest, sealAtRest } from '../security/at-rest.js';
+import { ManagedStateFilesystem } from '../security/managed-state-filesystem.js';
+import {
+  ensureRunOwnerClaim,
+  isLocalRunOwner,
+  normalizeRunOwner,
+  sameRunOwner,
+  type RunOwner,
+} from '../util/run-owner.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;
-
+const RUN_CHECKPOINT_V1_KEYS = [
+  'approvedTools', 'messages', 'metadata', 'phase', 'runId',
+  'step', 'todos', 'updatedAt', 'usage', 'version',
+] as const;
 export type TokenUsage = {
   prompt_tokens: number;
   completion_tokens: number;
@@ -17,6 +26,7 @@ export type TokenUsage = {
 
 export type CheckpointInput = {
   runId: string;
+  owner?: unknown;
   step?: number;
   phase?: string;
   messages?: unknown;
@@ -29,6 +39,7 @@ export type CheckpointInput = {
 export type RunCheckpoint = {
   version: number;
   runId: string;
+  owner?: RunOwner;
   step: number;
   phase: string;
   updatedAt: string;
@@ -83,6 +94,45 @@ function normalizeUsage(value: unknown): TokenUsage {
   };
 }
 
+function plainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return Object.getPrototypeOf(value) === Object.prototype
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function exactKeys(record: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Reflect.ownKeys(record);
+  return keys.length === expected.length && expected.every((key) => Object.hasOwn(record, key));
+}
+
+function isPersistedRunCheckpoint(value: unknown, expectedRunId: string): value is RunCheckpoint {
+  const record = plainRecord(value);
+  if (!record || (record.version !== 1 && record.version !== 2)) return false;
+  const keys = record.version === 1
+    ? RUN_CHECKPOINT_V1_KEYS
+    : [...RUN_CHECKPOINT_V1_KEYS, 'owner'];
+  const usage = plainRecord(record.usage);
+  if (!exactKeys(record, keys) || !usage || !exactKeys(usage, [
+    'prompt_tokens', 'completion_tokens', 'total_tokens',
+  ])) return false;
+  if (record.version === 2) {
+    try { normalizeRunOwner(record.owner, { label: 'Stored checkpoint owner' }); } catch { return false; }
+  }
+  const updatedAt = record.updatedAt;
+  return record.runId === expectedRunId
+    && Number.isInteger(record.step) && Number(record.step) >= 0
+    && typeof record.phase === 'string' && record.phase.length > 0
+    && typeof updatedAt === 'string'
+    && !Number.isNaN(Date.parse(updatedAt)) && new Date(updatedAt).toISOString() === updatedAt
+    && Array.isArray(record.messages)
+    && Array.isArray(record.approvedTools) && record.approvedTools.every((tool) => typeof tool === 'string')
+    && Array.isArray(record.todos)
+    && plainRecord(record.metadata) !== null
+    && ['prompt_tokens', 'completion_tokens', 'total_tokens']
+      .every((key) => typeof usage[key] === 'number' && Number.isFinite(usage[key]));
+}
+
 function normalizeApprovedTools(value: unknown): string[] {
   const items = value instanceof Set ? Array.from(value) : (Array.isArray(value) ? value : []);
   return Array.from(new Set(items.map((item) => String(item || '').trim()).filter(Boolean))).sort();
@@ -96,6 +146,20 @@ function toIsoString(value: Date | string): string {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
+export function checkpointOwnedBy(checkpoint: unknown, expectedOwner: RunOwner): boolean {
+  if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) return false;
+  const record = checkpoint as Record<string, unknown>;
+  if (!Object.hasOwn(record, 'owner')) return isLocalRunOwner(expectedOwner);
+  try {
+    return sameRunOwner(
+      normalizeRunOwner(record.owner, { label: 'Stored checkpoint owner' }),
+      expectedOwner,
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getCheckpointPath(root: string, runId: string): string {
   if (!root || typeof root !== 'string') {
     throw new Error('RunCheckpointer: root is required');
@@ -107,6 +171,7 @@ export function getCheckpointPath(root: string, runId: string): string {
 export class RunCheckpointer {
   readonly root: string;
   readonly now: () => Date | string;
+  private readonly filesystem: ManagedStateFilesystem;
 
   constructor({ root, now = () => new Date() }: RunCheckpointerOptions = {}) {
     if (!root || typeof root !== 'string') {
@@ -114,14 +179,34 @@ export class RunCheckpointer {
     }
     this.root = root;
     this.now = now;
+    this.filesystem = new ManagedStateFilesystem(root, { label: 'Run checkpoint store' });
   }
 
   save(input: CheckpointInput): string {
-    const filePath = getCheckpointPath(this.root, input.runId);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const runId = normalizeRunId(input.runId);
+    const filePath = getCheckpointPath(this.root, runId);
+    const owner = normalizeRunOwner(input.owner, {
+      allowLocalDefault: true,
+      label: 'Run checkpoint owner',
+    });
+    if (this.filesystem.fileExists(filePath)) {
+      const existing = this.load(input.runId);
+      if (!existing) throw new Error('Run checkpoint owner could not be verified');
+      if (!checkpointOwnedBy(existing, owner)) throw new Error('Run checkpoint owner mismatch');
+    }
+    const claimPath = path.join(path.dirname(filePath), '.owners', `${runId}.json`);
+    ensureRunOwnerClaim({
+      claimPath,
+      owner,
+      label: 'Run checkpoint',
+      beforeFilesystemMutation: this.filesystem.guardMutation,
+      boundary: this.filesystem.boundary,
+    });
+    this.filesystem.guardMutation(claimPath);
     const checkpoint: RunCheckpoint = {
-      version: 1,
-      runId: normalizeRunId(input.runId),
+      version: 2,
+      runId,
+      owner,
       step: Math.max(0, Math.floor(numberOrZero(input.step))),
       phase: String(input.phase || 'unknown'),
       updatedAt: toIsoString(this.now()),
@@ -131,34 +216,30 @@ export class RunCheckpointer {
       todos: cloneArray(input.todos),
       metadata: cloneObject(input.metadata),
     };
-    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     const secDir = path.join(path.dirname(this.root), 'security');
-    try {
-      fs.writeFileSync(tempPath, sealAtRest(`${JSON.stringify(checkpoint, null, 2)}\n`, secDir), 'utf8');
-      fs.renameSync(tempPath, filePath);
-    } catch (err) {
-      try { fs.unlinkSync(tempPath); } catch { /* 临时文件清理失败时保留原始写入错误 */ }
-      throw err;
-    }
+    this.filesystem.writeFile(
+      filePath,
+      sealAtRest(`${JSON.stringify(checkpoint, null, 2)}\n`, secDir),
+    );
     return filePath;
   }
 
   load(runId: string): RunCheckpoint | null {
     const filePath = getCheckpointPath(this.root, runId);
-    if (!fs.existsSync(filePath)) {
-      return null;
+    const raw = this.filesystem.readFile(filePath);
+    if (raw === null) return null;
+    const opened = openAtRest(raw, path.join(path.dirname(this.root), 'security'));
+    if (opened === null) return null;
+    const parsed: unknown = JSON.parse(opened);
+    if (!isPersistedRunCheckpoint(parsed, normalizeRunId(runId))) {
+      throw new Error('Run checkpoint is corrupt or has a mismatched runId');
     }
-    const opened = openAtRest(fs.readFileSync(filePath, 'utf8'), path.join(path.dirname(this.root), 'security'));
-    return opened === null ? null : JSON.parse(opened) as RunCheckpoint;
+    return parsed;
   }
 
   clear(runId: string): boolean {
     const filePath = getCheckpointPath(this.root, runId);
-    if (!fs.existsSync(filePath)) {
-      return false;
-    }
-    fs.unlinkSync(filePath);
-    return true;
+    return this.filesystem.removeFile(filePath);
   }
 }
 

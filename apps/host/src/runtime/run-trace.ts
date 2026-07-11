@@ -15,16 +15,21 @@ import {
   normalizeTraceEntry,
   toIsoString,
 } from './run-trace-normalizers.js';
+import { bindRunEventPublisher } from '../util/run-event-publisher.js';
+import type { RunEventScopeLike } from '../util/run-event-publisher.js';
 
 export type RunEventsLike = {
   publish(runId: string, event: Record<string, unknown>): unknown;
 };
+export type RunTracePublishErrorHandler = (error: Error) => void;
 
 export type RunTraceOptions = {
   runId?: string;
   runEvents?: RunEventsLike | null;
+  context?: RunEventScopeLike;
   now?: () => Date | string;
   maxTextChars?: number;
+  onPublishError?: RunTracePublishErrorHandler;
 };
 
 type ReplayOptions = { after?: number };
@@ -42,21 +47,38 @@ export class RunTrace {
   readonly runEvents: RunEventsLike | null;
   readonly now: () => Date | string;
   readonly maxTextChars: number;
+  readonly onPublishError: RunTracePublishErrorHandler;
   readonly entries: Record<string, unknown>[];
   traceSeq: number;
 
-  constructor({
-    runId,
-    runEvents = null,
-    now = () => new Date(),
-    maxTextChars = DEFAULT_MAX_TEXT_CHARS,
-  }: RunTraceOptions = {}) {
+  constructor(options: RunTraceOptions = {}) {
+    const {
+      runId,
+      runEvents = null,
+      context,
+      now = () => new Date(),
+      maxTextChars = DEFAULT_MAX_TEXT_CHARS,
+      onPublishError = (error: Error) => console.error('[run-trace] event publish failed:', error.message),
+    } = options;
     this.runId = normalizeRunId(runId);
-    this.runEvents = runEvents;
+    this.runEvents = Object.hasOwn(options, 'context')
+      ? bindRunEventPublisher(runEvents, context)
+      : bindRunEventPublisher(runEvents);
     this.now = now;
     this.maxTextChars = Math.max(80, Math.floor(Number(maxTextChars) || DEFAULT_MAX_TEXT_CHARS));
+    this.onPublishError = onPublishError;
     this.entries = [];
     this.traceSeq = 0;
+  }
+
+  private _reportPublishError(cause: unknown): void {
+    const error = cause instanceof Error ? cause : new Error(String(cause));
+    try {
+      this.onPublishError(error);
+    } catch (reportCause) {
+      const detail = reportCause instanceof Error ? reportCause.message : String(reportCause);
+      console.error('[run-trace] publish error reporter failed:', detail);
+    }
   }
 
   append(event: Record<string, unknown>): Record<string, unknown> {
@@ -73,7 +95,10 @@ export class RunTrace {
     const cloned = jsonClone(entry) as Record<string, unknown>;
     this.entries.push(cloned);
     if (this.runEvents && typeof this.runEvents.publish === 'function') {
-      this.runEvents.publish(this.runId, { type: 'run_trace', trace: cloned });
+      const published = this.runEvents.publish(this.runId, { type: 'run_trace', trace: cloned });
+      if (published && typeof (published as PromiseLike<unknown>).then === 'function') {
+        void Promise.resolve(published).catch((error) => this._reportPublishError(error));
+      }
     }
     return jsonClone(cloned) as Record<string, unknown>;
   }

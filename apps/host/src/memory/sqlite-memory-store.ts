@@ -1,6 +1,6 @@
 // SQLite 后端:用数据库表实现记忆读写(host · L1 领域层 · memory)
 // ---------------------------------------------------------------------------
-// 职责:以 memory_facts / memory_notes 两张表替代文件存储,按 tenant 隔离做事实追加与
+// 职责:以 memory_facts / memory_notes 两张表替代文件存储,按 tenant+user 隔离做事实追加与
 //       笔记 upsert(冲突按 tenant_id+name 更新),读主记忆时把事实行重组为 Markdown,
 //       构建 system 块/上下文委托 memory-query;写操作产生与文件后端一致的审计事件。
 //       接口与 FileMemoryStore 等价,二者经 createMemoryStore 互换。
@@ -10,6 +10,12 @@
 import { createSqliteDatabase, type SqliteDatabase } from '../storage/sqlite.js';
 import { MAX_MEMORY_BYTES, MEMORY_HEADER, NOTE_NAME_RE } from './memory-constants.js';
 import { appendAuditEvent } from './memory-audit.js';
+import {
+  isLegacyLocalMemoryOwner,
+  memoryLogicalNoteName,
+  memoryStorageNoteName,
+  requireMemoryOwner,
+} from './memory-owner.js';
 import { buildMemorySystemBlockFromText, loadMemoryContextFromStore, type MemoryContextSummary } from './memory-query.js';
 import {
   cleanFactKey,
@@ -18,8 +24,6 @@ import {
   clipUtf8,
   ensureTrustedRoot,
   memoryId,
-  normaliseTenantId,
-  normaliseUserId,
 } from './memory-utils.js';
 import type { MemoryContext, MemoryFact, MemoryFactInput, MemoryNote, MemoryQueryOptions } from './file-memory-store.js';
 
@@ -29,7 +33,7 @@ type MemoryNoteRow = { id: string; name: string; size: number; created_at: strin
 type MemoryNoteBodyRow = { body: string };
 type MemoryExistingNoteRow = { id: string; created_at: string };
 
-/** SQLite 后端实现,接口对齐 FileMemoryStore;事实/笔记落库并按租户隔离。 */
+/** SQLite 后端实现,接口对齐 FileMemoryStore;事实/笔记落库并按精确 tenant+user 隔离。 */
 export class SqliteMemoryStore {
   readonly db: SqliteDatabase;
   readonly now: () => Date;
@@ -44,13 +48,13 @@ export class SqliteMemoryStore {
 
   readMainMemory(trustedRoot: unknown, context: MemoryContext = {}): string {
     ensureTrustedRoot(trustedRoot);
-    const tenantId = normaliseTenantId(context.tenantId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const rows = this.db.prepare(`
       SELECT fact_json
       FROM memory_facts
-      WHERE tenant_id = ?
+      WHERE tenant_id = ? AND user_id = ?
       ORDER BY created_at ASC, id ASC
-    `).all(tenantId) as MemoryFactRow[];
+    `).all(tenantId, userId) as MemoryFactRow[];
     if (!rows.length) {
       return '';
     }
@@ -63,19 +67,26 @@ export class SqliteMemoryStore {
 
   listMemoryNotes(trustedRoot: unknown, context: MemoryContext = {}): MemoryNote[] {
     ensureTrustedRoot(trustedRoot);
-    const tenantId = normaliseTenantId(context.tenantId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const rows = this.db.prepare(`
       SELECT id, name, size, created_at, updated_at
       FROM memory_notes
-      WHERE tenant_id = ?
+      WHERE tenant_id = ? AND user_id = ?
       ORDER BY name ASC
-    `).all(tenantId) as MemoryNoteRow[];
-    return rows.map((row) => ({
-      name: row.name,
-      size: Number(row.size) || 0,
-      modifiedAt: row.updated_at || row.created_at,
-      path: `sqlite://memory_notes/${row.id}`,
-    }));
+    `).all(tenantId, userId) as MemoryNoteRow[];
+    const byName = new Map<string, MemoryNote>();
+    for (const row of rows) {
+      const name = memoryLogicalNoteName(row.name, context);
+      if (!name) continue;
+      const note = {
+        name,
+        size: Number(row.size) || 0,
+        modifiedAt: row.updated_at || row.created_at,
+        path: `sqlite://memory_notes/${row.id}`,
+      };
+      if (!byName.has(name) || row.name !== name) byName.set(name, note);
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   readMemoryNote(trustedRoot: unknown, noteName: string, context: MemoryContext = {}): string | null {
@@ -83,12 +94,20 @@ export class SqliteMemoryStore {
     if (!NOTE_NAME_RE.test(String(noteName || ''))) {
       throw new Error('Invalid memory note name');
     }
-    const tenantId = normaliseTenantId(context.tenantId);
-    const row = this.db.prepare(`
+    const { tenantId, userId } = requireMemoryOwner(context);
+    const storageName = memoryStorageNoteName(noteName, context);
+    let row = this.db.prepare(`
       SELECT body
       FROM memory_notes
-      WHERE tenant_id = ? AND name = ?
-    `).get(tenantId, noteName) as MemoryNoteBodyRow | null | undefined;
+      WHERE tenant_id = ? AND user_id = ? AND name = ?
+    `).get(tenantId, userId, storageName) as MemoryNoteBodyRow | null | undefined;
+    if (!row && isLegacyLocalMemoryOwner(context)) {
+      row = this.db.prepare(`
+        SELECT body
+        FROM memory_notes
+        WHERE tenant_id = ? AND user_id = ? AND name = ?
+      `).get(tenantId, userId, noteName) as MemoryNoteBodyRow | null | undefined;
+    }
     return row ? row.body : null;
   }
 
@@ -97,13 +116,13 @@ export class SqliteMemoryStore {
     if (!NOTE_NAME_RE.test(String(noteName || ''))) {
       throw new Error('Invalid memory note name');
     }
-    const tenantId = normaliseTenantId(context.tenantId);
-    const userId = normaliseUserId(context.userId);
+    const { tenantId, userId } = requireMemoryOwner(context);
+    const storageName = memoryStorageNoteName(noteName, context);
     const existing = this.db.prepare(`
       SELECT id, created_at
       FROM memory_notes
-      WHERE tenant_id = ? AND name = ?
-    `).get(tenantId, noteName);
+      WHERE tenant_id = ? AND user_id = ? AND name = ?
+    `).get(tenantId, userId, storageName);
     const existingRow = existing as MemoryExistingNoteRow | null;
     const id = existingRow?.id || memoryId('memnote');
     const now = this.now().toISOString();
@@ -129,7 +148,7 @@ export class SqliteMemoryStore {
         updated_at = excluded.updated_at,
         note_json = excluded.note_json
     `).run(
-      id, tenantId, userId, context.traceId || null, noteName, safeBody,
+      id, tenantId, userId, context.traceId || null, storageName, safeBody,
       note.size, note.createdAt, note.updatedAt, JSON.stringify(note),
     );
     appendAuditEvent(root, {
@@ -153,8 +172,7 @@ export class SqliteMemoryStore {
     const key = cleanFactKey(fact?.key);
     const value = cleanFactValue(fact?.value);
     const scope = cleanScope(fact?.scope);
-    const tenantId = normaliseTenantId(context.tenantId);
-    const userId = normaliseUserId(context.userId);
+    const { tenantId, userId } = requireMemoryOwner(context);
     const id = memoryId('memfact');
     const now = this.now().toISOString();
     const storedFact = { id, key, value, scope, createdAt: now };

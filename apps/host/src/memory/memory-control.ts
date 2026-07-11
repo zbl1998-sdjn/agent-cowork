@@ -2,20 +2,16 @@
 // ---------------------------------------------------------------------------
 // 职责:在既有 file/sqlite memory store 之上提供 2.1 所需的 settings/snapshot/items
 //       语义:暂停/隐身、候选安全判定、用户可见条目 DTO 与跨窗口召回快照。
-import fs from 'node:fs';
-import path from 'node:path';
-import { assertTrustedPath } from '../security/path-policy.js';
 import { createUserProfile, type MemoryStoreLike, type ProfileEntry, type ProfileType } from './profile.js';
-import { ensureTrustedRoot, memoryDir, safeWriteSync } from './memory-utils.js';
 import { decideMemoryDlp } from './memory-dlp-guard.js';
-
-export type MemorySettings = {
-  enabled: boolean;
-  paused: boolean;
-  incognito: boolean;
-  defaultScope: 'project' | 'user' | 'session';
-  updatedAt: string;
-};
+import { isMemoryActive, readMemorySettings, type MemorySettings } from './memory-settings.js';
+export {
+  isMemoryActive,
+  isMemoryActiveForRoot,
+  readMemorySettings,
+  writeMemorySettings,
+  type MemorySettings,
+} from './memory-settings.js';
 
 export type MemoryItem = {
   id: string;
@@ -55,27 +51,8 @@ export type MemoryItemInput = {
   scope?: unknown;
 };
 
-const SETTINGS_FILE = 'memory-settings.json';
-
 function nowIso(now: Date = new Date()): string {
   return now.toISOString();
-}
-
-function settingsPath(trustedRoot: unknown): string {
-  const root = ensureTrustedRoot(trustedRoot);
-  const file = path.join(memoryDir(root), SETTINGS_FILE);
-  assertTrustedPath(file, root);
-  return file;
-}
-
-function defaultSettings(): MemorySettings {
-  return {
-    enabled: true,
-    paused: false,
-    incognito: false,
-    defaultScope: 'project',
-    updatedAt: nowIso(),
-  };
 }
 
 function normalizeScope(value: unknown, fallback: MemorySettings['defaultScope'] = 'project'): MemorySettings['defaultScope'] {
@@ -122,37 +99,6 @@ function parseItemId(id: string): { kind?: ProfileType; scope?: string; title: s
   return parsed;
 }
 
-export function readMemorySettings(trustedRoot: unknown): MemorySettings {
-  const file = settingsPath(trustedRoot);
-  if (!fs.existsSync(file)) return defaultSettings();
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<MemorySettings>;
-    const base = defaultSettings();
-    return {
-      enabled: parsed.enabled !== false,
-      paused: parsed.paused === true,
-      incognito: parsed.incognito === true,
-      defaultScope: normalizeScope(parsed.defaultScope, base.defaultScope),
-      updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt ? parsed.updatedAt : base.updatedAt,
-    };
-  } catch {
-    return { ...defaultSettings(), paused: true, updatedAt: nowIso() };
-  }
-}
-
-export function writeMemorySettings(trustedRoot: unknown, patch: Partial<MemorySettings>, now = new Date()): MemorySettings {
-  const current = readMemorySettings(trustedRoot);
-  const next: MemorySettings = {
-    enabled: patch.enabled != null ? patch.enabled !== false : current.enabled,
-    paused: patch.paused != null ? patch.paused === true : current.paused,
-    incognito: patch.incognito != null ? patch.incognito === true : current.incognito,
-    defaultScope: normalizeScope(patch.defaultScope, current.defaultScope),
-    updatedAt: nowIso(now),
-  };
-  safeWriteSync(settingsPath(trustedRoot), JSON.stringify(next, null, 2));
-  return next;
-}
-
 export function classifyMemoryCandidate(input: Pick<MemoryItemInput, 'title' | 'content' | 'evidence'>): MemoryPolicyDecision {
   const decision = decideMemoryDlp(input);
   return { action: decision.action, sensitivity: decision.sensitivity, reason: decision.reason };
@@ -160,15 +106,6 @@ export function classifyMemoryCandidate(input: Pick<MemoryItemInput, 'title' | '
 
 // 记忆是否"活跃":启用且未暂停未隐身。读(召回/注入)与写(回写)都以此为总闸,
 // 让面板 API、内置分层注入、MASE 记忆桥接对同一个用户开关保持一致语义。
-export function isMemoryActive(settings: Pick<MemorySettings, 'enabled' | 'paused' | 'incognito'>): boolean {
-  return settings.enabled && !settings.paused && !settings.incognito;
-}
-
-// 便捷读法:直接按工作根判定记忆是否活跃(缺 settings 文件时按默认"活跃")。
-export function isMemoryActiveForRoot(trustedRoot: unknown): boolean {
-  return isMemoryActive(readMemorySettings(trustedRoot));
-}
-
 export async function listMemoryItems(
   memoryStore: MemoryStoreLike,
   trustedRoot: string,
@@ -184,9 +121,9 @@ export async function upsertMemoryItem(
   input: MemoryItemInput,
   context: Record<string, unknown> = {},
 ): Promise<{ item: MemoryItem; policy: MemoryPolicyDecision; items: MemoryItem[] }> {
-  const settings = readMemorySettings(trustedRoot);
+  const settings = readMemorySettings(trustedRoot, context);
   if (!isMemoryActive(settings)) {
-    throw Object.assign(new Error('memory is disabled, paused, or incognito for this workspace'), { statusCode: 409 });
+    throw Object.assign(new Error('memory is disabled, paused, or incognito for this user'), { statusCode: 409 });
   }
   const normalized = {
     type: normalizeKind(input.kind),
@@ -232,7 +169,7 @@ export async function buildMemorySnapshot(
   trustedRoot: string,
   options: { query?: string; context?: Record<string, unknown> } = {},
 ): Promise<MemorySnapshot> {
-  const settings = readMemorySettings(trustedRoot);
+  const settings = readMemorySettings(trustedRoot, options.context || {});
   if (!isMemoryActive(settings)) {
     return {
       settings,

@@ -9,7 +9,6 @@ import {
   createCredentialStore,
   createDefaultCredentialProtector,
   createDpapiProtector,
-  resetWeakCredentialFallbackWarning,
 } from '../src/security/credential-store.js';
 import { summarizeCredential } from '../src/security/credential-summary.js';
 import type { CredentialProtector } from '../src/security/credential-store.js';
@@ -37,6 +36,56 @@ function testProtector(): CredentialProtector {
     },
   };
 }
+
+function legacyCredentialKey(identity: {
+  tenantId: string;
+  userId: string;
+  provider: string;
+  accountId: string;
+}): string {
+  return [identity.tenantId, identity.userId, identity.provider, identity.accountId]
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+function moveOnlyCredentialToLegacyKey(filePath: string, legacyKey: string): void {
+  const persisted = requireJsonRecord(JSON.parse(fs.readFileSync(filePath, 'utf8')), 'credential file');
+  const entries = requireJsonRecord(persisted.entries, 'credential entries');
+  const current = Object.entries(entries)[0];
+  assert.ok(current);
+  const [currentKey, entry] = current;
+  entries[legacyKey] = entry;
+  Reflect.deleteProperty(entries, currentKey);
+  fs.writeFileSync(filePath, `${JSON.stringify(persisted, null, 2)}\n`, 'utf8');
+}
+
+test('credential get migrates a schemaVersion 1 URL key to the tuple key', () => {
+  const filePath = tmpFile();
+  const identity = {
+    tenantId: 'tenant-a',
+    userId: 'user-a',
+    provider: 'github',
+    accountId: 'octo/cat',
+  };
+  const legacyKey = legacyCredentialKey(identity);
+  const store = createCredentialStore({ filePath, protector: testProtector() });
+  store.put(identity, { accessToken: 'legacy-test-token' });
+  moveOnlyCredentialToLegacyKey(filePath, legacyKey);
+
+  assert.equal(store.get(identity)?.accessToken, 'legacy-test-token');
+
+  const persisted = requireJsonRecord(JSON.parse(fs.readFileSync(filePath, 'utf8')), 'migrated file');
+  const entries = requireJsonRecord(persisted.entries, 'migrated entries');
+  assert.equal(Object.hasOwn(entries, legacyKey), false);
+  assert.deepEqual(JSON.parse(Object.keys(entries)[0] || ''), [
+    'identity-scope:v1',
+    'tenant-a',
+    'user-a',
+    'credential',
+    'github',
+    'octo/cat',
+  ]);
+});
 
 test('credential store seals OAuth tokens on disk and returns redacted summaries', () => {
   const filePath = tmpFile();
@@ -100,8 +149,128 @@ test('credential store validates identity inputs and tolerates malformed entry f
 
   assert.throws(
     () => store.put({ tenantId: 't', userId: 'u', provider: '', accountId: 'octocat' }, { accessToken: 'token' }),
-    /empty key part/,
+    /credential provider/i,
   );
+});
+
+test('credential store rejects persisted summaries with undeclared fields', () => {
+  const filePath = tmpFile();
+  const store = createCredentialStore({ filePath, protector: testProtector() });
+  store.put(
+    { tenantId: 'tenant-a', userId: 'user-a', provider: 'github', accountId: 'octocat' },
+    { accessToken: 'test-token' },
+  );
+
+  const persisted = requireJsonRecord(JSON.parse(fs.readFileSync(filePath, 'utf8')), 'credential file');
+  const entries = requireJsonRecord(persisted.entries, 'credential entries');
+  const entry = requireJsonRecord(Object.values(entries)[0], 'credential entry');
+  const summary = requireJsonRecord(entry.summary, 'credential summary');
+  summary.accessToken = 'test-secret-marker';
+  fs.writeFileSync(filePath, `${JSON.stringify(persisted, null, 2)}\n`, 'utf8');
+
+  const listed = store.list({ tenantId: 'tenant-a', userId: 'user-a' });
+  assert.deepEqual(listed, []);
+  assert.equal(JSON.stringify(listed).includes('test-secret-marker'), false);
+});
+
+test('credential store rejects tuple keys whose persisted owner summary disagrees', () => {
+  const filePath = tmpFile();
+  const store = createCredentialStore({ filePath, protector: testProtector() });
+  const identity = { tenantId: 'tenant-a', userId: 'user-a', provider: 'github', accountId: 'octocat' };
+  store.put(identity, { accessToken: 'test-owner-secret' });
+
+  const persisted = requireJsonRecord(JSON.parse(fs.readFileSync(filePath, 'utf8')), 'credential file');
+  const entries = requireJsonRecord(persisted.entries, 'credential entries');
+  const entry = requireJsonRecord(Object.values(entries)[0], 'credential entry');
+  const summary = requireJsonRecord(entry.summary, 'credential summary');
+  summary.userId = 'user-b';
+  fs.writeFileSync(filePath, `${JSON.stringify(persisted, null, 2)}\n`, 'utf8');
+
+  assert.deepEqual(store.list({ tenantId: 'tenant-a', userId: 'user-a' }), []);
+  assert.equal(store.get(identity), null);
+  assert.equal(store.deleteMany({ tenantId: 'tenant-a', userId: 'user-a' }), 0);
+});
+
+test('credential store rejects non-object or dangerous decrypted JSON payloads', () => {
+  const invalidPayloads = [
+    'null',
+    '[]',
+    '{"__proto__":{"polluted":true}}',
+    '{"nested":{"constructor":"test-secret-marker"}}',
+  ];
+  for (const plainText of invalidPayloads) {
+    const filePath = tmpFile();
+    const protector: CredentialProtector = {
+      protect: () => 'sealed:test-payload',
+      unprotect: () => plainText,
+    };
+    const store = createCredentialStore({ filePath, protector });
+    const identity = { tenantId: 'tenant-a', userId: 'user-a', provider: 'github', accountId: 'octocat' };
+    store.put(identity, { accessToken: 'test-token' });
+    assert.throws(() => store.get(identity), /credential payload.*(?:corrupt|invalid)/i);
+  }
+});
+
+test('credential exact operations require a canonical owner and raw bounded key parts', () => {
+  const store = createCredentialStore({ filePath: tmpFile(), protector: testProtector() });
+  const valid = { tenantId: 'tenant-a', userId: 'user-a', provider: 'github', accountId: 'octocat' };
+  store.put(valid, { accessToken: 'token' });
+
+  const invalidIdentities = [
+    { userId: 'user-a', provider: 'github', accountId: 'octocat' },
+    { tenantId: 'tenant-a', provider: 'github', accountId: 'octocat' },
+    { tenantId: ' tenant-a', userId: 'user-a', provider: 'github', accountId: 'octocat' },
+    { tenantId: 'tenant-a', userId: 'user-a', provider: ' github', accountId: 'octocat' },
+    { tenantId: 'tenant-a', userId: 'user-a', provider: 'github', accountId: ' octocat' },
+  ];
+  for (const identity of invalidIdentities) {
+    assert.throws(() => store.put(identity, { accessToken: 'bad' }), /credential|canonical/i);
+    assert.throws(() => store.get(identity), /credential|canonical/i);
+    assert.throws(() => store.delete(identity), /credential|canonical/i);
+  }
+
+  const defaultAccount = store.put(
+    { tenantId: 'tenant-a', userId: 'user-a', provider: 'slack' },
+    { accessToken: 'token-default', account: { login: 'must-not-become-key' } },
+  );
+  assert.equal(defaultAccount.accountId, 'default');
+  const explicitUndefined = Object.defineProperty(
+    { tenantId: 'tenant-a', userId: 'user-a', provider: 'github' },
+    'accountId',
+    { enumerable: true, value: undefined },
+  );
+  assert.throws(() => store.get(explicitUndefined), /credential accountId/i);
+});
+
+test('credential filters preserve legal partial filters and reject malformed provided fields', () => {
+  const store = createCredentialStore({ filePath: tmpFile(), protector: testProtector() });
+  store.put({ tenantId: 't', userId: 'alice', provider: 'github', accountId: 'one' }, { accessToken: 'one' });
+  store.put({ tenantId: 't', userId: 'bob', provider: 'slack', accountId: 'two' }, { accessToken: 'two' });
+  assert.equal(store.list({ tenantId: 't' }).length, 2);
+  assert.equal(store.list({ userId: 'alice' }).length, 1);
+
+  const ownUndefined = Object.defineProperty({}, 'tenantId', { enumerable: true, value: undefined });
+  for (const filter of [
+    { tenantId: ' t' },
+    { userId: 42 },
+    { provider: ' github' },
+    { accountId: '' },
+    ownUndefined,
+  ]) {
+    assert.throws(() => store.list(filter), /credential|canonical/i);
+    assert.throws(() => store.deleteMany(filter), /credential|canonical/i);
+  }
+
+  let getterCalled = false;
+  const accessorFilter = Object.defineProperty({}, 'tenantId', {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return 't';
+    },
+  });
+  assert.throws(() => store.list(accessorFilter), /credential|canonical/i);
+  assert.equal(getterCalled, false);
 });
 
 test('credential store deleteMany revokes only the matching tenant/user/provider scope', () => {
@@ -158,27 +327,37 @@ test('AES-GCM credential protector rejects incomplete ciphertext parts', () => {
   assert.throws(() => protector.unprotect('aesgcm:v1:iv:tag'), /Unsupported credential cipher text/);
 });
 
-test('AES-GCM protector warns once when falling back to the weak host/user/home-derived key', () => {
+test('AES-GCM credential protector round-trips empty plaintext and rejects non-canonical parts', () => {
+  const protector = createAesGcmProtector({ keyMaterial: 'test-key-material' });
+  const emptySealed = protector.protect('');
+  assert.match(emptySealed, /^aesgcm:v1:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*:$/);
+  assert.equal(protector.unprotect(emptySealed), '');
+
+  const [, , iv, tag] = emptySealed.split(':');
+  assert.ok(iv);
+  assert.ok(tag);
+  for (const invalid of [
+    'aesgcm:v1:AA==:' + tag + ':',
+    'aesgcm:v1:' + iv + ':AA==:',
+    'aesgcm:v1:' + iv.slice(0, -1) + ':' + tag + ':',
+    'aesgcm:v1:' + iv + ':' + tag + ':AA',
+    'aesgcm:v1:' + iv + ':' + tag + ':!!!!',
+  ]) {
+    assert.throws(() => protector.unprotect(invalid), /Unsupported credential cipher text/);
+  }
+});
+
+test('AES-GCM protector fails closed instead of deriving a key from public host metadata', () => {
   const original = process.env.KCW_CREDENTIAL_KEY;
   delete process.env.KCW_CREDENTIAL_KEY;
-  const originalWarn = console.warn;
-  const calls: unknown[][] = [];
-  console.warn = (...args: unknown[]) => { calls.push(args); };
   try {
-    resetWeakCredentialFallbackWarning();
-    createAesGcmProtector({}); // 无 keyMaterial、无 env → 走弱 fallback → 应警告一次
-    createAesGcmProtector({}); // 再次落到同一弱 fallback → 不应重复刷屏
-    assert.equal(calls.length, 1, 'weak fallback must warn exactly once, not per-call');
-    assert.match(String(calls[0]?.[0]), /KCW_CREDENTIAL_KEY/);
-
-    // 显式传 keyMaterial 不算弱 fallback,不应触发警告。
-    resetWeakCredentialFallbackWarning();
-    createAesGcmProtector({ keyMaterial: 'explicit-key' });
-    assert.equal(calls.length, 1, 'explicit keyMaterial must not trigger the weak-fallback warning');
+    assert.throws(
+      () => createAesGcmProtector({}),
+      /KCW_CREDENTIAL_KEY.*required/i,
+    );
+    assert.doesNotThrow(() => createAesGcmProtector({ keyMaterial: 'explicit-test-key' }));
   } finally {
-    console.warn = originalWarn;
     if (original !== undefined) process.env.KCW_CREDENTIAL_KEY = original;
-    resetWeakCredentialFallbackWarning();
   }
 });
 
@@ -231,14 +410,21 @@ test('DPAPI credential protector uses stdin, timeout, hidden window, and validat
 });
 
 test('default credential protector can be created for the current platform', () => {
-  const protector = createDefaultCredentialProtector();
-  assert.equal(typeof protector.protect, 'function');
-  assert.equal(typeof protector.unprotect, 'function');
+  const original = process.env.KCW_CREDENTIAL_KEY;
+  process.env.KCW_CREDENTIAL_KEY = 'explicit-test-key';
+  try {
+    const protector = createDefaultCredentialProtector();
+    assert.equal(typeof protector.protect, 'function');
+    assert.equal(typeof protector.unprotect, 'function');
+  } finally {
+    if (original === undefined) delete process.env.KCW_CREDENTIAL_KEY;
+    else process.env.KCW_CREDENTIAL_KEY = original;
+  }
 });
 
-test('credential summaries whitelist account fields, normalize scopes, and fill safe defaults', () => {
+test('credential summaries whitelist account fields and preserve canonical identity', () => {
   const summary = summarizeCredential(
-    { provider: 'github', accountId: '', tenantId: '', userId: null },
+    { provider: 'github', tenantId: 'tenant-a', userId: 'user-a' },
     {
       scopes: [' repo ', '', 'read:user'],
       accessToken: 'token-must-not-leak',
@@ -255,9 +441,9 @@ test('credential summaries whitelist account fields, normalize scopes, and fill 
   );
 
   assert.equal(summary.provider, 'github');
-  assert.equal(summary.accountId, 'octocat');
-  assert.equal(summary.tenantId, 'tenant_local');
-  assert.equal(summary.userId, 'user_local');
+  assert.equal(summary.accountId, 'default');
+  assert.equal(summary.tenantId, 'tenant-a');
+  assert.equal(summary.userId, 'user-a');
   assert.deepEqual(summary.scopes, ['repo', 'read:user']);
   assert.deepEqual(summary.account, {
     login: 'octocat',

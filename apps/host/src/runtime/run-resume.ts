@@ -3,7 +3,8 @@
 // 职责:基于 run-checkpoint 落下的检查点,把中断的长任务从「上次步骤」续跑而非重头开始(可继续能力)。
 // 依赖:同层 run-checkpoint。导出:运行续跑相关函数。
 
-import { createRunCheckpointer } from './run-checkpoint.js';
+import { checkpointOwnedBy, createRunCheckpointer } from './run-checkpoint.js';
+import type { RunOwner } from '../util/run-owner.js';
 
 export type ResumeUsage = { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 export type ResumeState = {
@@ -92,6 +93,13 @@ export class RunResumer {
   load(runId: string): ResumeState | null {
     const checkpoint = this.checkpointer.load(runId);
     return checkpoint ? resumeStateFromCheckpoint(checkpoint) : null;
+  }
+
+  loadOwned(runId: string, owner: RunOwner): ResumeState | null {
+    const checkpoint = this.checkpointer.load(runId);
+    return checkpoint && checkpointOwnedBy(checkpoint, owner)
+      ? resumeStateFromCheckpoint(checkpoint)
+      : null;
   }
 }
 

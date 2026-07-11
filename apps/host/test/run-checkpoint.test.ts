@@ -6,6 +6,7 @@ import test from 'node:test';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
 import { runAgentChat } from '../src/kimi/agent-runner.js';
 import { createCheckpointRecorder } from '../src/kimi/agent/checkpoint-state.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { AgentTool, ToolArgs } from '../src/kimi/agent/tool-call-executor.js';
 
 type EmittedEvent = {
@@ -57,7 +58,8 @@ test('RunCheckpointer saves and loads a complete cloned loop state', () => {
   const loaded = checkpointer.load('run_checkpoint_1');
   assert.ok(loaded, 'checkpoint should be loadable');
   assert.equal(file, path.join(root, 'checkpoints', 'run_checkpoint_1.json'));
-  assert.equal(loaded.version, 1);
+  assert.equal(loaded.version, 2);
+  assert.deepEqual(loaded.owner, { tenantId: 'tenant_local', userId: 'user_local' });
   assert.equal(loaded.runId, 'run_checkpoint_1');
   assert.equal(loaded.step, 2);
   assert.equal(loaded.phase, 'tool_result');
@@ -78,6 +80,62 @@ test('RunCheckpointer rejects invalid run ids before writing', () => {
     /Invalid run id/,
   );
   assert.equal(fs.existsSync(path.join(root, '..', 'escape.json')), false);
+});
+
+test('RunCheckpointer refuses to overwrite incomplete or mismatched persisted state', () => {
+  for (const scenario of [
+    { name: 'incomplete', storedRunId: null },
+    { name: 'mismatched', storedRunId: 'run_checkpoint_other' },
+  ]) {
+    const root = tempRoot();
+    const runId = `run_checkpoint_${scenario.name}`;
+    const file = path.join(root, 'checkpoints', `${runId}.json`);
+    const persisted = scenario.storedRunId === null
+      ? {}
+      : {
+        version: 1,
+        runId: scenario.storedRunId,
+        step: 0,
+        phase: 'unknown',
+        updatedAt: '2026-05-25T00:00:00.000Z',
+        messages: [],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        approvedTools: [],
+        todos: [],
+        metadata: {},
+      };
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(persisted)}\n`, 'utf8');
+    const before = fs.readFileSync(file);
+
+    assert.throws(
+      () => new RunCheckpointer({ root }).save({ runId, step: 1 }),
+      /checkpoint.*corrupt|verified|runId/i,
+    );
+    assert.deepEqual(fs.readFileSync(file), before);
+  }
+});
+
+test('RunCheckpointer can replace a complete version 1 local checkpoint', () => {
+  const root = tempRoot();
+  const runId = 'run_checkpoint_legacy_v1';
+  const file = path.join(root, 'checkpoints', `${runId}.json`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify({
+    version: 1,
+    runId,
+    step: 0,
+    phase: 'unknown',
+    updatedAt: '2026-05-25T00:00:00.000Z',
+    messages: [],
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    approvedTools: [],
+    todos: [],
+    metadata: {},
+  })}\n`, 'utf8');
+
+  new RunCheckpointer({ root }).save({ runId, step: 2 });
+  assert.equal(new RunCheckpointer({ root }).load(runId)?.version, 2);
 });
 
 test('createCheckpointRecorder mirrors todos, emits save events, and reports save failures', () => {
@@ -190,7 +248,7 @@ test('runAgentChat checkpoints messages, usage, approvals and todos after loop p
 
   const out = await runAgentChat({
     prompt: 'echo',
-    kimiConfig: { model: 'fake' },
+    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -201,7 +259,8 @@ test('runAgentChat checkpoints messages, usage, approvals and todos after loop p
   });
 
   const loaded = checkpointer.load('run_checkpoint_agent');
-  assert.ok(loaded, 'agent checkpoint should be loadable');
+  const checkpointErrors = events.filter((event) => event.type === 'run_checkpoint_error');
+  assert.ok(loaded, `agent checkpoint should be loadable: ${JSON.stringify(checkpointErrors)}`);
   assert.equal(out.text, 'done');
   assert.equal(loaded.runId, 'run_checkpoint_agent');
   assert.equal(loaded.phase, 'completed');

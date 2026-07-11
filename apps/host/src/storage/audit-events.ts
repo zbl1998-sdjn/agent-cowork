@@ -112,7 +112,9 @@ export function createJsonlAuditSubscriber(filePath: string, opts: AuditJsonlSub
   const { hashChain = true, ...writerOptions } = opts;
   const writer = new JsonlWriter(filePath, writerOptions);
   const withHashChain = hashChain !== false;
-  let previousHash = withHashChain ? readLastAuditHash(filePath) : null;
+  let previousHash = withHashChain
+    ? readLastAuditHash(filePath, () => writer.readCurrentText())
+    : null;
   return (event) => {
     const record = withHashChain ? createAuditChainRecord(event, previousHash) : event;
     writer.append(record);

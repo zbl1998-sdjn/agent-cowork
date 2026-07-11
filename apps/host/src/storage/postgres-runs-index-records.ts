@@ -1,21 +1,26 @@
 // runs 索引记录归一与解析(host · L1 领域层 · storage)
 // ---------------------------------------------------------------------------
-// 职责:为 Postgres runs 索引做记录层处理——归一化单条 run 记录(必填校验、租户/用户回落、
+// 职责:为 Postgres runs 索引做记录层处理——归一化单条 run 记录(必填校验、租户/用户严格校验、
 //       字段截断、默认版本)、校验表名防注入、从 record_json 列还原 RunRecord。
 // 依赖:L1 storage(postgres-runs-index-types 的类型契约)。
 // 导出:normaliseTenantId, normaliseUserId, safePgIdentifier, normaliseRecord, parseRecord。
 import type { RunRecord, RunRecordInput } from './postgres-runs-index-types.js';
+import {
+  canonicalIdentityPart,
+  canonicalRequiredIdentityScope,
+  requireIdentityScopeFrom,
+} from '../security/identity-scope.js';
 
 type RunsIndexRow = { record_json?: unknown };
 
-function clampId(value: unknown, fallback: string): string {
-  const text = String(value || '').trim();
-  if (!text) return fallback;
-  return text.length > 96 ? text.slice(0, 96) : text;
+function requireIdentityPart(value: unknown, label: string): string {
+  const canonical = canonicalIdentityPart(value);
+  if (!canonical) throw new Error(`${label}: canonical identity part is required`);
+  return canonical;
 }
 
-export const normaliseTenantId = (v: unknown): string => clampId(v, 'tenant_local');
-export const normaliseUserId = (v: unknown): string => clampId(v, 'user_local');
+export const normaliseTenantId = (v: unknown): string => requireIdentityPart(v, 'runs-index tenantId');
+export const normaliseUserId = (v: unknown): string => requireIdentityPart(v, 'runs-index userId');
 
 /** 校验表名合法(表名拼进 SQL 不能参数化,需防注入)。 */
 export function safePgIdentifier(value: unknown): string {
@@ -26,16 +31,17 @@ export function safePgIdentifier(value: unknown): string {
   return text;
 }
 
-/** 归一一条 run 记录:必填 id 校验、租户/用户回落、字段截断与默认版本。 */
+/** 归一一条 run 记录:必填 id 校验、租户/用户严格校验、字段截断与默认版本。 */
 export function normaliseRecord(record: unknown): RunRecord {
   if (!record || typeof record !== 'object') throw new Error('runs-index: record must be an object');
   const input = record as RunRecordInput;
   const id = String(input.id || '').trim();
   if (!id) throw new Error('runs-index: record.id is required');
+  const owner = requireIdentityScopeFrom(input, { label: 'runs-index record identity' });
   return {
     id,
-    tenantId: normaliseTenantId(input.tenantId),
-    userId: normaliseUserId(input.userId),
+    tenantId: owner.tenantId,
+    userId: owner.userId,
     traceId: String(input.traceId || ''),
     type: String(input.type || ''),
     status: String(input.status || ''),
@@ -57,5 +63,14 @@ export function normaliseRecord(record: unknown): RunRecord {
 export function parseRecord(row: unknown): RunRecord | null {
   if (!row) return null;
   const raw = (row as RunsIndexRow).record_json;
-  return typeof raw === 'string' ? JSON.parse(raw) as RunRecord : raw as RunRecord | null;
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const record = parsed as RunRecord;
+  if (!canonicalRequiredIdentityScope(record.tenantId, record.userId)) return null;
+  return record;
 }

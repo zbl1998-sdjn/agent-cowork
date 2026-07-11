@@ -5,6 +5,7 @@
 // 依赖:node:path(路径解析)。导出:StoreBackend, StoreBackendConfigInput,
 //       ResolvedStoreBackendConfig, resolveStoreBackendConfig。
 import path from 'node:path';
+import { assertTrustedPathForCreate } from '../security/path-policy.js';
 
 export type StoreBackend = 'file' | 'sqlite' | 'postgres';
 
@@ -29,15 +30,17 @@ export function resolveStoreBackendConfig(
   const storeBackend = resolveStoreBackend(storeRaw);
   const databaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
 
+  const configuredSqliteDbPath = config.sqliteDbPath || process.env.KCW_SQLITE_PATH;
   return {
     storeBackend,
     databaseUrl,
     usePostgresState: storeBackend === 'postgres' && !!databaseUrl,
-    sqliteDbPath: path.resolve(
-      config.sqliteDbPath
-        || process.env.KCW_SQLITE_PATH
-        || path.join(trustedRootDefault, '.AgentCowork', 'state.sqlite'),
-    ),
+    sqliteDbPath: configuredSqliteDbPath
+      ? path.resolve(configuredSqliteDbPath)
+      : assertTrustedPathForCreate(
+        path.join(trustedRootDefault, '.AgentCowork', 'state.sqlite'),
+        trustedRootDefault,
+      ),
   };
 }
 

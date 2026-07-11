@@ -1,14 +1,17 @@
 // 主题知识库(host · L1 领域层 · memory)
 // ---------------------------------------------------------------------------
 // 职责:装「对话结束自动提炼出的主题知识条目」——独立于手工 profile items(生命周期不同:
-//       自动写入、置信度门控、待确认队列)。落 <root>/.AgentCowork/knowledge.json,提供
+//       自动写入、置信度门控、待确认队列)。落 owner 哈希命名空间内的 knowledge.json,提供
 //       upsert(DLP → 按 主题+标题 去重合并/supersede → 置信度门 active/pending → per-scope
 //       容量淘汰)、list(可按状态)、setStatus(批准 pending)。召回侧(Phase 3)按相关性挑选注入。
 // 安全:每条先过 decideMemoryDlp,含密钥/敏感一律不入库;复用 safeWriteSync 的 at-rest 封装。
 // 依赖:L0 无;同层 memory-utils(路径/写入/id)、memory-dlp-guard(DLP)。
-import { decideMemoryDlp } from './memory-dlp-guard.js';
-import { ensureTrustedRoot, memoryDir, memoryId, safeReadSync, safeWriteSync } from './memory-utils.js';
+import fs from 'node:fs';
 import path from 'node:path';
+import { decideMemoryDlp } from './memory-dlp-guard.js';
+import { memoryOwnerDir, requireMemoryOwner, type MemoryOwnerContext } from './memory-owner.js';
+import { memoryDir, memoryId, safeReadSync, safeWriteSync } from './memory-utils.js';
+import { createManagedDirectoryBoundary, type ManagedDirectoryBoundary } from '../security/managed-directory-boundary.js';
 import type { MemoryScope } from './memory-utils.js';
 
 const KNOWLEDGE_FILE = 'knowledge.json';
@@ -34,6 +37,7 @@ export type UpsertOptions = {
   confidenceThreshold?: number;
   maxActivePerScope?: number;
   now?: Date;
+  context?: MemoryOwnerContext;
 };
 export type UpsertResult = {
   stored: boolean;
@@ -43,23 +47,75 @@ export type UpsertResult = {
   evicted?: Array<{ id: string; title: string }>;
 };
 
-function knowledgeFile(trustedRoot: unknown): string {
-  return path.join(memoryDir(trustedRoot), KNOWLEDGE_FILE);
+function knowledgeFile(trustedRoot: unknown, context: MemoryOwnerContext): string {
+  return path.join(memoryOwnerDir(trustedRoot, context), KNOWLEDGE_FILE);
 }
 
-function readAll(trustedRoot: unknown): KnowledgeItem[] {
-  const raw = safeReadSync(knowledgeFile(trustedRoot), '');
-  if (!raw.trim()) return [];
+function knowledgeBoundary(trustedRoot: unknown, create: boolean): ManagedDirectoryBoundary | null {
+  const appDir = memoryDir(trustedRoot);
+  if (!create && !fs.existsSync(appDir)) return null;
+  return createManagedDirectoryBoundary(appDir, {
+    create,
+    label: 'Knowledge store directory',
+  });
+}
+
+function readAll(
+  trustedRoot: unknown,
+  context: MemoryOwnerContext,
+  boundary: ManagedDirectoryBoundary | null,
+): KnowledgeItem[] {
+  if (!boundary) return [];
+  const file = knowledgeFile(trustedRoot, context);
+  const before = boundary.inspectPath(file, { allowMissing: true, kind: 'file' });
+  if (!before) return [];
+  const raw = safeReadSync(before.canonicalPath, '');
+  boundary.revalidatePath(file, before, { kind: 'file' });
   try {
     const parsed = JSON.parse(raw) as { items?: unknown };
-    return Array.isArray(parsed.items) ? parsed.items as KnowledgeItem[] : [];
+    if (!parsed || !Array.isArray(parsed.items)) throw new Error('items must be an array');
+    const items = parsed.items as KnowledgeItem[];
+    const ids = new Set<string>();
+    const keys = new Set<string>();
+    for (const item of items) {
+      if (!item || typeof item !== 'object'
+        || typeof item.id !== 'string' || !item.id
+        || typeof item.topic !== 'string'
+        || typeof item.title !== 'string'
+        || typeof item.content !== 'string'
+        || !Number.isFinite(item.confidence)
+        || (item.status !== 'active' && item.status !== 'pending')
+        || (item.scope !== 'project' && item.scope !== 'user' && item.scope !== 'session')) {
+        throw new Error('invalid knowledge item');
+      }
+      const key = dedupKey(item.scope, item.topic, item.title);
+      if (ids.has(item.id) || keys.has(key)) throw new Error('conflicting knowledge items');
+      ids.add(item.id);
+      keys.add(key);
+    }
+    return items;
   } catch {
-    return [];
+    throw new Error('knowledge store is corrupt or conflicting');
   }
 }
 
-function writeAll(trustedRoot: unknown, items: KnowledgeItem[]): void {
-  safeWriteSync(knowledgeFile(trustedRoot), `${JSON.stringify({ version: 1, items }, null, 2)}\n`);
+function writeAll(
+  trustedRoot: unknown,
+  items: KnowledgeItem[],
+  context: MemoryOwnerContext,
+  boundary: ManagedDirectoryBoundary,
+): void {
+  const file = knowledgeFile(trustedRoot, context);
+  const guardMutation = boundary.createMutationGuard();
+  guardMutation(file);
+  boundary.inspectPath(file, { allowMissing: true, kind: 'file' });
+  safeWriteSync(file, `${JSON.stringify({ version: 1, items }, null, 2)}\n`, {
+    beforeFilesystemMutation: guardMutation,
+  });
+  guardMutation(file);
+  if (!boundary.inspectPath(file, { kind: 'file' })) {
+    throw new Error('knowledge store file disappeared after publishing');
+  }
 }
 
 function normScope(value: unknown): MemoryScope {
@@ -81,7 +137,8 @@ export function upsertKnowledgeItem(
   candidate: KnowledgeCandidateInput,
   options: UpsertOptions = {},
 ): UpsertResult {
-  ensureTrustedRoot(trustedRoot);
+  const context = options.context || {};
+  requireMemoryOwner(context);
   const content = String(candidate?.content ?? '').trim();
   if (!content) return { stored: false, reason: 'empty content' };
   const title = String(candidate?.title ?? '').trim() || content.slice(0, 24);
@@ -98,7 +155,8 @@ export function upsertKnowledgeItem(
   const status: KnowledgeStatus = confidence >= threshold ? 'active' : 'pending';
   const ts = (options.now || new Date()).toISOString();
 
-  const items = readAll(trustedRoot);
+  const boundary = knowledgeBoundary(trustedRoot, true) as ManagedDirectoryBoundary;
+  const items = readAll(trustedRoot, context, boundary);
   const key = dedupKey(scope, topic, title);
   const existingIdx = items.findIndex((it) => dedupKey(normScope(it.scope), it.topic, it.title) === key);
 
@@ -138,7 +196,7 @@ export function upsertKnowledgeItem(
     }
   }
 
-  writeAll(trustedRoot, items);
+  writeAll(trustedRoot, items, context, boundary);
   return omitEmptyEvicted({ stored: true, status: items.find((it) => dedupKey(normScope(it.scope), it.topic, it.title) === key)?.status || status, merged, evicted });
 }
 
@@ -148,28 +206,44 @@ function omitEmptyEvicted(result: UpsertResult): UpsertResult {
 }
 
 /** 列出知识条目,可按状态过滤。 */
-export function listKnowledgeItems(trustedRoot: unknown, options: { status?: KnowledgeStatus } = {}): KnowledgeItem[] {
-  const items = readAll(trustedRoot);
+export function listKnowledgeItems(
+  trustedRoot: unknown,
+  options: { status?: KnowledgeStatus; context?: MemoryOwnerContext } = {},
+): KnowledgeItem[] {
+  const context = options.context || {};
+  requireMemoryOwner(context);
+  const items = readAll(trustedRoot, context, knowledgeBoundary(trustedRoot, false));
   return options.status ? items.filter((it) => it.status === options.status) : items;
 }
 
 /** 设置某条知识的状态(批准 pending→active 或退回 active→pending);找不到返回 false。 */
-export function setKnowledgeItemStatus(trustedRoot: unknown, id: string, status: KnowledgeStatus): boolean {
-  const items = readAll(trustedRoot);
+export function setKnowledgeItemStatus(
+  trustedRoot: unknown,
+  id: string,
+  status: KnowledgeStatus,
+  context: MemoryOwnerContext = {},
+): boolean {
+  requireMemoryOwner(context);
+  const boundary = knowledgeBoundary(trustedRoot, false);
+  if (!boundary) return false;
+  const items = readAll(trustedRoot, context, boundary);
   const idx = items.findIndex((it) => it.id === id);
   if (idx < 0) return false;
   const prev = items[idx] as KnowledgeItem;
   items[idx] = { ...prev, status, updatedAt: new Date().toISOString() };
-  writeAll(trustedRoot, items);
+  writeAll(trustedRoot, items, context, boundary);
   return true;
 }
 
 /** 删除某条知识(用户在面板剔除误提炼的记忆);找不到返回 false。 */
-export function deleteKnowledgeItem(trustedRoot: unknown, id: string): boolean {
-  const items = readAll(trustedRoot);
+export function deleteKnowledgeItem(trustedRoot: unknown, id: string, context: MemoryOwnerContext = {}): boolean {
+  requireMemoryOwner(context);
+  const boundary = knowledgeBoundary(trustedRoot, false);
+  if (!boundary) return false;
+  const items = readAll(trustedRoot, context, boundary);
   const idx = items.findIndex((it) => it.id === id);
   if (idx < 0) return false;
   items.splice(idx, 1);
-  writeAll(trustedRoot, items);
+  writeAll(trustedRoot, items, context, boundary);
   return true;
 }

@@ -7,7 +7,7 @@ import { runRecipe } from '../src/recipes/run-recipe.js';
 import { captureRun } from '../src/recipes/capture.js';
 import { RunEventBus } from '../src/runtime/run-events.js';
 import { RunsIndex } from '../src/runtime/runs-index.js';
-import { writeRunRecord } from '../src/runtime/run-store.js';
+import { readRunRecord, writeRunRecord } from '../src/runtime/run-store.js';
 import { listRecipes } from '../src/recipes/registry.js';
 import { readZipEntries } from '../src/workspace/zip-utils.js';
 import type { FileOperationInput } from '../src/workspace/file-operations.js';
@@ -89,15 +89,18 @@ test('runRecipe produces operations, run record, events, and indexes the run', a
   }
 
   // Run record embeds events for replay across restart.
-  const record = JSON.parse(fs.readFileSync(result.runPath, 'utf8')) as { events?: unknown[] };
+  const record = JSON.parse(fs.readFileSync(result.runPath, 'utf8')) as { events?: Array<Record<string, unknown>>; status?: string };
   assert.ok(Array.isArray(record.events));
   assert.equal(record.events.length, result.events.length);
+  assert.equal(record.status, 'awaiting_approval');
+  assert.equal(record.events.at(-1)?.status, 'awaiting_approval');
 
   // Indexed and tenant scoped.
   const listed = runsIndex.list({ tenantId: 'tenant_alice' });
   const firstListed = firstItem(listed, 'indexed run');
   assert.equal(listed.length, 1);
   assert.equal(firstListed.id, result.runId);
+  assert.equal(firstListed.status, 'awaiting_approval');
   assert.equal(runsIndex.list({ tenantId: 'tenant_bob' }).length, 0);
 });
 
@@ -193,7 +196,7 @@ test('captureRun extracts a redacted reusable recipe draft from an agent run', a
   const root = tempRoot();
   const runStoreRoot = path.join(root, 'runs');
   const runId = 'run_capture_agent';
-  const secret = 'sk-ABCDEFGHIJ1234567890';
+  const secret = 'sk-test-dummy-0000000000';
   writeRunRecord(runStoreRoot, {
     id: runId,
     type: 'agent-chat',
@@ -211,7 +214,10 @@ test('captureRun extracts a redacted reusable recipe draft from an agent run', a
     ],
   });
 
-  const draft = (await captureRun({ runId, runStoreRoot })).recipe;
+  const draft = (await captureRun({
+    runId,
+    recordReader: (id) => readRunRecord(runStoreRoot, id),
+  })).recipe;
 
   assert.equal(draft.draft, true);
   assert.equal(draft.sourceRunId, runId);
@@ -226,9 +232,8 @@ test('captureRun extracts a redacted reusable recipe draft from an agent run', a
   assert.equal(draft.redacted, true);
 });
 
-test('captureRun falls back to runsIndex runPath when runStoreRoot has no record', async () => {
+test('captureRun uses an injected canonical reader after index authorization', async () => {
   const root = tempRoot();
-  const primaryRunStore = path.join(root, 'primary-runs');
   const indexedRunStore = path.join(root, 'indexed-runs');
   const runsIndex = new RunsIndex({ indexRoot: path.join(root, 'index') });
   const runId = 'run_capture_indexed';
@@ -239,6 +244,7 @@ test('captureRun falls back to runsIndex runPath when runStoreRoot has no record
     recipeId: 'summary-report',
     status: 'succeeded',
     startedAt: '2026-05-24T00:00:00.000Z',
+    context: { tenantId: 'tenant_local', userId: 'user_local' },
     input: { prompt: '总结材料' },
     result: { ok: true, text: '生成总结报告' },
     events: [
@@ -248,9 +254,20 @@ test('captureRun falls back to runsIndex runPath when runStoreRoot has no record
       },
     ],
   });
-  runsIndex.upsert({ id: runId, runPath, type: 'recipe-run', status: 'succeeded' });
+  runsIndex.upsert({
+    id: runId,
+    runPath,
+    type: 'recipe-run',
+    status: 'succeeded',
+    tenantId: 'tenant_local',
+    userId: 'user_local',
+  });
 
-  const draft = (await captureRun({ runId, runStoreRoot: primaryRunStore, runsIndex })).recipe;
+  const draft = (await captureRun({
+    runId,
+    runsIndex,
+    recordReader: (id) => readRunRecord(indexedRunStore, id),
+  })).recipe;
 
   assert.equal(draft.name, 'Captured summary-report');
   assert.equal(firstItem(draft.steps, 'captured recipe step').tool, 'recipe.operation');

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import path from 'node:path';
 import { PostgresConversationStore } from '../src/storage/postgres-conversation-store.js';
 import type { PgPool } from '../src/storage/postgres-conversation-store.js';
 import type { ConversationBranch } from '../src/storage/conversation-store.js';
@@ -20,9 +22,12 @@ type ConversationRow = {
 
 // In-memory mock pool that understands the store's SQL well enough to verify
 // isolation, search, pagination and upsert semantics.
-function convPool(): PgPool {
+function convPool(initialRows: ConversationRow[] = []): PgPool {
   const rows = new Map<string, ConversationRow>(); // tenant|user|workspace|id -> record
   const key = (...parts: unknown[]) => parts.map((part) => String(part ?? '')).join('|');
+  for (const row of initialRows) {
+    rows.set(key(row.tenant_id, row.user_id, row.workspace_key, row.id), row);
+  }
   return {
     async query(text: string, params: unknown[] = []) {
       const t = text.replace(/\s+/g, ' ').trim();
@@ -182,4 +187,65 @@ test('PG conversations: invalid id is rejected', async () => {
     () => store.save('/r', { id: '../x', messages: [] }, { tenantId: 't1', userId: 'u1' }),
     /invalid conversation id/,
   );
+});
+
+test('PG conversations keep long tenant and user owners exact across every operation', async () => {
+  const store = new PostgresConversationStore({ pool: convPool() });
+  const pairs = [
+    [
+      { tenantId: 'tenant-long', userId: `${'u'.repeat(96)}A` },
+      { tenantId: 'tenant-long', userId: `${'u'.repeat(96)}B` },
+    ],
+    [
+      { tenantId: `${'t'.repeat(96)}A`, userId: 'same-user' },
+      { tenantId: `${'t'.repeat(96)}B`, userId: 'same-user' },
+    ],
+  ] as const;
+
+  for (const [ownerA, ownerB] of pairs) {
+    await store.save('/r', { id: 'shared', title: 'Alice secret', messages: [{ role: 'user', text: 'secret' }] }, ownerA);
+    assert.equal(await store.get('/r', 'shared', ownerB), null);
+    assert.deepEqual(await store.list('/r', ownerB), []);
+    assert.deepEqual(await store.listFull('/r', ownerB), []);
+    assert.equal((await store.query('/r', ownerB, { q: 'Alice' })).total, 0);
+    assert.equal(await store.remove('/r', 'shared', ownerB), false);
+
+    await store.save('/r', { id: 'shared', title: 'Bob private', messages: [] }, ownerB);
+    assert.equal((await store.get('/r', 'shared', ownerA))?.title, 'Alice secret');
+    assert.equal((await store.get('/r', 'shared', ownerB))?.title, 'Bob private');
+    assert.equal(await store.remove('/r', 'shared', ownerB), true);
+    assert.equal((await store.get('/r', 'shared', ownerA))?.title, 'Alice secret');
+    assert.equal(await store.remove('/r', 'shared', ownerA), true);
+  }
+});
+
+test('PG conversations fail closed against ambiguous rows written with a legacy workspace key', async () => {
+  const trustedRoot = '/legacy-root';
+  const legacyWorkspaceKey = crypto.createHash('sha256').update(path.resolve(trustedRoot)).digest('hex');
+  const truncatedUser = 'u'.repeat(96);
+  const legacyRow: ConversationRow = {
+    tenant_id: 'tenant-long',
+    user_id: truncatedUser,
+    workspace_key: legacyWorkspaceKey,
+    id: 'legacy-secret',
+    title: 'Legacy Alice secret',
+    pinned: false,
+    messages: [{ role: 'user', text: 'secret' }],
+    branches: [],
+    active_branch_id: null,
+    created_at: '2026-07-01T00:00:00.000Z',
+    updated_at: '2026-07-01T00:00:00.000Z',
+  };
+  const store = new PostgresConversationStore({ pool: convPool([legacyRow]) });
+
+  for (const context of [
+    { tenantId: 'tenant-long', userId: truncatedUser },
+    { tenantId: 'tenant-long', userId: `${truncatedUser}A` },
+  ]) {
+    assert.equal(await store.get(trustedRoot, 'legacy-secret', context), null);
+    assert.deepEqual(await store.list(trustedRoot, context), []);
+    assert.deepEqual(await store.listFull(trustedRoot, context), []);
+    assert.equal((await store.query(trustedRoot, context, { q: 'Legacy' })).total, 0);
+    assert.equal(await store.remove(trustedRoot, 'legacy-secret', context), false);
+  }
 });

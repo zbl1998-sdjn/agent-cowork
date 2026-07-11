@@ -8,6 +8,7 @@ import {
 } from '../src/runtime/run-trace.js';
 import { runAgentChat } from '../src/kimi/agent/tool-loop.js';
 import { traceModelContext, traceToolDecision, traceToolResult } from '../src/kimi/agent/run-trace-events.js';
+import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -63,7 +64,7 @@ test('RunTrace appends sanitized entries and publishes replayable run events', (
       reasoning_content: 'Need inspect the file before editing.',
       content: 'I will call Read.',
       tool_calls: [
-        { id: 'call_1', function: { name: 'Read', arguments: JSON.stringify({ path: 'note.md', apiKey: 'sk-test-args-secret-12345' }) } },
+        { id: 'call_1', function: { name: 'Read', arguments: JSON.stringify({ path: 'note.md', apiKey: 'sk-test-dummy-0000000000' }) } },
       ],
     },
   });
@@ -174,7 +175,7 @@ test('runAgentChat publishes model context, tool decisions, and tool results to 
   const result = await runAgentChat({
     prompt: 'Read note.md before answering.',
     trustedRoot: process.cwd(),
-    kimiConfig: { model: 'test-model' },
+    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, model: 'test-model' },
     runId,
     runEvents: bus,
     runTrace,
@@ -198,7 +199,7 @@ test('runAgentChat publishes model context, tool decisions, and tool results to 
             id: 'call_read_note',
             function: {
               name: 'ReadNote',
-              arguments: JSON.stringify({ path: 'note.md', apiKey: 'sk-test-arg-secret-12345' }),
+              arguments: JSON.stringify({ path: 'note.md', apiKey: 'sk-test-dummy-0000000000' }),
             },
           }],
           usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
@@ -230,4 +231,21 @@ test('runAgentChat publishes model context, tool decisions, and tool results to 
   assert.equal(liveResult.tool, 'ReadNote');
   assert.equal(liveResult.status, 'succeeded');
   assert.ok(!JSON.stringify(entries).includes('sk-test-'), 'live trace leaked a secret');
+});
+
+test('RunTrace observes and reports asynchronous event publisher failures', async () => {
+  const errors: string[] = [];
+  const trace = createRunTrace({
+    runId: 'run_trace_publish_failure',
+    runEvents: {
+      publish: async () => {
+        throw new Error('event backend offline');
+      },
+    },
+    onPublishError: (error) => errors.push(error.message),
+  });
+
+  trace.append({ kind: 'model_context', messages: [] });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(errors, ['event backend offline']);
 });

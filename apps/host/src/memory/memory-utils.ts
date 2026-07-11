@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { openAtRest, sealAtRest } from '../security/at-rest.js';
+import { canonicalIdentityPart } from '../security/identity-scope.js';
+import { writePrivateFileAtomically } from '../security/private-atomic-file.js';
 import {
   AUDIT_FILE,
   MAIN_MEMORY_FILE,
@@ -31,6 +33,9 @@ export function securityDirForMemoryPath(filePath: string): string {
 
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export type MemoryScope = 'project' | 'user' | 'session';
+export type SafeWriteOptions = Readonly<{
+  beforeFilesystemMutation?: (candidatePath: string) => void;
+}>;
 
 function pickAlphabet(byte: number): string {
   return ULID_ALPHABET[byte & 0x1f] ?? '0';
@@ -97,17 +102,22 @@ export function mainMemoryPath(trustedRoot: unknown): string {
 /**
  * 写文件并确保父目录存在(先 mkdir 再 writeFile),返回写入路径。
  */
-export function safeWriteSync(filePath: string, body: string): string {
-  ensureDirSync(path.dirname(filePath));
-  fs.writeFileSync(filePath, sealAtRest(body, securityDirForMemoryPath(filePath)), 'utf8');
+export function safeWriteSync(
+  filePath: string,
+  body: string,
+  options: SafeWriteOptions = {},
+): string {
+  const persisted = sealAtRest(body, securityDirForMemoryPath(filePath));
+  writePrivateFileAtomically(filePath, persisted, options);
   return filePath;
 }
 
-/** 读记忆文件并透明解封(遗留明文透传);文件缺失或解不开返回 fallback。 */
+/** 读记忆文件并透明解封(遗留明文透传);仅文件缺失返回 fallback,解密失败显式报错。 */
 export function safeReadSync(filePath: string, fallback = ''): string {
   if (!fs.existsSync(filePath)) return fallback;
   const opened = openAtRest(fs.readFileSync(filePath, 'utf8'), securityDirForMemoryPath(filePath));
-  return opened === null ? fallback : opened;
+  if (opened === null) throw new Error('memory file is corrupt or cannot be decrypted');
+  return opened;
 }
 
 /**
@@ -171,19 +181,21 @@ export function cleanScope(value: unknown): MemoryScope {
 }
 
 /**
- * 归一化租户 ID:去空白、限 96 字符,缺省回落到 'tenant_local'。
+ * 校验租户 ID:只接受中心身份契约的原始 canonical 值,不转换、不截断、不默认。
  */
 export function normaliseTenantId(value: unknown): string {
-  const text = String(value || '').trim();
-  return text ? text.slice(0, 96) : 'tenant_local';
+  const tenantId = canonicalIdentityPart(value);
+  if (!tenantId) throw new Error('memory tenantId must be a canonical identity part');
+  return tenantId;
 }
 
 /**
- * 归一化用户 ID:去空白、限 96 字符,缺省回落到 'user_local'。
+ * 校验用户 ID:只接受中心身份契约的原始 canonical 值,不转换、不截断、不默认。
  */
 export function normaliseUserId(value: unknown): string {
-  const text = String(value || '').trim();
-  return text ? text.slice(0, 96) : 'user_local';
+  const userId = canonicalIdentityPart(value);
+  if (!userId) throw new Error('memory userId must be a canonical identity part');
+  return userId;
 }
 
 /**

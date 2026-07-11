@@ -24,6 +24,7 @@ import {
 } from '../src/memory/memory-query.js';
 
 type JsonRecord = Record<string, unknown>;
+const owner = { tenantId: 'tenant_test', userId: 'user_test' };
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-mem-'));
@@ -41,7 +42,7 @@ function requireText(value: string | null, label: string): string {
 
 test('readMainMemory returns empty string when MEMORY.md absent', () => {
   const root = tempRoot();
-  assert.equal(readMainMemory(root), '');
+  assert.equal(readMainMemory(root, owner), '');
 });
 
 test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
@@ -52,7 +53,7 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
     { traceId: 'trace_test', tenantId: 'tenant_test', userId: 'user_test' },
   );
   assert.match(result.file, /MEMORY\.md$/);
-  const body = readMainMemory(root);
+  const body = readMainMemory(root, owner);
   assert.match(body, /# Agent Cowork 项目记忆/);
   assert.match(body, /\*\*客户简称\*\* \(project\): 阿里 = 阿里巴巴中国区运营/);
   await flushMemoryAuditEvents(root);
@@ -72,34 +73,33 @@ test('appendMemoryFact bootstraps MEMORY.md and appends bullet', async () => {
 
 test('appendMemoryFact rejects empty key or value and over-long value', () => {
   const root = tempRoot();
-  assert.throws(() => appendMemoryFact(root, { key: '', value: 'x' }), /key is required/);
-  assert.throws(() => appendMemoryFact(root, { key: 'k', value: '' }), /value is required/);
+  assert.throws(() => appendMemoryFact(root, { key: '', value: 'x' }, owner), /key is required/);
+  assert.throws(() => appendMemoryFact(root, { key: 'k', value: '' }, owner), /value is required/);
   assert.throws(
-    () => appendMemoryFact(root, { key: 'k', value: 'x'.repeat(MEMORY_LIMITS.maxFactValueLength + 1) }),
+    () => appendMemoryFact(root, { key: 'k', value: 'x'.repeat(MEMORY_LIMITS.maxFactValueLength + 1) }, owner),
     /value too long/,
   );
 });
 
 test('appendMemoryFact normalizes scope to allowed values', () => {
   const root = tempRoot();
-  appendMemoryFact(root, { key: 'a', value: 'b', scope: 'INVALID' });
-  appendMemoryFact(root, { key: 'c', value: 'd', scope: 'user' });
-  const body = readMainMemory(root);
+  appendMemoryFact(root, { key: 'a', value: 'b', scope: 'INVALID' }, owner);
+  appendMemoryFact(root, { key: 'c', value: 'd', scope: 'user' }, owner);
+  const body = readMainMemory(root, owner);
   assert.match(body, /\(project\): b/);
   assert.match(body, /\(user\): d/);
 });
 
-test('writeMemoryNote stores file under .AgentCowork/memory/', () => {
+test('writeMemoryNote stores file under the hashed owner namespace', () => {
   const root = tempRoot();
   const file = writeMemoryNote(root, 'projects.md', '# Projects\n- A: alpha\n', {
+    ...owner,
     traceId: 't',
-    tenantId: 'T',
-    userId: 'U',
   });
-  assert.match(file, /\.AgentCowork[\\/]memory[\\/]projects\.md$/);
-  const note = requireText(readMemoryNote(root, 'projects.md'), 'projects memory note');
+  assert.match(file, /\.AgentCowork[\\/]owners[\\/]v1-[a-f0-9]{64}[\\/]notes[\\/]projects\.md$/);
+  const note = requireText(readMemoryNote(root, 'projects.md', owner), 'projects memory note');
   assert.match(note, /# Projects/);
-  const notes = listMemoryNotes(root);
+  const notes = listMemoryNotes(root, owner);
   assert.equal(notes.length, 1);
   const [firstNote] = notes;
   assert.ok(firstNote);
@@ -114,22 +114,22 @@ test('writeMemoryNote rejects invalid note names', () => {
 
 test('buildMemorySystemBlock returns empty when MEMORY.md missing', () => {
   const root = tempRoot();
-  assert.equal(buildMemorySystemBlock(root), '');
+  assert.equal(buildMemorySystemBlock(root, { context: owner }), '');
 });
 
 test('buildMemorySystemBlock returns clipped text up to maxBytes', () => {
   const root = tempRoot();
-  appendMemoryFact(root, { key: '客户简称', value: '阿里 = 阿里巴巴' });
-  const block = buildMemorySystemBlock(root, { maxBytes: 4096 });
+  appendMemoryFact(root, { key: '客户简称', value: '阿里 = 阿里巴巴' }, owner);
+  const block = buildMemorySystemBlock(root, { maxBytes: 4096, context: owner });
   assert.match(block, /客户简称/);
   assert.ok(Buffer.byteLength(block, 'utf8') <= 4096);
 });
 
 test('loadMemoryContext exposes enabled flag, bytes and notes', () => {
   const root = tempRoot();
-  appendMemoryFact(root, { key: '术语', value: 'OKR = Objectives and Key Results' });
-  writeMemoryNote(root, 'glossary.md', '# Glossary\nKPI = Key Performance Indicator\n');
-  const ctx = loadMemoryContext(root);
+  appendMemoryFact(root, { key: '术语', value: 'OKR = Objectives and Key Results' }, owner);
+  writeMemoryNote(root, 'glossary.md', '# Glossary\nKPI = Key Performance Indicator\n', owner);
+  const ctx = loadMemoryContext(root, { context: owner });
   assert.equal(ctx.enabled, true);
   assert.ok(ctx.bytes > 0);
   assert.ok(ctx.text.includes('术语'));
@@ -141,7 +141,7 @@ test('loadMemoryContext exposes enabled flag, bytes and notes', () => {
 
 test('loadMemoryContext disabled when MEMORY.md absent', () => {
   const root = tempRoot();
-  const ctx = loadMemoryContext(root);
+  const ctx = loadMemoryContext(root, { context: owner });
   assert.equal(ctx.enabled, false);
   assert.equal(ctx.bytes, 0);
 });
@@ -150,8 +150,8 @@ test('createMemoryStore keeps the default file backend compatible', () => {
   const root = tempRoot();
   const store = createMemoryStore();
   assert.ok(store instanceof FileMemoryStore);
-  store.appendMemoryFact(root, { key: '默认后端', value: 'file memory store' });
-  assert.match(store.readMainMemory(root), /默认后端/);
+  store.appendMemoryFact(root, { key: '默认后端', value: 'file memory store' }, owner);
+  assert.match(store.readMainMemory(root, owner), /默认后端/);
 });
 
 test('memory query helpers trim, clamp, and fail closed across stores', () => {

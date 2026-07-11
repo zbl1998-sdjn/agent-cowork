@@ -1,12 +1,10 @@
 // 按用户持久化对话历史(文件后端)(host · L1 领域层 · storage)
 // ---------------------------------------------------------------------------
-// 职责:把每个对话存为 <root>/.AgentCowork/conversations/<tenant>/<user>/<id>.json,
+// 职责:把每个对话存为 <root>/.AgentCowork/conversations/<owner-hash>/<id>.json,
 //       提供 list/query/listFull/get/save/remove;对 id/标题/分支/消息做白名单清洗与
 //       体量上限,防止越权目录穿越与文档膨胀。后端:本地文件系统(JSON 文档)。
 // 依赖:仅标准库(fs/path)。
 // 导出:FileConversationStore(类) · createConversationStore(工厂)。
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   cleanConversationId,
   MAX_CONVERSATION_TITLE,
@@ -15,7 +13,9 @@ import {
   sanitizeConversationMessages,
 } from './conversation-sanitizers.js';
 import { omitUndefined } from '../util/object.js';
-import { openAtRest, sealAtRest } from '../security/at-rest.js';
+import { AtRestKeyError, openAtRest, sealAtRest } from '../security/at-rest.js';
+import { ConversationFileBoundary, ConversationPathError } from './conversation-file-boundary.js';
+import { conversationOwnerDirectory, legacyLocalConversationSegments } from './conversation-owner.js';
 import type {
   ConversationContext,
   ConversationInput,
@@ -27,10 +27,8 @@ import type {
   ConversationSummary,
 } from './conversation-types.js';
 
-// 每个对话是一份 JSON 文档,按 tenant/user 分目录;共享数据根时,登录用户的历史可随账号保留。
+// 每个对话是一份 JSON 文档,按精确 tenant/user tuple 的版本化哈希分目录;共享数据根时仍可随账号保留。
 // 访客也使用同一路径模型,保证桌面离线体验不退化。
-const ROOT_DIR = '.AgentCowork';
-const CONV_DIR = 'conversations';
 const MAX_BYTES = 1024 * 1024; // hard cap per conversation document
 
 export type {
@@ -44,33 +42,47 @@ export type {
   ConversationStoreOptions,
   ConversationSummary,
 } from './conversation-types.js';
-
-/** 把 tenant/user 段清洗为文件系统安全字符串(防目录穿越)。 */
-function normaliseSegment(value: unknown, fallback: string): string {
-  const text = String(value || '').trim();
-  if (!text) return fallback;
-  // 只保留文件系统安全字符;恶意 tenant/user id 无法逃出 conversations 目录。
-  const safe = text.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 96);
-  return safe || fallback;
+/** 新 owner 目录优先；legacy 只作为精确 local/local 的受限兼容读取面。 */
+function userDirs(files: ConversationFileBoundary, context: ConversationContext = {}): string[] {
+  const current = files.ownerDirectory(conversationOwnerDirectory(context));
+  const segments = legacyLocalConversationSegments(context);
+  const legacy = segments ? files.legacyDirectory(segments) : null;
+  return legacy && legacy !== current ? [current, legacy] : [current];
 }
 
-/** 校验并解析受信根目录(为空抛错)。 */
-function ensureTrustedRoot(trustedRoot: unknown): string {
-  const root = String(trustedRoot || '').trim();
-  if (!root) throw new Error('trustedRoot is required');
-  return path.resolve(root);
+function isInfrastructureError(error: unknown): boolean {
+  return error instanceof AtRestKeyError || error instanceof ConversationPathError;
 }
 
-/** 拼出某租户/用户的对话目录路径。 */
-function userDir(trustedRoot: unknown, context: ConversationContext = {}): string {
-  const tenant = normaliseSegment(context.tenantId, 'tenant_local');
-  const user = normaliseSegment(context.userId, 'user_local');
-  return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, CONV_DIR, tenant, user);
+/** Parse one persisted document and reject records that cannot belong to the requested file. */
+function parseConversationRecord(text: string, expectedId: string): ConversationRecord {
+  const parsed: unknown = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid persisted conversation record');
+  const record = parsed as Record<string, unknown>;
+  if (
+    record.id !== expectedId
+    || typeof record.title !== 'string'
+    || !Array.isArray(record.messages)
+    || (Object.hasOwn(record, 'pinned') && typeof record.pinned !== 'boolean')
+    || (Object.hasOwn(record, 'activeBranchId') && typeof record.activeBranchId !== 'string')
+    || (Object.hasOwn(record, 'branches') && !Array.isArray(record.branches))
+  ) {
+    throw new Error('Invalid persisted conversation record');
+  }
+  return record as ConversationRecord;
 }
 
-// 对话正文是最高敏感落盘面;加密密钥箱与其它 store 共享 <trustedRoot>/.AgentCowork/security。
-function convSecurityDir(trustedRoot: unknown): string {
-  return path.join(ensureTrustedRoot(trustedRoot), ROOT_DIR, 'security');
+function readConversationFile(
+  files: ConversationFileBoundary,
+  file: string,
+  expectedId: string,
+): ConversationRecord | null | undefined {
+  const text = files.readFile(file);
+  if (text === null) return undefined;
+  files.assertDirectory(files.securityDirectory);
+  const opened = openAtRest(text, files.securityDirectory);
+  files.assertDirectory(files.securityDirectory);
+  return opened === null ? null : parseConversationRecord(opened, expectedId);
 }
 
 /** 把完整对话记录压成列表用的摘要(含消息/分支计数)。 */
@@ -87,7 +99,7 @@ function summarise(conv: ConversationRecord): ConversationSummary {
   });
 }
 
-/** 基于文件系统的对话存储:每个对话一份 JSON 文档,按 tenant/user 分目录。 */
+/** 基于文件系统的对话存储:每个对话一份 JSON 文档,按不可碰撞 owner 哈希分目录。 */
 export class FileConversationStore {
   now: () => Date;
 
@@ -97,18 +109,24 @@ export class FileConversationStore {
 
   /** 读取用户目录下全部对话文档,经 mapper 映射后按 updatedAt 倒序返回(跳过损坏文件)。 */
   _readDir<T>(trustedRoot: unknown, context: ConversationContext, mapper: (conv: ConversationRecord) => T): T[] {
-    const dir = userDir(trustedRoot, context);
-    if (!fs.existsSync(dir)) return [];
+    const files = new ConversationFileBoundary(trustedRoot);
     const out: T[] = [];
-    for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith('.json')) continue;
-      try {
-        const opened = openAtRest(fs.readFileSync(path.join(dir, name), 'utf8'), convSecurityDir(trustedRoot));
-        if (opened === null) continue; // 开不了的对话跳过,列表尽力可用
-        const conv = JSON.parse(opened) as ConversationRecord;
-        if (conv && conv.id) out.push(mapper(conv));
-      } catch {
-        /* 跳过损坏的对话文档。 */
+    const seenFiles = new Set<string>();
+    for (const dir of userDirs(files, context)) {
+      const names = files.readDirectory(dir);
+      if (!names) continue;
+      for (const name of names) {
+        if (!name.endsWith('.json') || seenFiles.has(name)) continue;
+        seenFiles.add(name); // 新目录中的同名文件即使损坏,也不回退到旧副本。
+        try {
+          const expectedId = cleanConversationId(name.slice(0, -'.json'.length));
+          const record = readConversationFile(files, files.file(dir, name), expectedId);
+          if (!record) continue; // 消失、损坏或单条密文认证失败时跳过。
+          out.push(mapper(record));
+        } catch (error) {
+          if (isInfrastructureError(error)) throw error;
+          /* 跳过损坏的对话文档。 */
+        }
       }
     }
     out.sort((a, b) => {
@@ -140,25 +158,44 @@ export class FileConversationStore {
     return typeof limit === 'number' ? all.slice(0, Math.max(0, limit)) : all;
   }
 
+  private _get(
+    files: ConversationFileBoundary,
+    id: string,
+    context: ConversationContext,
+  ): ConversationRecord | null {
+    const name = `${id}.json`;
+    for (const dir of userDirs(files, context)) {
+      try {
+        const record = readConversationFile(files, files.file(dir, name), id);
+        if (record === undefined) continue;
+        return record;
+      } catch (error) {
+        if (isInfrastructureError(error)) throw error;
+        return null;
+      }
+    }
+    return null;
+  }
+
   /** 读取单个对话完整记录,不存在或损坏返回 null。 */
   get(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): ConversationRecord | null {
-    const file = path.join(userDir(trustedRoot, context), `${cleanConversationId(id)}.json`);
-    if (!fs.existsSync(file)) return null;
-    try {
-      const opened = openAtRest(fs.readFileSync(file, 'utf8'), convSecurityDir(trustedRoot));
-      return opened === null ? null : JSON.parse(opened) as ConversationRecord;
-    } catch {
-      return null;
-    }
+    const cleanId = cleanConversationId(id);
+    return this._get(new ConversationFileBoundary(trustedRoot), cleanId, context);
   }
 
   /** 落盘对话(清洗 + 选活跃分支 + 保留 createdAt);超字节上限则进一步裁剪消息而非拒绝。 */
   save(trustedRoot: unknown, conv: ConversationInput, context: ConversationContext = {}): ConversationSummary {
     const id = cleanConversationId(conv && conv.id);
-    const dir = userDir(trustedRoot, context);
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, `${id}.json`);
-    const existing = fs.existsSync(file) ? this.get(trustedRoot, id, context) : null;
+    const files = new ConversationFileBoundary(trustedRoot);
+    const directories = userDirs(files, context);
+    const dir = directories[0] as string;
+    const file = files.file(dir, `${id}.json`);
+    const existing = this._get(files, id, context);
+    const existingFileIsUnreadable = existing === null
+      && directories.some((candidateDir) => files.fileExists(files.file(candidateDir, `${id}.json`)));
+    if (existingFileIsUnreadable) {
+      throw new Error('Existing conversation cannot be decrypted or parsed; refusing to overwrite');
+    }
     const now = this.now().toISOString();
     const branches = sanitizeConversationBranches(conv && conv.branches);
     const requestedActive = safeOptionalConversationId(conv && conv.activeBranchId);
@@ -180,16 +217,23 @@ export class FileConversationStore {
       record.messages = record.messages.slice(-50);
       body = JSON.stringify(record);
     }
-    fs.writeFileSync(file, sealAtRest(body, convSecurityDir(trustedRoot)), 'utf8');
+    files.guardMutation(files.securityDirectory);
+    const sealed = sealAtRest(body, files.securityDirectory);
+    files.guardMutation(files.securityDirectory);
+    files.writeFile(file, sealed);
     return summarise(record);
   }
 
   /** 删除单个对话文档,返回是否真的删除。 */
   remove(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): boolean {
-    const file = path.join(userDir(trustedRoot, context), `${cleanConversationId(id)}.json`);
-    if (!fs.existsSync(file)) return false;
-    fs.unlinkSync(file);
-    return true;
+    const name = `${cleanConversationId(id)}.json`;
+    const files = new ConversationFileBoundary(trustedRoot);
+    let deleted = false;
+    // legacy 先删:若旧副本删除失败,保留 current 权威副本,避免错误后旧正文重新显现。
+    for (const dir of userDirs(files, context).reverse()) {
+      if (files.removeFile(files.file(dir, name))) deleted = true;
+    }
+    return deleted;
   }
 }
 

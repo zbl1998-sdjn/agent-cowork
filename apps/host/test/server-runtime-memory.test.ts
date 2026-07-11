@@ -19,26 +19,26 @@ test('memory routes: append fact, list notes, read back, inject in workspace inf
   const server = createServer({ trustedRoot, enableScheduler: false });
   const base = await bind(server);
   try {
-    const empty = await jsonRequest(base, '/api/memory');
+    const headers = {
+      'x-tenant-id': 'tenant_alice',
+      'x-user-id': 'user_alice',
+      'x-trace-id': 'trace_memory_route',
+    };
+    const empty = await jsonRequest(base, '/api/memory', { headers });
     assert.equal(empty.status, 200);
     const emptyMemory = objectField(empty.body, 'memory', 'empty memory state');
     assert.equal(emptyMemory.enabled, false);
 
     const factResp = await jsonRequest(base, '/api/memory/facts', {
       method: 'POST',
-      headers: {
-        'x-tenant-id': 'tenant_alice',
-        'x-user-id': 'user_alice',
-        'x-trace-id': 'trace_memory_route',
-        'idempotency-key': 'k1',
-      },
+      headers: { ...headers, 'idempotency-key': 'k1' },
       body: { key: '客户简称', value: '阿里 = 阿里巴巴中国区运营' },
     });
     assert.equal(factResp.status, 200);
     const fact = objectField(factResp.body, 'fact', 'memory fact');
     assert.equal(fact.key, '客户简称');
 
-    const filled = await jsonRequest(base, '/api/memory');
+    const filled = await jsonRequest(base, '/api/memory', { headers });
     assert.equal(filled.status, 200);
     const filledMemory = objectField(filled.body, 'memory', 'filled memory state');
     assert.equal(filledMemory.enabled, true);
@@ -46,11 +46,12 @@ test('memory routes: append fact, list notes, read back, inject in workspace inf
 
     const noteResp = await jsonRequest(base, '/api/memory/notes', {
       method: 'POST',
+      headers,
       body: { name: 'projects.md', body: '# Projects\n- Alpha: launched\n' },
     });
     assert.equal(noteResp.status, 200);
 
-    const noteRead = await jsonRequest(base, '/api/memory/notes/projects.md');
+    const noteRead = await jsonRequest(base, '/api/memory/notes/projects.md', { headers });
     assert.equal(noteRead.status, 200);
     const note = objectField(noteRead.body, 'note', 'memory note');
     assert.ok(stringField(note, 'body', 'memory note body').includes('Alpha'));
@@ -99,6 +100,40 @@ test('memory routes reject invalid input', async () => {
 
     const missing = await jsonRequest(base, '/api/memory/notes/missing.md');
     assert.equal(missing.status, 404);
+  } finally {
+    await close(server);
+  }
+});
+
+test('memory settings routes cannot pause or hide a same-tenant sibling owner', async () => {
+  const trustedRoot = tempRoot();
+  const server = createServer({ trustedRoot, enableScheduler: false });
+  const base = await bind(server);
+  const aliceHeaders = { 'x-tenant-id': 'tenant_shared', 'x-user-id': 'alice' };
+  const bobHeaders = { 'x-tenant-id': 'tenant_shared', 'x-user-id': 'bob' };
+  try {
+    const paused = await jsonRequest(base, '/api/memory/settings', {
+      method: 'POST',
+      headers: aliceHeaders,
+      body: { paused: true },
+    });
+    assert.equal(paused.status, 200);
+
+    const alice = await jsonRequest(base, '/api/memory/settings', { headers: aliceHeaders });
+    const bob = await jsonRequest(base, '/api/memory/settings', { headers: bobHeaders });
+    assert.equal(recordValue(recordValue(alice.body, 'alice settings response').settings, 'alice settings').paused, true);
+    assert.equal(recordValue(recordValue(bob.body, 'bob settings response').settings, 'bob settings').paused, false);
+
+    const incognito = await jsonRequest(base, '/api/memory/settings', {
+      method: 'POST',
+      headers: bobHeaders,
+      body: { incognito: true },
+    });
+    assert.equal(incognito.status, 200);
+    const aliceAfter = await jsonRequest(base, '/api/memory/settings', { headers: aliceHeaders });
+    const aliceSettings = recordValue(recordValue(aliceAfter.body, 'alice settings response').settings, 'alice settings');
+    assert.equal(aliceSettings.paused, true);
+    assert.equal(aliceSettings.incognito, false);
   } finally {
     await close(server);
   }

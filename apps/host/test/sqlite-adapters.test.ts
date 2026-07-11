@@ -122,38 +122,69 @@ test('SqliteRunsIndex matches file adapter semantics for upsert/list/stats/remov
 
   const reopened = new SqliteRunsIndex({ dbPath });
   assert.equal(present(reopened.get(id), 'reopened run index record').status, 'succeeded');
-  assert.equal(reopened.remove(id), true);
+  assert.equal(reopened.remove(id, { tenantId: 'tenant_alice', userId: 'user_alice' }), true);
   assert.equal(reopened.size(), 0);
 });
 
-test('SqliteMemoryStore stores tenant-scoped facts and notes', { skip: !sqliteAvailable }, () => {
+test('SqliteRunsIndex rejects cross-owner upserts and scopes get/stats by tenant and user', { skip: !sqliteAvailable }, () => {
+  const root = tempRoot();
+  const index = new SqliteRunsIndex({ dbPath: path.join(root, 'state.sqlite') });
+  index.upsert({ id: 'owned', tenantId: 'shared', userId: 'alice', type: 'agent-chat', status: 'running' });
+  index.upsert({ id: 'bob-run', tenantId: 'shared', userId: 'bob', type: 'agent-chat', status: 'failed' });
+
+  assert.throws(
+    () => index.upsert({ id: 'owned', tenantId: 'other', userId: 'alice', type: 'agent-chat', status: 'failed' }),
+    /another owner/,
+  );
+  assert.throws(
+    () => index.upsert({ id: 'owned', tenantId: 'shared', userId: 'bob', type: 'agent-chat', status: 'failed' }),
+    /another owner/,
+  );
+
+  const original = present(index.get('owned', { tenantId: 'shared', userId: 'alice' }), 'sqlite original owner record');
+  assert.equal(original.status, 'running');
+  assert.equal(original.version, 1);
+  assert.equal(index.get('owned', { tenantId: 'other', userId: 'alice' }), null);
+  assert.equal(index.get('owned', { tenantId: 'shared', userId: 'bob' }), null);
+  assert.throws(() => index.remove('owned'), /owner context/);
+  assert.equal(index.remove('owned', { tenantId: 'shared', userId: 'bob' }), false);
+  assert.ok(index.get('owned', { tenantId: 'shared', userId: 'alice' }));
+  const aliceStats = index.stats({ tenantId: 'shared', userId: 'alice' });
+  assert.equal(aliceStats.total, 1);
+  assert.equal(aliceStats.byStatus.running, 1);
+  assert.equal(aliceStats.byStatus.failed, undefined);
+});
+
+test('SqliteMemoryStore stores owner-scoped facts and notes', { skip: !sqliteAvailable }, () => {
   const root = tempRoot();
   const dbPath = path.join(root, 'state.sqlite');
   const store = new SqliteMemoryStore({ dbPath });
+  const alice = { tenantId: 'tenant_shared', userId: 'alice', traceId: 'trace_1' };
+  const bob = { tenantId: 'tenant_shared', userId: 'bob' };
 
   const fact = store.appendMemoryFact(
     root,
     { key: '客户简称', value: '阿里 = 阿里巴巴中国区运营', scope: 'project' },
-    { tenantId: 'tenant_alice', userId: 'user_alice', traceId: 'trace_1' },
+    alice,
   );
   assert.equal(fact.fact.key, '客户简称');
   assert.match(fact.file, /^sqlite:\/\/memory_facts\//);
 
-  store.appendMemoryFact(root, { key: '隔离', value: '不应泄漏' }, { tenantId: 'tenant_bob' });
-  const body = store.readMainMemory(root, { tenantId: 'tenant_alice' });
+  store.appendMemoryFact(root, { key: '隔离', value: '不应泄漏' }, bob);
+  const body = store.readMainMemory(root, alice);
   assert.match(body, /客户简称/);
-  assert.equal(/不应泄漏/.test(body), false, 'tenant-scoped memory should not leak other tenants');
+  assert.equal(/不应泄漏/.test(body), false, 'owner-scoped memory should not leak to a sibling user');
 
   const notePath = store.writeMemoryNote(
     root,
     'projects.md',
     '# Projects\n- Alpha\n',
-    { tenantId: 'tenant_alice', userId: 'user_alice' },
+    alice,
   );
   assert.match(notePath, /^sqlite:\/\/memory_notes\//);
-  assert.match(present(store.readMemoryNote(root, 'projects.md', { tenantId: 'tenant_alice' }), 'sqlite memory note'), /Alpha/);
-  assert.equal(store.listMemoryNotes(root, { tenantId: 'tenant_alice' }).length, 1);
-  assert.equal(store.loadMemoryContext(root, { context: { tenantId: 'tenant_alice' } }).enabled, true);
+  assert.match(present(store.readMemoryNote(root, 'projects.md', alice), 'sqlite memory note'), /Alpha/);
+  assert.equal(store.listMemoryNotes(root, alice).length, 1);
+  assert.equal(store.loadMemoryContext(root, { context: alice }).enabled, true);
 });
 
 test('SqliteScheduleStore persists schedules across Scheduler instances', { skip: !sqliteAvailable }, async () => {

@@ -9,13 +9,14 @@ import {
   conversationBufferPath,
 } from '../src/memory/conversation-buffer.js';
 import { tempRoot } from './helpers/host-http.js';
+const owner = { tenantId: 'tenant_test', userId: 'user_test' };
 
 test('appendConversationTurn persists turns and readRecentTurns returns them in order', () => {
   const root = tempRoot('kcw-convbuf-');
-  appendConversationTurn(root, 'conv-A', { role: 'user', text: '我的工位号是 555' });
-  appendConversationTurn(root, 'conv-A', { role: 'assistant', text: '已记住工位号 555' });
+  appendConversationTurn(root, 'conv-A', { role: 'user', text: '我的工位号是 555' }, { context: owner });
+  appendConversationTurn(root, 'conv-A', { role: 'assistant', text: '已记住工位号 555' }, { context: owner });
 
-  const turns = readRecentTurns(root, 'conv-A');
+  const turns = readRecentTurns(root, 'conv-A', { context: owner });
   assert.equal(turns.length, 2);
   assert.equal(turns[0]?.role, 'user');
   assert.match(String(turns[0]?.text), /555/);
@@ -25,20 +26,20 @@ test('appendConversationTurn persists turns and readRecentTurns returns them in 
 
 test('conversation buffers are isolated per conversationId', () => {
   const root = tempRoot('kcw-convbuf-');
-  appendConversationTurn(root, 'conv-A', { role: 'user', text: 'A-only fact 111' });
-  appendConversationTurn(root, 'conv-B', { role: 'user', text: 'B-only fact 222' });
+  appendConversationTurn(root, 'conv-A', { role: 'user', text: 'A-only fact 111' }, { context: owner });
+  appendConversationTurn(root, 'conv-B', { role: 'user', text: 'B-only fact 222' }, { context: owner });
 
-  assert.match(String(readRecentTurns(root, 'conv-A')[0]?.text), /111/);
-  assert.equal(readRecentTurns(root, 'conv-A').some((t) => /222/.test(t.text)), false);
-  assert.match(String(readRecentTurns(root, 'conv-B')[0]?.text), /222/);
+  assert.match(String(readRecentTurns(root, 'conv-A', { context: owner })[0]?.text), /111/);
+  assert.equal(readRecentTurns(root, 'conv-A', { context: owner }).some((t) => /222/.test(t.text)), false);
+  assert.match(String(readRecentTurns(root, 'conv-B', { context: owner })[0]?.text), /222/);
 });
 
 test('readRecentTurns caps to the requested number of most-recent turns', () => {
   const root = tempRoot('kcw-convbuf-');
   for (let i = 0; i < 10; i += 1) {
-    appendConversationTurn(root, 'conv-A', { role: 'user', text: `turn ${i}` });
+    appendConversationTurn(root, 'conv-A', { role: 'user', text: `turn ${i}` }, { context: owner });
   }
-  const recent = readRecentTurns(root, 'conv-A', { maxTurns: 3 });
+  const recent = readRecentTurns(root, 'conv-A', { maxTurns: 3, context: owner });
   assert.equal(recent.length, 3);
   assert.match(String(recent[0]?.text), /turn 7/);
   assert.match(String(recent[2]?.text), /turn 9/);
@@ -47,13 +48,13 @@ test('readRecentTurns caps to the requested number of most-recent turns', () => 
 test('the on-disk buffer rolls to a bounded number of turns (does not grow unbounded)', () => {
   const root = tempRoot('kcw-convbuf-');
   for (let i = 0; i < 200; i += 1) {
-    appendConversationTurn(root, 'conv-A', { role: 'user', text: `msg ${i}` }, { maxTurns: 40 });
+    appendConversationTurn(root, 'conv-A', { role: 'user', text: `msg ${i}` }, { maxTurns: 40, context: owner });
   }
-  const file = conversationBufferPath(root, 'conv-A');
+  const file = conversationBufferPath(root, 'conv-A', owner);
   const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
   assert.ok(lines.length <= 40, `buffer should be capped at 40 lines, got ${lines.length}`);
   // 最新的一定还在
-  const all = readRecentTurns(root, 'conv-A', { maxTurns: 100 });
+  const all = readRecentTurns(root, 'conv-A', { maxTurns: 100, context: owner });
   assert.match(String(all[all.length - 1]?.text), /msg 199/);
 });
 
@@ -61,23 +62,23 @@ test('turn text is DLP-redacted before being written to disk (no raw secrets in 
   const root = tempRoot('kcw-convbuf-');
   // 刻意用假密钥样式验证脱敏:值绝不会真实使用,仅用于断言不会原样落盘。
   const fakeSecret = 'sk-livetestfakekey000000000000000000'; // allowlist-secret
-  appendConversationTurn(root, 'conv-A', { role: 'user', text: `my key is ${fakeSecret} keep it` });
-  const raw = fs.readFileSync(conversationBufferPath(root, 'conv-A'), 'utf8');
+  appendConversationTurn(root, 'conv-A', { role: 'user', text: `my key is ${fakeSecret} keep it` }, { context: owner });
+  const raw = fs.readFileSync(conversationBufferPath(root, 'conv-A', owner), 'utf8');
   assert.equal(raw.includes(fakeSecret), false, 'raw secret must not be persisted');
 });
 
 test('conversationId is sanitized so it cannot escape the conversations dir', () => {
   const root = tempRoot('kcw-convbuf-');
-  appendConversationTurn(root, '../../evil', { role: 'user', text: 'traversal attempt' });
+  appendConversationTurn(root, '../../evil', { role: 'user', text: 'traversal attempt' }, { context: owner });
   // 逃逸尝试不得写到 root 之外
   const escaped = path.join(root, '..', 'evil.jsonl');
   assert.equal(fs.existsSync(escaped), false, 'must not write outside the conversations dir');
   // 归一后的缓冲文件必须存在,且位于 conversations 目录内(用模块自身的 jail 后路径断言,避免手工拼路径受规范化影响)
-  const file = conversationBufferPath(root, '../../evil');
+  const file = conversationBufferPath(root, '../../evil', owner);
   assert.ok(fs.existsSync(file), 'sanitized buffer file should exist');
-  assert.match(file.replace(/\\/g, '/'), /\/\.AgentCowork\/conversations\/[A-Za-z0-9_-]+\.jsonl$/);
+  assert.match(file.replace(/\\/g, '/'), /\/\.AgentCowork\/owners\/v1-[a-f0-9]{64}\/conversations\/[A-Za-z0-9_-]+\.jsonl$/);
   // 归一后读回内容正常
-  assert.match(String(readRecentTurns(root, '../../evil')[0]?.text), /traversal attempt/);
+  assert.match(String(readRecentTurns(root, '../../evil', { context: owner })[0]?.text), /traversal attempt/);
 });
 
 test('formatRecentTurns renders a compact labeled block for system-prompt injection', () => {

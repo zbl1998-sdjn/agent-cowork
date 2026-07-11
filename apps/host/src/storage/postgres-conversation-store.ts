@@ -14,6 +14,7 @@ import {
   sanitizeConversationBranches,
   sanitizeConversationMessages,
 } from './conversation-sanitizers.js';
+import { conversationOwnerValues } from './conversation-owner.js';
 import type {
   ConversationBranch,
   ConversationContext,
@@ -44,14 +45,15 @@ type ConversationRow = {
   total?: unknown;
 };
 
-function clampId(v: unknown, fb: string): string { const t = String(v || '').trim(); return t ? t.slice(0, 96) : fb; }
-const normTenant = (v: unknown): string => clampId(v, 'tenant_local');
-const normUser = (v: unknown): string => clampId(v, 'user_local');
+function ownerParams(context: ConversationContext): [string, string] {
+  const owner = conversationOwnerValues(context);
+  return [owner.tenantId, owner.userId];
+}
 
-/** 用受信根目录的 sha256 作为工作区隔离键,使同库不同工作区互不串数据。 */
+/** 用版本化 sha256 工作区键隔离新数据;旧版无前缀 key 一律 fail-closed。 */
 function workspaceKey(trustedRoot: unknown): string {
   const root = path.resolve(String(trustedRoot || ''));
-  return crypto.createHash('sha256').update(root).digest('hex');
+  return `v1-${crypto.createHash('sha256').update(root).digest('hex')}`;
 }
 
 /** 把列值解析为数组:已是数组直接用,字符串则尝试 JSON.parse,失败返回空数组。 */
@@ -127,15 +129,14 @@ export class PostgresConversationStore {
               COALESCE(jsonb_array_length(branches), 0) AS branch_count, active_branch_id,
               created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 ORDER BY updated_at DESC`,
-      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot)],
+      [...ownerParams(context), workspaceKey(trustedRoot)],
     );
     return (r.rows || []).map((row) => summariseRow(row as ConversationRow));
   }
 
   /** 标题 ILIKE 搜索 + 分页,返回 { items, total };limit 夹在 1~200。 */
   async query(trustedRoot: unknown, context: ConversationContext = {}, { q = '', limit = 30, offset = 0 }: ConversationQueryOptions = {}): Promise<ConversationQueryResult> {
-    const tenantId = normTenant(context.tenantId);
-    const userId = normUser(context.userId);
+    const [tenantId, userId] = ownerParams(context);
     const wsKey = workspaceKey(trustedRoot);
     const lim = Math.min(Math.max(Number(limit) || 30, 1), 200);
     const off = Math.max(Number(offset) || 0, 0);
@@ -164,8 +165,8 @@ export class PostgresConversationStore {
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 ORDER BY updated_at DESC${hasLimit ? ' LIMIT $4' : ''}`,
       hasLimit
-        ? [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), Math.max(0, limit)]
-        : [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot)],
+        ? [...ownerParams(context), workspaceKey(trustedRoot), Math.max(0, limit)]
+        : [...ownerParams(context), workspaceKey(trustedRoot)],
     );
     return (r.rows || []).map((row) => fullRow(row as ConversationRow));
   }
@@ -175,7 +176,7 @@ export class PostgresConversationStore {
     const r = await this._query(
       `SELECT id, title, pinned, messages, branches, active_branch_id, created_at, updated_at
        FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
-      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanConversationId(id)],
+      [...ownerParams(context), workspaceKey(trustedRoot), cleanConversationId(id)],
     );
     const row = (r.rows && r.rows[0]) as ConversationRow | undefined;
     return row ? fullRow(row) : null;
@@ -184,8 +185,7 @@ export class PostgresConversationStore {
   /** upsert 对话(按 tenant/user/workspace/id 冲突更新),清洗后写入并返回摘要。 */
   async save(trustedRoot: unknown, conv: ConversationInput, context: ConversationContext = {}): Promise<ConversationSummary> {
     const id = cleanConversationId(conv && conv.id);
-    const tenantId = normTenant(context.tenantId);
-    const userId = normUser(context.userId);
+    const [tenantId, userId] = ownerParams(context);
     const wsKey = workspaceKey(trustedRoot);
     const now = this._now().toISOString();
     const title = String((conv && conv.title) || '新对话').slice(0, MAX_CONVERSATION_TITLE);
@@ -218,7 +218,7 @@ export class PostgresConversationStore {
   async remove(trustedRoot: unknown, id: unknown, context: ConversationContext = {}): Promise<boolean> {
     const r = await this._query(
       `DELETE FROM conversations WHERE tenant_id=$1 AND user_id=$2 AND workspace_key=$3 AND id=$4`,
-      [normTenant(context.tenantId), normUser(context.userId), workspaceKey(trustedRoot), cleanConversationId(id)],
+      [...ownerParams(context), workspaceKey(trustedRoot), cleanConversationId(id)],
     );
     return (r.rowCount || 0) > 0;
   }

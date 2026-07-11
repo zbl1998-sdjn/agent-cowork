@@ -9,6 +9,7 @@ import { SYSTEM_PROMPT_VERSION } from '../src/kimi/system-prompt.js';
 import { buildRunAttribution } from '../src/runtime/run-attribution.js';
 import { readRunRecord, writeRunRecord } from '../src/runtime/run-store.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-run-attr-'));
@@ -32,7 +33,7 @@ async function bind(server: Server): Promise<string> {
 }
 
 test('buildRunAttribution records prompt, model, and config versions without secrets', () => {
-  const secret = 'sk-test-attr-secret-1234567890';
+  const secret = 'sk-test-dummy-0000000000';
   const attribution = buildRunAttribution({
     type: 'agent-chat',
     provider: 'kimi-api',
@@ -102,10 +103,10 @@ test('agent stream persists system-prompt version and safe config attribution', 
   const root = tempRoot();
   const agentModelCall = async () => ({ content: '完成。', usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
   const server = createServer({
+    ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
     kimiApiKey: 'sk-test-server-attr-secret-1234567890',
-    kimiBaseUrl: 'https://api.example.test/v1',
     kimiModel: 'agent-attr-model',
     kimiApiTimeoutMs: 7000,
     kimiApiMaxTokens: 1234,
