@@ -1,28 +1,34 @@
 // Host 测试覆盖率入口(scripts · 门禁/报告)
 // ---------------------------------------------------------------------------
 // 职责:用 Node 内置 test coverage 跑 apps/host 测试,捕获文本报告,并把本次证据写入
-//       reports/coverage。支持 --fail-under=N 作为行覆盖率门禁。
+//       reports/coverage。支持 --fail-under=N 全局行门禁,并对静态策略中的关键文件
+//       分别执行 line / branch / function 下限。
 // 依赖:Node test runner 的 --experimental-test-coverage,不依赖 Python/pytest 工具链。
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-type CoverageSummary = {
-  linePct: number;
-  branchPct: number;
-  functionPct: number;
-};
+import {
+  coverageProcessExitCode,
+  evaluateCoverageThresholds,
+  formatCoverageEvidenceCommand,
+  HOST_COVERAGE_ARTIFACT_PATHS,
+  parseCoverageReport,
+  parseHostCoverageThresholdPolicy,
+  sanitizeCoverageEnvironment,
+  type CoverageMetrics,
+  type CoverageReport,
+  type CoverageThresholdPolicy,
+} from './coverage-policy.js';
+import {
+  HOST_COVERAGE_TIMEOUT_MS,
+  runCoverageProcess,
+} from './coverage-process.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hostRoot = path.join(repoRoot, 'apps', 'host');
-const coverageRoot = path.join(repoRoot, 'reports', 'coverage');
+const thresholdPolicyPath = path.join(repoRoot, 'scripts', 'host-coverage-thresholds.json');
 const registerLoaderUrl = pathToFileURL(path.join(repoRoot, 'scripts', 'run-host-node.mjs'));
 registerLoaderUrl.searchParams.set('register-only', '1');
-
-function timestamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-');
-}
 
 function parseFailUnder(args: string[]): number | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -38,22 +44,6 @@ function parseFailUnder(args: string[]): number | null {
   return null;
 }
 
-function stripAnsi(value: string): string {
-  return value.replace(/\x1B\[[0-9;]*m/g, '');
-}
-
-function parseCoverageSummary(output: string): CoverageSummary | null {
-  const lines = stripAnsi(output).replace(/\r/g, '').split('\n');
-  const allFilesLine = lines.map((line) => line.replace(/^ℹ\s*/, '').trim()).find((line) => /^all files\s*\|/.test(line));
-  if (!allFilesLine) return null;
-  const cells = allFilesLine.split('|').map((cell) => cell.trim());
-  const linePct = Number(cells[1]);
-  const branchPct = Number(cells[2]);
-  const functionPct = Number(cells[3]);
-  if (![linePct, branchPct, functionPct].every(Number.isFinite)) return null;
-  return { linePct, branchPct, functionPct };
-}
-
 function textOf(value: string | Buffer | undefined): string {
   if (typeof value === 'string') return value;
   if (value) return value.toString('utf8');
@@ -61,12 +51,21 @@ function textOf(value: string | Buffer | undefined): string {
 }
 
 const failUnder = parseFailUnder(process.argv.slice(2));
-const runId = timestamp();
-const v8CoverageDir = path.join(coverageRoot, `host-v8-${runId}`);
-const textReportPath = path.join(coverageRoot, 'host-coverage-latest.txt');
-const summaryPath = path.join(coverageRoot, 'host-coverage-summary.json');
+let thresholdPolicy: CoverageThresholdPolicy;
+try {
+  thresholdPolicy = parseHostCoverageThresholdPolicy(
+    JSON.parse(fs.readFileSync(thresholdPolicyPath, 'utf8')) as unknown,
+  );
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[coverage] failed to load critical-file policy: ${message}`);
+  process.exit(1);
+}
 
-fs.mkdirSync(v8CoverageDir, { recursive: true });
+const textReportPath = path.resolve(repoRoot, HOST_COVERAGE_ARTIFACT_PATHS.textReport);
+const summaryPath = path.resolve(repoRoot, HOST_COVERAGE_ARTIFACT_PATHS.summary);
+
+fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
 
 const nodeArgs = [
   '--enable-source-maps',
@@ -75,6 +74,7 @@ const nodeArgs = [
   '--test',
   '--experimental-test-coverage',
   '--test-isolation=process',
+  '--test-concurrency=8',
   '--test-timeout=60000',
   '--import',
   '../../scripts/test-setup.ts',
@@ -82,14 +82,12 @@ const nodeArgs = [
   'test/*.test.js',
   'test/*.test.ts',
 ];
-const result = spawnSync(process.execPath, nodeArgs, {
+const result = await runCoverageProcess({
+  command: process.execPath,
+  args: nodeArgs,
   cwd: hostRoot,
-  env: {
-    ...process.env,
-    NODE_V8_COVERAGE: v8CoverageDir,
-    NO_COLOR: '1',
-  },
-  encoding: 'utf8',
+  env: sanitizeCoverageEnvironment(process.env),
+  timeoutMs: HOST_COVERAGE_TIMEOUT_MS,
 });
 
 const stdout = textOf(result.stdout);
@@ -102,28 +100,50 @@ if (spawnErrorOutput) process.stderr.write(spawnErrorOutput);
 
 fs.writeFileSync(textReportPath, combinedOutput, 'utf8');
 
-const summary = parseCoverageSummary(combinedOutput);
+let report: CoverageReport = { summary: null, files: new Map<string, CoverageMetrics>() };
+let parseError: string | null = null;
+try {
+  report = parseCoverageReport(combinedOutput);
+} catch (error) {
+  parseError = error instanceof Error ? error.message : String(error);
+}
+const summary = report.summary;
+const criticalCoverage = evaluateCoverageThresholds(report, thresholdPolicy);
+const processExitCode = coverageProcessExitCode(result.status);
 const summaryDocument = {
   generatedAt: new Date().toISOString(),
-  command: `node ${nodeArgs.join(' ')}`,
-  status: result.status ?? (result.error ? 1 : 0),
+  command: formatCoverageEvidenceCommand(nodeArgs, registerLoaderUrl.href),
+  status: processExitCode,
   signal: result.signal || null,
+  timedOut: result.timedOut,
+  timeoutMs: HOST_COVERAGE_TIMEOUT_MS,
+  cleanupError: result.cleanupError || null,
   spawnError: result.error ? { name: result.error.name, message: result.error.message } : null,
   failUnderLinePct: failUnder,
   meetsFailUnder: summary && failUnder != null ? summary.linePct >= failUnder : null,
   summary,
+  criticalCoverage: {
+    policy: path.relative(repoRoot, thresholdPolicyPath).split(path.sep).join('/'),
+    parseError,
+    passed: parseError == null && criticalCoverage.failures.length === 0,
+    failures: criticalCoverage.failures,
+    observed: criticalCoverage.observed,
+  },
   artifacts: {
     textReport: path.relative(repoRoot, textReportPath).split(path.sep).join('/'),
     summary: path.relative(repoRoot, summaryPath).split(path.sep).join('/'),
-    v8CoverageDir: path.relative(repoRoot, v8CoverageDir).split(path.sep).join('/'),
   },
 };
 fs.writeFileSync(summaryPath, `${JSON.stringify(summaryDocument, null, 2)}\n`, 'utf8');
 
 console.log(`[coverage] wrote ${path.relative(repoRoot, textReportPath)} and ${path.relative(repoRoot, summaryPath)}`);
 
-if (result.status) {
-  process.exit(result.status);
+if (processExitCode !== 0) {
+  process.exit(processExitCode);
+}
+if (parseError) {
+  console.error(`[coverage] failed to parse the Node coverage report: ${parseError}`);
+  process.exit(1);
 }
 if (!summary) {
   console.error('[coverage] failed to parse the Node coverage summary from test output.');
@@ -133,3 +153,15 @@ if (failUnder != null && summary.linePct < failUnder) {
   console.error(`[coverage] line coverage ${summary.linePct}% is below required ${failUnder}%.`);
   process.exit(1);
 }
+if (criticalCoverage.failures.length > 0) {
+  console.error('[coverage] critical-file coverage policy failed:');
+  for (const failure of criticalCoverage.failures) {
+    console.error(`- ${failure}`);
+  }
+  process.exit(1);
+}
+
+console.log(
+  `[coverage] critical-file policy passed (`
+  + `${Object.keys(criticalCoverage.observed).length} files, line/branch/function enforced).`,
+);

@@ -1,7 +1,7 @@
 // CI 门禁步骤编排与按变更触发 eval 的判定(scripts · 门禁(gate))
 // ---------------------------------------------------------------------------
-// 职责:纯逻辑库,定义 CI 的基础步骤序列(check / test:host / test:ui),并根据
-//   本次变更的文件路径判断是否需要追加 eval 步骤;同时提供变更文件解析与环境变量读取。
+// 职责:纯逻辑库,定义 CI 的基础步骤序列及其有界并行分组(check / coverage host tests /
+//   test:ui),并根据本次变更的文件路径判断是否需要追加 eval 步骤;同时提供变更文件解析与环境变量读取。
 //   仅返回步骤描述与判定结果,不实际执行(执行由 ci.ts 负责)。
 // 用法:被 scripts/ci.ts 导入调用(buildCiSteps / changedFilesFromEnv),
 //   变更文件经由 KCW_CI_CHANGED_FILES 或 CHANGED_FILES 环境变量传入;
@@ -11,15 +11,27 @@
 export type CiStep = {
   name: string;
   args: readonly string[];
+  timeoutMs: number;
+  env?: Readonly<Record<string, string>>;
+  parallelGroup?: string;
 };
 
 type ChangedFilesInput = string | readonly unknown[] | null | undefined;
 
 const BASE_STEPS: readonly CiStep[] = [
-  { name: 'check', args: ['run', 'check'] },
-  { name: 'test:host', args: ['run', 'test:host'] },
-  { name: 'test:ui', args: ['run', 'test:ui'] },
+  { name: 'check', args: ['run', 'check'], timeoutMs: 1_800_000, parallelGroup: 'source-gates' },
+  { name: 'test:host:coverage:90', args: ['run', 'test:host:coverage:90'], timeoutMs: 1_800_000, parallelGroup: 'source-gates' },
+  { name: 'test:ui', args: ['run', 'test:ui'], timeoutMs: 1_200_000, parallelGroup: 'source-gates' },
 ];
+
+export const CI_EVAL_REPLAY_FIXTURE = 'eval/fixtures/ci-model-records.json';
+const EVAL_STEP: CiStep = {
+  name: 'eval',
+  args: ['run', 'eval'],
+  timeoutMs: 1_800_000,
+  env: { KCW_EVAL_REPLAY_RECORDS: CI_EVAL_REPLAY_FIXTURE },
+  parallelGroup: 'source-gates',
+};
 
 const EVAL_TRIGGER_PATTERNS = [
   /^apps\/host\/src\/kimi\/system-prompt\.(?:js|ts)$/,
@@ -58,9 +70,20 @@ export function buildCiSteps({
   const files = parseChangedFiles(changedFiles);
   const changedFilesUnknown = files.length === 0;
   const runEval = forceEval || changedFilesUnknown || shouldRunEvalForFiles(files);
-  return runEval ? [...BASE_STEPS, { name: 'eval', args: ['run', 'eval'] }] : [...BASE_STEPS];
+  return runEval ? [...BASE_STEPS, EVAL_STEP] : [...BASE_STEPS];
 }
 
 export function changedFilesFromEnv(env: Record<string, string | undefined> = process.env): string[] {
   return parseChangedFiles(env.KCW_CI_CHANGED_FILES || env.CHANGED_FILES);
+}
+
+export function ciStepEnvironment(
+  step: CiStep,
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string | undefined> {
+  const merged = { ...env };
+  for (const [key, value] of Object.entries(step.env || {})) {
+    if (merged[key] === undefined) merged[key] = value;
+  }
+  return merged;
 }

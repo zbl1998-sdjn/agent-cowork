@@ -1,7 +1,8 @@
 // 仓库明文凭据扫描门禁(scripts · 门禁(gate))
 // ---------------------------------------------------------------------------
 // 职责:遍历仓库文本文件(优先 git ls-files 含未跟踪文件,失败回退磁盘遍历;跳过
-//   测试/fixtures、二进制、超 512KB 文件及构建产物目录),用一组正则探测器匹配私钥、
+//   二进制及构建产物目录;测试、fixtures 与已跟踪报告同样纳入),
+//   用一组正则探测器匹配私钥、
 //   GitHub token/PAT、Slack/AWS/OpenAI 风格 key 以及 api_key=/password= 等赋值形态。
 //   命中含 dummy/fake/test/sample 等占位词的值会被忽略,降低误报。导出
 //   scanTextForSecrets / scanRepoForSecrets 等供测试与其他门禁复用。
@@ -31,13 +32,11 @@ const SKIP_DIRS = new Set([
   '.AgentCowork',
   '.KimiCowork',
   'node_modules',
-  'coverage',
   'dist',
   'build',
   'target',
   'ui-dist',
   'releases',
-  'reports',
   'installers',
 ]);
 const WALK_FALLBACK_SKIP_BASENAMES = new Set([
@@ -79,15 +78,23 @@ function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
 }
 
-function isTestPath(relativePath: string): boolean {
-  return /(^|\/)(test|tests|fixtures)(\/|$)/.test(relativePath)
-    || /\.(test|spec)\.(js|mjs|ts|tsx)$/.test(relativePath);
+function isGeneratedCoveragePath(normalized: string): boolean {
+  if (normalized === 'reports/coverage/generated'
+    || normalized.startsWith('reports/coverage/generated/')
+    || normalized.startsWith('reports/coverage/host-v8-')
+    || normalized === 'reports/coverage/host-coverage-latest.txt') {
+    return true;
+  }
+  const segments = normalized.split('/');
+  const coverageIndex = segments.indexOf('coverage');
+  return coverageIndex >= 0
+    && !(coverageIndex === 1 && segments[0] === 'reports');
 }
 
 function shouldSkip(relativePath: string): boolean {
   if (!relativePath || relativePath.startsWith('..')) return true;
   const normalized = relativePath.split('\\').join('/');
-  if (isTestPath(normalized)) return true;
+  if (isGeneratedCoveragePath(normalized)) return true;
   if (normalized.endsWith('.snap')) return true;
   if (normalized.endsWith('.tsbuildinfo')) return true;
   if (normalized.split('/').some((segment) => SKIP_DIRS.has(segment))) return true;
@@ -178,10 +185,11 @@ export function candidateFiles(): string[] {
 export function scanRepoForSecrets(files = candidateFiles()): SecretFinding[] {
   const findings: SecretFinding[] = [];
   for (const relative of files) {
+    if (shouldSkip(relative)) continue;
     const full = path.join(ROOT, relative);
     if (!fs.existsSync(full)) continue;
     const stat = fs.statSync(full);
-    if (!stat.isFile() || stat.size > 512 * 1024) continue;
+    if (!stat.isFile()) continue;
     const text = fs.readFileSync(full, 'utf8');
     findings.push(...scanTextForSecrets(text, relative));
   }

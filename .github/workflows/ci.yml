@@ -10,23 +10,27 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # ── Job 1: Architecture & Quality Gates ────────────────────────────────────
   check:
     name: Architecture & Quality Gates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "22"
+          node-version: "22.23.1"
+          cache: npm
 
       - name: Install root dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install UI dependencies (typescript + lint + ui typecheck)
-        run: npm install --prefix apps/windows-client/ui
+        run: npm ci --prefix apps/windows-client/ui
 
       # Full local static gate (arch + filesize + secrets + all TS type-checks +
       # lint + ui-types + ts-coverage + js-boundary + icons). Keeps CI at parity
@@ -37,48 +41,197 @@ jobs:
   # ── Job 2: Host Unit Tests ─────────────────────────────────────────────────
   test-host:
     name: Host Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "22"
+          node-version: "22.23.1"
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run host unit tests
-        # Windows-only plan tests in runtime-dependency-plans.test.ts self-skip on
-        # non-Windows via a platform guard (winOnly), so no file exclusion is needed.
-        # Tests run through the host TS loader (scripts/run-host-node.mjs) with
-        # scripts/test-setup.ts. No --test-isolation flag: it needs Node 22.8+ and
-        # CI pins Node 22; the suite is isolation-safe (single-process run locally).
-        run: |
-          FILES=$(cd apps/host && ls test/*.test.ts | tr '\n' ' ')
-          node scripts/run-host-node.mjs --cwd apps/host -- --test --test-timeout=60000 --import ../../scripts/test-setup.ts $FILES
+      - name: Preload the immutable sandbox integration image
+        shell: bash
         env:
-          KCW_REQUIRE_AUTH: "false"
-          KCW_TRUST_IDENTITY_HEADERS: "true"
-          KCW_AUTH_PERSIST: "false"
-          KCW_KIMI_API_KEY: ""
-          KCW_SANDBOX_DOCKER_IMAGE: ""
+          PINNED_SANDBOX_IMAGE: alpine@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
+        run: |
+          set -euo pipefail
+          docker pull "$PINNED_SANDBOX_IMAGE"
+          image_id="$(docker image inspect --format='{{.Id}}' "$PINNED_SANDBOX_IMAGE")"
+          if [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Docker returned a non-immutable local image ID: $image_id" >&2
+            exit 1
+          fi
+          echo "KCW_SANDBOX_REAL_DOCKER_IMAGE=$image_id" >> "$GITHUB_ENV"
+          echo "KCW_REQUIRE_REAL_DOCKER_TEST=1" >> "$GITHUB_ENV"
+
+      - name: Run host tests with the enforced coverage gate
+        run: npm run test:host:coverage:90
+        env:
+          KCW_CREDENTIAL_KEY: "test-only-ci-key-material"
 
   # ── Job 3: UI Unit Tests ───────────────────────────────────────────────────
   test-ui:
     name: UI Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "22"
+          node-version: "22.23.1"
+          cache: npm
+          cache-dependency-path: apps/windows-client/ui/package-lock.json
 
       - name: Install UI dependencies
-        run: npm install --prefix apps/windows-client/ui
+        run: npm ci --prefix apps/windows-client/ui
 
       - name: Run UI unit tests (vitest)
         run: npm --prefix apps/windows-client/ui run test -- --run
+
+  eval-replay:
+    name: Version-Controlled Model Replay Eval
+    runs-on: ubuntu-24.04
+    needs: check
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22.23.1"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run fail-closed offline eval
+        run: npm run eval
+        env:
+          KCW_EVAL_REPLAY_RECORDS: eval/fixtures/ci-model-records.json
+
+  desktop-source-build:
+    name: Windows SEA and Tauri Source Build
+    runs-on: windows-2025
+    needs: check
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22.23.1"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/windows-client/ui
+
+      - name: Build the current UI sources
+        run: npm run build:ui
+
+      - name: Build the packaged Node SEA host
+        run: npm run build:host
+
+      - name: Pin the Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+
+      - name: Check the locked Tauri crate
+        run: cargo check --manifest-path apps/windows-client/src-tauri/Cargo.toml --locked
+
+      - name: Test the locked Tauri crate
+        run: cargo test --manifest-path apps/windows-client/src-tauri/Cargo.toml --locked
+
+      - name: Install the pinned Tauri CLI
+        run: cargo install tauri-cli --locked --version 2.11.2
+
+      - name: Build the unsigned NSIS package from current sources
+        working-directory: apps/windows-client/src-tauri
+        run: cargo tauri build --ci --bundles nsis --no-sign -- --locked
+
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22.23.1"
+          cache: npm
+
+      - name: Verify pinned npm audit CLI
+        run: test "$(npm --version)" = "10.9.8"
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.5"
+          cache: false
+
+      - name: Install locked JavaScript dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/windows-client/ui
+
+      - name: Install the pinned Python vulnerability auditor
+        run: |
+          python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'
+          python3 -m venv "$RUNNER_TEMP/pip-audit-2.10.1"
+          "$RUNNER_TEMP/pip-audit-2.10.1/bin/python" -m pip install --disable-pip-version-check "pip-audit==2.10.1"
+          echo "$RUNNER_TEMP/pip-audit-2.10.1/bin" >> "$GITHUB_PATH"
+
+      - name: Verify the pinned Python vulnerability auditor on PATH
+        run: |
+          command -v pip-audit
+          test "$(pip-audit --version)" = "pip-audit 2.10.1"
+
+      - name: Audit the hash-locked embedded Python runtime
+        run: |
+          for lock in \
+            apps/windows-client/resources/python-packages.lock \
+            apps/windows-client/resources/python-bootstrap.lock; do
+            pip-audit \
+              --requirement "$lock" \
+              --require-hashes \
+              --disable-pip \
+              --strict \
+              --vulnerability-service pypi \
+              --progress-spinner=off \
+              --timeout 30
+          done
+
+      - name: Audit all root and UI JavaScript dependencies against the official registry
+        run: |
+          npm audit --audit-level=high --registry=https://registry.npmjs.org
+          npm --prefix apps/windows-client/ui audit --audit-level=high --registry=https://registry.npmjs.org
+
+      - name: Pin the Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+
+      - name: Audit locked Rust dependencies
+        working-directory: apps/windows-client/src-tauri
+        run: |
+          cargo install cargo-audit --locked --version 0.22.2
+          cargo audit --version
+          cargo audit
+
+      - name: Audit all Go modules
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck -version
+          for module in apps/local-agent services/api services/relay services/orchestrator services/kimi-gateway; do
+            (cd "$module" && govulncheck ./...)
+          done

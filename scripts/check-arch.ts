@@ -3,15 +3,16 @@
 // 职责:扫描 host(apps/host/src)与 UI(apps/windows-client/ui/src)源码,解析
 //   静态/动态 import、export-from、require 的相对依赖,校验三类边界:UI 不得直接
 //   import host 源码(只能走 lib/api 的 HTTP/SSE 契约)、host 不得依赖前端或 Tauri
-//   外壳代码、host 内部 import 必须指向更低分层(L0→L4,不得反向)。同时检测 import
-//   环。已知技术债通过 HOST_LAYER_WAIVERS 白名单显式豁免。
+//   外壳代码、host 内部 import 必须指向更低分层(L0→L4,不得反向);UI 内部按
+//   lib→hooks→components→App/main 分层并禁止反向依赖。同时检测 import 环。
+//   Host 分层不接受逐边白名单；发现反向依赖即失败。
 // 用法:npm run check:arch(经 node scripts/run-host-node.mjs scripts/check-arch.ts
-//   运行);也作为 npm run check 聚合门禁的一环。仅作为主入口时执行扫描,被其他脚本
-//   (如 check-icons.ts)import 时不触发(共用 stripComments)。
-// 依赖:分层定义内置于本文件 HOST_LAYERS;失败即 exit 1 阻断。
+//   运行);也作为 npm run check 聚合门禁的一环。仅作为主入口时执行扫描。
+// 依赖:分层定义内置于本文件 HOST_LAYERS/UI_LAYERS;失败即 exit 1 阻断。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT = path.resolve(process.env.KCW_ARCH_CHECK_ROOT || DEFAULT_ROOT);
@@ -27,6 +28,8 @@ type HostLayer = {
   files?: string[];
 };
 
+type UiLayer = HostLayer;
+
 const HOST_LAYERS = [
   { name: 'L0', rank: 0, prefixes: ['security/', 'http/', 'util/'] },
   {
@@ -39,6 +42,7 @@ const HOST_LAYERS = [
       'kimi/',
       'mcp/',
       'memory/',
+      'onboarding/',
       'recipes/',
       'sandbox/',
       'skills/',
@@ -52,40 +56,17 @@ const HOST_LAYERS = [
   { name: 'L4', rank: 4, files: ['server.ts', 'main.ts'] },
 ] satisfies HostLayer[];
 
-// Known debt from plan/00, kept explicit so the guard still catches new
-// violations while P0 split tasks remove these one by one.
-const HOST_LAYER_WAIVERS = new Map([
-  ['memory/memory-store.js -> runtime/runs-index.js', 'P0-T6 memory-store split'],
-  ['memory/memory-store.js -> runtime/audit-events.js', 'P0-T6 memory-store split'],
-  ['kimi/agent-runner.js -> runtime/run-store.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent-runner.js -> runtime/runs-index.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent-runner.js -> runtime/hooks.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent-runner.js -> runtime/action-audit.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent-runner.js -> runtime/circuit-breaker.js', 'P0-T5 agent-runner split'],
-  ['kimi/agent/model-resilience.js -> runtime/model-breakers.js', 'model breaker is shared runtime protection used by the agent model call'],
-  ['kimi/chat-stream.js -> runtime/run-store.js', 'stream runner currently records runs directly'],
-  ['kimi/chat-stream.js -> runtime/runs-index.js', 'stream runner currently indexes runs directly'],
-  ['recipes/run-recipe.js -> runtime/run-store.js', 'P0 recipe runner currently records runs directly'],
-  ['recipes/run-recipe.js -> runtime/runs-index.js', 'P0 recipe runner currently indexes runs directly'],
-  ['sandbox/code-runner.js -> runtime/run-store.js', 'P0 sandbox code runner currently records runs directly'],
-  ['sandbox/code-runner.js -> runtime/runs-index.js', 'P0 sandbox code runner currently indexes runs directly'],
-  ['storage/postgres-event-bus.js -> runtime/run-events.js', 'postgres event bus adapts runtime event shape'],
-  ['tools/builtin-tools.js -> runtime/subagent.js', 'builtin tool registry wires subagent adapter'],
-]);
-
-// Four targeted regexes, replacing one over-broad combined regex that used to
-// match string literals inside comments (e.g. a sample `import { X } from './Y'`
-// quoted in a JSDoc) as if they were real imports. The fix anchors static
-// import/export to start-of-line (with `m` flag) so commented lines like
-// `// import { x } from './y'` no longer qualify — `//` isn't whitespace.
-//
-// The `[^;'"]*?` inside the from-clause prevents the non-greedy span from
-// crossing into the NEXT statement when an export has no from at all (e.g.
-// `export const X = "y";` followed by another import on the next line).
-const STATIC_IMPORT_RE = /^\s*import\s+(?:[^;'"]*?\bfrom\s+)?['"]([^'"\n]+)['"]/gm;
-const STATIC_EXPORT_FROM_RE = /^\s*export\s+[^;'"]*?\bfrom\s+['"]([^'"\n]+)['"]/gm;
-const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+// plan/00 defines lib as the UI contract/foundation, hooks as state/data
+// orchestration, components as rendering, and App/main as composition roots.
+// New production TypeScript must fit one of these zones; unknown directories
+// fail closed instead of silently escaping dependency checks.
+const UI_LAYERS = [
+  { name: 'UI-L0', rank: 0, prefixes: ['lib/'] },
+  { name: 'UI-L1', rank: 1, prefixes: ['hooks/'] },
+  { name: 'UI-L2', rank: 2, prefixes: ['components/'] },
+  { name: 'UI-L3', rank: 3, files: ['App.tsx'] },
+  { name: 'UI-L4', rank: 4, files: ['main.tsx'] },
+] satisfies UiLayer[];
 
 function toPosix(filePath: string): string {
   return filePath.split(path.sep).join('/');
@@ -118,75 +99,14 @@ function isUiSource(filePath: string): boolean {
   return /\.(ts|tsx)$/.test(filePath);
 }
 
-// Strip both line- and block-comments before regexing. Preserves newlines so
-// the line-anchored static-import regex still gets correct line boundaries.
-// Belt + braces against the regex flagging an `import` keyword that happens
-// to appear inside a doc comment — the regex already requires line-start, but
-// stripping comments outright also kills `/* import x from 'foo' */` style
-// trap strings that managed to land at column 0.
-export function stripComments(text: string): string {
-  const out: string[] = [];
-  let i = 0;
-  let inLine = false;
-  let inBlock = false;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  while (i < text.length) {
-    const ch = text[i] ?? '';
-    const next = text[i + 1];
-    if (inLine) {
-      if (ch === '\n') { inLine = false; out.push(ch); }
-      i += 1;
-      continue;
-    }
-    if (inBlock) {
-      if (ch === '*' && next === '/') { inBlock = false; i += 2; continue; }
-      if (ch === '\n') out.push(ch); // keep line numbers stable
-      i += 1;
-      continue;
-    }
-    if (inSingle) {
-      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
-      if (ch === "'") inSingle = false;
-      out.push(ch);
-      i += 1;
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
-      if (ch === '"') inDouble = false;
-      out.push(ch);
-      i += 1;
-      continue;
-    }
-    if (inTemplate) {
-      if (ch === '\\') { out.push(ch); out.push(next ?? ''); i += 2; continue; }
-      if (ch === '`') inTemplate = false;
-      out.push(ch);
-      i += 1;
-      continue;
-    }
-    if (ch === '/' && next === '/') { inLine = true; i += 2; continue; }
-    if (ch === '/' && next === '*') { inBlock = true; i += 2; continue; }
-    if (ch === "'") { inSingle = true; out.push(ch); i += 1; continue; }
-    if (ch === '"') { inDouble = true; out.push(ch); i += 1; continue; }
-    if (ch === '`') { inTemplate = true; out.push(ch); i += 1; continue; }
-    out.push(ch);
-    i += 1;
-  }
-  return out.join('');
-}
-
 function readImports(filePath: string): string[] {
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const text = stripComments(raw);
-  const imports: string[] = [];
-  for (const match of text.matchAll(STATIC_IMPORT_RE)) if (match[1]) imports.push(match[1]);
-  for (const match of text.matchAll(STATIC_EXPORT_FROM_RE)) if (match[1]) imports.push(match[1]);
-  for (const match of text.matchAll(DYNAMIC_IMPORT_RE)) if (match[1]) imports.push(match[1]);
-  for (const match of text.matchAll(REQUIRE_RE)) if (match[1]) imports.push(match[1]);
-  return imports;
+  const source = fs.readFileSync(filePath, 'utf8');
+  // Use the installed TypeScript scanner instead of approximating JavaScript
+  // syntax with regexes. This covers multiline import/export declarations,
+  // literal dynamic imports (including a second options argument), CommonJS
+  // require calls and no-substitution template literals while ignoring trivia
+  // and import-like text inside strings, templates, regex literals or comments.
+  return ts.preProcessFile(source, true, true).importedFiles.map((reference) => reference.fileName);
 }
 
 function candidateFiles(base: string): string[] {
@@ -227,12 +147,13 @@ function hostLayer(filePath: string): HostLayer | null {
   return null;
 }
 
-function waiverRel(filePath: string): string {
-  const rel = toPosix(path.relative(HOST_ROOT, filePath));
-  // During JS->TS migration source imports intentionally keep NodeNext-style
-  // `.js` specifiers. Normalize waiver keys so existing debt markers survive a
-  // mechanical `.js` -> `.ts` source move without weakening the boundary check.
-  return rel.replace(/\.(?:js|ts)$/u, '.js');
+function uiLayer(filePath: string): UiLayer | null {
+  const rel = toPosix(path.relative(UI_ROOT, filePath));
+  for (const layer of UI_LAYERS) {
+    if (layer.files?.includes(rel)) return layer;
+    if (layer.prefixes?.some((prefix) => rel.startsWith(prefix))) return layer;
+  }
+  return null;
 }
 
 function checkBoundary(fromFile: string, targetFile: string, violations: string[]): void {
@@ -259,12 +180,21 @@ function checkBoundary(fromFile: string, targetFile: string, violations: string[
     const targetLayer = hostLayer(targetFile);
     if (!fromLayer || !targetLayer) return;
     if (targetLayer.rank > fromLayer.rank && fromFile !== targetFile) {
-      const key = `${waiverRel(fromFile)} -> ${waiverRel(targetFile)}`;
-      if (!HOST_LAYER_WAIVERS.has(key)) {
-        violations.push(
-          `${fromRel} (${fromLayer.name}) imports ${targetRel} (${targetLayer.name}); host imports must point inward to lower layers`,
-        );
-      }
+      violations.push(
+        `${fromRel} (${fromLayer.name}) imports ${targetRel} (${targetLayer.name}); host imports must point inward to lower layers`,
+      );
+    }
+  }
+
+  if (fromIsUi && targetIsUi) {
+    const fromLayer = uiLayer(fromFile);
+    const targetLayer = uiLayer(targetFile);
+    if (!fromLayer || !targetLayer) return;
+    if (targetLayer.rank > fromLayer.rank && fromFile !== targetFile) {
+      violations.push(
+        fromRel + ' (' + fromLayer.name + ') imports ' + targetRel + ' (' + targetLayer.name
+          + '); UI imports must point inward from roots/components/hooks to lib',
+      );
     }
   }
 }
@@ -305,6 +235,18 @@ function runMain(): void {
   const graph = new Map<string, string[]>(files.map((file) => [file, []]));
   const violations: string[] = [];
 
+  for (const file of files.filter(isHostSource)) {
+    if (!hostLayer(file)) {
+      violations.push(relFromRoot(file) + ' is not assigned to a host architecture layer');
+    }
+  }
+
+  for (const file of files.filter(isUiSource)) {
+    if (!uiLayer(file)) {
+      violations.push(relFromRoot(file) + ' is not assigned to a UI architecture layer');
+    }
+  }
+
   for (const file of files) {
     for (const specifier of readImports(file)) {
       const target = resolveImport(file, specifier);
@@ -330,8 +272,7 @@ function runMain(): void {
   console.log(`Architecture check passed (${files.length} source files).`);
 }
 
-// Only run the architecture scan when invoked as the main entrypoint.
-// `check-icons.ts` uses the same strip-comments rule; without the guard
-// loading that import would run the scan a second time as a side-effect.
+// Only run the architecture scan when invoked as the main entrypoint so this
+// module can be imported by focused tests without scanning the repository.
 const invokedAsMain = Boolean(process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url));
 if (invokedAsMain) runMain();

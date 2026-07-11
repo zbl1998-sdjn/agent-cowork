@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "evidence": {
+    "measuredAt": "2026-07-11",
+    "command": "npm run test:host:coverage:90",
+    "policy": "Critical security, authentication, approval, and outbound files use conservative floors below observed coverage."
+  },
+  "files": {
+    "src/auth/sqlite-user-store.ts": { "linePct": 90, "branchPct": 70, "functionPct": 85 },
+    "src/auth/user-store.ts": { "linePct": 90, "branchPct": 80, "functionPct": 85 },
+    "src/connectors/oauth-github.ts": { "linePct": 95, "branchPct": 85, "functionPct": 95 },
+    "src/http/request-origin-policy.ts": { "linePct": 85, "branchPct": 70, "functionPct": 95 },
+    "src/kimi/agent/approval-gate.ts": { "linePct": 95, "branchPct": 85, "functionPct": 95 },
+    "src/kimi/agent/approval-support.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/kimi/agent/model-call-capability.ts": { "linePct": 75, "branchPct": 95, "functionPct": 95 },
+    "src/kimi/agent/tool-call-executor.ts": { "linePct": 95, "branchPct": 85, "functionPct": 95 },
+    "src/orchestrator/provider-task-runner.ts": { "linePct": 95, "branchPct": 80, "functionPct": 90 },
+    "src/routes/orchestrator-security-mode.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/runtime/approvals.ts": { "linePct": 95, "branchPct": 80, "functionPct": 85 },
+    "src/runtime/desktop-update-source.ts": { "linePct": 95, "branchPct": 60, "functionPct": 95 },
+    "src/sandbox/sandbox-spec.ts": { "linePct": 85, "branchPct": 70, "functionPct": 95 },
+    "src/sandbox/startup-probe-docker.ts": { "linePct": 85, "branchPct": 70, "functionPct": 95 },
+    "src/sandbox/startup-probe.ts": { "linePct": 95, "branchPct": 85, "functionPct": 95 },
+    "src/sandbox/wsl-docker-runner.ts": { "linePct": 90, "branchPct": 65, "functionPct": 95 },
+    "src/security/credential-store.ts": { "linePct": 95, "branchPct": 75, "functionPct": 95 },
+    "src/security/egress-gateway.ts": { "linePct": 95, "branchPct": 85, "functionPct": 95 },
+    "src/security/model-egress-approval.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/security/model-endpoint-request.ts": { "linePct": 95, "branchPct": 85, "functionPct": 80 },
+    "src/security/model-gateway-policy.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/security/path-policy.ts": { "linePct": 90, "branchPct": 75, "functionPct": 85 },
+    "src/security/public-host-policy.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/security/security-mode.ts": { "linePct": 95, "branchPct": 80, "functionPct": 90 },
+    "src/storage/postgres-approvals.ts": { "linePct": 90, "branchPct": 85, "functionPct": 80 },
+    "src/storage/postgres-event-bus.ts": { "linePct": 90, "branchPct": 60, "functionPct": 80 },
+    "src/storage/postgres-migration-baseline.ts": { "linePct": 95, "branchPct": 95, "functionPct": 95 },
+    "src/storage/postgres-migration-plan.ts": { "linePct": 90, "branchPct": 75, "functionPct": 95 },
+    "src/tools/ssrf-guard.ts": { "linePct": 95, "branchPct": 75, "functionPct": 95 },
+    "src/tools/web-fetch.ts": { "linePct": 90, "branchPct": 65, "functionPct": 75 }
+  }
+}

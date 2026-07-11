@@ -1,4 +1,4 @@
 module kimi-cowork/services/kimi-gateway
 
-go 1.26
+go 1.26.5
 

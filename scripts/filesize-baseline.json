@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "softLimit": 250,
+  "hardLimit": 400,
+  "evidence": {
+    "measuredAt": "2026-07-11",
+    "command": "npm run check:filesize",
+    "policy": "Existing debt may shrink but cannot grow; new files above 250 lines fail."
+  },
+  "files": {
+    "apps/host/src/kimi/agent/tool-call-executor.ts": { "maxLines": 283 },
+    "apps/host/src/kimi/agent/tool-loop.ts": { "maxLines": 314 },
+    "apps/host/src/kimi/provider/catalog-data.ts": { "maxLines": 321 },
+    "apps/host/src/kimi/provider/models-dev-catalog.ts": { "maxLines": 255 },
+    "apps/host/src/memory/mase-bridge.ts": { "maxLines": 334 },
+    "apps/host/src/orchestrator/agent-registry.ts": { "maxLines": 286 },
+    "apps/host/src/orchestrator/workflow-runner.ts": { "maxLines": 387 },
+    "apps/host/src/recipes/registry.ts": { "maxLines": 308 },
+    "apps/host/src/recipes/run-recipe.ts": { "maxLines": 251 },
+    "apps/host/src/routes/agent-stream.ts": { "maxLines": 320 },
+    "apps/host/src/routes/memory-routes.ts": { "maxLines": 373 },
+    "apps/host/src/routes/orchestrator-route-support.ts": { "maxLines": 393 },
+    "apps/host/src/routes/orchestrator-routes.ts": { "maxLines": 295 },
+    "apps/host/src/routes/recipe-routes.ts": { "maxLines": 281 },
+    "apps/host/src/routes/system-routes.ts": { "maxLines": 391 },
+    "apps/host/src/routes/tool-routes.ts": { "maxLines": 287 },
+    "apps/host/src/runtime/host-state.ts": { "maxLines": 257 },
+    "apps/host/src/security/security-mode.ts": { "maxLines": 361 },
+    "apps/windows-client/resources-src/app-controller-assembly.ts": { "maxLines": 260 },
+    "apps/windows-client/src-tauri/src/security.rs": { "maxLines": 276 },
+    "apps/windows-client/ui/src/App.tsx": { "maxLines": 325 },
+    "apps/windows-client/ui/src/components/Composer.tsx": { "maxLines": 264 },
+    "apps/windows-client/ui/src/components/SettingsTabsContent.tsx": { "maxLines": 268 },
+    "apps/windows-client/ui/src/components/panels/VizPanel.tsx": { "maxLines": 280 },
+    "apps/windows-client/ui/src/hooks/useAppRuntimeState.ts": { "maxLines": 310 },
+    "apps/windows-client/ui/src/hooks/useConversations.ts": { "maxLines": 254 },
+    "apps/windows-client/ui/src/lib/agent-team-timeline.ts": { "maxLines": 350 },
+    "apps/windows-client/ui/src/lib/api/chat.ts": { "maxLines": 279 },
+    "apps/windows-client/ui/src/lib/model-highlights.ts": { "maxLines": 289 }
+  }
+}

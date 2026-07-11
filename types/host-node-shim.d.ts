@@ -1,4 +1,4 @@
-interface Buffer extends Iterable<number> {
+interface Buffer extends Uint8Array {
   readonly length: number;
   readonly [index: number]: number;
   readUInt16LE(offset: number): number;
@@ -153,6 +153,9 @@ declare module 'node:child_process' {
 }
 
 declare module 'node:util' {
+  export const types: {
+    isProxy(value: unknown): boolean;
+  };
   export class TextDecoder {
     constructor(label?: string, options?: { fatal?: boolean });
     decode(input?: Buffer): string;
@@ -165,12 +168,19 @@ declare module 'node:timers/promises' {
 }
 
 declare module 'node:fs' {
+  export type PathLike = string | Buffer | URL;
+  export type PathOrFileDescriptor = PathLike | number;
+
   export interface Stats {
+    dev: number;
+    ino: number;
+    mode: number;
     size: number;
     mtime: Date;
     mtimeMs: number;
     isDirectory(): boolean;
     isFile(): boolean;
+    isSymbolicLink(): boolean;
   }
 
   export interface Dirent {
@@ -180,10 +190,13 @@ declare module 'node:fs' {
     isSymbolicLink(): boolean;
   }
 
-  export function existsSync(path: string): boolean;
+  export function existsSync(path: PathLike): boolean;
   export function appendFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function closeSync(fd: number): void;
   export function copyFileSync(src: string, dest: string): void;
+  export function fsyncSync(fd: number): void;
+  export function fstatSync(fd: number): Stats;
+  export function linkSync(existingPath: PathLike, newPath: PathLike): void;
   export function mkdtempSync(prefix: string): string;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
   export function openSync(path: string, flags: string | number, mode?: number): number;
@@ -191,11 +204,18 @@ declare module 'node:fs' {
   export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string): string[];
   export function readdirSync(path: string, options: { withFileTypes: true }): Dirent[];
-  export function renameSync(oldPath: string, newPath: string): void;
+  export function renameSync(oldPath: PathLike, newPath: PathLike): void;
+  export function rmdirSync(path: PathLike): void;
   export function rmSync(path: string, options?: { recursive?: boolean, force?: boolean }): void;
   export function statSync(path: string): Stats;
+  export function lstatSync(path: string): Stats;
   export function symlinkSync(target: string, path: string, type?: string): void;
-  export function unlinkSync(path: string): void;
+  export function unlinkSync(path: PathLike): void;
+  export function utimesSync(
+    path: PathLike,
+    atime: string | number | Date,
+    mtime: string | number | Date
+  ): void;
   export function writeFileSync(path: string, data: Buffer | string, encoding?: string): void;
   export function writeFileSync(path: string, data: Buffer | string, options?: Record<string, unknown>): void;
   export function realpathSync(path: string): string;
@@ -251,6 +271,21 @@ declare module 'node:http' {
     on(event: 'error', listener: (error: Error) => void): ClientRequest;
     setTimeout(timeout: number, callback?: () => void): ClientRequest;
     destroy(error?: Error): void;
+    write(chunk: string | Buffer): boolean;
+    end(chunk?: string | Buffer): void;
+  }
+
+  export interface RequestOptions {
+    method?: string;
+    headers?: Record<string, string>;
+    signal?: AbortSignal;
+    family?: number;
+    autoSelectFamily?: boolean;
+    lookup?: (
+      hostname: string,
+      options: unknown,
+      callback: (error: Error | null, address: string, family: number) => void,
+    ) => void;
   }
 
   export interface IncomingMessage {
@@ -292,6 +327,20 @@ declare module 'node:http' {
     listener?: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
   ): Server;
   export function get(url: string, callback?: (response: IncomingMessage) => void): ClientRequest;
+  export function request(
+    url: URL,
+    options: RequestOptions,
+    callback?: (response: IncomingMessage) => void,
+  ): ClientRequest;
+}
+
+declare module 'node:https' {
+  import type { ClientRequest, IncomingMessage, RequestOptions } from 'node:http';
+  export function request(
+    url: URL,
+    options: RequestOptions,
+    callback?: (response: IncomingMessage) => void,
+  ): ClientRequest;
 }
 
 declare module 'node:url' {
@@ -347,6 +396,7 @@ declare module 'node:assert/strict' {
   export interface Assert {
     ok(value: unknown, message?: string): asserts value;
     equal(actual: unknown, expected: unknown, message?: string): void;
+    notEqual(actual: unknown, expected: unknown, message?: string): void;
     deepEqual(actual: unknown, expected: unknown, message?: string): void;
     match(actual: string, expected: RegExp, message?: string): void;
     throws(block: () => unknown, validator?: RegExp | ((error: unknown) => boolean), message?: string): void;
