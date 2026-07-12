@@ -26,9 +26,15 @@ export function resolveStoreBackendConfig(
   config: StoreBackendConfigInput,
   trustedRootDefault: string,
 ): ResolvedStoreBackendConfig {
-  const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'file').toLowerCase();
+  const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'sqlite').toLowerCase();
   const storeBackend = resolveStoreBackend(storeRaw);
-  const databaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
+  const rawDatabaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
+  const databaseUrl = typeof rawDatabaseUrl === 'string' && rawDatabaseUrl.trim()
+    ? rawDatabaseUrl.trim()
+    : null;
+  if (storeBackend === 'postgres' && !databaseUrl) {
+    throw new Error('KCW_STORE=postgres requires DATABASE_URL');
+  }
 
   const configuredSqliteDbPath = config.sqliteDbPath || process.env.KCW_SQLITE_PATH;
   return {

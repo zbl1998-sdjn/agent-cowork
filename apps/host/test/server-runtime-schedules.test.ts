@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
 import { createSkillRegistry } from '../src/skills/skill-registry.js';
-import type { ScheduleStore } from '../src/runtime/scheduler.js';
+import { FileScheduleStore, type ScheduleStore } from '../src/runtime/scheduler.js';
 import {
   arrayField,
   bind,
@@ -17,11 +17,18 @@ import {
   tempRoot,
 } from './helpers/host-http.js';
 
+function fileScheduleStore(trustedRoot: string): FileScheduleStore {
+  return new FileScheduleStore({
+    storeDir: path.join(trustedRoot, '.AgentCowork', 'schedules'),
+  });
+}
+
 test('schedules: create cron + list + cancel + manual tick', async () => {
   const trustedRoot = tempRoot();
   const fired: string[] = [];
   const server = createServer({
     trustedRoot,
+    scheduleStore: fileScheduleStore(trustedRoot),
     enableScheduler: true,
     startScheduler: false,
     scheduleExecutor: async (record) => {
@@ -112,6 +119,7 @@ test('schedules: default executor forwards configured model to runRecipe (functi
   // state.kimiApiConfig 转发给了 runRecipe(此前从不转发,定时任务永远只能走模板路径)。
   const server = createServer({
     trustedRoot,
+    scheduleStore: fileScheduleStore(trustedRoot),
     enableScheduler: true,
     startScheduler: false,
     kimiProvider: 'ollama',
@@ -249,6 +257,7 @@ test('default scheduler revalidates recipe enabled state immediately before firi
   const skillRegistry = createSkillRegistry();
   const server = createServer({
     trustedRoot,
+    scheduleStore: fileScheduleStore(trustedRoot),
     enableScheduler: true,
     startScheduler: false,
     skillRegistry,
@@ -356,6 +365,7 @@ test('scheduler default executor runs a recipe and records a run', async () => {
   const trustedRoot = tempRoot();
   const server = createServer({
     trustedRoot,
+    scheduleStore: fileScheduleStore(trustedRoot),
     enableScheduler: true,
     startScheduler: false,
   });

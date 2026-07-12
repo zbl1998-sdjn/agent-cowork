@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { createClarificationStore } from '../src/runtime/clarifications.js';
+import { FileScheduleStore } from '../src/runtime/scheduler.js';
 import { createServer } from '../src/server.js';
 import {
   arrayField,
@@ -27,6 +28,9 @@ test('schedules reject same-tenant sibling list, query override, cancel, delete,
   const fired: string[] = [];
   const server = createServer({
     trustedRoot,
+    scheduleStore: new FileScheduleStore({
+      storeDir: path.join(trustedRoot, '.AgentCowork', 'schedules'),
+    }),
     requireAuth: false,
     trustIdentityHeaders: true,
     enableScheduler: true,

@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
 import type { HostServer, ServerConfig } from '../src/server.js';
+import { FileScheduleStore } from '../src/runtime/scheduler.js';
 import { closeTestServer } from './helpers/close-server.js';
 
 type JsonRequestOptions = {
@@ -385,6 +386,9 @@ test('schedule mutation routes are tenant scoped', async () => {
   const fired: string[] = [];
   const server = createSecurityServer({
     trustedRoot,
+    scheduleStore: new FileScheduleStore({
+      storeDir: path.join(trustedRoot, '.AgentCowork', 'schedules'),
+    }),
     enableScheduler: true,
     startScheduler: false,
     scheduleExecutor: async (record) => {

@@ -342,13 +342,24 @@ test('resolveStoreBackendConfig prefers explicit config and falls back to enviro
     delete process.env.KCW_SQLITE_PATH;
 
     const defaults = resolveStoreBackendConfig({}, root);
-    assert.equal(defaults.storeBackend, 'file');
+    assert.equal(defaults.storeBackend, 'sqlite');
     assert.equal(defaults.databaseUrl, null);
     assert.equal(defaults.usePostgresState, false);
     assert.equal(defaults.sqliteDbPath, path.resolve(root, '.AgentCowork', 'state.sqlite'));
 
     process.env.KCW_STORE = 'postgres';
+    assert.throws(
+      () => resolveStoreBackendConfig({}, root),
+      /KCW_STORE=postgres requires DATABASE_URL/,
+    );
+    delete process.env.KCW_STORE;
+
     process.env.DATABASE_URL = 'postgres://example.invalid/agent_cowork_test';
+    const urlOnly = resolveStoreBackendConfig({}, root);
+    assert.equal(urlOnly.storeBackend, 'sqlite');
+    assert.equal(urlOnly.usePostgresState, false);
+
+    process.env.KCW_STORE = 'postgres';
     process.env.KCW_SQLITE_PATH = path.join(root, 'env-state.sqlite');
     const fromEnv = resolveStoreBackendConfig({}, root);
     assert.equal(fromEnv.storeBackend, 'postgres');
@@ -365,6 +376,10 @@ test('resolveStoreBackendConfig prefers explicit config and falls back to enviro
     assert.equal(explicit.databaseUrl, 'postgres://example.invalid/agent_cowork_test');
     assert.equal(explicit.usePostgresState, false);
     assert.equal(explicit.sqliteDbPath, path.resolve(root, 'explicit-state.sqlite'));
+
+    const explicitFile = resolveStoreBackendConfig({ storeBackend: 'file' }, root);
+    assert.equal(explicitFile.storeBackend, 'file');
+    assert.equal(explicitFile.usePostgresState, false);
 
     const unknown = resolveStoreBackendConfig({ storeBackend: 'memory' }, root);
     assert.equal(unknown.storeBackend, 'file');

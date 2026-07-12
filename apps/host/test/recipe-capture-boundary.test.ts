@@ -70,7 +70,8 @@ test('capture route ignores an indexed runPath and reads the canonical run by id
     input: { prompt: 'canonical prompt' },
     result: { text: 'canonical result' },
   });
-  new RunsIndex({ indexRoot }).upsert({
+  const runsIndex = new RunsIndex({ indexRoot });
+  runsIndex.upsert({
     id: runId,
     runPath: externalRunPath,
     type: 'recipe-run',
@@ -81,6 +82,7 @@ test('capture route ignores an indexed runPath and reads the canonical run by id
 
   const server = createServer({
     trustedRoot,
+    runsIndex,
     enableScheduler: false,
     requireAuth: false,
     trustIdentityHeaders: true,

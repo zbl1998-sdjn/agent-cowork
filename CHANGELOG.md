@@ -18,6 +18,10 @@ The format follows Keep a Changelog, and release versions use SemVer.
 - 调度记录新增不可变运行 attempt 历史，严格解码并保留最近 20 次成功/失败结果；`lastRunId` 只在成功时更新。
 - 新增只读受控能力包目录和安装计划：展示版本、发布者、必需包、权限、安全要求与 fail-closed 治理结论，解析传递依赖及继承权限，但不下载、安装、启用或执行第三方代码。
 
+### Changed
+
+- 本地 Host 未显式配置 `KCW_STORE` 时默认使用 SQLite 单文件持久化；`DATABASE_URL` 单独存在不会启用 PostgreSQL，`file` 与 `postgres` 后端仍需显式选择，PostgreSQL 缺少 `DATABASE_URL` 时会在启动期明确失败。
+
 ### Fixed
 
 - 运行事件订阅在网络/Host 短暂中断后会携带 `Last-Event-ID` 进行有上限指数退避重连，按事件序号去重，并在终态主动关闭长连接；不可恢复响应或重试耗尽会显式报错。

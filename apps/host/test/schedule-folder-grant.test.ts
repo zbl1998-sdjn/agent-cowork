@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { createServer } from '../src/server.js';
+import { FileScheduleStore } from '../src/runtime/scheduler.js';
 import {
   arrayField,
   bind,
@@ -30,7 +31,14 @@ test('scheduled connected-folder work revalidates its persisted grant before eve
   fs.mkdirSync(connectedRoot);
   const sourcePath = path.join(connectedRoot, 'meeting-notes.md');
   fs.writeFileSync(sourcePath, '# 会议纪要\n- 跟进采购合同\n', 'utf8');
-  const server = createServer({ trustedRoot, enableScheduler: true, startScheduler: false });
+  const server = createServer({
+    trustedRoot,
+    scheduleStore: new FileScheduleStore({
+      storeDir: path.join(trustedRoot, '.AgentCowork', 'schedules'),
+    }),
+    enableScheduler: true,
+    startScheduler: false,
+  });
   const base = await bind(server);
 
   try {
