@@ -24,7 +24,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ### Fixed
 
-- Host 覆盖率与普通测试入口不再传入 Node 22.23.1 不识别的稳定版 `--test-isolation` 参数；继续依赖 Node 20+ 默认的逐文件子进程隔离，覆盖率解析同时兼容 Node 22 的 TAP `#` 与新版 reporter 的 `ℹ` 行标记。
+- Host 覆盖率与普通测试入口不再传入 Node 22.23.1 不识别的稳定版 `--test-isolation` 参数；继续依赖 Node 20+ 默认的逐文件子进程隔离，覆盖率解析同时兼容 Node 22 的 TAP `#` 与新版 reporter 的 `ℹ` 行标记，并为覆盖率插桩下的多进程架构夹具保留 120 秒单文件上限。
 - 运行事件订阅在网络/Host 短暂中断后会携带 `Last-Event-ID` 进行有上限指数退避重连，按事件序号去重，并在终态主动关闭长连接；不可恢复响应或重试耗尽会显式报错。
 - 任务展示不再把 `awaiting_approval` 与 `cancelled` 误报为“任务运行中”，失败记录也会在租户/用户隔离的任务复核面透传错误信息。
 - 移除前端对高风险 `approval_request` 的自动代答，避免“自动执行”绕过人工审批语义。

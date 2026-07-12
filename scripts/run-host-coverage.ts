@@ -77,7 +77,9 @@ const nodeArgs = [
   // by default. Avoid the version-specific isolation flag: Node 22.23.1 still
   // exposes only its experimental name, while the stable name starts in 23.6.
   '--test-concurrency=8',
-  '--test-timeout=60000',
+  // Coverage instrumentation makes process-heavy architecture fixtures slower
+  // on shared CI runners. Keep a bounded per-file limit with measured headroom.
+  '--test-timeout=120000',
   '--import',
   '../../scripts/test-setup.ts',
   '--test-coverage-include=src/**/*.ts',

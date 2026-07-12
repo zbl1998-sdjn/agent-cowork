@@ -99,6 +99,7 @@ test('host test entrypoints keep bounded execution and Node 20-compatible defaul
   assert.match(source, /runCoverageProcess\(\{/);
   assert.match(source, /timeoutMs: HOST_COVERAGE_TIMEOUT_MS/);
   assert.match(source, /'--test-concurrency=8'/);
+  assert.match(source, /'--test-timeout=120000'/);
   assert.match(hostTestScript, /--test-concurrency=8/);
   assert.equal(packageJson.engines?.node, '>=20');
   assert.doesNotMatch(source, /--(?:experimental-)?test-isolation/);
