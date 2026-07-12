@@ -89,13 +89,20 @@ test('coverage process returns captured output for a successful bounded command'
   assert.equal(result.stderr, 'coverage-note');
 });
 
-test('host coverage entrypoint uses the bounded process runner with outer-gate headroom', () => {
+test('host test entrypoints keep bounded execution and Node 20-compatible default process isolation', () => {
   const source = fs.readFileSync(path.join(repoRoot, 'scripts', 'run-host-coverage.ts'), 'utf8');
-  const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { scripts?: Record<string, string> };
+  const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as {
+    engines?: Record<string, string>;
+    scripts?: Record<string, string>;
+  };
+  const hostTestScript = packageJson.scripts?.['test:host'] || '';
   assert.match(source, /runCoverageProcess\(\{/);
   assert.match(source, /timeoutMs: HOST_COVERAGE_TIMEOUT_MS/);
   assert.match(source, /'--test-concurrency=8'/);
-  assert.match(packageJson.scripts?.['test:host'] || '', /--test-concurrency=8/);
+  assert.match(hostTestScript, /--test-concurrency=8/);
+  assert.equal(packageJson.engines?.node, '>=20');
+  assert.doesNotMatch(source, /--(?:experimental-)?test-isolation/);
+  assert.doesNotMatch(hostTestScript, /--(?:experimental-)?test-isolation/);
   assert.doesNotMatch(source, /spawnSync/);
   assert.equal(HOST_COVERAGE_TIMEOUT_MS, 1_680_000);
   assert.ok(HOST_COVERAGE_TIMEOUT_MS < 1_800_000);

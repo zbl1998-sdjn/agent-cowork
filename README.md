@@ -46,7 +46,7 @@ $imageId = docker image inspect --format='{{.Id}}' $pinnedRef
 if ($imageId -notmatch '^sha256:[0-9a-f]{64}$') { throw "Docker returned a non-immutable image ID: $imageId" }
 $env:KCW_SANDBOX_REAL_DOCKER_IMAGE = $imageId
 $env:KCW_REQUIRE_REAL_DOCKER_TEST = '1'
-node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-timeout=60000 --import ../../scripts/test-setup.ts test/sandbox-docker-integration.test.ts
+node scripts/run-host-node.mjs --cwd apps/host -- --test --test-timeout=60000 --import ../../scripts/test-setup.ts test/sandbox-docker-integration.test.ts
 ```
 
 ## 快速开始
@@ -82,7 +82,7 @@ npm run smoke:ui
 npm run smoke:host
 ```
 
-Host 测试使用 Node 内置 test runner；覆盖率用 `npm run test:host:coverage:90` 走 Node/V8 coverage，不依赖 Python/pytest 工具链。Windows sandbox/Defender 可能阻止测试子进程或 esbuild 子进程并报 `spawn EPERM`，这种情况需在正常本机权限上下文重跑同一命令确认真实结果。
+Host 测试使用 Node 内置 test runner；Node 20+ 默认把每个匹配测试文件放入独立子进程，因此命令不传在不同 Node 版本间改过名的 isolation flag。覆盖率用 `npm run test:host:coverage:90` 走 Node/V8 coverage，不依赖 Python/pytest 工具链。Windows sandbox/Defender 可能阻止测试子进程或 esbuild 子进程并报 `spawn EPERM`，这种情况需在正常本机权限上下文重跑同一命令确认真实结果。
 `npm run smoke:ui` 会验证前端入口、关键 UI 控件、前端脚本使用的 Host API 路由，以及和页面一致的 workspace / tree / read / preview / apply / audit 操作链。
 `npm run smoke:rendered-ui` 会用本机 Edge/Chrome 的 DevTools 协议启动临时 headless 浏览器，真实打开 Agent Cowork、检查 1536x900 和 1366x768 布局、点击发送和审批，确认执行动态信息流显示用户指令、读取上下文、等待审批和执行完成，确认前台任务卡片新增并高亮最新 run，并确认 artifact / audit 已落盘；报告和截图写入 `build/rendered-ui-smoke-report.json` 与 `build/rendered-ui-smoke-1536x900.png`。
 `npm run smoke:react-scroll` 会启动临时 Host API，真实加载构建后的 React UI，预置长对话并发送一条流式回复，确认用户翻看历史时不会被新内容拽回底部，且“回到底部”按钮可出现并返回底部；报告和截图写入 `build/react-scroll-smoke-report.json` 与 `build/react-scroll-smoke-1280x760.png`。如果刚改过 React UI，先运行 `npm run build:ui`。

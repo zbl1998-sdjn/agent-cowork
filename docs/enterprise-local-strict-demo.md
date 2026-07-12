@@ -34,7 +34,7 @@ $env:KCW_SANDBOX_BACKEND = 'auto'
 
 ```powershell
 npm run check
-node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-timeout=60000 test/security-mode.test.ts test/policy-decision.test.ts test/cache-telemetry.test.ts test/audit-events.test.ts test/model-resilience.test.ts test/tool-call-executor.test.ts test/sandbox-startup.test.ts test/tools.test.ts
+node scripts/run-host-node.mjs --cwd apps/host -- --test --test-timeout=60000 test/security-mode.test.ts test/policy-decision.test.ts test/cache-telemetry.test.ts test/audit-events.test.ts test/model-resilience.test.ts test/tool-call-executor.test.ts test/sandbox-startup.test.ts test/tools.test.ts
 ```
 
 ## Audit Chain Evidence

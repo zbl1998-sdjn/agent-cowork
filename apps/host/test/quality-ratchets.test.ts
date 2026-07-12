@@ -101,6 +101,17 @@ const COVERAGE_TEXT = `
 ℹ all files                             |  94.00 |    79.00 |   95.00 |
 `;
 
+const NODE_22_TAP_COVERAGE_TEXT = `
+# file                                  | % line | % branch | % funcs |
+# src                                   |        |          |         |
+#  auth                                 |        |          |         |
+#   user-store.ts                       |  96.10 |    85.19 |   87.50 |
+#  kimi                                 |        |          |         |
+#   agent                               |        |          |         |
+#    approval-gate.ts                   | 100.00 |    93.67 |  100.00 |
+# all files                             |  94.00 |    79.00 |   95.00 |
+`;
+
 const COVERAGE_POLICY: CoverageThresholdPolicy = {
   schemaVersion: 1,
   files: {
@@ -111,6 +122,22 @@ const COVERAGE_POLICY: CoverageThresholdPolicy = {
 
 test('coverage parser preserves nested source paths and all three metrics', () => {
   const report = parseCoverageReport(COVERAGE_TEXT);
+
+  assert.deepEqual(report.summary, { linePct: 94, branchPct: 79, functionPct: 95 });
+  assert.deepEqual(report.files.get('src/auth/user-store.ts'), {
+    linePct: 96.1,
+    branchPct: 85.19,
+    functionPct: 87.5,
+  });
+  assert.deepEqual(report.files.get('src/kimi/agent/approval-gate.ts'), {
+    linePct: 100,
+    branchPct: 93.67,
+    functionPct: 100,
+  });
+});
+
+test('coverage parser accepts the Node 22 TAP diagnostic marker', () => {
+  const report = parseCoverageReport(NODE_22_TAP_COVERAGE_TEXT);
 
   assert.deepEqual(report.summary, { linePct: 94, branchPct: 79, functionPct: 95 });
   assert.deepEqual(report.files.get('src/auth/user-store.ts'), {

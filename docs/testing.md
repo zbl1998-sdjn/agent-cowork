@@ -27,7 +27,7 @@ python -X utf8 scripts/quality_gate.py --level full
 
 - `python -X utf8 scripts/quality_gate.py --level full`: full local-source gate; it runs the repository-declared security, build, browser-smoke and CI layers and fails on the first red layer.
 - `npm run check`: architecture, file-size, secrets, type, lint and repository-boundary guards.
-- `npm run test:host`: `npm run check`, then isolated host tests with `--test-isolation=process`.
+- `npm run test:host`: `npm run check`, then host tests using Node 20+'s default per-file child-process isolation; no version-specific isolation flag is passed.
 - `npm run test:ui`: UI test suite through the UI package.
 - `npm run ci`: repository CI layer; read `scripts/ci.ts` and its command output for the current ordered steps.
 - `npm run smoke:host`: host API operation smoke.

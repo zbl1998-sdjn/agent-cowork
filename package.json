@@ -83,7 +83,7 @@
     "build:ui:fresh": "node scripts/run-host-node.mjs scripts/build-ui.ts --install",
     "build:host-source": "node scripts/run-host-node.mjs scripts/build-host-source.ts",
     "build:host": "node scripts/run-host-node.mjs scripts/build-host.ts",
-    "test:host": "npm run check && node scripts/run-host-node.mjs --cwd apps/host -- --test --test-isolation=process --test-concurrency=8 --test-timeout=60000 --import ../../scripts/test-setup.ts \"test/*.test.js\" \"test/*.test.ts\"",
+    "test:host": "npm run check && node scripts/run-host-node.mjs --cwd apps/host -- --test --test-concurrency=8 --test-timeout=60000 --import ../../scripts/test-setup.ts \"test/*.test.js\" \"test/*.test.ts\"",
     "test:ui": "npm --prefix apps/windows-client/ui run test",
     "build:resources": "npx tsc -p tsconfig.windows-resources.json --pretty false"
   },

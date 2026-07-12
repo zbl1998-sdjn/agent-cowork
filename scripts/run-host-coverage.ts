@@ -73,7 +73,9 @@ const nodeArgs = [
   registerLoaderUrl.href,
   '--test',
   '--experimental-test-coverage',
-  '--test-isolation=process',
+  // Node 20+ already runs each matching test file in a separate child process
+  // by default. Avoid the version-specific isolation flag: Node 22.23.1 still
+  // exposes only its experimental name, while the stable name starts in 23.6.
   '--test-concurrency=8',
   '--test-timeout=60000',
   '--import',

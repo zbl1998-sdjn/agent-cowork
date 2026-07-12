@@ -168,7 +168,9 @@ export function parseCoverageReport(output: string): CoverageReport {
   let summary: CoverageMetrics | null = null;
 
   for (const rawLine of stripAnsi(output).replace(/\r/g, '').split('\n')) {
-    const match = /^ℹ(\s+)([^|]+?)\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|/.exec(rawLine);
+    // Node emits coverage rows as either TAP diagnostics (#) or info diagnostics (ℹ),
+    // depending on the runtime release and reporter.
+    const match = /^(?:ℹ|#)(\s+)([^|]+?)\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*([^|]*)\|/.exec(rawLine);
     if (!match) continue;
 
     const indentation = match[1]?.length ?? 0;
