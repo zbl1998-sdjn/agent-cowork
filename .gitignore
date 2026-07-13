@@ -61,3 +61,8 @@ threecol-browser.png
 # Python bytecode cache emitted next to scripts/quality_gate.py.
 __pycache__/
 *.pyc
+
+# Global quality-gate evidence (written by the Stop hook; never part of the source baseline).
+.ai/
+# Cargo build target dirs (randomized-suffix local build variants).
+.cargo-target-*/
