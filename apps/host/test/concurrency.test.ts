@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
 import type { ConcurrencyLimiter } from '../src/runtime/concurrency.js';
 import { createConcurrencyLimiter } from '../src/runtime/concurrency.js';
 import type { HostServer } from '../src/server.js';
@@ -33,7 +33,7 @@ function requireJsonRecord(value: unknown, label: string): JsonRecord {
   return value as JsonRecord;
 }
 
-async function fakeKimiChatRunner(): Promise<KimiTextResult> {
+async function fakeKimiChatRunner(): Promise<ModelTextResult> {
   return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'ok', durationMs: 0 };
 }
 

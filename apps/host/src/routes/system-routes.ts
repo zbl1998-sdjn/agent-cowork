@@ -33,7 +33,7 @@ import {
   withParsedDependencyPlanBody,
 } from './system-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import type { KimiApiConfig } from '../engine/api-runner-config.js';
+import type { AgentModelConfig } from '../engine/api-runner-config.js';
 import type { CircuitBreakerStats } from '../runtime/circuit-breaker.js';
 type RouteRequest = HttpRequestLike & { method?: string };
 type ConcurrencyStats = { active: number; maxConcurrent: number; tenants: number; [key: string]: unknown };
@@ -49,7 +49,7 @@ type SystemRequestContext = {
   authenticated?: boolean;
   idempotencyKey?: string;
 };
-type KimiApiConfigLike = Pick<KimiApiConfig, 'configured' | 'apiKey' | 'provider' | 'baseUrl' | 'model'>;
+type AgentModelConfigLike = Pick<AgentModelConfig, 'configured' | 'apiKey' | 'provider' | 'baseUrl' | 'model'>;
 type SandboxLike = { backend?: string; networkIsolated?: boolean };
 type SandboxStartupLike = {
   info?: { backend?: string; networkIsolated?: boolean; userMessage?: string; [key: string]: unknown };
@@ -66,7 +66,7 @@ type HostStateLike = {
   agentConcurrency: AgentConcurrencyLike;
   rateLimiter?: RateLimiterLike | null;
   draining?: boolean;
-  kimiApiConfig: KimiApiConfigLike;
+  kimiApiConfig: AgentModelConfigLike;
   securityMode?: string;
   kimiApiEnabled?: boolean;
   sandboxEnabled?: boolean;
@@ -88,7 +88,7 @@ export type SystemRouteOptions = {
   state: HostStateLike;
 };
 
-function modelProvider(kimiConfig: KimiApiConfigLike | null | undefined): string {
+function modelProvider(kimiConfig: AgentModelConfigLike | null | undefined): string {
   return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { runAgentChat } from '../src/engine/agent-runner.js';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
 import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import type { AgentTool } from '../src/engine/agent/tool-loop-support.js';
 import { createServer } from '../src/server.js';
@@ -31,7 +31,7 @@ function booleanField(source: Record<string, unknown>, key: string, label = key)
   return value;
 }
 
-async function okKimiChat(): Promise<KimiTextResult> {
+async function okKimiChat(): Promise<ModelTextResult> {
   return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'ok', durationMs: 0 };
 }
 

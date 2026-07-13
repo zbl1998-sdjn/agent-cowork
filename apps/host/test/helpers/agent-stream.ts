@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { readableBody, recordValue } from './host-http.js';
-import type { KimiTextResult } from '../../src/engine/api-runner.js';
+import type { ModelTextResult } from '../../src/engine/api-runner.js';
 
 export type AgentModelCallInput = {
   kimiConfig?: {
@@ -17,7 +17,7 @@ export type AgentModelCallInput = {
   tools?: Array<{ function?: { name?: string } }>;
 };
 
-export async function noopKimiChatRunner(): Promise<KimiTextResult> {
+export async function noopKimiChatRunner(): Promise<ModelTextResult> {
   return {
     ok: true,
     provider: 'test',

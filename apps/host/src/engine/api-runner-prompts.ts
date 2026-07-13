@@ -3,7 +3,7 @@
 // 职责:为非工具调用的直答场景拼装提示词——计划模式(只读摘要给整理建议)与
 //       聊天模式(自然对话),并注入工作区长期记忆块、做长度校验。
 // 依赖:同层 ./api-runner-config.js(cleanText、MAX_PROMPT_LENGTH)。
-// 导出:buildKimiApiPlanPrompt、buildKimiApiChatPrompt。
+// 导出:buildModelApiPlanPrompt、buildModelApiChatPrompt。
 import { cleanText, MAX_PROMPT_LENGTH } from './api-runner-config.js';
 
 export type PromptOptions = { prompt?: unknown; summary?: unknown; mode?: unknown; memory?: unknown };
@@ -22,7 +22,7 @@ function buildMemoryBlock(memory: unknown): string {
 }
 
 /** 计划模式提示:仅基于摘要、禁止读写/工具,输出中文整理建议与待审批动作清单。 */
-export function buildKimiApiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }: PromptOptions): string {
+export function buildModelApiPlanPrompt({ prompt, summary = '', mode = 'cowork', memory = '' }: PromptOptions): string {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
     throw new Error('prompt is required');
@@ -48,7 +48,7 @@ export function buildKimiApiPlanPrompt({ prompt, summary = '', mode = 'cowork', 
 }
 
 /** 聊天模式提示:像同事一样自然直答,日常对话不读写文件、不生成待审批动作。 */
-export function buildKimiApiChatPrompt({ prompt, summary = '', memory = '' }: PromptOptions): string {
+export function buildModelApiChatPrompt({ prompt, summary = '', memory = '' }: PromptOptions): string {
   const userPrompt = cleanText(prompt);
   if (!userPrompt) {
     throw new Error('prompt is required');

@@ -6,14 +6,14 @@ import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
 import type { ChatMessage } from '../src/engine/agent/tool-loop-types.js';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
 import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import { closeTestServer } from './helpers/close-server.js';
 import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-vis-')); }
 
-function kimiChatResult(): KimiTextResult {
+function kimiChatResult(): ModelTextResult {
   return {
     ok: true,
     provider: 'kimi-api',

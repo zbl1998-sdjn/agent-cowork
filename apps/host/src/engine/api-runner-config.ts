@@ -1,10 +1,10 @@
 // Kimi/模型 API 的配置常量与解析:默认值、provider 归一、回退链(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:集中放置默认 baseUrl/model/超时/maxTokens 等常量,并把 config+env 解析成
-//       一份规范化的 KimiApiConfig(含 Anthropic/Kimi 不同的 key/url/model 取值规则)。
+//       一份规范化的 AgentModelConfig(含 Anthropic/Kimi 不同的 key/url/model 取值规则)。
 // 依赖:仅标准库(读 process.env)。
-// 导出:常量(DEFAULT_*、MAX_PROMPT_LENGTH、KIMI_API_NOT_CONFIGURED_MESSAGE)、
-//       cleanText、cleanProvider、resolveKimiApiConfig。
+// 导出:常量(DEFAULT_*、MAX_PROMPT_LENGTH、MODEL_API_NOT_CONFIGURED_MESSAGE)、
+//       cleanText、cleanProvider、resolveAgentModelConfig。
 import { omitUndefined } from '../util/object.js';
 import { resolveSecurityMode, type SecurityMode } from '../security/security-mode.js';
 import {
@@ -24,7 +24,7 @@ export const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 export const DEFAULT_TIMEOUT_MS = 60_000;
 export const DEFAULT_MAX_TOKENS = 2048;
 export const MAX_PROMPT_LENGTH = 8000;
-export const KIMI_API_NOT_CONFIGURED_MESSAGE = '未配置当前安全策略允许的模型端点。本地文件功能仍可离线使用；需要模型回复时请配置 Ollama/LM Studio，或使用管理员明确放行的客户模型网关。当前 Internal Beta 不允许公网云模型直接出站。';
+export const MODEL_API_NOT_CONFIGURED_MESSAGE = '未配置当前安全策略允许的模型端点。本地文件功能仍可离线使用；需要模型回复时请配置 Ollama/LM Studio，或使用管理员明确放行的客户模型网关。当前 Internal Beta 不允许公网云模型直接出站。';
 
 export type ModelFallback = {
   provider?: string;
@@ -43,7 +43,7 @@ export type ProviderProfile = {
   maxTokens?: number;
   temperature?: number;
 };
-export type KimiApiConfig = {
+export type AgentModelConfig = {
   provider: string;
   securityMode: SecurityMode;
   configured: boolean;
@@ -122,11 +122,11 @@ function cleanModelFallbacks(value: unknown): ModelFallback[] {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
-/** 把 config 与环境变量合并解析成规范化的 KimiApiConfig(含 provider/key/url/model/回退链)。 */
-export function resolveKimiApiConfig(
+/** 把 config 与环境变量合并解析成规范化的 AgentModelConfig(含 provider/key/url/model/回退链)。 */
+export function resolveAgentModelConfig(
   config: Record<string, unknown> = {},
   env: Record<string, string | undefined> = process.env,
-): KimiApiConfig {
+): AgentModelConfig {
   const explicitProvider = config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER;
   const initialModelInput = config.kimiModel || env.KIMI_MODEL || '';
   const parsedInitialModel = splitFullModelId(initialModelInput);

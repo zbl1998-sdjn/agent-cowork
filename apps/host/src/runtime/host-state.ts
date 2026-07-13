@@ -4,7 +4,7 @@
 // 注:这是 L2 内的「运行时状态聚合」,仍只依赖 L0/L1 与同层;真正的 HTTP 装配在 L4 server.js。
 // 依赖:kimi/api-runner、storage/*、memory、sandbox 及同层 runs-index/scheduler/run-events 等。导出:host 状态工厂。
 import path from 'node:path';
-import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../engine/api-runner.js';
+import { resolveAgentModelConfig, runModelApiChat, runModelApiPlan, runModelApiChatStream } from '../engine/api-runner.js';
 import { createRunsIndex } from './runs-index.js';
 import { createPostgresRunsIndex, withSafeWrites } from '../storage/postgres-runs-index.js';
 import { RunEventBus } from './run-events.js';
@@ -69,7 +69,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
   const kimiConfigFile = statePaths.kimiConfigFile();
-  const kimiApiConfig = resolveKimiApiConfig(config);
+  const kimiApiConfig = resolveAgentModelConfig(config);
   const kimiConfigStoreOptions = omitUndefined({ protector: config.kimiConfigProtector });
   applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig, kimiConfigStoreOptions);
   const securityMode = kimiApiConfig.securityMode;
@@ -88,9 +88,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     kimiConfigFile,
     securityMode,
     kimiApiConfig,
-    kimiPlanRunner: config.kimiPlanRunner || runKimiApiPlan,
-    kimiChatRunner: config.kimiChatRunner || runKimiApiChat,
-    kimiChatStreamRunner: config.kimiChatStreamRunner || runKimiApiChatStream,
+    kimiPlanRunner: config.kimiPlanRunner || runModelApiPlan,
+    kimiChatRunner: config.kimiChatRunner || runModelApiChat,
+    kimiChatStreamRunner: config.kimiChatStreamRunner || runModelApiChatStream,
     runStoreRoot: config.runStoreRoot ? path.resolve(config.runStoreRoot) : assertTrustedPathForCreate(path.join(trustedRootDefault, '.AgentCowork', 'runs'), trustedRootDefault),
     idempotencyStore: config.idempotencyStore instanceof Map
       ? config.idempotencyStore as Map<string, IdempotencyEntry>

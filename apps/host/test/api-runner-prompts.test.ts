@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  buildKimiApiChatPrompt,
-  buildKimiApiPlanPrompt,
+  buildModelApiChatPrompt,
+  buildModelApiPlanPrompt,
 } from '../src/engine/api-runner.js';
 
-test('buildKimiApiPlanPrompt constrains API plan output', () => {
-  const prompt = buildKimiApiPlanPrompt({
+test('buildModelApiPlanPrompt constrains API plan output', () => {
+  const prompt = buildModelApiPlanPrompt({
     mode: 'code',
     summary: '合同草稿包含 renewal date。',
     prompt: '生成整理计划',
@@ -22,8 +22,8 @@ test('buildKimiApiPlanPrompt constrains API plan output', () => {
   assert.match(prompt, /生成整理计划/);
 });
 
-test('buildKimiApiChatPrompt is conversational (no forced file-planning)', () => {
-  const prompt = buildKimiApiChatPrompt({
+test('buildModelApiChatPrompt is conversational (no forced file-planning)', () => {
+  const prompt = buildModelApiChatPrompt({
     summary: '已上传 invoice.pdf。',
     prompt: '这个文件能做什么？',
   });

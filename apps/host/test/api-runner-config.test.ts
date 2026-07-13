@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveKimiApiConfig } from '../src/engine/api-runner.js';
+import { resolveAgentModelConfig } from '../src/engine/api-runner.js';
 
-test('resolveKimiApiConfig reads Kimi and Moonshot env names without exposing keys', () => {
-  const config = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig reads Kimi and Moonshot env names without exposing keys', () => {
+  const config = resolveAgentModelConfig({}, {
     MOONSHOT_API_KEY: 'test-key-primary',
     MOONSHOT_BASE_URL: 'https://example.test/v1/',
     KIMI_MODEL: 'kimi-test',
@@ -19,20 +19,20 @@ test('resolveKimiApiConfig reads Kimi and Moonshot env names without exposing ke
   assert.equal(config.maxTokens, 321);
 });
 
-test('resolveKimiApiConfig reads model provider from env/config', () => {
-  const envConfig = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig reads model provider from env/config', () => {
+  const envConfig = resolveAgentModelConfig({}, {
     KCW_MODEL_PROVIDER: 'OPENAI',
     KIMI_API_KEY: 'test-key-env',
     KIMI_MODEL: 'gpt-test',
   });
   assert.equal(envConfig.provider, 'openai');
 
-  const explicitConfig = resolveKimiApiConfig({ kimiProvider: 'openai/local' }, {});
+  const explicitConfig = resolveAgentModelConfig({ kimiProvider: 'openai/local' }, {});
   assert.equal(explicitConfig.provider, 'openai/local');
 });
 
-test('resolveKimiApiConfig reads opencode-style domestic provider defaults and env keys', () => {
-  const config = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig reads opencode-style domestic provider defaults and env keys', () => {
+  const config = resolveAgentModelConfig({}, {
     KCW_MODEL_PROVIDER: 'deepseek',
     DEEPSEEK_API_KEY: 'test-key-deepseek',
   });
@@ -45,8 +45,8 @@ test('resolveKimiApiConfig reads opencode-style domestic provider defaults and e
   assert.equal(config.fullModelId, 'deepseek/deepseek-v4-flash');
 });
 
-test('resolveKimiApiConfig parses provider_id/model_id when provider is omitted', () => {
-  const config = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig parses provider_id/model_id when provider is omitted', () => {
+  const config = resolveAgentModelConfig({}, {
     KIMI_MODEL: 'openai/local/qwen2.5-coder:7b',
   });
 
@@ -56,16 +56,16 @@ test('resolveKimiApiConfig parses provider_id/model_id when provider is omitted'
   assert.equal(config.configured, true);
 });
 
-test('resolveKimiApiConfig carries host security mode from config or env', () => {
-  const fromEnv = resolveKimiApiConfig({}, { SECURITY_MODE: 'local_strict' });
+test('resolveAgentModelConfig carries host security mode from config or env', () => {
+  const fromEnv = resolveAgentModelConfig({}, { SECURITY_MODE: 'local_strict' });
   assert.equal(fromEnv.securityMode, 'local_strict');
 
-  const fromConfig = resolveKimiApiConfig({ securityMode: 'enterprise_hybrid' }, { SECURITY_MODE: 'local_strict' });
+  const fromConfig = resolveAgentModelConfig({ securityMode: 'enterprise_hybrid' }, { SECURITY_MODE: 'local_strict' });
   assert.equal(fromConfig.securityMode, 'enterprise_local');
 });
 
-test('resolveKimiApiConfig reads Anthropic provider-specific env without Kimi defaults', () => {
-  const config = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig reads Anthropic provider-specific env without Kimi defaults', () => {
+  const config = resolveAgentModelConfig({}, {
     KCW_MODEL_PROVIDER: 'anthropic',
     KIMI_API_KEY: 'test-key-kimi-unused',
     KIMI_MODEL: 'kimi-model-should-not-cross',
@@ -81,8 +81,8 @@ test('resolveKimiApiConfig reads Anthropic provider-specific env without Kimi de
   assert.equal(config.model, 'claude-test');
 });
 
-test('resolveKimiApiConfig fails closed for Anthropic when no model env is configured', () => {
-  const config = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig fails closed for Anthropic when no model env is configured', () => {
+  const config = resolveAgentModelConfig({}, {
     KIMI_PROVIDER: 'claude',
     CLAUDE_API_KEY: 'test-key-claude',
   });
@@ -94,8 +94,8 @@ test('resolveKimiApiConfig fails closed for Anthropic when no model env is confi
   assert.equal(config.model, '');
 });
 
-test('resolveKimiApiConfig reads sanitized fallback model chain', () => {
-  const fromEnv = resolveKimiApiConfig({}, {
+test('resolveAgentModelConfig reads sanitized fallback model chain', () => {
+  const fromEnv = resolveAgentModelConfig({}, {
     KIMI_API_KEY: 'test-key-primary',
     KCW_MODEL_FALLBACKS: JSON.stringify([
       { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11434/v1/', model: 'local-model' },

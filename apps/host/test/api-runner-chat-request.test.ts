@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runKimiApiChat } from '../src/engine/api-runner.js';
+import { runModelApiChat } from '../src/engine/api-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const LOCAL_EGRESS = {
@@ -23,7 +23,7 @@ type CapturedChatRequest = {
   body?: ChatRequestBody;
 };
 
-test('runKimiApiChat posts system and user messages and extracts multipart text output', async () => {
+test('runModelApiChat posts system and user messages and extracts multipart text output', async () => {
   const captured: CapturedChatRequest = {};
   const fetchImpl = async (url: string, init: Record<string, unknown> = {}) => {
     captured.url = url;
@@ -45,7 +45,7 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
     };
   };
 
-  const result = await runKimiApiChat({
+  const result = await runModelApiChat({
     apiKey: 'test-key-chat',
     ...LOCAL_EGRESS,
     model: 'kimi-chat-test',
@@ -81,8 +81,8 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
   assert.equal(usage?.total_tokens, 9);
 });
 
-test('runKimiApiChat allows local providers without an API key', async () => {
-  const result = await runKimiApiChat({
+test('runModelApiChat allows local providers without an API key', async () => {
+  const result = await runModelApiChat({
     ...LOCAL_EGRESS,
     model: 'local-no-key',
     prompt: '本地调用',
@@ -104,9 +104,9 @@ test('runKimiApiChat allows local providers without an API key', async () => {
   assert.equal(result.provider, 'openai/local');
 });
 
-test('runKimiApiChat rejects empty successful responses and abort-shaped failures', async () => {
+test('runModelApiChat rejects empty successful responses and abort-shaped failures', async () => {
   await assert.rejects(
-    () => runKimiApiChat({
+    () => runModelApiChat({
       apiKey: 'test-key-chat',
       ...LOCAL_EGRESS,
       prompt: 'empty',
@@ -124,7 +124,7 @@ test('runKimiApiChat rejects empty successful responses and abort-shaped failure
   const abortError = new Error('aborted');
   abortError.name = 'AbortError';
   await assert.rejects(
-    () => runKimiApiChat({
+    () => runModelApiChat({
       apiKey: 'test-key-chat',
       ...LOCAL_EGRESS,
       prompt: 'abort',

@@ -4,7 +4,7 @@
 //       OpenAI 兼容提供商共用的 SSE 解析器(含流中断时部分工具调用的拆分)。
 // 依赖:同层配置常量 ../api-runner-config.js(未配置文案);其余仅标准库。
 // 导出:createKimiProvider(工厂,供注册表登记)、parseOpenAiCompatibleStream(共用流解析)。
-import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner-config.js';
+import { MODEL_API_NOT_CONFIGURED_MESSAGE } from '../api-runner-config.js';
 import { omitUndefined } from '../../util/object.js';
 import type { Provider, ProviderChatArgs, ProviderChatResult, ProviderToolCall, ProviderUsage } from './types.js';
 import { providerChatResultFromMessage, providerUsage } from './result.js';
@@ -52,7 +52,7 @@ export function createKimiProvider(): Provider {
       stream = true,
     }: ProviderChatArgs): Promise<ProviderChatResult> {
       if (!kimiConfig || !kimiConfig.apiKey) {
-        throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
+        throw new Error(MODEL_API_NOT_CONFIGURED_MESSAGE);
       }
       const endpoint = `${String(kimiConfig.baseUrl).replace(/\/+$/, '')}/chat/completions`;
       const headers: Record<string, string> = {

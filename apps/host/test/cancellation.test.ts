@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
-import type { KimiStreamOptions, KimiStreamResult } from '../src/engine/api-runner-stream.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
+import type { ModelStreamOptions, ModelStreamResult } from '../src/engine/api-runner-stream.js';
 import { CancellationRegistry } from '../src/runtime/cancellation.js';
 import { createServer } from '../src/server.js';
 import type { HostServer } from '../src/server.js';
@@ -30,7 +30,7 @@ function requireJsonRecord(value: unknown, label: string): JsonRecord {
   return value as JsonRecord;
 }
 
-async function fakeKimiChatRunner(): Promise<KimiTextResult> {
+async function fakeKimiChatRunner(): Promise<ModelTextResult> {
   return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'x', durationMs: 0 };
 }
 
@@ -161,7 +161,7 @@ test('POST /api/runs/:id/cancel rejects encoded path escapes in run id', async (
 });
 
 test('streaming chat can be cancelled mid-flight via /api/runs/:id/cancel', async () => {
-  const fakeStream = async ({ onToken, signal }: KimiStreamOptions = {}): Promise<KimiStreamResult> => {
+  const fakeStream = async ({ onToken, signal }: ModelStreamOptions = {}): Promise<ModelStreamResult> => {
     onToken?.('部分');
     for (let i = 0; i < 200; i += 1) {
       if (signal && signal.aborted) break;

@@ -1,10 +1,10 @@
 // Kimi route model-connection projection (host L3 routes).
-import type { KimiApiConfig } from '../engine/api-runner-config.js';
+import type { AgentModelConfig } from '../engine/api-runner-config.js';
 import { testModelConnection } from '../engine/model-connection-test.js';
 import { listProviderRuntimeStates, providerRuntimeState } from '../engine/provider-profiles.js';
 
 export async function inspectRouteModelConnection(
-  config: KimiApiConfig,
+  config: AgentModelConfig,
   provider: string,
   fetchImpl?: unknown,
 ) {

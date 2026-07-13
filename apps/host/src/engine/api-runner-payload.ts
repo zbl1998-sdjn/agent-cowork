@@ -5,7 +5,7 @@
 // 依赖:同层 ./api-runner-config.js(cleanText)。导出:extractMessageText。
 import { cleanText } from './api-runner-config.js';
 
-type KimiPayload = {
+type ModelApiPayload = {
   usage?: unknown;
   choices?: Array<{
     message?: { content?: unknown };
@@ -15,7 +15,7 @@ type KimiPayload = {
 
 /** 从响应体里提取首条 message 文本。 */
 export function extractMessageText(payload: unknown): string {
-  const data = (payload && typeof payload === 'object' ? payload : {}) as KimiPayload;
+  const data = (payload && typeof payload === 'object' ? payload : {}) as ModelApiPayload;
   const content = data.choices?.[0]?.message?.content;
   if (typeof content === 'string') return cleanText(content);
   if (Array.isArray(content)) {

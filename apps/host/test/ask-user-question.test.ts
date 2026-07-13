@@ -8,7 +8,7 @@ import { createApprovalRegistry } from '../src/runtime/approvals.js';
 import { createServer } from '../src/server.js';
 import type { ApprovalRegistry as AgentApprovalRegistry } from '../src/engine/agent/approval-gate.js';
 import type { ModelCall, ModelCallArgs } from '../src/engine/agent/model-resilience.js';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
 import type { HostServer } from '../src/server.js';
 import { TEST_LOCAL_HOST_MODEL_CONFIG, TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
@@ -46,7 +46,7 @@ function recordPayload(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function fakeKimiTextResult(text = ''): KimiTextResult {
+function fakeKimiTextResult(text = ''): ModelTextResult {
   return { ok: true, provider: 'test', model: 'test', mode: 'chat', text, durationMs: 0 };
 }
 

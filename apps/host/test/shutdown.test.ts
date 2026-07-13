@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelTextResult } from '../src/engine/api-runner.js';
 import type { HostServer } from '../src/server.js';
 import { createServer } from '../src/server.js';
 import { createCancellationRegistry } from '../src/runtime/cancellation.js';
@@ -24,7 +24,7 @@ async function bind(server: HostServer): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
-async function fakeKimiChatRunner(): Promise<KimiTextResult> {
+async function fakeKimiChatRunner(): Promise<ModelTextResult> {
   return { ok: true, provider: 'test', model: 'test', mode: 'chat', text: 'ok', durationMs: 0 };
 }
 

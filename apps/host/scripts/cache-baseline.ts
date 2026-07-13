@@ -12,7 +12,7 @@
 //   可选 KIMI_BASE_URL / KIMI_MODEL 覆盖。
 // 用法:node scripts/run-host-node.mjs apps/host/scripts/cache-baseline.ts
 import { createKimiProvider } from '../src/engine/provider/kimi.js';
-import { resolveKimiApiConfig } from '../src/engine/api-runner-config.js';
+import { resolveAgentModelConfig } from '../src/engine/api-runner-config.js';
 import { buildSystemPrompt, buildEnvBlock } from '../src/engine/system-prompt.js';
 import { resolveAgentEnvFacts } from '../src/engine/agent-env.js';
 import {
@@ -32,7 +32,7 @@ try {
   /* 无 .env,忽略 */
 }
 
-const cfg = resolveKimiApiConfig({}, process.env);
+const cfg = resolveAgentModelConfig({}, process.env);
 if (!cfg.configured || !cfg.apiKey) {
   console.error('[基线] 未配置 Kimi key。请在环境变量或 .env 设置 KIMI_API_KEY(或 MOONSHOT_API_KEY)后重试。');
   process.exit(2);

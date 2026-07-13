@@ -8,17 +8,17 @@ import {
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   DEFAULT_TIMEOUT_MS,
-  KIMI_API_NOT_CONFIGURED_MESSAGE,
+  MODEL_API_NOT_CONFIGURED_MESSAGE,
 } from './api-runner-config.js';
-import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
+import { buildModelApiChatPrompt, buildModelApiPlanPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 import { callProviderChatCompletion } from './provider/index.js';
 import { providerRequiresApiKey } from './provider/catalog.js';
 
-export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
-export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
-export { runKimiApiChatStream } from './api-runner-stream.js';
+export { MODEL_API_NOT_CONFIGURED_MESSAGE, resolveAgentModelConfig } from './api-runner-config.js';
+export { buildModelApiChatPrompt, buildModelApiPlanPrompt } from './api-runner-prompts.js';
+export { runModelApiChatStream } from './api-runner-stream.js';
 
 type FetchResponse = {
   ok: boolean;
@@ -28,7 +28,7 @@ type FetchResponse = {
 };
 type FetchLike = (input: string, init?: Record<string, unknown>) => Promise<FetchResponse> | FetchResponse;
 
-export type KimiTextResult = {
+export type ModelTextResult = {
   ok: true;
   provider: string;
   model: string;
@@ -37,7 +37,7 @@ export type KimiTextResult = {
   durationMs: number;
   usage?: unknown;
 };
-export type KimiTextOptions = PromptOptions & {
+export type ModelTextOptions = PromptOptions & {
   systemMessage?: string;
   apiKey?: unknown;
   baseUrl?: unknown;
@@ -59,7 +59,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 /** 非流式直答核心:校验 key/fetch、超时中止、发请求并返回规范化文本结果。 */
-async function runKimiApiText({
+async function runModelApiText({
   prompt,
   summary,
   mode,
@@ -78,7 +78,7 @@ async function runKimiApiText({
   temperature,
   promptBuilder,
   resultMode,
-}: KimiTextOptions = {}): Promise<KimiTextResult> {
+}: ModelTextOptions = {}): Promise<ModelTextResult> {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
   }
@@ -86,7 +86,7 @@ async function runKimiApiText({
     throw new Error('promptBuilder is required');
   }
   if (providerRequiresApiKey(provider) && (typeof apiKey !== 'string' || !apiKey.trim())) {
-    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
+    throw new Error(MODEL_API_NOT_CONFIGURED_MESSAGE);
   }
 
   const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
@@ -150,19 +150,19 @@ async function runKimiApiText({
 }
 
 /** 计划模式直答:用 plan 提示构造器走非流式调用。 */
-export function runKimiApiPlan(options: KimiTextOptions = {}): Promise<KimiTextResult> {
-  return runKimiApiText({
+export function runModelApiPlan(options: ModelTextOptions = {}): Promise<ModelTextResult> {
+  return runModelApiText({
     ...options,
-    promptBuilder: buildKimiApiPlanPrompt,
+    promptBuilder: buildModelApiPlanPrompt,
     resultMode: options.mode === 'code' ? 'code' : 'cowork',
   });
 }
 
 /** 聊天模式直答:用 chat 提示构造器走非流式调用。 */
-export function runKimiApiChat(options: KimiTextOptions = {}): Promise<KimiTextResult> {
-  return runKimiApiText({
+export function runModelApiChat(options: ModelTextOptions = {}): Promise<ModelTextResult> {
+  return runModelApiText({
     ...options,
-    promptBuilder: buildKimiApiChatPrompt,
+    promptBuilder: buildModelApiChatPrompt,
     resultMode: 'chat',
   });
 }

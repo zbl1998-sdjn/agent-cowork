@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runKimiApiPlan } from '../src/engine/api-runner.js';
+import { runModelApiPlan } from '../src/engine/api-runner.js';
 import {
   kimiTextResultSchema,
   successfulPlanFetch,
@@ -15,9 +15,9 @@ const LOCAL_EGRESS = {
   baseUrl: 'http://127.0.0.1:11434/v1',
 } as const;
 
-test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
+test('runModelApiPlan posts OpenAI-compatible chat completions', async () => {
   const captured: CapturedKimiRequestSlot = {};
-  const result = kimiTextResultSchema.parse(await runKimiApiPlan({
+  const result = kimiTextResultSchema.parse(await runModelApiPlan({
     apiKey: 'test-key-plan',
     ...LOCAL_EGRESS,
     model: 'kimi-test',
@@ -42,9 +42,9 @@ test('runKimiApiPlan posts OpenAI-compatible chat completions', async () => {
   assert.equal(result.usage?.total_tokens, 7);
 });
 
-test('runKimiApiPlan rejects missing API key before network calls', async () => {
+test('runModelApiPlan rejects missing API key before network calls', async () => {
   await assert.rejects(
-    () => runKimiApiPlan({
+    () => runModelApiPlan({
       prompt: '生成计划',
       summary: '摘要',
       fetchImpl: async () => {

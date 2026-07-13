@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { KimiTextOptions } from '../../src/engine/api-runner.js';
+import type { ModelTextOptions } from '../../src/engine/api-runner.js';
 
-type FetchImpl = NonNullable<KimiTextOptions['fetchImpl']>;
+type FetchImpl = NonNullable<ModelTextOptions['fetchImpl']>;
 
 export const chatCompletionRequestSchema = z.object({
   model: z.string(),

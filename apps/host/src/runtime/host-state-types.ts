@@ -3,8 +3,8 @@
 // 职责:集中描述 createHostState 的配置与状态端口,避免 host-state.ts 为类型声明继续膨胀。
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { RateLimiterLike } from '../http/middleware/common.js';
-import type { runKimiApiChat, runKimiApiChatStream, runKimiApiPlan } from '../engine/api-runner.js';
-import type { KimiApiConfig } from '../engine/api-runner-config.js';
+import type { runModelApiChat, runModelApiChatStream, runModelApiPlan } from '../engine/api-runner.js';
+import type { AgentModelConfig } from '../engine/api-runner-config.js';
 import type { McpRegistry } from '../mcp/connect.js';
 import type { RunsIndexLike as RecipeRunsIndexLike } from '../recipes/run-recipe-types.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
@@ -46,9 +46,9 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   kimiConfigFile?: string;
   kimiConfigProtector?: CredentialProtector;
   securityMode?: SecurityMode;
-  kimiPlanRunner?: typeof runKimiApiPlan;
-  kimiChatRunner?: typeof runKimiApiChat;
-  kimiChatStreamRunner?: typeof runKimiApiChatStream;
+  kimiPlanRunner?: typeof runModelApiPlan;
+  kimiChatRunner?: typeof runModelApiChat;
+  kimiChatStreamRunner?: typeof runModelApiChatStream;
   runStoreRoot?: string;
   idempotencyStore?: Map<string, IdempotencyEntry>;
   enableKimiApi?: boolean;
@@ -133,7 +133,7 @@ export type HostState = Record<string, unknown> & {
   uiDistEnabled: boolean;
   kimiConfigFile: string;
   securityMode: SecurityMode;
-  kimiApiConfig: KimiApiConfig;
+  kimiApiConfig: AgentModelConfig;
   kimiApiEnabled?: boolean;
   runStoreRoot: string;
   idempotencyStore: Map<string, IdempotencyEntry>;

@@ -3,7 +3,7 @@
 // 职责:封装 Kimi 配置响应、provider 归一化、运行记录落盘与索引,保持主路由只做分支编排。
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
-import type { KimiApiConfig } from '../engine/api-runner-config.js';
+import type { AgentModelConfig } from '../engine/api-runner-config.js';
 import { composeFullModelId, normaliseModelProviderId } from '../engine/provider/catalog.js';
 import { modelsDevProviderCatalogResponse } from '../engine/provider/models-dev-catalog.js';
 import { inspectRouteModelConnection } from './agent-engine-route-connection.js';
@@ -28,7 +28,7 @@ type StreamChatRunner = Parameters<typeof streamChat>[0]['streamRunner'];
 
 export type AgentEngineRouteState = HostState & {
   memoryStore: MemoryStoreLike;
-  kimiApiConfig: KimiApiConfig;
+  kimiApiConfig: AgentModelConfig;
   kimiApiEnabled?: boolean;
   kimiPlanRunner: ModelRunner;
   kimiChatRunner: ModelRunner;

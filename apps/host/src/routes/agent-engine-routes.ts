@@ -4,7 +4,7 @@
 // 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleAgentEngineRoutes。
 import { streamChat } from '../engine/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
-import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';
+import { MODEL_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { hasSessionModelAccess } from './session-model-config.js';
@@ -140,7 +140,7 @@ export async function handleAgentEngineRoutes({
       const input = parseAgentEngineBody(response, agentEnginePlanChatBodySchema, body, 'invalid kimi request');
       if (!input) return;
       if (!routeState.kimiApiEnabled) {
-        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
+        sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       const isPlan = pathname === '/api/agent-engine/plan';
@@ -164,7 +164,7 @@ export async function handleAgentEngineRoutes({
       const input = parseAgentEngineBody(response, agentEngineStreamBodySchema, body, 'invalid agent stream request');
       if (!input) return;
       if (!routeState.kimiApiEnabled && !hasSessionModelAccess(input)) {
-        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
+        sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       const hasPrompt = typeof input.prompt === 'string' && input.prompt.trim();
@@ -215,7 +215,7 @@ export async function handleAgentEngineRoutes({
       const input = parseAgentEngineBody(response, agentEngineChatStreamBodySchema, body, 'invalid kimi stream request');
       if (!input) return;
       if (!routeState.kimiApiEnabled) {
-        sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
+        sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
       await streamChat({

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runKimiApiChatStream } from '../src/engine/api-runner.js';
+import { runModelApiChatStream } from '../src/engine/api-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const LOCAL_EGRESS = {
@@ -39,7 +39,7 @@ function streamReader(chunks: string[]): StreamReader {
   };
 }
 
-test('runKimiApiChatStream posts a streaming chat request and emits token callbacks', async () => {
+test('runModelApiChatStream posts a streaming chat request and emits token callbacks', async () => {
   const captured: CapturedStreamRequest = {};
   const tokens: string[] = [];
   const reasoning: string[] = [];
@@ -63,7 +63,7 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
     };
   };
 
-  const result = await runKimiApiChatStream({
+  const result = await runModelApiChatStream({
     apiKey: 'test-key-stream',
     ...LOCAL_EGRESS,
     model: 'kimi-stream-test',
@@ -101,8 +101,8 @@ test('runKimiApiChatStream posts a streaming chat request and emits token callba
   assert.equal(result.text, '你好呀');
 });
 
-test('runKimiApiChatStream keeps the final SSE data line when the stream closes without a trailing newline', async () => {
-  const result = await runKimiApiChatStream({
+test('runModelApiChatStream keeps the final SSE data line when the stream closes without a trailing newline', async () => {
+  const result = await runModelApiChatStream({
     apiKey: 'test-key-stream',
     ...LOCAL_EGRESS,
     prompt: '末尾 token',
@@ -120,8 +120,8 @@ test('runKimiApiChatStream keeps the final SSE data line when the stream closes 
   assert.equal(result.text, '最后一段');
 });
 
-test('runKimiApiChatStream allows local providers without an API key', async () => {
-  const result = await runKimiApiChatStream({
+test('runModelApiChatStream allows local providers without an API key', async () => {
+  const result = await runModelApiChatStream({
     ...LOCAL_EGRESS,
     model: 'local-no-key',
     prompt: '本地流式调用',
@@ -140,9 +140,9 @@ test('runKimiApiChatStream allows local providers without an API key', async () 
   assert.equal(result.provider, 'openai/local');
 });
 
-test('runKimiApiChatStream fails closed before unsupported or failed streams are consumed', async () => {
+test('runModelApiChatStream fails closed before unsupported or failed streams are consumed', async () => {
   await assert.rejects(
-    () => runKimiApiChatStream({
+    () => runModelApiChatStream({
       prompt: '缺少 key',
       fetchImpl: async () => {
         throw new Error('network must not be called');
@@ -152,7 +152,7 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
   );
 
   await assert.rejects(
-    () => runKimiApiChatStream({
+    () => runModelApiChatStream({
       apiKey: 'test-key-stream',
       ...LOCAL_EGRESS,
       prompt: 'HTTP error',
@@ -162,7 +162,7 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
   );
 
   await assert.rejects(
-    () => runKimiApiChatStream({
+    () => runModelApiChatStream({
       apiKey: 'test-key-stream',
       ...LOCAL_EGRESS,
       prompt: 'missing body',

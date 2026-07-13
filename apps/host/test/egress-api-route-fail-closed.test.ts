@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { runKimiApiChatStream } from '../src/engine/api-runner.js';
+import { runModelApiChatStream } from '../src/engine/api-runner.js';
 import { createKimiRefineModelCall } from '../src/engine/prompt/refine-model-call.js';
 import { createServer } from '../src/server.js';
 import { isEgressAuditFailure } from '../src/security/egress-gateway.js';
@@ -85,7 +85,7 @@ test('streaming Kimi runner never fetches when audit persistence fails', async (
   let fetchCalls = 0;
 
   await assert.rejects(
-    () => runKimiApiChatStream({
+    () => runModelApiChatStream({
       ...LOCAL_MODEL,
       trustedRoot,
       prompt: 'stream without audit bypass',

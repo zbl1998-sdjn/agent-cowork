@@ -3,7 +3,7 @@
 // 职责:对 OpenAI 兼容的 /chat/completions 端点发起 stream:true 请求,逐块解析 SSE,
 //       通过 onToken/onReasoning 回调增量推送正文与思考内容,并处理超时/中止。
 // 依赖:同层 kimi(api-runner-config 默认值/常量、api-runner-prompts 拼接提示)。
-//       导出:KimiStreamResult, KimiStreamOptions, runKimiApiChatStream。
+//       导出:ModelStreamResult, ModelStreamOptions, runModelApiChatStream。
 
 import {
   cleanProvider,
@@ -11,9 +11,9 @@ import {
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   DEFAULT_TIMEOUT_MS,
-  KIMI_API_NOT_CONFIGURED_MESSAGE,
+  MODEL_API_NOT_CONFIGURED_MESSAGE,
 } from './api-runner-config.js';
-import { buildKimiApiChatPrompt } from './api-runner-prompts.js';
+import { buildModelApiChatPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 import { callProviderChatCompletion } from './provider/index.js';
@@ -27,7 +27,7 @@ type FetchResponse = {
 };
 type FetchLike = (input: string, init?: Record<string, unknown>) => Promise<FetchResponse> | FetchResponse;
 
-export type KimiStreamResult = {
+export type ModelStreamResult = {
   ok: true;
   provider: string;
   model: string;
@@ -36,7 +36,7 @@ export type KimiStreamResult = {
   durationMs: number;
   usage?: unknown;
 };
-export type KimiStreamOptions = PromptOptions & {
+export type ModelStreamOptions = PromptOptions & {
   systemMessage?: string;
   apiKey?: unknown;
   baseUrl?: unknown;
@@ -59,7 +59,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 /** 流式聊天:stream:true 调用并逐块解析 SSE,通过 onToken/onReasoning 回调增量推送,返回累计文本。 */
-export async function runKimiApiChatStream({
+export async function runModelApiChatStream({
   prompt,
   summary = '',
   memory = '',
@@ -78,15 +78,15 @@ export async function runKimiApiChatStream({
   signal,
   userAgent,
   temperature,
-}: KimiStreamOptions = {}): Promise<KimiStreamResult> {
+}: ModelStreamOptions = {}): Promise<ModelStreamResult> {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
   }
   if (providerRequiresApiKey(provider) && (typeof apiKey !== 'string' || !apiKey.trim())) {
-    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
+    throw new Error(MODEL_API_NOT_CONFIGURED_MESSAGE);
   }
   const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
-  const apiPrompt = buildKimiApiChatPrompt({ prompt, summary, memory });
+  const apiPrompt = buildModelApiChatPrompt({ prompt, summary, memory });
   const messages = systemMessage
     ? [{ role: 'system', content: String(systemMessage) }, { role: 'user', content: apiPrompt }]
     : [{ role: 'user', content: apiPrompt }];

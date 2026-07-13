@@ -1,6 +1,6 @@
 // Model provider profile management (host L1 kimi domain).
 // Keeps each provider's credential and endpoint independent while exposing one active config.
-import type { KimiApiConfig, ProviderProfile } from './api-runner-config.js';
+import type { AgentModelConfig, ProviderProfile } from './api-runner-config.js';
 import {
   apiKeyFromEnvForProvider,
   composeFullModelId,
@@ -39,7 +39,7 @@ function profileConfigured(provider: string, profile: ProviderProfile): boolean 
     : Boolean(cleanBaseUrl(profile.baseUrl) && cleanText(profile.model));
 }
 
-export function activeProviderProfile(config: KimiApiConfig): ProviderProfile {
+export function activeProviderProfile(config: AgentModelConfig): ProviderProfile {
   return {
     apiKey: cleanText(config.apiKey),
     baseUrl: cleanBaseUrl(config.baseUrl),
@@ -50,7 +50,7 @@ export function activeProviderProfile(config: KimiApiConfig): ProviderProfile {
   };
 }
 
-export function syncActiveProviderProfile(config: KimiApiConfig): void {
+export function syncActiveProviderProfile(config: AgentModelConfig): void {
   const provider = normaliseModelProviderId(config.provider, 'kimi-api');
   config.providerProfiles ||= {};
   config.provider = provider;
@@ -60,7 +60,7 @@ export function syncActiveProviderProfile(config: KimiApiConfig): void {
 }
 
 export function activateProviderProfile(
-  config: KimiApiConfig,
+  config: AgentModelConfig,
   providerInput: unknown,
   env: Record<string, string | undefined> = process.env,
 ): void {
@@ -78,7 +78,7 @@ export function activateProviderProfile(
   syncActiveProviderProfile(config);
 }
 
-export function providerRuntimeState(config: KimiApiConfig, providerInput: unknown): ProviderRuntimeState {
+export function providerRuntimeState(config: AgentModelConfig, providerInput: unknown): ProviderRuntimeState {
   const provider = normaliseModelProviderId(providerInput, 'kimi-api');
   const active = provider === normaliseModelProviderId(config.provider, 'kimi-api');
   const profile = active ? activeProviderProfile(config) : (config.providerProfiles || {})[provider] || {};
@@ -104,7 +104,7 @@ export function providerRuntimeState(config: KimiApiConfig, providerInput: unkno
   };
 }
 
-export function listProviderRuntimeStates(config: KimiApiConfig): ProviderRuntimeState[] {
+export function listProviderRuntimeStates(config: AgentModelConfig): ProviderRuntimeState[] {
   const ids = new Set(listModelProviderCatalog().map((entry) => entry.id));
   for (const id of Object.keys(config.providerProfiles || {})) ids.add(normaliseModelProviderId(id, id));
   return [...ids].map((provider) => providerRuntimeState(config, provider));

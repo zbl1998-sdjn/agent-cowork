@@ -1,5 +1,5 @@
 // Non-persisting model connection test (host L1 kimi domain).
-import type { KimiApiConfig } from './api-runner-config.js';
+import type { AgentModelConfig } from './api-runner-config.js';
 import { discoverProviderModels, type ModelDiscoveryResult } from './model-discovery.js';
 import {
   activateProviderProfile,
@@ -15,7 +15,7 @@ export type ModelConnectionTestInput = {
 };
 
 export async function testModelConnection(
-  saved: KimiApiConfig,
+  saved: AgentModelConfig,
   input: ModelConnectionTestInput,
   fetchImpl?: typeof fetch,
 ): Promise<{
@@ -24,7 +24,7 @@ export async function testModelConnection(
   models: string[];
   connection: ModelDiscoveryResult;
 }> {
-  const candidate: KimiApiConfig = {
+  const candidate: AgentModelConfig = {
     ...saved,
     fallbacks: saved.fallbacks.map((item) => ({ ...item })),
     providerProfiles: cloneProviderProfiles(saved.providerProfiles),

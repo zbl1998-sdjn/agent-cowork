@@ -16,7 +16,7 @@ import {
 } from '../security/credential-store.js';
 import { createManagedSingleFileOperation } from '../security/managed-single-file.js';
 import { syncActiveProviderProfile } from './provider-profiles.js';
-import type { KimiApiConfig, ProviderProfile } from './api-runner-config.js';
+import type { AgentModelConfig, ProviderProfile } from './api-runner-config.js';
 
 type KimiConfigRecord = Record<string, unknown>;
 type ConfigStoreOptions = { protector?: CredentialProtector };
@@ -168,12 +168,12 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord,
   }
   if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
   recomputeConfigured(target);
-  syncActiveProviderProfile(target as KimiApiConfig);
+  syncActiveProviderProfile(target as AgentModelConfig);
 }
 
 /** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
 export function persistKimiConfig(file: string, source: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
-  syncActiveProviderProfile(source as KimiApiConfig);
+  syncActiveProviderProfile(source as AgentModelConfig);
   const apiKey = String(source.apiKey || '').trim();
   const payload = {
     kimiApi: {
