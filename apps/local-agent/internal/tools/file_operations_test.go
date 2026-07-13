@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kimi-cowork/apps/local-agent/internal/journal"
+	"agent-cowork/apps/local-agent/internal/journal"
 )
 
 // 本地 agent 的批量文件操作默认不允许删除,防止模型计划把破坏性动作伪装成普通补丁。

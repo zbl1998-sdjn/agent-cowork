@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	httpapi "kimi-cowork/services/api/internal/http"
+	httpapi "agent-cowork/services/api/internal/http"
 )
 
 func main() {
