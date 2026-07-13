@@ -34,7 +34,7 @@
 - 已有 **trusted root jail / 敏感段黑名单 / symlink 解析 / redaction / JWT / SSRF 守卫 / Host 白名单 / shell:false** 等安全边界。
 - 已有 SQLite / PostgreSQL 双存储、任务运行记录、审计、产物面板、上传导入、连接器、GitHub OAuth 凭证仓库、Docker `--network=none` 沙箱验证等基础能力。
 - 已有 `summary-report` recipe，能够在 trusted root 下生成 Markdown、DOCX、PPTX、PDF 产物。
-- 当前 Kimi API 计划生成仍偏专用，接口为 `/api/kimi/chat` 和 `/api/kimi/plan`，需要升级为 provider-neutral 的模型路由。
+- 当前 Kimi API 计划生成仍偏专用，接口为 `/api/agent-engine/chat` 和 `/api/agent-engine/plan`，需要升级为 provider-neutral 的模型路由。
 
 因此，下一阶段不需要重写核心 Agent，而应做 **能力抽象、配置产品化、模板产品化、安全策略统一化**。
 
@@ -103,7 +103,7 @@
 
 ### 3.2 三条主线
 
-1. **模型主线**：`/api/kimi/*` → `/api/llm/*` → `ModelRouter` → 多 provider。
+1. **模型主线**：`/api/agent-engine/*` → `/api/llm/*` → `ModelRouter` → 多 provider。
 2. **任务主线**：用户输入 → Task Template / Recipe 选择 → Plan → Approval → Tool calls → Artifacts。
 3. **安全主线**：Security Mode → Policy Engine → Hooks → Approval → Audit → Rollback。
 
@@ -141,8 +141,8 @@
 
 ```txt
 旧接口：
-POST /api/kimi/chat
-POST /api/kimi/plan
+POST /api/agent-engine/chat
+POST /api/agent-engine/plan
 
 新接口：
 GET  /api/models/providers
@@ -157,8 +157,8 @@ POST /api/llm/stream
 兼容策略：
 
 ```txt
-/api/kimi/chat  → 内部转发到 /api/llm/chat，providerId = moonshot-kimi
-/api/kimi/plan  → 内部转发到 /api/llm/plan，providerId = moonshot-kimi
+/api/agent-engine/chat  → 内部转发到 /api/llm/chat，providerId = moonshot-kimi
+/api/agent-engine/plan  → 内部转发到 /api/llm/plan，providerId = moonshot-kimi
 ```
 
 ### 5.2 Provider 抽象
@@ -1803,7 +1803,7 @@ function evaluateModelPolicy(ctx: PolicyContext): PolicyDecision {
 - 新增 SecretStore 统一密钥读取
 - 新增 capability probe
 - 新增 /api/llm/chat、/api/llm/plan
-- 兼容 /api/kimi/chat、/api/kimi/plan
+- 兼容 /api/agent-engine/chat、/api/agent-engine/plan
 ```
 
 验收：

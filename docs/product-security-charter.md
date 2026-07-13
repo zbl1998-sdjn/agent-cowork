@@ -34,10 +34,10 @@ Configuration source of truth:
 - Tool policy decision: `apps/host/src/security/policy-decision.ts`
 - Telemetry allowlist: `apps/host/src/security/telemetry-allowlist.ts`
 - Tamper-evident audit chain: `apps/host/src/storage/audit-chain.ts`
-- Model candidate filtering: `apps/host/src/kimi/agent/model-resilience.ts`
+- Model candidate filtering: `apps/host/src/engine/agent/model-resilience.ts`
 - Model endpoint validation and receipt boundary: `apps/host/src/security/model-gateway-policy.ts`, `apps/host/src/security/model-endpoint-request.ts`, and `apps/host/src/security/model-egress-approval.ts`
 - Host-global mutation authorization: `apps/host/src/auth/global-mutation-admin.ts`
-- Tool enforcement: `apps/host/src/kimi/agent/tool-call-executor.ts` and `apps/host/src/routes/tool-routes.ts`
+- Tool enforcement: `apps/host/src/engine/agent/tool-call-executor.ts` and `apps/host/src/routes/tool-routes.ts`
 - Sandbox startup posture: `apps/host/src/sandbox/startup-probe.ts`
 
 ## Out Of Scope For This Slice
