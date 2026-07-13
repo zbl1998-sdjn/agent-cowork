@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"kimi-cowork/apps/local-agent/internal/policy"
+	"agent-cowork/apps/local-agent/internal/policy"
 )
 
 const DefaultMaxReadBytes int64 = 256 * 1024

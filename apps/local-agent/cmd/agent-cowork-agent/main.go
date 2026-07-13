@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"kimi-cowork/apps/local-agent/internal/journal"
-	"kimi-cowork/apps/local-agent/internal/tools"
+	"agent-cowork/apps/local-agent/internal/journal"
+	"agent-cowork/apps/local-agent/internal/tools"
 )
 
 const version = "0.1.0-v0.3"

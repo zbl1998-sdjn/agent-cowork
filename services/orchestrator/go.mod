@@ -1,4 +1,4 @@
-module kimi-cowork/services/orchestrator
+module agent-cowork/services/orchestrator
 
 go 1.26.5
 
