@@ -3,8 +3,8 @@
 // 职责:集中描述 createHostState 的配置与状态端口,避免 host-state.ts 为类型声明继续膨胀。
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { RateLimiterLike } from '../http/middleware/common.js';
-import type { runKimiApiChat, runKimiApiChatStream, runKimiApiPlan } from '../kimi/api-runner.js';
-import type { KimiApiConfig } from '../kimi/api-runner-config.js';
+import type { runKimiApiChat, runKimiApiChatStream, runKimiApiPlan } from '../engine/api-runner.js';
+import type { KimiApiConfig } from '../engine/api-runner-config.js';
 import type { McpRegistry } from '../mcp/connect.js';
 import type { RunsIndexLike as RecipeRunsIndexLike } from '../recipes/run-recipe-types.js';
 import type { SandboxLimits } from '../sandbox/sandbox-spec.js';
@@ -103,6 +103,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   trustIdentityHeaders?: boolean;
   globalMutationAdmins?: readonly GlobalMutationAdminIdentity[];
   allowLocalModelConfigSelfService?: boolean;
+  allowLocalGuestEnrollment?: boolean;
   validateHost?: boolean;
   uiDist?: boolean;
   projectStores?: Map<string, ProjectStore>;

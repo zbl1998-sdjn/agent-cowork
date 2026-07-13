@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { callThenAnswer, createAgentApprovalRegistry, mutatingTool, parseApprovalPayload, tool } from './helpers/approvals.js';
 import { tempRoot } from './helpers/host-http.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';

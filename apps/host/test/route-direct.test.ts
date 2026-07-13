@@ -7,7 +7,7 @@ import { handlePromptRoutes } from '../src/routes/prompt-routes.js';
 import { handleSearchRoutes } from '../src/routes/search-routes.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
-import type { PromptContext, PromptRefiner, PromptRefineResult } from '../src/kimi/prompt/refiner.js';
+import type { PromptContext, PromptRefiner, PromptRefineResult } from '../src/engine/prompt/refiner.js';
 import type { MemoryStoreLike } from '../src/memory/profile.js';
 import type { Planner, PlanToolRegistry } from '../src/runtime/plan-builder.js';
 

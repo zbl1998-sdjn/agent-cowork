@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   buildKimiApiChatPrompt,
   buildKimiApiPlanPrompt,
-} from '../src/kimi/api-runner.js';
+} from '../src/engine/api-runner.js';
 
 test('buildKimiApiPlanPrompt constrains API plan output', () => {
   const prompt = buildKimiApiPlanPrompt({

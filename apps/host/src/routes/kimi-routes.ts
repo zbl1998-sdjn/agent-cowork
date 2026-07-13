@@ -2,9 +2,9 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/kimi/* —— Kimi 配置读写、CLI 探测、以及把对话请求接到流式聊天(SSE)。
 // 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleKimiRoutes。
-import { streamChat } from '../kimi/chat-stream.js';
+import { streamChat } from '../engine/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
-import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../kimi/api-runner.js';
+import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { hasSessionModelAccess } from './session-model-config.js';
@@ -12,12 +12,12 @@ import { modelProvider, sendKimiInfo, sendModelProviderCatalog, type KimiRouteSt
 import { runKimiAndRecord } from './kimi-route-records.js';
 import {
   splitFullModelId,
-} from '../kimi/provider/catalog.js';
+} from '../engine/provider/catalog.js';
 import {
   activateProviderProfile,
   cloneProviderProfiles,
   syncActiveProviderProfile,
-} from '../kimi/provider-profiles.js';
+} from '../engine/provider-profiles.js';
 import {
   kimiAgentStreamBodySchema,
   kimiChatStreamBodySchema,
@@ -30,7 +30,7 @@ import {
 import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
 import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
-import { testModelConnection } from '../kimi/model-connection-test.js';
+import { testModelConnection } from '../engine/model-connection-test.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type KimiRouteOptions = {

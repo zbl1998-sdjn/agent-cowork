@@ -8,10 +8,10 @@
     "policy": "Existing debt may shrink but cannot grow; new files above 250 lines fail."
   },
   "files": {
-    "apps/host/src/kimi/agent/tool-call-executor.ts": { "maxLines": 283 },
-    "apps/host/src/kimi/agent/tool-loop.ts": { "maxLines": 314 },
-    "apps/host/src/kimi/provider/catalog-data.ts": { "maxLines": 321 },
-    "apps/host/src/kimi/provider/models-dev-catalog.ts": { "maxLines": 255 },
+    "apps/host/src/engine/agent/tool-call-executor.ts": { "maxLines": 283 },
+    "apps/host/src/engine/agent/tool-loop.ts": { "maxLines": 314 },
+    "apps/host/src/engine/provider/catalog-data.ts": { "maxLines": 321 },
+    "apps/host/src/engine/provider/models-dev-catalog.ts": { "maxLines": 255 },
     "apps/host/src/memory/mase-bridge.ts": { "maxLines": 334 },
     "apps/host/src/orchestrator/agent-registry.ts": { "maxLines": 286 },
     "apps/host/src/orchestrator/workflow-runner.ts": { "maxLines": 387 },

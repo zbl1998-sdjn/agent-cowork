@@ -10,7 +10,7 @@ import {
 } from '../src/artifacts/artifact-owner-write.js';
 import { renameArtifact } from '../src/artifacts/artifact-catalog.js';
 import { LIVE_ARTIFACT_HTML_SENTINEL } from '../src/artifacts/live-artifact-contract.js';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { previewFileOperations } from '../src/workspace/file-operations.js';
 import { rollbackFileOperations } from '../src/workspace/file-rollback.js';
 import { tempRoot } from './helpers/host-http.js';

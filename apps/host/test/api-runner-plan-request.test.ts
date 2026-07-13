@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runKimiApiPlan } from '../src/kimi/api-runner.js';
+import { runKimiApiPlan } from '../src/engine/api-runner.js';
 import {
   kimiTextResultSchema,
   successfulPlanFetch,

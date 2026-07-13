@@ -3,15 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { runAgentChat } from '../src/kimi/agent-runner.js';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { ToolRegistry } from '../src/tools/tool-registry.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import { makeTestWorkspace } from './test-fixtures.js';
-import type { AgentTool } from '../src/kimi/agent-tools.js';
-import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { AgentTool } from '../src/engine/agent-tools.js';
+import type { ChatMessage } from '../src/engine/agent/tool-loop-types.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import type { ToolEntry } from '../src/tools/tool-registry.js';
 
 const ALICE = Object.freeze({ tenantId: 'tenant_test', userId: 'alice' });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildEnvBlock, buildSystemPrompt, SYSTEM_PROMPT_VERSION } from '../src/kimi/system-prompt.js';
+import { buildEnvBlock, buildSystemPrompt, SYSTEM_PROMPT_VERSION } from '../src/engine/system-prompt.js';
 
 const fixedNow = new Date('2026-05-28T01:23:00Z');
 

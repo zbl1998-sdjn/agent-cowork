@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
-import type { ModelFallback } from '../kimi/api-runner-config.js';
+import type { ModelFallback } from '../engine/api-runner-config.js';
 
 const objectBody = (message: string): z.ZodType<Record<string, unknown>> => z.custom<Record<string, unknown>>(
   (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value)),

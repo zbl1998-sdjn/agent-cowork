@@ -5,15 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { z } from 'zod';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { createGitCommitTool, createGitDiffTool, createGitLogTool, createGitStatusTool } from '../src/tools/dev/git.js';
 import { intInRange, resolveGitPath, resolveWorkspace } from '../src/tools/dev/git-runner.js';
 import { canonicalizePath } from '../src/security/path-policy.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { createAgentApprovalRegistry } from './helpers/approvals.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import type { GitRunResult } from '../src/tools/dev/git-runner.js';
 import type { EmittedEvent } from './helpers/agent.js';
 

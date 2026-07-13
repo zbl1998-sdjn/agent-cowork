@@ -4,11 +4,11 @@
 // 依赖:L0 request-utils + L1 kimi/prompt 精炼器(经 state 注入)。导出:handlePromptRoutes。
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
-import { createPromptRefiner } from '../kimi/prompt/refiner.js';
+import { createPromptRefiner } from '../engine/prompt/refiner.js';
 import { createUserProfile } from '../memory/profile.js';
 import { omitUndefined } from '../util/object.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import type { PromptContext, PromptModelCall, PromptRefiner } from '../kimi/prompt/refiner.js';
+import type { PromptContext, PromptModelCall, PromptRefiner } from '../engine/prompt/refiner.js';
 import type { MemoryStoreLike } from '../memory/profile.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };

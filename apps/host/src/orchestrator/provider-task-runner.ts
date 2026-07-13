@@ -1,5 +1,5 @@
-import { callProviderChatCompletion } from '../kimi/provider/index.js';
-import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/index.js';
+import { callProviderChatCompletion } from '../engine/provider/index.js';
+import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../engine/provider/index.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 import type {
   AgentDefinition,

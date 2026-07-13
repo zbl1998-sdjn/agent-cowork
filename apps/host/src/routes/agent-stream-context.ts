@@ -4,8 +4,8 @@
 //       当请求未显式指定 maxContextTokens 时,按「当前所选模型」的上下文窗口自适应推导
 //       压缩阈值(留输出余量),避免大窗口模型被写死的保守默认过早压缩。
 import { omitUndefined } from '../util/object.js';
-import { resolveHistoryBudgetTokens } from '../kimi/context/model-context-window.js';
-import { findModelProviderCatalog } from '../kimi/provider/catalog.js';
+import { resolveHistoryBudgetTokens } from '../engine/context/model-context-window.js';
+import { findModelProviderCatalog } from '../engine/provider/catalog.js';
 
 type NumericLimit = number | string;
 

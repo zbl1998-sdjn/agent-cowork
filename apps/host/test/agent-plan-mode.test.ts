@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import {
   hasTodoSnapshotText,
   parsePlanProposal,
@@ -11,7 +11,7 @@ import {
 import { createAgentApprovalRegistry, parseApprovalPayload } from './helpers/approvals.js';
 import { tempRoot } from './helpers/host-http.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 
 test('plan mode blocks writes until ExitPlanMode is approved, then executes', async () => {
   const root = tempRoot('kcw-agent-');

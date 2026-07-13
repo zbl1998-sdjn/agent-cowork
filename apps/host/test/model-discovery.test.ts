@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { discoverProviderModels } from '../src/kimi/model-discovery.js';
+import { discoverProviderModels } from '../src/engine/model-discovery.js';
 
 const LOCAL_CONFIG = {
   provider: 'ollama',

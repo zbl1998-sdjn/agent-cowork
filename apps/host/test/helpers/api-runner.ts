@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { KimiTextOptions } from '../../src/kimi/api-runner.js';
+import type { KimiTextOptions } from '../../src/engine/api-runner.js';
 
 type FetchImpl = NonNullable<KimiTextOptions['fetchImpl']>;
 

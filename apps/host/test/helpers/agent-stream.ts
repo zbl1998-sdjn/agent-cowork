@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { readableBody, recordValue } from './host-http.js';
-import type { KimiTextResult } from '../../src/kimi/api-runner.js';
+import type { KimiTextResult } from '../../src/engine/api-runner.js';
 
 export type AgentModelCallInput = {
   kimiConfig?: {

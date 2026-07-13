@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveKimiApiConfig } from '../src/kimi/api-runner.js';
+import { resolveKimiApiConfig } from '../src/engine/api-runner.js';
 
 test('resolveKimiApiConfig reads Kimi and Moonshot env names without exposing keys', () => {
   const config = resolveKimiApiConfig({}, {

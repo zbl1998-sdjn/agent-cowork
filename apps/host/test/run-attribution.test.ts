@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
-import { SYSTEM_PROMPT_VERSION } from '../src/kimi/system-prompt.js';
+import { SYSTEM_PROMPT_VERSION } from '../src/engine/system-prompt.js';
 import { buildRunAttribution } from '../src/runtime/run-attribution.js';
 import { readRunRecord, writeRunRecord } from '../src/runtime/run-store.js';
 import { closeTestServer } from './helpers/close-server.js';

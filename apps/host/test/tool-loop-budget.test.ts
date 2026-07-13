@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { createBudgetGuard } from '../src/runtime/budget-guard.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { AgentTool } from '../src/kimi/agent-tools.js';
+import type { AgentTool } from '../src/engine/agent-tools.js';
 
 type EmittedEvent = {
   type: string;

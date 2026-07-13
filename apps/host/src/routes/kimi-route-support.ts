@@ -3,12 +3,12 @@
 // 职责:封装 Kimi 配置响应、provider 归一化、运行记录落盘与索引,保持主路由只做分支编排。
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
-import type { KimiApiConfig } from '../kimi/api-runner-config.js';
-import { composeFullModelId, normaliseModelProviderId } from '../kimi/provider/catalog.js';
-import { modelsDevProviderCatalogResponse } from '../kimi/provider/models-dev-catalog.js';
+import type { KimiApiConfig } from '../engine/api-runner-config.js';
+import { composeFullModelId, normaliseModelProviderId } from '../engine/provider/catalog.js';
+import { modelsDevProviderCatalogResponse } from '../engine/provider/models-dev-catalog.js';
 import { inspectRouteModelConnection } from './kimi-route-connection.js';
 import type { HostState } from '../runtime/host-state-types.js';
-import type { streamChat } from '../kimi/chat-stream.js';
+import type { streamChat } from '../engine/chat-stream.js';
 
 type MemoryContext = { enabled?: boolean; bytes?: unknown; notes?: unknown; text?: string };
 type MemoryStoreLike = {

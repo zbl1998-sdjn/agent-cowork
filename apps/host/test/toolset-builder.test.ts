@@ -3,15 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildAgentToolset } from '../src/kimi/agent-runner.js';
-import { createParallelSubAgentTool } from '../src/kimi/agent/parallel-agent-tool.js';
+import { buildAgentToolset } from '../src/engine/agent-runner.js';
+import { createParallelSubAgentTool } from '../src/engine/agent/parallel-agent-tool.js';
 import type {
   AgentDeps,
   AgentTool,
   SkillRegistry,
   ToolRegistry,
   ToolsetContext,
-} from '../src/kimi/agent/toolset-builder.js';
+} from '../src/engine/agent/toolset-builder.js';
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-toolset-'));

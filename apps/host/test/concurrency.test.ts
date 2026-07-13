@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import type { KimiTextResult } from '../src/kimi/api-runner.js';
+import type { KimiTextResult } from '../src/engine/api-runner.js';
 import type { ConcurrencyLimiter } from '../src/runtime/concurrency.js';
 import { createConcurrencyLimiter } from '../src/runtime/concurrency.js';
 import type { HostServer } from '../src/server.js';

@@ -176,7 +176,10 @@ async function main() {
 
   const host = createServer({
     trustedRoot: workspace,
-    requireAuth: false,
+    requireAuth: true,
+    trustIdentityHeaders: false,
+    validateHost: true,
+    allowLocalGuestEnrollment: true,
     persistAuth: false,
     enableScheduler: false,
     uiDistRoot,
@@ -203,9 +206,19 @@ async function main() {
   let uploadedFiles: string[] = [];
   let egressRecords: Array<Record<string, unknown>> = [];
   let securityStatus: Record<string, unknown> | null = null;
+  let guestToken = '';
 
   try {
     baseUrl = await bind(host);
+    const guestResponse = await fetch(`${baseUrl}/api/auth/guest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert(guestResponse.ok, `local guest bootstrap failed with status ${guestResponse.status}`);
+    const guestSession = await guestResponse.json();
+    assert(isRecord(guestSession) && typeof guestSession.token === 'string' && guestSession.token.length > 0, 'local guest bootstrap did not return a token');
+    guestToken = guestSession.token;
     const debugPort = await getFreePort();
     userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-playwright-profile-'));
     browser = spawn(
@@ -247,6 +260,7 @@ async function main() {
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
         localStorage.setItem('kcw.guest', '1');
+        localStorage.setItem('kcw.authToken', ${JSON.stringify(guestToken)});
         localStorage.setItem('kcw.onboardingDone', '1');
         localStorage.setItem('kcw.conversations.v1', JSON.stringify([{ id: 'playwright-all', title: 'Playwright all', messages: [] }]));
       })();`,
@@ -691,7 +705,14 @@ async function main() {
     const lastModelEgress = [...egressRecords].reverse().find((record) => record.kind === 'model_inference');
     assert(lastModelEgress?.provider === 'ollama', `expected Ollama egress record, got ${String(lastModelEgress?.provider || '')}`);
     assert(lastModelEgress?.model === OLLAMA_MODEL, `expected ${OLLAMA_MODEL} egress record, got ${String(lastModelEgress?.model || '')}`);
-    securityStatus = await getJson<Record<string, unknown>>(`${baseUrl}/api/security/status`, 10000);
+    const securityResponse = await fetch(`${baseUrl}/api/security/status`, {
+      headers: { authorization: `Bearer ${guestToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    assert(securityResponse.ok, `security status failed with status ${securityResponse.status}`);
+    const securityPayload = await securityResponse.json();
+    assert(isRecord(securityPayload), 'security status payload must be an object');
+    securityStatus = securityPayload;
 
     await evaluate(
       sendPage,

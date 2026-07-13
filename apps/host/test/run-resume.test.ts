@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
 import { RunResumer, resumeStateFromCheckpoint } from '../src/runtime/run-resume.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { ChatMessage, ResumeState as AgentResumeState } from '../src/kimi/agent/tool-loop-types.js';
-import type { AgentTool, ToolArgs } from '../src/kimi/agent/tool-call-executor.js';
+import type { ChatMessage, ResumeState as AgentResumeState } from '../src/engine/agent/tool-loop-types.js';
+import type { AgentTool, ToolArgs } from '../src/engine/agent/tool-call-executor.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-resume-'));

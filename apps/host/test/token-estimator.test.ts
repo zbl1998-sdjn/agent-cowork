@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   HeuristicTokenEstimator,
   createHeuristicTokenEstimator,
-} from '../src/kimi/context/token-estimator.js';
+} from '../src/engine/context/token-estimator.js';
 
 test('heuristic token estimator gives stable text estimates across scripts', () => {
   const estimator = createHeuristicTokenEstimator();

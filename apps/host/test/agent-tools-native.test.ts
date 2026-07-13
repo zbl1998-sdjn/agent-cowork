@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { LocalSubprocessSandbox } from '../src/sandbox/local-sandbox.js';
 import {
   agentTool,
@@ -13,7 +13,7 @@ import {
   parseWriteResult,
 } from './helpers/agent.js';
 import { tempRoot } from './helpers/host-http.js';
-import type { SandboxLike } from '../src/kimi/agent-tools.js';
+import type { SandboxLike } from '../src/engine/agent-tools.js';
 import type { WebFetchLike } from '../src/tools/web-fetch.js';
 
 test('native agent tools (Read/Write/Glob) are jailed to the workspace', async () => {

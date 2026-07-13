@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:释放断连运行的审批等待者,并把同步/异步清理失败统一脱敏上报。
 import { redactText } from '../security/redaction.js';
-import type { ApprovalRegistry, RequestContext } from '../kimi/agent/approval-gate.js';
+import type { ApprovalRegistry, RequestContext } from '../engine/agent/approval-gate.js';
 
 export type DisconnectApprovalRegistry = ApprovalRegistry & {
   cancelByRun?: (runId: string, context?: RequestContext | null) => unknown;

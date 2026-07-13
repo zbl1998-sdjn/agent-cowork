@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateToolArguments } from '../src/kimi/agent/arg-validator.js';
+import { validateToolArguments } from '../src/engine/agent/arg-validator.js';
 
 test('validateToolArguments accepts values matching a simple object schema', () => {
   const result = validateToolArguments({

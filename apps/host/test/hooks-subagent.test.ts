@@ -5,12 +5,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { z } from 'zod';
 import { createHookEngine, loadHooksConfig } from '../src/runtime/hooks.js';
-import { runAgentChat, buildAgentToolset } from '../src/kimi/agent-runner.js';
+import { runAgentChat, buildAgentToolset } from '../src/engine/agent-runner.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { AgentDeps } from '../src/kimi/agent/toolset-builder.js';
-import type { AgentTool, HookEngine as AgentHookEngine } from '../src/kimi/agent/approval-gate.js';
+import type { AgentDeps } from '../src/engine/agent/toolset-builder.js';
+import type { AgentTool, HookEngine as AgentHookEngine } from '../src/engine/agent/approval-gate.js';
 import type { HookEngine, HookResult, SandboxLike } from '../src/runtime/hooks.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-hk-')); }
 

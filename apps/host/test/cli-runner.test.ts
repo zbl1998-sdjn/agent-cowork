@@ -8,8 +8,8 @@ import {
   buildKimiPlanPrompt,
   runKimiCliChat,
   runKimiCliPlan,
-} from '../src/kimi/cli-runner.js';
-import { decodeCliOutput } from '../src/kimi/cli-output.js';
+} from '../src/engine/cli-runner.js';
+import { decodeCliOutput } from '../src/engine/cli-output.js';
 import { createFakeChild } from './helpers/mcp.js';
 import type { FakeChild } from './helpers/mcp.js';
 

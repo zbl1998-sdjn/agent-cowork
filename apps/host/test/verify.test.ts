@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { AgentTool } from '../src/kimi/agent/tool-call-executor.js';
+import type { AgentTool } from '../src/engine/agent/tool-call-executor.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-verify-')); }
 

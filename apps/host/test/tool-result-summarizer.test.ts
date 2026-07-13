@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolResultSummarizer, createToolResultSummarizer } from '../src/kimi/context/tool-result-summarizer.js';
-import { HeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
+import { ToolResultSummarizer, createToolResultSummarizer } from '../src/engine/context/tool-result-summarizer.js';
+import { HeuristicTokenEstimator } from '../src/engine/context/token-estimator.js';
 
 test('tool result summarizer leaves small results readable and unsummarized', () => {
   const estimator = new HeuristicTokenEstimator({ charsPerToken: 4 });

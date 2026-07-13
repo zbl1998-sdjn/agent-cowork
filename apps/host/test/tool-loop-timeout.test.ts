@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 type EmittedEvent = {

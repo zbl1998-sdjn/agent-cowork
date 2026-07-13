@@ -11,16 +11,16 @@
 // 配置:从环境变量取 key(KIMI_API_KEY 或 MOONSHOT_API_KEY;Node 22 自动读 .env)。
 //   可选 KIMI_BASE_URL / KIMI_MODEL 覆盖。
 // 用法:node scripts/run-host-node.mjs apps/host/scripts/cache-baseline.ts
-import { createKimiProvider } from '../src/kimi/provider/kimi.js';
-import { resolveKimiApiConfig } from '../src/kimi/api-runner-config.js';
-import { buildSystemPrompt, buildEnvBlock } from '../src/kimi/system-prompt.js';
-import { resolveAgentEnvFacts } from '../src/kimi/agent-env.js';
+import { createKimiProvider } from '../src/engine/provider/kimi.js';
+import { resolveKimiApiConfig } from '../src/engine/api-runner-config.js';
+import { buildSystemPrompt, buildEnvBlock } from '../src/engine/system-prompt.js';
+import { resolveAgentEnvFacts } from '../src/engine/agent-env.js';
 import {
   recordCacheUsage,
   getCacheTelemetry,
   resetCacheTelemetry,
   hashPrefix,
-} from '../src/kimi/cache-telemetry.js';
+} from '../src/engine/cache-telemetry.js';
 
 type ChatResult = { content?: unknown; usage?: unknown; tool_calls?: unknown };
 type Msg = { role: string; content: unknown };

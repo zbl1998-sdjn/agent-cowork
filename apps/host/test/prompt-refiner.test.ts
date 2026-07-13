@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createKimiRefineModelCall } from '../src/kimi/prompt/refine-model-call.js';
-import { analyzePromptForRefine } from '../src/kimi/prompt/refine-policy.js';
-import { createPromptRefiner, refinePrompt } from '../src/kimi/prompt/refiner.js';
+import { createKimiRefineModelCall } from '../src/engine/prompt/refine-model-call.js';
+import { analyzePromptForRefine } from '../src/engine/prompt/refine-policy.js';
+import { createPromptRefiner, refinePrompt } from '../src/engine/prompt/refiner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const LOCAL_TRUSTED_ROOT = makeTestWorkspace('prompt-refiner');

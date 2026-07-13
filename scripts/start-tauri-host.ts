@@ -35,6 +35,7 @@ const trustedRoot = path.resolve(process.env.TRUSTED_ROOT || repoRoot);
 const server = createServer(withPublicHostSecurity({
   trustedRoot,
   allowLocalModelConfigSelfService: true,
+  allowLocalGuestEnrollment: true,
   kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
   kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
   kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),

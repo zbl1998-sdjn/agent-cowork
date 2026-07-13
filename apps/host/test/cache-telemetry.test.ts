@@ -6,7 +6,7 @@ import {
   getSafeCacheTelemetry,
   recordCacheUsage,
   resetCacheTelemetry,
-} from '../src/kimi/cache-telemetry.js';
+} from '../src/engine/cache-telemetry.js';
 import { sanitizeTelemetryPayload } from '../src/security/telemetry-allowlist.js';
 
 test('safe cache telemetry strips raw cache keys but preserves allowlisted counters', () => {

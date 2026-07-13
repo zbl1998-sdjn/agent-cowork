@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createProviderRouter, orderProviderChain, runWithFallback } from '../src/kimi/provider/router.js';
-import type { ProviderCandidate } from '../src/kimi/provider/router.js';
+import { createProviderRouter, orderProviderChain, runWithFallback } from '../src/engine/provider/router.js';
+import type { ProviderCandidate } from '../src/engine/provider/router.js';
 
 type FallbackEvent = { failed: ProviderCandidate; next: ProviderCandidate; error: unknown };
 type AggregateProviderError = Error & { attempts?: unknown[] };

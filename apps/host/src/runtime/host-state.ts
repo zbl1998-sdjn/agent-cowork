@@ -4,7 +4,7 @@
 // 注:这是 L2 内的「运行时状态聚合」,仍只依赖 L0/L1 与同层;真正的 HTTP 装配在 L4 server.js。
 // 依赖:kimi/api-runner、storage/*、memory、sandbox 及同层 runs-index/scheduler/run-events 等。导出:host 状态工厂。
 import path from 'node:path';
-import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../kimi/api-runner.js';
+import { resolveKimiApiConfig, runKimiApiChat, runKimiApiPlan, runKimiApiChatStream } from '../engine/api-runner.js';
 import { createRunsIndex } from './runs-index.js';
 import { createPostgresRunsIndex, withSafeWrites } from '../storage/postgres-runs-index.js';
 import { RunEventBus } from './run-events.js';
@@ -34,9 +34,9 @@ import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
-import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
-import { providerRuntimeState } from '../kimi/provider-profiles.js';
-import { createKimiRefineModelCall } from '../kimi/prompt/refine-model-call.js';
+import { applyPersistedKimiConfig, persistKimiConfig } from '../engine/config-store.js';
+import { providerRuntimeState } from '../engine/provider-profiles.js';
+import { createKimiRefineModelCall } from '../engine/prompt/refine-model-call.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import { resolveStoreBackendConfig } from './store-backend-config.js';
 import {

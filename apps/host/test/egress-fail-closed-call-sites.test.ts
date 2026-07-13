@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { createAgentTools } from '../src/kimi/agent-tools.js';
-import { callModelResilient } from '../src/kimi/agent/model-resilience.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
+import { callModelResilient } from '../src/engine/agent/model-resilience.js';
 import { createDefaultAgentRegistry } from '../src/orchestrator/agent-registry.js';
 import { createProviderTaskRunner } from '../src/orchestrator/provider-task-runner.js';
 import { extractMeetingActions } from '../src/recipes/model-recipe.js';

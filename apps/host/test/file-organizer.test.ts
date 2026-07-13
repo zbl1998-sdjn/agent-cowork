@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { planFileOrganization } from '../src/workspace/file-organizer.js';
 import type { OrganizeOperation } from '../src/workspace/file-organizer.js';

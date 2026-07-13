@@ -33,7 +33,7 @@ import {
   withParsedDependencyPlanBody,
 } from './system-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import type { KimiApiConfig } from '../kimi/api-runner-config.js';
+import type { KimiApiConfig } from '../engine/api-runner-config.js';
 import type { CircuitBreakerStats } from '../runtime/circuit-breaker.js';
 type RouteRequest = HttpRequestLike & { method?: string };
 type ConcurrencyStats = { active: number; maxConcurrent: number; tenants: number; [key: string]: unknown };

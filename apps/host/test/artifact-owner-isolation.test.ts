@@ -8,7 +8,7 @@ import {
 } from '../src/artifacts/artifact-owner.js';
 import { renameArtifact } from '../src/artifacts/artifact-catalog.js';
 import { buildLiveArtifact } from '../src/artifacts/live-artifact.js';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { createServer } from '../src/server.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { bind, close, jsonRequest, stringField, tempRoot } from './helpers/host-http.js';

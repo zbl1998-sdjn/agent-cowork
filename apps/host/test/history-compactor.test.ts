@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HistoryCompactor, createHistoryCompactor } from '../src/kimi/context/history-compactor.js';
-import { HeuristicTokenEstimator } from '../src/kimi/context/token-estimator.js';
-import type { ChatMessageLike } from '../src/kimi/context/history-compactor-utils.js';
+import { HistoryCompactor, createHistoryCompactor } from '../src/engine/context/history-compactor.js';
+import { HeuristicTokenEstimator } from '../src/engine/context/token-estimator.js';
+import type { ChatMessageLike } from '../src/engine/context/history-compactor-utils.js';
 
 function makeLongHistory(rounds = 220): ChatMessageLike[] {
   const messages: ChatMessageLike[] = [

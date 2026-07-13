@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RetryPolicy, createRetryPolicy, isRetryableToolError } from '../src/kimi/agent/tool-retry.js';
+import { RetryPolicy, createRetryPolicy, isRetryableToolError } from '../src/engine/agent/tool-retry.js';
 
 test('retry policy retries transient thrown errors with bounded exponential backoff', async () => {
   const delays: number[] = [];

@@ -6,8 +6,8 @@ import {
   createRunTrace,
   replayRunTraceEvents,
 } from '../src/runtime/run-trace.js';
-import { runAgentChat } from '../src/kimi/agent/tool-loop.js';
-import { traceModelContext, traceToolDecision, traceToolResult } from '../src/kimi/agent/run-trace-events.js';
+import { runAgentChat } from '../src/engine/agent/tool-loop.js';
+import { traceModelContext, traceToolDecision, traceToolResult } from '../src/engine/agent/run-trace-events.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {

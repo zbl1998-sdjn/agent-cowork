@@ -74,6 +74,7 @@ function buildMaseMcpServers(): McpServerSpec[] {
 const server = createServer(withPublicHostSecurity(omitUndefined({
   trustedRoot,
   allowLocalModelConfigSelfService: env.KCW_TAURI === '1' || undefined,
+  allowLocalGuestEnrollment: env.KCW_TAURI === '1' || undefined,
   kimiApiKey: firstNonEmpty(env.KIMI_API_KEY, env.MOONSHOT_API_KEY),
   kimiBaseUrl: firstNonEmpty(env.KIMI_BASE_URL, env.MOONSHOT_BASE_URL),
   kimiApiTimeoutMs: env.KIMI_API_TIMEOUT_MS,

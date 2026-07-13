@@ -3,7 +3,7 @@
 // 职责:在请求入口组装模板契约、受限工具集与明确提示，阻止通用写入和子代理绕过模板。
 import type { ArtifactTemplateContract } from '../artifacts/artifact-template-contract.js';
 import { applyArtifactTemplateCopy, buildArtifactTemplateContracts } from '../artifacts/artifact-template-contract.js';
-import type { AgentTool } from '../kimi/agent/approval-gate-types.js';
+import type { AgentTool } from '../engine/agent/approval-gate-types.js';
 
 const TEMPLATE_SAFE_TOOLS = new Set([
   'Read', 'Glob', 'Grep', 'SearchWorkspace', 'SearchMemory', 'AnalyzeDataFile',

@@ -13,8 +13,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from '../apps/host/src/server.js';
 import type { HostServer } from '../apps/host/src/server.js';
-import type { ModelCall } from '../apps/host/src/kimi/agent/model-resilience.js';
-import type { KimiTextResult } from '../apps/host/src/kimi/api-runner.js';
+import type { ModelCall } from '../apps/host/src/engine/agent/model-resilience.js';
+import type { KimiTextResult } from '../apps/host/src/engine/api-runner.js';
 
 type StreamEvent = { event: string; data: unknown };
 type JsonRecord = Record<string, unknown>;

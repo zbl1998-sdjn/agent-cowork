@@ -10,8 +10,8 @@ import {
   type LoopGuard,
   type RetryPolicy,
   type TodoTracker,
-} from '../src/kimi/agent/tool-call-executor.js';
-import type { HookEngine } from '../src/kimi/agent/approval-gate.js';
+} from '../src/engine/agent/tool-call-executor.js';
+import type { HookEngine } from '../src/engine/agent/approval-gate.js';
 
 type EmittedEvent = { type: string; payload: Record<string, unknown> };
 type AuditEvent = { kind: string; extra?: Record<string, unknown> };

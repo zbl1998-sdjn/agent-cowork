@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
-import { SYSTEM_PROMPT_VERSION } from '../kimi/system-prompt.js';
+import { SYSTEM_PROMPT_VERSION } from '../engine/system-prompt.js';
 import { buildAgentConfigSnapshot } from './agent-config-snapshot.js';
 import { AtRestKeyError } from '../security/at-rest.js';
 import { redactValue } from '../security/redaction.js';

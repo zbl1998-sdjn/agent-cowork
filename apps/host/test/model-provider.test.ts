@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defaultAgentModelCall } from '../src/kimi/agent-runner.js';
-import { createAnthropicProvider } from '../src/kimi/provider/anthropic.js';
-import { resolveModelProvider } from '../src/kimi/provider/index.js';
-import { createKimiProvider, parseOpenAiCompatibleStream } from '../src/kimi/provider/kimi.js';
+import { defaultAgentModelCall } from '../src/engine/agent-runner.js';
+import { createAnthropicProvider } from '../src/engine/provider/anthropic.js';
+import { resolveModelProvider } from '../src/engine/provider/index.js';
+import { createKimiProvider, parseOpenAiCompatibleStream } from '../src/engine/provider/kimi.js';
 import { modelBreaker, modelBreakerStats, modelProvider } from '../src/runtime/model-breakers.js';
 
 type StreamReader = { read(): Promise<{ value?: Uint8Array; done?: boolean }> };

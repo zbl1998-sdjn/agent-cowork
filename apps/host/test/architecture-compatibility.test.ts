@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import * as domainModelBreakers from '../src/kimi/model-breakers.js';
+import * as domainModelBreakers from '../src/engine/model-breakers.js';
 import * as runtimeModelBreakers from '../src/runtime/model-breakers.js';
 import * as utilRunEvents from '../src/util/run-events.js';
 import * as runtimeRunEvents from '../src/runtime/run-events.js';

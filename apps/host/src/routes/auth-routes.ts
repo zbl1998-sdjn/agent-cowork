@@ -27,6 +27,7 @@ type AuthRouteOptions = {
   requestContext?: Record<string, unknown>;
   authStore?: AuthStoreLike | null;
   enrollmentPolicy?: EnrollmentPolicy | null;
+  allowLocalGuestEnrollment?: boolean;
 };
 
 const credentialsBodySchema = z.preprocess(
@@ -53,7 +54,7 @@ function errorPayload(err: unknown, fallbackStatus: number): { status: number; b
   return { status: fallbackStatus, body: { error: 'auth request failed' } };
 }
 
-export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore, enrollmentPolicy }: AuthRouteOptions): Promise<boolean> {
+export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore, enrollmentPolicy, allowLocalGuestEnrollment }: AuthRouteOptions): Promise<boolean> {
   if (!authStore) {
     return false;
   }
@@ -80,7 +81,7 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/auth/guest') {
     // 「跳过登录」仍签发隔离访客身份与 token,避免出现真正未鉴权 API 访问。
     try {
-      if (!enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
+      if (!allowLocalGuestEnrollment && !enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
         sendJson(response, 403, { error: 'a valid one-time enrollment capability is required' });
         return true;
       }

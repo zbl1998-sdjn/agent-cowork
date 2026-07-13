@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildAgentToolset, runAgentChat } from '../src/kimi/agent-runner.js';
+import { buildAgentToolset, runAgentChat } from '../src/engine/agent-runner.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-sched-')); }

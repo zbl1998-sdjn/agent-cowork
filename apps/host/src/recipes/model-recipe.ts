@@ -8,7 +8,7 @@ import { combinedText, textOperation, xlsxOperation, csvOperation, binaryOperati
 import { createDocxDocument, createPptxPresentation, createPdfDocument } from '../artifacts/office-writers.js';
 import { createXlsxWorkbook } from '../artifacts/xlsx-writer.js';
 import type { FileOperationInput } from '../workspace/file-operations.js';
-import type { ModelConfig } from '../kimi/provider/types.js';
+import type { ModelConfig } from '../engine/provider/types.js';
 import { isEgressAuditFailure } from '../security/egress-gateway.js';
 import {
   callModelForJson, extractMeetingActions, extractSummary,

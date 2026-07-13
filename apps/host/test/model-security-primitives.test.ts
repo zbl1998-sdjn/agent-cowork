@@ -4,11 +4,11 @@ import test from 'node:test';
 import {
   approvalScope,
   recordUnavailableApproval,
-} from '../src/kimi/agent/approval-support.js';
+} from '../src/engine/agent/approval-support.js';
 import {
   createTrustedInProcessModelCallCapability,
   grantsTrustedInProcessModelCall,
-} from '../src/kimi/agent/model-call-capability.js';
+} from '../src/engine/agent/model-call-capability.js';
 import { resolveOrchestratorSecurityMode } from '../src/routes/orchestrator-security-mode.js';
 import { MODEL_EGRESS_APPROVAL_CAPABILITY } from '../src/security/model-egress-approval.js';
 import {

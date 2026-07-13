@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { callModelResilient, friendlyAgentError } from '../src/kimi/agent-runner.js';
-import { createTrustedInProcessModelCallCapability } from '../src/kimi/agent/model-call-capability.js';
-import type { ModelConfig } from '../src/kimi/agent/model-resilience.js';
+import { callModelResilient, friendlyAgentError } from '../src/engine/agent-runner.js';
+import { createTrustedInProcessModelCallCapability } from '../src/engine/agent/model-call-capability.js';
+import type { ModelConfig } from '../src/engine/agent/model-resilience.js';
 
 type ModelOutput = { content?: unknown; provider?: unknown; model?: unknown };
 type FallbackSummary = { provider?: unknown };

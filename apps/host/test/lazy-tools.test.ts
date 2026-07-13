@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
-import { addLazySearchTool, createNoopBudgetGuard, parseToolCall } from '../src/kimi/agent/tool-loop-support.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
+import { addLazySearchTool, createNoopBudgetGuard, parseToolCall } from '../src/engine/agent/tool-loop-support.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { AgentTool } from '../src/kimi/agent-tools.js';
-import type { ModelCall, ModelCallArgs } from '../src/kimi/agent/model-resilience.js';
+import type { AgentTool } from '../src/engine/agent-tools.js';
+import type { ModelCall, ModelCallArgs } from '../src/engine/agent/model-resilience.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-lazy-')); }
 

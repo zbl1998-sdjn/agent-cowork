@@ -6,7 +6,7 @@ import { createServer } from '../src/server.js';
 import { runsIndexSchema } from './helpers/agent.js';
 import { noopKimiChatRunner, readAgentStream } from './helpers/agent-stream.js';
 import { bind, close, tempRoot } from './helpers/host-http.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 
 test('POST /api/agent/chat/stream (autoApprove) writes the file and records an agent-chat run', async () => {

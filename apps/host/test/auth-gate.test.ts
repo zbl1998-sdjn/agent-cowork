@@ -159,6 +159,57 @@ test('guest enrollment is default-closed without an enrollment capability', asyn
   });
 });
 
+test('explicit safe local desktop guest bootstrap creates an authenticated isolated guest', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-authgate-local-guest');
+  await withServer({
+    trustedRoot,
+    requireAuth: true,
+    trustIdentityHeaders: false,
+    validateHost: true,
+    allowLocalGuestEnrollment: true,
+  }, async (base) => {
+    const guestResponse = await fetch(`${base}/api/auth/guest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(guestResponse.status, 200);
+    const guest = recordValue(await guestResponse.json(), 'guest response');
+    const token = stringField(guest, 'token');
+    assert.ok(token, 'guest bootstrap returns a session token');
+    assert.equal((await fetch(`${base}/api/workspace`, {
+      headers: { authorization: `Bearer ${token}` },
+    })).status, 200);
+
+    const registerResponse = await fetch(`${base}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'local-user', password: 'passw0rd' }),
+    });
+    assert.equal(registerResponse.status, 403, 'local guest bootstrap must not open user registration');
+  });
+});
+
+test('local guest bootstrap flag is ignored outside the safe desktop boundary', async () => {
+  const cases: ReadonlyArray<readonly [string, Partial<ServerConfig>]> = [
+    ['authentication disabled', { requireAuth: false, trustIdentityHeaders: false, validateHost: true }],
+    ['trusted identity headers enabled', { requireAuth: true, trustIdentityHeaders: true, validateHost: true }],
+    ['host validation disabled', { requireAuth: true, trustIdentityHeaders: false, validateHost: false }],
+  ];
+
+  for (const [label, config] of cases) {
+    const trustedRoot = makeTestWorkspace(`kcw-authgate-local-guest-${label.replaceAll(' ', '-')}`);
+    await withServer({ trustedRoot, allowLocalGuestEnrollment: true, ...config }, async (base) => {
+      const response = await fetch(`${base}/api/auth/guest`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      assert.equal(response.status, 403, label);
+    });
+  }
+});
+
 test('requireAuth:false disables the gate (functional-test mode)', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-off');
   await withServer({ trustedRoot, requireAuth: false }, async (base) => {

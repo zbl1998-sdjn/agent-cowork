@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
-import { createLoopGuard } from '../src/kimi/agent/loop-guard.js';
-import { createRetryPolicy } from '../src/kimi/agent/tool-retry.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
+import { createLoopGuard } from '../src/engine/agent/loop-guard.js';
+import { createRetryPolicy } from '../src/engine/agent/tool-retry.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
-import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
+import type { ChatMessage } from '../src/engine/agent/tool-loop-types.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-resilience-'));

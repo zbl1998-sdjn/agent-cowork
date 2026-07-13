@@ -3,7 +3,7 @@
 // 职责:把单次请求体里携带的「会话级模型覆盖」安全叠加到基础 Kimi 配置,并判断调用方
 //       是否有权使用会话级覆盖。依赖:L0 security 策略与 L1 provider catalog,不反向依赖 L4 组装根。
 import { z } from 'zod';
-import { findModelProviderCatalog, normaliseModelProviderId } from '../kimi/provider/catalog.js';
+import { findModelProviderCatalog, normaliseModelProviderId } from '../engine/provider/catalog.js';
 import {
   decideModelProviderPolicy,
   normalizeModelBaseUrl,

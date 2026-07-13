@@ -7,7 +7,7 @@ import {
   createArtifactFileOperationGuards,
   createArtifactRollbackGuards,
 } from '../src/artifacts/artifact-owner-write.js';
-import { createAgentTools } from '../src/kimi/agent-tools.js';
+import { createAgentTools } from '../src/engine/agent-tools.js';
 import { createServer } from '../src/server.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import {
@@ -15,7 +15,7 @@ import {
   rollbackFileOperations,
 } from '../src/workspace/file-operations.js';
 import { bind, close, jsonRequest, tempRoot } from './helpers/host-http.js';
-import type { AgentTool } from '../src/kimi/agent-tools.js';
+import type { AgentTool } from '../src/engine/agent-tools.js';
 
 const TENANT = 'tenant_shared';
 const ALICE_OWNER = Object.freeze({ tenantId: TENANT, userId: 'alice' });

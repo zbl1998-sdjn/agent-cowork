@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { z } from 'zod';
 import { createApprovalRegistry } from '../../src/runtime/approvals.js';
 import { LOCAL_IDENTITY_SCOPE } from '../../src/security/identity-scope.js';
-import type { ApprovalRegistry as AgentApprovalRegistry } from '../../src/kimi/agent/approval-gate.js';
-import type { ModelCall } from '../../src/kimi/agent/model-resilience.js';
+import type { ApprovalRegistry as AgentApprovalRegistry } from '../../src/engine/agent/approval-gate.js';
+import type { ModelCall } from '../../src/engine/agent/model-resilience.js';
 import type { ApprovalRegistry as RuntimeApprovalRegistry } from '../../src/runtime/approvals.js';
-import type { AgentTool } from '../../src/kimi/agent/tool-call-executor.js';
+import type { AgentTool } from '../../src/engine/agent/tool-call-executor.js';
 
 const approvalEventSchema = z.object({
   id: z.string().min(1),

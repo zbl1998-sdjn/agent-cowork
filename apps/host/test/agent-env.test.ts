@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { labelOs, resolveAgentEnvFacts, resolveAppVersion } from '../src/kimi/agent-env.js';
+import { labelOs, resolveAgentEnvFacts, resolveAppVersion } from '../src/engine/agent-env.js';
 
 test('labelOs maps common Node platform tokens to human-friendly names', () => {
   assert.equal(labelOs('win32'), 'Windows');

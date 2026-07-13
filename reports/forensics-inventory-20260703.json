@@ -1464,7 +1464,7 @@
     {
       "file": "tsconfig.host-checkjs.json",
       "line": 46,
-      "text": "\"apps/host/src/kimi/agent/todo-state.ts\","
+      "text": "\"apps/host/src/engine/agent/todo-state.ts\","
     },
     {
       "file": "tsconfig.host-test.json",
@@ -1494,7 +1494,7 @@
     {
       "file": ".AgentCowork/runs/run_20260609024013_3f05ea09.json",
       "line": 455,
-      "text": "\"apps/host/src/kimi/agent/todo-state.ts\","
+      "text": "\"apps/host/src/engine/agent/todo-state.ts\","
     },
     {
       "file": ".AgentCowork/runs/run_20260609030018_8aa4d157.json",
@@ -1852,482 +1852,482 @@
       "text": "return null;"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools-shell.ts",
+      "file": "apps/host/src/engine/agent-tools-shell.ts",
       "line": 34,
       "text": "if (!command) throw new Error('command is required');"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools.ts",
+      "file": "apps/host/src/engine/agent-tools.ts",
       "line": 25,
       "text": "if (typeof trustedRoot !== 'string' || !trustedRoot) throw new Error('trustedRoot is required');"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools.ts",
+      "file": "apps/host/src/engine/agent-tools.ts",
       "line": 52,
       "text": "if (!args.path) throw new Error('path is required');"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools.ts",
+      "file": "apps/host/src/engine/agent-tools.ts",
       "line": 71,
       "text": "if (!oldStr || !original.includes(oldStr)) throw new Error('old_string not found in file');"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools.ts",
+      "file": "apps/host/src/engine/agent-tools.ts",
       "line": 99,
       "text": "try { re = new RegExp(String(args.pattern || ''), 'i'); } catch { throw new Error('invalid regex pattern'); }"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-prompts.ts",
+      "file": "apps/host/src/engine/api-runner-prompts.ts",
       "line": 28,
       "text": "throw new Error('prompt is required');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-prompts.ts",
+      "file": "apps/host/src/engine/api-runner-prompts.ts",
       "line": 31,
       "text": "throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-prompts.ts",
+      "file": "apps/host/src/engine/api-runner-prompts.ts",
       "line": 54,
       "text": "throw new Error('prompt is required');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-prompts.ts",
+      "file": "apps/host/src/engine/api-runner-prompts.ts",
       "line": 57,
       "text": "throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "line": 76,
       "text": "throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "line": 79,
       "text": "throw new Error('fetch is not available for Kimi API calls');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "line": 115,
       "text": "throw new Error(`Kimi API request failed with status ${response.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "line": 119,
       "text": "throw new Error('streaming not supported by this fetch implementation');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "line": 167,
       "text": "throw new Error(`Kimi API timed out after ${timeoutMs}ms`, { cause: error });"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 73,
       "text": "throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 76,
       "text": "throw new Error('fetch is not available for Kimi API calls');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 79,
       "text": "throw new Error('promptBuilder is required');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 111,
       "text": "throw new Error(`Kimi API request failed with status ${response.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 117,
       "text": "throw new Error('Kimi API returned empty output');"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "line": 130,
       "text": "throw new Error(`Kimi API timed out after ${timeoutMs}ms`, { cause: error });"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 31,
       "text": "throw new Error('prompt is required');"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 34,
       "text": "throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 57,
       "text": "throw new Error('prompt is required');"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 60,
       "text": "throw new Error(`prompt is too long; max ${MAX_PROMPT_LENGTH} characters`);"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 90,
       "text": "throw new Error('trustedRoot is required');"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "line": 117,
       "text": "throw new Error('trustedRoot is required');"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner.ts",
+      "file": "apps/host/src/engine/cli-runner.ts",
       "line": 72,
       "text": "throw new Error('argsBuilder is required');"
     },
     {
-      "file": "apps/host/src/kimi/protocol-info.ts",
+      "file": "apps/host/src/engine/protocol-info.ts",
       "line": 12,
       "text": "throw new Error(`Unable to parse kimi --version output: ${raw}`);"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "line": 6,
       "text": "// 依赖:同层 todo-state.js(从计划文本生成 todo 快照);其余靠注入的回调/注册表。"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "line": 9,
       "text": "import { todoItemsFromPlan } from './todo-state.js';"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "line": 139,
       "text": "/** 处理 ExitPlanMode 调用:征求计划批准、记录审计、批准后据计划文本生成 todo 快照。 */"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "line": 169,
       "text": "const items = todoItemsFromPlan(plan);"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "line": 170,
       "text": "if (items.length) emit('todo_snapshot', { todos: items });"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 3,
       "text": "// 职责:在 Agent 循环各阶段把当前 messages/usage/已批准工具/todos/步骤等快照交给"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 4,
       "text": "//      checkpointer 持久化,供中断后续跑;同时维护一份内存 todos 镜像(按 id 去重更新)。"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 6,
       "text": "// 导出:createCheckpointRecorder(返回 { emitTodo, save })"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 7,
       "text": "export type TodoPayload = { id?: unknown };"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 16,
       "text": "initialTodos?: unknown;"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 21,
       "text": "emitTodo(type: string, payload: unknown): void;"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 25,
       "text": "function recordTodo(todos: unknown[], payload: unknown): void {"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 27,
       "text": "const item = payload as TodoPayload;"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 30,
       "text": "const index = todos.findIndex((todo) => ("
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 31,
       "text": "!!todo && typeof todo === 'object' && String((todo as TodoPayload).id || '') === id"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 33,
       "text": "if (index >= 0) todos[index] = payload;"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 34,
       "text": "else todos.push(payload);"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 42,
       "text": "* 创建检查点记录器:emitTodo 在广播 todo 的同时同步内存镜像,save 把当前进度落盘。"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 51,
       "text": "initialTodos,"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 55,
       "text": "const todos: unknown[] = Array.isArray(initialTodos) ? JSON.parse(JSON.stringify(initialTodos)) as unknown[] : [];"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 57,
       "text": "emitTodo(type: string, payload: unknown) {"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 58,
       "text": "if (type === 'todo_update') recordTodo(todos, payload);"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "line": 71,
       "text": "todos,"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 1,
       "text": "// Todo 状态模型与生成(host · L1 领域层 · kimi/agent)"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 3,
       "text": "// 职责:规范化 todo 条目(id/text/状态),从计划文本切出 todo 列表(去标记/去重/截断),"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 4,
       "text": "//      并提供\"工具调用 todo 追踪器\"——每次工具调用 start→finish 自动发 todo_update 事件。"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 6,
       "text": "// 导出:createTodoItem / todoItemsFromPlan / createToolTodoTracker"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 7,
       "text": "export type TodoStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'rejected';"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 8,
       "text": "export type TodoItem = { id: string; text: string; status: TodoStatus; detail?: string; kind?: string };"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 9,
       "text": "export type TodoItemInput = { id?: unknown; text?: unknown; status?: unknown; detail?: unknown; kind?: unknown };"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 10,
       "text": "export type TodoPlanOptions = { maxItems?: number };"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 11,
       "text": "export type TodoEmitter = (type: 'todo_update', payload: TodoItem) => void;"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 12,
       "text": "export type ToolTodoHandle = { id: string; finish(status: unknown): void };"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 13,
       "text": "export type ToolTodoTracker = { start(name: unknown): ToolTodoHandle };"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 15,
       "text": "const VALID_STATUSES = new Set<TodoStatus>(['pending', 'running', 'done', 'failed', 'blocked', 'rejected']);"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 17,
       "text": "function normalizeStatus(status: unknown, fallback: TodoStatus = 'pending'): TodoStatus {"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 19,
       "text": "const candidate = value as TodoStatus;"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 29,
       "text": "* 规范化生成一个 todo 条目(缺省值兜底、状态校验、detail 截断 240 字)。"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 31,
       "text": "export function createTodoItem({ id, text, status = 'pending', detail, kind }: TodoItemInput = {}): TodoItem {"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 33,
       "text": "id: normalizeText(id, `todo-${Date.now()}`),"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 49,
       "text": "* 从计划文本逐行解析出 todo 列表:剥离列表/标题标记、去引号、去重并截断到 maxItems。"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 51,
       "text": "export function todoItemsFromPlan(planText: unknown, { maxItems = 8 }: TodoPlanOptions = {}): TodoItem[] {"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "line": 65,
       "text": ".map((text, index) => createTodoItem({ id: `plan-${index + 1}`, text, status: 'pending', kind: 'plan' }));"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 4,
       "text": "//      →带重试执行→记录用量/审计/trace/todo→格式化结果写回 messages→post_tool hook"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 41,
       "text": "export type TodoTracker = { start(name: string): { finish(status: string): void } };"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 54,
       "text": "toolTodos: TodoTracker;"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 93,
       "text": "toolTodos,"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 211,
       "text": "const todo = toolTodos.start(toolName);"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "line": 244,
       "text": "todo.finish(ok ? 'done' : 'failed');"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop-types.ts",
+      "file": "apps/host/src/engine/agent/tool-loop-types.ts",
       "line": 40,
       "text": "export type ResumeState = { usage?: Usage; messages?: ChatMessage[]; approvedTools?: string[]; todos?: unknown[] };"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "line": 7,
       "text": "//      todo-state/loop-guard/tool-retry/run-timeout/checkpoint-state/run-trace-events/"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "line": 22,
       "text": "import { createToolTodoTracker } from './todo-state.js';"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "line": 116,
       "text": "initialTodos: resumed ? resumed.todos : [],"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "line": 120,
       "text": "const toolTodos = createToolTodoTracker(checkpointRecorder.emitTodo);"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "line": 243,
       "text": "activeBudgetGuard, activeLoopGuard, toolCtx, toolTodos,"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-retry.ts",
+      "file": "apps/host/src/engine/agent/tool-retry.ts",
       "line": 105,
       "text": "throw new Error('retry policy exhausted unexpectedly');"
     },
     {
-      "file": "apps/host/src/kimi/context/tool-result-summarizer.ts",
+      "file": "apps/host/src/engine/context/tool-result-summarizer.ts",
       "line": 15,
       "text": "const KEY_POINT_RE = /\\b(?:important|summary|error|failed|failure|warning|decision|fact|todo|fixme|security|risk|blocked|validate|validation|token|cost)\\b|(?:重要|摘要|错误|失败|警告|决定|关键事实|风险|阻塞|安全|必须|校验|验证)/"
     },
     {
-      "file": "apps/host/src/kimi/provider/anthropic.ts",
+      "file": "apps/host/src/engine/provider/anthropic.ts",
       "line": 195,
       "text": "if (!apiKey || !model) throw new Error('未配置 Anthropic/Claude 模型。请配置 API key 与 model 后重试。');"
     },
     {
-      "file": "apps/host/src/kimi/provider/anthropic.ts",
+      "file": "apps/host/src/engine/provider/anthropic.ts",
       "line": 223,
       "text": "if (!resp.ok) throw new Error(`anthropic request failed with status ${resp.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/provider/index.ts",
+      "file": "apps/host/src/engine/provider/index.ts",
       "line": 74,
       "text": "throw new Error('Built-in kimi provider is not registered');"
     },
     {
-      "file": "apps/host/src/kimi/provider/kimi.ts",
+      "file": "apps/host/src/engine/provider/kimi.ts",
       "line": 53,
       "text": "throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);"
     },
     {
-      "file": "apps/host/src/kimi/provider/kimi.ts",
+      "file": "apps/host/src/engine/provider/kimi.ts",
       "line": 81,
       "text": "throw new Error(`Kimi API request failed with status ${resp.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/provider/models-dev-catalog.ts",
+      "file": "apps/host/src/engine/provider/models-dev-catalog.ts",
       "line": 204,
       "text": "if (!response.ok) throw new Error(`models.dev catalog failed with status ${response.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/provider/openai-compatible.ts",
+      "file": "apps/host/src/engine/provider/openai-compatible.ts",
       "line": 74,
       "text": "throw new Error(providerMessage(id, notConfiguredMessage));"
     },
     {
-      "file": "apps/host/src/kimi/provider/openai-compatible.ts",
+      "file": "apps/host/src/engine/provider/openai-compatible.ts",
       "line": 77,
       "text": "throw new Error('fetch is not available for model provider calls');"
     },
     {
-      "file": "apps/host/src/kimi/provider/openai-compatible.ts",
+      "file": "apps/host/src/engine/provider/openai-compatible.ts",
       "line": 106,
       "text": "throw new Error(`${id} request failed with status ${resp.status}`);"
     },
     {
-      "file": "apps/host/src/kimi/provider/router.ts",
+      "file": "apps/host/src/engine/provider/router.ts",
       "line": 87,
       "text": "throw new Error('runWithFallback: runner is required');"
     },
     {
-      "file": "apps/host/src/kimi/provider/router.ts",
+      "file": "apps/host/src/engine/provider/router.ts",
       "line": 91,
       "text": "throw new Error('provider chain is empty');"
     },
@@ -4549,12 +4549,12 @@
     {
       "file": "apps/host/test/todo-state.test.ts",
       "line": 3,
-      "text": "import { createTodoItem, createToolTodoTracker, todoItemsFromPlan } from '../src/kimi/agent/todo-state.js';"
+      "text": "import { createTodoItem, createToolTodoTracker, todoItemsFromPlan } from '../src/engine/agent/todo-state.js';"
     },
     {
       "file": "apps/host/test/todo-state.test.ts",
       "line": 4,
-      "text": "import type { TodoItem } from '../src/kimi/agent/todo-state.js';"
+      "text": "import type { TodoItem } from '../src/engine/agent/todo-state.js';"
     },
     {
       "file": "apps/host/test/todo-state.test.ts",
@@ -11220,223 +11220,223 @@
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-env.ts",
+      "file": "apps/host/src/engine/agent-env.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-runner.ts",
+      "file": "apps/host/src/engine/agent-runner.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools-shell.ts",
+      "file": "apps/host/src/engine/agent-tools-shell.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools-support.ts",
+      "file": "apps/host/src/engine/agent-tools-support.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools-types.ts",
+      "file": "apps/host/src/engine/agent-tools-types.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent-tools.ts",
+      "file": "apps/host/src/engine/agent-tools.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-config.ts",
+      "file": "apps/host/src/engine/api-runner-config.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-payload.ts",
+      "file": "apps/host/src/engine/api-runner-payload.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-prompts.ts",
+      "file": "apps/host/src/engine/api-runner-prompts.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/api-runner-stream.ts",
+      "file": "apps/host/src/engine/api-runner-stream.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/api-runner.ts",
+      "file": "apps/host/src/engine/api-runner.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/cache-telemetry.ts",
+      "file": "apps/host/src/engine/cache-telemetry.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/chat-stream.ts",
+      "file": "apps/host/src/engine/chat-stream.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/cli-detect.ts",
+      "file": "apps/host/src/engine/cli-detect.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/cli-output.ts",
+      "file": "apps/host/src/engine/cli-output.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner-prompts.ts",
+      "file": "apps/host/src/engine/cli-runner-prompts.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/cli-runner.ts",
+      "file": "apps/host/src/engine/cli-runner.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/config-store.ts",
+      "file": "apps/host/src/engine/config-store.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/model-call.ts",
+      "file": "apps/host/src/engine/model-call.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/protocol-info.ts",
+      "file": "apps/host/src/engine/protocol-info.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/system-prompt.ts",
+      "file": "apps/host/src/engine/system-prompt.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/approval-gate.ts",
+      "file": "apps/host/src/engine/agent/approval-gate.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/arg-validator.ts",
+      "file": "apps/host/src/engine/agent/arg-validator.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/checkpoint-state.ts",
+      "file": "apps/host/src/engine/agent/checkpoint-state.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/clarification.ts",
+      "file": "apps/host/src/engine/agent/clarification.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/finalize.ts",
+      "file": "apps/host/src/engine/agent/finalize.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/loop-guard.ts",
+      "file": "apps/host/src/engine/agent/loop-guard.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/model-resilience.ts",
+      "file": "apps/host/src/engine/agent/model-resilience.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/parallel-agent-tool.ts",
+      "file": "apps/host/src/engine/agent/parallel-agent-tool.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/run-timeout.ts",
+      "file": "apps/host/src/engine/agent/run-timeout.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/run-trace-events.ts",
+      "file": "apps/host/src/engine/agent/run-trace-events.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/todo-state.ts",
+      "file": "apps/host/src/engine/agent/todo-state.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-call-executor.ts",
+      "file": "apps/host/src/engine/agent/tool-call-executor.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop-support.ts",
+      "file": "apps/host/src/engine/agent/tool-loop-support.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop-types.ts",
+      "file": "apps/host/src/engine/agent/tool-loop-types.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-loop.ts",
+      "file": "apps/host/src/engine/agent/tool-loop.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/tool-retry.ts",
+      "file": "apps/host/src/engine/agent/tool-retry.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/agent/toolset-builder.ts",
+      "file": "apps/host/src/engine/agent/toolset-builder.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/context/context-manager.ts",
+      "file": "apps/host/src/engine/context/context-manager.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/context/history-compactor-utils.ts",
+      "file": "apps/host/src/engine/context/history-compactor-utils.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/context/history-compactor.ts",
+      "file": "apps/host/src/engine/context/history-compactor.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/context/token-estimator.ts",
+      "file": "apps/host/src/engine/context/token-estimator.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/context/tool-result-summarizer.ts",
+      "file": "apps/host/src/engine/context/tool-result-summarizer.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/prompt/refine-model-call.ts",
+      "file": "apps/host/src/engine/prompt/refine-model-call.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/prompt/refine-policy.ts",
+      "file": "apps/host/src/engine/prompt/refine-policy.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/prompt/refiner.ts",
+      "file": "apps/host/src/engine/prompt/refiner.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/anthropic.ts",
+      "file": "apps/host/src/engine/provider/anthropic.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/catalog.ts",
+      "file": "apps/host/src/engine/provider/catalog.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/index.ts",
+      "file": "apps/host/src/engine/provider/index.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/kimi.ts",
+      "file": "apps/host/src/engine/provider/kimi.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/models-dev-catalog.ts",
+      "file": "apps/host/src/engine/provider/models-dev-catalog.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/openai-compatible.ts",
+      "file": "apps/host/src/engine/provider/openai-compatible.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/router.ts",
+      "file": "apps/host/src/engine/provider/router.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/provider/types.ts",
+      "file": "apps/host/src/engine/provider/types.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {
-      "file": "apps/host/src/kimi/safety/untrusted-content.ts",
+      "file": "apps/host/src/engine/safety/untrusted-content.ts",
       "reason": "no relative import or manifest-script inbound reference found"
     },
     {

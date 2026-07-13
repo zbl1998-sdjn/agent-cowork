@@ -6,7 +6,7 @@ import {
   deriveHistoryBudgetTokens,
   resolveHistoryBudgetTokens,
   resolveModelContextWindowTokens,
-} from '../src/kimi/context/model-context-window.js';
+} from '../src/engine/context/model-context-window.js';
 
 test('resolves conservative context windows by provider id', () => {
   assert.equal(resolveModelContextWindowTokens({ provider: 'anthropic', model: 'claude-sonnet-5' }), 200_000);

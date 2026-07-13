@@ -62,7 +62,7 @@ export async function handleRouteChain({
   const safeTrustedRoot = (requestedRoot?: unknown): string => state.safeTrustedRoot(requestedRoot, requestContext, workspaceGrantId);
   const requestState = { ...state, safeTrustedRoot } as HostState;
   if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, requestUrl, state }))) return true;
-  if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore, enrollmentPolicy: state.enrollmentPolicy }))) return true;
+  if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore, enrollmentPolicy: state.enrollmentPolicy, allowLocalGuestEnrollment: state.config.allowLocalGuestEnrollment === true && state.requireAuth === true && state.trustIdentityHeaders !== true && state.validateHost === true }))) return true;
   if (await handleApprovalRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRoutes>>({ ...base, approvalRegistry: state.approvalRegistry }))) return true;
   if (await handleFolderGrantRoutes(routeOptions<RouteHandlerOptions<typeof handleFolderGrantRoutes>>({
     ...base,

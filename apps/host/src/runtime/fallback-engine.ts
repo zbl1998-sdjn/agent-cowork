@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:把模型、沙箱、依赖、缓存等运行状态归一成用户可见的降级决策。只描述
 //       "当前能怎么继续",不直接执行重试、安装或切模型。
-import { getSafeCacheTelemetry, type SafeCacheTelemetry } from '../kimi/cache-telemetry.js';
+import { getSafeCacheTelemetry, type SafeCacheTelemetry } from '../engine/cache-telemetry.js';
 import type { RuntimeDependencyStatus, RuntimeDependencyStatusItem } from './dependencies.js';
 
 export type FallbackCause =

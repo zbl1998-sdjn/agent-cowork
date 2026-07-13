@@ -34,7 +34,7 @@ import type { ReadOnlyToolRegistryLike } from '../orchestrator/subagent-task-run
 import type { RunEventsLike as SubagentRunEventsLike, RunsIndexLike as SubagentRunsIndexLike } from '../runtime/subagent.js';
 import type { RunRecord } from '../runtime/run-store.js';
 import type { RunOwner } from '../util/run-owner.js';
-import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/index.js';
+import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../engine/provider/index.js';
 import type { AgentTaskRunner } from '../orchestrator/index.js';
 
 const RUN_ID_RE = /^[a-z0-9_-]+$/i;

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { applyPersistedKimiConfig, persistKimiConfig } from '../src/kimi/config-store.js';
+import { applyPersistedKimiConfig, persistKimiConfig } from '../src/engine/config-store.js';
 import { createCustomRecipeStore } from '../src/recipes/custom-recipes.js';
 import {
   createCredentialStore,

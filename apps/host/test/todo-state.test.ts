@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createTodoItem, createToolTodoTracker, todoItemsFromPlan } from '../src/kimi/agent/todo-state.js';
-import type { TodoItem } from '../src/kimi/agent/todo-state.js';
+import { createTodoItem, createToolTodoTracker, todoItemsFromPlan } from '../src/engine/agent/todo-state.js';
+import type { TodoItem } from '../src/engine/agent/todo-state.js';
 
 test('todoItemsFromPlan turns numbered plan lines into pending todos', () => {
   const items = todoItemsFromPlan('1. 读取现状\n2. 修改文件\n3. 运行测试');

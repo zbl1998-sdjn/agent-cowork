@@ -6,8 +6,8 @@
 // 依赖:L1 provider(callProviderChatCompletion);L0 security/egress-gateway(出站闸门——
 //       与 kimi/agent/model-resilience.ts 的对话路径共用同一策略,机密档 air_gap/
 //       local_strict 下必须同样拒绝出网,不能因为走了 recipe 分支就绕过)。
-import { callProviderChatCompletion } from '../kimi/provider/index.js';
-import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../kimi/provider/types.js';
+import { callProviderChatCompletion } from '../engine/provider/index.js';
+import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../engine/provider/types.js';
 import {
   decideEgressPolicy,
   enforceRecordedEgressDecision,

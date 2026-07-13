@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
-import type { AgentTool } from '../src/kimi/agent/tool-call-executor.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ChatMessage } from '../src/engine/agent/tool-loop-types.js';
+import type { AgentTool } from '../src/engine/agent/tool-call-executor.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-tool-loop-validation-'));

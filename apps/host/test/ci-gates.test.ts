@@ -21,17 +21,17 @@ async function loadCiGates(): Promise<CiGatesModule> {
 test('CI eval gate triggers on prompt, model, and agent loop changes', async () => {
   const { shouldRunEvalForFiles } = await loadCiGates();
 
-  assert.equal(shouldRunEvalForFiles(['apps/host/src/kimi/system-prompt.ts']), true);
-  assert.equal(shouldRunEvalForFiles(['apps/host/src/kimi/system-prompt.js']), true);
-  assert.equal(shouldRunEvalForFiles(['apps/host/src/kimi/model-call.ts']), true);
-  assert.equal(shouldRunEvalForFiles(['apps/host/src/kimi/agent/tool-loop.ts']), true);
+  assert.equal(shouldRunEvalForFiles(['apps/host/src/engine/system-prompt.ts']), true);
+  assert.equal(shouldRunEvalForFiles(['apps/host/src/engine/system-prompt.js']), true);
+  assert.equal(shouldRunEvalForFiles(['apps/host/src/engine/model-call.ts']), true);
+  assert.equal(shouldRunEvalForFiles(['apps/host/src/engine/agent/tool-loop.ts']), true);
   assert.equal(shouldRunEvalForFiles(['docs/operator-notes.md']), false);
 });
 
 test('CI step builder adds eval when relevant changes are present or unknown', async () => {
   const { buildCiSteps, ciStepEnvironment } = await loadCiGates();
 
-  const evalStep = buildCiSteps({ changedFiles: ['apps/host/src/kimi/agent-runner.ts'] })
+  const evalStep = buildCiSteps({ changedFiles: ['apps/host/src/engine/agent-runner.ts'] })
     .find((step) => step.name === 'eval');
   assert.ok(evalStep);
   assert.equal(
@@ -47,7 +47,7 @@ test('CI step builder adds eval when relevant changes are present or unknown', a
 
 test('CI eval step preserves an explicit parent replay fixture', async () => {
   const { buildCiSteps, ciStepEnvironment } = await loadCiGates();
-  const evalStep = buildCiSteps({ changedFiles: ['apps/host/src/kimi/agent-runner.ts'] })
+  const evalStep = buildCiSteps({ changedFiles: ['apps/host/src/engine/agent-runner.ts'] })
     .find((step) => step.name === 'eval');
   assert.ok(evalStep);
   const explicitReplay = 'output/eval-replay/override.json';

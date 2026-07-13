@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
 import { AuditEventBus } from '../src/runtime/audit-events.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
-import type { AgentTool } from '../src/kimi/agent-tools-types.js';
+import type { AgentTool } from '../src/engine/agent-tools-types.js';
 import type { AuditEvent } from '../src/storage/audit-events.js';
 
 type ScriptedResponse = {

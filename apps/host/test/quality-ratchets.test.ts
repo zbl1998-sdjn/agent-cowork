@@ -116,7 +116,7 @@ const COVERAGE_POLICY: CoverageThresholdPolicy = {
   schemaVersion: 1,
   files: {
     'src/auth/user-store.ts': { linePct: 90, branchPct: 80, functionPct: 85 },
-    'src/kimi/agent/approval-gate.ts': { linePct: 95, branchPct: 90, functionPct: 95 },
+    'src/engine/agent/approval-gate.ts': { linePct: 95, branchPct: 90, functionPct: 95 },
   },
 };
 
@@ -129,7 +129,7 @@ test('coverage parser preserves nested source paths and all three metrics', () =
     branchPct: 85.19,
     functionPct: 87.5,
   });
-  assert.deepEqual(report.files.get('src/kimi/agent/approval-gate.ts'), {
+  assert.deepEqual(report.files.get('src/engine/agent/approval-gate.ts'), {
     linePct: 100,
     branchPct: 93.67,
     functionPct: 100,
@@ -145,7 +145,7 @@ test('coverage parser accepts the Node 22 TAP diagnostic marker', () => {
     branchPct: 85.19,
     functionPct: 87.5,
   });
-  assert.deepEqual(report.files.get('src/kimi/agent/approval-gate.ts'), {
+  assert.deepEqual(report.files.get('src/engine/agent/approval-gate.ts'), {
     linePct: 100,
     branchPct: 93.67,
     functionPct: 100,
@@ -208,8 +208,8 @@ test('coverage policy ratchets every model egress security boundary', () => {
   const policyPath = resolve(process.cwd(), '../../scripts/host-coverage-thresholds.json');
   const policy = parseCoverageThresholdPolicy(JSON.parse(readFileSync(policyPath, 'utf8')));
   const criticalFiles = [
-    'src/kimi/agent/approval-support.ts',
-    'src/kimi/agent/model-call-capability.ts',
+    'src/engine/agent/approval-support.ts',
+    'src/engine/agent/model-call-capability.ts',
     'src/routes/orchestrator-security-mode.ts',
     'src/security/model-egress-approval.ts',
     'src/security/model-endpoint-request.ts',

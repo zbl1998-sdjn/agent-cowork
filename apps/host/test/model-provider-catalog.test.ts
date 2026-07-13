@@ -9,7 +9,7 @@ import {
   splitFullModelId,
   clearModelsDevCatalogCache,
   modelsDevProviderCatalogResponse,
-} from '../src/kimi/provider/index.js';
+} from '../src/engine/provider/index.js';
 
 test('model provider catalog exposes domestic, local, and opencode-style provider data', () => {
   const catalog = listModelProviderCatalog();

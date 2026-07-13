@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
-import type { ChatMessage } from '../src/kimi/agent/tool-loop-types.js';
-import type { KimiTextResult } from '../src/kimi/api-runner.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ChatMessage } from '../src/engine/agent/tool-loop-types.js';
+import type { KimiTextResult } from '../src/engine/api-runner.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 import { closeTestServer } from './helpers/close-server.js';
 import { TEST_LOCAL_HOST_MODEL_CONFIG } from './helpers/kimi-config.js';
 

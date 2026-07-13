@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createServer } from '../src/server.js';
-import { streamChat } from '../src/kimi/chat-stream.js';
+import { streamChat } from '../src/engine/chat-stream.js';
 import { closeTestServer } from './helpers/close-server.js';
 import type { HostServer, ServerConfig } from '../src/server.js';
 import type { RequestContext } from '../src/http/middleware/common.js';

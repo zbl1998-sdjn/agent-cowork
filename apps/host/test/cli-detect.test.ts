@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { detectKimiInfo, parseKimiVersion, parseKimiInfo } from '../src/kimi/cli-detect.js';
+import { detectKimiInfo, parseKimiVersion, parseKimiInfo } from '../src/engine/cli-detect.js';
 import { createFakeChild } from './helpers/mcp.js';
 import type { FakeChild } from './helpers/mcp.js';
 

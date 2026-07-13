@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { runKimiApiChatStream } from '../src/kimi/api-runner.js';
-import { createKimiRefineModelCall } from '../src/kimi/prompt/refine-model-call.js';
+import { runKimiApiChatStream } from '../src/engine/api-runner.js';
+import { createKimiRefineModelCall } from '../src/engine/prompt/refine-model-call.js';
 import { createServer } from '../src/server.js';
 import { isEgressAuditFailure } from '../src/security/egress-gateway.js';
 import { makeTestWorkspace } from './test-fixtures.js';

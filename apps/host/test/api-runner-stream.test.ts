@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runKimiApiChatStream } from '../src/kimi/api-runner.js';
+import { runKimiApiChatStream } from '../src/engine/api-runner.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
 const LOCAL_EGRESS = {

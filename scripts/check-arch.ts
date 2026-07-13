@@ -39,7 +39,7 @@ const HOST_LAYERS = [
       'artifacts/',
       'auth/',
       'connectors/',
-      'kimi/',
+      'engine/',
       'mcp/',
       'memory/',
       'onboarding/',

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInjectionGuard } from '../src/kimi/safety/untrusted-content.js';
+import { createInjectionGuard } from '../src/engine/safety/untrusted-content.js';
 
 test('injection guard wraps tool output as untrusted data and flags suspicious instructions', () => {
   const guard = createInjectionGuard();

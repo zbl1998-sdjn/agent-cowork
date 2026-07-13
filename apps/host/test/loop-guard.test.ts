@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LoopGuard, createLoopGuard } from '../src/kimi/agent/loop-guard.js';
+import { LoopGuard, createLoopGuard } from '../src/engine/agent/loop-guard.js';
 
 test('loop guard breaks when the same tool and args repeat at the threshold', () => {
   const guard = createLoopGuard({ maxRepeats: 3 });

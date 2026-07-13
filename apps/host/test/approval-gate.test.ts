@@ -10,7 +10,7 @@ import {
   toolNeedsApproval,
   type AgentTool,
   type ApprovalRegistry,
-} from '../src/kimi/agent/approval-gate.js';
+} from '../src/engine/agent/approval-gate.js';
 
 type Event = { type: string; payload: Record<string, unknown> };
 

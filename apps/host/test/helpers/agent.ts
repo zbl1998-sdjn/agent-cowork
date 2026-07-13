@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import type { AgentTool } from '../../src/kimi/agent-tools.js';
+import type { AgentTool } from '../../src/engine/agent-tools.js';
 
 export type CallableAgentTool = AgentTool & { handler: NonNullable<AgentTool['handler']> };
 

@@ -2,16 +2,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { addUsage, applyStaticBackstop, sse, summarizeAfterBudget } from '../src/kimi/agent/finalize.js';
-import { runAgentChat } from '../src/kimi/agent-runner.js';
-import { createTrustedInProcessModelCallCapability } from '../src/kimi/agent/model-call-capability.js';
+import { addUsage, applyStaticBackstop, sse, summarizeAfterBudget } from '../src/engine/agent/finalize.js';
+import { runAgentChat } from '../src/engine/agent-runner.js';
+import { createTrustedInProcessModelCallCapability } from '../src/engine/agent/model-call-capability.js';
 import {
   hasTodoEvent,
   hasToolResultEvent,
   type EmittedEvent,
 } from './helpers/agent.js';
 import { tempRoot } from './helpers/host-http.js';
-import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
+import type { ModelCall } from '../src/engine/agent/model-resilience.js';
 
 const TEST_LOCAL_MODEL_CONFIG = Object.freeze({
   provider: 'openai/local',
