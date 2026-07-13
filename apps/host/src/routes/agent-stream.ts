@@ -31,6 +31,7 @@ import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './ag
 import { cancelApprovalsForDisconnectedRun, type DisconnectApprovalRegistry } from './agent-stream-disconnect.js';
 import { sanitizeAgentEventData } from './agent-stream-events.js';
 import { buildMaseMemoryThread, recallBuiltinAgentMemory, rememberBuiltinConversation } from './agent-stream-memory.js';
+import { createAgentTemplateMode } from './agent-template-mode.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
 import type { SandboxLike as HookSandboxLike } from '../runtime/hooks.js';
 import type { ModelCall } from '../kimi/agent/model-resilience.js';
@@ -51,8 +52,7 @@ type CancellationRegistry = {
 type SkillRegistryLike = SkillRegistry & {
   enabledSkills?: () => Array<{ id: unknown; name: unknown; description?: unknown }>;
 };
-type StreamRequestContext = RequestContext & { tenantId: string; userId: string; traceId?: unknown };
-type RunEventsLike = { publish(runId: string, event: Record<string, unknown>): unknown };
+type StreamRequestContext = RequestContext & { tenantId: string; userId: string; traceId?: unknown }; type RunEventsLike = { publish(runId: string, event: Record<string, unknown>): unknown };
 type AgentOutcome = { text: string; steps: Array<Record<string, unknown>>; usage?: unknown; stepsExhausted?: boolean; autoContinues?: number };
 export type StreamAgentChatOptions = {
   response: ResponseLike;
@@ -74,7 +74,6 @@ export type StreamAgentChatOptions = {
   request?: { on?(event: string, listener: () => void): unknown } | null;
   scheduler?: Scheduler | null;
 };
-
 export { cancelApprovalsForDisconnectedRun };
 export async function streamAgentChat({
   response,
@@ -139,7 +138,7 @@ export async function streamAgentChat({
   const maseConversation = String(body.conversationId ?? '').trim().slice(0, 64) || 'default';
   const maseThread = buildMaseMemoryThread(requestContext, maseConversation);
   try {
-    const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext };
+    const agentCtx = { trustedRoot, sandbox, sandboxLimits, context: requestContext }; const templateMode = createAgentTemplateMode({ trustedRoot, context: requestContext, templateFiles: body.templateFiles || [], prompt: String(body.prompt || '') });
     const hooks = loadHooksConfig(omitUndefined({
       trustedRoot,
       sandbox: sandbox as unknown as HookSandboxLike | null | undefined,
@@ -149,7 +148,7 @@ export async function streamAgentChat({
     const imageParts = Array.isArray(body.images) && body.images.length
       ? loadImageContentParts({ trustedRoot, paths: body.images })
       : [];
-    const userContent = imageParts.length ? [{ type: 'text', text: String(body.prompt || '') }, ...imageParts] : null;
+    const userContent = imageParts.length ? [{ type: 'text', text: templateMode.prompt }, ...imageParts] : null;
     const subAgentRunner: NonNullable<AgentDeps['runAgentChat']> = (args) => runAgentChat(args as RunAgentChatOptions);
     const agentTools = buildAgentToolset({
       ctx: agentCtx,
@@ -170,8 +169,8 @@ export async function streamAgentChat({
         runAgentChat: subAgentRunner,
       },
     });
-    const lazyTools = agentTools.filter((t) => String(t.name).startsWith('mcp__'));
-    const coreTools = agentTools.filter((t) => !String(t.name).startsWith('mcp__'));
+    const activeTools = templateMode.lockTools(agentTools); const lazyTools = activeTools.filter((t) => String(t.name).startsWith('mcp__'));
+    const coreTools = activeTools.filter((t) => !String(t.name).startsWith('mcp__'));
     // 记忆总闸:尊重用户「暂停/隐身/停用」开关(memory-settings)——非活跃时本轮既不注入也不回写,
     // 内置分层记忆与 MASE 记忆桥接对同一个开关保持一致(否则 UI 里的开关对实时对话形同虚设)。
     memoryActive = isMemoryActiveForRoot(trustedRoot, requestContext);
@@ -226,7 +225,7 @@ export async function streamAgentChat({
     const convergenceOptions = resolveAgentConvergenceOptions();
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents, context: requestContext }));
-    const skills = skillRegistry && typeof skillRegistry.enabledSkills === 'function'
+    const skills = !templateMode.active && skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills()
         .map((sk) => omitUndefined({
           id: String(sk.id || ''),
@@ -236,7 +235,7 @@ export async function streamAgentChat({
         .filter((sk) => sk.id && sk.name)
       : [];
     outcome = await runAgentChat(omitUndefined({
-      prompt: body.prompt,
+      prompt: templateMode.prompt,
       kimiConfig: runKimiConfig,
       trustedRoot,
       modelCall,
@@ -276,6 +275,7 @@ export async function streamAgentChat({
       resumeState: resumeState as RunAgentChatOptions['resumeState'],
       runTrace,
     }) as RunAgentChatOptions);
+    templateMode.assertApplied(outcome.steps);
     if (controller && controller.signal.aborted) {
       status = 'cancelled';
       sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });

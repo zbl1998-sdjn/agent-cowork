@@ -15,16 +15,16 @@ import {
 } from './api-runner-config.js';
 import { buildKimiApiChatPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
-import { createModelEndpointFetch } from '../security/model-endpoint-request.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
+import { callProviderChatCompletion } from './provider/index.js';
+import { providerRequiresApiKey } from './provider/catalog.js';
 
-type KimiPayload = {
-  choices?: Array<{ delta?: { content?: unknown; reasoning_content?: unknown } }>;
+type FetchResponse = {
+  ok: boolean;
+  status: number;
+  body?: { getReader?: () => { read(): Promise<{ value?: BufferSource; done?: boolean }> } } | null;
+  json?: () => Promise<unknown> | unknown;
 };
-type StreamReadResult = { value?: Uint8Array; done?: boolean };
-type StreamReader = { read(): Promise<StreamReadResult> };
-type StreamBody = { getReader?: () => StreamReader };
-type FetchResponse = { ok: boolean; status: number; body?: StreamBody | null };
 type FetchLike = (input: string, init?: Record<string, unknown>) => Promise<FetchResponse> | FetchResponse;
 
 export type KimiStreamResult = {
@@ -34,6 +34,7 @@ export type KimiStreamResult = {
   mode: 'chat';
   text: string;
   durationMs: number;
+  usage?: unknown;
 };
 export type KimiStreamOptions = PromptOptions & {
   systemMessage?: string;
@@ -78,11 +79,11 @@ export async function runKimiApiChatStream({
   userAgent,
   temperature,
 }: KimiStreamOptions = {}): Promise<KimiStreamResult> {
-  if (!apiKey || typeof apiKey !== 'string') {
-    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
-  }
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
+  }
+  if (providerRequiresApiKey(provider) && (typeof apiKey !== 'string' || !apiKey.trim())) {
+    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
   }
   const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
   const apiPrompt = buildKimiApiChatPrompt({ prompt, summary, memory });
@@ -102,86 +103,41 @@ export async function runKimiApiChatStream({
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-  const modelFetch = createModelEndpointFetch({ provider, baseUrl, model }, {
-    fetchImpl: fetchImpl as never,
-  });
+  const abortFromCaller = () => controller.abort();
   if (signal) {
     if (signal.aborted) controller.abort();
-    else signal.addEventListener('abort', () => controller.abort(), { once: true });
+    else signal.addEventListener('abort', abortFromCaller, { once: true });
   }
-  let text = '';
   try {
-    const headers: Record<string, string> = {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-      accept: 'text/event-stream',
-    };
-    if (userAgent) headers['user-agent'] = String(userAgent);
     const numericTemperature = Number(temperature);
-    const response = await modelFetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const result = await callProviderChatCompletion({
+      messages,
+      tools: [],
+      stream: true,
+      kimiConfig: {
+        provider: cleanProvider(provider),
+        apiKey: typeof apiKey === 'string' ? apiKey : '',
+        baseUrl: String(baseUrl || DEFAULT_BASE_URL),
         model: String(model || DEFAULT_MODEL),
-        // 简单 chat 也前置 env/date grounding,确保时间敏感问题按真实环境回答。
-        messages,
+        maxTokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         ...(Number.isFinite(numericTemperature) ? { temperature: numericTemperature } : {}),
-        max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
-        stream: true,
-      }),
+        ...(userAgent ? { userAgent: String(userAgent) } : {}),
+        securityMode,
+      },
+      fetchImpl: fetchImpl as never,
       signal: controller.signal,
+      ...(onToken ? { onContent: onToken } : {}),
+      ...(onReasoning ? { onReasoning } : {}),
     });
-    if (!response.ok) {
-      throw new Error(`Kimi API request failed with status ${response.status}`);
-    }
-    const reader = response.body && typeof response.body.getReader === 'function' ? response.body.getReader() : null;
-    if (!reader) {
-      throw new Error('streaming not supported by this fetch implementation');
-    }
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let streamDone = false;
-    const processSseLine = (rawLine: string): void => {
-      const line = rawLine.trim();
-      if (!line || !line.startsWith('data:')) return;
-      const data = line.slice(5).trim();
-      if (data === '[DONE]') {
-        buffer = '';
-        streamDone = true;
-        return;
-      }
-      try {
-        const json = JSON.parse(data) as KimiPayload;
-        const choiceDelta = json.choices?.[0]?.delta || {};
-        const reasoning = typeof choiceDelta.reasoning_content === 'string' ? choiceDelta.reasoning_content : '';
-        if (reasoning && typeof onReasoning === 'function') onReasoning(reasoning);
-        const delta = typeof choiceDelta.content === 'string' ? choiceDelta.content : '';
-        if (delta) {
-          text += delta;
-          if (typeof onToken === 'function') onToken(delta);
-        }
-      } catch {
-        // ignore partial / non-JSON keepalive lines
-      }
+    return {
+      ok: true,
+      provider: result.provider || cleanProvider(provider),
+      model: result.model || String(model || DEFAULT_MODEL),
+      mode: 'chat',
+      text: result.content,
+      durationMs: Date.now() - startedAt,
+      usage: result.usage,
     };
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) {
-        buffer += decoder.decode();
-        if (buffer.trim()) processSseLine(buffer);
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      let nl;
-      while ((nl = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, nl);
-        buffer = buffer.slice(nl + 1);
-        processSseLine(line);
-        if (streamDone) break;
-      }
-      if (streamDone) break;
-    }
-    return { ok: true, provider: cleanProvider(provider), model: String(model || DEFAULT_MODEL), mode: 'chat', text, durationMs: Date.now() - startedAt };
   } catch (error) {
     if (isAbortError(error)) {
       throw new Error(`Kimi API timed out after ${timeoutMs}ms`, { cause: error });
@@ -189,5 +145,6 @@ export async function runKimiApiChatStream({
     throw error;
   } finally {
     clearTimeout(timeout);
+    if (signal) signal.removeEventListener('abort', abortFromCaller);
   }
 }

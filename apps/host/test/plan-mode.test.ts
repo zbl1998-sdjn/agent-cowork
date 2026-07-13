@@ -56,11 +56,11 @@ function collectAudit() {
 test('plan mode blocks mutating tools until ExitPlanMode is approved', async () => {
   const root = tmp();
   const { bus, events } = collectAudit();
-  const approvals = queuedApprovals(['once']); // approve the plan
+  const approvals = queuedApprovals(['once', 'once']); // approve the plan, then the write
   const model = scriptedModel([
     toolCall('Write', { path: 'a.txt', content: 'before-plan' }), // blocked: no approved plan yet
     toolCall('ExitPlanMode', { plan: '步骤1：写 a.txt；步骤2：汇报。' }), // approved
-    toolCall('Write', { path: 'a.txt', content: 'after-plan' }), // plan-authorized (non-high) → runs
+    toolCall('Write', { path: 'a.txt', content: 'after-plan' }), // explicitly approved after the plan
     { content: '完成。' },
   ]);
   const out = await runAgentChat({
@@ -75,12 +75,17 @@ test('plan mode blocks mutating tools until ExitPlanMode is approved', async () 
   assert.ok(kinds.includes('tool.plan_blocked'), 'pre-plan write is audited as plan_blocked');
   assert.ok(kinds.includes('plan.proposed'));
   assert.ok(kinds.includes('plan.approved'));
-  assert.ok(kinds.includes('tool.auto_approved'), 'post-plan write authorized by the approved plan');
-  // The plan went through the approval registry exactly once.
-  assert.equal(approvals.requested.length, 1);
-  const [planApproval] = approvals.requested;
+  assert.ok(kinds.includes('tool.approved'), 'post-plan write records explicit approval');
+  assert.equal(kinds.includes('tool.auto_approved'), false, 'an approved plan must not auto-approve tools');
+  // The plan and the post-plan write each go through the approval registry.
+  assert.equal(approvals.requested.length, 2);
+  const [planApproval, writeApproval] = approvals.requested;
   assert.ok(planApproval);
   assert.equal(planApproval.kind, 'plan');
+  assert.ok(writeApproval);
+  assert.equal(writeApproval.kind, 'tool');
+  assert.equal(writeApproval.name, 'Write');
+  assert.deepEqual(writeApproval.args, { path: 'a.txt', content: 'after-plan' });
 });
 
 test('rejecting the plan keeps mutating tools blocked', async () => {

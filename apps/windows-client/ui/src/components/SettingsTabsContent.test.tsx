@@ -37,6 +37,18 @@ function render(tab: 'appearance' | 'model' | 'api' | 'input'): string {
       apiKey=""
       setApiKey={vi.fn()}
       hasKey={false}
+      setHasKey={vi.fn()}
+      providerStates={[{
+        provider: 'deepseek', configured: true, enabled: false, hasKey: true,
+        baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash',
+        policyDecision: 'needs_approval', providerClass: 'external_provider',
+        reasonCode: 'controlled_hybrid_external_provider_needs_preview',
+        reason: 'requires approval',
+      }]}
+      availableModels={['deepseek-v4-flash', 'deepseek-v4-pro']}
+      connection={{ status: 'connected', models: ['deepseek-v4-flash', 'deepseek-v4-pro'], modelAvailable: true, latencyMs: 18 }}
+      testingConnection={false}
+      onTestConnection={vi.fn()}
       loading={false}
       busy={false}
       persist={persist}
@@ -68,6 +80,8 @@ describe('SettingsTabsContent provider catalog', () => {
     expect(html).toContain('https://api.deepseek.com');
     expect(html).toContain('仅保存配置（当前不启用公网出站）');
     expect(html).toContain('公网 provider 只提供目录/配置发现');
+    expect(html).toContain('测试连接');
+    expect(html).toContain('连接正常');
     expect(html).not.toContain('test-secret');
   });
 

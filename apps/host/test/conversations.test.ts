@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { handleConversationRoutes } from '../src/routes/conversation-routes.js';
 import { createServer } from '../src/server.js';
+import { createUserStore } from '../src/auth/user-store.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
 import { assertTrustedPath } from '../src/security/path-policy.js';
 import { bind, close, recordArray, recordValue, stringField } from './helpers/host-http.js';
@@ -88,21 +89,12 @@ async function conversationListFrom(response: Response, label: string): Promise<
   return recordArray((await jsonRecord(response, `${label} response`)).conversations, label);
 }
 
-async function registerUser(baseUrl: string, username: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username, password: 'passw0rd' }),
-  });
-  assert.equal(res.status, 200, `register ${username}`);
-  return stringField(await jsonRecord(res, `register ${username}`), 'token');
-}
-
 test('conversations are isolated per signed-in user', async () => {
   const trustedRoot = makeTestWorkspace('kcw-conv');
-  await withServer({ trustedRoot }, async (baseUrl) => {
-    const tokenA = await registerUser(baseUrl, 'alice');
-    const tokenB = await registerUser(baseUrl, 'bob');
+  const authStore = createUserStore();
+  const tokenA = authStore.createSession(authStore.register('alice', 'passw0rd'));
+  const tokenB = authStore.createSession(authStore.register('bob', 'passw0rd'));
+  await withServer({ trustedRoot, authStore }, async (baseUrl) => {
     const authA = { authorization: `Bearer ${tokenA}`, 'content-type': 'application/json' };
     const authB = { authorization: `Bearer ${tokenB}`, 'content-type': 'application/json' };
 
@@ -142,8 +134,9 @@ test('conversations are isolated per signed-in user', async () => {
 
 test('upsert preserves createdAt and updates title/messages', async () => {
   const trustedRoot = makeTestWorkspace('kcw-conv-upsert');
-  await withServer({ trustedRoot }, async (baseUrl) => {
-    const token = await registerUser(baseUrl, 'carol');
+  const authStore = createUserStore();
+  const token = authStore.createSession(authStore.register('carol', 'passw0rd'));
+  await withServer({ trustedRoot, authStore }, async (baseUrl) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
     let res = await fetch(`${baseUrl}/api/conversations/x1`, {
       method: 'PUT', headers: auth, body: JSON.stringify({ title: 'v1', messages: [] }),
@@ -172,8 +165,9 @@ test('upsert preserves createdAt and updates title/messages', async () => {
 
 test('conversation storage preserves branch metadata and active branch', async () => {
   const trustedRoot = makeTestWorkspace('kcw-conv-branches');
-  await withServer({ trustedRoot }, async (baseUrl) => {
-    const token = await registerUser(baseUrl, 'dana');
+  const authStore = createUserStore();
+  const token = authStore.createSession(authStore.register('dana', 'passw0rd'));
+  await withServer({ trustedRoot, authStore }, async (baseUrl) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
     const branches = [
       { id: 'main', title: '主线', messages: [{ id: 'u1', role: 'user', text: '原问题' }, { id: 'a1', role: 'assistant', text: '原回答' }] },
@@ -205,8 +199,9 @@ test('conversation storage preserves branch metadata and active branch', async (
 
 test('conversation list supports full/query modes and rejects malformed route inputs', async () => {
   const trustedRoot = makeTestWorkspace('kcw-conv-query');
-  await withServer({ trustedRoot }, async (baseUrl) => {
-    const token = await registerUser(baseUrl, 'erin');
+  const authStore = createUserStore();
+  const token = authStore.createSession(authStore.register('erin', 'passw0rd'));
+  await withServer({ trustedRoot, authStore }, async (baseUrl) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
     for (const item of [
       { id: 'needle-a', title: 'Needle Alpha', text: 'first' },

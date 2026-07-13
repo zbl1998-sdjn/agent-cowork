@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { sendJson, withJsonBody, headerValue } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
 import type { Identity, SessionIdentity } from '../auth/user-store.js';
+import type { EnrollmentPolicy } from '../auth/enrollment-policy.js';
 
 // 本地鉴权路由只暴露注册、登录、访客、当前会话和登出;所有 token 都交由 authStore 解析。
 
@@ -25,6 +26,7 @@ type AuthRouteOptions = {
   pathname: string;
   requestContext?: Record<string, unknown>;
   authStore?: AuthStoreLike | null;
+  enrollmentPolicy?: EnrollmentPolicy | null;
 };
 
 const credentialsBodySchema = z.preprocess(
@@ -51,7 +53,7 @@ function errorPayload(err: unknown, fallbackStatus: number): { status: number; b
   return { status: fallbackStatus, body: { error: 'auth request failed' } };
 }
 
-export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore }: AuthRouteOptions): Promise<boolean> {
+export async function handleAuthRoutes({ request, response, pathname, requestContext, authStore, enrollmentPolicy }: AuthRouteOptions): Promise<boolean> {
   if (!authStore) {
     return false;
   }
@@ -60,6 +62,10 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
     await withJsonBody(request, response, async (body) => {
       try {
         const input = credentialsBodySchema.parse(body);
+        if (!enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
+          sendJson(response, 403, { error: 'a valid one-time enrollment capability is required' });
+          return;
+        }
         const identity = authStore.register(input.username, input.password);
         const token = authStore.createSession(identity);
         sendJson(response, 200, { ...identity, token });
@@ -74,6 +80,10 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/auth/guest') {
     // 「跳过登录」仍签发隔离访客身份与 token,避免出现真正未鉴权 API 访问。
     try {
+      if (!enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
+        sendJson(response, 403, { error: 'a valid one-time enrollment capability is required' });
+        return true;
+      }
       sendJson(response, 200, authStore.createGuest());
     } catch (err) {
       const error = errorPayload(err, 500);

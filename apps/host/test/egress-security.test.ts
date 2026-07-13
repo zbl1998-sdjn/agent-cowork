@@ -193,6 +193,19 @@ test('memory DLP denies credentials before long-term write', () => {
   assert.equal(decision.sensitivity, 'secret');
 });
 
+test('memory DLP denies bare credential shapes recognized by redaction while allowing ordinary dotted text', () => {
+  for (const content of [
+    'sampleheader.samplepayload.samplesignature',
+    'sampleopaquevalue1234567890.sampleopaquevalue0987654321',
+  ]) {
+    const classification = classifyData({ text: content });
+    assert.equal(classification.redactionApplied, true, `${content} should be recognized by redaction`);
+    assert.equal(decideMemoryDlp({ content }).action, 'deny_write');
+  }
+
+  assert.equal(decideMemoryDlp({ content: '版本是 1.2.3' }).action, 'allow_auto_write');
+});
+
 test('egress audit rejects a malformed middle record instead of undercounting evidence', () => {
   const trustedRoot = tempRoot();
   const first = decideEgressPolicy({

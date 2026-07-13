@@ -217,6 +217,7 @@ export async function handleSandboxRoutes({
           ext: input.ext,
           timeoutMs: input.timeoutMs,
           network: input.network === true,
+          unrestrictedHostExecution: input.unrestrictedHostExecution === true,
           trustedRoot,
           runStoreRoot,
           runEvents: requestRunEvents,

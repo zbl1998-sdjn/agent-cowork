@@ -83,28 +83,53 @@ test('docker runner rejects mutable tags and option-like image references', asyn
   }
 });
 
-test('createWslDockerRunner builds a wsl command and warns about network', async () => {
+test('createWslDockerRunner rejects WSL host execution by default before spawning', async () => {
+  const captured: CapturedSpawn = {};
+  const runner = createWslDockerRunner({ backend: 'wsl', spawn: fakeSpawn(captured) });
+  const spec = normalizeSandboxSpec({ tool: 'python3' });
+  await assert.rejects(
+    () => runner(null, spec, { trustedRoot: '/root' }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /cannot enforce workspace or host isolation/);
+      assert.equal((error as Error & { statusCode?: number }).statusCode, 501);
+      return true;
+    },
+  );
+  assert.equal(captured.command, undefined);
+});
+
+test('createWslDockerRunner builds a wsl command and warns about network with explicit unrestricted capability', async () => {
   const captured: CapturedSpawn = {};
   const runner = createWslDockerRunner({ backend: 'wsl', distro: 'Ubuntu', spawn: fakeSpawn(captured) });
-  const spec = normalizeSandboxSpec({ tool: 'python3', args: ['-c', 'pass'], timeoutMs: 1000 });
+  const spec = normalizeSandboxSpec(
+    { tool: 'python3', args: ['-c', 'pass'], timeoutMs: 1000, unrestrictedHostExecution: true },
+    { allowUnrestrictedHostExecution: true },
+  );
   const result = await runner(null, spec, { trustedRoot: '/root' });
   assert.equal(captured.command, 'wsl.exe');
   assert.deepEqual(captured.args, ['-d', 'Ubuntu', '--', 'python3', '-c', 'pass']);
   assert.equal(result.networkIsolated, false);
   assert.ok(result.warnings.some((warning) => /network/.test(warning)));
+  assert.ok(result.warnings.some((warning) => /not a read-only or OS-isolated sandbox/.test(warning)));
 });
 
 test('createWslDockerRunner builds the default-distro wsl command for an explicit network request', async () => {
   const captured: CapturedSpawn = {};
   const runner = createWslDockerRunner({ backend: 'wsl', spawn: fakeSpawn(captured) });
-  const spec = normalizeSandboxSpec({ tool: 'python3', args: ['-V'], timeoutMs: 1000, network: true });
+  const spec = normalizeSandboxSpec(
+    { tool: 'python3', args: ['-V'], timeoutMs: 1000, network: true, unrestrictedHostExecution: true },
+    { allowUnrestrictedHostExecution: true },
+  );
 
   const result = await runner(null, spec, { trustedRoot: '/root' });
 
   assert.equal(captured.command, 'wsl.exe');
   assert.deepEqual(captured.args, ['--', 'python3', '-V']);
   assert.equal(result.networkIsolated, false);
-  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.warnings, [
+    'unrestricted host execution is enabled; this process is not a read-only or OS-isolated sandbox',
+  ]);
 });
 
 test('createWslDockerRunner rejects a missing trusted root before spawning', async () => {

@@ -6,6 +6,7 @@ export * from './transport';
 export * from './runs';
 export * from './tools';
 export * from './artifacts';
+export * from './officeEditor';
 export * from './schedules';
 export * from './kimiConfig';
 export * from './auth';

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizeSandboxSpec } from '../src/sandbox/sandbox-spec.js';
+import { sandboxExecBodySchema, sandboxRunCodeBodySchema } from '../src/routes/sandbox-route-schemas.js';
 
 test('normalizeSandboxSpec applies safe defaults for a valid spec', () => {
   const spec = normalizeSandboxSpec({ tool: 'node', args: ['-e', 'process.stdout.write("a b")'] });
@@ -8,6 +9,7 @@ test('normalizeSandboxSpec applies safe defaults for a valid spec', () => {
   assert.deepEqual(spec.args, ['-e', 'process.stdout.write("a b")']);
   assert.equal(spec.network, false, 'network defaults off');
   assert.equal(spec.workspaceWrite, false, 'workspace mount defaults read-only');
+  assert.equal(spec.unrestrictedHostExecution, false, 'host execution defaults off');
   assert.ok(spec.timeoutMs > 0);
   assert.ok(spec.maxOutputBytes > 0);
 });
@@ -26,6 +28,29 @@ test('normalizeSandboxSpec grants workspace writes only for an explicit true cap
     () => normalizeSandboxSpec({ tool: 'node', workspaceWrite: 'true' }),
     /workspaceWrite must be a boolean/,
   );
+});
+
+test('normalizeSandboxSpec grants unrestricted host execution only for an explicit true capability', () => {
+  assert.throws(
+    () => normalizeSandboxSpec({ tool: 'node', unrestrictedHostExecution: true }),
+    /unrestrictedHostExecution requires an explicit capability/,
+  );
+  const allowed = normalizeSandboxSpec(
+    { tool: 'node', unrestrictedHostExecution: true },
+    { allowUnrestrictedHostExecution: true },
+  );
+  assert.equal(allowed.unrestrictedHostExecution, true);
+  assert.throws(
+    () => normalizeSandboxSpec({ tool: 'node', unrestrictedHostExecution: 'true' }),
+    /unrestrictedHostExecution must be a boolean/,
+  );
+});
+
+test('sandbox route schemas carry only a boolean unrestricted host execution request', () => {
+  assert.equal(sandboxExecBodySchema.safeParse({ spec: { tool: 'node', unrestrictedHostExecution: true } }).success, true);
+  assert.equal(sandboxExecBodySchema.safeParse({ spec: { tool: 'node', unrestrictedHostExecution: 'true' } }).success, false);
+  assert.equal(sandboxRunCodeBodySchema.safeParse({ tool: 'node', code: 'x', unrestrictedHostExecution: true }).success, true);
+  assert.equal(sandboxRunCodeBodySchema.safeParse({ tool: 'node', code: 'x', unrestrictedHostExecution: 'true' }).success, false);
 });
 
 test('normalizeSandboxSpec rejects unsafe / malformed specs', () => {

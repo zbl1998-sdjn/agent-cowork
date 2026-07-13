@@ -5,7 +5,9 @@
 // 依赖:hooks/* + components/* + lib/api + lib/app-logic 纯逻辑。
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importRecipeTemplate, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
-import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent } from './lib/app-logic';
+import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent, resolveUploadedTemplatePaths } from './lib/app-logic';
+import { latestWorkbenchGeneration } from './lib/workbench-logic';
+import { latestArtifactMessage } from './lib/artifact-canvas';
 import { loadConversations, nextMessageId, PREVIEWABLE_RE } from './lib/app-constants';
 import type { AssistantMessage, Message, RecipeRunResponse, SidePanel } from './lib/app-types';
 import type { AgentMode, RunEvent } from './lib/types';
@@ -20,6 +22,7 @@ import { Timeline } from './components/chat/Timeline';
 import { AppComposerDock } from './components/AppComposerDock';
 import { AppSidePanel } from './components/AppSidePanel';
 import { AppContextRail } from './components/AppContextRail';
+import { ConversationWorkspace } from './components/ConversationWorkspace';
 import { AppOverlays } from './components/AppOverlays';
 import { Icon } from './components/ui/Icon';
 import type { Command } from './components/CommandPalette';
@@ -29,7 +32,6 @@ import { useConversations } from './hooks/useConversations';
 import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
 import { useAgentTeamTimeline } from './hooks/useAgentTeamTimeline';
-
 type ImportedRecipeResponse = {
   recipe: {
     id: string;
@@ -38,7 +40,6 @@ type ImportedRecipeResponse = {
     prompt?: string;
   };
 };
-
 export function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [messages, setMessages] = useState<Message[]>(() => loadConversations()[0]?.messages || []);
@@ -50,7 +51,7 @@ export function App() {
   const [editText, setEditText] = useState('');
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [contextRailCollapsed, setContextRailCollapsed] = useState(false);
+  const [contextRailCollapsed, setContextRailCollapsed] = useState(true);
   const {
     applyKimiInfo,
     authReady,
@@ -113,7 +114,9 @@ export function App() {
     workspace: trustedRoot,
     recipe: selectedRecipe,
     streaming: Boolean(streamingId),
-  }), [composerDraft, defaultModel, defaultProvider, mode, selectedRecipe, streamingId, trustedRoot]);
+    generation: latestWorkbenchGeneration(messages),
+  }), [composerDraft, defaultModel, defaultProvider, messages, mode, selectedRecipe, streamingId, trustedRoot]);
+  const artifactMessage = useMemo(() => latestArtifactMessage(messages), [messages]);
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -124,9 +127,9 @@ export function App() {
   const patchAssistant = useCallback((id: string, patch: (m: AssistantMessage) => AssistantMessage) => {
     setMessages((list) => list.map((m) => (m.id === id && m.role === 'assistant' ? patch(m) : m)));
   }, []);
+  const applyArtifactText = useCallback((text: string) => { if (artifactMessage) patchAssistant(artifactMessage.id, (message) => ({ ...message, text })); }, [artifactMessage, patchAssistant]);
   const captureRecipe = useRecipeCapture({ patchAssistant, onRecipeSaved: upsertRecipe });
   const { containerRef: timelineRef, isAtBottom, hasNewContent, scrollToBottom } = useStickToBottom(messages, conversations.activeConvId);
-
   const copyText = useCallback((t: string) => {
     try { void navigator.clipboard.writeText(t); } catch { /* 剪贴板在测试/受限 WebView 中可能不可用 */ }
   }, []);
@@ -166,7 +169,6 @@ export function App() {
     }
     return imported;
   }, [upsertRecipe]);
-
   const runRecipeTurn = useCallback(async (assistantId: string, recipeId: string, prompt: string, uploaded: string[]) => {
     try {
       const res = await postJson<RecipeRunResponse>(`/api/recipes/${encodeURIComponent(recipeId)}/run`, {
@@ -176,9 +178,8 @@ export function App() {
       wireEvents(assistantId, res.runId);
     } catch (error) { patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '运行技能' }) })); }
   }, [trustedRoot, patchAssistant, wireEvents]);
-
   const handleSend = useCallback(async (text: string, meta: ComposerMeta & { resumeRunId?: string }) => {
-    const resumeRunId = meta.resumeRunId?.trim();
+    const resumeRunId = meta.resumeRunId?.trim(); const resumedTemplatePaths = resumeRunId ? (messagesRef.current.find((message) => message.role === 'assistant' && message.runId === resumeRunId) as AssistantMessage | undefined)?.templateFiles || [] : [];
     const userText = text || (meta.files.length ? `（已上传 ${meta.files.length} 个文件）` : '');
     setMessages((list) => [...list, { id: nextMessageId(), role: 'user', text: userText }]);
     const assistantId = nextMessageId();
@@ -190,6 +191,7 @@ export function App() {
       patchAssistant(assistantId, (m) => ({ ...m, status: 'failed', text: humanizeError(error, { action: '上传附件' }) }));
       return;
     }
+    const templatePaths = resolveUploadedTemplatePaths(meta.files, meta.templateFiles, uploaded, resumedTemplatePaths); if (templatePaths.length) patchAssistant(assistantId, (message) => ({ ...message, templateFiles: templatePaths }));
     if (!resumeRunId && selectedRecipe) {
       // recipe 来源 = 上传的附件 + 经 @ 提及引用的工作区文件(修复:「引用本地文件」选的源
       // 之前没进 recipe files,导致 requiresSources 配方报「引用 0 个」)。
@@ -197,7 +199,6 @@ export function App() {
       await runRecipeTurn(assistantId, selectedRecipe.id, text, recipeFiles);
       return;
     }
-
     const sessionModelAccess = hasSessionModelAccess(meta.modelConfig);
     let enabled = Boolean(resumeRunId) || chatEnabled || sessionModelAccess;
     if (!enabled) {
@@ -226,7 +227,7 @@ export function App() {
         modelConfig: meta.modelConfig,
         thinking: meta.thinking,
         permissionMode,
-        images: contextFiles.filter((p) => isImagePath(p)),
+        images: contextFiles.filter((p) => isImagePath(p)), templateFiles: templatePaths,
         resumeRunId,
         conversationId: conversations.activeConvId,
         autoContextCompaction,
@@ -284,10 +285,9 @@ export function App() {
     } catch (error) { patchAssistant(message.id, (m) => ({ ...m, text: humanizeError(error, { action: '应用文件变更' }) })); }
   }, [trustedRoot, patchAssistant]);
   const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
-
   const commands = useMemo<Command[]>(() => [
     { id: 'new', label: '新建对话', run: startNewConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
-    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-auto', label: '模式：安全自动（高风险仍需批准）', run: () => setMode('auto') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化', run: () => setPanel('viz') },
+    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-auto', label: '模式：安全自动（高风险仍需批准）', run: () => setMode('auto') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化编辑', run: () => setPanel('viz') },
     { id: 'p-tasks', label: '面板：任务中心', run: () => setPanel('tasks') }, { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
     { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
     { id: 'settings', label: '模型设置', run: () => openSettings('model') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
@@ -305,19 +305,19 @@ export function App() {
         {panel !== 'none' ? (
           <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
         ) : (
-          <>
+          <ConversationWorkspace artifactId={artifactMessage?.id || null} artifactText={artifactMessage?.text || ''} streaming={Boolean(streamingId)} onApplyArtifact={applyArtifactText} onRequestRevision={quickSend}>
             <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
             <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} modelProviders={modelProviders} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onDraftChange={setComposerDraft} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} onUploadTemplates={uploadTemplates} />
-          </>
+          </ConversationWorkspace>
         )}
       </div>
-      {panel === 'none' && (contextRailCollapsed ? (
+      {contextRailCollapsed ? (
         <button type="button" className="context-expand" onClick={() => setContextRailCollapsed(false)} title="展开上下文栏" aria-label="展开上下文栏">
           <Icon name="sidebar" size={16} />
         </button>
       ) : (
         <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} agentTeamView={agentTeamTimeline.view} agentTeamLoading={agentTeamTimeline.loading} agentTeamError={agentTeamTimeline.error} onRefreshAgentTeam={agentTeamTimeline.refresh} onOpenRuns={() => setPanel('tasks')} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
-      ))}
+      )}
       <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} autoContextCompaction={autoContextCompaction} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetAutoContextCompaction={setAutoContextCompaction} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );

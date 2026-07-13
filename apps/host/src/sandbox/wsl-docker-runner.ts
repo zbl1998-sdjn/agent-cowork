@@ -125,8 +125,17 @@ export function createWslDockerRunner(options: WslDockerRunnerOptions = {}): Wsl
     if (!ctx.trustedRoot) {
       throw new Error('vm runner: trustedRoot is required');
     }
+    if (backend === 'wsl' && spec.unrestrictedHostExecution !== true) {
+      const error = new Error(
+        'wsl backend cannot enforce workspace or host isolation; use Docker, or explicitly request unrestrictedHostExecution with an allowed capability',
+      ) as HttpError;
+      error.statusCode = 501;
+      throw error;
+    }
     const argv = buildArgv(backend, spec, ctx, { image, distro });
-    const warnings: string[] = [];
+    const warnings: string[] = backend === 'wsl'
+      ? ['unrestricted host execution is enabled; this process is not a read-only or OS-isolated sandbox']
+      : [];
     const networkIsolated = networkBacked ? !spec.network : false;
     if (!networkIsolated && !spec.network) {
       warnings.push(`${backend} backend does not guarantee network isolation in this configuration`);

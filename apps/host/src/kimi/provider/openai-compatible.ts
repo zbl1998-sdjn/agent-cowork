@@ -17,6 +17,8 @@ type ProviderOptions = {
   defaultBaseUrl?: string;
   requiresApiKey?: boolean;
   notConfiguredMessage?: string;
+  includeStreamUsage?: boolean;
+  supportsPromptCacheKey?: boolean;
 };
 type StreamReader = { read(): Promise<{ value?: BufferSource; done?: boolean }> };
 type FetchLike = (
@@ -50,6 +52,8 @@ export function createOpenAiCompatibleProvider({
   defaultBaseUrl = '',
   requiresApiKey = true,
   notConfiguredMessage = '',
+  includeStreamUsage = false,
+  supportsPromptCacheKey = false,
 }: ProviderOptions = {}): Provider {
   return {
     id,
@@ -62,6 +66,7 @@ export function createOpenAiCompatibleProvider({
       onReasoning,
       signal,
       promptCacheKey,
+      stream = true,
     }: ProviderChatArgs): Promise<ProviderChatResult> {
       const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
@@ -75,22 +80,21 @@ export function createOpenAiCompatibleProvider({
       }
       const headers: Record<string, string> = {
         'content-type': 'application/json',
-        accept: 'text/event-stream',
+        accept: stream ? 'text/event-stream' : 'application/json',
       };
       if (apiKey) headers.authorization = `Bearer ${apiKey}`;
       if (config.userAgent) headers['user-agent'] = String(config.userAgent);
       const body: Record<string, unknown> = {
         model,
         messages,
-        tools,
-        tool_choice: 'auto',
+        ...(Array.isArray(tools) && tools.length ? { tools, tool_choice: 'auto' } : {}),
         max_tokens: config.maxTokens || 2048,
-        stream: true,
+        stream,
         // 让流式响应在末尾带回 usage(token 用量)。OpenAI/Kimi/Ollama/LM Studio 均支持;
         // 不带此项时 Ollama 流式默认不返回 usage → 成本·可观测面板显示 0 tokens(dogfood 实测)。
-        stream_options: { include_usage: true },
+        ...(stream && includeStreamUsage ? { stream_options: { include_usage: true } } : {}),
         // 稳定缓存键(通常为 session/run id):提高前缀缓存命中率;不支持的后端会忽略。
-        ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
+        ...(supportsPromptCacheKey && promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
       if (typeof config.temperature === 'number' && Number.isFinite(config.temperature)) {
         body.temperature = config.temperature;
@@ -116,6 +120,9 @@ export function createOpenAiCompatibleProvider({
         throw new Error(`${id} 请求失败(HTTP ${resp.status})${detail ? `:${detail}` : ''}${modelHint}`);
       }
       const reader = resp.body && typeof resp.body.getReader === 'function' ? resp.body.getReader() : null;
+      if (!reader && typeof resp.json !== 'function') {
+        throw new Error(`${id} 响应没有可读取的流或 JSON 正文`);
+      }
       const message = reader
         ? await parseOpenAiCompatibleStream(reader, omitUndefined({ onContent, onReasoning }))
         : jsonMessage(await resp.json());
@@ -134,6 +141,8 @@ export function createOpenAiProvider(): Provider {
     id: 'openai',
     defaultBaseUrl: DEFAULT_OPENAI_BASE_URL,
     requiresApiKey: true,
+    includeStreamUsage: true,
+    supportsPromptCacheKey: true,
     notConfiguredMessage: '未配置 OpenAI API Key。请配置 OPENAI_API_KEY 或在设置中提供 key 后重试。',
   });
 }
@@ -143,6 +152,7 @@ export function createLocalOpenAiCompatibleProvider(): Provider {
   return createOpenAiCompatibleProvider({
     id: 'openai/local',
     requiresApiKey: false,
+    includeStreamUsage: true,
     notConfiguredMessage: '未配置本地 OpenAI-compatible 模型。请配置本地 baseUrl 与 model 后重试。',
   });
 }

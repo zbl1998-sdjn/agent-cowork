@@ -143,7 +143,7 @@ export function blockUntilPlanApproved({
   return true;
 }
 
-/** 向用户申请单次工具审批:命中自动批准/计划授权则放行,否则等待用户决定(可记会话级)。 */
+/** 向用户申请单次工具审批:命中自动批准则放行,否则等待用户决定(可记会话级)。 */
 export async function requestToolApproval({
   needsApproval,
   hasApprovals,
@@ -159,17 +159,14 @@ export async function requestToolApproval({
   messages,
   call,
   autoApprove,
-  planMode,
-  planApproved,
   context,
 }: ToolApprovalOptions): Promise<boolean> {
   if (!needsApproval) return false;
   const risk = String(tool.risk || '').toLowerCase();
   const requiresExplicitApproval = tool.requiresApproval === true || risk === 'high' || risk === 'critical';
   if (!requiresExplicitApproval && sessionApproved.has(name)) return false;
-  const planAuthorized = planMode && planApproved;
-  if ((autoApprove || planAuthorized) && !requiresExplicitApproval) {
-    audit('tool.auto_approved', { tool: name, risk: tool.risk, via: autoApprove ? 'auto' : 'plan' });
+  if (autoApprove && !requiresExplicitApproval) {
+    audit('tool.auto_approved', { tool: name, risk: tool.risk, via: 'auto' });
     return false;
   }
   if (!hasApprovals || !approvals) {

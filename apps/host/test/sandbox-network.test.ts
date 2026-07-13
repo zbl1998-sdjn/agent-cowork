@@ -14,7 +14,10 @@ test('local sandbox does NOT isolate the network (documented limitation, locked 
   try {
     const sandbox = createSandbox({ backend: 'local' });
     const code = `const http=require('http');http.get('http://127.0.0.1:${port}/',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d));}).on('error',e=>process.stdout.write('ERR '+e.message));`;
-    const spec = normalizeSandboxSpec({ tool: 'node', args: ['-e', code], timeoutMs: 8000, network: false }, { allowTools: ['node'] });
+    const spec = normalizeSandboxSpec(
+      { tool: 'node', args: ['-e', code], timeoutMs: 8000, network: false, unrestrictedHostExecution: true },
+      { allowTools: ['node'], allowUnrestrictedHostExecution: true },
+    );
     const res = recordValue(await sandbox.exec(spec, { trustedRoot: tempRoot('kcw-sbx-') }), 'local sandbox result');
     const warnings = res.warnings;
     assert.equal(res.networkIsolated, false, 'local backend must not claim network isolation');

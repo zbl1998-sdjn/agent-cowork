@@ -10,7 +10,6 @@ import {
   parseGlobResult,
   parseGrepResult,
   parseReadResult,
-  parseShellResult,
   parseWriteResult,
 } from './helpers/agent.js';
 import { tempRoot } from './helpers/host-http.js';
@@ -114,7 +113,7 @@ test('Edit replaces a string in a workspace file', async () => {
   assert.equal(all.replacements, 1);
 });
 
-test('Shell captures stdout from quoted node -e commands on Windows local backend', {
+test('Shell fails closed instead of presenting unrestricted Windows host execution as a sandbox', {
   skip: process.platform !== 'win32' ? 'Windows shell quoting regression' : false,
 }, async () => {
   const root = tempRoot('kcw-agent-');
@@ -125,10 +124,15 @@ test('Shell captures stdout from quoted node -e commands on Windows local backen
   });
   const shell = agentTool(tools, 'Shell');
 
-  const result = parseShellResult(await shell.handler({ command: 'node -e "process.stdout.write(\'shell-ok\')"' }));
-  assert.equal(result.exitCode, 0);
-  assert.equal(result.stdout, 'shell-ok');
-  assert.equal(result.stderr, '');
+  await assert.rejects(
+    () => shell.handler({ command: 'node -e "process.stdout.write(\'shell-ok\')"' }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /cannot enforce workspace or host isolation/);
+      assert.equal((error as Error & { statusCode?: number }).statusCode, 501);
+      return true;
+    },
+  );
 });
 
 test('SearchMemory returns relevant active topic knowledge and is read-only', async () => {

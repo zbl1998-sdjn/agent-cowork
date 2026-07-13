@@ -76,6 +76,29 @@ describe('runtimeDefaultsFromKimiInfo', () => {
       providers: [],
     });
   });
+
+  it('attaches provider runtime availability and discovered models to composer options', () => {
+    const defaults = runtimeDefaultsFromKimiInfo({
+      chatEnabled: true,
+      provider: 'ollama',
+      model: 'qwen3:14b',
+      availableModels: ['qwen3:14b', 'qwen2.5:0.5b'],
+      providers: [{
+        id: 'ollama', displayName: 'Ollama', region: 'local', protocol: 'openai-chat',
+        defaultBaseUrl: 'http://127.0.0.1:11434/v1', defaultModel: 'qwen3',
+        models: ['qwen3'], apiKeyEnv: [], requiresApiKey: false, source: 'builtin',
+      }],
+      providerStates: [{
+        provider: 'ollama', configured: true, enabled: true, hasKey: false,
+        baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:14b',
+        policyDecision: 'allow', providerClass: 'local',
+        reasonCode: 'model_provider_allowed', reason: 'allowed',
+      }],
+    });
+
+    expect(defaults.models).toEqual(['qwen3:14b', 'qwen2.5:0.5b', 'qwen3']);
+    expect(defaults.providers[0]?.runtimeState?.enabled).toBe(true);
+  });
 });
 
 describe('historyRunsFromIndex', () => {

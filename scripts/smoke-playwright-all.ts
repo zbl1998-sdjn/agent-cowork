@@ -1,7 +1,7 @@
 // Playwright-style full UI smoke(scripts · smoke·E2E)
 // ---------------------------------------------------------------------------
 // 职责:启动真实 host + React UI dist,用 Edge/Chrome 真实验证模板上传、拖拽批量上传、
-// 本地模型选择、当前项目可视化和移动端无横向溢出。报告/截图写入 output/playwright。
+// 本地模型选择、高级可视化编辑入口和桌面分屏无横向溢出。报告/截图写入 output/playwright。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -32,9 +32,9 @@ const outputRoot = path.join(repoRoot, 'output', 'playwright');
 const reportPath = path.join(outputRoot, 'agent-cowork-all-smoke-report.json');
 const home1366ScreenshotPath = path.join(outputRoot, 'agent-cowork-beginner-home-1366.png');
 const home1536ScreenshotPath = path.join(outputRoot, 'agent-cowork-beginner-home-1536.png');
-const composerAdvancedMobileScreenshotPath = path.join(outputRoot, 'agent-cowork-composer-advanced-mobile.png');
+const composerAdvancedSplitScreenshotPath = path.join(outputRoot, 'agent-cowork-composer-advanced-split.png');
 const desktopScreenshotPath = path.join(outputRoot, 'agent-cowork-all-desktop.png');
-const mobileScreenshotPath = path.join(outputRoot, 'agent-cowork-all-mobile.png');
+const splitScreenshotPath = path.join(outputRoot, 'agent-cowork-all-split.png');
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434/v1';
 const OLLAMA_MODEL = 'qwen2.5:0.5b';
 
@@ -47,8 +47,8 @@ type SmokeSnapshot = {
   provider: string;
   model: string;
   modelOptions: string[];
-  vizText: string;
-  hasVizFrame: boolean;
+  visualEditorText: string;
+  hasVisualEditorPanel: boolean;
   securityText: string;
   assistantText: string;
   scrollWidth: number;
@@ -89,8 +89,8 @@ function snapshotFromPage(value: unknown): SmokeSnapshot {
     provider: typeof value.provider === 'string' ? value.provider : '',
     model: typeof value.model === 'string' ? value.model : '',
     modelOptions: Array.isArray(value.modelOptions) ? value.modelOptions.filter((item): item is string => typeof item === 'string') : [],
-    vizText: typeof value.vizText === 'string' ? value.vizText : '',
-    hasVizFrame: value.hasVizFrame === true,
+    visualEditorText: typeof value.visualEditorText === 'string' ? value.visualEditorText : '',
+    hasVisualEditorPanel: value.hasVisualEditorPanel === true,
     securityText: typeof value.securityText === 'string' ? value.securityText : '',
     assistantText: typeof value.assistantText === 'string' ? value.assistantText : '',
     scrollWidth: typeof value.scrollWidth === 'number' ? value.scrollWidth : 0,
@@ -255,12 +255,12 @@ async function main() {
     await sendPage('Page.navigate', { url: baseUrl });
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.app-header') && document.querySelector('.security-status-bar') && document.querySelector('.template-upload-input') && document.querySelector('.provider-select option[value="ollama"]')`,
+      `() => document.querySelector('.app-header') && document.querySelector('.security-status-bar') && document.querySelector('input[aria-label="上传任务模板文件"]') && document.querySelector('input[aria-label="上传版式模板文件"]') && document.querySelector('.provider-select option[value="ollama"]')`,
       'React shell did not become ready for full Playwright smoke',
     );
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.security-status-bar')?.innerText.includes('外发 0 B')`,
+      `() => document.querySelector('.security-status-bar')?.innerText.includes('今天未记录外发内容')`,
       'security status bar did not report zero external egress',
     );
     await waitForPage(
@@ -303,11 +303,32 @@ async function main() {
     fs.writeFileSync(home1536ScreenshotPath, Buffer.from(home1536Shot.data, 'base64'));
 
     await sendPage('Emulation.setDeviceMetricsOverride', {
-      width: 390,
+      width: 900,
       height: 844,
       deviceScaleFactor: 1,
-      mobile: true,
+      mobile: false,
     });
+    await waitForPage(
+      sendPage,
+      `() => {
+        const conversation = document.querySelector('.conversation-pane')?.getBoundingClientRect();
+        const canvas = document.querySelector('.artifact-canvas')?.getBoundingClientRect();
+        return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+          && conversation
+          && canvas
+          && conversation.bottom <= canvas.top + 1;
+      }`,
+      '900px desktop panels overlap or have horizontal overflow',
+    );
+    await evaluate(
+      sendPage,
+      `(() => {
+        const details = document.querySelector('.composer-advanced');
+        if (!details) throw new Error('advanced settings details missing');
+        details.open = true;
+        return true;
+      })()`,
+    );
     await waitForPage(
       sendPage,
       `() => {
@@ -333,10 +354,10 @@ async function main() {
           && rightRect.width > 160
           && visibleControls;
       }`,
-      'mobile composer footer controls overflow horizontally',
+      'split-view composer footer controls overflow horizontally',
     );
     const composerAdvancedShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-    fs.writeFileSync(composerAdvancedMobileScreenshotPath, Buffer.from(composerAdvancedShot.data, 'base64'));
+    fs.writeFileSync(composerAdvancedSplitScreenshotPath, Buffer.from(composerAdvancedShot.data, 'base64'));
 
     await sendPage('Emulation.setDeviceMetricsOverride', {
       width: 1440,
@@ -347,8 +368,82 @@ async function main() {
 
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.template-upload-bar .template-upload-input')`,
+      `() => {
+        const pane = document.querySelector('.conversation-pane')?.getBoundingClientRect();
+        const panel = document.querySelector('.composer-advanced-panel')?.getBoundingClientRect();
+        const controls = [
+          document.querySelector('.provider-select'),
+          document.querySelector('.model-input'),
+          document.querySelector('.thinking-select')
+        ];
+        if (!pane || !panel || controls.some((control) => !control)) return false;
+        const controlsAreReachable = controls.every((control) => {
+          const rect = control.getBoundingClientRect();
+          const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          return hit === control || control.contains(hit);
+        });
+        return panel.left >= pane.left - 1
+          && panel.right <= pane.right + 1
+          && panel.top >= 0
+          && panel.bottom <= document.documentElement.clientHeight + 1
+          && controlsAreReachable;
+      }`,
+      'desktop advanced settings panel is clipped by the sidebar or viewport',
+    );
+
+    await waitForPage(
+      sendPage,
+      `() => document.querySelector('.template-upload-bar input[aria-label="上传任务模板文件"]') && document.querySelector('.template-upload-bar input[aria-label="上传版式模板文件"]')`,
       'template upload bar did not render',
+    );
+    await evaluate(
+      sendPage,
+      `(() => {
+        const trigger = document.querySelector('.template-upload-button');
+        if (!trigger) throw new Error('template menu trigger missing');
+        trigger.focus();
+        trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+        return true;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => document.activeElement?.getAttribute('role') === 'menuitem' && document.querySelector('.template-upload-button')?.getAttribute('aria-expanded') === 'true'`,
+      'template menu did not open with keyboard focus',
+    );
+    await evaluate(
+      sendPage,
+      `(() => {
+        document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+        return true;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => document.activeElement?.matches('.composer textarea') && document.querySelector('.template-upload-button')?.getAttribute('aria-expanded') === 'false'`,
+      'template menu Tab did not move focus into the composer',
+    );
+    await evaluate(
+      sendPage,
+      `(() => {
+        const trigger = document.querySelector('.template-upload-button');
+        trigger?.focus();
+        trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+        return true;
+      })()`,
+    );
+    await waitForPage(sendPage, `() => document.activeElement?.getAttribute('role') === 'menuitem'`, 'template menu did not reopen');
+    await evaluate(
+      sendPage,
+      `(() => {
+        document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        return true;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => document.activeElement?.matches('.template-upload-button') && document.querySelector('.template-upload-button')?.getAttribute('aria-expanded') === 'false'`,
+      'template menu Escape did not restore trigger focus',
     );
 
     const strictTemplateBytes = Buffer.from(JSON.stringify({
@@ -368,7 +463,7 @@ async function main() {
     await evaluate(
       sendPage,
       `(() => {
-        const input = document.querySelector('.template-upload-input');
+        const input = document.querySelector('input[aria-label="上传任务模板文件"]');
         if (!input) throw new Error('template upload input missing');
         const fileBytes = Uint8Array.from(atob('${strictTemplateBytes}'), (char) => char.charCodeAt(0));
         const dt = new DataTransfer();
@@ -380,8 +475,43 @@ async function main() {
     );
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.template-upload-status')?.innerText.includes('已导入 1 个模板')`,
+      `() => document.querySelector('.template-upload-status')?.innerText.includes('已导入 1 个任务流程模板')`,
       'valid template upload did not complete',
+    );
+
+    const layoutTemplateBytes = Buffer.from('layout template browser smoke', 'utf8').toString('base64');
+    await evaluate(
+      sendPage,
+      `(() => {
+        const input = document.querySelector('input[aria-label="上传版式模板文件"]');
+        if (!input) throw new Error('layout template upload input missing');
+        const fileBytes = Uint8Array.from(atob('${layoutTemplateBytes}'), (char) => char.charCodeAt(0));
+        const dt = new DataTransfer();
+        dt.items.add(new File([fileBytes], 'strict-layout-template.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => document.querySelector('.template-upload-status')?.innerText.includes('已添加 1 个版式模板') && [...document.querySelectorAll('.attachment-chip')].some((node) => node.innerText.includes('strict-layout-template.docx') && node.innerText.includes('模板已锁定'))`,
+      'layout template did not enter the locked attachment flow',
+    );
+    await evaluate(
+      sendPage,
+      `(() => {
+        const chip = [...document.querySelectorAll('.attachment-chip')].find((node) => node.innerText.includes('strict-layout-template.docx'));
+        const remove = chip?.querySelector('.attachment-remove');
+        if (!remove) throw new Error('layout template remove action missing');
+        remove.click();
+        return true;
+      })()`,
+    );
+    await waitForPage(
+      sendPage,
+      `() => ![...document.querySelectorAll('.attachment-chip')].some((node) => node.innerText.includes('strict-layout-template.docx'))`,
+      'layout template attachment did not clear after verification',
     );
 
     const invalidTemplateBytes = Buffer.from(JSON.stringify({
@@ -402,7 +532,7 @@ async function main() {
     await evaluate(
       sendPage,
       `(() => {
-        const input = document.querySelector('.template-upload-input');
+        const input = document.querySelector('input[aria-label="上传任务模板文件"]');
         if (!input) throw new Error('template upload input missing');
         const fileBytes = Uint8Array.from(atob('${invalidTemplateBytes}'), (char) => char.charCodeAt(0));
         const dt = new DataTransfer();
@@ -580,7 +710,7 @@ async function main() {
     await evaluate(
       sendPage,
       `(() => {
-        const button = [...document.querySelectorAll('button')].find((item) => item.innerText.trim() === '可视化');
+        const button = [...document.querySelectorAll('button')].find((item) => item.innerText.trim() === '可视化编辑');
         if (!button) throw new Error('visualization panel button missing');
         button.click();
         return true;
@@ -588,48 +718,35 @@ async function main() {
     );
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.project-viz-overview')?.innerText.includes('Agent Cowork 项目视图')`,
-      'project visualization panel did not render',
-    );
-    await waitForPage(
-      sendPage,
       `() => {
-        const button = [...document.querySelectorAll('.project-viz-actions button')].find((item) => item.innerText.includes('渲染当前项目活页'));
-        return button && !button.disabled;
+        const panel = document.querySelector('.visual-editor-panel');
+        const text = panel?.innerText || '';
+        return text.includes('可视化编辑')
+          && text.includes('Word')
+          && text.includes('Excel')
+          && text.includes('PPT')
+          && text.includes('网页')
+          && text.includes('模板锁定');
       }`,
-      'project render button did not become enabled',
-    );
-    await evaluate(
-      sendPage,
-      `(() => {
-        const button = [...document.querySelectorAll('.project-viz-actions button')].find((item) => item.innerText.includes('渲染当前项目活页'));
-        if (!button) throw new Error('render current project button missing');
-        button.click();
-        return true;
-      })()`,
-    );
-    await waitForPage(
-      sendPage,
-      `() => document.querySelector('.viz-frame') && document.querySelector('.live-artifact-view')`,
-      'project live artifact did not render',
+      'advanced visual editor panel did not render',
     );
 
     const desktopShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(desktopScreenshotPath, Buffer.from(desktopShot.data, 'base64'));
 
     await sendPage('Emulation.setDeviceMetricsOverride', {
-      width: 390,
-      height: 844,
+      width: 960,
+      height: 768,
       deviceScaleFactor: 1,
-      mobile: true,
+      mobile: false,
     });
     await waitForPage(
       sendPage,
-      `() => document.querySelector('.project-viz-overview') && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
-      'mobile project visualization has horizontal overflow',
+      `() => Boolean(document.querySelector('.visual-editor-panel')) && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
+      'split-view advanced visual editor has horizontal overflow',
     );
-    const mobileShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-    fs.writeFileSync(mobileScreenshotPath, Buffer.from(mobileShot.data, 'base64'));
+    const splitShot = await sendPage<ScreenshotResult>('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(splitScreenshotPath, Buffer.from(splitShot.data, 'base64'));
 
 
     snapshot = snapshotFromPage(await evaluate(
@@ -643,8 +760,8 @@ async function main() {
         provider: document.querySelector('.provider-select')?.value || '',
         model: document.querySelector('.model-input')?.value || '',
         modelOptions: [...document.querySelectorAll('.model-opt-id')].map((node) => node.textContent || ''),
-        vizText: document.querySelector('.project-viz-overview')?.innerText || '',
-        hasVizFrame: Boolean(document.querySelector('.viz-frame')),
+        visualEditorText: document.querySelector('.visual-editor-panel')?.innerText || '',
+        hasVisualEditorPanel: Boolean(document.querySelector('.visual-editor-panel')),
         securityText: document.querySelector('.security-status-bar')?.innerText || '',
         assistantText: [...document.querySelectorAll('.bubble-assistant .message-text')].map((node) => node.innerText).join('\\n'),
         scrollWidth: document.documentElement.scrollWidth,
@@ -669,10 +786,11 @@ async function main() {
     assert(snapshot.modelOptions.includes('qwen2.5:0.5b'), 'Ollama qwen2.5:0.5b curated fallback missing');
     assert(!snapshot.modelOptions.includes('deepseek-r1:7b'), 'Ollama stale R1 should not be a curated highlight');
     assert(snapshot.assistantText.trim().length > 0, 'Ollama assistant text missing');
-    assert(snapshot.securityText.includes('外发 0 B'), 'security status did not show zero external egress');
-    assert(snapshot.vizText.includes('Agent Cowork 项目视图'), 'project visualization snapshot missing project view');
-    assert(snapshot.hasVizFrame, 'live artifact iframe missing');
-    assert(snapshot.scrollWidth <= snapshot.clientWidth + 1, 'mobile layout has horizontal overflow');
+    assert(snapshot.securityText.includes('仅本地处理'), 'security status did not show the local model boundary');
+    assert(snapshot.securityText.includes('今天未记录外发内容'), 'security status did not show zero recorded egress');
+    assert(snapshot.visualEditorText.includes('模板锁定'), 'advanced visual editor snapshot missing template lock');
+    assert(snapshot.hasVisualEditorPanel, 'advanced visual editor panel missing');
+    assert(snapshot.scrollWidth <= snapshot.clientWidth + 1, 'split-view layout has horizontal overflow');
 
     const report = {
       ok: true,
@@ -684,7 +802,7 @@ async function main() {
       uiDistRoot,
       ollama: { baseUrl: OLLAMA_BASE_URL, model: OLLAMA_MODEL, installedModels: ollamaModels },
       reportPath,
-      screenshots: { desktopScreenshotPath, mobileScreenshotPath, composerAdvancedMobileScreenshotPath },
+      screenshots: { desktopScreenshotPath, splitScreenshotPath, composerAdvancedSplitScreenshotPath },
       beginnerScreenshots: { home1366ScreenshotPath, home1536ScreenshotPath },
       uploadedFiles,
       beginnerHome,

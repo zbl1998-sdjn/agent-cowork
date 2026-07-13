@@ -10,8 +10,8 @@ import { Input } from '../ui/Input';
 import { Empty, ErrorState } from '../ui/StateViews';
 import { ArtifactVersionCreate } from './ArtifactVersionCreate';
 import { ArtifactVersionHistory } from './ArtifactVersionHistory';
-
-interface ArtifactsPanelProps { trustedRoot: string }
+import { OfficeVisualEditor, supportsVisualEditing } from '../office/OfficeVisualEditor';
+interface ArtifactsPanelProps { trustedRoot: string; variant?: 'artifacts' | 'visual' }
 
 export function humanArtifactSize(n?: number): string {
   if (!n || n < 0) return '';
@@ -49,7 +49,7 @@ export function sanitizeArtifactRename(value: string): string {
 
 export function ArtifactsPanelStateViews({ error, onRetry }: { error: string; onRetry: () => void }) {
   if (error) {
-    return <ErrorState title="产物加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
+    return <ErrorState title="文件成果加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
   return <Empty title="还没有成果" message="完成一次任务后，Word、Excel、PPT、PDF、可复制文本或 CSV 会出现在这里。" />;
 }
@@ -66,6 +66,7 @@ export interface ArtifactPanelItemProps {
   onBeginRename: (item: ArtifactItem) => void;
   onCreateVersion?: (artifactId: string) => void;
   onViewHistory?: (artifactId: string) => void;
+  onVisualEdit?: (item: ArtifactItem) => void;
 }
 
 export function ArtifactPanelItem({
@@ -80,6 +81,7 @@ export function ArtifactPanelItem({
   onBeginRename,
   onCreateVersion,
   onViewHistory,
+  onVisualEdit,
 }: ArtifactPanelItemProps) {
   const liveArtifactId = item.liveArtifactId;
   const onRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -90,10 +92,9 @@ export function ArtifactPanelItem({
   return (
     <li className="artifact-panel-card" key={item.path}>
       <div className="artifact-panel-head">
-        <code>{item.name}</code>
+        <strong className="artifact-panel-name">{item.name}</strong>
         <span>{artifactMeta(item)}</span>
       </div>
-      {item.relativePath && <p>{item.relativePath}</p>}
       {renaming && (
         <div className="panel-row">
           <Input
@@ -102,22 +103,25 @@ export function ArtifactPanelItem({
             onChange={(event: ChangeEvent<HTMLInputElement>) => onRenameTextChange(event.target.value)}
             onKeyDown={onRenameKeyDown}
           />
-          <Button variant="primary" disabled={busy || !sanitizeArtifactRename(renameText)} onClick={() => onCommitRename(item)}>保存</Button>
-          <Button variant="secondary" disabled={busy} onClick={onCancelRename}>取消</Button>
+          <Button aria-label={`保存 ${item.name} 的新名称`} variant="primary" disabled={busy || !sanitizeArtifactRename(renameText)} onClick={() => onCommitRename(item)}>保存</Button>
+          <Button aria-label={`取消重命名 ${item.name}`} variant="secondary" disabled={busy} onClick={onCancelRename}>取消</Button>
         </div>
       )}
       <div className="panel-row">
-        <Button variant="secondary" onClick={() => onOpen(item.path)}>打开</Button>
+        {supportsVisualEditing(item.name) && onVisualEdit && (
+          <Button aria-label={`可视化编辑 ${item.name}`} variant="primary" disabled={busy} onClick={() => onVisualEdit(item)}>可视化编辑</Button>
+        )}
+        <Button aria-label={`打开 ${item.name}`} variant="secondary" onClick={() => onOpen(item.path)}>打开</Button>
         {!liveArtifactId && (
-          <Button variant="secondary" disabled={busy} onClick={() => onBeginRename(item)}>重命名</Button>
+          <Button aria-label={`重命名 ${item.name}`} variant="secondary" disabled={busy} onClick={() => onBeginRename(item)}>重命名</Button>
         )}
         {liveArtifactId && onCreateVersion && (
-          <Button variant="secondary" disabled={busy} onClick={() => onCreateVersion(liveArtifactId)}>
+          <Button aria-label={`为 ${item.name} 创建新版本`} variant="secondary" disabled={busy} onClick={() => onCreateVersion(liveArtifactId)}>
             创建新版本
           </Button>
         )}
         {liveArtifactId && onViewHistory && (
-          <Button variant="secondary" disabled={busy} onClick={() => onViewHistory(liveArtifactId)}>
+          <Button aria-label={`查看 ${item.name} 的版本历史`} variant="secondary" disabled={busy} onClick={() => onViewHistory(liveArtifactId)}>
             版本历史
           </Button>
         )}
@@ -126,7 +130,7 @@ export function ArtifactPanelItem({
   );
 }
 
-export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
+export function ArtifactsPanel({ trustedRoot, variant = 'artifacts' }: ArtifactsPanelProps) {
   const [items, setItems] = useState<ArtifactItem[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,6 +138,7 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
   const [renameText, setRenameText] = useState('');
   const [versionParentId, setVersionParentId] = useState('');
   const [historyId, setHistoryId] = useState('');
+  const [editingItem, setEditingItem] = useState<ArtifactItem | null>(null);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -175,12 +180,21 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
     }
   };
 
+  if (editingItem) return (
+    <OfficeVisualEditor
+        item={editingItem}
+        trustedRoot={trustedRoot}
+        onClose={() => setEditingItem(null)}
+        onSaved={() => { setEditingItem(null); void refresh(); }}
+    />
+  );
+
   return (
-    <section className="side-panel">
-      <h2>成果</h2>
-      <p className="panel-intro">这里优先展示白领常用格式：Word、Excel、PPT、PDF、可复制文本和 CSV。默认生成副本，不会覆盖原文件。</p>
+    <section className={`side-panel${variant === 'visual' ? ' visual-editor-panel' : ''}`}>
+      <h2>{variant === 'visual' ? '可视化编辑' : '文件成果'}</h2>
+      <p className="panel-intro">{variant === 'visual' ? '直接编辑 Word、Excel、PPT 和网页组件；上传版式模板后启用模板锁定，Agent 只填内容并保留原结构与样式。' : '这里优先展示白领常用格式：Word、Excel、PPT、PDF、可复制文本和 CSV。默认生成副本，不会覆盖原文件。'}</p>
       <div className="artifact-format-strip" aria-label="常用成果格式">
-        {['Word', 'Excel', 'PPT', 'PDF', '文本', 'CSV'].map((format) => <span key={format}>{format}</span>)}
+        {(variant === 'visual' ? ['Word', 'Excel', 'PPT', '网页'] : ['Word', 'Excel', 'PPT', 'PDF', '文本', 'CSV']).map((format) => <span key={format}>{format}</span>)}
       </div>
       <div className="panel-row">
         <Button variant="secondary" disabled={busy} onClick={() => void refresh()}>{busy ? '刷新中…' : '刷新'}</Button>
@@ -200,6 +214,7 @@ export function ArtifactsPanel({ trustedRoot }: ArtifactsPanelProps) {
             onBeginRename={beginRename}
             onCreateVersion={(artifactId) => { setHistoryId(''); setVersionParentId(artifactId); }}
             onViewHistory={setHistoryId}
+            onVisualEdit={setEditingItem}
           />
         ))}
         {items.length === 0 && !error && (

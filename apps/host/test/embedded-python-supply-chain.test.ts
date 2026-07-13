@@ -39,7 +39,7 @@ test('embedded Python package install is hash-locked, binary-only, and fail-clos
 
 test('embedded Python lock retains the audited vulnerability-fixed direct pins', () => {
   const inputLines = new Set(input.split(/\r?\n/));
-  for (const pin of ['lxml==6.1.0', 'pillow==12.2.0', 'requests==2.33.0']) {
+  for (const pin of ['lxml==6.1.0', 'pillow==12.3.0', 'requests==2.33.0']) {
     assert.ok(inputLines.has(pin), pin + ' must remain a direct pin');
     assert.ok(lock.toLowerCase().includes(pin + ' \\'), pin + ' must appear in the resolved lock');
   }

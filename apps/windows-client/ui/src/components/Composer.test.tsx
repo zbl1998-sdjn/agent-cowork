@@ -51,10 +51,12 @@ function renderComposerWithFallbackOllama(): string {
 }
 
 describe('Composer', () => {
-  it('renders per-session provider + model controls but NOT credential fields', () => {
+  it('keeps model controls behind a beginner-facing advanced disclosure and omits credential fields', () => {
     const html = renderComposer();
 
-    expect(html).toContain('class="composer-footer-right"'); // 模型控件直接可见,不再折叠进「高级」
+    expect(html).toContain('class="composer-footer-right"');
+    expect(html).toContain('<details class="composer-advanced"');
+    expect(html).toContain('<summary>标准 · Kimi / Moonshot</summary>');
     expect(html).toContain('provider-select');
     expect(html).toContain('title="本轮模型提供商"');
     expect(html).toContain('placeholder="今天想完成什么？例如：帮我把这些表格合并成一个总表"');
@@ -68,6 +70,8 @@ describe('Composer', () => {
     expect(html).toContain('type="file"');
     expect(html).toContain('multiple=""');
     expect(html).toContain('aria-label="选择附件文件"');
+    expect(html).not.toContain('aria-label="选择版式模板"');
+    expect(html).not.toContain('aria-label="上传版式模板"');
     // Base URL / API Key 已移到 Settings;凭据绝不能出现在输入框组件里。
     expect(html).not.toContain('title="本轮 Base URL"');
     expect(html).not.toContain('placeholder="本轮 API Key"');

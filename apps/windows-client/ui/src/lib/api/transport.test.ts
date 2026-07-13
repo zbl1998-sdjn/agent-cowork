@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(async () => undefined) }));
@@ -18,8 +19,15 @@ function setLocation(loc: Loc): void {
   (globalThis as unknown as { window: unknown }).window = { location: loc };
 }
 
+function setDesktopLocation(loc: Loc): void {
+  (globalThis as unknown as { window: unknown }).window = { location: loc, __TAURI_INTERNALS__: {} };
+}
+
 // 还原全局 window,防止一个 origin 场景污染后续 host base 判断。
 afterEach(() => {
+  vi.useRealTimers();
+  vi.mocked(invoke).mockReset();
+  vi.mocked(fetch).mockClear();
   if (hadWindow) (globalThis as unknown as { window: unknown }).window = originalWindow;
   else delete (globalThis as unknown as { window?: unknown }).window;
 });
@@ -52,5 +60,50 @@ describe('defaultHostBase (host base URL selection)', () => {
     setLocation({ origin: 'http://127.0.0.1:3017', port: '3017', protocol: 'http:', hostname: '127.0.0.1' });
     const { defaultHostBase } = await import('./transport');
     expect(defaultHostBase()).toBe('http://127.0.0.1:3017');
+  });
+});
+
+describe('desktop sidecar identity gate', () => {
+  const desktopLocation: Loc = {
+    origin: 'http://tauri.localhost',
+    port: '',
+    protocol: 'http:',
+    hostname: 'tauri.localhost',
+  };
+  const verifiedStatus = { url: 'http://127.0.0.1:3017', running: true, verified: true };
+  const unverifiedStatus = { ...verifiedStatus, verified: false };
+
+  it('does not trust a public /health 200 when native status is unverified', async () => {
+    vi.useFakeTimers();
+    setDesktopLocation(desktopLocation);
+    vi.mocked(invoke).mockResolvedValue(unverifiedStatus);
+    vi.mocked(fetch).mockClear();
+    const { ensureHost } = await import('./transport');
+    const pending = ensureHost(1, 0);
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts a desktop host only after native verification', async () => {
+    setDesktopLocation(desktopLocation);
+    vi.mocked(invoke).mockResolvedValue(verifiedStatus);
+    vi.mocked(fetch).mockClear();
+    const { ensureHost } = await import('./transport');
+    await expect(ensureHost(1, 0)).resolves.toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('blocks an API fetch after the native verified state is revoked', async () => {
+    vi.useFakeTimers();
+    setDesktopLocation(desktopLocation);
+    vi.mocked(invoke).mockResolvedValue(unverifiedStatus);
+    vi.mocked(fetch).mockClear();
+    const { getJson } = await import('./transport');
+    const pending = getJson('/api/workspace');
+    const rejected = expect(pending).rejects.toThrow('desktop host identity is not verified');
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

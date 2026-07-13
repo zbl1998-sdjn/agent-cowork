@@ -3,7 +3,9 @@ import { IconButton } from './ui/Button';
 
 interface ComposerAttachmentsProps {
   attachments: File[];
+  templateFiles?: File[] | undefined;
   onRemove: (index: number) => void;
+  onToggleTemplate?: ((index: number) => void) | undefined;
 }
 
 export function formatAttachmentSize(size: unknown): string {
@@ -25,7 +27,9 @@ export function attachmentBatchSummary(files: File[]): string {
   return `已选 ${files.length} 个文件 · ${formatAttachmentSize(total)}`;
 }
 
-export function ComposerAttachments({ attachments, onRemove }: ComposerAttachmentsProps) {
+const TEMPLATE_FILE_RE = /\.(docx|xlsx|pptx|html?)$/i;
+
+export function ComposerAttachments({ attachments, templateFiles = [], onRemove, onToggleTemplate }: ComposerAttachmentsProps) {
   if (attachments.length === 0) return null;
   const summary = attachmentBatchSummary(attachments);
   return (
@@ -35,6 +39,15 @@ export function ComposerAttachments({ attachments, onRemove }: ComposerAttachmen
         <span key={`${file.name}-${file.size}-${index}`} className="attachment-chip" title={`${file.name} · ${formatAttachmentSize(file.size)}`}>
           <span className="attachment-name">{file.name}</span>
           <span className="attachment-size">{formatAttachmentSize(file.size)}</span>
+          {templateFiles.includes(file) && <span className="attachment-template-badge">模板已锁定</span>}
+          {onToggleTemplate && TEMPLATE_FILE_RE.test(file.name) && (
+            <IconButton
+              className="attachment-template-toggle"
+              label={`${templateFiles.includes(file) ? '取消' : '设为'}版式模板 ${file.name}`}
+              size="sm"
+              onClick={() => onToggleTemplate(index)}
+            >T</IconButton>
+          )}
           <IconButton
             className="attachment-remove"
             label="移除附件"

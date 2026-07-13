@@ -36,7 +36,8 @@ test('runCode prefers configured embedded Python on the local backend', async ()
 
   const outcome = await runCode({
     sandbox,
-    sandboxLimits: { allowTools: sandboxAllowTools() },
+    sandboxLimits: { allowTools: sandboxAllowTools(), allowUnrestrictedHostExecution: true },
+    unrestrictedHostExecution: true,
     runtimeEnv: { KCW_EMBEDDED_PYTHON: embeddedPython },
     tool: 'python3',
     code: 'print("ok")',
@@ -46,6 +47,7 @@ test('runCode prefers configured embedded Python on the local backend', async ()
 
   const spec = present(sandbox.capturedSpec, 'captured python spec');
   assert.equal(spec.tool, path.basename(embeddedPython));
+  assert.equal(spec.executablePath, embeddedPython);
   assert.deepEqual(spec.args, [outcome.scriptRelative]);
   assert.equal(spec.env.PATH, path.dirname(embeddedPython));
   assert.match(outcome.scriptRelative, /^\.AgentCowork\/scripts\/run_[^/]+\.py$/);
@@ -68,6 +70,7 @@ test('runCode keeps VM Python tools inside the VM image', async () => {
 
   const spec = present(sandbox.capturedSpec, 'captured VM python spec');
   assert.equal(spec.tool, 'python3');
+  assert.equal(spec.executablePath, undefined);
   assert.deepEqual(spec.env, {});
 });
 
@@ -102,7 +105,8 @@ test('runCode prefers the host Node runtime on the local backend', async () => {
 
   await runCode({
     sandbox,
-    sandboxLimits: { allowTools: sandboxAllowTools() },
+    sandboxLimits: { allowTools: sandboxAllowTools(), allowUnrestrictedHostExecution: true },
+    unrestrictedHostExecution: true,
     runtimeEnv: {},
     nodeExecPath,
     tool: 'node',
@@ -113,6 +117,7 @@ test('runCode prefers the host Node runtime on the local backend', async () => {
 
   const spec = present(sandbox.capturedSpec, 'captured node spec');
   assert.equal(spec.tool, path.basename(nodeExecPath));
+  assert.equal(spec.executablePath, nodeExecPath);
   assert.equal(spec.env.PATH, path.dirname(nodeExecPath));
 });
 
@@ -134,6 +139,7 @@ test('runCode keeps VM Node tools inside the VM image', async () => {
 
   const spec = present(sandbox.capturedSpec, 'captured VM node spec');
   assert.equal(spec.tool, 'node');
+  assert.equal(spec.executablePath, undefined);
   assert.deepEqual(spec.env, {});
 });
 
@@ -168,7 +174,8 @@ test('runCode ignores relative Node runtime configuration', async () => {
 
   await runCode({
     sandbox,
-    sandboxLimits: { allowTools: sandboxAllowTools() },
+    sandboxLimits: { allowTools: sandboxAllowTools(), allowUnrestrictedHostExecution: true },
+    unrestrictedHostExecution: true,
     runtimeEnv: { KCW_NODE_HOME: '..\\not-absolute' },
     nodeExecPath: path.join(trustedRoot, 'agent-cowork-host.exe'),
     tool: 'node',
@@ -179,5 +186,6 @@ test('runCode ignores relative Node runtime configuration', async () => {
 
   const spec = present(sandbox.capturedSpec, 'captured relative node spec');
   assert.equal(spec.tool, 'node');
+  assert.equal(spec.executablePath, undefined);
   assert.deepEqual(spec.env, {});
 });

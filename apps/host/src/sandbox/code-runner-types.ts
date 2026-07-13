@@ -40,6 +40,7 @@ export type RunCodeOptions = {
   ext?: unknown;
   timeoutMs?: unknown;
   network?: boolean;
+  unrestrictedHostExecution?: boolean;
   trustedRoot: string;
   runStoreRoot: string;
   runEvents?: RunEventsLike | null;

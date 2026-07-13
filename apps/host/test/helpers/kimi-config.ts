@@ -33,6 +33,18 @@ const fallbackStatusSchema = z.object({
   model: z.string().optional(),
 }).loose();
 
+const providerStateSchema = z.object({
+  provider: z.string(),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  hasKey: z.boolean(),
+  baseUrl: z.string(),
+  model: z.string(),
+  policyDecision: z.enum(['allow', 'deny', 'needs_approval']),
+  reasonCode: z.string(),
+  reason: z.string(),
+}).loose();
+
 export const kimiConfigResponseSchema = z.object({
   provider: z.string().optional(),
   configured: z.boolean().optional(),
@@ -43,6 +55,7 @@ export const kimiConfigResponseSchema = z.object({
   model: z.string().optional(),
   apiKey: z.unknown().optional(),
   fallbacks: z.array(fallbackStatusSchema).optional(),
+  providerStates: z.array(providerStateSchema).optional(),
 }).loose();
 
 export const kimiErrorResponseSchema = z.object({
@@ -57,6 +70,11 @@ const persistedConfigSchema = z.object({
     model: z.string().optional(),
     fallbacks: z.array(z.object({
       provider: z.string().optional(),
+      apiKey: z.string().optional(),
+      baseUrl: z.string().optional(),
+      model: z.string().optional(),
+    }).loose()).optional(),
+    providerProfiles: z.record(z.string(), z.object({
       apiKey: z.string().optional(),
       baseUrl: z.string().optional(),
       model: z.string().optional(),
@@ -86,6 +104,14 @@ export async function withKimiConfigServer(
 
 export function postKimiConfig(baseUrl: string, body: unknown): Promise<Response> {
   return fetch(`${baseUrl}/api/kimi/config`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export function postKimiTest(baseUrl: string, body: unknown): Promise<Response> {
+  return fetch(`${baseUrl}/api/kimi/test`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),

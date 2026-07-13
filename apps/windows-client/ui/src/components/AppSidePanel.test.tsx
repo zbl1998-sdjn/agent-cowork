@@ -30,10 +30,10 @@ describe('AppSidePanel', () => {
 
     expect(boundary).toBeTruthy();
     expect(String(boundary?.key)).toContain('tools');
-    expect((boundary?.props as { label?: string }).label).toBe('工具');
+    expect((boundary?.props as { label?: string }).label).toBe('扩展能力');
   });
 
-  it('labels the task center as a review surface', () => {
+  it('uses the same beginner-facing task label as the navigation rail', () => {
     const element = renderPanel('tasks');
     const props = element?.props as { children: unknown };
     const children = Children.toArray(props.children as ReactNode);
@@ -41,7 +41,7 @@ describe('AppSidePanel', () => {
       (child) => isValidElement(child) && child.type === ErrorBoundary,
     ) as ReactElement | undefined;
 
-    expect((boundary?.props as { label?: string }).label).toBe('任务中心');
+    expect((boundary?.props as { label?: string }).label).toBe('任务记录');
   });
 
   it('renders lazy panel fallback while the selected panel chunk loads', () => {

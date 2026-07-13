@@ -1,6 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { nextTemplateMenuIndex } from '../hooks/useTemplateImportMenu';
 import { AppComposerDockStatus, TemplateUploadBar } from './AppComposerDock';
 import { Button } from './ui/Button';
 
@@ -57,16 +58,39 @@ describe('AppComposerDockStatus', () => {
     expect(onClearRecipe).toHaveBeenCalledOnce();
   });
 
-  it('renders a batch template upload control without exposing JSON jargon', () => {
-    const html = renderToStaticMarkup(<TemplateUploadBar onUploadTemplates={async () => []} />);
+  it('offers task and layout templates from one beginner-facing import entry', () => {
+    const html = renderToStaticMarkup(
+      <TemplateUploadBar
+        onUploadTemplates={async () => []}
+        onUploadLayoutTemplates={() => {}}
+      />,
+    );
 
-    expect(html).toContain('导入任务模板');
-    expect(html).toContain('支持批量任务模板文件');
-    expect(html).toContain('class="template-upload-input"');
-    expect(html).toContain('type="file"');
+    expect(html).toContain('导入模板');
+    expect(html).toContain('任务流程模板');
+    expect(html).toContain('Office / 网页版式');
+    expect(html).toContain('可导入任务步骤，也可上传 Word / Excel / PPT / 网页模板');
+    expect(html.match(/class="template-upload-input"/g)?.length).toBe(2);
     expect(html).toContain('accept=".json,application/json"');
     expect(html).toContain('multiple=""');
-    expect(html).not.toContain('支持批量 JSON 模板');
     expect(html).toContain('aria-label="上传任务模板文件"');
+    expect(html).toContain('accept=".docx,.xlsx,.pptx,.html,.htm"');
+    expect(html).toContain('aria-label="上传版式模板文件"');
+    expect(html).not.toContain('支持批量 JSON 模板');
+  });
+
+  it('exposes menu-button semantics and deterministic keyboard navigation', () => {
+    const html = renderToStaticMarkup(
+      <TemplateUploadBar onUploadTemplates={async () => []} onUploadLayoutTemplates={() => {}} />,
+    );
+
+    expect(html).toContain('aria-controls="template-import-menu"');
+    expect(html).toContain('id="template-import-menu"');
+    expect(nextTemplateMenuIndex('ArrowDown', 0, 2)).toBe(1);
+    expect(nextTemplateMenuIndex('ArrowDown', 1, 2)).toBe(0);
+    expect(nextTemplateMenuIndex('ArrowUp', 0, 2)).toBe(1);
+    expect(nextTemplateMenuIndex('Home', 1, 2)).toBe(0);
+    expect(nextTemplateMenuIndex('End', 0, 2)).toBe(1);
+    expect(nextTemplateMenuIndex('Enter', 1, 2)).toBeNull();
   });
 });

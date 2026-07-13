@@ -5,6 +5,7 @@ import { createServer, type ServerConfig } from '../src/server.js';
 import { closeTestServer } from './helpers/close-server.js';
 import { recordValue, stringField } from './helpers/host-http.js';
 import { makeTestWorkspace } from './test-fixtures.js';
+import { createUserStore } from '../src/auth/user-store.js';
 
 type AuthRouteOptions = {
   method: 'GET' | 'POST' | 'PUT';
@@ -118,11 +119,21 @@ test('new file and route surfaces are covered by the auth gate', async () => {
   });
 });
 
-test('public auth routes work without a token, and the token then unlocks /api', async () => {
+test('registration is default-closed and a valid enrollment capability is consumed once', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-2');
-  await withServer({ trustedRoot, requireAuth: true }, async (base) => {
-    const registerResponse = await fetch(`${base}/api/auth/register`, {
+  const authStore = createUserStore();
+  const enrollmentToken = 'sample-enrollment-capability-000000000001';
+  await withServer({ trustedRoot, requireAuth: true, authStore, enrollmentToken }, async (base) => {
+    const denied = await fetch(`${base}/api/auth/register`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'gateuser', password: 'passw0rd' }),
+    });
+    assert.equal(denied.status, 403);
+    assert.equal(authStore.count(), 0, 'denied enrollment must not create a user');
+
+    const registerResponse = await fetch(`${base}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kcw-enrollment-token': enrollmentToken },
       body: JSON.stringify({ username: 'gateuser', password: 'passw0rd' }),
     });
     const reg = recordValue(await registerResponse.json(), 'register response');
@@ -130,20 +141,21 @@ test('public auth routes work without a token, and the token then unlocks /api',
     assert.ok(token, 'register returns a token');
     const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(ok.status, 200);
+
+    const replay = await fetch(`${base}/api/auth/guest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kcw-enrollment-token': enrollmentToken },
+      body: '{}',
+    });
+    assert.equal(replay.status, 403, 'enrollment capability must be single-use');
   });
 });
 
-test('guest endpoint mints an isolated token that passes the gate', async () => {
+test('guest enrollment is default-closed without an enrollment capability', async () => {
   const trustedRoot = makeTestWorkspace('kcw-authgate-guest');
   await withServer({ trustedRoot, requireAuth: true }, async (base) => {
     const guestResponse = await fetch(`${base}/api/auth/guest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-    const guest = recordValue(await guestResponse.json(), 'guest response');
-    const token = stringField(guest, 'token');
-    const tenantId = stringField(guest, 'tenantId');
-    assert.ok(token, 'guest returns a token');
-    assert.match(tenantId, /^tenant_guest_/, 'guest gets its own tenant');
-    const ok = await fetch(`${base}/api/workspace`, { headers: { authorization: `Bearer ${token}` } });
-    assert.equal(ok.status, 200);
+    assert.equal(guestResponse.status, 403);
   });
 });
 

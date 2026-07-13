@@ -6,27 +6,31 @@ import { streamChat } from '../kimi/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../kimi/api-runner.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
+import { omitUndefined } from '../util/object.js';
 import { hasSessionModelAccess } from './session-model-config.js';
-import { modelProvider, runKimiAndRecord, sendKimiInfo, sendModelProviderCatalog, type KimiRouteState } from './kimi-route-support.js';
+import { modelProvider, sendKimiInfo, sendModelProviderCatalog, type KimiRouteState } from './kimi-route-support.js';
+import { runKimiAndRecord } from './kimi-route-records.js';
 import {
-  apiKeyFromEnvForProvider,
-  composeFullModelId,
-  defaultBaseUrlForProvider,
-  defaultModelForProvider,
-  providerRequiresApiKey,
   splitFullModelId,
 } from '../kimi/provider/catalog.js';
+import {
+  activateProviderProfile,
+  cloneProviderProfiles,
+  syncActiveProviderProfile,
+} from '../kimi/provider-profiles.js';
 import {
   kimiAgentStreamBodySchema,
   kimiChatStreamBodySchema,
   kimiConfigBodySchema,
   kimiPlanChatBodySchema,
+  kimiTestBodySchema,
   normalizeKimiFallbacks,
   parseKimiBody,
 } from './kimi-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
 import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
+import { testModelConnection } from '../kimi/model-connection-test.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
 type KimiRouteOptions = {
@@ -38,12 +42,14 @@ type KimiRouteOptions = {
   safeTrustedRoot(input?: unknown): string;
 };
 
-function recomputeModelConfigured(config: KimiRouteState['kimiApiConfig']): void {
-  const provider = modelProvider(config);
-  config.fullModelId = composeFullModelId(provider, config.model);
-  config.configured = providerRequiresApiKey(provider)
-    ? Boolean(config.apiKey)
-    : Boolean(config.baseUrl && config.model);
+function hasLocalModelConfigSelfService(
+  state: HostState,
+  requestContext: RequestContext,
+): boolean {
+  return state.allowLocalModelConfigSelfService === true
+    && state.requireAuth === true
+    && state.trustIdentityHeaders !== true
+    && requestContext.authenticated === true;
 }
 
 export async function handleKimiRoutes({
@@ -62,39 +68,37 @@ export async function handleKimiRoutes({
   }
 
   if (request.method === 'POST' && pathname === '/api/kimi/config') {
-    if (!requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)) return true;
+    if (
+      !hasLocalModelConfigSelfService(state, requestContext)
+      && !requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)
+    ) return true;
     await withJsonBody(request, response, async (body) => {
       const input = parseKimiBody(response, kimiConfigBodySchema, body, 'invalid kimi config request');
       if (!input) return;
       const previousConfig = {
         ...routeState.kimiApiConfig,
         fallbacks: routeState.kimiApiConfig.fallbacks.map((fallback) => ({ ...fallback })),
+        providerProfiles: cloneProviderProfiles(routeState.kimiApiConfig.providerProfiles),
       };
       const previousEnabled = routeState.kimiApiEnabled;
       const previousProvider = modelProvider(routeState.kimiApiConfig);
+      const parsedModel = splitFullModelId(input.model);
+      const requestedProvider = input.provider?.trim()
+        ? modelProvider(input)
+        : parsedModel.provider || previousProvider;
+      if (requestedProvider !== previousProvider) {
+        activateProviderProfile(routeState.kimiApiConfig, requestedProvider);
+      }
       if (input.clearKey === true) routeState.kimiApiConfig.apiKey = '';
       else if (input.apiKey?.trim()) routeState.kimiApiConfig.apiKey = input.apiKey.trim();
-      if (input.provider?.trim()) {
-        const nextProvider = modelProvider(input);
-        routeState.kimiApiConfig.provider = nextProvider;
-        if (nextProvider !== previousProvider) {
-          if (input.clearKey !== true && !input.apiKey?.trim()) {
-            routeState.kimiApiConfig.apiKey = apiKeyFromEnvForProvider(nextProvider, process.env);
-          }
-          if (!input.baseUrl?.trim()) routeState.kimiApiConfig.baseUrl = defaultBaseUrlForProvider(nextProvider);
-          if (!input.model?.trim()) routeState.kimiApiConfig.model = defaultModelForProvider(nextProvider);
-        }
-      }
       if (input.fallbacks) routeState.kimiApiConfig.fallbacks = normalizeKimiFallbacks(input.fallbacks);
       if (input.baseUrl?.trim()) routeState.kimiApiConfig.baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
       if (input.model?.trim()) {
-        const parsed = splitFullModelId(input.model);
-        if (!input.provider?.trim() && parsed.provider) routeState.kimiApiConfig.provider = parsed.provider;
-        routeState.kimiApiConfig.model = parsed.provider && (!input.provider?.trim() || parsed.provider === modelProvider(routeState.kimiApiConfig))
-          ? parsed.model
+        routeState.kimiApiConfig.model = parsedModel.provider && (!input.provider?.trim() || parsedModel.provider === modelProvider(routeState.kimiApiConfig))
+          ? parsedModel.model
           : input.model.trim();
       }
-      recomputeModelConfigured(routeState.kimiApiConfig);
+      syncActiveProviderProfile(routeState.kimiApiConfig);
       routeState.recomputeKimiEnabled();
       try {
         routeState.persistKimiConfig();
@@ -112,6 +116,22 @@ export async function handleKimiRoutes({
 
   if (request.method === 'GET' && pathname === '/api/kimi/info') {
     await sendKimiInfo(response, routeState);
+    return true;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/kimi/test') {
+    await withJsonBody(request, response, async (body) => {
+      const input = parseKimiBody(response, kimiTestBodySchema, body, 'invalid kimi test request');
+      if (!input) return;
+      const fetchImpl = typeof routeState.config.fetchImpl === 'function'
+        ? routeState.config.fetchImpl as typeof fetch
+        : undefined;
+      sendJson(response, 200, await testModelConnection(
+        routeState.kimiApiConfig,
+        omitUndefined(input),
+        fetchImpl,
+      ));
+    });
     return true;
   }
 

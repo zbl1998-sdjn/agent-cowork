@@ -96,6 +96,13 @@ test('resolveModelProvider registers Anthropic aliases', () => {
   assert.equal(resolveModelProvider({ provider: 'CLAUDE' }).id, 'anthropic');
 });
 
+test('resolveModelProvider rejects unknown provider ids instead of silently using Kimi', () => {
+  assert.throws(
+    () => resolveModelProvider({ provider: 'openai-typo' }),
+    /Unknown model provider: openai-typo/,
+  );
+});
+
 test('model breakers are scoped by normalized provider, endpoint, and model', () => {
   const first = modelBreaker({ provider: ' OpenAI ', baseUrl: 'https://breaker-a.example.invalid/v1', model: 'm1' });
   const same = modelBreaker({ provider: 'openai', baseUrl: 'https://breaker-a.example.invalid/v1', model: 'm1' });
@@ -258,6 +265,8 @@ test('local OpenAI-compatible provider does not require or send an API key', asy
   assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.headers.authorization, undefined);
   assert.equal(captured.body.model, 'local-model');
+  assert.equal(captured.body.tools, undefined);
+  assert.equal(captured.body.tool_choice, undefined);
   assert.equal(message.content, 'local ok');
   assert.equal(message.provider, 'openai/local');
   assert.equal(message.model, 'local-model');
@@ -332,6 +341,10 @@ test('domestic catalog providers route through OpenAI-compatible fetch', async (
   assert.equal(captured.url, 'https://api.deepseek.example/chat/completions');
   assert.equal(captured.headers.authorization, 'Bearer test-deepseek-key');
   assert.equal(captured.body.model, 'deepseek-v4-flash');
+  assert.equal(captured.body.tools, undefined);
+  assert.equal(captured.body.tool_choice, undefined);
+  assert.equal(captured.body.stream_options, undefined);
+  assert.equal(captured.body.prompt_cache_key, undefined);
   assert.equal(message.provider, 'deepseek');
   assert.equal(message.content, 'deepseek ok');
 });

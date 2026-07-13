@@ -8,8 +8,12 @@ import path from 'node:path';
 
 export type SandboxLike = { backend?: unknown };
 export type RuntimeEnv = Record<string, string | undefined>;
-export type LocalRuntimeTool = { tool: string; pathPrefix: string };
-export type SandboxLimits = { allowTools?: readonly string[] | null; allowEnv?: readonly string[] };
+export type LocalRuntimeTool = { tool: string; executablePath: string; pathPrefix: string };
+export type SandboxLimits = {
+  allowTools?: readonly string[] | null;
+  allowEnv?: readonly string[];
+  allowUnrestrictedHostExecution?: boolean;
+};
 
 const PYTHON_TOOLS = new Set(['python', 'python3']);
 const NODE_TOOLS = new Set(['node']);
@@ -28,12 +32,14 @@ function cleanConfiguredPath(value: unknown): string {
 
 function fromExecutable(exePath: unknown): LocalRuntimeTool | null {
   const clean = cleanConfiguredPath(exePath);
-  return clean ? { tool: path.basename(clean), pathPrefix: path.dirname(clean) } : null;
+  return clean ? { tool: path.basename(clean), executablePath: clean, pathPrefix: path.dirname(clean) } : null;
 }
 
 function fromHome(homePath: unknown, exeName: string): LocalRuntimeTool | null {
   const clean = cleanConfiguredPath(homePath);
-  return clean ? { tool: exeName, pathPrefix: clean } : null;
+  return clean
+    ? { tool: exeName, executablePath: path.join(clean, exeName), pathPrefix: clean }
+    : null;
 }
 
 function resolvePython(_toolName: string, runtimeEnv: RuntimeEnv): LocalRuntimeTool | null {
@@ -50,7 +56,7 @@ function resolveNode(runtimeEnv: RuntimeEnv, nodeExecPath: unknown): LocalRuntim
 }
 
 /**
- * 解析本地运行时工具:本地后端下把 python/node 映射到内置/配置的可执行文件(返回 { tool, pathPrefix });否则 null。
+ * 解析本地运行时工具:本地后端下把 python/node 映射到内置/配置的可执行文件(返回绝对 executablePath);否则 null。
  */
 export function resolveLocalRuntimeTool(
   toolName: string,

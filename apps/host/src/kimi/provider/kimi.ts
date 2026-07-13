@@ -2,9 +2,9 @@
 // ---------------------------------------------------------------------------
 // 职责:对 Kimi(OpenAI 兼容)发起流式 chat/completions,并提供被本目录其它
 //       OpenAI 兼容提供商共用的 SSE 解析器(含流中断时部分工具调用的拆分)。
-// 依赖:上层常量 ../api-runner.js(未配置文案);其余仅标准库。
+// 依赖:同层配置常量 ../api-runner-config.js(未配置文案);其余仅标准库。
 // 导出:createKimiProvider(工厂,供注册表登记)、parseOpenAiCompatibleStream(共用流解析)。
-import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner.js';
+import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../api-runner-config.js';
 import { omitUndefined } from '../../util/object.js';
 import type { Provider, ProviderChatArgs, ProviderChatResult, ProviderToolCall, ProviderUsage } from './types.js';
 import { providerChatResultFromMessage, providerUsage } from './result.js';
@@ -49,6 +49,7 @@ export function createKimiProvider(): Provider {
       onReasoning,
       signal,
       promptCacheKey,
+      stream = true,
     }: ProviderChatArgs): Promise<ProviderChatResult> {
       if (!kimiConfig || !kimiConfig.apiKey) {
         throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
@@ -57,19 +58,18 @@ export function createKimiProvider(): Provider {
       const headers: Record<string, string> = {
         authorization: `Bearer ${kimiConfig.apiKey}`,
         'content-type': 'application/json',
-        accept: 'text/event-stream',
+        accept: stream ? 'text/event-stream' : 'application/json',
       };
       if (kimiConfig.userAgent) headers['user-agent'] = String(kimiConfig.userAgent);
       const body: Record<string, unknown> = {
         model: kimiConfig.model,
         messages,
-        tools,
-        tool_choice: 'auto',
+        ...(Array.isArray(tools) && tools.length ? { tools, tool_choice: 'auto' } : {}),
         max_tokens: kimiConfig.maxTokens || 2048,
-        stream: true,
+        stream,
         // OpenAI 兼容流只有设置 include_usage 才会在最终 SSE chunk 返回 usage。
         // 否则 run 记录的 token 用量会全为 0,观测面板也会显示为空。
-        stream_options: { include_usage: true },
+        ...(stream ? { stream_options: { include_usage: true } } : {}),
         // 稳定缓存键:官方建议多轮 agent 传入(通常为 session/run id),提高前缀缓存命中率。
         ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
@@ -155,8 +155,12 @@ export async function parseOpenAiCompatibleStream(
       break;
     }
     const { value, done } = chunk;
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    if (done) {
+      buffer += decoder.decode();
+      if (buffer.trim()) buffer += '\n';
+    } else {
+      buffer += decoder.decode(value, { stream: true });
+    }
     let nl;
     let sawDone = false;
     while ((nl = buffer.indexOf('\n')) >= 0) {
@@ -202,7 +206,7 @@ export async function parseOpenAiCompatibleStream(
         }
       }
     }
-    if (sawDone) break;
+    if (sawDone || done) break;
   }
   return finish();
 }

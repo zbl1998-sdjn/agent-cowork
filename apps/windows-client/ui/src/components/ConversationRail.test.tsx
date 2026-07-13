@@ -53,7 +53,7 @@ function props(overrides: Partial<Parameters<typeof ConversationRail>[0]> = {}):
 }
 
 describe('ConversationRail', () => {
-  it('renders a Claude-style nav center: brand, new chat, 9 panels, search, recents', () => {
+  it('keeps four outcome-first destinations visible and moves technical panels under more', () => {
     const html = renderToStaticMarkup(<ConversationRail {...props()} />);
 
     expect(html).toContain('rail-brand');
@@ -62,12 +62,18 @@ describe('ConversationRail', () => {
     expect(html).toContain('Beta');
     expect(html).toContain('rail-new');
     expect(html).toContain('新建对话');
-    expect(html.match(/rail-nav-item/g)?.length).toBe(9);
-    expect(html).toContain('任务');
-    expect(html).toContain('工具');
-    expect(html).toContain('连接器');
-    expect(html).toContain('记忆');
-    expect(html).toContain('可视化');
+    expect(html.match(/rail-nav-item/g)?.length).toBe(4);
+    expect(html.match(/rail-more-item/g)?.length).toBe(5);
+    expect(html).toContain('任务记录');
+    expect(html).toContain('文件成果');
+    expect(html).toContain('自动任务');
+    expect(html).toContain('可视化编辑');
+    expect(html).toContain('<summary>');
+    expect(html).toContain('更多功能');
+    expect(html).toContain('扩展能力');
+    expect(html).toContain('外部应用');
+    expect(html).toContain('使用偏好');
+    expect(html).toContain('运行详情');
     expect(html).toContain('rail-search');
     expect(html).toContain('最近');
     expect(html).toContain('主线');
@@ -80,7 +86,7 @@ describe('ConversationRail', () => {
     const buttons = collectByType(ConversationRail(p), 'button');
 
     buttons.find((b) => (b.props.className || '') === 'rail-new')?.props.onClick();
-    buttons.find((b) => (b.props.className || '').includes('rail-nav-item') && textOf(b.props.children).includes('工具'))?.props.onClick();
+    buttons.find((b) => (b.props.className || '').includes('rail-more-item') && textOf(b.props.children).includes('扩展能力'))?.props.onClick();
     buttons.find((b) => (b.props.className || '') === 'conv-title' && textOf(b.props.children).includes('主线'))?.props.onClick();
     buttons.find((b) => b.props['aria-label'] === '取消置顶')?.props.onClick();
     buttons.find((b) => b.props['aria-label'] === '删除')?.props.onClick();

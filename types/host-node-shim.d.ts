@@ -61,7 +61,7 @@ declare module 'node:crypto' {
   }
 
   export interface Hmac {
-    update(data: Buffer | string): Hmac;
+    update(data: Buffer | string, inputEncoding?: string): Hmac;
     digest(): Buffer;
     digest(encoding: 'hex' | 'base64'): string;
   }

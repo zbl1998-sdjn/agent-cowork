@@ -72,6 +72,7 @@ export function createServer(config: ServerConfig = {}): HostServer {
         rateLimiter: state.rateLimiter,
         requireAuth: state.requireAuth,
         validateHost: state.validateHost,
+        onlyOfficePublicHost: state.onlyOfficeConfig.publicHost,
       }))) {
         return;
       }

@@ -1,13 +1,15 @@
 // SettingsTabsContent(UI · components):设置各标签内容——按当前标签 lazy 渲染 API/外观/连接器/更新等设置区。纯展示+回调。
 import { lazy, Suspense } from 'react';
-import type { ModelProviderOption, SelfCheckResult } from '../lib/api';
 import { Button } from './ui/Button';
+import { SettingsApiPanel } from './SettingsApiPanel';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Loading } from './ui/StateViews';
-import type { AppFontFamily, AppFontScale, SettingsTab } from './settings-types';
+import type { AppFontFamily, AppFontScale } from './settings-types';
+import type { SettingsTabsContentProps } from './settings-tabs-types';
+export type { SettingsPersistPayload } from './settings-tabs-types';
 import {
   FALLBACK_MODEL_PROVIDERS,
-  isLocalProviderOption, providerDisplayName,
+  modelConnectionLabel, providerDisplayName,
 } from './settings-provider-options';
 
 // 懒加载较重的运行时/更新子面板,避免打开账户标签时把这些 bundle 一起拖进来。
@@ -38,55 +40,6 @@ const AUTO_CLARIFY_OPTIONS: Array<{ value: boolean; label: string }> = [
   { value: true, label: '开启' },
 ];
 
-export interface SettingsPersistPayload {
-  provider?: string | undefined;
-  apiKey?: string | undefined;
-  baseUrl?: string | undefined;
-  model?: string | undefined;
-  clearKey?: boolean | undefined;
-}
-
-export interface SettingsTabsContentProps {
-  tab: SettingsTab;
-  // identity
-  username: string;
-  tenantId: string;
-  onLogout: () => void;
-  // appearance / input
-  theme: 'light' | 'dark';
-  onSetTheme: (t: 'light' | 'dark') => void;
-  fontScale: AppFontScale;
-  onSetFontScale: (scale: AppFontScale) => void;
-  fontFamily: AppFontFamily;
-  onSetFontFamily: (family: AppFontFamily) => void;
-  autoClarify: boolean;
-  onSetAutoClarify: (enabled: boolean) => void;
-  autoContextCompaction: boolean;
-  onSetAutoContextCompaction: (enabled: boolean) => void;
-  // model / api state
-  provider: string;
-  setProvider: (v: string) => void;
-  providers?: ModelProviderOption[] | undefined;
-  model: string;
-  setModel: (v: string) => void;
-  baseUrl: string;
-  setBaseUrl: (v: string) => void;
-  apiKey: string;
-  setApiKey: (v: string) => void;
-  hasKey: boolean;
-  loading: boolean;
-  busy: boolean;
-  persist: (payload: SettingsPersistPayload, okMsg: string) => void;
-  // selfcheck
-  selfCheck: SelfCheckResult | null;
-  scError: string;
-  scLoading: boolean;
-  onRefreshSelfCheck: () => void;
-  // shared output line
-  error: string;
-  savedTip: string;
-}
-
 // 设置模态框的纯展示正文:每个标签一个分支,尾部共享错误/保存提示。
 // 从 Settings.tsx 拆出后,父组件控制状态,这里专注标签内容迭代。
 export function SettingsTabsContent(props: SettingsTabsContentProps) {
@@ -95,22 +48,32 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
     username, tenantId, onLogout,
     theme, onSetTheme, fontScale, onSetFontScale, fontFamily, onSetFontFamily, autoClarify, onSetAutoClarify, autoContextCompaction, onSetAutoContextCompaction,
     provider, setProvider, providers, model, setModel, baseUrl, setBaseUrl,
-    apiKey, setApiKey, hasKey, loading, busy, persist,
+    apiKey, setApiKey, hasKey, setHasKey, providerStates, availableModels,
+    connection, testingConnection, onTestConnection, onProviderSelected,
+    loading, busy, persist,
     selfCheck, scError, scLoading, onRefreshSelfCheck,
     error, savedTip,
   } = props;
   const providerOptions = providers?.length ? providers : FALLBACK_MODEL_PROVIDERS;
   const selectedProvider = providerOptions.find((item) => item.id === provider) || providerOptions[0];
-  const selectedIsLocal = isLocalProviderOption(selectedProvider);
-  const knownModels = [...new Set([selectedProvider?.defaultModel, ...(selectedProvider?.models || [])].filter(Boolean))] as string[];
+  const knownModels = [...new Set([
+    ...availableModels,
+    selectedProvider?.defaultModel,
+    ...(selectedProvider?.models || []),
+  ].filter(Boolean))] as string[];
   const isCustomModel = Boolean(model) && !knownModels.includes(model);
-  const providerLabel = selectedProvider?.displayName || provider || '模型提供商';
-  const apiKeyNames = selectedProvider?.apiKeyEnv?.length ? selectedProvider.apiKeyEnv.join(' / ') : '本地模型通常不需要 API Key';
   const selectProvider = (next: string) => {
     const nextProvider = providerOptions.find((item) => item.id === next);
+    if (onProviderSelected) {
+      onProviderSelected(next);
+      return;
+    }
+    const nextState = providerStates.find((item) => item.provider === next);
     setProvider(next);
-    if (nextProvider?.defaultModel) setModel(nextProvider.defaultModel);
-    if (nextProvider?.defaultBaseUrl) setBaseUrl(nextProvider.defaultBaseUrl);
+    setApiKey('');
+    setHasKey(Boolean(nextState?.hasKey));
+    setModel(nextState?.model || nextProvider?.defaultModel || '');
+    setBaseUrl(nextState?.baseUrl || nextProvider?.defaultBaseUrl || '');
   };
 
   return (
@@ -166,7 +129,9 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
           )}
           <p className="modal-note">模型按 provider_id/model_id 管理；换厂商会自动带出它的推荐模型。这里存默认值，每轮对话仍可临时切换。</p>
           <p className="modal-note">当前 Internal Beta 仅执行本地模型或管理员明确放行的客户网关；公网 provider 只提供目录/配置发现。</p>
+          <p className="modal-note" role="status">连接状态：{modelConnectionLabel(connection)}</p>
           <div className="modal-actions">
+            <Button className="btn-secondary" disabled={busy || testingConnection} onClick={onTestConnection}>{testingConnection ? '检测中…' : '测试连接'}</Button>
             <span className="modal-actions-spacer" />
             <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
           </div>
@@ -188,34 +153,21 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
       )}
       {tab === 'api' && (
         loading ? <div className="modal-loading">加载中…</div> : (
-          <div>
-            <label className="auth-field">
-              <span>提供商</span>
-              <select value={provider} onChange={(e) => selectProvider(e.target.value)}>
-                {providerOptions.map((item) => <option key={item.id} value={item.id}>{providerDisplayName(item)}</option>)}
-              </select>
-            </label>
-            <p className="modal-note">当前配置:{providerLabel}。环境变量:{apiKeyNames}。</p>
-            <p className="modal-note">当前 Internal Beta 仅执行本地模型或管理员明确放行的客户网关；公网 provider 只提供目录/配置发现。</p>
-            <label className="auth-field">
-              <span>API Key {hasKey && <em className="key-set">已配置</em>}</span>
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={hasKey ? '已配置(留空保持不变)' : (selectedIsLocal ? '本地模型可留空' : selectedProvider?.region === 'custom' || selectedProvider?.region === 'enterprise' ? '保存网关凭据（启用需管理员 allowlist）' : '仅保存配置（当前不启用公网出站）')} autoComplete="off" />
-            </label>
-            <details className="api-advanced">
-              <summary>高级:接口地址(一般不用改)</summary>
-              <label className="auth-field">
-                <span>Base URL</span>
-                <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={selectedProvider?.defaultBaseUrl || 'https://.../v1'} />
-              </label>
-              <p className="modal-note">内置 provider 会带默认地址；自建 OpenAI-compatible 或本地服务时再修改。</p>
-            </details>
-            <div className="modal-actions">
-              {hasKey && <Button variant="danger" className="btn-ghost-danger" disabled={busy} onClick={() => persist({ clearKey: true }, '密钥已清除')}>清除密钥</Button>}
-              <span className="modal-actions-spacer" />
-              <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => persist({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined }, '已保存')}>保存</Button>
-            </div>
-            <p className="modal-note">密钥仅保存在你本机的 .AgentCowork/config.json,绝不会回传或显示出明文。</p>
-          </div>
+          <SettingsApiPanel
+            provider={provider}
+            providerOptions={providerOptions}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            hasKey={hasKey}
+            baseUrl={baseUrl}
+            setBaseUrl={setBaseUrl}
+            connection={connection}
+            busy={busy}
+            testingConnection={testingConnection}
+            onTestConnection={onTestConnection}
+            selectProvider={selectProvider}
+            persist={persist}
+          />
         )
       )}
       {tab === 'runtime' && (

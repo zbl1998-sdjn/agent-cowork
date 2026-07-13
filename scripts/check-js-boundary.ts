@@ -54,6 +54,9 @@ function isSkipped(relativePath: string): boolean {
   const normalized = relativePath.split('\\').join('/');
   const parts = normalized.split('/');
   if (parts.some((part) => SKIP_DIR_NAMES.has(part))) return true;
+  // 本机验收可使用隔离的 Cargo target 根（如 .cargo-target-<run>）；其中的嵌入式
+  // Python/前端依赖是构建产物，不属于仓库 JS/TS 源边界。
+  if (parts.some((part) => part.startsWith('.cargo-target-'))) return true;
   return SKIP_PATH_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }
 

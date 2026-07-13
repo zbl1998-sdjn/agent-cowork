@@ -21,25 +21,12 @@ import type { RunSummary } from '../lib/types';
 import type { HistoryRun, Recipe } from '../lib/types/composer';
 import type { SecurityStatus } from '../lib/types/security';
 import type { AppFontFamily, AppFontScale, SettingsTab } from '../lib/types/settings';
-
-interface RuntimeDefaults {
-  chatEnabled: boolean;
-  provider: string;
-  baseUrl: string;
-  model: string;
-  models: string[];
-  providers: ModelProviderOption[];
-}
-
-const LOCAL_PROVIDER_IDS = new Set(['ollama', 'lmstudio', 'openai/local']);
+import { runtimeDefaultsFromKimiInfo } from './runtime-model-defaults';
+export { runtimeDefaultsFromKimiInfo } from './runtime-model-defaults';
 const FONT_SCALE_KEY = 'kcw.fontScale';
 const FONT_FAMILY_KEY = 'kcw.fontFamily';
 const FONT_SCALES = new Set<AppFontScale>(['small', 'normal', 'large', 'xlarge']);
 const FONT_FAMILIES = new Set<AppFontFamily>(['system', 'chinese', 'serif', 'mono']);
-
-function isLocalProviderId(id: string): boolean {
-  return id.includes('local') || LOCAL_PROVIDER_IDS.has(id);
-}
 
 function readStoredFontScale(): AppFontScale {
   try {
@@ -57,46 +44,6 @@ function readStoredFontFamily(): AppFontFamily {
   } catch {
     return 'system';
   }
-}
-
-function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): ModelProviderOption[] {
-  if (Array.isArray(info?.providers) && info.providers.length) return info.providers;
-  const catalog = info?.catalog?.all || {};
-  return Object.values(catalog).map((item) => ({
-    id: item.id,
-    displayName: item.name,
-    region: isLocalProviderId(item.id) ? 'local' : item.source === 'custom' ? 'custom' : 'cn',
-    protocol: 'openai-chat',
-    defaultBaseUrl: item.options.baseURL || '',
-    defaultModel: info?.catalog?.default?.[item.id] || Object.keys(item.models)[0] || '',
-    models: Object.keys(item.models),
-    apiKeyEnv: item.env,
-    requiresApiKey: item.options.requiresApiKey,
-    allowCustomModel: true,
-    allowCustomBaseUrl: item.source === 'custom' || isLocalProviderId(item.id),
-    source: 'builtin',
-  }));
-}
-
-export function runtimeDefaultsFromKimiInfo(info: Partial<KimiInfo> | null | undefined): RuntimeDefaults {
-  const providers = providersFromCatalog(info);
-  const provider = info?.provider || 'kimi-api';
-  const model = info?.model || '';
-  const selectedProvider = providers.find((item) => item.id === provider);
-  const modelSet = new Set<string>();
-  if (model) modelSet.add(model);
-  if (selectedProvider?.defaultModel) modelSet.add(selectedProvider.defaultModel);
-  for (const candidate of selectedProvider?.models || []) {
-    if (candidate) modelSet.add(candidate);
-  }
-  return {
-    chatEnabled: Boolean(info?.chatEnabled),
-    provider,
-    baseUrl: info?.baseUrl || '',
-    model,
-    models: [...modelSet],
-    providers,
-  };
 }
 
 export function historyRunsFromIndex(runs: RunSummary[] = []): HistoryRun[] {

@@ -47,4 +47,22 @@ describe('ComposerAttachments', () => {
     expect(formatAttachmentSize(1536)).toBe('1.5 KB');
     expect(attachmentBatchSummary([{ name: 'a.txt', size: 1024 }, { name: 'b.txt', size: 2048 }] as File[])).toBe('已选 2 个文件 · 3.0 KB');
   });
+
+  it('marks uploaded Office files as locked layout templates and keeps the role reversible', () => {
+    const onToggleTemplate = vi.fn();
+    const attachments = [{ name: 'brand-template.docx', size: 2048 }] as File[];
+    const node = ComposerAttachments({
+      attachments,
+      templateFiles: attachments,
+      onRemove: () => {},
+      onToggleTemplate,
+    });
+    const html = renderToStaticMarkup(node);
+
+    expect(html).toContain('模板已锁定');
+    expect(html).toContain('aria-label="取消版式模板 brand-template.docx"');
+    const toggle = collectByType(node, IconButton).find((button) => button.props.className === 'attachment-template-toggle');
+    toggle?.props.onClick();
+    expect(onToggleTemplate).toHaveBeenCalledWith(0);
+  });
 });

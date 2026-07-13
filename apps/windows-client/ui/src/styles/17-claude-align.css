@@ -148,12 +148,15 @@
 /* —— 右侧上下文栏(对齐 Claude 三栏右栏:运行状态 / 工作文件夹 / 技能·模板)—— */
 .app-content { flex: 1 1 0 !important; min-width: 0 !important; }
 .context-rail {
-  width: 300px; flex-shrink: 0; height: 100vh; box-sizing: border-box;
+  width: clamp(340px, 27vw, 420px); flex-shrink: 0; height: 100vh; box-sizing: border-box;
   background: var(--rail-surface); border-left: 1px solid transparent;
   padding: 14px 14px 18px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 12px;
 }
 [data-theme="dark"] .context-rail { border-left-color: rgba(255,255,255,0.05); }
+.context-live-workbench { min-width: 0; }
+.context-live-workbench .workbench-live-preview { min-height: 0; }
+.context-live-workbench .workbench-preview-stage { min-height: 150px; }
 .context-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 2px; }
 .context-title { font-size: 13px; font-weight: 600; color: var(--rail-ink); }
 .context-collapse { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--rail-ink-soft); cursor: pointer; }

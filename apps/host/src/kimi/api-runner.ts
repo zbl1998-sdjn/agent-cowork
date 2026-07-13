@@ -10,18 +10,22 @@ import {
   DEFAULT_TIMEOUT_MS,
   KIMI_API_NOT_CONFIGURED_MESSAGE,
 } from './api-runner-config.js';
-import { extractMessageText } from './api-runner-payload.js';
 import { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 import type { PromptOptions } from './api-runner-prompts.js';
-import { createModelEndpointFetch } from '../security/model-endpoint-request.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
+import { callProviderChatCompletion } from './provider/index.js';
+import { providerRequiresApiKey } from './provider/catalog.js';
 
 export { KIMI_API_NOT_CONFIGURED_MESSAGE, resolveKimiApiConfig } from './api-runner-config.js';
 export { buildKimiApiChatPrompt, buildKimiApiPlanPrompt } from './api-runner-prompts.js';
 export { runKimiApiChatStream } from './api-runner-stream.js';
 
-type KimiPayload = { usage?: unknown; choices?: Array<{ message?: { content?: unknown } }> };
-type FetchResponse = { ok: boolean; status: number; json(): Promise<unknown> | unknown };
+type FetchResponse = {
+  ok: boolean;
+  status: number;
+  body?: { getReader?: () => { read(): Promise<{ value?: BufferSource; done?: boolean }> } } | null;
+  json(): Promise<unknown> | unknown;
+};
 type FetchLike = (input: string, init?: Record<string, unknown>) => Promise<FetchResponse> | FetchResponse;
 
 export type KimiTextResult = {
@@ -75,14 +79,14 @@ async function runKimiApiText({
   promptBuilder,
   resultMode,
 }: KimiTextOptions = {}): Promise<KimiTextResult> {
-  if (!apiKey || typeof apiKey !== 'string') {
-    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
-  }
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is not available for Kimi API calls');
   }
   if (typeof promptBuilder !== 'function') {
     throw new Error('promptBuilder is required');
+  }
+  if (providerRequiresApiKey(provider) && (typeof apiKey !== 'string' || !apiKey.trim())) {
+    throw new Error(KIMI_API_NOT_CONFIGURED_MESSAGE);
   }
 
   const endpoint = `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`;
@@ -103,47 +107,37 @@ async function runKimiApiText({
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-  const modelFetch = createModelEndpointFetch({ provider, baseUrl, model }, {
-    fetchImpl: fetchImpl as never,
-  });
-
   try {
-    const headers: Record<string, string> = {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-      accept: 'application/json',
-    };
-    if (userAgent) headers['user-agent'] = String(userAgent);
     const numericTemperature = Number(temperature);
-    const response = await modelFetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const result = await callProviderChatCompletion({
+      messages,
+      tools: [],
+      stream: resultMode === 'chat',
+      kimiConfig: {
+        provider: cleanProvider(provider),
+        apiKey: typeof apiKey === 'string' ? apiKey : '',
+        baseUrl: String(baseUrl || DEFAULT_BASE_URL),
         model: String(model || DEFAULT_MODEL),
-        messages,
+        maxTokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
         ...(Number.isFinite(numericTemperature) ? { temperature: numericTemperature } : {}),
-        max_tokens: Math.max(1, Number(maxTokens) || DEFAULT_MAX_TOKENS),
-        stream: false,
-      }),
+        ...(userAgent ? { userAgent: String(userAgent) } : {}),
+        securityMode,
+      },
+      fetchImpl: fetchImpl as never,
       signal: controller.signal,
     });
-    if (!response.ok) {
-      throw new Error(`Kimi API request failed with status ${response.status}`);
-    }
-
-    const payload = await response.json() as KimiPayload;
-    const text = extractMessageText(payload);
+    const text = result.content;
     if (!text) {
-      throw new Error('Kimi API returned empty output');
+      throw new Error('Model provider returned empty output');
     }
     return {
       ok: true,
-      provider: cleanProvider(provider),
-      model: String(model || DEFAULT_MODEL),
+      provider: result.provider || cleanProvider(provider),
+      model: result.model || String(model || DEFAULT_MODEL),
       mode: resultMode || (mode === 'code' ? 'code' : 'cowork'),
       text,
       durationMs: Date.now() - startedAt,
-      usage: payload.usage || null,
+      usage: result.usage || null,
     };
   } catch (error) {
     if (isAbortError(error)) {

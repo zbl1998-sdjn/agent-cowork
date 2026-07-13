@@ -33,7 +33,7 @@ describe('ArtifactsPanel state views', () => {
   it('renders the reusable error state with retry affordance', () => {
     const html = renderToStaticMarkup(<ArtifactsPanelStateViews error="读取失败" onRetry={() => {}} />);
 
-    expect(html).toContain('产物加载失败');
+    expect(html).toContain('文件成果加载失败');
     expect(html).toContain('读取失败');
     expect(html).toContain('重新加载');
     expect(html).toContain('state-view--error');
@@ -41,7 +41,7 @@ describe('ArtifactsPanel state views', () => {
   });
 
   it('renders artifact row actions with Button and Input primitives', () => {
-    const item = { path: 'C:/work/.AgentCowork/artifacts/report.md', name: 'report.md', kind: 'markdown', size: 42 };
+    const item = { path: 'C:/work/.AgentCowork/artifacts/report.md', relativePath: '.AgentCowork/artifacts/report.md', name: 'report.md', kind: 'markdown', size: 42 };
     const html = renderToStaticMarkup(
       <ArtifactPanelItem
         item={item}
@@ -61,7 +61,12 @@ describe('ArtifactsPanel state views', () => {
     expect(html).toContain('ui-btn ui-btn--secondary');
     expect(html).toContain('保存');
     expect(html).toContain('重命名');
+    expect(html).toContain('aria-label="打开 report.md"');
+    expect(html).toContain('aria-label="重命名 report.md"');
+    expect(html).toContain('aria-label="保存 report.md 的新名称"');
     expect(html).toContain('草稿文本');
+    expect(html).not.toContain('.AgentCowork/artifacts');
+    expect(html).not.toContain('<code>report.md</code>');
   });
 
   it('keeps artifact row callbacks and disabled state wired through primitives', () => {

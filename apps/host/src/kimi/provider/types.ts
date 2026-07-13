@@ -52,6 +52,7 @@ export type ProviderChatArgs = {
   onContent?: (delta: string) => void;
   onReasoning?: (delta: string) => void;
   signal?: AbortSignal;
+  stream?: boolean;
   // 稳定缓存键(通常为 session/task id):官方建议多轮 agent 传入以提高前缀缓存命中率。
   promptCacheKey?: string;
 };

@@ -188,7 +188,7 @@ export async function parseAnthropicStream(
 export function createAnthropicProvider(): Provider {
   return {
     id: 'anthropic',
-    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal }: ProviderChatArgs): Promise<ProviderChatResult> {
+    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal, stream = true }: ProviderChatArgs): Promise<ProviderChatResult> {
       const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const model = String(config.model || '').trim();
@@ -199,7 +199,7 @@ export function createAnthropicProvider(): Provider {
         model,
         messages: converted.messages,
         max_tokens: config.maxTokens || 2048,
-        stream: true,
+        stream,
         ...(converted.system ? { system: converted.system } : {}),
       };
       const anthropicTools = (Array.isArray(tools) ? tools : []).map(toAnthropicTool).filter((tool) => tool.name);
@@ -210,7 +210,7 @@ export function createAnthropicProvider(): Provider {
       const fetcher = fetchImpl as FetchLike;
       const headers: Record<string, string> = {
         'content-type': 'application/json',
-        accept: 'text/event-stream',
+        accept: stream ? 'text/event-stream' : 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': ANTHROPIC_VERSION,
       };

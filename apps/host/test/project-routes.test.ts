@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:http';
 import { sendJson } from '../src/http/request-utils.js';
 import { handleProjectRoutes } from '../src/routes/project-routes.js';
 import { createServer } from '../src/server.js';
+import { createUserStore } from '../src/auth/user-store.js';
 import { createProjectStore } from '../src/storage/projects.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
@@ -213,16 +214,6 @@ async function withServer(config: ServerConfig, fn: (baseUrl: string) => Promise
   }
 }
 
-async function registerUser(baseUrl: string, username: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username, password: 'passw0rd' }),
-  });
-  assert.equal(res.status, 200);
-  return ((await res.json()) as { token: string }).token;
-}
-
 async function jsonRequest<T = ProjectRoutesBody>(
   baseUrl: string,
   route: string,
@@ -241,9 +232,10 @@ async function jsonRequest<T = ProjectRoutesBody>(
 
 test('project routes scope projects per signed-in user and manage memberships', async () => {
   const trustedRoot = makeTestWorkspace('kcw-project-routes');
-  await withServer({ trustedRoot }, async (baseUrl) => {
-    const tokenA = await registerUser(baseUrl, 'project-alice');
-    const tokenB = await registerUser(baseUrl, 'project-bob');
+  const authStore = createUserStore();
+  const tokenA = authStore.createSession(authStore.register('project-alice', 'passw0rd'));
+  const tokenB = authStore.createSession(authStore.register('project-bob', 'passw0rd'));
+  await withServer({ trustedRoot, authStore }, async (baseUrl) => {
 
     let res = await jsonRequest(baseUrl, '/api/projects', {
       method: 'POST',

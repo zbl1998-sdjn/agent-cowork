@@ -41,6 +41,21 @@ export async function invokeDesktop<T>(command: string, args?: Record<string, un
   return tauriInvoke<T>(command, args);
 }
 
+export interface DesktopHostStatus {
+  url: string;
+  running: boolean;
+  verified: boolean;
+}
+
+function isVerifiedDesktopStatus(value: unknown): value is DesktopHostStatus {
+  const status = value as Partial<DesktopHostStatus> | null;
+  return Boolean(status && status.running === true && status.verified === true && typeof status.url === 'string');
+}
+
+async function desktopHostStatus(): Promise<DesktopHostStatus> {
+  return invokeDesktop<DesktopHostStatus>('host_status');
+}
+
 async function probeHealth(): Promise<boolean> {
   try {
     const response = await fetch(resolveUrl('/health'));
@@ -52,8 +67,23 @@ async function probeHealth(): Promise<boolean> {
 
 export async function ensureHost(attempts = 40, intervalMs = 250): Promise<boolean> {
   if (isDesktop()) {
-    void invokeDesktop('start_node_host').catch(() => { /* setup 已尝试自启 host,最终以健康探测为准 */ });
+    try {
+      const started = await invokeDesktop<DesktopHostStatus>('start_node_host');
+      if (isVerifiedDesktopStatus(started)) return true;
+    } catch {
+      // setup 可能已启动 host；继续只向 native 层查询身份校验状态。
+    }
+    for (let i = 0; i < attempts; i += 1) {
+      try {
+        if (isVerifiedDesktopStatus(await desktopHostStatus())) return true;
+      } catch {
+        // native 状态暂不可用时继续有限次轮询，不回退信任 loopback /health。
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    return false;
   }
+
   for (let i = 0; i < attempts; i += 1) {
     if (await probeHealth()) return true;
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -62,6 +92,20 @@ export async function ensureHost(attempts = 40, intervalMs = 250): Promise<boole
 }
 
 export const hostReady: Promise<boolean> = ensureHost().catch(() => false);
+
+/** 每次敏感请求前动态确认 desktop host 仍由本次 Tauri 启动且已通过 native HMAC 校验。 */
+export async function requireHost(): Promise<void> {
+  if (isDesktop()) {
+    try {
+      if (isVerifiedDesktopStatus(await desktopHostStatus())) return;
+    } catch {
+      // 进入下面的有限次重新启动/校验路径。
+    }
+    if (await ensureHost()) return;
+    throw new Error('desktop host identity is not verified');
+  }
+  if (!(await hostReady)) throw new Error('host is unavailable');
+}
 
 function readStoredToken(): string | null {
   try {
@@ -138,7 +182,7 @@ async function parse<T>(response: Response, route: string): Promise<T> {
 }
 
 export async function getJson<T>(route: string): Promise<T> {
-  await hostReady;
+  await requireHost();
   return parse<T>(await fetch(resolveUrl(route), { headers: authHeaders() }), route);
 }
 
@@ -148,7 +192,7 @@ export interface PostBody {
 }
 
 export async function postJson<T>(route: string, body: PostBody): Promise<T> {
-  await hostReady;
+  await requireHost();
   const headers: Record<string, string> = authHeaders({ 'content-type': 'application/json' });
   if (body.idempotencyKey) headers['idempotency-key'] = body.idempotencyKey;
   const response = await fetch(resolveUrl(route), {
@@ -160,7 +204,7 @@ export async function postJson<T>(route: string, body: PostBody): Promise<T> {
 }
 
 export async function sendJsonMethod<T>(method: string, route: string, body?: unknown): Promise<T> {
-  await hostReady;
+  await requireHost();
   const headers = authHeaders({ 'content-type': 'application/json' });
   if (body && typeof body === 'object' && 'idempotencyKey' in body) {
     const value = (body as { idempotencyKey?: unknown }).idempotencyKey;

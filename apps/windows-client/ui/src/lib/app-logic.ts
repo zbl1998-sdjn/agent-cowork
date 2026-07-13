@@ -146,6 +146,7 @@ export function buildAgentChatStreamOptions(input: {
   autoApprove?: boolean | undefined;
   planMode?: boolean | undefined;
   images?: string[] | undefined;
+  templateFiles?: string[] | undefined;
   resumeRunId?: string | undefined;
   conversationId?: string | undefined;
   autoContextCompaction?: boolean | undefined;
@@ -159,10 +160,25 @@ export function buildAgentChatStreamOptions(input: {
     autoApprove: input.autoApprove,
     planMode: input.planMode,
     images: input.images,
+    ...(input.templateFiles?.length ? { templateFiles: input.templateFiles } : {}),
     ...(input.resumeRunId ? { resumeRunId: input.resumeRunId } : {}),
     ...(input.conversationId ? { conversationId: input.conversationId } : {}),
     contextCompaction: { enabled: input.autoContextCompaction !== false } satisfies ContextCompactionConfig,
   };
+}
+
+export function resolveUploadedTemplatePaths(
+  files: File[],
+  templateFiles: File[] | undefined,
+  uploadedPaths: string[],
+  inheritedPaths: string[] = [],
+): string[] {
+  if (!files.length) return inheritedPaths;
+  const templates = new Set(templateFiles || []);
+  return uploadedPaths.filter((_, index) => {
+    const file = files[index];
+    return Boolean(file && templates.has(file));
+  });
 }
 
 export function hasSessionModelAccess(config?: ModelRunConfig): boolean {

@@ -13,6 +13,7 @@ import { readEgressAuditRecords, summariseEgressAudit } from '../security/egress
 import { isConfidentialMode } from '../security/confidential.js';
 import { AtRestKeyError } from '../security/at-rest.js';
 import { handleSecurityDataRoutes } from './security-data-routes.js';
+import { handleHealthRoute } from './sidecar-health-proof.js';
 import { buildTrustReport } from '../security/trust-report.js';
 import {
   buildCapabilityInstallPlan,
@@ -60,6 +61,7 @@ type SystemRouteConfig = {
   desktopUpdateEnv?: Record<string, string | undefined>;
 };
 type SelfCheck = { id: string; status: 'pass' | 'warn'; detail: unknown };
+
 type HostStateLike = {
   agentConcurrency: AgentConcurrencyLike;
   rateLimiter?: RateLimiterLike | null;
@@ -122,10 +124,8 @@ export async function handleSystemRoutes({
   requestContext,
   state,
 }: SystemRouteOptions): Promise<boolean> {
-  if (request.method === 'GET' && pathname === '/health') {
-    sendJson(response, 200, { ok: true, service: 'agent-cowork-host' });
-    return true;
-  }
+  // Native shell identity is challenge-bound; ordinary probes keep the public health payload.
+  if (request.method === 'GET' && pathname === '/health') return handleHealthRoute(request, response);
 
   const updateMatch = /^\/desktop-update\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(pathname);
   if (request.method === 'GET' && updateMatch) {

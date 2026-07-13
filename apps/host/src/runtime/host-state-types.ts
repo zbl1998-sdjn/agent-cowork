@@ -19,6 +19,8 @@ import type { CancellationScope } from './cancellation.js';
 import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
 import type { FolderGrantStore } from '../workspace/folder-grant-store.js';
 import type { FolderGrantRegistry } from './folder-grants.js';
+import type { OnlyOfficeConfig, OnlyOfficeConfigInput } from '../artifacts/onlyoffice-config.js';
+import type { EnrollmentPolicy } from '../auth/enrollment-policy.js';
 
 export type IdempotencyEntry = { status: number; payload: unknown; fingerprint?: string };
 export type Startable = { start?: () => unknown | Promise<unknown> };
@@ -64,6 +66,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   sandbox?: unknown;
   sandboxAllowTools?: string[];
   sandboxAllowEnv?: string[];
+  sandboxAllowUnrestrictedHostExecution?: boolean;
   sandboxMaxTimeoutMs?: number;
   sandboxMaxOutputBytes?: number;
   toolRegistry?: McpRegistry;
@@ -83,12 +86,15 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   authStore?: AuthStoreLike;
   persistAuth?: boolean;
   authDbPath?: string;
+  enrollmentToken?: string;
   credentialStore?: unknown;
   credentialStorePath?: string;
   folderGrantStore?: FolderGrantStore;
   folderGrantStorePath?: string;
   folderGrantProtector?: CredentialProtector;
   folderGrants?: FolderGrantRegistry;
+  onlyOffice?: OnlyOfficeConfigInput;
+  onlyOfficeFetch?: typeof fetch;
   oauthSessions?: unknown;
   oauthFetch?: typeof fetch;
   oauthConfig?: unknown;
@@ -96,6 +102,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   requireAuth?: boolean;
   trustIdentityHeaders?: boolean;
   globalMutationAdmins?: readonly GlobalMutationAdminIdentity[];
+  allowLocalModelConfigSelfService?: boolean;
   validateHost?: boolean;
   uiDist?: boolean;
   projectStores?: Map<string, ProjectStore>;
@@ -141,6 +148,7 @@ export type HostState = Record<string, unknown> & {
   activeScheduler?: Scheduler | null;
   scheduleRecipeValidator?: ScheduleRecipeValidator | null;
   authStore: AuthStoreLike;
+  enrollmentPolicy: EnrollmentPolicy;
   cancellation: CancellationRegistryLike;
   jwtSecret?: string | null;
   rateLimiter?: RateLimiterLike | null;
@@ -152,11 +160,14 @@ export type HostState = Record<string, unknown> & {
   toolRegistry: McpRegistry;
   trustIdentityHeaders?: boolean;
   globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
+  allowLocalModelConfigSelfService: boolean;
   validateHost?: boolean;
   recomputeKimiEnabled?: () => boolean;
   persistKimiConfig?: () => void;
   folderGrantStore: FolderGrantStore;
   folderGrants: FolderGrantRegistry;
+  onlyOfficeConfig: OnlyOfficeConfig;
+  onlyOfficeFetch: typeof fetch;
   safeTrustedRoot: (
     requestedRoot?: unknown,
     context?: { tenantId?: unknown; userId?: unknown },

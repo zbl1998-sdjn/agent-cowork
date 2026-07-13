@@ -32,6 +32,7 @@ export interface HistoryRun {
 
 export interface ComposerMeta {
   files: File[];
+  templateFiles?: File[] | undefined;
   // 经 @ 提及引用的工作区文件绝对路径(用于 recipe 来源);不经上传,直接引用磁盘文件。
   referencedFiles?: string[] | undefined;
   model: string;
@@ -44,6 +45,7 @@ export interface ComposerDraftFile {
   size: number;
   type?: string | undefined;
   lastModified?: number | undefined;
+  role?: 'template' | undefined;
 }
 
 export interface ComposerDraftPreview {
@@ -55,11 +57,20 @@ export interface ComposerDraftPreview {
   updatedAt: string;
 }
 
+export interface WorkbenchGenerationSnapshot {
+  text: string;
+  status: string;
+  progress: Array<{ text: string; status?: string | undefined }>;
+  tools: Array<{ name: string; status: string }>;
+  updatedAt: string;
+}
+
 export interface WorkbenchPreviewState extends ComposerDraftPreview {
   mode: 'plan' | 'execute' | 'auto';
   workspace: string;
   recipe: Recipe | null;
   streaming: boolean;
+  generation?: WorkbenchGenerationSnapshot | undefined;
 }
 
 export interface ComposerProps {
@@ -78,4 +89,6 @@ export interface ComposerProps {
   defaultBaseUrl?: string | undefined;
   autoClarify?: boolean | undefined;
   onRefinePrompt?: ((text: string) => Promise<PromptRefineResult>) | undefined;
+  importedTemplateFiles?: File[] | undefined;
+  onImportedTemplateFilesConsumed?: (() => void) | undefined;
 }

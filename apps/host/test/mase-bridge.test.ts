@@ -250,3 +250,25 @@ test('remember skips credential-bearing assistant log while keeping clean user l
   // 干净的用户事实(城市=悉尼)不受助手侧含密影响,仍 upsert。
   assert.equal(registry.calls.filter((call) => call.name === UPSERT_FACT).length, 1, 'clean user fact should still be upserted');
 });
+
+test('remember skips a bare credential shape recognized by redaction while keeping the clean assistant log', async () => {
+  const registry = makeRegistry({
+    [REMEMBER]: () => ({ content: [{ type: 'text', text: 'assistant logged' }] }),
+    [UPSERT_FACT]: () => ({ content: [] }),
+  });
+  const bareCredential = 'sampleheader.samplepayload.samplesignature';
+
+  await maseRememberTurn(registry, bareCredential, '普通回复', 'thread-bare-secret');
+
+  const remembers = registry.calls.filter((call) => call.name === REMEMBER);
+  assert.equal(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'user'),
+    undefined,
+    'bare credential-bearing user log must not be written to MASE',
+  );
+  assert.ok(
+    remembers.find((call) => recordValue(call.args, 'remember args').role === 'assistant'),
+    'clean assistant log should still be written',
+  );
+  assert.equal(JSON.stringify(registry.calls).includes(bareCredential), false, 'bare credential must not reach any MASE call');
+});

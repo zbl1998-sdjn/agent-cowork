@@ -59,6 +59,7 @@ describe('ComposerActions', () => {
     );
 
     expect(html.match(/class="ui-btn /g)?.length).toBe(3);
+    expect(html).not.toContain('上传版式模板');
     expect(html).toContain('is-active'); // 语音 listening 高亮
     expect(html).toContain('tool-refining'); // 优化中占位
     expect(html).toContain('disabled=""');

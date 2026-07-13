@@ -10,33 +10,20 @@ import { ComposerFooter } from './ComposerFooter';
 import { ComposerSuggestions } from './ComposerSuggestions';
 import { RefinePreview } from './chat/RefinePreview';
 import { useComposerVoice } from '../hooks/useComposerVoice';
+import { useComposerTemplates } from '../hooks/useComposerTemplates';
+import { mergeComposerFiles } from '../lib/composer-files';
 import type { ComposerProps, ThinkingLevel } from '../lib/types/composer';
 // AppComposerDock 与 Composer.test 仍从本模块导入 ComposerMeta;类型实际在 lib/types/composer,
 // 这里再导出以保持旧 import path 稳定。
 export type { ComposerDraftPreview, ComposerMeta, ComposerProps, FileHit, HistoryRun, Recipe, WorkbenchPreviewState } from '../lib/types/composer';
 export type { ThinkingLevel } from '../lib/types/composer';
+export { mergeComposerFiles } from '../lib/composer-files';
 
 const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
   ollama: ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'ibm/granite3.3:2b', 'lfm2.5-thinking:1.2b', 'qwen2.5vl:7b', 'minicpm-v4.5:latest', 'bge-m3:latest'],
   'openai/local': ['qwen3', 'qwen3-coder', 'qwen2.5:7b', 'qwen2.5:3b', 'qwen2.5:1.5b', 'qwen2.5:0.5b', 'deepseek-r1:7b', 'local-model'],
   lmstudio: ['local-model', 'qwen3', 'qwen3-coder', 'deepseek-r1', 'llama-3.1-8b-instruct', 'gpt-oss-20b'],
 };
-
-function composerFileKey(file: File): string {
-  return `${file.name}\u0000${file.size}\u0000${file.lastModified}`;
-}
-
-export function mergeComposerFiles(current: File[], incoming: File[]): File[] {
-  const seen = new Set(current.map(composerFileKey));
-  const next = [...current];
-  for (const file of incoming) {
-    const key = composerFileKey(file);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    next.push(file);
-  }
-  return next;
-}
 
 function dragContainsFiles(event: DragEvent<HTMLDivElement>): boolean {
   return Array.from(event.dataTransfer?.types || []).includes('Files');
@@ -58,6 +45,8 @@ export function Composer({
   autoClarify = false,
   onDraftChange,
   onRefinePrompt,
+  importedTemplateFiles = [],
+  onImportedTemplateFilesConsumed,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -67,6 +56,7 @@ export function Composer({
   const mentionedRef = useRef<Map<string, string>>(new Map());
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const templates = useComposerTemplates(attachments, setAttachments, importedTemplateFiles, onImportedTemplateFilesConsumed);
   const [model, setModel] = useState('');
   const [provider, setProvider] = useState('');
   const [thinking, setThinking] = useState<ThinkingLevel>('standard');
@@ -131,13 +121,14 @@ export function Composer({
         size: file.size,
         type: file.type || undefined,
         lastModified: file.lastModified,
+        ...(templates.templateFiles.includes(file) ? { role: 'template' as const } : {}),
       })),
       provider: currentProvider,
       model: currentModel || '',
       thinking,
       updatedAt: new Date().toISOString(),
     });
-  }, [attachments, currentModel, currentProvider, onDraftChange, thinking, value]);
+  }, [attachments, currentModel, currentProvider, onDraftChange, templates.templateFiles, thinking, value]);
 
   function updateProvider(nextProvider: string) {
     setProvider(nextProvider);
@@ -159,9 +150,10 @@ export function Composer({
       { provider: defaultProvider, model: defaultModel, baseUrl: defaultBaseUrl },
     );
     const referencedFiles = referencedFilePaths(mentionedRef.current, finalText);
-    onSend(finalText, { files: attachments, ...(referencedFiles.length ? { referencedFiles } : {}), model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
+    onSend(finalText, { files: attachments, ...(templates.templateFiles.length ? { templateFiles: templates.templateFiles } : {}), ...(referencedFiles.length ? { referencedFiles } : {}), model: currentModel, ...(modelConfig ? { modelConfig } : {}), thinking });
     setValue('');
     setAttachments([]);
+    templates.resetTemplates();
     mentionedRef.current.clear();
     resetRefineAfterSend();
     close();
@@ -225,7 +217,7 @@ export function Composer({
       {dragging && <div className="composer-drop-hint"><strong>松开添加文件</strong><span>支持一次拖入多个文件</span></div>}
       {mode && items.length > 0 && <ComposerSuggestions mode={mode} items={items} active={active} />}
 
-      <ComposerAttachments attachments={attachments} onRemove={(index) => setAttachments((prev) => prev.filter((_, i) => i !== index))} />
+      <ComposerAttachments attachments={attachments} templateFiles={templates.templateFiles} onRemove={templates.removeAttachment} onToggleTemplate={templates.toggleTemplate} />
 
       {refineResult && (
         <RefinePreview

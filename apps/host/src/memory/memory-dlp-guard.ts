@@ -14,7 +14,11 @@ export function decideMemoryDlp(input: { title?: unknown; content?: unknown; evi
     text: `${String(input.title || '')}\n${String(input.content || '')}\n${String(input.evidence || '')}`,
   });
   const tags = classification.tags.map((tag) => tag.kind);
-  if (classification.sensitivity === 'restricted' || tags.includes('credential_secret')) {
+  if (
+    classification.sensitivity === 'restricted'
+    || tags.includes('credential_secret')
+    || classification.redactionApplied
+  ) {
     return {
       action: 'deny_write',
       sensitivity: 'secret',

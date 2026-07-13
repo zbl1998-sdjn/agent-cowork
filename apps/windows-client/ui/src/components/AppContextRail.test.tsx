@@ -40,7 +40,8 @@ describe('AppContextRail', () => {
   it('renders context cards: run status, agent team, working folder, skills — Claude 三栏右栏', () => {
     const html = renderToStaticMarkup(<AppContextRail {...props()} />);
     expect(html).toContain('context-rail');
-    expect(html).toContain('上下文');
+    expect(html).toContain('项目上下文');
+    expect(html).not.toContain('常驻可视化画布');
     expect(html).toContain('运行状态');
     expect(html).toContain('空闲');
     expect(html).toContain('执行');
@@ -53,7 +54,9 @@ describe('AppContextRail', () => {
   });
 
   it('reflects running state while streaming', () => {
-    const html = renderToStaticMarkup(<AppContextRail {...props({ streamingId: 'run1' })} />);
+    const html = renderToStaticMarkup(<AppContextRail {...props({
+      streamingId: 'run1',
+    })} />);
     expect(html).toContain('运行中');
     expect(html).toContain('is-running');
   });

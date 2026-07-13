@@ -15,6 +15,8 @@ import {
   type CredentialProtector,
 } from '../security/credential-store.js';
 import { createManagedSingleFileOperation } from '../security/managed-single-file.js';
+import { syncActiveProviderProfile } from './provider-profiles.js';
+import type { KimiApiConfig, ProviderProfile } from './api-runner-config.js';
 
 type KimiConfigRecord = Record<string, unknown>;
 type ConfigStoreOptions = { protector?: CredentialProtector };
@@ -75,6 +77,51 @@ function cleanFallbacks(value: unknown): KimiConfigRecord[] {
   }).filter((item) => item.provider || item.baseUrl || item.model || item.apiKey);
 }
 
+function cleanProfile(value: unknown): ProviderProfile {
+  const source = value && typeof value === 'object' ? value as KimiConfigRecord : {};
+  const profile: ProviderProfile = {};
+  if (typeof source.apiKey === 'string' && source.apiKey.trim()) profile.apiKey = source.apiKey.trim();
+  if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) profile.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
+  if (typeof source.model === 'string' && source.model.trim()) profile.model = source.model.trim();
+  if (Number.isFinite(Number(source.timeoutMs))) profile.timeoutMs = Math.max(1000, Number(source.timeoutMs));
+  if (Number.isFinite(Number(source.maxTokens))) profile.maxTokens = Math.max(1, Number(source.maxTokens));
+  if (Number.isFinite(Number(source.temperature))) profile.temperature = Number(source.temperature);
+  return profile;
+}
+
+function unsealProfiles(
+  value: unknown,
+  options: ConfigStoreOptions,
+): Record<string, ProviderProfile> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const profiles: Record<string, ProviderProfile> = {};
+  for (const [rawProvider, rawProfile] of Object.entries(value as KimiConfigRecord)) {
+    const provider = cleanProvider(rawProvider);
+    if (!provider) continue;
+    const profile = cleanProfile(rawProfile);
+    if (profile.apiKey) {
+      const plain = unsealSecret(profile.apiKey, activeProtector(options));
+      if (plain) profile.apiKey = plain;
+      else delete profile.apiKey;
+    }
+    profiles[provider] = profile;
+  }
+  return profiles;
+}
+
+function sealProfiles(
+  value: unknown,
+  options: ConfigStoreOptions,
+): Record<string, ProviderProfile> {
+  const profiles = unsealProfiles(value, { protector: { protect: String, unprotect: String } });
+  return Object.fromEntries(Object.entries(profiles).map(([provider, profile]) => [
+    provider,
+    profile.apiKey
+      ? { ...profile, apiKey: sealSecret(profile.apiKey, activeProtector(options)) }
+      : profile,
+  ]));
+}
+
 /** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);仅文件不存在时不动。 */
 export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
   let serialized: string;
@@ -97,6 +144,10 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord,
   const kimi = config.kimiApi || config.kimi || config;
   if (!kimi || typeof kimi !== 'object') return;
   const source = kimi as KimiConfigRecord;
+  const targetProfiles = target.providerProfiles && typeof target.providerProfiles === 'object'
+    ? target.providerProfiles as Record<string, ProviderProfile>
+    : {};
+  target.providerProfiles = { ...targetProfiles, ...unsealProfiles(source.providerProfiles, options) };
   if (typeof source.provider === 'string' && source.provider.trim()) target.provider = cleanProvider(source.provider);
   if (Array.isArray(source.fallbacks)) {
     // fallback 内的 apiKey 同样解封;解不开的按未配置丢弃该 key,保留其余路由字段。
@@ -117,10 +168,12 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord,
   }
   if (typeof source.model === 'string' && source.model.trim()) target.model = source.model.trim();
   recomputeConfigured(target);
+  syncActiveProviderProfile(target as KimiApiConfig);
 }
 
 /** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
 export function persistKimiConfig(file: string, source: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
+  syncActiveProviderProfile(source as KimiApiConfig);
   const apiKey = String(source.apiKey || '').trim();
   const payload = {
     kimiApi: {
@@ -128,6 +181,7 @@ export function persistKimiConfig(file: string, source: KimiConfigRecord, option
       baseUrl: source.baseUrl || '',
       model: source.model || '',
       provider: source.provider || 'kimi-api',
+      providerProfiles: sealProfiles(source.providerProfiles, options),
       fallbacks: cleanFallbacks(source.fallbacks).map((item) => (
         typeof item.apiKey === 'string' && item.apiKey
           ? { ...item, apiKey: sealSecret(item.apiKey, activeProtector(options)) }

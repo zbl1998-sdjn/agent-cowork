@@ -10,6 +10,8 @@ mod config;
 mod error;
 mod security;
 mod sidecar;
+mod sidecar_health;
+mod sidecar_monitor;
 mod updater;
 
 use tauri::Manager;

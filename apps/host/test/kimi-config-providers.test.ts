@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {
   modelProvider,
-  runKimiAndRecord,
   sendKimiInfo,
   type KimiRouteState,
 } from '../src/routes/kimi-route-support.js';
+import { runKimiAndRecord } from '../src/routes/kimi-route-records.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 import {
   CONFIG_SECRET,
@@ -109,6 +109,40 @@ test('POST /api/kimi/config stores provider without echoing the key', async () =
     assert.equal(info.hasKey, true);
     assert.equal(info.model, 'gpt-test');
   });
+});
+
+test('provider credentials remain isolated and survive provider switching', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-kimicfg-provider-profiles');
+  const anthropicSecret = 'test-anthropic-profile-secret';
+  await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
+    await postKimiConfig(baseUrl, {
+      provider: 'openai', apiKey: CONFIG_SECRET,
+      baseUrl: 'https://api.openai.test/v1', model: 'gpt-profile-test',
+    });
+    await postKimiConfig(baseUrl, {
+      provider: 'anthropic', apiKey: anthropicSecret,
+      baseUrl: 'https://api.anthropic.test/v1', model: 'claude-profile-test',
+    });
+    const switched = await postKimiConfig(baseUrl, { provider: 'openai' });
+    const { raw, body } = await readConfigResponse(switched);
+    assert.equal(body.provider, 'openai');
+    assert.equal(body.hasKey, true);
+    assert.equal(body.model, 'gpt-profile-test');
+    assert.equal(body.baseUrl, 'https://api.openai.test/v1');
+    assert.equal(raw.includes(CONFIG_SECRET), false);
+    assert.equal(raw.includes(anthropicSecret), false);
+
+    const states = body.providerStates || [];
+    assert.equal(states.find((item) => item.provider === 'openai')?.hasKey, true);
+    assert.equal(states.find((item) => item.provider === 'anthropic')?.hasKey, true);
+  });
+
+  const serialized = fs.readFileSync(`${trustedRoot}/.AgentCowork/config.json`, 'utf8');
+  assert.equal(serialized.includes(CONFIG_SECRET), false);
+  assert.equal(serialized.includes(anthropicSecret), false);
+  const profiles = readPersistedConfig(trustedRoot).kimiApi.providerProfiles;
+  assert.match(String(profiles?.openai?.apiKey), /^aesgcm:v1:/);
+  assert.match(String(profiles?.anthropic?.apiKey), /^aesgcm:v1:/);
 });
 
 test('POST /api/kimi/config stores fallback providers without echoing fallback keys', async () => {

@@ -1,10 +1,8 @@
-// 路由链(host · L3 路由层 · routes)
-// ---------------------------------------------------------------------------
-// 职责:把各 /api 子路由按顺序串联成一条「责任链」——依次调用 handleXRoutes,谁处理了就短路返回。
-//       这是 L3 路由层的总入口,被 L4 server.js 挂载。每个子路由只认自己的 /api/* 前缀。
-// 依赖:同层全部 handleXRoutes。导出:handleRouteChain。
+// 路由链(host · L3 routes):把 /api 子路由串成责任链,由首个匹配项短路,再由 L4 server.js 挂载。
+// 依赖:同层 handleXRoutes。导出:handleRouteChain。
 import path from 'node:path';
 import { handleArtifactRoutes } from './artifact-routes.js';
+import { handleArtifactEditorRoutes } from './artifact-editor-routes.js';
 import { handleArtifactVersionRoutes } from './artifact-version-routes.js';
 import { handleAuthRoutes } from './auth-routes.js';
 import { handleClarifyRoutes } from './clarify-routes.js';
@@ -14,6 +12,7 @@ import { handleFolderGrantRoutes } from './folder-grant-routes.js';
 import { handleMemoryRoutes } from './memory-routes.js';
 import { handleMemoryKnowledgeRoutes } from './memory-knowledge-routes.js';
 import { handleOnboardingRoutes } from './onboarding-routes.js';
+import { handleOnlyOfficeRoutes } from './onlyoffice-routes.js';
 import { handleOrchestratorRoutes } from './orchestrator-routes.js';
 import { handlePlanRoutes } from './plan-routes.js';
 import { handleProjectRoutes } from './project-routes.js';
@@ -34,7 +33,6 @@ import { omitUndefined } from '../util/object.js';
 import { readRunRecord } from '../runtime/run-store.js';
 import { headerValue, type HttpRequestLike, type HttpResponseLike, type RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
-
 type RouteHandlerOptions<T> = T extends (options: infer Options) => Promise<boolean> ? Options : never;
 type RouteRequest = HttpRequestLike & { method?: string };
 type ConnectorOptions = RouteHandlerOptions<typeof handleConnectorRoutes>;
@@ -49,11 +47,7 @@ type RouteChainOptions = {
   state: HostState;
   server: RouteServer;
 };
-
-function routeOptions<T>(options: Record<string, unknown>): T {
-  return omitUndefined(options) as T;
-}
-
+function routeOptions<T>(options: Record<string, unknown>): T { return omitUndefined(options) as T; }
 export async function handleRouteChain({
   request,
   response,
@@ -65,12 +59,10 @@ export async function handleRouteChain({
 }: RouteChainOptions): Promise<boolean> {
   const base = { request, response, pathname, requestContext };
   const workspaceGrantId = headerValue(request, 'x-workspace-grant-id');
-  const safeTrustedRoot = (requestedRoot?: unknown): string => (
-    state.safeTrustedRoot(requestedRoot, requestContext, workspaceGrantId)
-  );
+  const safeTrustedRoot = (requestedRoot?: unknown): string => state.safeTrustedRoot(requestedRoot, requestContext, workspaceGrantId);
   const requestState = { ...state, safeTrustedRoot } as HostState;
   if (await handleSystemRoutes(routeOptions<RouteHandlerOptions<typeof handleSystemRoutes>>({ ...base, requestUrl, state }))) return true;
-  if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore }))) return true;
+  if (await handleAuthRoutes(routeOptions<RouteHandlerOptions<typeof handleAuthRoutes>>({ ...base, authStore: state.authStore, enrollmentPolicy: state.enrollmentPolicy }))) return true;
   if (await handleApprovalRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRoutes>>({ ...base, approvalRegistry: state.approvalRegistry }))) return true;
   if (await handleFolderGrantRoutes(routeOptions<RouteHandlerOptions<typeof handleFolderGrantRoutes>>({
     ...base,
@@ -151,6 +143,14 @@ export async function handleRouteChain({
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
+  }))) return true;
+  if (await handleArtifactEditorRoutes(routeOptions<RouteHandlerOptions<typeof handleArtifactEditorRoutes>>({
+    ...base, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor, requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore, fileOperationApprovals: state.fileOperationApprovals,
+  }))) return true;
+  if (await handleOnlyOfficeRoutes(routeOptions<RouteHandlerOptions<typeof handleOnlyOfficeRoutes>>({
+    ...base, requestUrl, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor,
+    requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore,
+    fileOperationApprovals: state.fileOperationApprovals, config: state.onlyOfficeConfig, fetchImpl: state.onlyOfficeFetch,
   }))) return true;
   if (await handleArtifactVersionRoutes(routeOptions<RouteHandlerOptions<typeof handleArtifactVersionRoutes>>({
     ...base, requestUrl, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor, requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore, fileOperationApprovals: state.fileOperationApprovals, resolveSecurityMode: () => state.kimiApiConfig?.securityMode,

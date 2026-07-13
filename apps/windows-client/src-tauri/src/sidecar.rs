@@ -1,24 +1,23 @@
 //! Node host sidecar 生命周期(sidecar)——打包的 Node 二进制(agent-cowork-host(.exe))随桌面程序分发。
-//! 本模块在锁后持有其唯一子进程句柄,负责启动/停止/查询状态与优雅停机,保证关窗不遗留孤儿 Node 进程。
-//! 启动时直接用 `std::process::Command` 指向当前 exe 旁的已知二进制,而不是 Tauri shell
-//! plugin 的 sidecar() helper;后者在安装版里曾静默解析/启动失败,会让应用卡在启动态。
+//! 本模块持有其唯一子进程句柄和每次启动独立的认证密钥。只有通过本机 challenge/HMAC
+//! 身份校验后，才会向 webview 宣布 host 可用；密钥从不进入 loopback 响应、事件或 renderer。
 
 use std::path::PathBuf;
-use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::process::Command;
+use std::sync::{Arc, Mutex};
 
+use ring::rand::{SecureRandom, SystemRandom};
 use serde::Serialize;
+use tauri::AppHandle;
 #[cfg(windows)]
 use tauri::Manager;
-use tauri::{AppHandle, Emitter};
 
 use crate::config::{HOST, HOST_URL, PORT};
 use crate::error::{DesktopError, DesktopResult};
+use crate::sidecar_health::{encode_hex, SECRET_BYTES};
+use crate::sidecar_monitor::{emit_host_stopped, monitor_generation, SidecarState};
 
-/// host 进入 running 状态时发给 webview 的事件名。
-pub const EVENT_HOST_STARTED: &str = "kimi://host-started";
-/// host 被停止后发给 webview 的事件名。
-pub const EVENT_HOST_STOPPED: &str = "kimi://host-stopped";
+const SIDECAR_SECRET_ENV: &str = "KCW_SIDECAR_SECRET";
 
 /// 打包 host 二进制文件名,运行时从桌面 exe 同目录解析。
 #[cfg(windows)]
@@ -31,24 +30,26 @@ const EMBEDDED_PYTHON_DIR: &str = "python-embedded";
 #[cfg(windows)]
 const EMBEDDED_PYTHON_EXE: &str = "python.exe";
 
-/// Tauri 托管状态:只保存一个可选的 host 子进程句柄。
+/// Tauri 托管状态:保存唯一 host 子进程及其仅限 native 层使用的身份状态。
 #[derive(Default)]
 pub struct HostSidecar {
-    child: Mutex<Option<Child>>,
+    state: Arc<Mutex<SidecarState>>,
 }
 
-/// 暴露给前端的 host 可用性快照。
-#[derive(Serialize, Clone)]
+/// 暴露给前端的 host 可用性快照。verified 仅由 native HMAC 校验置真。
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct HostStatus {
     pub url: &'static str,
     pub running: bool,
+    pub verified: bool,
 }
 
 impl HostStatus {
-    fn new(running: bool) -> Self {
+    fn new(running: bool, verified: bool) -> Self {
         Self {
             url: HOST_URL,
             running,
+            verified: running && verified,
         }
     }
 }
@@ -85,52 +86,35 @@ fn configure_embedded_python_env(command: &mut Command, app: &AppHandle) {
 #[cfg(not(windows))]
 fn configure_embedded_python_env(_command: &mut Command, _app: &AppHandle) {}
 
-/// 轮询 TCP 连接,确认打包 host 已在 127.0.0.1:PORT 开始监听(最多约 10s)。
-/// 用于在宣布 host-started 前确认 host 真正可用,避免"已启动但连不上"。
-fn wait_for_host_listening() -> bool {
-    use std::net::{SocketAddr, TcpStream};
-    use std::time::{Duration, Instant};
-    let Ok(addr) = format!("{HOST}:{PORT}").parse::<SocketAddr>() else {
-        return false;
-    };
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline {
-        if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-    false
-}
-
 impl HostSidecar {
-    /// 查询当前 host 状态;若子进程已自行退出,顺手回收句柄以反映真实状态。
+    /// 查询真实进程态和 native 身份校验态；子进程退出后立即撤销信任。
     pub fn status(&self) -> DesktopResult<HostStatus> {
         let mut guard = self
-            .child
+            .state
             .lock()
             .map_err(|_| DesktopError::Lock("host sidecar"))?;
-        // 子进程自行退出时清空句柄,避免 UI 误以为 host 仍在运行。
-        if let Some(child) = guard.as_mut() {
-            if matches!(child.try_wait(), Ok(Some(_))) {
-                *guard = None;
-            }
-        }
-        Ok(HostStatus::new(guard.is_some()))
+        Ok(guard.status()?.map_or_else(
+            || HostStatus::new(false, false),
+            |verified| HostStatus::new(true, verified),
+        ))
     }
 
-    /// 启动 host sidecar;幂等,已运行时只返回当前状态。
+    /// 启动 host sidecar；幂等。新进程先返回 running=true/verified=false，
+    /// 只有后台 challenge/HMAC 校验成功后 verified 才会变为 true。
     pub fn start(&self, app: &AppHandle, trusted_root: &str) -> DesktopResult<HostStatus> {
         let mut guard = self
-            .child
+            .state
             .lock()
             .map_err(|_| DesktopError::Lock("host sidecar"))?;
-        if let Some(child) = guard.as_mut() {
-            // 已持有句柄时仍确认进程未退出,避免僵尸句柄导致误报。
-            if matches!(child.try_wait(), Ok(None)) {
-                return Ok(HostStatus::new(true));
-            }
+        if let Some(verified) = guard.status()? {
+            return Ok(HostStatus::new(true, verified));
         }
+
+        let mut secret = [0_u8; SECRET_BYTES];
+        SystemRandom::new()
+            .fill(&mut secret)
+            .map_err(|_| DesktopError::Sidecar("generate sidecar identity secret failed".into()))?;
+        let secret_hex = encode_hex(&secret);
 
         let path = sidecar_path()?;
         let mut command = Command::new(&path);
@@ -139,57 +123,63 @@ impl HostSidecar {
             .env("PORT", PORT)
             .env("TRUSTED_ROOT", trusted_root)
             .env("KCW_TAURI", "1")
-            // host 侧 parent-watchdog 依赖此变量:外壳进程消失(强杀/崩溃/关窗未及
-            // kill)时 host 自行优雅退出,杜绝孤儿 sidecar 常驻占 3017。
+            .env(SIDECAR_SECRET_ENV, &secret_hex)
+            // host 侧 parent-watchdog 依赖此变量：外壳进程消失时 host 自行优雅退出。
             .env("KCW_PARENT_PID", std::process::id().to_string());
         configure_embedded_python_env(&mut command, app);
-        // Windows 上后台 host 不应弹出控制台窗口。
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             command.creation_flags(CREATE_NO_WINDOW);
         }
+
         let child = command.spawn().map_err(|error| {
+            secret.fill(0);
             DesktopError::Sidecar(format!("spawn {} failed: {error}", path.display()))
         })?;
-        *guard = Some(child);
+        let generation = guard.register(child, secret);
         drop(guard);
 
-        // 不在 spawn 后立刻宣布 started:host 可能尚未开始监听,甚至会因端口被占
-        // (EADDRINUSE→exit)起不来。改为后台轮询 TCP,确认 host 真在监听后再 emit
-        // started;未就绪则不发,避免前端"已启动但连不上"。host_status 仍如实反映进程态。
+        let state = Arc::clone(&self.state);
         let app_handle = app.clone();
-        std::thread::spawn(move || {
-            if wait_for_host_listening() {
-                let _ = app_handle.emit(EVENT_HOST_STARTED, HOST_URL);
-            }
-        });
-        Ok(HostStatus::new(true))
+        std::thread::spawn(move || monitor_generation(state, app_handle, generation));
+        Ok(HostStatus::new(true, false))
     }
 
-    /// 停止 host sidecar;幂等,退出流程中可安全调用。
+    /// 停止 host sidecar；幂等，并立即清除进程句柄、密钥与信任态。
     pub fn stop(&self, app: &AppHandle) -> DesktopResult<HostStatus> {
-        let mut guard = self
-            .child
+        let stopped = self
+            .state
             .lock()
-            .map_err(|_| DesktopError::Lock("host sidecar"))?;
-        if let Some(mut child) = guard.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-            drop(guard);
-            let _ = app.emit(EVENT_HOST_STOPPED, HOST_URL);
+            .map_err(|_| DesktopError::Lock("host sidecar"))?
+            .stop();
+        if stopped {
+            emit_host_stopped(app);
         }
-        Ok(HostStatus::new(false))
+        Ok(HostStatus::new(false, false))
     }
 
-    /// 进程 teardown 阶段的尽力关闭:不向用户冒泡错误,不 panic,也不长时间阻塞。
+    /// 进程 teardown 阶段的尽力关闭：不向用户冒泡错误，不 panic，也不长时间阻塞。
     pub fn shutdown_quietly(&self) {
-        if let Ok(mut guard) = self.child.lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+        if let Ok(mut guard) = self.state.lock() {
+            guard.stop();
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::HostStatus;
+
+    #[test]
+    fn stopped_status_can_never_be_verified() {
+        assert_eq!(
+            HostStatus::new(false, true),
+            HostStatus {
+                url: super::HOST_URL,
+                running: false,
+                verified: false,
+            }
+        );
     }
 }

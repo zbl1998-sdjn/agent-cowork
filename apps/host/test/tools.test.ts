@@ -265,10 +265,14 @@ test('ToolRegistry.registerMcpClient imports namespaced tools and forwards calls
 
 // ---- built-in tools ----
 
-test('createBuiltinTools exposes sandbox + recipe tools and sandbox.exec actually runs', async () => {
+test('createBuiltinTools runs local sandbox tools only with explicit unrestricted host capability', async () => {
   const root = tempRoot();
   const sandbox = new LocalSubprocessSandbox();
-  const tools = createBuiltinTools({ sandbox, sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS }, runStoreRoot: path.join(root, 'runs') });
+  const tools = createBuiltinTools({
+    sandbox,
+    sandboxLimits: { allowTools: DEFAULT_ALLOW_TOOLS, allowUnrestrictedHostExecution: true },
+    runStoreRoot: path.join(root, 'runs'),
+  });
   const registry = new ToolRegistry().registerMany(tools);
   assert.equal(registry.has('sandbox.exec'), true);
   assert.equal(registry.has('sandbox.run-code'), true);
@@ -276,12 +280,29 @@ test('createBuiltinTools exposes sandbox + recipe tools and sandbox.exec actuall
   assert.equal(descriptorValue(registry.descriptor('sandbox.exec'), 'sandbox.exec').requiresApproval, true);
   const result = await registry.call(
     'sandbox.exec',
-    { tool: 'node', args: ['-e', 'process.stdout.write("agent-ok")'], timeoutMs: 5000 },
+    {
+      tool: 'node',
+      args: ['-e', 'process.stdout.write("agent-ok")'],
+      timeoutMs: 5000,
+      unrestrictedHostExecution: true,
+    },
     { trustedRoot: root },
   );
   const resultRecord = recordValue(result, 'sandbox.exec result');
   assert.equal(resultRecord.exitCode, 0);
   assert.equal(resultRecord.stdout, 'agent-ok');
+
+  const codeResult = recordValue(await registry.call(
+    'sandbox.run-code',
+    {
+      tool: 'node',
+      code: 'process.stdout.write("code-ok")',
+      timeoutMs: 5000,
+      unrestrictedHostExecution: true,
+    },
+    { trustedRoot: root },
+  ), 'sandbox.run-code result');
+  assert.equal(recordValue(codeResult.result, 'sandbox.run-code execution result').stdout, 'code-ok');
 });
 
 test('air_gap without an isolated sandbox backend must not register sandbox.exec/sandbox.run-code (dogfood security fix: policyBlocked was computed but never actually consumed to block tool registration)', async () => {

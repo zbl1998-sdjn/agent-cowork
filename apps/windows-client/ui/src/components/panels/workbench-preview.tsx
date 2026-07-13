@@ -2,6 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:把 Composer 草稿快照转成可视化预览模型,并在侧边面板内实时展示输出形态。纯展示,不发请求。
 import type { WorkbenchPreviewState } from '../composer-types';
+import { buildWorkbenchGenerationModel, type WorkbenchGenerationModel } from './workbench-generation';
 
 export type WorkbenchPreviewKind = 'document' | 'spreadsheet' | 'deck' | 'page' | 'code' | 'office';
 
@@ -15,6 +16,7 @@ export interface WorkbenchLivePreviewModel {
   lines: string[];
   fileLabels: string[];
   isEmpty: boolean;
+  generation?: WorkbenchGenerationModel | undefined;
 }
 
 type PreviewProfile = {
@@ -74,7 +76,7 @@ function modeLabel(mode: WorkbenchPreviewState['mode']): string {
 }
 
 function chooseProfile(preview: WorkbenchPreviewState): PreviewProfile {
-  const haystack = `${preview.text} ${preview.files.map((file) => file.name).join(' ')}`;
+  const haystack = `${preview.generation?.text || preview.text} ${preview.files.map((file) => file.name).join(' ')}`;
   return PREVIEW_PROFILES.find((profile) => profile.pattern.test(haystack)) || DEFAULT_PROFILE;
 }
 
@@ -96,12 +98,13 @@ function previewTitle(text: string, profile: PreviewProfile): string {
 
 export function buildWorkbenchLivePreviewModel(preview: WorkbenchPreviewState): WorkbenchLivePreviewModel {
   const profile = chooseProfile(preview);
-  const text = preview.text.trim();
+  const generationText = preview.generation?.text?.trim() || '';
+  const text = generationText || preview.text.trim();
   const fileLabels = preview.files.slice(0, 4).map((file) => `${file.name} · ${formatFileSize(file.size)}`);
   const provider = preview.provider || '未配置';
   const model = preview.model || '未选择';
   const recipe = preview.recipe?.name || '无模板';
-  const outputState = preview.streaming ? '生成中' : (text || preview.files.length ? '待发送' : '草稿');
+  const outputState = preview.streaming ? '生成中' : (generationText ? '已生成' : (text || preview.files.length ? '待发送' : '草稿'));
   return {
     kind: profile.kind,
     kindLabel: profile.label,
@@ -117,6 +120,7 @@ export function buildWorkbenchLivePreviewModel(preview: WorkbenchPreviewState): 
     lines: previewLines(text),
     fileLabels,
     isEmpty: !text && preview.files.length === 0,
+    generation: buildWorkbenchGenerationModel(preview),
   };
 }
 
@@ -207,8 +211,19 @@ export function WorkbenchLivePreview({ preview }: { preview: WorkbenchPreviewSta
           <strong>{model.title}</strong>
           <em>{model.subtitle}</em>
         </div>
-        <mark>{model.kindLabel}</mark>
+        <div className="workbench-live-badges">
+          {model.generation && <mark className={model.generation.active ? 'is-live' : ''}>{model.generation.active ? `实时 · ${model.generation.phase}` : model.generation.phase}</mark>}
+          <mark>{model.kindLabel}</mark>
+        </div>
       </div>
+      {model.generation && (
+        <div className="workbench-generation-strip" role="status" aria-live="polite">
+          <span className="workbench-generation-pulse" aria-hidden="true" />
+          <span>{model.generation.active ? '正在接收真实生成片段' : '本轮生成已收束'}</span>
+          <em>{model.generation.latestActivity}</em>
+          <small>更新 {model.generation.updateCount} 次</small>
+        </div>
+      )}
       <div className="workbench-preview-stage">
         <WorkbenchPreviewCanvas model={model} />
       </div>

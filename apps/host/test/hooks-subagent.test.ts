@@ -133,6 +133,7 @@ test('loadHooksConfig executes normalized hook commands through the sandbox', as
     timeoutMs: 15000,
     network: false,
     workspaceWrite: false,
+    unrestrictedHostExecution: false,
     env: {},
     maxOutputBytes: 262144,
   });

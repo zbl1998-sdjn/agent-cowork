@@ -62,10 +62,10 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
 
   assert.equal(captured.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(captured.headers?.authorization, 'Bearer test-key-chat');
-  assert.equal(captured.headers?.accept, 'application/json');
+  assert.equal(captured.headers?.accept, 'text/event-stream');
   assert.equal(captured.headers?.['user-agent'], 'AgentCowork-Test');
   assert.equal(captured.body?.model, 'kimi-chat-test');
-  assert.equal(captured.body?.stream, false);
+  assert.equal(captured.body?.stream, true);
   assert.equal(captured.body?.max_tokens, 77);
   assert.equal(captured.body?.temperature, 0.7);
   assert.equal(captured.body?.messages?.[0]?.role, 'system');
@@ -79,6 +79,29 @@ test('runKimiApiChat posts system and user messages and extracts multipart text 
   assert.equal(result.text, '第一段\n第二段');
   const usage = result.usage as { total_tokens?: unknown } | null | undefined;
   assert.equal(usage?.total_tokens, 9);
+});
+
+test('runKimiApiChat allows local providers without an API key', async () => {
+  const result = await runKimiApiChat({
+    ...LOCAL_EGRESS,
+    model: 'local-no-key',
+    prompt: '本地调用',
+    fetchImpl: async (_url, init = {}) => {
+      const headers = init.headers as Record<string, string>;
+      assert.equal(headers.authorization, undefined);
+      return {
+        ok: true,
+        status: 200,
+        body: null,
+        async json() {
+          return { choices: [{ message: { content: 'local ok' } }] };
+        },
+      };
+    },
+  });
+
+  assert.equal(result.text, 'local ok');
+  assert.equal(result.provider, 'openai/local');
 });
 
 test('runKimiApiChat rejects empty successful responses and abort-shaped failures', async () => {

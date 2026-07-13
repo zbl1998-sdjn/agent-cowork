@@ -35,12 +35,13 @@ test('host reflects CORS headers for a loopback origin (browser preview at :5173
 });
 
 test('the host-served UI may write back to the exact same loopback origin', async () => {
-  const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
+  const enrollmentToken = 'sample-cors-enrollment-capability-000001';
+  const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false, enrollmentToken });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/auth/guest`, {
       method: 'POST',
-      headers: { origin: base, 'content-type': 'application/json' },
+      headers: { origin: base, 'content-type': 'application/json', 'x-kcw-enrollment-token': enrollmentToken },
       body: '{}',
     });
     assert.equal(res.status, 200);

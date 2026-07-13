@@ -73,6 +73,7 @@ export function createBuiltinTools(options: BuiltinToolsOptionsInput = {}): Tool
           ext: args.ext,
           timeoutMs: args.timeoutMs,
           network: args.network === true,
+          unrestrictedHostExecution: args.unrestrictedHostExecution === true,
           trustedRoot: ctx.trustedRoot || '',
           runStoreRoot: runStoreRoot || '',
           runEvents,

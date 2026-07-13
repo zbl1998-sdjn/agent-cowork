@@ -21,6 +21,7 @@ export type MiddlewareRequest = {
 };
 export type MiddlewareResponse = {
   setHeader(name: string, value: string): unknown;
+  removeHeader?(name: string): unknown;
   writeHead(statusCode: number, headers?: Record<string, string | number>): unknown;
   end(chunk?: string | Buffer): unknown;
 };
@@ -35,6 +36,7 @@ export type RequestMiddlewareOptions = {
   rateLimiter?: RateLimiterLike | null;
   requireAuth?: boolean;
   validateHost?: boolean;
+  onlyOfficePublicHost?: string;
 };
 
 // 内容安全策略(CSP):本地 sidecar 直接服务已构建的 SPA。脚本仅同源(禁内联/eval,
@@ -62,15 +64,35 @@ export const SECURITY_HEADERS = Object.freeze({
   'Content-Security-Policy': CONTENT_SECURITY_POLICY,
 });
 
+const OFFICE_WEB_FRAME_PATH = '/office-web-frame.html';
+const OFFICE_WEB_FRAME_SCRIPT_PATH = '/vendor/office-web-frame.js';
+const ONLYOFFICE_EDITOR_PATH = '/onlyoffice-editor.html';
+const OFFICE_WEB_FRAME_CSP = CONTENT_SECURITY_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+
 const PUBLIC_API_ROUTES = [
   ['POST', '/api/auth/register'],
   ['POST', '/api/auth/login'],
   ['POST', '/api/auth/guest'],
+  ['GET', '/api/artifacts/onlyoffice/content'],
+  ['POST', '/api/artifacts/onlyoffice/callback'],
 ];
 
-function isPublicApiRoute(method: unknown, pathname: string): boolean {
+const ONLYOFFICE_PUBLIC_ROUTES = [
+  ['GET', '/api/artifacts/onlyoffice/content'],
+  ['POST', '/api/artifacts/onlyoffice/callback'],
+];
+
+function matchesRoute(routes: string[][], method: unknown, pathname: string): boolean {
   const requestMethod = String(method || '').toUpperCase();
-  return PUBLIC_API_ROUTES.some(([m, p]) => m === requestMethod && p === pathname);
+  return routes.some(([m, p]) => m === requestMethod && p === pathname);
+}
+
+function isPublicApiRoute(method: unknown, pathname: string): boolean {
+  return matchesRoute(PUBLIC_API_ROUTES, method, pathname);
+}
+
+function isOnlyOfficePublicRoute(method: unknown, pathname: string): boolean {
+  return matchesRoute(ONLYOFFICE_PUBLIC_ROUTES, method, pathname);
 }
 
 export function applyRequestMiddleware({
@@ -81,11 +103,15 @@ export function applyRequestMiddleware({
   rateLimiter,
   requireAuth,
   validateHost,
+  onlyOfficePublicHost,
 }: RequestMiddlewareOptions): boolean {
   // 防 DNS rebinding:Host 必须是回环 host 或 Tauri webview;该检查先于所有路径/方法执行。
   // Origin 校验只覆盖会改状态的 /api/* 请求,所以 GET 也必须过 Host 闸门。
   const requestHost = headerValue(request, 'host');
-  if (validateHost !== false && !isAllowedHost(requestHost)) {
+  const externalOnlyOfficeHostAllowed = isOnlyOfficePublicRoute(request.method, pathname)
+    && Boolean(onlyOfficePublicHost)
+    && String(requestHost || '').trim().toLowerCase() === String(onlyOfficePublicHost).trim().toLowerCase();
+  if (validateHost !== false && !isAllowedHost(requestHost) && !externalOnlyOfficeHostAllowed) {
     sendJson(response, 403, { error: 'Host not allowed' });
     return true;
   }
@@ -96,6 +122,17 @@ export function applyRequestMiddleware({
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     response.setHeader(name, value);
   }
+  // 仅固定的本地网页编辑画布允许被同源主界面嵌入；其他页面继续保持 DENY / frame-ancestors 'none'。
+  if (pathname === OFFICE_WEB_FRAME_PATH) {
+    response.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    response.setHeader('Content-Security-Policy', OFFICE_WEB_FRAME_CSP);
+  }
+  // sandbox 会把画布变成不透明来源；仅放行这一个无数据的固定桥脚本供该沙箱加载。
+  if (pathname === OFFICE_WEB_FRAME_SCRIPT_PATH) {
+    response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+  // 该页面由签名 session token 保护，必须允许 Tauri 主界面跨 origin 嵌入；动态 CSP 在路由响应中收紧。
+  if (pathname === ONLYOFFICE_EDITOR_PATH) response.removeHeader?.('X-Frame-Options');
 
   const requestOrigin = headerValue(request, 'origin');
   const originOk = isAllowedOrigin(requestOrigin, requestHost);
@@ -105,7 +142,7 @@ export function applyRequestMiddleware({
     response.setHeader('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     response.setHeader(
       'access-control-allow-headers',
-      'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,last-event-id',
+      'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,x-kcw-enrollment-token,last-event-id',
     );
     response.setHeader('access-control-max-age', '600');
   }

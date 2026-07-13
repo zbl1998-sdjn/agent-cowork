@@ -31,7 +31,7 @@ export function AppContextRail({ trustedRoot, recipes, streamingId, mode, model,
   return (
     <aside className="context-rail" aria-label="上下文栏">
       <div className="context-head">
-        <span className="context-title">上下文</span>
+        <span className="context-title">项目上下文</span>
         <button type="button" className="context-collapse" onClick={onToggle} title="收起上下文栏" aria-label="收起上下文栏">
           <Icon name="sidebar" size={15} />
         </button>

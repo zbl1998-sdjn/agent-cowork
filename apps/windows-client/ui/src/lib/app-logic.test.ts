@@ -258,4 +258,14 @@ describe('hasSessionModelAccess', () => {
     expect(hasSessionModelAccess({ provider: 'openai', model: 'gpt-4.1' })).toBe(false);
     expect(hasSessionModelAccess()).toBe(false);
   });
+  it('preserves locked template paths for initial and resumed agent turns', () => {
+    expect(buildAgentChatStreamOptions({
+      trustedRoot: 'C:/work',
+      templateFiles: ['C:/work/uploads/brand.docx'],
+      resumeRunId: 'run_template',
+    })).toMatchObject({
+      templateFiles: ['C:/work/uploads/brand.docx'],
+      resumeRunId: 'run_template',
+    });
+  });
 });

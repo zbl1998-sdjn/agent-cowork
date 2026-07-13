@@ -82,11 +82,13 @@ test('user store expires and revokes sessions after the bounded TTL', () => {
 });
 
 test('auth routes: register -> login -> me, and token sets request identity', async () => {
-  const server = createServer({ trustedRoot: tmp(), enableScheduler: false });
+  const enrollmentToken = 'sample-enrollment-capability-000000000002';
+  const server = createServer({ trustedRoot: tmp(), enableScheduler: false, enrollmentToken });
   const base = await bind(server);
   try {
     const reg = await requestJson(base, '/api/auth/register', {
       method: 'POST',
+      headers: { 'x-kcw-enrollment-token': enrollmentToken },
       body: { username: 'alice', password: 'hunter2x' },
     });
     assert.equal(reg.status, 200);

@@ -1,6 +1,16 @@
 // Settings(UI · components):设置模态外框——管理标签切换与保存,内容由 SettingsTabsContent 承载。纯展示+回调。
 import { useEffect, useState } from 'react';
-import { getKimiInfo, saveKimiConfig, getSelfCheck, type KimiInfo, type ModelProviderOption, type SelfCheckResult } from '../lib/api';
+import {
+  getKimiInfo,
+  saveKimiConfig,
+  testKimiConfig,
+  getSelfCheck,
+  type KimiInfo,
+  type ModelConnectionResult,
+  type ModelProviderOption,
+  type ModelProviderRuntimeState,
+  type SelfCheckResult,
+} from '../lib/api';
 import { humanizeError } from '../lib/friendly-error';
 import { IconButton } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -51,6 +61,10 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
   const [model, setModel] = useState('');
   const [providers, setProviders] = useState<ModelProviderOption[]>([]);
   const [hasKey, setHasKey] = useState(false);
+  const [providerStates, setProviderStates] = useState<ModelProviderRuntimeState[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [connection, setConnection] = useState<ModelConnectionResult | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +82,9 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
         setModel(info.model || '');
         setProviders(info.providers || []);
         setHasKey(Boolean(info.hasKey));
+        setProviderStates(info.providerStates || []);
+        setAvailableModels(info.availableModels || []);
+        setConnection(info.connection || null);
       } catch {
         /* host 未就绪时保持默认值 */
       } finally {
@@ -110,6 +127,9 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
         setBaseUrl(info.baseUrl || '');
         setModel(info.model || '');
         setProviders(info.providers || providers);
+        setProviderStates(info.providerStates || providerStates);
+        setAvailableModels(info.availableModels || []);
+        setConnection(info.connection || null);
         setApiKey('');
         onSaved(info);
         setSavedTip(okMsg);
@@ -120,6 +140,37 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
         setBusy(false);
       }
     })();
+  };
+
+  const selectProvider = (next: string) => {
+    const option = providers.find((item) => item.id === next);
+    const runtime = providerStates.find((item) => item.provider === next);
+    setProvider(next);
+    setApiKey('');
+    setHasKey(Boolean(runtime?.hasKey));
+    setBaseUrl(runtime?.baseUrl || option?.defaultBaseUrl || '');
+    setModel(runtime?.model || option?.defaultModel || '');
+    setAvailableModels([]);
+    setConnection(null);
+    setError('');
+    setSavedTip('');
+  };
+
+  const testConnection = () => {
+    if (testingConnection) return;
+    setTestingConnection(true); setError(''); setSavedTip('');
+    void testKimiConfig({
+      provider,
+      apiKey: apiKey.trim() || undefined,
+      baseUrl: baseUrl.trim() || undefined,
+      model: model.trim() || undefined,
+    }).then((result) => {
+      setAvailableModels(result.models);
+      setConnection(result.connection);
+      if (result.connection.status === 'connected') setSavedTip('连接正常，可以使用');
+    }).catch((err) => {
+      setError(humanizeError(err, { action: '测试连接' }));
+    }).finally(() => setTestingConnection(false));
   };
 
   return (
@@ -144,7 +195,14 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
             model={model} setModel={setModel}
             baseUrl={baseUrl} setBaseUrl={setBaseUrl}
             apiKey={apiKey} setApiKey={setApiKey}
-            hasKey={hasKey} loading={loading} busy={busy} persist={persist}
+            hasKey={hasKey} setHasKey={setHasKey}
+            providerStates={providerStates}
+            availableModels={availableModels}
+            connection={connection}
+            testingConnection={testingConnection}
+            onTestConnection={testConnection}
+            onProviderSelected={selectProvider}
+            loading={loading} busy={busy} persist={persist}
             selfCheck={selfCheck} scError={scError} scLoading={scLoading}
             onRefreshSelfCheck={loadSelfCheck}
             error={error} savedTip={savedTip}

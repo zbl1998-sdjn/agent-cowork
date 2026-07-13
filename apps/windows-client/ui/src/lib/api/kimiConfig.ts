@@ -19,6 +19,28 @@ export interface ModelProviderOption {
   allowCustomModel?: boolean | undefined;
   baseUrlRequired?: boolean | undefined;
   source: 'builtin';
+  runtimeState?: ModelProviderRuntimeState | undefined;
+}
+
+export interface ModelProviderRuntimeState {
+  provider: string;
+  configured: boolean;
+  enabled: boolean;
+  hasKey: boolean;
+  baseUrl: string;
+  model: string;
+  policyDecision: 'allow' | 'deny' | 'needs_approval';
+  providerClass: 'local' | 'customer_gateway' | 'external_provider';
+  reasonCode: string;
+  reason: string;
+}
+
+export interface ModelConnectionResult {
+  status: 'connected' | 'model_missing' | 'unreachable' | 'blocked';
+  models: string[];
+  modelAvailable?: boolean | undefined;
+  latencyMs: number;
+  error?: string | undefined;
 }
 
 export interface OpenCodeModelInfo {
@@ -69,6 +91,9 @@ export interface KimiInfo {
   providers?: ModelProviderOption[] | undefined;
   catalog?: OpenCodeProviderCatalog | undefined;
   catalogSource?: ModelCatalogSource | undefined;
+  providerStates?: ModelProviderRuntimeState[] | undefined;
+  availableModels?: string[] | undefined;
+  connection?: ModelConnectionResult | null | undefined;
 }
 
 export async function getKimiInfo(): Promise<KimiInfo> {
@@ -85,4 +110,23 @@ export interface SaveKimiConfigInput {
 
 export async function saveKimiConfig(input: SaveKimiConfigInput): Promise<KimiInfo> {
   return postJson<KimiInfo>('/api/kimi/config', { ...input });
+}
+
+export interface TestKimiConfigInput {
+  action?: 'models' | undefined;
+  provider?: string | undefined;
+  apiKey?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+}
+
+export interface TestKimiConfigResult {
+  provider: string;
+  model: string;
+  models: string[];
+  connection: ModelConnectionResult;
+}
+
+export async function testKimiConfig(input: TestKimiConfigInput): Promise<TestKimiConfigResult> {
+  return postJson<TestKimiConfigResult>('/api/kimi/test', { action: 'models', ...input });
 }

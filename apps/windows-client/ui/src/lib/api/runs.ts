@@ -6,7 +6,7 @@
 import type { RunEvent, RunRecord } from '../types';
 import type { TaskSummary } from '../types/tasks';
 import { getJson } from './transport';
-import { authHeaders, hostReady, resolveUrl } from './transport';
+import { authHeaders, requireHost, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse } from './sse';
 
 const RUN_EVENT_TYPES = new Set<string>([
@@ -80,11 +80,11 @@ export function subscribeRunEvents(
   });
 
   const run = async (): Promise<void> => {
-    await hostReady;
     let reconnects = 0;
     while (!stopped && !terminal) {
       let disconnectError = new Error('运行事件连接提前结束');
       try {
+        await requireHost();
         const headers = authHeaders({ accept: 'text/event-stream' });
         if (lastEventId > 0) headers['last-event-id'] = String(lastEventId);
         const response = await fetch(resolveUrl(`/api/runs/${encodeURIComponent(runId)}/events`), {

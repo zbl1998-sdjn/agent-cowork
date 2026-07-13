@@ -10,6 +10,15 @@ test('agent stream input schema rejects malformed images before streaming', () =
   );
 });
 
+test('agent stream input schema accepts bounded layout template paths', () => {
+  const body = parseAgentStreamBody({ prompt: 'fill it', templateFiles: ['C:/work/brand.docx'] });
+  assert.deepEqual(body.templateFiles, ['C:/work/brand.docx']);
+  assert.throws(
+    () => parseAgentStreamBody({ prompt: 'fill it', templateFiles: Array.from({ length: 5 }, (_, index) => `t${index}.docx`) }),
+    /agent stream body: templateFiles/,
+  );
+});
+
 test('agent stream input schema keeps known route flags and unknown extension fields', () => {
   const body = parseAgentStreamBody({
     prompt: ' hello ',

@@ -1,0 +1,35 @@
+name: agent-cowork-onlyoffice
+
+services:
+  document-server:
+    image: onlyoffice/documentserver:9.4.0.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ONLYOFFICE_PORT:-8082}:80"
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: "${ONLYOFFICE_JWT_SECRET:?set ONLYOFFICE_JWT_SECRET in deploy/onlyoffice/.env}"
+      JWT_HEADER: "Authorization"
+      JWT_IN_BODY: "false"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+      USE_UNAUTHORIZED_STORAGE: "false"
+      EXAMPLE_ENABLED: "false"
+      METRICS_ENABLED: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1/healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    volumes:
+      - document_server_data:/var/www/onlyoffice/Data
+      - document_server_logs:/var/log/onlyoffice
+      - document_server_lib:/var/lib/onlyoffice
+
+volumes:
+  document_server_data:
+  document_server_logs:
+  document_server_lib:

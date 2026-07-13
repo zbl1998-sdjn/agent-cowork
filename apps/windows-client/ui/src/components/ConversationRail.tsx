@@ -7,16 +7,19 @@ import { Icon, type IconName } from './ui/Icon';
 
 type PanelId = Exclude<SidePanel, 'none'>;
 
-const NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
-  { id: 'tasks', icon: 'history', label: '任务' },
-  { id: 'tools', icon: 'tools', label: '工具' },
-  { id: 'connectors', icon: 'connectors', label: '连接器' },
-  { id: 'artifacts', icon: 'artifacts', label: '产物' },
-  { id: 'memory', icon: 'memory', label: '记忆' },
-  { id: 'observability', icon: 'observability', label: '成本 · 可观测' },
-  { id: 'schedules', icon: 'schedules', label: '定时任务' },
-  { id: 'projects', icon: 'projects', label: '项目' },
-  { id: 'viz', icon: 'viz', label: '可视化' },
+const PRIMARY_NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
+  { id: 'tasks', icon: 'history', label: '任务记录' },
+  { id: 'artifacts', icon: 'artifacts', label: '文件成果' },
+  { id: 'schedules', icon: 'schedules', label: '自动任务' },
+  { id: 'viz', icon: 'viz', label: '可视化编辑' },
+];
+
+const MORE_NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
+  { id: 'projects', icon: 'projects', label: '项目空间' },
+  { id: 'tools', icon: 'tools', label: '扩展能力' },
+  { id: 'connectors', icon: 'connectors', label: '外部应用' },
+  { id: 'memory', icon: 'memory', label: '使用偏好' },
+  { id: 'observability', icon: 'observability', label: '运行详情' },
 ];
 
 interface ConversationRailProps {
@@ -56,8 +59,8 @@ export function ConversationRail({
         <Icon name="new-chat" size={16} /><span>新建对话</span>
       </button>
 
-      <nav className="rail-nav" aria-label="功能面板">
-        {NAV_ITEMS.map((item) => (
+      <nav className="rail-nav" aria-label="主要功能">
+        {PRIMARY_NAV_ITEMS.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -69,6 +72,23 @@ export function ConversationRail({
           </button>
         ))}
       </nav>
+
+      <details className="rail-more" open={MORE_NAV_ITEMS.some((item) => item.id === panel) || undefined}>
+        <summary><Icon name="chevron-down" size={15} /><span>更多功能</span></summary>
+        <div className="rail-more-list">
+          {MORE_NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`rail-more-item${panel === item.id ? ' is-active' : ''}`}
+              aria-pressed={panel === item.id}
+              onClick={() => onNavigate(item.id)}
+            >
+              <Icon name={item.icon} size={17} /><span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </details>
 
       <div className="rail-search">
         <Icon name="search" size={15} />

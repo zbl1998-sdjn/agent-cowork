@@ -43,6 +43,7 @@ function providerFromCatalogEntry(entry: (typeof MODEL_PROVIDER_CATALOG)[number]
       id: entry.id,
       defaultBaseUrl: entry.defaultBaseUrl,
       requiresApiKey: entry.requiresApiKey,
+      includeStreamUsage: entry.region === 'local',
       notConfiguredMessage: `未配置 ${entry.displayName} 模型。请配置 baseUrl、model${entry.requiresApiKey ? ' 和 API key' : ''} 后重试。`,
     });
   }
@@ -61,7 +62,7 @@ function createBuiltinProviders(): Map<string, Provider> {
 
 const BUILTIN_PROVIDERS = createBuiltinProviders();
 
-// 解析目标 Provider:优先使用注入实现,否则按别名表查找,未知 id 兜底到 kimi。
+// 解析目标 Provider:优先使用注入实现,否则按别名表查找;未知 id 显式失败。
 export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
   const injected = kimiConfig.provider;
   const provider = injected && typeof injected === 'object' ? injected as Partial<Provider> : {};
@@ -70,11 +71,9 @@ export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
   }
 
   const id = String(kimiConfig.provider || 'kimi').trim().toLowerCase() || 'kimi';
-  const fallback = BUILTIN_PROVIDERS.get('kimi');
-  if (!fallback) {
-    throw new Error('Built-in kimi provider is not registered');
-  }
-  return BUILTIN_PROVIDERS.get(id) || fallback;
+  const resolved = BUILTIN_PROVIDERS.get(id);
+  if (!resolved) throw new Error(`Unknown model provider: ${id}`);
+  return resolved;
 }
 
 // 统一发起一次对话补全,让调用方无需感知具体 provider 实现。

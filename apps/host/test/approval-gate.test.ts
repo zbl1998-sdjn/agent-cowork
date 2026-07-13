@@ -273,8 +273,18 @@ test('tool approval handles early exits, auto approval, session approval, and re
   assert.equal(await requestToolApproval({ ...base, needsApproval: true, autoApprove: true }), false);
   assert.equal(events.at(-1)?.payload.kind, 'tool.auto_approved');
   assert.equal(events.at(-1)?.payload.via, 'auto');
-  assert.equal(await requestToolApproval({ ...base, needsApproval: true, planMode: true, planApproved: true }), false);
-  assert.equal(events.at(-1)?.payload.via, 'plan');
+
+  const postPlanRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({
+    ...base,
+    needsApproval: true,
+    approvals: approval('once', postPlanRequests),
+    planMode: true,
+    planApproved: true,
+  }), false);
+  assert.equal(postPlanRequests.length, 1, 'an approved plan must not bypass per-tool approval');
+  assert.deepEqual(postPlanRequests[0]?.args, { path: 'a.txt' });
+  assert.equal(events.at(-1)?.payload.kind, 'tool.approved');
 
   const lowRiskRequests: Record<string, unknown>[] = [];
   assert.equal(await requestToolApproval({

@@ -19,6 +19,7 @@ export type SandboxLimits = {
   allowTools?: readonly string[] | null;
   allowEnv?: readonly string[];
   allowWorkspaceWrite?: boolean;
+  allowUnrestrictedHostExecution?: boolean;
   maxTimeoutMs?: number;
   defaultMaxOutputBytes?: number;
 };
@@ -29,6 +30,7 @@ export type RawSandboxSpec = {
   timeoutMs?: unknown;
   network?: unknown;
   workspaceWrite?: unknown;
+  unrestrictedHostExecution?: unknown;
   env?: unknown;
 };
 export type SandboxSpec = {
@@ -38,8 +40,11 @@ export type SandboxSpec = {
   timeoutMs: number;
   network: boolean;
   workspaceWrite: boolean;
+  unrestrictedHostExecution: boolean;
   env: Record<string, string>;
   maxOutputBytes: number;
+  /** Internal trusted runtime path. Never accepted from a raw sandbox request. */
+  executablePath?: string;
 };
 
 function fail(message: string): HttpError {
@@ -131,9 +136,26 @@ export function normalizeSandboxSpec(input: RawSandboxSpec, limits: SandboxLimit
   if (workspaceWrite && limits.allowWorkspaceWrite !== true) {
     throw fail('workspaceWrite requires an explicit capability');
   }
+  if (spec.unrestrictedHostExecution != null && typeof spec.unrestrictedHostExecution !== 'boolean') {
+    throw fail('unrestrictedHostExecution must be a boolean');
+  }
+  const unrestrictedHostExecution = spec.unrestrictedHostExecution === true;
+  if (unrestrictedHostExecution && limits.allowUnrestrictedHostExecution !== true) {
+    throw fail('unrestrictedHostExecution requires an explicit capability');
+  }
   const env = cleanEnv(spec.env, limits.allowEnv);
 
-  return { tool, args, cwd, timeoutMs, network, workspaceWrite, env, maxOutputBytes };
+  return {
+    tool,
+    args,
+    cwd,
+    timeoutMs,
+    network,
+    workspaceWrite,
+    unrestrictedHostExecution,
+    env,
+    maxOutputBytes,
+  };
 }
 
 export const SANDBOX_DEFAULTS = Object.freeze({

@@ -50,6 +50,14 @@ export const kimiConfigBodySchema = objectBody('invalid kimi config request').pi
   model: optionalText(200),
 }).loose());
 
+export const kimiTestBodySchema = objectBody('invalid kimi test request').pipe(z.object({
+  action: z.literal('models').default('models'),
+  apiKey: optionalText(4096),
+  provider: optionalText(96),
+  baseUrl: optionalText(2048),
+  model: optionalText(200),
+}).loose());
+
 export const kimiPlanChatBodySchema = objectBody('invalid kimi request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
@@ -61,6 +69,7 @@ export const kimiAgentStreamBodySchema = objectBody('invalid agent stream reques
   prompt: z.string().optional(),
   resumeRunId: optionalNonEmptyText(96),
   trustedRoot: trustedRootSchema,
+  templateFiles: z.array(z.string().trim().min(1).max(2000)).max(4).optional(),
 }).loose());
 
 export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request').pipe(z.object({
@@ -72,6 +81,7 @@ export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request'
 }).loose());
 
 export type KimiConfigBody = z.output<typeof kimiConfigBodySchema>;
+export type KimiTestBody = z.output<typeof kimiTestBodySchema>;
 export type KimiPlanChatBody = z.output<typeof kimiPlanChatBodySchema>;
 export type KimiAgentStreamBody = z.output<typeof kimiAgentStreamBodySchema>;
 export type KimiChatStreamBody = z.output<typeof kimiChatStreamBodySchema>;

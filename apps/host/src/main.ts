@@ -27,6 +27,7 @@ const envSchema = z.object({
   KIMI_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(60_000),
   KIMI_API_MAX_TOKENS: z.coerce.number().int().positive().catch(2048),
   KIMI_MODEL: z.string().optional(),
+  KCW_TAURI: z.literal('1').optional(),
   KCW_PARENT_PID: z.coerce.number().int().positive().optional().catch(undefined),
   MASE_MCP_ENABLED: z.string().optional(),
   MASE_REPO: z.string().optional(),
@@ -72,6 +73,7 @@ function buildMaseMcpServers(): McpServerSpec[] {
 
 const server = createServer(withPublicHostSecurity(omitUndefined({
   trustedRoot,
+  allowLocalModelConfigSelfService: env.KCW_TAURI === '1' || undefined,
   kimiApiKey: firstNonEmpty(env.KIMI_API_KEY, env.MOONSHOT_API_KEY),
   kimiBaseUrl: firstNonEmpty(env.KIMI_BASE_URL, env.MOONSHOT_BASE_URL),
   kimiApiTimeoutMs: env.KIMI_API_TIMEOUT_MS,

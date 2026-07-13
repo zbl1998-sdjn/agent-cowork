@@ -22,19 +22,45 @@ function modeLabel(mode: string): string {
   return labels[mode] || mode || '未知';
 }
 
+function protectionLabel(mode: string, providerClass?: string): string {
+  if (mode === 'air_gap') return '完全离线';
+  if (providerClass === 'local') return '仅本地处理';
+  if (providerClass === 'customer_gateway') return '使用企业模型服务';
+  if (providerClass === 'external_provider') return '使用云端模型';
+  return mode === 'local_strict' || mode === 'enterprise_local' || mode === 'local_demo'
+    ? '仅本地处理'
+    : '数据边界待确认';
+}
+
+function activityLabel(contentBytes: unknown, externalModelCalls: number): string {
+  const egressBytes = formatBytes(contentBytes);
+  if (egressBytes === '0 B' && externalModelCalls === 0) return '今天未记录外发内容';
+  if (egressBytes === '0 B') return `今天已调用外部模型 ${externalModelCalls} 次，未记录外发内容`;
+  const calls = externalModelCalls > 0 ? ` · 外部模型 ${externalModelCalls} 次` : '';
+  return `今天已记录外发内容 ${egressBytes}${calls}`;
+}
+
 export function SecurityStatusBar({ status }: { status: SecurityStatus | null }) {
   if (!status) return null;
   const provider = status.model?.provider || '未配置';
   const model = status.model?.model || '';
-  const egressBytes = formatBytes(status.egress?.todayContentBytes);
   const cloudCalls = status.egress?.todayExternalModelCalls || 0;
   const deniedCount = status.egress?.deniedCount || 0;
   return (
-    <div className="security-status-bar" role="status" aria-label="本地安全状态">
-      <span className="security-pill">{modeLabel(status.securityMode)}</span>
-      <span>模型 {provider}{model ? ` / ${model}` : ''}</span>
-      <span>外发 {egressBytes}</span>
-      {(cloudCalls > 0 || deniedCount > 0) && <span>云模型 {cloudCalls} 次 / 阻断 {deniedCount}</span>}
+    <div className="security-status-bar" role="status" aria-live="polite" aria-label="数据保护状态">
+      <span className="security-pill">{protectionLabel(status.securityMode, status.model?.providerClass)}</span>
+      <span className="security-summary">
+        {activityLabel(status.egress?.todayContentBytes, cloudCalls)}
+      </span>
+      <details className="security-details">
+        <summary>技术详情</summary>
+        <div>
+          <span>保护模式：{modeLabel(status.securityMode)}</span>
+          <span>使用模型：{provider}{model ? ` / ${model}` : ''}</span>
+          <span>外部模型调用：{cloudCalls} 次</span>
+          <span>已阻止：{deniedCount} 次</span>
+        </div>
+      </details>
     </div>
   );
 }

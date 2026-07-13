@@ -35,6 +35,14 @@ export type ModelFallback = {
   maxTokens?: number;
   temperature?: number;
 };
+export type ProviderProfile = {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  timeoutMs?: number;
+  maxTokens?: number;
+  temperature?: number;
+};
 export type KimiApiConfig = {
   provider: string;
   securityMode: SecurityMode;
@@ -48,6 +56,7 @@ export type KimiApiConfig = {
   temperature?: number;
   userAgent: string;
   fallbacks: ModelFallback[];
+  providerProfiles: Record<string, ProviderProfile>;
 };
 
 /** 规范化文本:统一换行、去首尾空白;非字符串安全转空串。 */
@@ -151,6 +160,14 @@ export function resolveKimiApiConfig(
   const userAgent = String(config.kimiUserAgent || env.KIMI_USER_AGENT || '').trim();
   const tempRaw = config.kimiTemperature != null ? config.kimiTemperature : env.KIMI_TEMPERATURE;
   const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
+  const providerProfile = omitUndefined({
+    apiKey,
+    baseUrl: baseUrl.replace(/\/+$/, ''),
+    model,
+    timeoutMs,
+    maxTokens,
+    temperature,
+  });
   return omitUndefined({
     provider,
     securityMode,
@@ -164,5 +181,6 @@ export function resolveKimiApiConfig(
     temperature,
     userAgent,
     fallbacks: cleanModelFallbacks(fallbackInput),
+    providerProfiles: { [provider]: providerProfile },
   });
 }

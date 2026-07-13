@@ -229,6 +229,44 @@ test('Bearer-authenticated users cannot self-assert admin while an exact allowli
   });
 });
 
+test('explicit local model self-service permits bearer users without trusting identity headers', async () => {
+  const root = tempRoot('kcw-local-model-self-service-');
+  const authStore = {
+    resolveToken(token: string) {
+      return token === 'test-local-model-user-token' ? SIBLING_USER : null;
+    },
+  };
+  await withServer(mutationConfig(root, {
+    authStore,
+    requireAuth: true,
+    trustIdentityHeaders: false,
+    allowLocalModelConfigSelfService: true,
+  }), async (base) => {
+    const response = await jsonRequest(base, '/api/kimi/config', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-local-model-user-token' },
+      body: { provider: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:0.5b' },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(fs.existsSync(path.join(root, '.AgentCowork', 'config.json')), true);
+  });
+
+  const headerRoot = tempRoot('kcw-local-model-self-service-headers-');
+  await withServer(mutationConfig(headerRoot, {
+    requireAuth: true,
+    trustIdentityHeaders: true,
+    allowLocalModelConfigSelfService: true,
+  }), async (base) => {
+    const response = await jsonRequest(base, '/api/kimi/config', {
+      method: 'POST',
+      headers: identityHeaders(SIBLING_USER),
+      body: { provider: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:0.5b' },
+    });
+    assert.equal(response.status, 403, 'trusted identity headers must not activate local model self-service');
+    assert.equal(fs.existsSync(path.join(headerRoot, '.AgentCowork', 'config.json')), false);
+  });
+});
+
 test('global mutation admin env accepts exact tuples and malformed config fails closed at startup', async () => {
   const key = 'KCW_GLOBAL_MUTATION_ADMINS';
   const previous = process.env[key];

@@ -11,12 +11,15 @@ type AtomicWriteOptions = Readonly<{
 }>;
 
 const ATOMIC_SUFFIX_RE = /^[A-Za-z0-9-]{1,128}$/;
-function writeFileDescriptor(descriptor: number, data: string): void {
-  const write = fs.writeFileSync as unknown as (
-    target: number,
-    content: string,
-    encoding: string,
-  ) => void;
+function writeFileDescriptor(descriptor: number, data: string | Buffer): void {
+  const write = fs.writeFileSync as unknown as {
+    (target: number, content: Buffer): void;
+    (target: number, content: string, encoding: string): void;
+  };
+  if (Buffer.isBuffer(data)) {
+    write(descriptor, data);
+    return;
+  }
   write(descriptor, data, 'utf8');
 }
 
@@ -40,7 +43,7 @@ function cleanupOwnedTemporaryFile(
 
 export function writePrivateFileAtomically(
   filePath: string,
-  data: string,
+  data: string | Buffer,
   options: AtomicWriteOptions = {},
 ): void {
   const directory = path.dirname(filePath);
@@ -91,7 +94,7 @@ function isAlreadyExistsError(error: unknown): boolean {
  */
 export function writePrivateFileOnceAtomically(
   filePath: string,
-  data: string,
+  data: string | Buffer,
   options: AtomicWriteOptions = {},
 ): boolean {
   const directory = path.dirname(filePath);

@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // 职责:封装普通对话与 Agent 流式对话(SSE),把 token/推理/工具调用/审批/计划/待办/问答/完成等事件分发到 handlers;并提供审批应答、问答应答与运行取消。
 // 依赖/对应路由:POST /api/kimi/chat(/stream)、/api/agent/chat/stream、/api/approvals/:id、/api/approvals/batch、/api/runs/:id/cancel;经 ./sse(streamSse)。导出:chat / chatStream / agentChatStream / respondApproval(s) / answerQuestion / cancelRun + 相关类型。
-import { authHeaders, hostReady, postJson, resolveUrl } from './transport';
+import { authHeaders, postJson, requireHost, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse, type SsePayload } from './sse';
 import { approvalRequestMeta, type ApprovalRequestMeta } from './approval-event';
 import type { PermissionMode, TodoItem, TodoStatus } from '../types';
@@ -40,7 +40,7 @@ export async function chatStream(
   opts: { trustedRoot?: string | undefined; model?: string | undefined; thinking?: string | undefined } = {},
   handlers: ChatStreamHandlers = {},
 ): Promise<void> {
-  await hostReady;
+  await requireHost();
   const response = await fetch(resolveUrl('/api/kimi/chat/stream'), {
     method: 'POST',
     headers: authHeaders({ 'content-type': 'application/json' }),
@@ -168,14 +168,14 @@ export async function agentChatStream(
     permissionMode?: PermissionMode | undefined;
     autoApprove?: boolean | undefined;
     planMode?: boolean | undefined;
-    images?: string[] | undefined;
+    images?: string[] | undefined; templateFiles?: string[] | undefined;
     resumeRunId?: string | undefined;
     conversationId?: string | undefined;
     contextCompaction?: ContextCompactionConfig | undefined;
   } = {},
   handlers: AgentStreamHandlers = {},
 ): Promise<void> {
-  await hostReady;
+  await requireHost();
   const response = await fetch(resolveUrl('/api/agent/chat/stream'), {
     method: 'POST',
     headers: authHeaders({ 'content-type': 'application/json' }),
@@ -188,7 +188,7 @@ export async function agentChatStream(
       permissionMode: opts.permissionMode,
       autoApprove: opts.autoApprove,
       planMode: opts.planMode,
-      images: opts.images,
+      images: opts.images, templateFiles: opts.templateFiles,
       resumeRunId: opts.resumeRunId,
       conversationId: opts.conversationId,
       contextCompaction: opts.contextCompaction,

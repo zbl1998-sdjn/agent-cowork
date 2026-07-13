@@ -15,6 +15,7 @@ const sandboxSpecShape = z.object({
   cwd: z.unknown().optional(),
   timeoutMs: z.unknown().optional(),
   network: z.unknown().optional(),
+  unrestrictedHostExecution: z.boolean().optional(),
   env: z.unknown().optional(),
 }).loose();
 
@@ -30,6 +31,7 @@ export const sandboxRunCodeBodySchema = objectBodySchema.pipe(z.object({
   ext: z.string().trim().max(16).regex(/^[a-zA-Z0-9]+$/).optional(),
   timeoutMs: z.unknown().optional(),
   network: z.boolean().optional(),
+  unrestrictedHostExecution: z.boolean().optional(),
   trustedRoot: z.unknown().optional(),
 }).loose());
 

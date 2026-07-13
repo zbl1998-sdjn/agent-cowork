@@ -41,6 +41,7 @@ export async function runCode({
   ext,
   timeoutMs,
   network = false,
+  unrestrictedHostExecution = false,
   trustedRoot,
   runStoreRoot,
   runEvents = null,
@@ -81,7 +82,7 @@ export async function runCode({
   let requestedSpec: SandboxSpec;
   try {
     requestedSpec = normalizeSandboxSpec(
-      { tool: toolName, args: [scriptRelative], timeoutMs, network },
+      { tool: toolName, args: [scriptRelative], timeoutMs, network, unrestrictedHostExecution },
       sandboxLimits,
     );
   } catch (err) {
@@ -100,10 +101,12 @@ export async function runCode({
           args: requestedSpec.args,
           timeoutMs: requestedSpec.timeoutMs,
           network: requestedSpec.network,
+          unrestrictedHostExecution: requestedSpec.unrestrictedHostExecution,
           env: { PATH: localRuntime.pathPrefix },
         },
         withLocalRuntimeToolLimits(sandboxLimits, localRuntime.tool),
       );
+      spec = { ...spec, executablePath: localRuntime.executablePath };
     } else {
       spec = requestedSpec;
     }

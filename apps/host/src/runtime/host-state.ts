@@ -12,7 +12,7 @@ import { createMemoryStore } from '../memory/memory-store.js';
 import { assertTrustedPathForCreate } from '../security/path-policy.js';
 import { createConversationStore } from '../storage/conversation-store.js';
 import { createPostgresConversationStore } from '../storage/postgres-conversation-store.js';
-import { createSandbox, DEFAULT_ALLOW_TOOLS } from '../sandbox/index.js';
+import { createSandbox } from '../sandbox/index.js';
 import { createToolRegistry } from '../tools/tool-registry.js';
 import { createBuiltinTools } from '../tools/builtin-tools.js';
 import { createSkillRegistry } from '../skills/skill-registry.js';
@@ -28,12 +28,14 @@ import { createOAuthPermissionApprovalStore } from './oauth-permission-approvals
 import { createClarificationStore } from './clarifications.js';
 import { createUserStore } from '../auth/user-store.js';
 import { createSqliteUserStore } from '../auth/sqlite-user-store.js';
+import { createEnrollmentPolicy } from '../auth/enrollment-policy.js';
 import { resolveGlobalMutationAdmins } from '../auth/global-mutation-admin.js';
 import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { applyPersistedKimiConfig, persistKimiConfig } from '../kimi/config-store.js';
+import { providerRuntimeState } from '../kimi/provider-profiles.js';
 import { createKimiRefineModelCall } from '../kimi/prompt/refine-model-call.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
 import { resolveStoreBackendConfig } from './store-backend-config.js';
@@ -47,8 +49,10 @@ import { configureHostScheduler } from './host-scheduler.js';
 import { indexHostRun } from './host-run-indexing.js';
 import { idempotencyCacheKey } from './idempotency-key.js';
 import { createHostStatePathResolvers } from './host-state-paths.js';
+import { resolveHostSandboxLimits } from './host-sandbox-limits.js';
 import { createFolderGrantStore } from '../workspace/folder-grant-store.js';
 import { createFolderGrantRegistry } from './folder-grants.js';
+import { resolveOnlyOfficeConfig } from '../artifacts/onlyoffice-config.js';
 import type {
   ApprovalRegistryLike,
   CancellationRegistryLike,
@@ -61,9 +65,7 @@ import type {
 export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
   // 配置优先级在装配根统一处理:config→环境变量→安全默认值,排查只需看 HostConfig 与 `.env.example`。
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
-  const staticRoot = config.staticRoot === false
-    ? null
-    : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
+  const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
   const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
   const kimiConfigFile = statePaths.kimiConfigFile();
@@ -97,17 +99,20 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     startupReady: Promise.resolve(),
     approvalRegistry: config.approvalRegistry as ApprovalRegistryLike,
     authStore: config.authStore as HostState['authStore'],
+    enrollmentPolicy: createEnrollmentPolicy(config.enrollmentToken ?? process.env.KCW_ENROLLMENT_TOKEN),
     cancellation: config.cancellation as CancellationRegistryLike,
     runEvents: config.runEventBus as RunEventsState,
     runsIndex: config.runsIndex as HostState['runsIndex'],
     sandboxStartup: config.sandboxStartup as HostState['sandboxStartup'],
     folderGrantStore, folderGrants,
+    onlyOfficeConfig: resolveOnlyOfficeConfig(config.onlyOffice), onlyOfficeFetch: config.onlyOfficeFetch || fetch,
     safeTrustedRoot: folderGrants.safeTrustedRoot,
-    toolRegistry: config.toolRegistry as HostState['toolRegistry'], globalMutationAdmins: resolveGlobalMutationAdmins(config.globalMutationAdmins, process.env),
+    toolRegistry: config.toolRegistry as HostState['toolRegistry'],
+    globalMutationAdmins: resolveGlobalMutationAdmins(config.globalMutationAdmins, process.env),
+    allowLocalModelConfigSelfService: config.allowLocalModelConfigSelfService === true,
   };
   state.recomputeKimiEnabled = () => {
-    state.kimiApiEnabled = config.enableKimiApi !== false
-      && (kimiApiConfig.configured || Boolean(config.kimiPlanRunner) || Boolean(config.kimiChatRunner));
+    state.kimiApiEnabled = config.enableKimiApi !== false && (providerRuntimeState(kimiApiConfig, kimiApiConfig.provider).enabled || Boolean(config.kimiPlanRunner) || Boolean(config.kimiChatRunner));
     return state.kimiApiEnabled;
   };
   state.recomputeKimiEnabled();
@@ -151,12 +156,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     timeoutMs: config.sandboxProbeTimeoutMs,
   }));
   state.sandbox = config.sandbox || createSandbox(state.sandboxStartup.options);
-  state.sandboxLimits = omitUndefined({
-    allowTools: config.sandboxAllowTools || [...DEFAULT_ALLOW_TOOLS],
-    allowEnv: config.sandboxAllowEnv || [],
-    maxTimeoutMs: config.sandboxMaxTimeoutMs,
-    defaultMaxOutputBytes: config.sandboxMaxOutputBytes,
-  });
+  state.sandboxLimits = resolveHostSandboxLimits(config);
   // 严格本地模式(local_demo/local_strict/air_gap)下若没有真隔离的沙箱后端(Docker/VM/
   // Hyper-V),policyBlocked=true——此前这个字段只写进 info 供展示,从未被读取来真正
   // 阻止 sandbox.exec/sandbox.run-code 注册,等于「宣称阻塞高风险工具」但代码里从没

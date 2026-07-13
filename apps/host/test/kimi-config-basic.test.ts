@@ -14,7 +14,7 @@ import {
   withKimiConfigServer,
 } from './helpers/kimi-config.js';
 
-test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags', async () => {
+test('POST /api/kimi/config stores key without claiming policy-blocked cloud calls are enabled', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     let info = (await readKimiInfo(baseUrl)).body;
@@ -33,8 +33,8 @@ test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags
     assert.ok(!raw.includes(CONFIG_SECRET), 'config response leaked the API key');
     assert.equal(body.hasKey, true);
     assert.equal(body.configured, true);
-    assert.equal(body.chatEnabled, true);
-    assert.equal(body.planEnabled, true);
+    assert.equal(body.chatEnabled, false);
+    assert.equal(body.planEnabled, false);
     assert.equal(body.baseUrl, 'https://api.moonshot.cn/v1');
     assert.equal(body.model, 'kimi-k2-test');
     assert.equal(body.apiKey, undefined);
@@ -44,7 +44,11 @@ test('POST /api/kimi/config stores key, never echoes it, and flips enabled flags
     info = infoPayload.body;
     assert.equal(info.hasKey, true);
     assert.equal(info.configured, true);
-    assert.equal(info.chatEnabled, true);
+    assert.equal(info.chatEnabled, false);
+    const active = info.providerStates?.find((item) => item.provider === 'kimi-api');
+    assert.equal(active?.configured, true);
+    assert.equal(active?.enabled, false);
+    assert.equal(active?.policyDecision, 'needs_approval');
     assert.equal(info.model, 'kimi-k2-test');
   });
 
@@ -70,7 +74,7 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
     const info = (await readKimiInfo(baseUrl)).body;
     assert.equal(info.hasKey, true);
     assert.equal(info.configured, true);
-    assert.equal(info.chatEnabled, true);
+    assert.equal(info.chatEnabled, false);
     assert.equal(info.model, 'persisted-model');
     assert.equal(info.baseUrl, 'https://x.example/v1');
   });

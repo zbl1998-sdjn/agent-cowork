@@ -85,11 +85,23 @@ test('GET /api/selfcheck warns when startup falls back to the local sandbox', as
 
 test('POST /api/sandbox/exec runs a tool, records a run, and is idempotent', async () => {
   const trustedRoot = tempRoot('kcw-sbx-');
-  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
+  const server = createServer({
+    trustedRoot,
+    enableScheduler: false,
+    allowUnsafeDirectSandboxRoutes: true,
+    sandboxAllowUnrestrictedHostExecution: true,
+  });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_alice', 'x-user-id': 'user_alice', 'idempotency-key': 'sbx-1' };
-    const body = { spec: { tool: 'node', args: ['-e', 'process.stdout.write("ok")'], timeoutMs: 5000 } };
+    const body = {
+      spec: {
+        tool: 'node',
+        args: ['-e', 'process.stdout.write("ok")'],
+        timeoutMs: 5000,
+        unrestrictedHostExecution: true,
+      },
+    };
     const first = await jsonRequest(base, '/api/sandbox/exec', { method: 'POST', headers, body });
     assert.equal(first.status, 200);
     assert.equal(objectField(first.body, 'result', 'sandbox exec result').exitCode, 0);

@@ -28,15 +28,15 @@ interface AppSidePanelProps {
 }
 
 const PANEL_LABELS: Record<Exclude<SidePanel, 'none'>, string> = {
-  tasks: '任务中心',
-  tools: '工具',
-  viz: '可视化',
-  connectors: '连接器',
-  artifacts: '产物',
-  projects: '项目',
-  schedules: '定时任务',
-  memory: '记忆',
-  observability: '成本 · 可观测',
+  tasks: '任务记录',
+  tools: '扩展能力',
+  viz: '可视化编辑',
+  connectors: '外部应用',
+  artifacts: '文件成果',
+  projects: '项目空间',
+  schedules: '自动任务',
+  memory: '使用偏好',
+  observability: '运行详情',
 };
 
 function panelContent(

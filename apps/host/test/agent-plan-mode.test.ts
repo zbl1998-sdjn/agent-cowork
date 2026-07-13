@@ -8,7 +8,7 @@ import {
   parsePlanProposal,
   type EmittedEvent,
 } from './helpers/agent.js';
-import { createAgentApprovalRegistry } from './helpers/approvals.js';
+import { createAgentApprovalRegistry, parseApprovalPayload } from './helpers/approvals.js';
 import { tempRoot } from './helpers/host-http.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
 import type { ModelCall } from '../src/kimi/agent/model-resilience.js';
@@ -19,7 +19,11 @@ test('plan mode blocks writes until ExitPlanMode is approved, then executes', as
   const events: EmittedEvent[] = [];
   const emit = (type: string, payload: unknown) => {
     events.push({ type, payload });
-    if (type === 'plan_proposed') approvals.resolve(parsePlanProposal(payload).id, 'once');
+    if (type === 'plan_proposed') {
+      approvals.resolve(parsePlanProposal(payload).id, 'once');
+    } else if (type === 'approval_request') {
+      approvals.resolve(parseApprovalPayload(payload).id, 'once');
+    }
   };
   let calls = 0;
   const modelCall: ModelCall = async () => {
@@ -49,6 +53,7 @@ test('plan mode blocks writes until ExitPlanMode is approved, then executes', as
 
   assert.ok(out.steps.some((step) => step.tool === 'Write' && step.planBlocked), 'early write blocked');
   assert.ok(events.some((event) => event.type === 'plan_proposed'), 'plan_proposed emitted');
+  assert.ok(events.some((event) => event.type === 'approval_request'), 'post-plan write requested explicit approval');
   assert.ok(hasTodoSnapshotText(events, '写 out.txt'), 'plan todo snapshot emitted');
   assert.ok(out.steps.some((step) => step.tool === 'ExitPlanMode' && step.plan && step.approved), 'plan approved');
   assert.equal(fs.readFileSync(path.join(root, 'out.txt'), 'utf8'), 'APPROVED');

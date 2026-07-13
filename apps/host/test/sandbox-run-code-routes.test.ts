@@ -15,11 +15,11 @@ import {
 
 test('POST /api/sandbox/run-code runs inline code, writes the script, records a sandbox-code run, and is idempotent', async () => {
   const trustedRoot = tempRoot('kcw-sbx-');
-  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true, sandboxAllowUnrestrictedHostExecution: true });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_carol', 'x-user-id': 'user_carol', 'idempotency-key': 'code-1' };
-    const body = { tool: 'node', code: 'process.stdout.write("from-script:" + (2 + 3))', prompt: 'add two numbers' };
+    const body = { tool: 'node', code: 'process.stdout.write("from-script:" + (2 + 3))', prompt: 'add two numbers', unrestrictedHostExecution: true };
     const first = await jsonRequest(base, '/api/sandbox/run-code', { method: 'POST', headers, body });
     assert.equal(first.status, 200);
     const firstResult = objectField(first.body, 'result', 'first run-code result');
@@ -72,11 +72,11 @@ test('POST /api/sandbox/run-code rejects direct execution by default', async () 
 
 test('POST /api/sandbox/run-code records a failed run when the script exits non-zero', async () => {
   const trustedRoot = tempRoot('kcw-sbx-');
-  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true });
+  const server = createServer({ trustedRoot, enableScheduler: false, allowUnsafeDirectSandboxRoutes: true, sandboxAllowUnrestrictedHostExecution: true });
   const base = await bind(server);
   try {
     const headers = { 'x-tenant-id': 'tenant_dan', 'idempotency-key': 'code-fail' };
-    const body = { tool: 'node', code: 'process.stderr.write("boom"); process.exit(3)' };
+    const body = { tool: 'node', code: 'process.stderr.write("boom"); process.exit(3)', unrestrictedHostExecution: true };
     const res = await jsonRequest(base, '/api/sandbox/run-code', { method: 'POST', headers, body });
     assert.equal(res.status, 200);
     const result = objectField(res.body, 'result', 'failed run-code result');

@@ -120,6 +120,26 @@ test('runKimiApiChatStream keeps the final SSE data line when the stream closes 
   assert.equal(result.text, '最后一段');
 });
 
+test('runKimiApiChatStream allows local providers without an API key', async () => {
+  const result = await runKimiApiChatStream({
+    ...LOCAL_EGRESS,
+    model: 'local-no-key',
+    prompt: '本地流式调用',
+    fetchImpl: async (_url, init = {}) => {
+      const headers = init.headers as Record<string, string>;
+      assert.equal(headers.authorization, undefined);
+      return {
+        ok: true,
+        status: 200,
+        body: { getReader: () => streamReader(['data: {"choices":[{"delta":{"content":"local stream ok"}}]}\n']) },
+      };
+    },
+  });
+
+  assert.equal(result.text, 'local stream ok');
+  assert.equal(result.provider, 'openai/local');
+});
+
 test('runKimiApiChatStream fails closed before unsupported or failed streams are consumed', async () => {
   await assert.rejects(
     () => runKimiApiChatStream({
@@ -138,7 +158,7 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
       prompt: 'HTTP error',
       fetchImpl: async () => ({ ok: false, status: 429, body: null }),
     }),
-    /status 429/,
+    /429/,
   );
 
   await assert.rejects(
@@ -148,6 +168,6 @@ test('runKimiApiChatStream fails closed before unsupported or failed streams are
       prompt: 'missing body',
       fetchImpl: async () => ({ ok: true, status: 200, body: null }),
     }),
-    /streaming not supported/,
+    /流或 JSON 正文/,
   );
 });

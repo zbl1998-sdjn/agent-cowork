@@ -1,0 +1,30 @@
+{
+  "ruleGroup": "Agent Cowork Egress Lockdown",
+  "rules": [
+    {
+      "name": "Agent Cowork Egress Lockdown - Allow Loopback Ports 11434",
+      "direction": "outbound",
+      "action": "allow",
+      "remoteAddress": "127.0.0.0/8",
+      "remotePort": "11434",
+      "description": "仅放行回环指定端口出站(本地模型端点 11434),不放行本机代理端口"
+    },
+    {
+      "name": "Agent Cowork Egress Lockdown - Block app.exe",
+      "direction": "outbound",
+      "action": "block",
+      "program": "C:\\test\\app.exe",
+      "description": "阻断 C:\\test\\app.exe 的对外出站(仅放行 loopback 与白名单网关)"
+    }
+  ],
+  "commands": [
+    "New-NetFirewallRule -DisplayName 'Agent Cowork Egress Lockdown - Allow Loopback Ports 11434' -Group 'Agent Cowork Egress Lockdown' -Direction Outbound -Action Allow -Profile Any -Enabled True -RemoteAddress '127.0.0.0/8' -Protocol TCP -RemotePort '11434'",
+    "New-NetFirewallRule -DisplayName 'Agent Cowork Egress Lockdown - Block app.exe' -Group 'Agent Cowork Egress Lockdown' -Direction Outbound -Action Block -Profile Any -Enabled True -Program 'C:\\test\\app.exe'"
+  ],
+  "removeCommand": "Remove-NetFirewallRule -Group 'Agent Cowork Egress Lockdown'",
+  "warnings": [
+    "【关键】Windows 防火墙不过滤 loopback 流量:若隔离机存在本机转发代理(http(s)_proxy=127.0.0.1:xxxx,如 Mihomo/Clash),被锁进程经代理即可绕过本封锁外呼(2026-07-07 真机复现:经代理 http=301 成功,直连被拦 exit=7)。netsh 规则无法封堵此旁路。唯一有效缓解:①机密档进程环境清除 http_proxy/https_proxy/ALL_PROXY/NO_PROXY;②隔离机不安装本机代理;③或用 WFP 底层过滤器拦代理进程本身。",
+    "Windows 防火墙 Block 优先于 Allow:纯 netsh 规则无法完美表达\"默认拒绝仅放行白名单\"。本计划为 best-effort OS 强制,应用层出口网关仍是主执行点;需要绝对默认拒绝时用 WFP 带权重过滤器或机器级出站默认拒绝策略。"
+  ],
+  "executed": false
+}

@@ -22,6 +22,19 @@ const FALLBACK_PROVIDER_OPTIONS = [
   { id: 'lmstudio', displayName: 'LM Studio' },
 ];
 
+export function modelProviderDisplayName(provider: string, providerOptions?: ModelProviderOption[]): string {
+  const options = providerOptions?.length ? providerOptions : FALLBACK_PROVIDER_OPTIONS;
+  return options.find((item) => item.id === provider)?.displayName || provider || '默认模型';
+}
+
+function providerRuntimeLabel(item: Pick<ModelProviderOption, 'displayName' | 'runtimeState'>): string {
+  const state = item.runtimeState;
+  if (!state || state.enabled) return item.displayName;
+  if (!state.configured) return `${item.displayName}（未配置）`;
+  if (state.policyDecision !== 'allow') return `${item.displayName}（受安全策略限制）`;
+  return `${item.displayName}（当前不可用）`;
+}
+
 // 标签 → 语义 class(颜色见 CSS)
 const TAG_CLASS: Record<ModelTag, string> = {
   '旗舰': 'flagship', '平衡': 'balance', '轻量': 'light', '免费': 'free',
@@ -47,16 +60,20 @@ export function ComposerModelControls({
 }: ComposerModelControlsProps) {
   const [open, setOpen] = useState(false);
   const options = (providerOptions?.length ? providerOptions : FALLBACK_PROVIDER_OPTIONS)
-    .map((item) => ({ id: item.id, displayName: item.displayName }));
+    .map((item) => ({
+      id: item.id,
+      displayName: providerRuntimeLabel(item as ModelProviderOption),
+      disabled: Boolean((item as ModelProviderOption).runtimeState && !(item as ModelProviderOption).runtimeState?.enabled),
+    }));
   if (provider && !options.some((item) => item.id === provider)) {
-    options.unshift({ id: provider, displayName: provider });
+    options.unshift({ id: provider, displayName: provider, disabled: false });
   }
   const highlights = highlightsForProvider(provider, modelOptions);
 
   return (
     <>
       <select className="provider-select" value={provider} onChange={(e) => onProvider(e.target.value)} title="本轮模型提供商">
-        {options.map((opt) => <option key={opt.id} value={opt.id}>{opt.displayName}</option>)}
+        {options.map((opt) => <option key={opt.id} value={opt.id} disabled={opt.disabled}>{opt.displayName}</option>)}
       </select>
       <div className="model-picker">
         <input

@@ -23,6 +23,9 @@ function makeResponse(): CapturedResponse {
     setHeader(name, value) {
       res.headers[name.toLowerCase()] = value;
     },
+    removeHeader(name) {
+      Reflect.deleteProperty(res.headers, name.toLowerCase());
+    },
     writeHead(statusCode, headers) {
       res.statusCode = statusCode;
       Object.assign(res.headers, headers ?? {});
@@ -86,6 +89,45 @@ test('missing Host header is allowed (non-browser client)', () => {
   assert.equal(handled, false);
 });
 
+test('external ONLYOFFICE Host is limited to signed content and callback routes', () => {
+  const publicHost = 'host.docker.internal:3017';
+  for (const [method, pathname] of [
+    ['GET', '/api/artifacts/onlyoffice/content'],
+    ['POST', '/api/artifacts/onlyoffice/callback'],
+  ] as const) {
+    const response = makeResponse();
+    const handled = applyRequestMiddleware({
+      request: makeRequest(publicHost, method),
+      response,
+      pathname,
+      requestContext: { ...ctx(), authenticated: false },
+      requireAuth: true,
+      validateHost: true,
+      onlyOfficePublicHost: publicHost,
+    });
+    assert.equal(handled, false, `${method} ${pathname} should reach its signed route guard`);
+  }
+
+  for (const [method, pathname] of [
+    ['GET', '/api/artifacts/onlyoffice/status'],
+    ['POST', '/api/auth/login'],
+  ] as const) {
+    const response = makeResponse();
+    const handled = applyRequestMiddleware({
+      request: makeRequest(publicHost, method),
+      response,
+      pathname,
+      requestContext: { ...ctx(), authenticated: false },
+      requireAuth: true,
+      validateHost: true,
+      onlyOfficePublicHost: publicHost,
+    });
+    assert.equal(handled, true, `${method} ${pathname} must retain the loopback Host boundary`);
+    assert.equal(response.statusCode, 403);
+    assert.match(response.body, /Host not allowed/);
+  }
+});
+
 test('validateHost:false disables the Host allowlist', () => {
   const response = makeResponse();
   const handled = applyRequestMiddleware({
@@ -96,4 +138,46 @@ test('validateHost:false disables the Host allowlist', () => {
     validateHost: false,
   });
   assert.equal(handled, false);
+});
+
+test('only the fixed Office web frame may be embedded by the same local origin', () => {
+  const frameResponse = makeResponse();
+  const handled = applyRequestMiddleware({
+    request: makeRequest('127.0.0.1:3017'),
+    response: frameResponse,
+    pathname: '/office-web-frame.html',
+    requestContext: ctx(),
+  });
+  assert.equal(handled, false);
+  assert.equal(frameResponse.headers['x-frame-options'], 'SAMEORIGIN');
+  assert.match(String(frameResponse.headers['content-security-policy']), /frame-ancestors 'self'/);
+
+  const bridgeResponse = makeResponse();
+  applyRequestMiddleware({
+    request: makeRequest('127.0.0.1:3017'),
+    response: bridgeResponse,
+    pathname: '/vendor/office-web-frame.js',
+    requestContext: ctx(),
+  });
+  assert.equal(bridgeResponse.headers['cross-origin-resource-policy'], 'cross-origin');
+
+  const ordinaryResponse = makeResponse();
+  applyRequestMiddleware({
+    request: makeRequest('127.0.0.1:3017'),
+    response: ordinaryResponse,
+    pathname: '/',
+    requestContext: ctx(),
+  });
+  assert.equal(ordinaryResponse.headers['x-frame-options'], 'DENY');
+  assert.match(String(ordinaryResponse.headers['content-security-policy']), /frame-ancestors 'none'/);
+
+  const onlyOfficeResponse = makeResponse();
+  applyRequestMiddleware({
+    request: makeRequest('127.0.0.1:3017'),
+    response: onlyOfficeResponse,
+    pathname: '/onlyoffice-editor.html',
+    requestContext: ctx(),
+  });
+  assert.equal(onlyOfficeResponse.headers['x-frame-options'], undefined);
+  assert.match(String(onlyOfficeResponse.headers['content-security-policy']), /frame-ancestors 'none'/);
 });

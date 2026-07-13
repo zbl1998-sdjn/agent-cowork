@@ -44,6 +44,7 @@ export interface AssistantMessage {
   approval?: PendingApproval | undefined;
   plan?: { id: string; text: string } | undefined;
   files?: string[] | undefined;
+  templateFiles?: string[] | undefined;
   verifying?: boolean | undefined;
   question?: { id: string; question: string; options: Array<{ label: string; description?: string | undefined }> } | undefined;
   usage?: { prompt_tokens?: number | undefined; completion_tokens?: number | undefined; total_tokens?: number | undefined } | undefined;

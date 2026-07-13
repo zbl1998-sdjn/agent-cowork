@@ -12,7 +12,7 @@
   "app": {
     "withGlobalTauri": false,
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3017 http://127.0.0.1:5173 ws://127.0.0.1:5173; img-src 'self' data:; object-src 'none'; frame-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3017 http://127.0.0.1:5173 ws://127.0.0.1:5173; img-src 'self' data:; object-src 'none'; frame-src 'self' data: http://127.0.0.1:3017; style-src 'self' 'unsafe-inline'; script-src 'self'"
     },
     "windows": [
       {

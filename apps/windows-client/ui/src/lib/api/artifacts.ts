@@ -2,10 +2,10 @@
 // ---------------------------------------------------------------------------
 // 职责:封装可视化制品的渲染/读取/列出/重命名,渲染前先预检申请文件写入审批再落盘。
 // 依赖/对应路由:POST /api/viz/render(/preview)、GET /api/artifacts、GET /api/artifacts/view、POST /api/artifacts/rename、活页数据/视图 URL。导出:renderViz / previewVizRender / fetchArtifactHtml / fetchLiveArtifactData / liveArtifactUrl / listArtifacts / artifactViewUrl / renameArtifact + 相关类型。
-import { authHeaders, getJson, hostReady, newIdempotencyKey, postJson, resolveUrl } from './transport';
+import { authHeaders, getJson, newIdempotencyKey, postJson, requireHost, resolveUrl } from './transport';
 
 export async function fetchArtifactHtml(viewUrl: string): Promise<string> {
-  await hostReady;
+  await requireHost();
   const response = await fetch(viewUrl, { headers: authHeaders({ accept: 'text/html' }) });
   if (!response.ok) throw new Error(`artifact view returned ${response.status}`);
   return response.text();
