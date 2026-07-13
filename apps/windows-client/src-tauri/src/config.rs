@@ -17,18 +17,25 @@ pub const HOST_URL: &str = "http://127.0.0.1:3017";
 /// 而非让用户点"检查更新"后得到一串 DNS/网络裸错。接好正式发布源后改为 true。
 pub const UPDATES_CONFIGURED: bool = false;
 
-/// 解析 host 允许操作的可信根。顺序:KCW_TRUSTED_ROOT → KCW_REPO_ROOT → 用户 home → 当前目录。
+/// 解析 host 允许操作的可信根。顺序:ACW_TRUSTED_ROOT(兼容旧 KCW_TRUSTED_ROOT)→
+/// ACW_REPO_ROOT(兼容旧 KCW_REPO_ROOT)→ 用户 home → 当前目录。
 /// 安装版常从不可写系统目录启动,所以优先退回 home,保证 host 能创建自己的 .AgentCowork 状态。
 /// 用户每次选择的工作区会随 /api 请求另传;这里仅是 host 自身状态根。
+/// 新旧变量名都读取:用户/脚本可能仍在用旧的 KCW_* 环境变量名,直接改读 ACW_* 会
+/// 让既有配置悄悄失效,所以优先认新名、找不到再退回旧名。
 pub fn trusted_root() -> DesktopResult<PathBuf> {
-    if let Ok(root) = env::var("KCW_TRUSTED_ROOT") {
-        if !root.is_empty() {
-            return Ok(PathBuf::from(root));
+    for var in ["ACW_TRUSTED_ROOT", "KCW_TRUSTED_ROOT"] {
+        if let Ok(root) = env::var(var) {
+            if !root.is_empty() {
+                return Ok(PathBuf::from(root));
+            }
         }
     }
-    if let Ok(root) = env::var("KCW_REPO_ROOT") {
-        if !root.is_empty() {
-            return Ok(PathBuf::from(root));
+    for var in ["ACW_REPO_ROOT", "KCW_REPO_ROOT"] {
+        if let Ok(root) = env::var(var) {
+            if !root.is_empty() {
+                return Ok(PathBuf::from(root));
+            }
         }
     }
     for var in ["USERPROFILE", "HOME"] {

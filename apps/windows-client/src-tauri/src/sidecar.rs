@@ -16,9 +16,9 @@ use crate::config::{HOST, HOST_URL, PORT};
 use crate::error::{DesktopError, DesktopResult};
 
 /// host 进入 running 状态时发给 webview 的事件名。
-pub const EVENT_HOST_STARTED: &str = "kimi://host-started";
+pub const EVENT_HOST_STARTED: &str = "agent-cowork://host-started";
 /// host 被停止后发给 webview 的事件名。
-pub const EVENT_HOST_STOPPED: &str = "kimi://host-stopped";
+pub const EVENT_HOST_STOPPED: &str = "agent-cowork://host-stopped";
 
 /// 打包 host 二进制文件名,运行时从桌面 exe 同目录解析。
 #[cfg(windows)]
@@ -76,9 +76,14 @@ fn embedded_python_paths(app: &AppHandle) -> Option<(PathBuf, PathBuf)> {
 #[cfg(windows)]
 fn configure_embedded_python_env(command: &mut Command, app: &AppHandle) {
     if let Some((home, exe)) = embedded_python_paths(app) {
+        // 同时设置新旧变量名:host(Node)侧目前仍读取 KCW_PYTHON_HOME /
+        // KCW_EMBEDDED_PYTHON(见 apps/host/src/runtime/python-runtime.ts),待其
+        // 完成 ACW_* 改名前两者都设置以保持握手不断。
         command
-            .env("KCW_PYTHON_HOME", home)
-            .env("KCW_EMBEDDED_PYTHON", exe);
+            .env("ACW_PYTHON_HOME", &home)
+            .env("KCW_PYTHON_HOME", &home)
+            .env("ACW_EMBEDDED_PYTHON", &exe)
+            .env("KCW_EMBEDDED_PYTHON", &exe);
     }
 }
 
@@ -138,9 +143,12 @@ impl HostSidecar {
             .env("HOST", HOST)
             .env("PORT", PORT)
             .env("TRUSTED_ROOT", trusted_root)
-            .env("KCW_TAURI", "1")
+            .env("ACW_TAURI", "1")
             // host 侧 parent-watchdog 依赖此变量:外壳进程消失(强杀/崩溃/关窗未及
             // kill)时 host 自行优雅退出,杜绝孤儿 sidecar 常驻占 3017。
+            // 同时设置新旧变量名:host(apps/host/src/main.ts)目前仍读取
+            // KCW_PARENT_PID,待其完成 ACW_* 改名前两者都设置以保持握手不断。
+            .env("ACW_PARENT_PID", std::process::id().to_string())
             .env("KCW_PARENT_PID", std::process::id().to_string());
         configure_embedded_python_env(&mut command, app);
         // Windows 上后台 host 不应弹出控制台窗口。
