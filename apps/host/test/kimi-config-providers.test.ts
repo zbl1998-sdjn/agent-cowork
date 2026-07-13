@@ -5,8 +5,8 @@ import {
   modelProvider,
   sendKimiInfo,
   type KimiRouteState,
-} from '../src/routes/kimi-route-support.js';
-import { runKimiAndRecord } from '../src/routes/kimi-route-records.js';
+} from '../src/routes/agent-engine-route-support.js';
+import { runKimiAndRecord } from '../src/routes/agent-engine-route-records.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 import {
   CONFIG_SECRET,

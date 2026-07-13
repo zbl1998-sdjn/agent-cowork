@@ -1,15 +1,15 @@
 // Kimi 路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/agent-engine/* —— Kimi 配置读写、CLI 探测、以及把对话请求接到流式聊天(SSE)。
-// 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleKimiRoutes。
+// 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleAgentEngineRoutes。
 import { streamChat } from '../engine/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
 import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { hasSessionModelAccess } from './session-model-config.js';
-import { modelProvider, sendKimiInfo, sendModelProviderCatalog, type KimiRouteState } from './kimi-route-support.js';
-import { runKimiAndRecord } from './kimi-route-records.js';
+import { modelProvider, sendKimiInfo, sendModelProviderCatalog, type KimiRouteState } from './agent-engine-route-support.js';
+import { runKimiAndRecord } from './agent-engine-route-records.js';
 import {
   splitFullModelId,
 } from '../engine/provider/catalog.js';
@@ -26,7 +26,7 @@ import {
   kimiTestBodySchema,
   normalizeKimiFallbacks,
   parseKimiBody,
-} from './kimi-route-schemas.js';
+} from './agent-engine-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
 import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
@@ -52,7 +52,7 @@ function hasLocalModelConfigSelfService(
     && requestContext.authenticated === true;
 }
 
-export async function handleKimiRoutes({
+export async function handleAgentEngineRoutes({
   request,
   response,
   pathname,

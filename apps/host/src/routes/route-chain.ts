@@ -28,7 +28,7 @@ import { handleToolRoutes } from './tool-routes.js';
 import { handleVizRoutes } from './viz-routes.js';
 import { handleWorkspaceFileRoutes } from './workspace-file-routes.js';
 import { handleApprovalRoutes } from './approval-routes.js';
-import { handleKimiRoutes } from './kimi-routes.js';
+import { handleAgentEngineRoutes } from './agent-engine-routes.js';
 import { omitUndefined } from '../util/object.js';
 import { readRunRecord } from '../runtime/run-store.js';
 import { headerValue, type HttpRequestLike, type HttpResponseLike, type RequestContext } from '../http/request-utils.js';
@@ -157,7 +157,7 @@ export async function handleRouteChain({
   }))) return true;
   if (await handlePromptRoutes(routeOptions<RouteHandlerOptions<typeof handlePromptRoutes>>({ ...base, state: requestState }))) return true;
   if (await handleSearchRoutes(routeOptions<RouteHandlerOptions<typeof handleSearchRoutes>>({ ...base, state: requestState }))) return true;
-  if (await handleKimiRoutes({ ...base, state, safeTrustedRoot })) return true;
+  if (await handleAgentEngineRoutes({ ...base, state, safeTrustedRoot })) return true;
   if (await handleOnboardingRoutes(routeOptions<RouteHandlerOptions<typeof handleOnboardingRoutes>>({ request, response, pathname }))) return true;
   if (await handleWorkspaceFileRoutes(routeOptions<RouteHandlerOptions<typeof handleWorkspaceFileRoutes>>({
     ...base,

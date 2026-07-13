@@ -1,14 +1,14 @@
 // Kimi 运行记录落盘(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:执行一次模型运行并把成功/失败证据落盘 + 索引,把结果作为 JSON 响应返回。
-//       自 kimi-route-support.ts 拆出以控制单文件行数,行为不变。
+//       自 agent-engine-route-support.ts 拆出以控制单文件行数,行为不变。
 import { createRunId, writeRunRecord } from '../runtime/run-store.js';
 import { AtRestKeyError } from '../security/at-rest.js';
 import { isEgressAuditFailure } from '../security/egress-gateway.js';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
-import { modelProvider } from './kimi-route-support.js';
-import type { KimiRouteState, KimiRunner } from './kimi-route-support.js';
+import { modelProvider } from './agent-engine-route-support.js';
+import type { KimiRouteState, KimiRunner } from './agent-engine-route-support.js';
 
 type RouteError = Error & { statusCode?: number; payload?: Record<string, unknown> };
 

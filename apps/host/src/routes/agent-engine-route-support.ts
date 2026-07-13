@@ -6,7 +6,7 @@ import type { HttpResponseLike, RequestContext } from '../http/request-utils.js'
 import type { KimiApiConfig } from '../engine/api-runner-config.js';
 import { composeFullModelId, normaliseModelProviderId } from '../engine/provider/catalog.js';
 import { modelsDevProviderCatalogResponse } from '../engine/provider/models-dev-catalog.js';
-import { inspectRouteModelConnection } from './kimi-route-connection.js';
+import { inspectRouteModelConnection } from './agent-engine-route-connection.js';
 import type { HostState } from '../runtime/host-state-types.js';
 import type { streamChat } from '../engine/chat-stream.js';
 

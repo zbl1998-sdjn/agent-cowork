@@ -15,8 +15,8 @@ import {
 import { createOrchestrationCheckpointStore } from '../src/orchestrator/checkpoint-store.js';
 import { handleConversationRoutes } from '../src/routes/conversation-routes.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
-import type { KimiRouteState } from '../src/routes/kimi-route-support.js';
-import { runKimiAndRecord } from '../src/routes/kimi-route-records.js';
+import type { KimiRouteState } from '../src/routes/agent-engine-route-support.js';
+import { runKimiAndRecord } from '../src/routes/agent-engine-route-records.js';
 import { handleRunRoutes } from '../src/routes/run-routes.js';
 import { handleSystemRoutes } from '../src/routes/system-routes.js';
 import { listRunRecords, writeRunRecord } from '../src/runtime/run-store.js';
