@@ -29,7 +29,7 @@ test('callModelResilient passes a success through and supplies an abort signal',
   const r = await callModelResilient(
     async ({ signal }) => { sawSignal = signal instanceof AbortSignal; return { content: 'ok' }; },
     auditedArgs(),
-    { kimiConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11430/v1', model: 'm-pass' }, timeoutMs: 5000 },
+    { modelConfig: { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11430/v1', model: 'm-pass' }, timeoutMs: 5000 },
   );
   assert.equal((r as ModelOutput).content, 'ok');
   assert.ok(sawSignal, 'modelCall must receive an AbortSignal');
@@ -45,7 +45,7 @@ test('callModelResilient rejects a caller-forged in-process capability object', 
       },
       auditedArgs(),
       {
-        kimiConfig: {
+        modelConfig: {
           provider: 'kimi-api',
           baseUrl: 'https://api.moonshot.ai/v1',
           model: 'external-model',
@@ -62,15 +62,15 @@ test('callModelResilient rejects a caller-forged in-process capability object', 
 
 test('callModelResilient treats external-looking config as metadata for an explicit in-process adapter', async () => {
   let calls = 0;
-  const modelCall = async ({ kimiConfig }: { kimiConfig: ModelConfig }) => {
+  const modelCall = async ({ modelConfig }: { modelConfig: ModelConfig }) => {
     calls += 1;
-    return { content: `observed ${String(kimiConfig.provider)}` };
+    return { content: `observed ${String(modelConfig.provider)}` };
   };
   const result = await callModelResilient(
     modelCall,
     auditedArgs(),
     {
-      kimiConfig: {
+      modelConfig: {
         securityMode: 'controlled_hybrid',
         provider: 'kimi-api',
         baseUrl: 'https://api.moonshot.ai/v1',
@@ -90,7 +90,7 @@ test('callModelResilient does not infer in-process trust from a fake model label
     () => callModelResilient(
       async () => ({ content: 'must not run' }),
       auditedArgs(),
-      { kimiConfig: { model: 'fake', securityMode: 'controlled_hybrid' }, timeoutMs: 5000 },
+      { modelConfig: { model: 'fake', securityMode: 'controlled_hybrid' }, timeoutMs: 5000 },
     ),
     (err) => errorCode(err) === 'EGRESS_APPROVAL_REQUIRED',
   );
@@ -100,11 +100,11 @@ test('callModelResilient opens the breaker after repeated failures', async () =>
   const cfg = { provider: 'openai/local', baseUrl: 'http://127.0.0.1:11431/v1', model: 'm-open' };
   const fail = async () => { throw new Error('upstream boom'); };
   for (let i = 0; i < 4; i += 1) {
-    await assert.rejects(() => callModelResilient(fail, auditedArgs(), { kimiConfig: cfg, timeoutMs: 5000 }));
+    await assert.rejects(() => callModelResilient(fail, auditedArgs(), { modelConfig: cfg, timeoutMs: 5000 }));
   }
   // 5th call short-circuits (breaker open) instead of hitting the upstream.
   await assert.rejects(
-    () => callModelResilient(fail, auditedArgs(), { kimiConfig: cfg, timeoutMs: 5000 }),
+    () => callModelResilient(fail, auditedArgs(), { modelConfig: cfg, timeoutMs: 5000 }),
     (e) => errorCode(e) === 'CIRCUIT_OPEN',
   );
 });
@@ -116,7 +116,7 @@ test('callModelResilient aborts a hung call via timeout', async () => {
       signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
     }),
     auditedArgs(),
-    { kimiConfig: cfg, timeoutMs: 30 },
+    { modelConfig: cfg, timeoutMs: 30 },
   ));
 });
 
@@ -134,15 +134,15 @@ test('callModelResilient falls back to the next provider without inheriting the 
   };
 
   const out = await callModelResilient(
-    async ({ kimiConfig }) => {
-      seen.push(kimiConfig);
-      if (kimiConfig.provider === 'openai') {
+    async ({ modelConfig }) => {
+      seen.push(modelConfig);
+      if (modelConfig.provider === 'openai') {
         throw new Error('primary failed for sk-test-primary-secret-1234567890');
       }
-      return { content: 'fallback ok', provider: kimiConfig.provider, model: kimiConfig.model };
+      return { content: 'fallback ok', provider: modelConfig.provider, model: modelConfig.model };
     },
     auditedArgs(),
-    { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
+    { modelConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
   );
 
   const result = out as ModelOutput;
@@ -169,15 +169,15 @@ test('callModelResilient keeps same-provider fallbacks distinct by baseUrl and m
   };
 
   const out = await callModelResilient(
-    async ({ kimiConfig }) => {
-      seen.push({ provider: kimiConfig.provider, baseUrl: kimiConfig.baseUrl, model: kimiConfig.model, apiKey: kimiConfig.apiKey });
-      if (kimiConfig.baseUrl === 'http://127.0.0.1:11436/v1') {
+    async ({ modelConfig }) => {
+      seen.push({ provider: modelConfig.provider, baseUrl: modelConfig.baseUrl, model: modelConfig.model, apiKey: modelConfig.apiKey });
+      if (modelConfig.baseUrl === 'http://127.0.0.1:11436/v1') {
         throw new Error('primary temporary outage');
       }
-      return { content: 'same provider fallback ok', provider: kimiConfig.provider, model: kimiConfig.model };
+      return { content: 'same provider fallback ok', provider: modelConfig.provider, model: modelConfig.model };
     },
     auditedArgs(),
-    { kimiConfig: cfg, timeoutMs: 5000 },
+    { modelConfig: cfg, timeoutMs: 5000 },
   );
 
   assert.equal((out as ModelOutput).content, 'same provider fallback ok');
@@ -199,12 +199,12 @@ test('callModelResilient skips external candidates before runtime calls in local
   };
 
   const out = await callModelResilient(
-    async ({ kimiConfig }) => {
-      seen.push({ provider: kimiConfig.provider, baseUrl: kimiConfig.baseUrl, model: kimiConfig.model, apiKey: kimiConfig.apiKey });
-      return { content: 'local ok', provider: kimiConfig.provider, model: kimiConfig.model };
+    async ({ modelConfig }) => {
+      seen.push({ provider: modelConfig.provider, baseUrl: modelConfig.baseUrl, model: modelConfig.model, apiKey: modelConfig.apiKey });
+      return { content: 'local ok', provider: modelConfig.provider, model: modelConfig.model };
     },
     auditedArgs(),
-    { kimiConfig: cfg, timeoutMs: 5000 },
+    { modelConfig: cfg, timeoutMs: 5000 },
   );
 
   assert.equal((out as ModelOutput).content, 'local ok');
@@ -218,7 +218,7 @@ test('callModelResilient fails closed when local strict leaves no allowed model 
       async () => ({ content: 'should not run' }),
       auditedArgs(),
       {
-        kimiConfig: {
+        modelConfig: {
           securityMode: 'local_strict',
           provider: 'kimi-api',
           baseUrl: 'https://api.moonshot.ai/v1',
@@ -241,7 +241,7 @@ test('callModelResilient does not invoke or fall back from unapproved controlled
       },
       auditedArgs(),
       {
-        kimiConfig: {
+        modelConfig: {
           securityMode: 'controlled_hybrid',
           provider: 'kimi-api',
           baseUrl: 'https://api.moonshot.ai/v1',
@@ -273,11 +273,11 @@ test('callModelResilient reports exhausted fallback chains with redacted layer e
 
   await assert.rejects(
     () => callModelResilient(
-      async ({ kimiConfig }) => {
-        throw new Error(`failed ${kimiConfig.provider} sk-test-exhaust-secret-1234567890`);
+      async ({ modelConfig }) => {
+        throw new Error(`failed ${modelConfig.provider} sk-test-exhaust-secret-1234567890`);
       },
       auditedArgs(),
-      { kimiConfig: cfg, timeoutMs: 5000 },
+      { modelConfig: cfg, timeoutMs: 5000 },
     ),
     (err) => errorCode(err) === 'FALLBACK_EXHAUSTED' && !errorMessage(err).includes('sk-test-exhaust-secret'),
   );
@@ -298,12 +298,12 @@ test('callModelResilient does not fall back on auth or 4xx configuration errors'
 
   await assert.rejects(
     () => callModelResilient(
-      async ({ kimiConfig }) => {
-        seen.push(kimiConfig.provider);
+      async ({ modelConfig }) => {
+        seen.push(modelConfig.provider);
         throw new Error('OpenAI request failed with status 401: invalid api key');
       },
       auditedArgs(),
-      { kimiConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
+      { modelConfig: cfg, timeoutMs: 5000, onFallback: (event) => events.push(event as FallbackEvent) },
     ),
     /status 401/,
   );

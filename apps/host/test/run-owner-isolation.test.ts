@@ -144,7 +144,7 @@ test('cross-owner resume fails before model, approval, or inherited tool executi
     response,
     requestContext: { ...OWNER_B, traceId: 'trace_owner_b' },
     body: { resumeRunId: runId },
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     runStoreRoot: root,
     runsIndex: { upsert: () => undefined },

@@ -39,7 +39,7 @@ async function runWithContextOptions(contextOptions: Record<string, unknown>): P
   const modelCall: ModelCall = async () => ({ content: 'done' });
   const out = await runAgentChat({
     prompt: 'ignored on resume',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [],
     modelCall,

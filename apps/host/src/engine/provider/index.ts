@@ -63,14 +63,14 @@ function createBuiltinProviders(): Map<string, Provider> {
 const BUILTIN_PROVIDERS = createBuiltinProviders();
 
 // 解析目标 Provider:优先使用注入实现,否则按别名表查找;未知 id 显式失败。
-export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
-  const injected = kimiConfig.provider;
+export function resolveModelProvider(modelConfig: ModelConfig = {}): Provider {
+  const injected = modelConfig.provider;
   const provider = injected && typeof injected === 'object' ? injected as Partial<Provider> : {};
   if (typeof provider.chatCompletion === 'function') {
     return injected as Provider;
   }
 
-  const id = String(kimiConfig.provider || 'kimi').trim().toLowerCase() || 'kimi';
+  const id = String(modelConfig.provider || 'kimi').trim().toLowerCase() || 'kimi';
   const resolved = BUILTIN_PROVIDERS.get(id);
   if (!resolved) throw new Error(`Unknown model provider: ${id}`);
   return resolved;
@@ -78,14 +78,14 @@ export function resolveModelProvider(kimiConfig: ModelConfig = {}): Provider {
 
 // 统一发起一次对话补全,让调用方无需感知具体 provider 实现。
 export async function callProviderChatCompletion(args: ProviderChatArgs): Promise<ProviderChatResult> {
-  const provider = resolveModelProvider(args?.kimiConfig);
-  const kimiConfig = args?.kimiConfig || {};
+  const provider = resolveModelProvider(args?.modelConfig);
+  const modelConfig = args?.modelConfig || {};
   const fetchOptions = typeof args?.fetchImpl === 'function'
     ? { fetchImpl: args.fetchImpl as never }
     : {};
   // Every built-in provider shares one network boundary: real requests use a
   // DNS-validated, address-pinned socket and never follow redirects. A custom
   // fetchImpl is an explicit in-process dependency-injection capability.
-  const fetchImpl = createModelEndpointFetch(kimiConfig, fetchOptions);
+  const fetchImpl = createModelEndpointFetch(modelConfig, fetchOptions);
   return provider.chatCompletion({ ...args, fetchImpl });
 }

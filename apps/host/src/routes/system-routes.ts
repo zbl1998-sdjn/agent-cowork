@@ -88,8 +88,8 @@ export type SystemRouteOptions = {
   state: HostStateLike;
 };
 
-function modelProvider(kimiConfig: AgentModelConfigLike | null | undefined): string {
-  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+function modelProvider(modelConfig: AgentModelConfigLike | null | undefined): string {
+  return String((modelConfig && modelConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
 function safeModelBreakerStats(): CircuitBreakerStats[] {

@@ -17,7 +17,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 type AgentEnvFacts = Required<EnvFacts>;
 type AgentEnvOptions = {
   trustedRoot?: unknown;
-  kimiConfig?: unknown;
+  modelConfig?: unknown;
   now?: Date;
   platform?: string;
   appVersion?: string;
@@ -46,11 +46,11 @@ export function resolveAppVersion(): string {
 
 /**
  * 把系统提示词所需的运行环境事实打包成一个对象;给定输入即纯函数,测试可逐项覆盖。
- * `kimiConfig` 以 unknown 接入,因为 Agent 循环会传入更窄的 ModelConfig;这里只防御式读取 provider/model。
+ * `modelConfig` 以 unknown 接入,因为 Agent 循环会传入更窄的 ModelConfig;这里只防御式读取 provider/model。
  */
-export function resolveAgentEnvFacts({ trustedRoot, kimiConfig, now, platform, appVersion }: AgentEnvOptions = {}): AgentEnvFacts {
+export function resolveAgentEnvFacts({ trustedRoot, modelConfig, now, platform, appVersion }: AgentEnvOptions = {}): AgentEnvFacts {
   const safeRoot = typeof trustedRoot === 'string' ? trustedRoot : '';
-  const cfg = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig as Record<string, unknown> : null;
+  const cfg = modelConfig && typeof modelConfig === 'object' ? modelConfig as Record<string, unknown> : null;
   const provider = cfg && typeof cfg.provider === 'string' ? cfg.provider : '';
   const model = cfg && typeof cfg.model === 'string' ? cfg.model : '';
   const platformToken = platform || (typeof process !== 'undefined' ? process.platform : '');

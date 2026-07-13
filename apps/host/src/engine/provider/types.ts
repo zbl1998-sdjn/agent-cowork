@@ -47,7 +47,7 @@ export type ModelConfig = Record<string, unknown> & {
 export type ProviderChatArgs = {
   messages?: unknown[];
   tools?: unknown[];
-  kimiConfig?: ModelConfig;
+  modelConfig?: ModelConfig;
   fetchImpl?: unknown;
   onContent?: (delta: string) => void;
   onReasoning?: (delta: string) => void;

@@ -36,7 +36,7 @@ type RunDeps = { runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknow
 type RunAgentChat = (args: Record<string, unknown>) => Promise<{ text?: unknown; steps: unknown[] }>;
 type AgentDeps = {
   runAgentChat?: RunAgentChat;
-  kimiConfig?: unknown;
+  modelConfig?: unknown;
   modelCall?: unknown;
   approvals?: unknown;
   autoApprove?: unknown;
@@ -130,7 +130,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
           try {
             const sub = await runAgentChat({
               prompt: task.task,
-              kimiConfig: agentDeps.kimiConfig,
+              modelConfig: agentDeps.modelConfig,
               trustedRoot: ctx.trustedRoot,
               tools: baseTools,
               modelCall: agentDeps.modelCall,

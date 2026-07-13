@@ -63,7 +63,7 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   await assert.rejects(
     () => runAgentChat({
       prompt: 'append',
-      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelConfig: TEST_LOCAL_MODEL_CONFIG,
       trustedRoot: root,
       tools,
       modelCall: crashingModelCall,
@@ -90,7 +90,7 @@ test('runAgentChat resumes from the latest checkpoint without replaying complete
   let resumedMessages: ChatMessage[] = [];
   const out = await runAgentChat({
     prompt: 'append',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     runId,

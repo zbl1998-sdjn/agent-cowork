@@ -60,7 +60,7 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
     events.push({ t, d: payload });
     if (t === 'question' && typeof payload.id === 'string') approvals.respond(payload.id, '方案B');
   };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
   assert.ok(tools.some((t) => t.name === 'AskUserQuestion'), 'AskUserQuestion tool present');
 
   const captured: { message: ChatMessage | undefined } = { message: undefined };
@@ -74,7 +74,7 @@ test('AskUserQuestion: agent emits a question frame and the answer flows back to
   };
   const out = await runAgentChat({
     prompt: '请在 README.md 里的方案A和方案B之间帮我选择一个导出方案',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -103,7 +103,7 @@ test('clarification-first preflights vague prompts before the first model call',
     events.push({ t, d: payload });
     if (t === 'question' && typeof payload.id === 'string') approvals.respond(payload.id, '请审查 README.md 并列出风险');
   };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
 
   const capture: { firstUserMessage: ChatMessage | undefined } = { firstUserMessage: undefined };
   const modelCall: ModelCall = async (args) => {
@@ -113,7 +113,7 @@ test('clarification-first preflights vague prompts before the first model call',
   };
   const out = await runAgentChat({
     prompt: '帮我处理一下',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -138,7 +138,7 @@ test('clarification-first skips already explicit prompts', async () => {
   const approvals = createApprovalRegistry();
   const events: UiEvent[] = [];
   const emit = (t: string, d: unknown) => { events.push({ t, d: recordPayload(d) }); };
-  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
+  const tools = buildAgentToolset({ ctx: { trustedRoot: root, context: {} }, agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), approvals, emit } });
 
   const capture: { firstUserMessage: ChatMessage | undefined } = { firstUserMessage: undefined };
   const modelCall: ModelCall = async (args) => {
@@ -148,7 +148,7 @@ test('clarification-first skips already explicit prompts', async () => {
   };
   await runAgentChat({
     prompt: '请审查 README.md 的安装说明并列出具体问题',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -169,7 +169,7 @@ test('AskUserQuestion fails closed when approval persistence fails', async () =>
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: { tenantId: 'tenant-a', userId: 'user-a' } },
     agentDeps: {
-      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelConfig: TEST_LOCAL_MODEL_CONFIG,
       modelCall: async () => ({}),
       approvals: {
         request: () => ({
@@ -200,7 +200,7 @@ test('AskUserQuestion does not publish the question before durable readiness', a
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: { tenantId: 'tenant-a', userId: 'user-a' } },
     agentDeps: {
-      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelConfig: TEST_LOCAL_MODEL_CONFIG,
       modelCall: async () => ({}),
       approvals: {
         request: () => ({ id: 'question_ready', ready, promise: Promise.resolve('是') }),

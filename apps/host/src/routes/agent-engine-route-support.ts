@@ -42,9 +42,9 @@ export type AgentEngineRouteState = HostState & {
 type CatalogOptions = NonNullable<Parameters<typeof modelsDevProviderCatalogResponse>[0]>;
 type CatalogFetchImpl = Exclude<CatalogOptions['fetchImpl'], undefined>;
 
-export function modelProvider(kimiConfig: unknown): string {
-  const config = kimiConfig && typeof kimiConfig === 'object'
-    ? kimiConfig as { provider?: unknown }
+export function modelProvider(modelConfig: unknown): string {
+  const config = modelConfig && typeof modelConfig === 'object'
+    ? modelConfig as { provider?: unknown }
     : {};
   return normaliseModelProviderId(config.provider, 'kimi-api');
 }

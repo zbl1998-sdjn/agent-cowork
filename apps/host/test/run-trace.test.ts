@@ -175,7 +175,7 @@ test('runAgentChat publishes model context, tool decisions, and tool results to 
   const result = await runAgentChat({
     prompt: 'Read note.md before answering.',
     trustedRoot: process.cwd(),
-    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, model: 'test-model' },
+    modelConfig: { ...TEST_LOCAL_MODEL_CONFIG, model: 'test-model' },
     runId,
     runEvents: bus,
     runTrace,

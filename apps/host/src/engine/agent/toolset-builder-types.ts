@@ -36,7 +36,7 @@ export type AgentDeps = {
   emit?: (type: string, payload: Record<string, unknown>) => void;
   runId?: unknown;
   runAgentChat?: (args: Record<string, unknown>) => Promise<{ text?: unknown; steps: unknown[] }>;
-  kimiConfig?: unknown;
+  modelConfig?: unknown;
   modelCall?: unknown;
   autoApprove?: unknown;
   planMode?: unknown;

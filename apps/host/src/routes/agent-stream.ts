@@ -58,7 +58,7 @@ export type StreamAgentChatOptions = {
   response: ResponseLike;
   requestContext: StreamRequestContext;
   body: unknown;
-  kimiConfig: unknown;
+  modelConfig: unknown;
   trustedRoot: string;
   runStoreRoot: string;
   runsIndex: RunsIndexLike;
@@ -79,7 +79,7 @@ export async function streamAgentChat({
   response,
   requestContext,
   body: rawBody,
-  kimiConfig,
+  modelConfig,
   trustedRoot,
   runStoreRoot,
   runsIndex,
@@ -100,7 +100,7 @@ export async function streamAgentChat({
   const autoApprove = shouldAutoApproveLowRisk(permissionMode);
   const planMode = permissionMode === 'plan';
   const { runId, startedAt, resumed, checkpointer, resumeState } = resolveAgentRunStart({ body, runStoreRoot, requestContext });
-  const runKimiConfig = applySessionModelConfig(kimiConfig, body);
+  const runKimiConfig = applySessionModelConfig(modelConfig, body);
   if (resumed && !resumeState) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify({ error: '没有找到可续跑的检查点。', runId }));
@@ -156,7 +156,7 @@ export async function streamAgentChat({
       skillRegistry,
       runDeps: { runStoreRoot, runEvents, runsIndex },
       agentDeps: {
-        kimiConfig: runKimiConfig,
+        modelConfig: runKimiConfig,
         modelCall,
         approvals,
         autoApprove,
@@ -223,7 +223,7 @@ export async function streamAgentChat({
     });
     // 收敛行为运行时开关(KCW_STEP_NUDGE_RATIO / KCW_TOOL_DISCIPLINE),默认不改变行为。
     const convergenceOptions = resolveAgentConvergenceOptions();
-    const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, kimiConfig: runKimiConfig, startedAt, runTimeoutMs }));
+    const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, modelConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents, context: requestContext }));
     const skills = !templateMode.active && skillRegistry && typeof skillRegistry.enabledSkills === 'function'
       ? skillRegistry.enabledSkills()
@@ -236,7 +236,7 @@ export async function streamAgentChat({
       : [];
     outcome = await runAgentChat(omitUndefined({
       prompt: templateMode.prompt,
-      kimiConfig: runKimiConfig,
+      modelConfig: runKimiConfig,
       trustedRoot,
       modelCall,
       tools: coreTools,
@@ -294,7 +294,7 @@ export async function streamAgentChat({
       runsIndex,
       requestContext,
       runId,
-      kimiConfig: runKimiConfig,
+      modelConfig: runKimiConfig,
       body,
       trustedRoot,
       startedAt,

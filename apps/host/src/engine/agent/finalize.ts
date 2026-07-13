@@ -24,7 +24,7 @@ export type SummarizeOptions = {
   modelCall: ModelCall;
   trustedRoot?: string;
   inProcessModelCallCapability?: TrustedInProcessModelCallCapability;
-  kimiConfig?: Record<string, unknown>;
+  modelConfig?: Record<string, unknown>;
   fetchImpl?: unknown;
   emit: Emit;
   usageTotals: UsageTotals;
@@ -51,7 +51,7 @@ async function summarizeWithoutTools({
   modelCall,
   trustedRoot,
   inProcessModelCallCapability,
-  kimiConfig,
+  modelConfig,
   fetchImpl,
   emit,
   usageTotals,
@@ -59,7 +59,7 @@ async function summarizeWithoutTools({
   if (finalText || (signal && signal.aborted)) return finalText;
   try {
     const emitToken = (delta: unknown) => { if (delta) emit('token', { delta }); };
-    const timeoutMs = typeof kimiConfig?.timeoutMs === 'number' ? kimiConfig.timeoutMs : undefined;
+    const timeoutMs = typeof modelConfig?.timeoutMs === 'number' ? modelConfig.timeoutMs : undefined;
     messages.push({
       role: 'user',
       content: prompt,
@@ -67,13 +67,13 @@ async function summarizeWithoutTools({
     const wrap = await callModelResilient(modelCall, {
       messages,
       tools: [],
-      kimiConfig,
+      modelConfig,
       fetchImpl,
       trustedRoot,
       onContent: emitToken,
       onReasoning: () => undefined,
     }, omitUndefined({
-      kimiConfig,
+      modelConfig,
       inProcessModelCallCapability,
       timeoutMs,
       onFallback: (event: ModelFallbackEvent) => emit('model_fallback', event),

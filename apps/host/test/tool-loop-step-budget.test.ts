@@ -63,7 +63,7 @@ test('runAgentChat injects the wrap-up reminder once when the model keeps callin
 
   await runAgentChat({
     prompt: 'keep going',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

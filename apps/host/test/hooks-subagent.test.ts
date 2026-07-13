@@ -241,7 +241,7 @@ test('runAgentChat: a pre_tool hook blocks the tool (not executed)', async () =>
   let n = 0;
   const modelCall: ModelCall = async () => { n += 1; return n === 1 ? { content: '', tool_calls: [{ id: 'c1', function: { name: 'Danger', arguments: '{}' } }] } : { content: '完成。' }; };
   const hooks = createHookEngine({ hooks: [{ event: 'pre_tool', tool: 'Danger', handler: async () => ({ block: true, reason: '策略禁止' }) }] });
-  const out = await runAgentChat({ prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, runStoreRoot: path.join(root, 'runs'), tools, modelCall, hooks: asAgentHookEngine(hooks) });
+  const out = await runAgentChat({ prompt: 'x', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, runStoreRoot: path.join(root, 'runs'), tools, modelCall, hooks: asAgentHookEngine(hooks) });
   assert.equal(ran, false, 'blocked tool must not run');
   assert.ok(out.steps.some((step) => {
     const parsed = blockedStepSchema.safeParse(step);
@@ -255,7 +255,7 @@ test('Agent tool spawns a nested sub-agent and returns its result', async () => 
   const subModel: ModelCall = async () => ({ content: '子任务完成' });
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: {} },
-    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: subModel, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
+    agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: subModel, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
     runDeps: { runStoreRoot: path.join(root, 'runs') },
   });
   const agentTool = toolByName(tools, 'Agent');
@@ -287,7 +287,7 @@ test('Agent child inherits plan mode and cannot write before approving its own p
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: {} },
     agentDeps: {
-      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelConfig: TEST_LOCAL_MODEL_CONFIG,
       modelCall: subModel,
       approvals: {
         request: () => {
@@ -328,7 +328,7 @@ test('AgentParallel tool dispatches nested sub-agents concurrently and summarize
   };
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: {} },
-    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), runAgentChat: runNestedAgentChat, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
+    agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), runAgentChat: runNestedAgentChat, approvals: null, autoApprove: true, hooks: null, emit: () => undefined },
     runDeps: { runStoreRoot: path.join(root, 'runs') },
   });
   const parallelTool = toolByName(tools, 'AgentParallel');

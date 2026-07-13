@@ -42,7 +42,7 @@ test('plan mode blocks writes until ExitPlanMode is approved, then executes', as
 
   const out = await runAgentChat({
     prompt: '写 out.txt',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,
@@ -83,7 +83,7 @@ test('plan mode: rejecting the plan keeps mutating tools blocked', async () => {
 
   const out = await runAgentChat({
     prompt: '改 out.txt',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,

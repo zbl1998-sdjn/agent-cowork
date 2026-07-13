@@ -144,7 +144,7 @@ export function createProviderTaskRunner({
     const startedAt = Date.now();
     const messages = buildMessages(task, pack, agent);
     const args: ProviderChatArgs = {
-      kimiConfig: modelConfig,
+      modelConfig: modelConfig,
       messages,
       tools: [],
       promptCacheKey: task.runId,

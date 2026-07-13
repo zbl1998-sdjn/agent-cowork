@@ -5,16 +5,16 @@
 import { CircuitBreaker } from '../util/circuit-breaker.js';
 import type { CircuitBreakerStats } from '../util/circuit-breaker.js';
 
-export type KimiConfigLike = { provider?: unknown; baseUrl?: unknown; model?: unknown };
+export type ModelConfigLike = { provider?: unknown; baseUrl?: unknown; model?: unknown };
 
 const MODEL_BREAKERS = new Map<string, CircuitBreaker>();
 
-export function modelProvider(kimiConfig: KimiConfigLike | null | undefined): string {
-  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+export function modelProvider(modelConfig: ModelConfigLike | null | undefined): string {
+  return String((modelConfig && modelConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
-export function modelBreaker(kimiConfig: KimiConfigLike | null | undefined): CircuitBreaker {
-  const key = `${modelProvider(kimiConfig)}|${kimiConfig && kimiConfig.baseUrl}|${kimiConfig && kimiConfig.model}`;
+export function modelBreaker(modelConfig: ModelConfigLike | null | undefined): CircuitBreaker {
+  const key = `${modelProvider(modelConfig)}|${modelConfig && modelConfig.baseUrl}|${modelConfig && modelConfig.model}`;
   let breaker = MODEL_BREAKERS.get(key);
   if (!breaker) {
     breaker = new CircuitBreaker({ name: `model:${key}`, failureThreshold: 4, cooldownMs: 15000 });

@@ -114,7 +114,7 @@ export async function runModelApiChatStream({
       messages,
       tools: [],
       stream: true,
-      kimiConfig: {
+      modelConfig: {
         provider: cleanProvider(provider),
         apiKey: typeof apiKey === 'string' ? apiKey : '',
         baseUrl: String(baseUrl || DEFAULT_BASE_URL),

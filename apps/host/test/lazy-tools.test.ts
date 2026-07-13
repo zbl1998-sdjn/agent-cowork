@@ -47,7 +47,7 @@ test('lazy tools are hidden until search_tools activates them, then callable', a
     return { content: '完成。' };
   };
   const approvals = { request: () => ({ id: 'connector_approval', promise: Promise.resolve('once') }) };
-  const out = await runAgentChat({ prompt: '查天气', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: lazy, modelCall, approvals, runStoreRoot: path.join(root, 'runs') });
+  const out = await runAgentChat({ prompt: '查天气', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: lazy, modelCall, approvals, runStoreRoot: path.join(root, 'runs') });
 
   // Turn 1: the lazy tool is NOT exposed, but search_tools IS.
   const firstTurnTools = seenToolNames(seenTools, 0);
@@ -64,7 +64,7 @@ test('no search_tools meta-tool when there are no lazy tools (unchanged behavior
   const core = [lowTool('Read', () => undefined)];
   const seen: { value: string[] | null } = { value: null };
   const modelCall: ModelCall = async (args) => { seen.value = toolNames(args); return { content: 'ok' }; };
-  await runAgentChat({ prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: [], modelCall, runStoreRoot: path.join(root, 'runs') });
+  await runAgentChat({ prompt: 'x', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, tools: core, lazyTools: [], modelCall, runStoreRoot: path.join(root, 'runs') });
   const names = seen.value;
   assert.ok(names);
   assert.ok(!names.includes('search_tools'), 'no meta-tool when nothing lazy');

@@ -46,7 +46,7 @@ test('Kimi plan and prompt-refine routes never fetch when audit persistence fail
     throw new Error('model fetch must not run');
   };
   const promptRefineModelCall = createKimiRefineModelCall({
-    kimiConfig: LOCAL_MODEL,
+    modelConfig: LOCAL_MODEL,
     fetchImpl: fetchImpl as never,
   });
 

@@ -12,5 +12,5 @@ export type ModelConfig = Record<string, unknown> & {
 export type ModelCallArgs = Record<string, unknown> & { signal?: AbortSignal };
 
 export type ModelCall = (
-  args: ModelCallArgs & { kimiConfig: ModelConfig; signal: AbortSignal },
+  args: ModelCallArgs & { modelConfig: ModelConfig; signal: AbortSignal },
 ) => unknown | Promise<unknown>;

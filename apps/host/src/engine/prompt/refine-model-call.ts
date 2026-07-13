@@ -13,7 +13,7 @@ import type { PromptContext, PromptModelCall } from './refiner.js';
 
 type FetchLike = typeof globalThis.fetch;
 type RefineModelCallDeps = {
-  kimiConfig: Record<string, unknown>;
+  modelConfig: Record<string, unknown>;
   fetchImpl?: FetchLike;
 };
 
@@ -51,16 +51,16 @@ function extractContent(payload: unknown): string {
 
 /** 用当前 Kimi 配置造一个 refiner 用的模型调用:发一次非流式补全,返回改写文本(失败/超时返回空串)。 */
 export function createKimiRefineModelCall(
-  { kimiConfig, fetchImpl = globalThis.fetch }: RefineModelCallDeps,
+  { modelConfig, fetchImpl = globalThis.fetch }: RefineModelCallDeps,
 ): PromptModelCall {
   return async ({ prompt, context, intent, missing }) => {
-    const apiKey = String(kimiConfig.apiKey || '');
+    const apiKey = String(modelConfig.apiKey || '');
     if (!apiKey || typeof fetchImpl !== 'function') return '';
-    const baseUrl = String(kimiConfig.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
-    const model = String(kimiConfig.model || DEFAULT_MODEL);
-    const maxTokens = Math.max(1, Number(kimiConfig.maxTokens) || 1024);
-    const timeoutMs = Math.max(1000, Number(kimiConfig.timeoutMs) || 15_000);
-    const temperature = Number(kimiConfig.temperature);
+    const baseUrl = String(modelConfig.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
+    const model = String(modelConfig.model || DEFAULT_MODEL);
+    const maxTokens = Math.max(1, Number(modelConfig.maxTokens) || 1024);
+    const timeoutMs = Math.max(1000, Number(modelConfig.timeoutMs) || 15_000);
+    const temperature = Number(modelConfig.temperature);
     const terms = contextTerms(context);
     const hints = [
       `任务类型:${INTENT_LABELS[intent] || INTENT_LABELS.general}`,
@@ -75,13 +75,13 @@ export function createKimiRefineModelCall(
     enforceRecordedEgressDecision(context.trustedRoot, decideEgressPolicy({
       kind: 'model_inference',
       destination: endpoint,
-      provider: kimiConfig.provider,
+      provider: modelConfig.provider,
       model,
       baseUrl,
-      securityMode: kimiConfig.securityMode,
+      securityMode: modelConfig.securityMode,
       content: messages,
     }));
-    const modelFetch = createModelEndpointFetch(kimiConfig, { fetchImpl: fetchImpl as never });
+    const modelFetch = createModelEndpointFetch(modelConfig, { fetchImpl: fetchImpl as never });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

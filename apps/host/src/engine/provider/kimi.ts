@@ -43,7 +43,7 @@ export function createKimiProvider(): Provider {
     async chatCompletion({
       messages,
       tools,
-      kimiConfig,
+      modelConfig,
       fetchImpl = globalThis.fetch,
       onContent,
       onReasoning,
@@ -51,21 +51,21 @@ export function createKimiProvider(): Provider {
       promptCacheKey,
       stream = true,
     }: ProviderChatArgs): Promise<ProviderChatResult> {
-      if (!kimiConfig || !kimiConfig.apiKey) {
+      if (!modelConfig || !modelConfig.apiKey) {
         throw new Error(MODEL_API_NOT_CONFIGURED_MESSAGE);
       }
-      const endpoint = `${String(kimiConfig.baseUrl).replace(/\/+$/, '')}/chat/completions`;
+      const endpoint = `${String(modelConfig.baseUrl).replace(/\/+$/, '')}/chat/completions`;
       const headers: Record<string, string> = {
-        authorization: `Bearer ${kimiConfig.apiKey}`,
+        authorization: `Bearer ${modelConfig.apiKey}`,
         'content-type': 'application/json',
         accept: stream ? 'text/event-stream' : 'application/json',
       };
-      if (kimiConfig.userAgent) headers['user-agent'] = String(kimiConfig.userAgent);
+      if (modelConfig.userAgent) headers['user-agent'] = String(modelConfig.userAgent);
       const body: Record<string, unknown> = {
-        model: kimiConfig.model,
+        model: modelConfig.model,
         messages,
         ...(Array.isArray(tools) && tools.length ? { tools, tool_choice: 'auto' } : {}),
-        max_tokens: kimiConfig.maxTokens || 2048,
+        max_tokens: modelConfig.maxTokens || 2048,
         stream,
         // OpenAI 兼容流只有设置 include_usage 才会在最终 SSE chunk 返回 usage。
         // 否则 run 记录的 token 用量会全为 0,观测面板也会显示为空。
@@ -73,8 +73,8 @@ export function createKimiProvider(): Provider {
         // 稳定缓存键:官方建议多轮 agent 传入(通常为 session/run id),提高前缀缓存命中率。
         ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
       };
-      if (typeof kimiConfig.temperature === 'number' && Number.isFinite(kimiConfig.temperature)) {
-        body.temperature = kimiConfig.temperature;
+      if (typeof modelConfig.temperature === 'number' && Number.isFinite(modelConfig.temperature)) {
+        body.temperature = modelConfig.temperature;
       }
       const fetcher = fetchImpl as FetchLike;
       const resp = await fetcher(endpoint, omitUndefined({ method: 'POST', headers, body: JSON.stringify(body), signal }));

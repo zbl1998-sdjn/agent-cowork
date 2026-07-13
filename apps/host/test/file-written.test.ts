@@ -32,7 +32,7 @@ test('successful Write emits a file_written frame with the path (for openable ar
     return { content: '已生成 report.md。' };
   };
   const approvals = { request: () => ({ id: 'write_approval', promise: Promise.resolve('once') }) };
-  await runAgentChat({ prompt: '写报告', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, approvals, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  await runAgentChat({ prompt: '写报告', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, approvals, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   const fw = events.filter((e) => e.t === 'file_written');
   assert.equal(fw.length, 1, 'one file_written frame');
   assert.ok(fw[0]);
@@ -49,6 +49,6 @@ test('read-only tools do not emit file_written', async () => {
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'Read', arguments: JSON.stringify({ path: 'a.txt' }) } }] };
     return { content: '读完了。' };
   };
-  await runAgentChat({ prompt: '看文件', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
+  await runAgentChat({ prompt: '看文件', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall, emit: (t, d) => events.push({ t, d }), runStoreRoot: path.join(root, 'runs') });
   assert.equal(events.filter((e) => e.t === 'file_written').length, 0);
 });

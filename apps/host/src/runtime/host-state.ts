@@ -121,7 +121,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   // 用当前 Kimi 配置造一个 refine 专用的非流式模型调用;否则保持空,refiner 走本地兜底。
   if (!config.promptRefineModelCall && !config.promptRefiner && kimiApiConfig.configured) {
     config.promptRefineModelCall = createKimiRefineModelCall({
-      kimiConfig: kimiApiConfig as unknown as Record<string, unknown>, ...(typeof config.fetchImpl === 'function' ? { fetchImpl: config.fetchImpl as typeof fetch } : {}),
+      modelConfig: kimiApiConfig as unknown as Record<string, unknown>, ...(typeof config.fetchImpl === 'function' ? { fetchImpl: config.fetchImpl as typeof fetch } : {}),
     });
     if (config.promptRefineTimeoutMs == null) {
       config.promptRefineTimeoutMs = 20_000;

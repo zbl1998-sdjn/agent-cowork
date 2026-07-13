@@ -21,7 +21,7 @@ type StreamResponse = {
   end(chunk?: string | Buffer): unknown;
 };
 type StreamBody = { prompt?: unknown; summary?: unknown; thinking?: unknown; model?: unknown };
-type KimiConfig = {
+type ModelConfig = {
   provider?: unknown;
   apiKey?: unknown;
   baseUrl?: unknown;
@@ -64,7 +64,7 @@ type StreamChatOptions = {
   requestContext: RequestContext;
   body: StreamBody;
   streamRunner: StreamRunner;
-  kimiConfig: KimiConfig;
+  modelConfig: ModelConfig;
   trustedRoot: string;
   runStoreRoot: string;
   runsIndex: RunsIndexLike;
@@ -86,8 +86,8 @@ function sse(response: StreamResponse, event: string, data: unknown): void {
 }
 
 /** 取出归一化后的 provider 名(缺省 kimi-api)。 */
-function modelProvider(kimiConfig: KimiConfig): string {
-  return String((kimiConfig && kimiConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+function modelProvider(modelConfig: ModelConfig): string {
+  return String((modelConfig && modelConfig.provider) || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
 /** 入口:开启 SSE 流、逐 token 转发模型输出,并把整次对话记录为一条 run。 */
@@ -96,7 +96,7 @@ export async function streamChat({
   requestContext,
   body,
   streamRunner,
-  kimiConfig,
+  modelConfig,
   trustedRoot,
   runStoreRoot,
   runsIndex,
@@ -120,7 +120,7 @@ export async function streamChat({
     const base = {
       id: runId,
       type: 'kimi-chat',
-      provider: modelProvider(kimiConfig),
+      provider: modelProvider(modelConfig),
       mode: 'chat',
       trustedRoot,
       startedAt: startedAt.toISOString(),
@@ -141,7 +141,7 @@ export async function streamChat({
   };
 
   // 简单 chat 端点也注入今天日期/cwd/OS/model 的 env 块,避免「今天几号」落回模型训练截止时间。
-  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, modelConfig });
   const systemMessage = buildEnvBlock(envFacts).join('\n');
 
   let text = '';
@@ -151,23 +151,23 @@ export async function streamChat({
       prompt: body.prompt,
       summary: body.summary,
       thinking: body.thinking,
-      apiKey: kimiConfig.apiKey,
-      baseUrl: kimiConfig.baseUrl,
-      model: body.model || kimiConfig.model,
-      provider: modelProvider(kimiConfig),
-      timeoutMs: kimiConfig.timeoutMs,
-      maxTokens: kimiConfig.maxTokens,
-      userAgent: kimiConfig.userAgent,
-      temperature: kimiConfig.temperature,
+      apiKey: modelConfig.apiKey,
+      baseUrl: modelConfig.baseUrl,
+      model: body.model || modelConfig.model,
+      provider: modelProvider(modelConfig),
+      timeoutMs: modelConfig.timeoutMs,
+      maxTokens: modelConfig.maxTokens,
+      userAgent: modelConfig.userAgent,
+      temperature: modelConfig.temperature,
       trustedRoot,
-      securityMode: kimiConfig.securityMode,
+      securityMode: modelConfig.securityMode,
       fetchImpl,
       signal,
       onToken: (delta: string) => { text += String(delta); sse(response, 'token', { delta }); },
       onReasoning: (delta: string) => sse(response, 'reasoning', { delta }),
     }));
     text = (result && result.text) || text;
-    const model = (result && result.model) || kimiConfig.model;
+    const model = (result && result.model) || modelConfig.model;
     const usage = (result && result.usage) || null;
 
     if (signal && signal.aborted) {

@@ -151,7 +151,7 @@ test('interactive and child-agent tools forward context and handle unavailable d
       childRuns.push(args);
       return { text: 'child finished', steps: [{}, {}, {}] };
     },
-    kimiConfig: { provider: 'test' },
+    modelConfig: { provider: 'test' },
     modelCall,
     autoApprove: true,
     planMode: true,
@@ -247,7 +247,7 @@ test('interactive and child-agent tools forward context and handle unavailable d
   assert.equal(childRuns.length, 1);
   assert.equal(childRuns[0]?.prompt, '审查 README');
   assert.equal(childRuns[0]?.trustedRoot, root);
-  assert.equal(childRuns[0]?.kimiConfig, agentDeps.kimiConfig);
+  assert.equal(childRuns[0]?.modelConfig, agentDeps.modelConfig);
   assert.equal(childRuns[0]?.modelCall, modelCall);
   assert.equal(childRuns[0]?.approvals, agentDeps.approvals);
   assert.equal(childRuns[0]?.autoApprove, true);
@@ -312,7 +312,7 @@ test('AgentParallel normalizes agents aliases, records child failures, and forwa
     ctx: contextFor(root),
     runDeps: { runStoreRoot: path.join(root, '.runs'), runEvents: { publish: () => undefined }, runsIndex: { upsert: () => undefined } },
     agentDeps: {
-      kimiConfig: { provider: 'test-provider' },
+      modelConfig: { provider: 'test-provider' },
       modelCall: async () => ({ content: 'unused' }),
       approvals: { request: () => ({ id: 'approval_1', promise: Promise.resolve(true) }) },
       autoApprove: true,

@@ -28,7 +28,7 @@ type RouteError = Error & { statusCode?: number };
 
 export type AgentBudgetGuardOptions = {
   body: unknown;
-  kimiConfig: unknown;
+  modelConfig: unknown;
   startedAt: Date;
   runTimeoutMs?: number | undefined;
 };
@@ -93,24 +93,24 @@ function tightestLimit(configValue: NumericLimit | undefined, requestValue: Nume
   return fromConfig ?? fromRequest ?? undefined;
 }
 
-function budgetInputs(body: unknown, kimiConfig: unknown): AgentBudgetInputs {
+function budgetInputs(body: unknown, modelConfig: unknown): AgentBudgetInputs {
   const requestBody = omitUndefined(parseSchema(requestBodySchema, objectOrEmpty(body))) as RequestBody;
-  const config = omitUndefined(parseSchema(modelConfigSchema, objectOrEmpty(kimiConfig))) as ModelConfig;
+  const config = omitUndefined(parseSchema(modelConfigSchema, objectOrEmpty(modelConfig))) as ModelConfig;
   return { requestBody, config, requestBudget: requestBody.budget ?? {} };
 }
 
-export function resolveAgentRunTimeoutMs(body: unknown, kimiConfig: unknown): number | undefined {
-  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
+export function resolveAgentRunTimeoutMs(body: unknown, modelConfig: unknown): number | undefined {
+  const { requestBody, config, requestBudget } = budgetInputs(body, modelConfig);
   return tightestLimit(config.maxAgentWallClockMs, requestBudget.maxWallClockMs ?? requestBody.maxWallClockMs);
 }
 
 export function createAgentBudgetGuard({
   body,
-  kimiConfig,
+  modelConfig,
   startedAt,
   runTimeoutMs,
 }: AgentBudgetGuardOptions): ReturnType<typeof createBudgetGuard> {
-  const { requestBody, config, requestBudget } = budgetInputs(body, kimiConfig);
+  const { requestBody, config, requestBudget } = budgetInputs(body, modelConfig);
   return createBudgetGuard(omitUndefined({
     maxRunTokens: tightestLimit(config.maxRunTokens, requestBudget.maxRunTokens ?? requestBody.maxRunTokens),
     maxSessionTokens: tightestLimit(config.maxSessionTokens, requestBudget.maxSessionTokens ?? requestBody.maxSessionTokens),

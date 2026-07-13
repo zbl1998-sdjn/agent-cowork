@@ -42,10 +42,10 @@ test('resolveAppVersion prefers npm env, then SEA global, then dev', () => {
   }
 });
 
-test('resolveAgentEnvFacts bundles platform + provider/model from kimiConfig', () => {
+test('resolveAgentEnvFacts bundles platform + provider/model from modelConfig', () => {
   const facts = resolveAgentEnvFacts({
     trustedRoot: 'C:/work',
-    kimiConfig: { provider: 'kimi-api', model: 'kimi-k2-0905-preview' },
+    modelConfig: { provider: 'kimi-api', model: 'kimi-k2-0905-preview' },
     now: new Date('2026-05-28T01:23:00Z'),
     platform: 'win32',
     appVersion: '0.2.0',
@@ -58,8 +58,8 @@ test('resolveAgentEnvFacts bundles platform + provider/model from kimiConfig', (
   assert.ok(facts.now instanceof Date);
 });
 
-test('resolveAgentEnvFacts handles missing kimiConfig + non-string trustedRoot defensively', () => {
-  const facts = resolveAgentEnvFacts({ trustedRoot: null, kimiConfig: null, platform: 'win32' });
+test('resolveAgentEnvFacts handles missing modelConfig + non-string trustedRoot defensively', () => {
+  const facts = resolveAgentEnvFacts({ trustedRoot: null, modelConfig: null, platform: 'win32' });
   assert.equal(facts.trustedRoot, '');
   assert.equal(facts.osName, 'Windows');
   assert.equal(facts.provider, '');
@@ -69,7 +69,7 @@ test('resolveAgentEnvFacts handles missing kimiConfig + non-string trustedRoot d
 test('resolveAgentEnvFacts ignores malformed config and empty version overrides', () => {
   const facts = resolveAgentEnvFacts({
     trustedRoot: 42,
-    kimiConfig: { provider: 1, model: null },
+    modelConfig: { provider: 1, model: null },
     now: new Date('bad-date'),
     platform: 'plan9',
     appVersion: '',

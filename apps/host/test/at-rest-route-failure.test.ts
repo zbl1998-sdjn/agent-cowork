@@ -254,7 +254,7 @@ test('diagnostic recorders and Kimi routes do not swallow or reclassify at-rest 
       runsIndex: { upsert: () => undefined },
       requestContext: { tenantId: 'tenant_record', userId: 'user_record' },
       runId,
-      kimiConfig: { provider: 'test', model: 'test-model' },
+      modelConfig: { provider: 'test', model: 'test-model' },
       body: {},
       trustedRoot: root,
       startedAt: new Date('2026-07-11T00:00:00.000Z'),

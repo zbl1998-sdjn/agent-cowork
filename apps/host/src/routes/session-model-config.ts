@@ -116,11 +116,11 @@ function requestModelConfig(body: unknown): SessionModelConfig {
  * host-managed so request bodies cannot smuggle secret fallback layers.
  */
 export function applySessionModelConfig(
-  kimiConfig: unknown,
+  modelConfig: unknown,
   body: unknown,
   { env = process.env as RuntimeEnv }: SessionModelAccessOptions = {},
 ): Record<string, unknown> {
-  const base = { ...objectOrEmpty(kimiConfig) };
+  const base = { ...objectOrEmpty(modelConfig) };
   const override = requestModelConfig(body);
   if (!Object.keys(override).length) return base;
   const combined = { ...base, ...override };

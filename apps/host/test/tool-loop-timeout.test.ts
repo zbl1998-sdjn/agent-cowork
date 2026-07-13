@@ -34,7 +34,7 @@ test('runAgentChat aborts a hung model call when the run wall-clock timeout expi
 
   const out = await runAgentChat({
     prompt: 'hang',
-    kimiConfig: { ...TEST_LOCAL_MODEL_CONFIG, timeoutMs: 5_000 },
+    modelConfig: { ...TEST_LOCAL_MODEL_CONFIG, timeoutMs: 5_000 },
     trustedRoot: root,
     modelCall,
     runTimeoutMs: 20,

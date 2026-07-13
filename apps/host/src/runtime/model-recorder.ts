@@ -76,7 +76,7 @@ export function sanitizeModelCallInput(args: Record<string, unknown> = {}): Reco
 }
 
 function fingerprintValue(value: unknown, key = '', inModelConfig = false): unknown {
-  const isModelConfigValue = inModelConfig || key === 'kimiConfig';
+  const isModelConfigValue = inModelConfig || key === 'modelConfig';
   if (OMIT_KEYS.has(key) || typeof value === 'function') return undefined;
   if (value === undefined || value === null) return value;
   if (typeof value === 'string') {

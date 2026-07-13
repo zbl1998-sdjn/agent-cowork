@@ -60,7 +60,7 @@ export function createOpenAiCompatibleProvider({
     async chatCompletion({
       messages,
       tools,
-      kimiConfig,
+      modelConfig,
       fetchImpl = globalThis.fetch,
       onContent,
       onReasoning,
@@ -68,7 +68,7 @@ export function createOpenAiCompatibleProvider({
       promptCacheKey,
       stream = true,
     }: ProviderChatArgs): Promise<ProviderChatResult> {
-      const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
+      const config: ModelConfig = modelConfig && typeof modelConfig === 'object' ? modelConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const baseUrl = trimBaseUrl(config.baseUrl || defaultBaseUrl);
       const model = String(config.model || '').trim();

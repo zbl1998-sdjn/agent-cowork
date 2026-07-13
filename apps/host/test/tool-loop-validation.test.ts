@@ -65,7 +65,7 @@ test('runAgentChat rejects invalid tool arguments before calling the handler', a
 
   const out = await runAgentChat({
     prompt: 'write report',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

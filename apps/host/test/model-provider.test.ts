@@ -74,7 +74,7 @@ test('resolveModelProvider accepts an injected provider seam', async () => {
     },
   };
   assert.equal(resolveModelProvider({ provider }), provider);
-  const message = await defaultAgentModelCall({ kimiConfig: { provider }, messages: [], tools: [] });
+  const message = await defaultAgentModelCall({ modelConfig: { provider }, messages: [], tools: [] });
   assert.equal((message as ModelMessage).content, 'custom-provider');
 });
 
@@ -139,7 +139,7 @@ test('defaultAgentModelCall routes OpenAI-compatible provider through fake fetch
   };
 
   const message = await defaultAgentModelCall({
-    kimiConfig: {
+    modelConfig: {
       provider: 'openai',
       apiKey: 'sk-test-secret',
       baseUrl: 'https://api.openai.test/v1/',
@@ -191,7 +191,7 @@ test('defaultAgentModelCall routes Anthropic provider through fake fetch', async
   };
 
   const message = await defaultAgentModelCall({
-    kimiConfig: {
+    modelConfig: {
       provider: 'anthropic',
       apiKey: 'sk-ant-test-secret',
       baseUrl: 'https://api.anthropic.test/v1/',
@@ -251,7 +251,7 @@ test('local OpenAI-compatible provider does not require or send an API key', asy
   };
 
   const message = await defaultAgentModelCall({
-    kimiConfig: {
+    modelConfig: {
       provider: 'openai/local',
       baseUrl: 'http://127.0.0.1:11434/v1',
       model: 'local-model',
@@ -290,7 +290,7 @@ test('Ollama provider is local OpenAI-compatible and does not send an API key', 
   };
 
   const message = await defaultAgentModelCall({
-    kimiConfig: {
+    modelConfig: {
       provider: 'ollama',
       baseUrl: 'http://127.0.0.1:11434/v1',
       model: 'qwen3:8b',
@@ -326,7 +326,7 @@ test('domestic catalog providers route through OpenAI-compatible fetch', async (
   };
 
   const message = await defaultAgentModelCall({
-    kimiConfig: {
+    modelConfig: {
       provider: 'deepseek',
       apiKey: 'test-deepseek-key',
       baseUrl: 'https://api.deepseek.example',
@@ -352,7 +352,7 @@ test('domestic catalog providers route through OpenAI-compatible fetch', async (
 test('OpenAI provider fails closed without an API key', async () => {
   await assert.rejects(
     () => defaultAgentModelCall({
-      kimiConfig: { provider: 'openai', baseUrl: 'https://api.openai.test/v1', model: 'gpt-test' },
+      modelConfig: { provider: 'openai', baseUrl: 'https://api.openai.test/v1', model: 'gpt-test' },
       messages: [],
       tools: [],
       fetchImpl: async () => {
@@ -366,7 +366,7 @@ test('OpenAI provider fails closed without an API key', async () => {
 test('Anthropic provider fails closed without API key or model', async () => {
   await assert.rejects(
     () => defaultAgentModelCall({
-      kimiConfig: { provider: 'anthropic', baseUrl: 'https://api.anthropic.test/v1', model: 'claude-test' },
+      modelConfig: { provider: 'anthropic', baseUrl: 'https://api.anthropic.test/v1', model: 'claude-test' },
       messages: [],
       tools: [],
       fetchImpl: async () => {
@@ -377,7 +377,7 @@ test('Anthropic provider fails closed without API key or model', async () => {
   );
   await assert.rejects(
     () => defaultAgentModelCall({
-      kimiConfig: { provider: 'claude', apiKey: 'sk-test-ant', baseUrl: 'https://api.anthropic.test/v1' },
+      modelConfig: { provider: 'claude', apiKey: 'sk-test-ant', baseUrl: 'https://api.anthropic.test/v1' },
       messages: [],
       tools: [],
       fetchImpl: async () => {
@@ -408,7 +408,7 @@ test('Kimi provider posts streaming request metadata and falls back to JSON resp
   };
 
   const message = await provider.chatCompletion({
-    kimiConfig: {
+    modelConfig: {
       apiKey: 'sk-test-kimi-provider',
       baseUrl: 'https://api.moonshot.test/v1/',
       model: 'moonshot-test',
@@ -442,7 +442,7 @@ test('Kimi provider fails closed before or after fetch when configuration or HTT
   const provider = createKimiProvider();
   await assert.rejects(
     () => provider.chatCompletion({
-      kimiConfig: { baseUrl: 'https://api.moonshot.test/v1', model: 'moonshot-test' },
+      modelConfig: { baseUrl: 'https://api.moonshot.test/v1', model: 'moonshot-test' },
       messages: [],
       tools: [],
       fetchImpl: async () => {
@@ -453,7 +453,7 @@ test('Kimi provider fails closed before or after fetch when configuration or HTT
   );
   await assert.rejects(
     () => provider.chatCompletion({
-      kimiConfig: {
+      modelConfig: {
         apiKey: 'sk-test-kimi-provider',
         baseUrl: 'https://api.moonshot.test/v1',
         model: 'moonshot-test',
@@ -495,7 +495,7 @@ test('Anthropic provider converts OpenAI-style messages/tools and falls back to 
   };
 
   const message = await provider.chatCompletion({
-    kimiConfig: {
+    modelConfig: {
       apiKey: 'sk-ant-provider-test',
       model: 'claude-json-test',
       maxTokens: 88,

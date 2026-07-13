@@ -40,7 +40,7 @@ export type ContextManagerLike = {
 };
 export type ResumeState = { usage?: Usage; messages?: ChatMessage[]; approvedTools?: string[]; todos?: unknown[] };
 export type RunAgentChatOptions = {
-  prompt?: unknown; kimiConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall;
+  prompt?: unknown; modelConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall;
   inProcessModelCallCapability?: TrustedInProcessModelCallCapability; maxSteps?: number;
   approvals?: ApprovalRegistry | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
   memoryText?: string; skills?: SkillDescriptor[]; emit?: EmitFn; sandbox?: unknown; sandboxLimits?: unknown; runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknown;

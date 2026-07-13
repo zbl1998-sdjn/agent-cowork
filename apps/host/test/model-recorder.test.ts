@@ -6,11 +6,11 @@ import path from 'node:path';
 
 type TestInput = Record<string, unknown> & {
   messages: Array<{ role: string; content: string }>;
-  kimiConfig: { model: string; baseUrl: string; apiKey: string };
+  modelConfig: { model: string; baseUrl: string; apiKey: string };
 };
 type StoredRecord = Record<string, unknown> & {
   request?: {
-    kimiConfig?: { apiKey?: unknown };
+    modelConfig?: { apiKey?: unknown };
     fetchImpl?: unknown;
     onContent?: unknown;
     signal?: unknown;
@@ -31,7 +31,7 @@ function errorCode(error: unknown): unknown {
 const INPUT: TestInput = {
   messages: [{ role: 'user', content: 'hello' }],
   tools: [{ type: 'function', function: { name: 'Read', parameters: { type: 'object' } } }],
-  kimiConfig: {
+  modelConfig: {
     model: 'fake-model',
     baseUrl: 'https://api.example.test',
     apiKey: 'sk-test-recorder-secret-1234567890',
@@ -69,7 +69,7 @@ test('ModelRecorder records sanitized model-call input and exact response', asyn
   assert.equal(record.startedAt, '2026-01-01T00:00:00.000Z');
   assert.equal(record.finishedAt, '2026-01-01T00:00:01.000Z');
   assert.equal(record.response?.content, 'reply:hello');
-  assert.equal(record.request?.kimiConfig?.apiKey, '[REDACTED]');
+  assert.equal(record.request?.modelConfig?.apiKey, '[REDACTED]');
   assert.equal(record.request?.fetchImpl, undefined);
   assert.equal(record.request?.onContent, undefined);
   assert.equal(record.request?.signal, undefined);
@@ -93,7 +93,7 @@ test('ModelReplayer returns the recorded response for the same sanitized input',
     return { content: 'live-answer' };
   })({
     ...INPUT,
-    kimiConfig: { ...INPUT.kimiConfig, apiKey: 'sk-test-different-secret-1234567890' },
+    modelConfig: { ...INPUT.modelConfig, apiKey: 'sk-test-different-secret-1234567890' },
   });
 
   assert.equal((replayed as { content?: unknown }).content, 'recorded-answer');
@@ -134,7 +134,7 @@ test('JsonlModelRecordStore persists sanitized records for deterministic replay'
   const records = reloadedStore.list() as StoredRecord[];
   const record = firstRecord(records);
   assert.equal(records.length, 1);
-  assert.equal(record.request?.kimiConfig?.apiKey, '[REDACTED]');
+  assert.equal(record.request?.modelConfig?.apiKey, '[REDACTED]');
   const replayed = await createModelReplayer({ store: reloadedStore }).wrap()(INPUT);
   assert.deepEqual(replayed, { content: 'persisted-answer', usage: { total_tokens: 9 } });
 });

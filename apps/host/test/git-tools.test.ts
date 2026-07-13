@@ -143,7 +143,7 @@ test('GitCommit is high-risk and goes through approval before mutating', async (
 
   const out = await runAgentChat({
     prompt: 'commit b.txt',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals,

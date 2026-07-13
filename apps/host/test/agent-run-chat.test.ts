@@ -45,7 +45,7 @@ test('runAgentChat executes a Write tool call then returns a final answer', asyn
 
   const out = await runAgentChat({
     prompt: '创建 out.txt',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     approvals: { request: () => ({ id: 'write_approval', promise: Promise.resolve('once') }) },
@@ -66,7 +66,7 @@ test('runAgentChat keeps an ordinary injected modelCall behind controlled-hybrid
   await assert.rejects(
     () => runAgentChat({
       prompt: 'must stay local',
-      kimiConfig: {
+      modelConfig: {
         provider: 'kimi-api',
         baseUrl: 'https://api.moonshot.ai/v1',
         model: 'external-model',
@@ -91,7 +91,7 @@ test('runAgentChat accepts only a capability bound to its exact in-process model
   const modelCall: ModelCall = async () => ({ content: 'trusted in-process result' });
   const result = await runAgentChat({
     prompt: 'local fixture',
-    kimiConfig: {
+    modelConfig: {
       provider: 'external-looking-fixture',
       baseUrl: 'https://example.invalid/v1',
       model: 'fixture-model',
@@ -123,7 +123,7 @@ test('a run that exhausts the step budget still returns a written reply', async 
 
   const out = await runAgentChat({
     prompt: '看看这里',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 3,
@@ -158,7 +158,7 @@ test('runAgentChat allows a final productive tool call before no-tool summary', 
 
   const out = await runAgentChat({
     prompt: '看看这里',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -192,7 +192,7 @@ test('runAgentChat finalizes early when the latest tool batch made no progress',
 
   const out = await runAgentChat({
     prompt: '读取不存在的文件',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -217,7 +217,7 @@ test('static backstop fires when even the forced summary comes back empty', asyn
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     modelCall,
     maxSteps: 2,
@@ -267,7 +267,7 @@ test('summarizeAfterBudget disables tools, emits streamed summary, and records u
     messages,
     modelCall,
     inProcessModelCallCapability: createTrustedInProcessModelCallCapability(modelCall),
-    kimiConfig: { timeoutMs: 1000 },
+    modelConfig: { timeoutMs: 1000 },
     emit: (type, payload) => events.push({ type, payload }),
     usageTotals,
   });

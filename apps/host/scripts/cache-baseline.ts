@@ -38,7 +38,7 @@ if (!cfg.configured || !cfg.apiKey) {
   process.exit(2);
 }
 
-const kimiConfig: Record<string, unknown> = {
+const modelConfig: Record<string, unknown> = {
   apiKey: cfg.apiKey,
   baseUrl: cfg.baseUrl,
   model: cfg.model,
@@ -49,7 +49,7 @@ const kimiConfig: Record<string, unknown> = {
 };
 
 // 真实生产 system 提示(前缀的大头);env facts 与 tool-loop 一致地解析。
-const envFacts = resolveAgentEnvFacts({ trustedRoot: process.cwd(), kimiConfig });
+const envFacts = resolveAgentEnvFacts({ trustedRoot: process.cwd(), modelConfig });
 // 与 agent 循环一致:系统前缀「不含日期」(跨天稳定),env 放进用户轮。
 const systemPrompt = buildSystemPrompt({ env: envFacts, includeEnvBlock: false });
 const envPreamble = buildEnvBlock(envFacts).join('\n');
@@ -96,7 +96,7 @@ async function callOnce(messages: Msg[], cacheKey: string): Promise<ChatResult> 
     return (await provider.chatCompletion({
       messages,
       tools,
-      kimiConfig,
+      modelConfig,
       fetchImpl: globalThis.fetch,
       signal: controller.signal,
       promptCacheKey: cacheKey,

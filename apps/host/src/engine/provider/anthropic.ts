@@ -188,8 +188,8 @@ export async function parseAnthropicStream(
 export function createAnthropicProvider(): Provider {
   return {
     id: 'anthropic',
-    async chatCompletion({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, signal, stream = true }: ProviderChatArgs): Promise<ProviderChatResult> {
-      const config: ModelConfig = kimiConfig && typeof kimiConfig === 'object' ? kimiConfig : {};
+    async chatCompletion({ messages, tools, modelConfig, fetchImpl = globalThis.fetch, onContent, signal, stream = true }: ProviderChatArgs): Promise<ProviderChatResult> {
+      const config: ModelConfig = modelConfig && typeof modelConfig === 'object' ? modelConfig : {};
       const apiKey = String(config.apiKey || '').trim();
       const model = String(config.model || '').trim();
       const baseUrl = trimBaseUrl(config.baseUrl || DEFAULT_ANTHROPIC_BASE_URL);

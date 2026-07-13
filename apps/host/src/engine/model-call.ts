@@ -10,6 +10,6 @@ import { omitUndefined } from '../util/object.js';
 type ProviderChatArgs = Parameters<typeof callProviderChatCompletion>[0];
 
 /** 默认的 agent 模型调用:直接转发到 provider 层的 chat completion。 */
-export async function defaultAgentModelCall({ messages, tools, kimiConfig, fetchImpl = globalThis.fetch, onContent, onReasoning, signal, promptCacheKey }: ProviderChatArgs) {
-  return callProviderChatCompletion(omitUndefined({ messages, tools, kimiConfig, fetchImpl, onContent, onReasoning, signal, promptCacheKey }));
+export async function defaultAgentModelCall({ messages, tools, modelConfig, fetchImpl = globalThis.fetch, onContent, onReasoning, signal, promptCacheKey }: ProviderChatArgs) {
+  return callProviderChatCompletion(omitUndefined({ messages, tools, modelConfig, fetchImpl, onContent, onReasoning, signal, promptCacheKey }));
 }

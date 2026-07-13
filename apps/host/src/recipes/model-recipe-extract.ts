@@ -29,13 +29,13 @@ const AI_MODEL_TIMEOUT_MS = 30_000;
 /** 唯一的模型调用出口:先过出站策略(与对话路径共用同一闸门),拒绝就抛错(调用方回退模板);
  * 通过则带超时调用。trustedRoot 存在时把出站决策记进审计,与对话路径保持同等可审计性。 */
 async function callWithTimeout(modelCall: ModelCaller, args: ProviderChatArgs, trustedRoot?: unknown, ms = AI_MODEL_TIMEOUT_MS): Promise<ProviderChatResult> {
-  const kimiConfig = args.kimiConfig as ModelConfig;
+  const modelConfig = args.modelConfig as ModelConfig;
   const egress = decideEgressPolicy({
     kind: 'model_inference',
-    provider: kimiConfig?.provider,
-    model: kimiConfig?.model,
-    baseUrl: kimiConfig?.baseUrl,
-    securityMode: kimiConfig?.securityMode,
+    provider: modelConfig?.provider,
+    model: modelConfig?.model,
+    baseUrl: modelConfig?.baseUrl,
+    securityMode: modelConfig?.securityMode,
     content: args.messages,
     trustedRoot,
   });
@@ -98,7 +98,7 @@ export async function callModelForJson(
   { system: string; user: string; modelConfig: ModelConfig; modelCall?: ModelCaller; trustedRoot?: unknown },
 ): Promise<unknown> {
   const result = await callWithTimeout(modelCall, {
-    kimiConfig: modelConfig,
+    modelConfig: modelConfig,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     tools: [],
   }, trustedRoot);
@@ -216,7 +216,7 @@ export async function extractMeetingActions(
   if (!String(source || '').trim()) return null;
   try {
     const result = await callWithTimeout(modelCall, {
-      kimiConfig: modelConfig,
+      modelConfig: modelConfig,
       messages: [
         { role: 'system', content: MEETING_SYSTEM },
         { role: 'user', content: MEETING_USER(String(source), String(prompt || '')) },

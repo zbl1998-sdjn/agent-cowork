@@ -6,7 +6,7 @@ import { readableBody, recordValue } from './host-http.js';
 import type { ModelTextResult } from '../../src/engine/api-runner.js';
 
 export type AgentModelCallInput = {
-  kimiConfig?: {
+  modelConfig?: {
     provider?: string;
     baseUrl?: string;
     model?: string;

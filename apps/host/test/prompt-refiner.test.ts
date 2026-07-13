@@ -117,7 +117,7 @@ test('createKimiRefineModelCall posts a bounded non-streaming refinement request
     };
   };
   const modelCall = createKimiRefineModelCall({
-    kimiConfig: {
+    modelConfig: {
       ...LOCAL_MODEL,
       apiKey: 'dummy-refine-key',
       model: 'kimi-refine',
@@ -165,23 +165,23 @@ test('createKimiRefineModelCall posts a bounded non-streaming refinement request
 });
 
 test('createKimiRefineModelCall fails closed on missing key, HTTP errors, and malformed responses', async () => {
-  const noKey = createKimiRefineModelCall({ kimiConfig: {}, fetchImpl: (async () => { throw new Error('should not fetch'); }) as never });
+  const noKey = createKimiRefineModelCall({ modelConfig: {}, fetchImpl: (async () => { throw new Error('should not fetch'); }) as never });
   assert.equal(await noKey({ prompt: 'x', intent: 'general', missing: [], context: {} }), '');
 
   const nonOk = createKimiRefineModelCall({
-    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
+    modelConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => ({ ok: false, json: async () => ({}) })) as never,
   });
   assert.equal(await nonOk({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');
 
   const malformed = createKimiRefineModelCall({
-    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
+    modelConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 42 } }] }) })) as never,
   });
   assert.equal(await malformed({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');
 
   const thrown = createKimiRefineModelCall({
-    kimiConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
+    modelConfig: { ...LOCAL_MODEL, apiKey: 'dummy-refine-key' },
     fetchImpl: (async () => { throw new Error('network down'); }) as never,
   });
   assert.equal(await thrown({ prompt: 'x', intent: 'general', missing: [], context: { trustedRoot: LOCAL_TRUSTED_ROOT } }), '');

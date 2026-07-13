@@ -120,7 +120,7 @@ test('runAgentChat accumulates token usage across model calls', async () => {
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [noop],
     modelCall,
@@ -144,7 +144,7 @@ test('runAgentChat stops between steps when the abort signal fires', async () =>
 
   const out = await runAgentChat({
     prompt: 'x',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [noop],
     modelCall,

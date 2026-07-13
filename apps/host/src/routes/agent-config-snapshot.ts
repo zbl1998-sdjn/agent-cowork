@@ -94,14 +94,14 @@ function parseSnapshotRequest(body: unknown): z.infer<typeof requestSnapshotSche
   return result.success ? result.data : {};
 }
 
-function parseSnapshotConfig(kimiConfig: unknown): z.infer<typeof modelConfigSnapshotSchema> {
-  const result = modelConfigSnapshotSchema.safeParse(kimiConfig);
+function parseSnapshotConfig(modelConfig: unknown): z.infer<typeof modelConfigSnapshotSchema> {
+  const result = modelConfigSnapshotSchema.safeParse(modelConfig);
   return result.success ? result.data : {};
 }
 
-export function buildAgentConfigSnapshot(body: unknown, kimiConfig: unknown): AgentConfigSnapshot {
+export function buildAgentConfigSnapshot(body: unknown, modelConfig: unknown): AgentConfigSnapshot {
   const requestBody = parseSnapshotRequest(body);
-  const config = parseSnapshotConfig(kimiConfig);
+  const config = parseSnapshotConfig(modelConfig);
   const permissionMode = resolvePermissionMode(requestBody);
   return {
     provider: config.provider,

@@ -21,9 +21,9 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
   const primarySecret = 'sk-test-primary-router-secret-1234567890'; // allowlist-secret
   const fallbackSecret = 'sk-test-fallback-router-secret-1234567890'; // allowlist-secret
   const seen: Array<{ baseUrl: string | undefined; apiKey: string | undefined }> = [];
-  const agentModelCall = async ({ kimiConfig, messages }: AgentModelCallInput) => {
-    seen.push({ baseUrl: kimiConfig?.baseUrl, apiKey: kimiConfig?.apiKey });
-    if (kimiConfig?.baseUrl === 'http://127.0.0.1:11440/v1') {
+  const agentModelCall = async ({ modelConfig, messages }: AgentModelCallInput) => {
+    seen.push({ baseUrl: modelConfig?.baseUrl, apiKey: modelConfig?.apiKey });
+    if (modelConfig?.baseUrl === 'http://127.0.0.1:11440/v1') {
       throw new Error(`temporary outage ${primarySecret}`);
     }
     if (hasToolResult(messages, 'fallback_write')) {
@@ -33,7 +33,7 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
       content: '',
       tool_calls: [{
         id: 'fallback_write',
-        function: { name: 'Write', arguments: JSON.stringify({ path: 'fallback.txt', content: kimiConfig?.model }) },
+        function: { name: 'Write', arguments: JSON.stringify({ path: 'fallback.txt', content: modelConfig?.model }) },
       }],
     };
   };
@@ -88,13 +88,13 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
 test('E2E /api/agent/chat/stream applies session model config without persisting or echoing keys', async () => {
   const root = tempRoot('kcw-e2e-');
   const sessionKey = 'test-session-secret-do-not-record';
-  let capturedConfig: AgentModelCallInput['kimiConfig'] | null = null;
-  const requireCapturedConfig = (): NonNullable<AgentModelCallInput['kimiConfig']> => {
+  let capturedConfig: AgentModelCallInput['modelConfig'] | null = null;
+  const requireCapturedConfig = (): NonNullable<AgentModelCallInput['modelConfig']> => {
     assert.ok(capturedConfig, 'agent model call should capture the session config');
     return capturedConfig;
   };
-  const agentModelCall = async ({ kimiConfig }: AgentModelCallInput) => {
-    capturedConfig = kimiConfig || null;
+  const agentModelCall = async ({ modelConfig }: AgentModelCallInput) => {
+    capturedConfig = modelConfig || null;
     return { content: 'session provider recorded' };
   };
   const server = createServer({

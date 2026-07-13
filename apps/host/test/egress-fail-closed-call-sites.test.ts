@@ -71,7 +71,7 @@ test('model resilience never invokes a local endpoint when audit persistence fai
       },
       { trustedRoot },
       {
-        kimiConfig: {
+        modelConfig: {
           provider: 'openai/local',
           baseUrl: 'http://127.0.0.1:11434/v1',
           model: 'local-model',
@@ -99,12 +99,12 @@ test('audit failures stay outside the model circuit breaker', async () => {
   };
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await assert.rejects(
-      () => callModelResilient(modelCall, { trustedRoot }, { kimiConfig: config }),
+      () => callModelResilient(modelCall, { trustedRoot }, { modelConfig: config }),
       isAuditFailure,
     );
   }
   fs.unlinkSync(path.join(trustedRoot, '.AgentCowork'));
-  const result = await callModelResilient(modelCall, { trustedRoot }, { kimiConfig: config });
+  const result = await callModelResilient(modelCall, { trustedRoot }, { modelConfig: config });
   assert.equal((result as { content?: unknown }).content, 'ok');
   assert.equal(modelCalls, 1);
 });
@@ -113,13 +113,13 @@ test('filtered denied model candidates are audited before a local fallback runs'
   const trustedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-egress-filtered-'));
   const seenProviders: unknown[] = [];
   const result = await callModelResilient(
-    async ({ kimiConfig }) => {
-      seenProviders.push(kimiConfig.provider);
+    async ({ modelConfig }) => {
+      seenProviders.push(modelConfig.provider);
       return { content: 'local fallback' };
     },
     { trustedRoot },
     {
-      kimiConfig: {
+      modelConfig: {
         securityMode: 'local_strict',
         provider: 'kimi-api',
         baseUrl: 'https://api.moonshot.ai/v1',

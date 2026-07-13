@@ -43,7 +43,7 @@ test('auto-continue extends the step budget up to the hard cap when the model ke
   const c = toolRoundCounter();
   const out = await runAgentChat({
     prompt: 'big task',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall: c.modelCall,
@@ -65,7 +65,7 @@ test('maxAutoContinues=0 keeps the old single-window behavior', async () => {
   const c = toolRoundCounter();
   const out = await runAgentChat({
     prompt: 'big task',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall: c.modelCall,
@@ -92,7 +92,7 @@ test('a naturally finishing run does not auto-continue and is not marked exhaust
   };
   const out = await runAgentChat({
     prompt: 'small task',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [NOOP_TOOL],
     modelCall,

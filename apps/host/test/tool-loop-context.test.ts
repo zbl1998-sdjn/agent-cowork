@@ -70,7 +70,7 @@ test('runAgentChat summarizes oversized tool results before the next model turn'
 
   const out = await runAgentChat({
     prompt: 'search',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -130,7 +130,7 @@ test('runAgentChat marks tool output as untrusted data before the next model tur
 
   const out = await runAgentChat({
     prompt: 'search notes safely',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -168,7 +168,7 @@ test('runAgentChat auto-compacts long resumed history and emits token stats', as
 
   const out = await runAgentChat({
     prompt: 'ignored on resume',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: [],
     modelCall,

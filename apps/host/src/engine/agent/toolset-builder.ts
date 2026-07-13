@@ -193,7 +193,7 @@ function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }: SubAgentTool
       if (typeof agentDeps.runAgentChat !== 'function') return { error: 'sub-agent runner unavailable' };
       const sub = await agentDeps.runAgentChat({
         prompt: String(args.task || ''),
-        kimiConfig: agentDeps.kimiConfig,
+        modelConfig: agentDeps.modelConfig,
         trustedRoot: ctx.trustedRoot,
         tools: baseTools,
         modelCall: agentDeps.modelCall,

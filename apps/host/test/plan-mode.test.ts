@@ -64,7 +64,7 @@ test('plan mode blocks mutating tools until ExitPlanMode is approved', async () 
     { content: '完成。' },
   ]);
   const out = await runAgentChat({
-    prompt: '建 a.txt', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
+    prompt: '建 a.txt', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
     planMode: true, approvals, auditBus: bus, runStoreRoot: path.join(root, 'runs'),
   });
   // The pre-plan Write was blocked, so the file only ever gets the post-plan content.
@@ -97,7 +97,7 @@ test('rejecting the plan keeps mutating tools blocked', async () => {
     { content: '我会根据反馈继续完善计划。' },
   ]);
   const out = await runAgentChat({
-    prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
+    prompt: 'x', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
     planMode: true, approvals, runStoreRoot: path.join(root, 'runs'),
   });
   assert.equal(fs.existsSync(path.join(root, 'b.txt')), false, 'rejected plan must not allow writes');
@@ -112,7 +112,7 @@ test('approval gate closes the leak: a plain Write requires approval (not just h
     { content: '已取消写入。' },
   ]);
   await runAgentChat({
-    prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
+    prompt: 'x', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
     approvals, runStoreRoot: path.join(root, 'runs'),
   });
   assert.equal(fs.existsSync(path.join(root, 'c.txt')), false, 'a rejected Write must not happen');
@@ -136,7 +136,7 @@ test('autoApprove covers non-high mutations but high-risk stays explicit', async
     { content: '完成。' },
   ]);
   await runAgentChat({
-    prompt: 'x', kimiConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
+    prompt: 'x', modelConfig: TEST_LOCAL_MODEL_CONFIG, trustedRoot: root, modelCall: model,
     tools: customTools, approvals, autoApprove: true, runStoreRoot: path.join(root, 'runs'),
   });
   assert.equal(fs.existsSync(path.join(root, 'd.txt')), true, 'non-high write auto-approved under autoApprove');

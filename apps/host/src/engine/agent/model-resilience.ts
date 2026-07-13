@@ -22,7 +22,7 @@ export type { ModelCall, ModelCallArgs, ModelConfig } from './model-call-types.j
 type ModelError = Error & { code?: string; errors?: unknown[] };
 type FallbackError = Error & { attempts?: Array<{ error: unknown }> };
 type ResilienceOptions = {
-  kimiConfig?: unknown;
+  modelConfig?: unknown;
   inProcessModelCallCapability?: TrustedInProcessModelCallCapability;
   timeoutMs?: number;
   onFallback?: (event: { failed: unknown; next: unknown; error: string }) => void;
@@ -43,14 +43,14 @@ function fallbackConfig(primary: unknown, fallback: unknown): ModelConfig {
   return out;
 }
 
-function modelCandidates(kimiConfig: unknown): ModelConfig[] {
-  const primary = objectConfig(kimiConfig);
+function modelCandidates(modelConfig: unknown): ModelConfig[] {
+  const primary = objectConfig(modelConfig);
   const fallbacks = Array.isArray(primary.fallbacks) ? primary.fallbacks : [];
   return [fallbackConfig(primary, primary), ...fallbacks.map((item) => fallbackConfig(primary, item))];
 }
 
-function modelSummary(kimiConfig: unknown): { provider: string; baseUrl: unknown; model: unknown; hasKey: boolean } {
-  const config = objectConfig(kimiConfig);
+function modelSummary(modelConfig: unknown): { provider: string; baseUrl: unknown; model: unknown; hasKey: boolean } {
+  const config = objectConfig(modelConfig);
   return {
     provider: modelProvider(config),
     baseUrl: config.baseUrl,
@@ -91,20 +91,20 @@ function fallbackExhausted(errors: unknown[]): ModelError {
   return agg;
 }
 
-async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiConfig: ModelConfig, timeoutMs: number, inProcess: boolean): Promise<unknown> {
+async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, modelConfig: ModelConfig, timeoutMs: number, inProcess: boolean): Promise<unknown> {
   if (!inProcess) {
     const egress = decideEgressPolicy({
       kind: 'model_inference',
-      provider: kimiConfig.provider,
-      model: kimiConfig.model,
-      baseUrl: kimiConfig.baseUrl,
-      securityMode: kimiConfig.securityMode,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
+      baseUrl: modelConfig.baseUrl,
+      securityMode: modelConfig.securityMode,
       content: callArgs.messages,
       trustedRoot: callArgs.trustedRoot,
     });
     enforceRecordedEgressDecision(callArgs.trustedRoot, egress);
   }
-  return modelBreaker(kimiConfig).run(async () => {
+  return modelBreaker(modelConfig).run(async () => {
     const controller = new AbortController();
     const upstreamSignal = callArgs && callArgs.signal;
     const abortFromUpstream = () => {
@@ -116,7 +116,7 @@ async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiC
     }
     const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs || 60000));
     try {
-      return await modelCall({ ...callArgs, kimiConfig, signal: controller.signal });
+      return await modelCall({ ...callArgs, modelConfig, signal: controller.signal });
     } finally {
       clearTimeout(timer);
       if (upstreamSignal) upstreamSignal.removeEventListener('abort', abortFromUpstream);
@@ -128,13 +128,13 @@ async function callOneModel(modelCall: ModelCall, callArgs: ModelCallArgs, kimiC
 export async function callModelResilient(
   modelCall: ModelCall,
   callArgs: ModelCallArgs,
-  { kimiConfig, inProcessModelCallCapability, timeoutMs = 60000, onFallback }: ResilienceOptions = {},
+  { modelConfig, inProcessModelCallCapability, timeoutMs = 60000, onFallback }: ResilienceOptions = {},
 ): Promise<unknown> {
-  const candidates = modelCandidates(kimiConfig);
+  const candidates = modelCandidates(modelConfig);
   const inProcess = grantsTrustedInProcessModelCall(inProcessModelCallCapability, modelCall);
   const governed = inProcess ? [] : candidates;
   const policy = filterModelCandidatesBySecurityMode(governed, {
-    securityMode: objectConfig(kimiConfig).securityMode,
+    securityMode: objectConfig(modelConfig).securityMode,
   });
   if (!inProcess) {
     for (const denied of policy.denied) {

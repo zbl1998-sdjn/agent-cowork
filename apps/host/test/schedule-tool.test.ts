@@ -35,7 +35,7 @@ test('ScheduleTask is high-risk, mutating, and creates only after an explicit ap
   const tools = buildAgentToolset({
     ctx: { trustedRoot: root, context: { tenantId: 't1', userId: 'u1', traceId: 'tr1' } },
     skillRegistry: ENABLED_RECIPE_REGISTRY,
-    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), scheduler },
+    agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}), scheduler },
   });
   const scheduleTool = tools.find((tool) => tool.name === 'ScheduleTask');
   assert.ok(scheduleTool, 'ScheduleTask exposed when a scheduler is present');
@@ -52,7 +52,7 @@ test('ScheduleTask is high-risk, mutating, and creates only after an explicit ap
   const approvalRequests: Record<string, unknown>[] = [];
   const out = await runAgentChat({
     prompt: '每天早上 6 点总结邮件',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -122,7 +122,7 @@ test('ScheduleTask fails closed when no approval registry is available', async (
     ctx: { trustedRoot: root, context: { tenantId: 't1', userId: 'u1' } },
     skillRegistry: { get: () => ({ enabled: true }) },
     agentDeps: {
-      kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+      modelConfig: TEST_LOCAL_MODEL_CONFIG,
       modelCall: async () => ({}),
       scheduler: {
         create: () => {
@@ -135,7 +135,7 @@ test('ScheduleTask fails closed when no approval registry is available', async (
   let modelCalls = 0;
   const out = await runAgentChat({
     prompt: '创建周期任务',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall: async () => {
@@ -155,7 +155,7 @@ test('ScheduleTask fails closed when no approval registry is available', async (
 test('no ScheduleTask tool when no scheduler is provided', () => {
   const tools = buildAgentToolset({
     ctx: { trustedRoot: '/tmp', context: {} },
-    agentDeps: { kimiConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}) },
+    agentDeps: { modelConfig: TEST_LOCAL_MODEL_CONFIG, modelCall: async () => ({}) },
   });
   assert.ok(!tools.some((t) => t.name === 'ScheduleTask'));
 });

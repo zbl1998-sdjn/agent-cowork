@@ -177,7 +177,7 @@ test('actual agent loop rejects PlanFileOrganization trustedRoot before its hand
 
   const outcome = await runAgentChat({
     prompt: 'organize files',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools: createAgentTools({ trustedRoot: root, context: ALICE }),
     modelCall,

@@ -45,7 +45,7 @@ test('runAgentChat stops safely when model usage exceeds the run token budget be
 
   const out = await runAgentChat({
     prompt: 'write',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

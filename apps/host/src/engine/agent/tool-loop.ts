@@ -55,7 +55,7 @@ function hasToolResult(messages: ChatMessage[]): boolean {
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, kimiConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, inProcessModelCallCapability, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = defaultAgentContext(options), fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
+  const { prompt, modelConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, inProcessModelCallCapability, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = defaultAgentContext(options), fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
   // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, context } as Parameters<typeof createAgentTools>[0]) as AgentTool[]).slice();
@@ -70,7 +70,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
     ? await clarifyPromptBeforeModel({ prompt, userContent, toolMap: toolMap as unknown as Map<string, AskTool> })
     : { prompt, clarified: false };
   // env(含每日日期)从系统前缀移到用户轮:让 system+工具前缀跨天稳定可缓存,日期随易变的用户轮走。
-  const envFacts = resolveAgentEnvFacts({ trustedRoot, kimiConfig });
+  const envFacts = resolveAgentEnvFacts({ trustedRoot, modelConfig });
   const envPreamble = buildEnvBlock(envFacts).join('\n');
   const userMessage = (Array.isArray(userContent) && userContent.length)
     ? { role: 'user', content: [{ type: 'text', text: `${envPreamble}\n\n` }, ...userContent] }
@@ -186,7 +186,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       }
       if (stepNumber >= effectiveBudget && hasToolResult(messages) && !lastToolBatchHadSuccess) {
         emit('tool_budget_finalizing', { stepNumber, stepBudget: effectiveBudget });
-        finalText = (await summarizeBeforeToolBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, inProcessModelCallCapability, kimiConfig, fetchImpl, trustedRoot, emit, usageTotals }))) || '';
+        finalText = (await summarizeBeforeToolBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, inProcessModelCallCapability, modelConfig, fetchImpl, trustedRoot, emit, usageTotals }))) || '';
         if (finalText) saveCheckpoint('tool_budget_finalized', stepNumber, [...messages, { role: 'assistant', content: finalText }]);
         break;
       }
@@ -197,11 +197,11 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       // 调用模型;callModelResilient 负责主模型失败后的有界降级。
       let message;
       try {
-        const modelTimeoutMs = typeof kimiConfig?.timeoutMs === 'number' ? kimiConfig.timeoutMs : undefined;
+        const modelTimeoutMs = typeof modelConfig?.timeoutMs === 'number' ? modelConfig.timeoutMs : undefined;
         message = await callModelResilient(modelCall, {
           messages,
           tools: toolSpecs,
-          kimiConfig,
+          modelConfig,
           fetchImpl,
           trustedRoot,
           signal: runTimeout.signal,
@@ -210,7 +210,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
           // 稳定缓存键:优先会话 id(跨运行复用)、回退 runId;官方建议多轮 agent 传入以提高前缀缓存命中率。
           promptCacheKey: cacheKeyForRun,
         }, omitUndefined({
-          kimiConfig, inProcessModelCallCapability,
+          modelConfig, inProcessModelCallCapability,
           timeoutMs: modelTimeoutMs,
           onFallback: (event: { failed: unknown; next: unknown; error: string }) => emit('model_fallback', event),
         })) as ModelMessage;
@@ -286,7 +286,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
       }
     }
 
-    finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, inProcessModelCallCapability, kimiConfig, fetchImpl, trustedRoot, emit, usageTotals }))) || '';
+    finalText = (await summarizeAfterBudget(omitUndefined({ finalText, signal: runTimeout.signal, messages, modelCall, inProcessModelCallCapability, modelConfig, fetchImpl, trustedRoot, emit, usageTotals }))) || '';
     finalText = applyStaticBackstop(finalText, runTimeout.signal, emit);
     if ((stopForBudget || stopForTimeout || stopForLoopGuard) && finalText) {
       const phase = stopForBudget ? 'budget_stopped' : (stopForTimeout ? 'timeout_stopped' : 'loop_guard_stopped');

@@ -19,7 +19,7 @@ export type RecordAgentRunOptions = {
   runsIndex: RunsIndexLike;
   requestContext: RequestContext;
   runId: string;
-  kimiConfig: ModelConfig;
+  modelConfig: ModelConfig;
   body: unknown;
   trustedRoot: string;
   startedAt: Date;
@@ -54,7 +54,7 @@ const recordOptionsSchema = z.object({
   ),
   requestContext: requestContextSchema,
   runId: z.string().trim().min(1),
-  kimiConfig: modelConfigSchema,
+  modelConfig: modelConfigSchema,
   body: z.unknown(),
   trustedRoot: z.string(),
   startedAt: z.instanceof(Date),
@@ -69,8 +69,8 @@ function parseRecordOptions(options: unknown): RecordAgentRunOptions | null {
   return result.success ? result.data : null;
 }
 
-function modelProvider(kimiConfig: ModelConfig): string {
-  return String(kimiConfig.provider || 'kimi-api').trim().toLowerCase() || 'kimi-api';
+function modelProvider(modelConfig: ModelConfig): string {
+  return String(modelConfig.provider || 'kimi-api').trim().toLowerCase() || 'kimi-api';
 }
 
 function safeDiagnosticValue(value: unknown, fallback: unknown): unknown {
@@ -89,7 +89,7 @@ export function recordAgentRun(options: unknown): void {
     runsIndex,
     requestContext,
     runId,
-    kimiConfig,
+    modelConfig,
     body,
     trustedRoot,
     startedAt,
@@ -104,11 +104,11 @@ export function recordAgentRun(options: unknown): void {
     const record = {
       id: runId,
       type: 'agent-chat',
-      provider: modelProvider(kimiConfig),
-      model: kimiConfig.model,
+      provider: modelProvider(modelConfig),
+      model: modelConfig.model,
       systemPromptVersion: SYSTEM_PROMPT_VERSION,
       promptBuilder: 'agent-system-prompt',
-      configSnapshot: buildAgentConfigSnapshot(body, kimiConfig),
+      configSnapshot: buildAgentConfigSnapshot(body, modelConfig),
       mode: 'agent',
       trustedRoot,
       startedAt: startedAt.toISOString(),

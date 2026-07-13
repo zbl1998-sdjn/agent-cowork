@@ -248,7 +248,7 @@ test('runAgentChat checkpoints messages, usage, approvals and todos after loop p
 
   const out = await runAgentChat({
     prompt: 'echo',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,

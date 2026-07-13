@@ -75,7 +75,7 @@ test('runAgentChat retries retryable tool failures before sending the tool resul
 
   const out = await runAgentChat({
     prompt: 'fetch',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -117,7 +117,7 @@ test('runAgentChat stops repeated identical tool calls through LoopGuard before 
 
   const out = await runAgentChat({
     prompt: 'ping loop',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -157,7 +157,7 @@ test('runAgentChat stops consecutive identical tool failures through LoopGuard b
 
   const out = await runAgentChat({
     prompt: 'read loop',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -209,7 +209,7 @@ test('runAgentChat does not retry permanent tool errors', async () => {
 
   const out = await runAgentChat({
     prompt: 'read',
-    kimiConfig: TEST_LOCAL_MODEL_CONFIG,
+    modelConfig: TEST_LOCAL_MODEL_CONFIG,
     trustedRoot: root,
     tools,
     modelCall,
@@ -231,9 +231,9 @@ test('runAgentChat emits model_fallback when the primary provider fails and fall
   const root = tmp();
   const events: EmittedEvent[] = [];
   const seenProviders: unknown[] = [];
-  const modelCall: ModelCall = async ({ kimiConfig }) => {
-    seenProviders.push(kimiConfig.provider);
-    if (kimiConfig.provider === 'openai') {
+  const modelCall: ModelCall = async ({ modelConfig }) => {
+    seenProviders.push(modelConfig.provider);
+    if (modelConfig.provider === 'openai') {
       throw new Error('primary temporary outage');
     }
     return { content: 'fallback done' };
@@ -241,7 +241,7 @@ test('runAgentChat emits model_fallback when the primary provider fails and fall
 
   const out = await runAgentChat({
     prompt: 'fallback',
-    kimiConfig: {
+    modelConfig: {
       provider: 'openai',
       apiKey: 'sk-primary-secret-DO-NOT-ECHO-123456',
       baseUrl: 'http://127.0.0.1:11440/v1',
