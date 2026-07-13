@@ -14,7 +14,7 @@ type MemoryContext = { enabled?: boolean; bytes?: unknown; notes?: unknown; text
 type MemoryStoreLike = {
   loadMemoryContext(root: string, options: { maxBytes: number; context: RequestContext }): MemoryContext;
 };
-type KimiRunnerResult = {
+type ModelRunnerResult = {
   ok?: unknown;
   text?: unknown;
   provider?: unknown;
@@ -22,16 +22,16 @@ type KimiRunnerResult = {
   usage?: unknown;
   durationMs?: number;
 };
-export type KimiRunner = (options: Record<string, unknown>) => Promise<KimiRunnerResult> | KimiRunnerResult;
+export type ModelRunner = (options: Record<string, unknown>) => Promise<ModelRunnerResult> | ModelRunnerResult;
 type AgentConcurrencyLike = { tryAcquire(tenantId?: string): (() => void) | null };
 type StreamChatRunner = Parameters<typeof streamChat>[0]['streamRunner'];
 
-export type KimiRouteState = HostState & {
+export type AgentEngineRouteState = HostState & {
   memoryStore: MemoryStoreLike;
   kimiApiConfig: KimiApiConfig;
   kimiApiEnabled?: boolean;
-  kimiPlanRunner: KimiRunner;
-  kimiChatRunner: KimiRunner;
+  kimiPlanRunner: ModelRunner;
+  kimiChatRunner: ModelRunner;
   kimiChatStreamRunner: StreamChatRunner;
   recomputeKimiEnabled: () => unknown;
   persistKimiConfig: () => void;
@@ -62,14 +62,14 @@ function fallbackSummaries(value: unknown): Array<{ provider: string; baseUrl: u
     : [];
 }
 
-function modelCatalogOptions(state: KimiRouteState): CatalogOptions {
+function modelCatalogOptions(state: AgentEngineRouteState): CatalogOptions {
   const fetchImpl = state.config.fetchImpl;
   return typeof fetchImpl === 'function'
     ? { fetchImpl: fetchImpl as CatalogFetchImpl }
     : {};
 }
 
-export async function sendKimiInfo(response: HttpResponseLike, state: KimiRouteState): Promise<void> {
+export async function sendAgentEngineInfo(response: HttpResponseLike, state: AgentEngineRouteState): Promise<void> {
   const provider = modelProvider(state.kimiApiConfig);
   state.recomputeKimiEnabled();
   const { activeState, connectionResult, providerStates } = await inspectRouteModelConnection(
@@ -99,7 +99,7 @@ export async function sendKimiInfo(response: HttpResponseLike, state: KimiRouteS
   });
 }
 
-export async function sendModelProviderCatalog(response: HttpResponseLike, state: KimiRouteState): Promise<void> {
+export async function sendModelProviderCatalog(response: HttpResponseLike, state: AgentEngineRouteState): Promise<void> {
   const provider = modelProvider(state.kimiApiConfig);
   sendJson(response, 200, {
     ...await modelsDevProviderCatalogResponse(modelCatalogOptions(state)),

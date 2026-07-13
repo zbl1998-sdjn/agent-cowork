@@ -15,7 +15,7 @@ import {
 import { createOrchestrationCheckpointStore } from '../src/orchestrator/checkpoint-store.js';
 import { handleConversationRoutes } from '../src/routes/conversation-routes.js';
 import { recordAgentRun } from '../src/routes/agent-stream-record.js';
-import type { KimiRouteState } from '../src/routes/agent-engine-route-support.js';
+import type { AgentEngineRouteState } from '../src/routes/agent-engine-route-support.js';
 import { runKimiAndRecord } from '../src/routes/agent-engine-route-records.js';
 import { handleRunRoutes } from '../src/routes/run-routes.js';
 import { handleSystemRoutes } from '../src/routes/system-routes.js';
@@ -277,7 +277,7 @@ test('diagnostic recorders and Kimi routes do not swallow or reclassify at-rest 
     config: {},
     runStoreRoot: path.join(root, 'kimi-runs'),
     indexRun: () => undefined,
-  } as unknown as KimiRouteState;
+  } as unknown as AgentEngineRouteState;
   assert.equal(await captureRejection(() => runKimiAndRecord({
       state,
       type: 'test',

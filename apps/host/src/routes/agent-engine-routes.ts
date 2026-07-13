@@ -8,7 +8,7 @@ import { KIMI_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
 import { hasSessionModelAccess } from './session-model-config.js';
-import { modelProvider, sendKimiInfo, sendModelProviderCatalog, type KimiRouteState } from './agent-engine-route-support.js';
+import { modelProvider, sendAgentEngineInfo, sendModelProviderCatalog, type AgentEngineRouteState } from './agent-engine-route-support.js';
 import { runKimiAndRecord } from './agent-engine-route-records.js';
 import {
   splitFullModelId,
@@ -19,13 +19,13 @@ import {
   syncActiveProviderProfile,
 } from '../engine/provider-profiles.js';
 import {
-  kimiAgentStreamBodySchema,
-  kimiChatStreamBodySchema,
-  kimiConfigBodySchema,
-  kimiPlanChatBodySchema,
-  kimiTestBodySchema,
-  normalizeKimiFallbacks,
-  parseKimiBody,
+  agentEngineStreamBodySchema,
+  agentEngineChatStreamBodySchema,
+  agentEngineConfigBodySchema,
+  agentEnginePlanChatBodySchema,
+  agentEngineTestBodySchema,
+  normalizeModelFallbacks,
+  parseAgentEngineBody,
 } from './agent-engine-route-schemas.js';
 import type { HttpRequestLike, HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import type { HostState } from '../runtime/host-state-types.js';
@@ -60,7 +60,7 @@ export async function handleAgentEngineRoutes({
   state,
   safeTrustedRoot,
 }: KimiRouteOptions): Promise<boolean> {
-  const routeState = state as KimiRouteState;
+  const routeState = state as AgentEngineRouteState;
 
   if (request.method === 'GET' && pathname === '/api/models/providers') {
     await sendModelProviderCatalog(response, routeState);
@@ -73,7 +73,7 @@ export async function handleAgentEngineRoutes({
       && !requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)
     ) return true;
     await withJsonBody(request, response, async (body) => {
-      const input = parseKimiBody(response, kimiConfigBodySchema, body, 'invalid kimi config request');
+      const input = parseAgentEngineBody(response, agentEngineConfigBodySchema, body, 'invalid kimi config request');
       if (!input) return;
       const previousConfig = {
         ...routeState.kimiApiConfig,
@@ -91,7 +91,7 @@ export async function handleAgentEngineRoutes({
       }
       if (input.clearKey === true) routeState.kimiApiConfig.apiKey = '';
       else if (input.apiKey?.trim()) routeState.kimiApiConfig.apiKey = input.apiKey.trim();
-      if (input.fallbacks) routeState.kimiApiConfig.fallbacks = normalizeKimiFallbacks(input.fallbacks);
+      if (input.fallbacks) routeState.kimiApiConfig.fallbacks = normalizeModelFallbacks(input.fallbacks);
       if (input.baseUrl?.trim()) routeState.kimiApiConfig.baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
       if (input.model?.trim()) {
         routeState.kimiApiConfig.model = parsedModel.provider && (!input.provider?.trim() || parsedModel.provider === modelProvider(routeState.kimiApiConfig))
@@ -109,19 +109,19 @@ export async function handleAgentEngineRoutes({
         sendJson(response, 500, { error: 'Failed to persist Kimi config' });
         return;
       }
-      await sendKimiInfo(response, routeState);
+      await sendAgentEngineInfo(response, routeState);
     });
     return true;
   }
 
   if (request.method === 'GET' && pathname === '/api/agent-engine/info') {
-    await sendKimiInfo(response, routeState);
+    await sendAgentEngineInfo(response, routeState);
     return true;
   }
 
   if (request.method === 'POST' && pathname === '/api/agent-engine/test') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseKimiBody(response, kimiTestBodySchema, body, 'invalid kimi test request');
+      const input = parseAgentEngineBody(response, agentEngineTestBodySchema, body, 'invalid kimi test request');
       if (!input) return;
       const fetchImpl = typeof routeState.config.fetchImpl === 'function'
         ? routeState.config.fetchImpl as typeof fetch
@@ -137,7 +137,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && (pathname === '/api/agent-engine/plan' || pathname === '/api/agent-engine/chat')) {
     await withJsonBody(request, response, async (body) => {
-      const input = parseKimiBody(response, kimiPlanChatBodySchema, body, 'invalid kimi request');
+      const input = parseAgentEngineBody(response, agentEnginePlanChatBodySchema, body, 'invalid kimi request');
       if (!input) return;
       if (!routeState.kimiApiEnabled) {
         sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
@@ -161,7 +161,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && pathname === '/api/agent/chat/stream') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseKimiBody(response, kimiAgentStreamBodySchema, body, 'invalid agent stream request');
+      const input = parseAgentEngineBody(response, agentEngineStreamBodySchema, body, 'invalid agent stream request');
       if (!input) return;
       if (!routeState.kimiApiEnabled && !hasSessionModelAccess(input)) {
         sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
@@ -212,7 +212,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && pathname === '/api/agent-engine/chat/stream') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseKimiBody(response, kimiChatStreamBodySchema, body, 'invalid kimi stream request');
+      const input = parseAgentEngineBody(response, agentEngineChatStreamBodySchema, body, 'invalid kimi stream request');
       if (!input) return;
       if (!routeState.kimiApiEnabled) {
         sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });

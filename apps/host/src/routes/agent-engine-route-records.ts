@@ -8,18 +8,18 @@ import { isEgressAuditFailure } from '../security/egress-gateway.js';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike, RequestContext } from '../http/request-utils.js';
 import { modelProvider } from './agent-engine-route-support.js';
-import type { KimiRouteState, KimiRunner } from './agent-engine-route-support.js';
+import type { AgentEngineRouteState, ModelRunner } from './agent-engine-route-support.js';
 
 type RouteError = Error & { statusCode?: number; payload?: Record<string, unknown> };
 
 type RunKimiAndRecordOptions = {
-  state: KimiRouteState;
+  state: AgentEngineRouteState;
   type: string;
   mode: string;
   trustedRoot: string;
   prompt: string;
   summary?: unknown;
-  runner: KimiRunner;
+  runner: ModelRunner;
   response: HttpResponseLike;
   context: RequestContext;
 };

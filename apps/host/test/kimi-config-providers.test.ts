@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {
   modelProvider,
-  sendKimiInfo,
-  type KimiRouteState,
+  sendAgentEngineInfo,
+  type AgentEngineRouteState,
 } from '../src/routes/agent-engine-route-support.js';
 import { runKimiAndRecord } from '../src/routes/agent-engine-route-records.js';
 import { makeTestWorkspace } from './test-fixtures.js';
@@ -40,7 +40,7 @@ class CapturingJsonResponse {
   }
 }
 
-function kimiRouteState(root: string, overrides: Partial<KimiRouteState> = {}): KimiRouteState {
+function kimiRouteState(root: string, overrides: Partial<AgentEngineRouteState> = {}): AgentEngineRouteState {
   const indexed: Array<{ record: Record<string, unknown>; context: Record<string, unknown> }> = [];
   return {
     config: { fetchImpl: async () => new Response('{}') },
@@ -69,7 +69,7 @@ function kimiRouteState(root: string, overrides: Partial<KimiRouteState> = {}): 
     agentConcurrency: { tryAcquire: () => () => undefined },
     indexed,
     ...overrides,
-  } as unknown as KimiRouteState;
+  } as unknown as AgentEngineRouteState;
 }
 
 function runRecordFromPath(runPath: unknown): Record<string, unknown> {
@@ -194,7 +194,7 @@ test('POST /api/agent-engine/config stores fallback providers without echoing fa
   });
 });
 
-test('sendKimiInfo normalizes providers and summarizes fallback keys without echoing secrets', async () => {
+test('sendAgentEngineInfo normalizes providers and summarizes fallback keys without echoing secrets', async () => {
   const root = makeTestWorkspace('kcw-kimi-route-info');
   const response = new CapturingJsonResponse();
   const state = kimiRouteState(root, {
@@ -210,11 +210,11 @@ test('sendKimiInfo normalizes providers and summarizes fallback keys without ech
         'malformed-fallback',
       ],
     },
-  } as Partial<KimiRouteState>);
+  } as Partial<AgentEngineRouteState>);
 
   assert.equal(modelProvider(null), 'kimi-api');
   assert.equal(modelProvider({ provider: ' OpenAI ' }), 'openai');
-  await sendKimiInfo(response, state);
+  await sendAgentEngineInfo(response, state);
 
   assert.equal(response.statusCode, 200);
   assert.ok(!response.body.includes(CONFIG_SECRET), 'info response leaked primary key');
@@ -263,7 +263,7 @@ test('runKimiAndRecord writes success evidence, indexes the run, and returns onl
       userAgent: 'route-test-agent',
       temperature: 0.4,
     },
-  } as Partial<KimiRouteState>);
+  } as Partial<AgentEngineRouteState>);
   const context = {
     traceId: 'trace_kimi_route',
     tenantId: 'tenant_kimi',

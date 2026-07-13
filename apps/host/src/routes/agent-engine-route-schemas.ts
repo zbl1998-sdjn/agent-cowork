@@ -4,8 +4,8 @@
 // 聊天流),并提供统一的请求体解析(校验失败回 400)与 fallbacks 归一化辅助,
 // 让 agent-engine-routes 专注编排、把边界校验留在此处。
 // 依赖:L0 http(request-utils.sendJson),L1 kimi(api-runner-config 的 ModelFallback 类型),zod。
-// 导出:kimiFallbackSchema、kimiConfigBodySchema、kimiPlanChatBodySchema、kimiAgentStreamBodySchema、
-//       kimiChatStreamBodySchema、对应的 Body 类型、parseKimiBody、normalizeKimiFallbacks。
+// 导出:modelFallbackSchema、agentEngineConfigBodySchema、agentEnginePlanChatBodySchema、agentEngineStreamBodySchema、
+//       agentEngineChatStreamBodySchema、对应的 Body 类型、parseAgentEngineBody、normalizeModelFallbacks。
 import { z } from 'zod';
 import { sendJson } from '../http/request-utils.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
@@ -31,7 +31,7 @@ const optionalNumber = (min?: number) => z.preprocess(
 const promptSchema = z.string().refine((value) => value.trim().length > 0, 'body.prompt is required');
 const trustedRootSchema = optionalNonEmptyText(1000);
 
-export const kimiFallbackSchema = z.object({
+export const modelFallbackSchema = z.object({
   provider: optionalText(96),
   apiKey: optionalText(4096),
   baseUrl: optionalText(2048),
@@ -41,16 +41,16 @@ export const kimiFallbackSchema = z.object({
   temperature: optionalNumber(),
 }).loose();
 
-export const kimiConfigBodySchema = objectBody('invalid kimi config request').pipe(z.object({
+export const agentEngineConfigBodySchema = objectBody('invalid kimi config request').pipe(z.object({
   clearKey: z.boolean().optional(),
   apiKey: optionalText(4096),
   provider: optionalText(96),
-  fallbacks: z.array(kimiFallbackSchema, 'fallbacks must be an array').optional(),
+  fallbacks: z.array(modelFallbackSchema, 'fallbacks must be an array').optional(),
   baseUrl: optionalText(2048),
   model: optionalText(200),
 }).loose());
 
-export const kimiTestBodySchema = objectBody('invalid kimi test request').pipe(z.object({
+export const agentEngineTestBodySchema = objectBody('invalid kimi test request').pipe(z.object({
   action: z.literal('models').default('models'),
   apiKey: optionalText(4096),
   provider: optionalText(96),
@@ -58,21 +58,21 @@ export const kimiTestBodySchema = objectBody('invalid kimi test request').pipe(z
   model: optionalText(200),
 }).loose());
 
-export const kimiPlanChatBodySchema = objectBody('invalid kimi request').pipe(z.object({
+export const agentEnginePlanChatBodySchema = objectBody('invalid kimi request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
   mode: optionalText(32),
   trustedRoot: trustedRootSchema,
 }).loose());
 
-export const kimiAgentStreamBodySchema = objectBody('invalid agent stream request').pipe(z.object({
+export const agentEngineStreamBodySchema = objectBody('invalid agent stream request').pipe(z.object({
   prompt: z.string().optional(),
   resumeRunId: optionalNonEmptyText(96),
   trustedRoot: trustedRootSchema,
   templateFiles: z.array(z.string().trim().min(1).max(2000)).max(4).optional(),
 }).loose());
 
-export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request').pipe(z.object({
+export const agentEngineChatStreamBodySchema = objectBody('invalid kimi stream request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
   thinking: z.unknown().optional(),
@@ -80,18 +80,18 @@ export const kimiChatStreamBodySchema = objectBody('invalid kimi stream request'
   trustedRoot: trustedRootSchema,
 }).loose());
 
-export type KimiConfigBody = z.output<typeof kimiConfigBodySchema>;
-export type KimiTestBody = z.output<typeof kimiTestBodySchema>;
-export type KimiPlanChatBody = z.output<typeof kimiPlanChatBodySchema>;
-export type KimiAgentStreamBody = z.output<typeof kimiAgentStreamBodySchema>;
-export type KimiChatStreamBody = z.output<typeof kimiChatStreamBodySchema>;
+export type AgentEngineConfigBody = z.output<typeof agentEngineConfigBodySchema>;
+export type AgentEngineTestBody = z.output<typeof agentEngineTestBodySchema>;
+export type AgentEnginePlanChatBody = z.output<typeof agentEnginePlanChatBodySchema>;
+export type AgentEngineStreamBody = z.output<typeof agentEngineStreamBodySchema>;
+export type AgentEngineChatStreamBody = z.output<typeof agentEngineChatStreamBodySchema>;
 
 function zodMessage(err: z.ZodError, fallback: string): string {
   return err.issues[0]?.message || fallback;
 }
 
 /** 用给定 schema 解析请求体;校验失败时直接回 400 并返回 null。 */
-export function parseKimiBody<T>(
+export function parseAgentEngineBody<T>(
   response: HttpResponseLike,
   schema: z.ZodType<T>,
   body: unknown,
@@ -106,7 +106,7 @@ export function parseKimiBody<T>(
 }
 
 /** 清洗并裁剪 fallback 列表(去空白、夹紧下限),滤掉无任何有效字段的项。 */
-export function normalizeKimiFallbacks(fallbacks: KimiConfigBody['fallbacks']): ModelFallback[] {
+export function normalizeModelFallbacks(fallbacks: AgentEngineConfigBody['fallbacks']): ModelFallback[] {
   return (fallbacks || []).map((fallback) => ({
     ...(fallback.provider ? { provider: fallback.provider.trim().toLowerCase() } : {}),
     ...(fallback.apiKey ? { apiKey: fallback.apiKey.trim() } : {}),
