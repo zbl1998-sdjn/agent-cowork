@@ -64,7 +64,7 @@ export async function handleFooRoutes({ request, response, pathname, requestUrl,
 
 ## 扩展点 3：Agent 工具 (Tools)
 
-Agent 循环在 `kimi/agent-runner.ts`。工具集由 `kimi/agent-tools.ts` 与 `kimi/agent/toolset-builder.ts` 装配，模型通过 `ToolSearch` 懒加载按需注入，避免一次性灌入全部工具。新增工具：实现 `{ name, description, inputSchema, run }`，在工具注册表登记即可，无需改 agent 循环本身。
+Agent 循环在 `engine/agent-runner.ts`。工具集由 `engine/agent-tools.ts` 与 `engine/agent/toolset-builder.ts` 装配，模型通过 `ToolSearch` 懒加载按需注入，避免一次性灌入全部工具。新增工具：实现 `{ name, description, inputSchema, run }`，在工具注册表登记即可，无需改 agent 循环本身。
 
 ## 扩展点 4：鉴权与多租户
 

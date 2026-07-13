@@ -17,7 +17,7 @@
 
 ## 1. 还差什么 (对位 Claude Cowork)
 
-| 能力 | Claude Cowork | Kimi 现状 | 迭代 |
+| 能力 | Claude Cowork | Agent Cowork 现状 | 迭代 |
 |---|---|---|---|
 | 安全工具/代码执行 | Linux sandbox VM (网络白名单, 工作区挂载) | command-runner 默认关闭, 无隔离 | **迭代 A (本轮)** |
 | 工具生态 / MCP | 完整 MCP host + 连接器 | 0 | 迭代 D |
