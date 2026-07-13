@@ -14,7 +14,7 @@ import {
   withKimiConfigServer,
 } from './helpers/kimi-config.js';
 
-test('POST /api/kimi/config stores key without claiming policy-blocked cloud calls are enabled', async () => {
+test('POST /api/agent-engine/config stores key without claiming policy-blocked cloud calls are enabled', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     let info = (await readKimiInfo(baseUrl)).body;
@@ -80,7 +80,7 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
   });
 });
 
-test('POST /api/kimi/config rejects non-object JSON bodies without changing config', async () => {
+test('POST /api/agent-engine/config rejects non-object JSON bodies without changing config', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-invalid-body');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     await postKimiConfig(baseUrl, { apiKey: CONFIG_SECRET, model: 'stable-model' });

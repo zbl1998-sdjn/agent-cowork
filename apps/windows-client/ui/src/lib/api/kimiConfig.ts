@@ -1,7 +1,7 @@
 // Kimi 配置 API(UI · 传输层 · lib/api)
 // ---------------------------------------------------------------------------
 // 职责:读取/保存模型(provider/key/baseUrl/model)配置及其启用与连通状态。
-// 依赖/对应路由:GET /api/kimi/info、POST /api/kimi/config。导出:getKimiInfo / saveKimiConfig + KimiInfo / SaveKimiConfigInput 类型。
+// 依赖/对应路由:GET /api/agent-engine/info、POST /api/agent-engine/config。导出:getKimiInfo / saveKimiConfig + KimiInfo / SaveKimiConfigInput 类型。
 import { getJson, postJson } from './transport';
 
 export interface ModelProviderOption {
@@ -97,7 +97,7 @@ export interface KimiInfo {
 }
 
 export async function getKimiInfo(): Promise<KimiInfo> {
-  return getJson('/api/kimi/info');
+  return getJson('/api/agent-engine/info');
 }
 
 export interface SaveKimiConfigInput {
@@ -109,7 +109,7 @@ export interface SaveKimiConfigInput {
 }
 
 export async function saveKimiConfig(input: SaveKimiConfigInput): Promise<KimiInfo> {
-  return postJson<KimiInfo>('/api/kimi/config', { ...input });
+  return postJson<KimiInfo>('/api/agent-engine/config', { ...input });
 }
 
 export interface TestKimiConfigInput {
@@ -128,5 +128,5 @@ export interface TestKimiConfigResult {
 }
 
 export async function testKimiConfig(input: TestKimiConfigInput): Promise<TestKimiConfigResult> {
-  return postJson<TestKimiConfigResult>('/api/kimi/test', { action: 'models', ...input });
+  return postJson<TestKimiConfigResult>('/api/agent-engine/test', { action: 'models', ...input });
 }

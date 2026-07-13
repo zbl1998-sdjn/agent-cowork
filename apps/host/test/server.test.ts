@@ -85,7 +85,7 @@ test('workspace endpoint returns configured trusted root', async () => {
 test('kimi plan endpoint is disabled unless API key or runner is configured', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({ trustedRoot }, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+    const response = await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ trustedRoot, prompt: '生成计划' }),
@@ -113,7 +113,7 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
       };
     },
   }, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+    const response = await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -163,7 +163,7 @@ test('kimi chat endpoint calls configured Kimi API runner', async () => {
       };
     },
   }, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/kimi/chat`, {
+    const response = await fetch(`${baseUrl}/api/agent-engine/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -255,7 +255,7 @@ test('run endpoints expose persisted Kimi plan records', async () => {
       durationMs: 18,
     }),
   }, async (baseUrl) => {
-    const planResponse = await fetch(`${baseUrl}/api/kimi/plan`, {
+    const planResponse = await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -299,7 +299,7 @@ test('task endpoint maps persisted runs into task cards', async () => {
       durationMs: 11,
     }),
   }, async (baseUrl) => {
-    await fetch(`${baseUrl}/api/kimi/plan`, {
+    await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ trustedRoot, prompt: '生成任务卡片', mode: 'cowork' }),
@@ -573,7 +573,7 @@ test('kimi plan failures persist run record and expose run id', async () => {
       throw new Error('simulated kimi failure');
     },
   }, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/kimi/plan`, {
+    const response = await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

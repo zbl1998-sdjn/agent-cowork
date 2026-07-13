@@ -1,6 +1,6 @@
 // Kimi 路由入参契约与解析(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
-// 职责:用 zod 定义 /api/kimi/* 各请求体的边界校验 schema(配置、计划对话、Agent 流、
+// 职责:用 zod 定义 /api/agent-engine/* 各请求体的边界校验 schema(配置、计划对话、Agent 流、
 // 聊天流),并提供统一的请求体解析(校验失败回 400)与 fallbacks 归一化辅助,
 // 让 kimi-routes 专注编排、把边界校验留在此处。
 // 依赖:L0 http(request-utils.sendJson),L1 kimi(api-runner-config 的 ModelFallback 类型),zod。

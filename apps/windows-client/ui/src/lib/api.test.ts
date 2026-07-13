@@ -779,7 +779,7 @@ describe('SSE streams', () => {
   it('streams chat tokens, reasoning, and done frames from a POST body', async () => {
     const { api, calls } = await importApi((url) => {
       if (url.endsWith('/health')) return jsonResponse({ ok: true });
-      if (url.endsWith('/api/kimi/chat/stream')) {
+      if (url.endsWith('/api/agent-engine/chat/stream')) {
         return sseResponse([
           'event: reasoning',
           'data: {"delta":"想一下"}',
@@ -807,7 +807,7 @@ describe('SSE streams', () => {
       onDone: (full) => { done = full; },
     });
 
-    const request = calls.find((call) => call.url.endsWith('/api/kimi/chat/stream'));
+    const request = calls.find((call) => call.url.endsWith('/api/agent-engine/chat/stream'));
     expect(request?.init?.method).toBe('POST');
     expect(JSON.parse(String(request?.init?.body))).toEqual({
       prompt: '打个招呼',

@@ -103,7 +103,7 @@ export async function withKimiConfigServer(
 }
 
 export function postKimiConfig(baseUrl: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}/api/kimi/config`, {
+  return fetch(`${baseUrl}/api/agent-engine/config`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -111,7 +111,7 @@ export function postKimiConfig(baseUrl: string, body: unknown): Promise<Response
 }
 
 export function postKimiTest(baseUrl: string, body: unknown): Promise<Response> {
-  return fetch(`${baseUrl}/api/kimi/test`, {
+  return fetch(`${baseUrl}/api/agent-engine/test`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -119,7 +119,7 @@ export function postKimiTest(baseUrl: string, body: unknown): Promise<Response> 
 }
 
 export async function readKimiInfo(baseUrl: string): Promise<{ raw: string; body: KimiConfigResponse }> {
-  const raw = await (await fetch(`${baseUrl}/api/kimi/info`)).text();
+  const raw = await (await fetch(`${baseUrl}/api/agent-engine/info`)).text();
   return { raw, body: kimiConfigResponseSchema.parse(JSON.parse(raw) as unknown) };
 }
 

@@ -84,7 +84,7 @@ export function readRunRecord(root: string, runId: string): z.infer<typeof runRe
 }
 
 export async function readKimiInfo(base: string): Promise<z.infer<typeof kimiInfoSchema> & { raw: string }> {
-  const raw = await (await fetch(`${base}/api/kimi/info`)).text();
+  const raw = await (await fetch(`${base}/api/agent-engine/info`)).text();
   const parsed = kimiInfoSchema.parse(JSON.parse(raw) as unknown);
   return { ...parsed, raw };
 }

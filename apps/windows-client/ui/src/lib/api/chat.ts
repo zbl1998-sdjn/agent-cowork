@@ -1,7 +1,7 @@
 // 聊天 API(UI · 传输层 · lib/api)
 // ---------------------------------------------------------------------------
 // 职责:封装普通对话与 Agent 流式对话(SSE),把 token/推理/工具调用/审批/计划/待办/问答/完成等事件分发到 handlers;并提供审批应答、问答应答与运行取消。
-// 依赖/对应路由:POST /api/kimi/chat(/stream)、/api/agent/chat/stream、/api/approvals/:id、/api/approvals/batch、/api/runs/:id/cancel;经 ./sse(streamSse)。导出:chat / chatStream / agentChatStream / respondApproval(s) / answerQuestion / cancelRun + 相关类型。
+// 依赖/对应路由:POST /api/agent-engine/chat(/stream)、/api/agent/chat/stream、/api/approvals/:id、/api/approvals/batch、/api/runs/:id/cancel;经 ./sse(streamSse)。导出:chat / chatStream / agentChatStream / respondApproval(s) / answerQuestion / cancelRun + 相关类型。
 import { authHeaders, postJson, requireHost, resolveUrl } from './transport';
 import { responseErrorMessage, streamSse, type SsePayload } from './sse';
 import { approvalRequestMeta, type ApprovalRequestMeta } from './approval-event';
@@ -16,7 +16,7 @@ export async function chat(
   prompt: string,
   opts: { trustedRoot?: string | undefined; model?: string | undefined; thinking?: string | undefined } = {},
 ): Promise<ChatResult> {
-  return postJson('/api/kimi/chat', {
+  return postJson('/api/agent-engine/chat', {
     prompt,
     trustedRoot: opts.trustedRoot,
     model: opts.model,
@@ -41,7 +41,7 @@ export async function chatStream(
   handlers: ChatStreamHandlers = {},
 ): Promise<void> {
   await requireHost();
-  const response = await fetch(resolveUrl('/api/kimi/chat/stream'), {
+  const response = await fetch(resolveUrl('/api/agent-engine/chat/stream'), {
     method: 'POST',
     headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ prompt, trustedRoot: opts.trustedRoot, model: opts.model, thinking: opts.thinking }),

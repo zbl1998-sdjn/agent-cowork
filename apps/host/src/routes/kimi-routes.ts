@@ -1,6 +1,6 @@
 // Kimi 路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
-// 职责:处理 /api/kimi/* —— Kimi 配置读写、CLI 探测、以及把对话请求接到流式聊天(SSE)。
+// 职责:处理 /api/agent-engine/* —— Kimi 配置读写、CLI 探测、以及把对话请求接到流式聊天(SSE)。
 // 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleKimiRoutes。
 import { streamChat } from '../engine/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
@@ -67,7 +67,7 @@ export async function handleKimiRoutes({
     return true;
   }
 
-  if (request.method === 'POST' && pathname === '/api/kimi/config') {
+  if (request.method === 'POST' && pathname === '/api/agent-engine/config') {
     if (
       !hasLocalModelConfigSelfService(state, requestContext)
       && !requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)
@@ -114,12 +114,12 @@ export async function handleKimiRoutes({
     return true;
   }
 
-  if (request.method === 'GET' && pathname === '/api/kimi/info') {
+  if (request.method === 'GET' && pathname === '/api/agent-engine/info') {
     await sendKimiInfo(response, routeState);
     return true;
   }
 
-  if (request.method === 'POST' && pathname === '/api/kimi/test') {
+  if (request.method === 'POST' && pathname === '/api/agent-engine/test') {
     await withJsonBody(request, response, async (body) => {
       const input = parseKimiBody(response, kimiTestBodySchema, body, 'invalid kimi test request');
       if (!input) return;
@@ -135,7 +135,7 @@ export async function handleKimiRoutes({
     return true;
   }
 
-  if (request.method === 'POST' && (pathname === '/api/kimi/plan' || pathname === '/api/kimi/chat')) {
+  if (request.method === 'POST' && (pathname === '/api/agent-engine/plan' || pathname === '/api/agent-engine/chat')) {
     await withJsonBody(request, response, async (body) => {
       const input = parseKimiBody(response, kimiPlanChatBodySchema, body, 'invalid kimi request');
       if (!input) return;
@@ -143,7 +143,7 @@ export async function handleKimiRoutes({
         sendJson(response, 503, { error: KIMI_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
-      const isPlan = pathname === '/api/kimi/plan';
+      const isPlan = pathname === '/api/agent-engine/plan';
       await runKimiAndRecord({
         state: routeState,
         type: isPlan ? 'kimi-plan' : 'kimi-chat',
@@ -210,7 +210,7 @@ export async function handleKimiRoutes({
     return true;
   }
 
-  if (request.method === 'POST' && pathname === '/api/kimi/chat/stream') {
+  if (request.method === 'POST' && pathname === '/api/agent-engine/chat/stream') {
     await withJsonBody(request, response, async (body) => {
       const input = parseKimiBody(response, kimiChatStreamBodySchema, body, 'invalid kimi stream request');
       if (!input) return;

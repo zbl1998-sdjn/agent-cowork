@@ -61,7 +61,7 @@ test('Kimi plan and prompt-refine routes never fetch when audit persistence fail
     promptRefineModelCall,
   }, async (baseUrl) => {
     blockAuditSink(trustedRoot);
-    const plan = await fetch(`${baseUrl}/api/kimi/plan`, {
+    const plan = await fetch(`${baseUrl}/api/agent-engine/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ prompt: '生成审计计划', trustedRoot }),

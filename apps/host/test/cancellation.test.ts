@@ -176,7 +176,7 @@ test('streaming chat can be cancelled mid-flight via /api/runs/:id/cancel', asyn
   });
   const base = await bind(server);
   try {
-    const res = await fetch(`${base}/api/kimi/chat/stream`, {
+    const res = await fetch(`${base}/api/agent-engine/chat/stream`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'hi' }),
     });
     assert.ok(res.body);

@@ -56,7 +56,7 @@ test('Kimi host config rejects ordinary identities before body parsing or persis
   const root = tempRoot('kcw-global-admin-kimi-');
   await withServer(mutationConfig(root), async (base) => {
     for (const identity of [CROSS_TENANT_USER, SIBLING_USER]) {
-      const response = await fetch(`${base}/api/kimi/config?role=admin`, {
+      const response = await fetch(`${base}/api/agent-engine/config?role=admin`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -67,7 +67,7 @@ test('Kimi host config rejects ordinary identities before body parsing or persis
       assert.equal(response.status, 403, `${identity.tenantId}/${identity.userId} must be denied before invalid JSON is read`);
     }
 
-    const response = await jsonRequest(base, '/api/kimi/config', {
+    const response = await jsonRequest(base, '/api/agent-engine/config', {
       method: 'POST',
       headers: identityHeaders(SIBLING_USER),
       body: { model: 'must-not-persist' },
@@ -242,7 +242,7 @@ test('explicit local model self-service permits bearer users without trusting id
     trustIdentityHeaders: false,
     allowLocalModelConfigSelfService: true,
   }), async (base) => {
-    const response = await jsonRequest(base, '/api/kimi/config', {
+    const response = await jsonRequest(base, '/api/agent-engine/config', {
       method: 'POST',
       headers: { authorization: 'Bearer test-local-model-user-token' },
       body: { provider: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:0.5b' },
@@ -257,7 +257,7 @@ test('explicit local model self-service permits bearer users without trusting id
     trustIdentityHeaders: true,
     allowLocalModelConfigSelfService: true,
   }), async (base) => {
-    const response = await jsonRequest(base, '/api/kimi/config', {
+    const response = await jsonRequest(base, '/api/agent-engine/config', {
       method: 'POST',
       headers: identityHeaders(SIBLING_USER),
       body: { provider: 'ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:0.5b' },

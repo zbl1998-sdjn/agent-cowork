@@ -8,7 +8,7 @@ import {
   withKimiConfigServer,
 } from './helpers/kimi-config.js';
 
-test('POST /api/kimi/test discovers local models without persisting or echoing credentials', async () => {
+test('POST /api/agent-engine/test discovers local models without persisting or echoing credentials', async () => {
   const trustedRoot = makeTestWorkspace('kcw-model-connection');
   const secret = 'test-connection-secret';
   await withKimiConfigServer({
@@ -41,7 +41,7 @@ test('POST /api/kimi/test discovers local models without persisting or echoing c
   });
 });
 
-test('POST /api/kimi/test reports a missing local model as a usable validation result', async () => {
+test('POST /api/agent-engine/test reports a missing local model as a usable validation result', async () => {
   const trustedRoot = makeTestWorkspace('kcw-model-missing');
   await withKimiConfigServer({
     trustedRoot,
@@ -60,7 +60,7 @@ test('POST /api/kimi/test reports a missing local model as a usable validation r
   });
 });
 
-test('POST /api/kimi/test is read-only for ordinary users while config writes stay admin-only', async () => {
+test('POST /api/agent-engine/test is read-only for ordinary users while config writes stay admin-only', async () => {
   const trustedRoot = makeTestWorkspace('kcw-model-ordinary-user-test');
   await withKimiConfigServer({
     trustedRoot,

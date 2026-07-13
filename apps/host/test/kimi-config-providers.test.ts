@@ -79,7 +79,7 @@ function runRecordFromPath(runPath: unknown): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-test('POST /api/kimi/config stores provider without echoing the key', async () => {
+test('POST /api/agent-engine/config stores provider without echoing the key', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-provider');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     const response = await postKimiConfig(baseUrl, {
@@ -145,7 +145,7 @@ test('provider credentials remain isolated and survive provider switching', asyn
   assert.match(String(profiles?.anthropic?.apiKey), /^aesgcm:v1:/);
 });
 
-test('POST /api/kimi/config stores fallback providers without echoing fallback keys', async () => {
+test('POST /api/agent-engine/config stores fallback providers without echoing fallback keys', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-fallbacks');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     const response = await postKimiConfig(baseUrl, {

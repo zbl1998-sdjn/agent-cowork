@@ -69,7 +69,7 @@ async function bind(server: HostServer): Promise<string> {
   return `http://127.0.0.1:${(address as AddressInfo).port}`;
 }
 
-test('POST /api/kimi/chat/stream emits start/token/done SSE frames and records a run', async () => {
+test('POST /api/agent-engine/chat/stream emits start/token/done SSE frames and records a run', async () => {
   const fakeStream: NonNullable<ServerConfig['kimiChatStreamRunner']> = async ({ prompt, onToken } = {}) => {
     assert.match(String(prompt), /你好/);
     if (typeof onToken !== 'function') {
@@ -86,7 +86,7 @@ test('POST /api/kimi/chat/stream emits start/token/done SSE frames and records a
   });
   const base = await bind(server);
   try {
-    const res = await fetch(`${base}/api/kimi/chat/stream`, {
+    const res = await fetch(`${base}/api/agent-engine/chat/stream`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ prompt: '你好', model: 'fake-model' }),
@@ -108,11 +108,11 @@ test('POST /api/kimi/chat/stream emits start/token/done SSE frames and records a
   }
 });
 
-test('POST /api/kimi/chat/stream returns a truthful local-first 503 when no model is configured', async () => {
+test('POST /api/agent-engine/chat/stream returns a truthful local-first 503 when no model is configured', async () => {
   const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
   const base = await bind(server);
   try {
-    const res = await fetch(`${base}/api/kimi/chat/stream`, {
+    const res = await fetch(`${base}/api/agent-engine/chat/stream`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'hi' }),
     });
     assert.equal(res.status, 503);
