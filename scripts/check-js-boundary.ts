@@ -21,6 +21,7 @@ const BOOTSTRAP_SOURCE_BY_SCRIPT = new Map([
 ]);
 const SKIP_DIR_NAMES = new Set([
   '.git',
+  '.claude',
   '.AgentCowork',
   '.KimiCowork',
   'node_modules',

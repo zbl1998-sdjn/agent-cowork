@@ -28,6 +28,7 @@ const CHECKED_TSCONFIGS = [
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const SKIP_DIRS = new Set([
   '.git',
+  '.claude',
   '.AgentCowork',
   '.KimiCowork',
   '.vscode',
