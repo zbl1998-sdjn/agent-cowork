@@ -1,4 +1,4 @@
-// Model provider catalog types(host · L1 domain · kimi/provider)
+// Model provider catalog types(host · L1 domain · engine/provider)
 // ---------------------------------------------------------------------------
 // 共享类型:被 catalog.ts(函数)与 catalog-data.ts(数据)共同引用。
 // 作为无依赖的叶子模块,打破 catalog ↔ catalog-data 的 import 循环。

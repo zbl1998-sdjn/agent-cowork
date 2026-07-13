@@ -4,7 +4,7 @@
 //       office-writers/落盘。模型只被要求输出严格 JSON;解析失败/无来源/模型失败/出站
 //       策略拒绝一律返回 null,由调用方回退模板。
 // 依赖:L1 provider(callProviderChatCompletion);L0 security/egress-gateway(出站闸门——
-//       与 kimi/agent/model-resilience.ts 的对话路径共用同一策略,机密档 air_gap/
+//       与 engine/agent/model-resilience.ts 的对话路径共用同一策略,机密档 air_gap/
 //       local_strict 下必须同样拒绝出网,不能因为走了 recipe 分支就绕过)。
 import { callProviderChatCompletion } from '../engine/provider/index.js';
 import type { ModelConfig, ProviderChatArgs, ProviderChatResult } from '../engine/provider/types.js';

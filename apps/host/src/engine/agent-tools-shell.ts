@@ -1,4 +1,4 @@
-// Agent Shell 工具(host · L1 领域层 · kimi)
+// Agent Shell 工具(host · L1 领域层 · engine)
 // ---------------------------------------------------------------------------
 // 职责:构造 mutating/high-risk 的 Shell 工具——在工作区内执行一条命令并回传
 //       stdout/stderr/退出码;标记 requiresApproval 语义,由 Agent 循环逐条走审批门。

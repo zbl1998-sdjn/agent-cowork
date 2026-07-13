@@ -1,4 +1,4 @@
-// 提供商注册表与解析入口(host · L1 领域层 · kimi/provider)
+// 提供商注册表与解析入口(host · L1 领域层 · engine/provider)
 // ---------------------------------------------------------------------------
 // 职责:维护「provider id → Provider 实例」的内置注册表(BUILTIN_PROVIDERS),
 //       按配置解析出目标 Provider(支持注入自定义实现),并统一发起 chatCompletion。

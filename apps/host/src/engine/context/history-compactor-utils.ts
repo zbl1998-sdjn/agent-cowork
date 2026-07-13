@@ -1,4 +1,4 @@
-// 历史压缩纯工具(host · L1 领域层 · kimi/context)
+// 历史压缩纯工具(host · L1 领域层 · engine/context)
 // ---------------------------------------------------------------------------
 // 职责:HistoryCompactor 使用的消息规范化、文本稳定化与裁剪工具。
 export type ChatMessageLike = { role?: string; content?: unknown; name?: string; tool_call_id?: string; tool_calls?: unknown[] };

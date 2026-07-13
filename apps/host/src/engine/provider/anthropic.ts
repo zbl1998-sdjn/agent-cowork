@@ -1,4 +1,4 @@
-// Anthropic/Claude 提供商适配(host · L1 领域层 · kimi/provider)
+// Anthropic/Claude 提供商适配(host · L1 领域层 · engine/provider)
 // ---------------------------------------------------------------------------
 // 职责:把统一的 OpenAI 风格消息/工具转成 Anthropic Messages API 格式,发起
 //       SSE 流式请求并解析回 { content, tool_calls, usage } 的统一结构。

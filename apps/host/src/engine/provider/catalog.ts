@@ -1,4 +1,4 @@
-// Model provider catalog(host · L1 domain · kimi/provider)
+// Model provider catalog(host · L1 domain · engine/provider)
 // ---------------------------------------------------------------------------
 // OpenCode-inspired routing surface: users select provider_id/model_id.
 // 类型见 catalog-types.ts,数据见 catalog-data.ts;本文件保留查询/解析函数,

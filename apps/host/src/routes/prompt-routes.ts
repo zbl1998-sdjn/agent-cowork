@@ -1,7 +1,7 @@
 // 提示词路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/prompt/* —— 智能输入相关:把用户草稿交给精炼器(refiner)做提示词优化/改写。
-// 依赖:L0 request-utils + L1 kimi/prompt 精炼器(经 state 注入)。导出:handlePromptRoutes。
+// 依赖:L0 request-utils + L1 engine/prompt 精炼器(经 state 注入)。导出:handlePromptRoutes。
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import { createPromptRefiner } from '../engine/prompt/refiner.js';

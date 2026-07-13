@@ -1,4 +1,4 @@
-// Kimi 提供商适配 + OpenAI 兼容流解析(host · L1 领域层 · kimi/provider)
+// Kimi 提供商适配 + OpenAI 兼容流解析(host · L1 领域层 · engine/provider)
 // ---------------------------------------------------------------------------
 // 职责:对 Kimi(OpenAI 兼容)发起流式 chat/completions,并提供被本目录其它
 //       OpenAI 兼容提供商共用的 SSE 解析器(含流中断时部分工具调用的拆分)。

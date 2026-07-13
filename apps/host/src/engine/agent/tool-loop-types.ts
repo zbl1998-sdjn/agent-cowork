@@ -1,4 +1,4 @@
-// Agent 主循环类型(host · L1 领域层 · kimi/agent)
+// Agent 主循环类型(host · L1 领域层 · engine/agent)
 // ---------------------------------------------------------------------------
 // 职责:集中放置 runAgentChat 的输入/输出契约,让 tool-loop.ts 保持编排职责。
 import type { SkillDescriptor } from '../system-prompt.js';

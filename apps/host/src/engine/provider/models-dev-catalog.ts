@@ -1,4 +1,4 @@
-// Models.dev catalog adapter(host · L1 domain · kimi/provider)
+// Models.dev catalog adapter(host · L1 domain · engine/provider)
 // ---------------------------------------------------------------------------
 // OpenCode uses https://models.dev/api.json as the provider/model directory.
 // This adapter keeps our UI catalog refreshed without putting API keys or

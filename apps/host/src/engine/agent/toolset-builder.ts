@@ -1,4 +1,4 @@
-// Agent 工具集构建(host · L1 领域层 · kimi/agent)
+// Agent 工具集构建(host · L1 领域层 · engine/agent)
 // ---------------------------------------------------------------------------
 // 职责:在基础文件/命令工具之上,按需挂载外部连接器(MCP)工具、Skill 运行工具,
 //      以及依赖回调的交互/编排工具(AskUserQuestion、ScheduleTask、Agent 子代理、AgentParallel);

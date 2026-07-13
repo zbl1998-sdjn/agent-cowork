@@ -1,4 +1,4 @@
-// Agent 工具共享类型契约(host · L1 领域层 · kimi)
+// Agent 工具共享类型契约(host · L1 领域层 · engine)
 // ---------------------------------------------------------------------------
 // 职责:集中放置 agent 工具集的输入/输出与沙箱契约(ToolArgs、SandboxLike、
 //       AgentToolsContext、AgentTool 等),只声明类型、不引入任何运行期依赖,

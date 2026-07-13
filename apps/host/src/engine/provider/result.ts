@@ -1,4 +1,4 @@
-// Provider 结果归一化(host · L1 领域层 · kimi/provider)
+// Provider 结果归一化(host · L1 领域层 · engine/provider)
 // ---------------------------------------------------------------------------
 // 职责:把外部 provider 的 unknown JSON 响应收敛成 ProviderChatResult,让 unknown
 //      停在集成边界内,不继续扩散到 agent/tool-loop/orchestrator。

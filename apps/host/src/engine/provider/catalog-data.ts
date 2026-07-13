@@ -1,4 +1,4 @@
-// Model provider catalog data(host · L1 domain · kimi/provider)
+// Model provider catalog data(host · L1 domain · engine/provider)
 // ---------------------------------------------------------------------------
 // 22 个厂商的 provider/model 目录数据。类型定义见 catalog.ts;从其拆出以满足文件大小门禁。
 import type { ProviderCatalogEntry } from './catalog-types.js';

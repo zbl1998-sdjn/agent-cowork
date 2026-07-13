@@ -1,4 +1,4 @@
-// 工具参数的轻量 JSON Schema 校验器(host · L1 领域层 · kimi/agent)
+// 工具参数的轻量 JSON Schema 校验器(host · L1 领域层 · engine/agent)
 // ---------------------------------------------------------------------------
 // 职责:在执行工具前,用工具自带的 parameters schema 校验模型给出的参数,
 //      支持 type/required/properties/items/enum/additionalProperties 子集;
