@@ -12,8 +12,8 @@ use crate::config::{HOST, HOST_URL, PORT};
 use crate::error::{DesktopError, DesktopResult};
 use crate::sidecar_health::{request_authenticated_health, SECRET_BYTES};
 
-const EVENT_HOST_STARTED: &str = "kimi://host-started";
-const EVENT_HOST_STOPPED: &str = "kimi://host-stopped";
+const EVENT_HOST_STARTED: &str = "agent-cowork://host-started";
+const EVENT_HOST_STOPPED: &str = "agent-cowork://host-stopped";
 
 struct ManagedChild {
     child: Child,
