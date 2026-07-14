@@ -142,7 +142,7 @@ export function applyRequestMiddleware({
     response.setHeader('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     response.setHeader(
       'access-control-allow-headers',
-      'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,x-kcw-enrollment-token,last-event-id',
+      'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,x-acw-enrollment-token,x-kcw-enrollment-token,last-event-id',
     );
     response.setHeader('access-control-max-age', '600');
   }

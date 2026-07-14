@@ -63,7 +63,7 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
     await withJsonBody(request, response, async (body) => {
       try {
         const input = credentialsBodySchema.parse(body);
-        if (!enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
+        if (!enrollmentPolicy?.consume(headerValue(request, 'x-acw-enrollment-token') || headerValue(request, 'x-kcw-enrollment-token'))) {
           sendJson(response, 403, { error: 'a valid one-time enrollment capability is required' });
           return;
         }
@@ -81,7 +81,7 @@ export async function handleAuthRoutes({ request, response, pathname, requestCon
   if (request.method === 'POST' && pathname === '/api/auth/guest') {
     // 「跳过登录」仍签发隔离访客身份与 token,避免出现真正未鉴权 API 访问。
     try {
-      if (!allowLocalGuestEnrollment && !enrollmentPolicy?.consume(headerValue(request, 'x-kcw-enrollment-token'))) {
+      if (!allowLocalGuestEnrollment && !enrollmentPolicy?.consume(headerValue(request, 'x-acw-enrollment-token') || headerValue(request, 'x-kcw-enrollment-token'))) {
         sendJson(response, 403, { error: 'a valid one-time enrollment capability is required' });
         return true;
       }

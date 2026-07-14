@@ -11,7 +11,7 @@ export type EnrollmentPolicy = {
 export function createEnrollmentPolicy(token: unknown): EnrollmentPolicy {
   const expected = typeof token === 'string' ? token.trim() : '';
   if (expected && expected.length < 32) {
-    throw new Error('KCW_ENROLLMENT_TOKEN must contain at least 32 characters');
+    throw new Error('ACW_ENROLLMENT_TOKEN must contain at least 32 characters');
   }
   let consumed = false;
 

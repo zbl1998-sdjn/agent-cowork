@@ -5,9 +5,10 @@ import { createHmac } from 'node:crypto';
 import { headerValue, sendJson, type HttpRequestLike, type HttpResponseLike } from '../http/request-utils.js';
 import { SECURITY_HEADERS } from '../http/middleware/common.js';
 
-const SECRET_ENV = 'KCW_SIDECAR_SECRET';
-const CHALLENGE_HEADER = 'x-kcw-sidecar-challenge';
-const PROOF_HEADER = 'x-kcw-sidecar-proof';
+const SECRET_ENV = 'ACW_SIDECAR_SECRET';
+const SECRET_ENV_LEGACY = 'KCW_SIDECAR_SECRET';
+const CHALLENGE_HEADER = 'x-acw-sidecar-challenge';
+const PROOF_HEADER = 'x-acw-sidecar-proof';
 const PROOF_CONTEXT = 'agent-cowork-sidecar-health-v1:';
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -18,7 +19,7 @@ export function handleHealthRoute(request: HttpRequestLike, response: HttpRespon
     sendJson(response, 400, { error: 'invalid sidecar identity challenge' });
     return true;
   }
-  const secretHex = String(process.env[SECRET_ENV] || '').trim();
+  const secretHex = String(process.env[SECRET_ENV] || process.env[SECRET_ENV_LEGACY] || '').trim();
   if (!SHA256_HEX_PATTERN.test(secretHex)) {
     response.writeHead(404, SECURITY_HEADERS);
     response.end();

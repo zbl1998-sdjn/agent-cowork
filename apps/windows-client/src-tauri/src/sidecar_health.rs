@@ -9,8 +9,8 @@ use ring::hmac;
 
 use crate::config::{HOST, PORT};
 
-const SIDECAR_CHALLENGE_HEADER: &str = "x-kcw-sidecar-challenge";
-const SIDECAR_PROOF_HEADER: &str = "x-kcw-sidecar-proof";
+const SIDECAR_CHALLENGE_HEADER: &str = "x-acw-sidecar-challenge";
+const SIDECAR_PROOF_HEADER: &str = "x-acw-sidecar-proof";
 const SIDECAR_PROOF_CONTEXT: &str = "agent-cowork-sidecar-health-v1:";
 pub(crate) const SECRET_BYTES: usize = 32;
 const MAX_HEALTH_RESPONSE_BYTES: u64 = 16 * 1024;

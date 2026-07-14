@@ -200,7 +200,7 @@ test('resolveSandboxStartup keeps probe failures and explicit backend isolation 
     }),
   });
   assert.equal(missingImage.options.backend, 'local');
-  assert.match(missingImage.info.fallbackReason || '', /KCW_SANDBOX_DOCKER_IMAGE is not configured/);
+  assert.match(missingImage.info.fallbackReason || '', /ACW_SANDBOX_DOCKER_IMAGE is not configured/);
 
   const envImage = resolveSandboxStartup({
     requestedBackend: 'auto',

@@ -70,7 +70,7 @@ export type FetchGitHubViewerOptions = {
 function requireClientId(clientId: unknown): string {
   const value = String(clientId || '').trim();
   if (!value) {
-    const err = new Error('GitHub OAuth client id is required. Set KCW_GITHUB_OAUTH_CLIENT_ID or pass clientId.') as OAuthError;
+    const err = new Error('GitHub OAuth client id is required. Set ACW_GITHUB_OAUTH_CLIENT_ID or pass clientId.') as OAuthError;
     err.statusCode = 400;
     throw err;
   }

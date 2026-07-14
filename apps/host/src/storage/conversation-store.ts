@@ -237,9 +237,9 @@ export class FileConversationStore {
   }
 }
 
-/** 工厂:返回文件后端对话存储(PG 后端由 server 在 KCW_STORE=postgres 时另选)。 */
+/** 工厂:返回文件后端对话存储(PG 后端由 server 在 ACW_STORE=postgres 时另选)。 */
 export function createConversationStore({ backend = 'file', now }: ConversationStoreOptions = {}): FileConversationStore {
-  // Postgres 适配器保持同接口,由 server 在 KCW_STORE=postgres 时选择。
+  // Postgres 适配器保持同接口,由 server 在 ACW_STORE=postgres 时选择。
   void backend;
   return new FileConversationStore(omitUndefined({ now }));
 }

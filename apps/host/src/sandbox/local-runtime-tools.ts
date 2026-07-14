@@ -43,15 +43,15 @@ function fromHome(homePath: unknown, exeName: string): LocalRuntimeTool | null {
 }
 
 function resolvePython(_toolName: string, runtimeEnv: RuntimeEnv): LocalRuntimeTool | null {
-  return fromExecutable(runtimeEnv.KCW_EMBEDDED_PYTHON)
-    || fromHome(runtimeEnv.KCW_PYTHON_HOME, process.platform === 'win32' ? 'python.exe' : 'python');
+  return fromExecutable(runtimeEnv.ACW_EMBEDDED_PYTHON || runtimeEnv.KCW_EMBEDDED_PYTHON)
+    || fromHome(runtimeEnv.ACW_PYTHON_HOME || runtimeEnv.KCW_PYTHON_HOME, process.platform === 'win32' ? 'python.exe' : 'python');
 }
 
 function resolveNode(runtimeEnv: RuntimeEnv, nodeExecPath: unknown): LocalRuntimeTool | null {
   const exeName = process.platform === 'win32' ? 'node.exe' : 'node';
   const execPath = typeof nodeExecPath === 'string' ? nodeExecPath : '';
-  return fromExecutable(runtimeEnv.KCW_NODE_EXE)
-    || fromHome(runtimeEnv.KCW_NODE_HOME, exeName)
+  return fromExecutable(runtimeEnv.ACW_NODE_EXE || runtimeEnv.KCW_NODE_EXE)
+    || fromHome(runtimeEnv.ACW_NODE_HOME || runtimeEnv.KCW_NODE_HOME, exeName)
     || fromExecutable(/(^|[/\\])node(\.exe)?$/i.test(execPath) ? execPath : '');
 }
 

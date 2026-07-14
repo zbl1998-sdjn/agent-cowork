@@ -4,7 +4,7 @@
 //       并对外只暴露脱敏摘要(summary)。绝不把明文写日志或入库(plan/01 D.12)。
 // 加密器(Protector,可注入):
 //   · Windows → DPAPI(CurrentUser 作用域,密钥随用户/机器绑定);
-//   · 其他平台 → AES-256-GCM(必须显式传入密钥或设置 KCW_CREDENTIAL_KEY)。
+//   · 其他平台 → AES-256-GCM(必须显式传入密钥或设置 ACW_CREDENTIAL_KEY,兼容旧名 KCW_CREDENTIAL_KEY)。
 // 文件权限:0o600(仅属主可读写)。键 = tenant/user/provider/account 四元组。
 // 导出:createAesGcmProtector / createDpapiProtector / createDefaultCredentialProtector
 //       / createCredentialStore / isSealedCredential。

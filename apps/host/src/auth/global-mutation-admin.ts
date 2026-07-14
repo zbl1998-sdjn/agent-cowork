@@ -10,7 +10,8 @@ import {
   requireIdentityScopeFrom,
 } from '../security/identity-scope.js';
 
-export const GLOBAL_MUTATION_ADMINS_ENV = 'KCW_GLOBAL_MUTATION_ADMINS';
+export const GLOBAL_MUTATION_ADMINS_ENV = 'ACW_GLOBAL_MUTATION_ADMINS';
+export const GLOBAL_MUTATION_ADMINS_ENV_LEGACY = 'KCW_GLOBAL_MUTATION_ADMINS';
 
 export type GlobalMutationAdminIdentity = Readonly<{
   tenantId: string;
@@ -99,7 +100,8 @@ export function resolveGlobalMutationAdmins(
   env: RuntimeEnv = process.env,
 ): readonly GlobalMutationAdminIdentity[] {
   if (configured !== undefined) return parseAllowlist(configured, 'HostConfig.globalMutationAdmins');
-  const raw = env[GLOBAL_MUTATION_ADMINS_ENV];
+  const hasNewEnv = Object.prototype.hasOwnProperty.call(env, GLOBAL_MUTATION_ADMINS_ENV);
+  const raw = hasNewEnv ? env[GLOBAL_MUTATION_ADMINS_ENV] : env[GLOBAL_MUTATION_ADMINS_ENV_LEGACY];
   if (raw === undefined) return DEFAULT_GLOBAL_MUTATION_ADMINS;
   let parsed: unknown;
   try {

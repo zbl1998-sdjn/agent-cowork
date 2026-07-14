@@ -135,3 +135,28 @@ test('auth routes: register -> login -> me, and token sets request identity', as
     await closeTestServer(server);
   }
 });
+
+test('auth routes: register accepts the new x-acw-enrollment-token header name', async () => {
+  const enrollmentToken = 'sample-enrollment-capability-000000000003';
+  const server = createServer({ trustedRoot: tmp(), enableScheduler: false, enrollmentToken });
+  const base = await bind(server);
+  try {
+    const rejectedLegacyHeaderName = await requestJson(base, '/api/auth/register', {
+      method: 'POST',
+      headers: { 'x-kcw-enrollment-token': 'wrong-token' },
+      body: { username: 'bob', password: 'hunter2x' },
+    });
+    assert.equal(rejectedLegacyHeaderName.status, 403, 'wrong token via the legacy header name must still be rejected');
+
+    const reg = await requestJson(base, '/api/auth/register', {
+      method: 'POST',
+      headers: { 'x-acw-enrollment-token': enrollmentToken },
+      body: { username: 'bob', password: 'hunter2x' },
+    });
+    assert.equal(reg.status, 200);
+    const regBody = requireJsonRecord(reg.body, 'register response');
+    assert.ok(typeof regBody.token === 'string' && typeof regBody.userId === 'string');
+  } finally {
+    await closeTestServer(server);
+  }
+});

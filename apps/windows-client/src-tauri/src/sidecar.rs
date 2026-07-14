@@ -17,10 +17,11 @@ use crate::error::{DesktopError, DesktopResult};
 use crate::sidecar_health::{encode_hex, SECRET_BYTES};
 use crate::sidecar_monitor::{emit_host_stopped, monitor_generation, SidecarState};
 
-// TODO(env-rename batch): KCW_SIDECAR_SECRET is a live Tauri<->host handshake secret
-// (see apps/host/src/routes/sidecar-health-proof.ts SECRET_ENV) — rename together with
-// the host side in the same commit, not here in isolation.
-const SIDECAR_SECRET_ENV: &str = "KCW_SIDECAR_SECRET";
+// Live Tauri<->host handshake secret (see apps/host/src/routes/sidecar-health-proof.ts
+// SECRET_ENV). Set under both names: host now reads ACW_SIDECAR_SECRET first, falling
+// back to the legacy KCW_SIDECAR_SECRET name.
+const SIDECAR_SECRET_ENV: &str = "ACW_SIDECAR_SECRET";
+const SIDECAR_SECRET_ENV_LEGACY: &str = "KCW_SIDECAR_SECRET";
 
 /// 打包 host 二进制文件名,运行时从桌面 exe 同目录解析。
 #[cfg(windows)]
@@ -132,10 +133,10 @@ impl HostSidecar {
             .env("TRUSTED_ROOT", trusted_root)
             .env("ACW_TAURI", "1")
             .env(SIDECAR_SECRET_ENV, &secret_hex)
+            .env(SIDECAR_SECRET_ENV_LEGACY, &secret_hex)
             // host 侧 parent-watchdog 依赖此变量:外壳进程消失(强杀/崩溃/关窗未及
-            // kill)时 host 自行优雅退出,杜绝孤儿 sidecar 常驻占 3017。
-            // 同时设置新旧变量名:host(apps/host/src/main.ts)目前仍读取
-            // KCW_PARENT_PID,待其完成 ACW_* 改名前两者都设置以保持握手不断。
+            // kill)时 host 自行优雅退出,杜绝孤儿 sidecar 常驻占 3017。同时设置新旧
+            // 变量名以兼容任何仍固定读 KCW_PARENT_PID 的旧版 host 二进制。
             .env("ACW_PARENT_PID", std::process::id().to_string())
             .env("KCW_PARENT_PID", std::process::id().to_string());
         configure_embedded_python_env(&mut command, app);

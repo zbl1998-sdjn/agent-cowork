@@ -93,7 +93,7 @@ function fallbackReason(backends: StartupBackends): string {
       : `Docker is available, but image "${docker.image}" is not present locally.`;
   }
   if (docker.available && !docker.image) {
-    return 'Docker is available, but KCW_SANDBOX_DOCKER_IMAGE is not configured.';
+    return 'Docker is available, but ACW_SANDBOX_DOCKER_IMAGE is not configured.';
   }
   if (backends.wsl.available) {
     return 'WSL is available, but this host cannot guarantee WSL network isolation.';
