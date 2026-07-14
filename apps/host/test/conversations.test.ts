@@ -11,6 +11,7 @@ import { bind, close, recordArray, recordValue, stringField } from './helpers/ho
 import { makeTestWorkspace } from './test-fixtures.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
 import type { ServerConfig, HostServer } from '../src/server.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type JsonRecord = Record<string, unknown>;
 type CapturedResponse = HttpResponseLike & { status: number; body: string; json(): JsonRecord };
@@ -420,7 +421,7 @@ test('FileConversationStore delete failure cannot revive a legacy local copy', (
 
   const originalUnlinkSync = fs.unlinkSync;
   fs.unlinkSync = ((filePath: string) => {
-    if (path.resolve(String(filePath)) === path.resolve(legacyFile)) throw new Error('legacy file is locked');
+    if (samePathReal(String(filePath), legacyFile)) throw new Error('legacy file is locked');
     return originalUnlinkSync(filePath);
   }) as typeof fs.unlinkSync;
   try {

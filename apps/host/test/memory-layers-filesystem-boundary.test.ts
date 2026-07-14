@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { loadLayeredMemory } from '../src/memory/memory-layers.js';
 import { AtRestKeyError } from '../src/security/at-rest.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -92,7 +93,7 @@ test('managed layer descriptor read rejects a regular file replacement after ope
   let injected = false;
   fs.openSync = ((target: unknown, ...args: unknown[]) => {
     const descriptor = Reflect.apply(originalOpen, fs, [target, ...args]) as number;
-    if (!injected && path.resolve(String(target)) === path.resolve(file)) {
+    if (!injected && samePathReal(String(target), file)) {
       injected = true;
       fs.renameSync(file, displaced);
       fs.writeFileSync(file, 'project-replacement', 'utf8');
@@ -201,7 +202,7 @@ test('explicit enterprisePath retains its legacy optional-source error handling'
   fs.writeFileSync(enterprisePath, 'enterprise-external', 'utf8');
   const originalRead = fs.readFileSync;
   fs.readFileSync = ((target: unknown, ...args: unknown[]) => {
-    if (path.resolve(String(target)) === path.resolve(enterprisePath)) {
+    if (samePathReal(String(target), enterprisePath)) {
       throw Object.assign(new Error('external enterprise source unavailable'), { code: 'EACCES' });
     }
     return Reflect.apply(originalRead, fs, [target, ...args]) as unknown;

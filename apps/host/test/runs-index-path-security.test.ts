@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { RunsIndex } from '../src/runtime/runs-index.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -70,7 +71,7 @@ test('RunsIndex keeps one boundary from owner claim through JSONL append', () =>
   let swapped = false;
   fs.lstatSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalLstatSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(claimPath) && result.isFile()) {
+    if (!swapped && samePathReal(String(args[0]), claimPath) && result.isFile()) {
       fs.renameSync(root, displaced);
       fs.mkdirSync(root);
       swapped = true;

@@ -9,6 +9,7 @@ import {
   readRunRecord,
   writeRunRecord,
 } from '../src/runtime/run-store.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -60,7 +61,7 @@ test('one run write guard rejects a regular .owners directory replaced during mk
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(owners)) {
+    if (!swapped && samePathReal(String(args[0]), owners)) {
       fs.renameSync(owners, displaced);
       originalMkdirSync(owners);
       swapped = true;
@@ -110,7 +111,7 @@ test('run listing revalidates the root after enumeration', () => {
   let swapped = false;
   fs.readdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalReaddirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(runs)) {
+    if (!swapped && samePathReal(String(args[0]), runs)) {
       fs.renameSync(runs, displaced);
       fs.mkdirSync(runs);
       fs.writeFileSync(path.join(runs, 'attacker.json'), 'preserve', 'utf8');

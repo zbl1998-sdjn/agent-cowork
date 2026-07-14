@@ -8,6 +8,7 @@ import { streamAgentChat } from '../src/routes/agent-stream.js';
 import { getCheckpointPath, RunCheckpointer } from '../src/runtime/run-checkpoint.js';
 import { createRunId, getRunPath, readRunRecord, writeRunRecord } from '../src/runtime/run-store.js';
 import { TEST_LOCAL_MODEL_CONFIG } from './helpers/kimi-config.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type Owner = { tenantId: string; userId: string };
 
@@ -231,7 +232,7 @@ test('atomic owner claims reject interleaved first writes for run records and ch
   let insertedRunWrite = false;
 
   fs.lstatSync = ((candidate: unknown, ...args: unknown[]) => {
-    if (!insertedRunWrite && path.resolve(String(candidate)) === path.resolve(runPath)) {
+    if (!insertedRunWrite && samePathReal(String(candidate), runPath)) {
       insertedRunWrite = true;
       writeRunRecord(runRoot, {
         id: runId,
@@ -268,7 +269,7 @@ test('atomic owner claims reject interleaved first writes for run records and ch
   let insertedCheckpointWrite = false;
 
   fs.lstatSync = ((candidate: unknown, ...args: unknown[]) => {
-    if (!insertedCheckpointWrite && path.resolve(String(candidate)) === path.resolve(checkpointPath)) {
+    if (!insertedCheckpointWrite && samePathReal(String(candidate), checkpointPath)) {
       insertedCheckpointWrite = true;
       checkpointer.save({ runId: checkpointId, owner: OWNER_B, phase: 'owner_b_claimed_first' });
       throw staleMissingPathError(candidate);
@@ -297,7 +298,7 @@ test('a partial first run-owner claim write leaves no final claim and can be ret
   fs.writeFileSync = ((...args: unknown[]) => {
     const [destination] = args;
     if (!injected && (typeof destination === 'number'
-      || path.resolve(String(destination)) === path.resolve(claimPath))) {
+      || samePathReal(String(destination), claimPath))) {
       injected = true;
       if (typeof destination === 'number') {
         const writeDescriptor = originalWriteFileSync as unknown as (

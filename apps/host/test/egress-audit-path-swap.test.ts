@@ -9,6 +9,7 @@ import {
   writeEgressAuditRecord,
   type EgressAuditRecord,
 } from '../src/security/egress-audit.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -36,7 +37,7 @@ test('egress audit append fails before writing when its directory is swapped aft
   const originalOpen = fs.openSync;
   let swapped = false;
   fs.openSync = ((target: string, flags: string | number, mode?: number) => {
-    if (!swapped && path.resolve(String(target)) === path.resolve(auditFile)) {
+    if (!swapped && samePathReal(String(target), auditFile)) {
       fs.renameSync(securityDir, displaced);
       try { symlinkSync(outside, securityDir, 'junction'); } catch (error) {
         fs.renameSync(displaced, securityDir);
@@ -98,7 +99,7 @@ test('egress audit read rejects an ordinary replacement directory during descrip
   let attempted = false;
   let swapped = false;
   fs.readFileSync = ((target: fs.PathOrFileDescriptor, options?: unknown) => {
-    if (!swapped && (typeof target === 'number' || path.resolve(String(target)) === path.resolve(auditFile))) {
+    if (!swapped && (typeof target === 'number' || samePathReal(String(target), auditFile))) {
       attempted = true;
       fs.renameSync(securityDir, displaced);
       fs.renameSync(replacement, securityDir);
@@ -126,7 +127,7 @@ test('egress audit read rejects an ordinary file identity replacement during des
   const originalRead = fs.readFileSync;
   let swapped = false;
   fs.readFileSync = ((target: fs.PathOrFileDescriptor, options?: unknown) => {
-    if (!swapped && (typeof target === 'number' || path.resolve(String(target)) === path.resolve(auditFile))) {
+    if (!swapped && (typeof target === 'number' || samePathReal(String(target), auditFile))) {
       fs.renameSync(auditFile, displaced);
       fs.renameSync(replacement, auditFile);
       swapped = true;

@@ -22,6 +22,7 @@ import { handleSystemRoutes } from '../src/routes/system-routes.js';
 import { listRunRecords, writeRunRecord } from '../src/runtime/run-store.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
 import type { HttpRequestLike, HttpResponseLike } from '../src/http/request-utils.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type RequestListener = (...args: unknown[]) => void;
 type SupportedRequestListener = RequestListener
@@ -96,7 +97,7 @@ function patchRead(
       const opened = fs.fstatSync(filePath);
       matches = target.dev === opened.dev && target.ino === opened.ino;
     } else if (isPathLike(filePath)) {
-      matches = path.resolve(String(filePath)) === path.resolve(targetPath);
+      matches = samePathReal(String(filePath), targetPath);
     }
     if (matches) throw error;
     return Reflect.apply(original, fs, [filePath, ...args]);

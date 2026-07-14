@@ -7,6 +7,7 @@ import test from 'node:test';
 import { createOrchestrationCheckpointStore } from '../src/orchestrator/checkpoint-store.js';
 import type { OrchestrationCheckpoint } from '../src/orchestrator/types.js';
 import { RunCheckpointer } from '../src/runtime/run-checkpoint.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -93,7 +94,7 @@ test('RunCheckpointer rejects a regular checkpoints directory replaced during sa
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(path.join(checkpoints, '.owners'))) {
+    if (!swapped && samePathReal(String(args[0]), path.join(checkpoints, '.owners'))) {
       fs.renameSync(checkpoints, displaced);
       originalMkdirSync(checkpoints);
       swapped = true;

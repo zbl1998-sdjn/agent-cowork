@@ -12,6 +12,7 @@ import {
 import { readMemorySettings, writeMemorySettings } from '../src/memory/memory-settings.js';
 import { memoryOwnerDir, memoryOwnerMainPath } from '../src/memory/memory-owner.js';
 import { AtRestKeyError } from '../src/security/at-rest.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const alice = { tenantId: 'tenant_memory_path', userId: 'alice' };
 
@@ -43,7 +44,7 @@ function injectDirectorySwapAfterFileClose(
     armed = true;
   }) as typeof fs.closeSync;
   fs.lstatSync = ((target: unknown, ...args: unknown[]) => {
-    if (armed && path.resolve(String(target)) === path.resolve(directory)) {
+    if (armed && samePathReal(String(target), directory)) {
       armed = false;
       injected = true;
       fs.renameSync(directory, displaced);
@@ -70,7 +71,7 @@ test('descriptor reads reject a regular memory file replacement', () => {
     let injected = false;
     fs.openSync = ((target: unknown, ...args: unknown[]) => {
       const descriptor = Reflect.apply(originalOpen, fs, [target, ...args]) as number;
-      if (!injected && path.resolve(String(target)) === path.resolve(file)) {
+      if (!injected && samePathReal(String(target), file)) {
         injected = true;
         fs.renameSync(file, displaced);
         fs.writeFileSync(file, '# replacement\nmalicious', 'utf8');
@@ -122,7 +123,7 @@ test('atomic note writes reject an owner replacement after mkdir and before open
     let injected = false;
     fs.mkdirSync = ((target: unknown, ...args: unknown[]) => {
       const result = Reflect.apply(originalMkdir, fs, [target, ...args]) as unknown;
-      if (!injected && path.resolve(String(target)) === path.resolve(notesDirectory)) {
+      if (!injected && samePathReal(String(target), notesDirectory)) {
         injected = true;
         fs.renameSync(ownerDirectory, displaced);
         originalMkdir(ownerDirectory);

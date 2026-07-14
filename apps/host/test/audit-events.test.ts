@@ -9,6 +9,7 @@ import {
   verifyAuditHashChain,
 } from '../src/runtime/audit-events.js';
 import { createAuditChainRecord } from '../src/storage/audit-events.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -57,7 +58,7 @@ function withTransientPathReplacement<T>({
     }
   };
   fs.openSync = ((...args: unknown[]) => {
-    if (!wasSwapped && !inReplacement && path.resolve(String(args[0])) === path.resolve(targetPath)) {
+    if (!wasSwapped && !inReplacement && samePathReal(String(args[0]), targetPath)) {
       return whileReplaced(() => Reflect.apply(originalOpen, fs, args));
     }
     return Reflect.apply(originalOpen, fs, args);
@@ -66,7 +67,7 @@ function withTransientPathReplacement<T>({
     if (!wasSwapped
       && !inReplacement
       && typeof args[0] !== 'number'
-      && path.resolve(String(args[0])) === path.resolve(targetPath)) {
+      && samePathReal(String(args[0]), targetPath)) {
       return whileReplaced(() => Reflect.apply(originalRead, fs, args));
     }
     return Reflect.apply(originalRead, fs, args);
@@ -98,14 +99,14 @@ function withTransientParentReplacement<T>({
   let writerBoundaryCreated = false;
   let wasSwapped = false;
   fs.lstatSync = ((...args: unknown[]) => {
-    const candidate = path.resolve(String(args[0]));
-    if (candidate === path.resolve(parentPath) && !writerBoundaryCreated) {
+    const candidate = String(args[0]);
+    if (samePathReal(candidate, parentPath) && !writerBoundaryCreated) {
       writerBoundaryCreated = true;
       return Reflect.apply(originalLstat, fs, args);
     }
     if (!wasSwapped
       && writerBoundaryCreated
-      && (candidate === path.resolve(parentPath) || candidate === path.resolve(targetPath))) {
+      && (samePathReal(candidate, parentPath) || samePathReal(candidate, targetPath))) {
       replace();
       try {
         wasSwapped = true;

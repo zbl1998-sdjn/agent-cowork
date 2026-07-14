@@ -12,6 +12,7 @@ import {
   ensureArtifactOwnerClaim,
 } from '../src/artifacts/artifact-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: string) => void;
 
@@ -89,7 +90,7 @@ test('catalog rename rejects replacement of an established ordinary claim direct
 
   fs.mkdirSync = ((candidate: string, options?: { recursive?: boolean }) => {
     const result = originalMkdir(candidate, options);
-    if (!swapped && path.resolve(String(candidate)) === path.resolve(ownerDirectory)) {
+    if (!swapped && samePathReal(String(candidate), ownerDirectory)) {
       swapped = true;
       fs.renameSync(ownerDirectory, parked);
       originalMkdir(ownerDirectory);

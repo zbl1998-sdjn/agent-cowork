@@ -11,6 +11,7 @@ import {
   resolveAtRestProtector,
 } from '../src/security/at-rest.js';
 import { createAesGcmProtector } from '../src/security/credential-store.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const credentialProtector = createAesGcmProtector({ keyMaterial: 'test-keybox-security-kek' });
 
@@ -86,7 +87,7 @@ test('an unreadable keybox preserves the filesystem error as the typed cause', (
   const accessError = Object.assign(new Error('injected keybox access denial'), { code: 'EACCES' });
   const originalReadFileSync = fs.readFileSync;
   fs.readFileSync = ((filePath: unknown, ...args: unknown[]) => {
-    if (typeof filePath !== 'number' && path.resolve(String(filePath)) === path.resolve(keyFile)) {
+    if (typeof filePath !== 'number' && samePathReal(String(filePath), keyFile)) {
       throw accessError;
     }
     return Reflect.apply(originalReadFileSync, fs, [filePath, ...args]);
@@ -175,7 +176,7 @@ test('keybox creation revalidates the directory after mkdir before publishing', 
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(securityDir)) {
+    if (!swapped && samePathReal(String(args[0]), securityDir)) {
       fs.renameSync(securityDir, displaced);
       try {
         linkDirectory(outside, securityDir);

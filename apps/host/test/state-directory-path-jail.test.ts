@@ -123,10 +123,22 @@ test('owner claim revalidates after mkdir before publishing into a swapped paren
   const claimPath = path.join(claimRoot, 'swapped.json');
   fs.mkdirSync(claimRoot, { recursive: true });
   const originalMkdirSync = fs.mkdirSync;
+  const realClaimRoot = fs.realpathSync.native ? fs.realpathSync.native(claimRoot) : fs.realpathSync(claimRoot);
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(claimRoot)) {
+    // args[0] 可能是 Windows 8.3 短名或长名(视调用链上是否先过 canonicalizePath 而定)——
+    // 与 claimRoot 字面串比较会漏判,统一走 realpath 再比对同一目录的两种别名。
+    let sameAsClaimRoot = false;
+    try {
+      const candidateReal = fs.realpathSync.native
+        ? fs.realpathSync.native(String(args[0]))
+        : fs.realpathSync(String(args[0]));
+      sameAsClaimRoot = candidateReal === realClaimRoot;
+    } catch {
+      sameAsClaimRoot = path.resolve(String(args[0])) === path.resolve(claimRoot);
+    }
+    if (!swapped && sameAsClaimRoot) {
       fs.renameSync(claimRoot, displacedClaimRoot);
       try {
         linkDirectory(outside, claimRoot);
@@ -142,7 +154,7 @@ test('owner claim revalidates after mkdir before publishing into a swapped paren
   try {
     assert.throws(
       () => ensureRunOwnerClaim({ claimPath, owner: OWNER }),
-      /escaped trusted root|symbolic link|junction|reparse|could not be verified/i,
+      /escaped (trusted root|managed directory)|symbolic link|junction|reparse|could not be verified/i,
     );
   } finally {
     fs.mkdirSync = originalMkdirSync;

@@ -11,6 +11,7 @@ import {
   readRecentTurns,
 } from '../src/memory/conversation-buffer.js';
 import { memoryOwnerDir } from '../src/memory/memory-owner.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const alice = { tenantId: 'tenant_conversation_path', userId: 'alice' };
 const bob = { tenantId: 'tenant_conversation_path', userId: 'bob' };
@@ -69,7 +70,7 @@ test('conversation reads reject a regular file replacement after open', () => {
   let injected = false;
   fs.openSync = ((target: unknown, ...args: unknown[]) => {
     const descriptor = Reflect.apply(originalOpen, fs, [target, ...args]) as number;
-    if (!injected && path.resolve(String(target)) === path.resolve(file)) {
+    if (!injected && samePathReal(String(target), file)) {
       injected = true;
       fs.renameSync(file, displaced);
       fs.writeFileSync(file, `${JSON.stringify({
@@ -96,7 +97,7 @@ test('clearConversationBuffer exposes filesystem deletion failures', () => {
   const originalRm = fs.rmSync;
   const originalUnlink = fs.unlinkSync;
   const fail = (target: unknown): never => {
-    if (path.resolve(String(target)) === path.resolve(file)) throw new Error('injected delete failure');
+    if (samePathReal(String(target), file)) throw new Error('injected delete failure');
     throw new Error(`unexpected delete target: ${String(target)}`);
   };
   fs.rmSync = fail as typeof fs.rmSync;
@@ -124,7 +125,7 @@ test('clear rejects an owner directory replacement before unlink without misdele
   let injected = false;
   fs.lstatSync = ((target: unknown, ...args: unknown[]) => {
     const stats = Reflect.apply(originalLstat, fs, [target, ...args]) as fs.Stats;
-    if (!injected && path.resolve(String(target)) === path.resolve(file)) {
+    if (!injected && samePathReal(String(target), file)) {
       injected = true;
       swapDirectory(ownerDirectory, displaced, replacementFile);
     }

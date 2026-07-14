@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { FileScheduleStore, type ScheduleRecord } from '../src/runtime/scheduler-store.js';
 import { ensureRunOwnerClaim, runOwnerClaimPath } from '../src/util/run-owner.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 function tempRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-schedule-operation-'));
@@ -49,7 +50,7 @@ test('schedule save keeps one guard from owner claim through record publish', ()
   let swapped = false;
   fs.lstatSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalLstatSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(claimPath) && result.isFile()) {
+    if (!swapped && samePathReal(String(args[0]), claimPath) && result.isFile()) {
       fs.renameSync(owners, displaced);
       fs.mkdirSync(owners);
       swapped = true;
@@ -103,7 +104,7 @@ test('schedule save does not trust a claim read through a transient .owners repl
     }
   };
   fs.openSync = ((...args: unknown[]) => {
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(claimPath)) {
+    if (!swapped && samePathReal(String(args[0]), claimPath)) {
       return whileOwnersAreReplaced(() => Reflect.apply(originalOpenSync, fs, args));
     }
     return Reflect.apply(originalOpenSync, fs, args);

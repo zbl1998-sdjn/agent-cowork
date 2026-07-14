@@ -10,6 +10,7 @@ import {
   applyRetention,
   PURGE_SCOPES,
 } from '../src/security/data-purge.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (
   target: string,
@@ -175,7 +176,7 @@ test('applyRetention revalidates a directory after listing before deleting a chi
   let swapped = false;
   fs.readdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalReaddirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(ownerDir)) {
+    if (!swapped && samePathReal(String(args[0]), ownerDir)) {
       fs.renameSync(ownerDir, displacedOwnerDir);
       try {
         linkDirectory(outside, ownerDir);
@@ -283,7 +284,7 @@ test('executePurgePlan rejects an ordinary nested-directory replacement after li
   let swapped = false;
   fs.readdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalReaddirSync, fs, args);
-    if (path.resolve(String(args[0])) === path.resolve(ownerDir)) {
+    if (samePathReal(String(args[0]), ownerDir)) {
       ownerListings += 1;
       if (ownerListings === 2) armed = true;
     }

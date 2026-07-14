@@ -11,6 +11,7 @@ import {
   removeAuthorizedArtifactOwnerClaim,
 } from '../src/artifacts/artifact-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const ALICE = Object.freeze({ tenantId: 'tenant_shared', userId: 'alice' });
 const BOB = Object.freeze({ tenantId: 'tenant_shared', userId: 'bob' });
@@ -41,7 +42,7 @@ test('owner authorization rejects an ordinary .owners directory replacement', ()
 
   fs.lstatSync = ((candidate: fs.PathLike) => {
     const result = originalLstat(String(candidate));
-    if (!replaced && path.resolve(String(candidate)) === path.resolve(claimPath)) {
+    if (!replaced && samePathReal(String(candidate), claimPath)) {
       replaced = true;
       fs.renameSync(ownerDirectory, parkedDirectory);
       fs.mkdirSync(ownerDirectory);
@@ -74,7 +75,7 @@ test('owner authorization rejects a claim identity replaced during descriptor re
   fs.readFileSync = ((candidate: string | number, encoding: 'utf8') => {
     const result = readText(candidate, encoding);
     if (!attempted && (typeof candidate === 'number'
-      || path.resolve(String(candidate)) === path.resolve(claimPath))) {
+      || samePathReal(String(candidate), claimPath))) {
       attempted = true;
       fs.renameSync(claimPath, parkedClaim);
       fs.writeFileSync(claimPath, claimText, 'utf8');

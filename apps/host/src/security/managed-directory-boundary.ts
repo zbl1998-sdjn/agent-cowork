@@ -39,14 +39,19 @@ function isErrorCode(error: unknown, code: string): boolean {
     && (error as { code?: unknown }).code === code;
 }
 
-function isInside(candidatePath: string, rootPath: string): boolean {
-  const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
+function isRelativeInside(relative: string): boolean {
   return relative === ''
     || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
+function isInside(candidatePath: string, rootPath: string): boolean {
+  return isRelativeInside(path.relative(path.resolve(rootPath), path.resolve(candidatePath)));
+}
+
+// 消解 Windows 短名/长名再比较:身份判断跨多次调用,两次各自可能落在字面串快路径
+// 或短名/长名兜底路径,必须统一到真实路径才能正确识别"同一目录"。
 function samePath(left: string, right: string): boolean {
-  return path.relative(path.resolve(left), path.resolve(right)) === '';
+  return path.relative(canonicalizePath(left), canonicalizePath(right)) === '';
 }
 
 function sameRootIdentity(left: fs.Stats, right: fs.Stats): boolean {
@@ -93,9 +98,7 @@ export function createManagedDirectoryBoundary(
   const rootPath = path.resolve(rootInput);
   if (create) fs.mkdirSync(rootPath, { recursive: true });
   const initialStats = fs.lstatSync(rootPath);
-  if (initialStats.isSymbolicLink()) {
-    throw new Error(`${label}: symbolic link, junction, or reparse point is not allowed`);
-  }
+  if (initialStats.isSymbolicLink()) throw new Error(`${label}: symbolic link, junction, or reparse point is not allowed`);
   if (!initialStats.isDirectory()) throw new Error(`${label}: expected a directory`);
   const canonicalRoot = canonicalizePath(rootPath);
 
@@ -123,18 +126,28 @@ export function createManagedDirectoryBoundary(
     { allowMissing = false, kind = 'either' }: ManagedPathOptions = {},
   ): ManagedPathInspection | null {
     const candidatePath = path.resolve(candidateInput);
-    if (!isInside(candidatePath, rootPath)) throw new Error(`${label}: path escaped managed directory`);
+    // 字面串比较优先(保留对中间段 symlink/junction 的逐段探测精度);判定越界时再用
+    // canonicalizePath 消解 Windows 短名/长名别名重判,两者可能只是同一目录的不同写法。
+    let usedRootPath = rootPath;
+    let compareCandidatePath = candidatePath;
+    let relative = path.relative(rootPath, candidatePath);
+    if (!isRelativeInside(relative)) {
+      const canonicalCandidate = canonicalizePath(candidatePath);
+      if (!isInside(canonicalCandidate, canonicalRoot)) throw new Error(`${label}: path escaped managed directory`);
+      usedRootPath = canonicalRoot;
+      compareCandidatePath = canonicalCandidate;
+      relative = path.relative(canonicalRoot, canonicalCandidate);
+    }
     const rootStats = inspectRoot(allowMissing);
     if (!rootStats) return null;
-    if (samePath(candidatePath, rootPath)) {
+    if (relative === '') {
       requireKind(rootStats, kind, label);
       return { canonicalPath: canonicalRoot, stats: rootStats, ancestors: [] };
     }
 
-    const relative = path.relative(rootPath, candidatePath);
     const segments = relative.split(path.sep).filter(Boolean);
     const inspected: ManagedAncestorInspection[] = [];
-    let currentPath = rootPath;
+    let currentPath = usedRootPath;
     for (const [index, segment] of segments.entries()) {
       currentPath = path.join(currentPath, segment);
       let currentStats: fs.Stats;
@@ -158,7 +171,7 @@ export function createManagedDirectoryBoundary(
     }
 
     const candidate = inspected.at(-1);
-    if (!candidate || !samePath(candidate.path, candidatePath)) {
+    if (!candidate || !samePath(candidate.path, compareCandidatePath)) {
       inspectRoot(false);
       if (allowMissing) return null;
       fs.lstatSync(candidatePath);
@@ -196,7 +209,7 @@ export function createManagedDirectoryBoundary(
     const pinnedDirectories: ManagedAncestorInspection[] = [];
     return (candidateInput: string): void => {
       const candidatePath = path.resolve(candidateInput);
-      if (!isInside(candidatePath, rootPath)) throw new Error(`${label}: path escaped managed directory`);
+      // 越界判定委托给下面 inspectPath(probe, ...):它已做过短名/长名兜底判断。
       let probe = candidatePath;
       let currentDirectories: ManagedAncestorInspection[] = [];
       for (;;) {

@@ -11,6 +11,7 @@ import type { AgentDeps } from '../src/engine/agent/toolset-builder.js';
 import type { AgentTool, HookEngine as AgentHookEngine } from '../src/engine/agent/approval-gate.js';
 import type { HookEngine, HookResult, SandboxLike } from '../src/runtime/hooks.js';
 import type { ModelCall } from '../src/engine/agent/model-resilience.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-hk-')); }
 
@@ -197,7 +198,7 @@ test('loadHooksConfig revalidates its directory after a runtime swap during read
   const originalReadFileSync = fs.readFileSync;
   let swapped = false;
   fs.readFileSync = ((...args: unknown[]) => {
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(configPath)) {
+    if (!swapped && samePathReal(String(args[0]), configPath)) {
       fs.renameSync(appDir, displaced);
       linkDirectory(outside, appDir);
       swapped = true;

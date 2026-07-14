@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { appendValidatedJsonl } from '../src/runtime/jsonl-file.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type Row = { id: string };
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
@@ -30,7 +31,7 @@ test('runtime JSONL append fails before writing when its parent is swapped after
   const originalOpen = fs.openSync;
   let swapped = false;
   fs.openSync = ((target: string, flags: string | number, mode?: number) => {
-    if (!swapped && path.resolve(String(target)) === path.resolve(file)) {
+    if (!swapped && samePathReal(String(target), file)) {
       fs.renameSync(parent, displaced);
       try { symlinkSync(outside, parent, 'junction'); } catch (error) {
         fs.renameSync(displaced, parent);
@@ -63,7 +64,7 @@ test('runtime JSONL append rejects an ordinary replacement parent before writing
   const originalBytes = fs.readFileSync(file, 'utf8');
   const originalOpen = fs.openSync;
   fs.openSync = ((target: string, flags: string | number, mode?: number) => {
-    if (path.resolve(target) === path.resolve(file)) {
+    if (samePathReal(target, file)) {
       fs.renameSync(parent, displaced);
       fs.renameSync(replacement, parent);
     }

@@ -11,6 +11,7 @@ import {
 } from '../src/artifacts/artifact-owner.js';
 import { rollbackFileOperations } from '../src/workspace/file-operations.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: string) => void;
 
@@ -51,7 +52,7 @@ test('owner rollback rename rejects claim-directory junction swaps before extern
 
   fs.mkdirSync = ((candidate: string, options?: { recursive?: boolean }) => {
     const result = originalMkdir(candidate, options);
-    if (!swapped && path.resolve(String(candidate)) === path.resolve(ownerDirectory)) {
+    if (!swapped && samePathReal(String(candidate), ownerDirectory)) {
       swapped = true;
       fs.renameSync(ownerDirectory, parked);
       symlinkSync(outside, ownerDirectory, 'junction');
@@ -89,7 +90,7 @@ test('owner rollback rename rejects a different target identity after the filesy
 
   fs.renameSync = ((from: string, to: string) => {
     const result = originalRename(from, to);
-    if (!injected && String(from) === source && String(to) === target) {
+    if (!injected && samePathReal(String(from), source) && samePathReal(String(to), target)) {
       injected = true;
       fs.unlinkSync(target);
       fs.writeFileSync(target, 'WINNER', 'utf8');

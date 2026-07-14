@@ -10,6 +10,7 @@ import {
 } from '../src/memory/knowledge-store.js';
 import { memoryOwnerStorageKey } from '../src/memory/memory-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const cand = (over = {}) => ({ topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.9, ...over });
 const owner = { tenantId: 'tenant_test', userId: 'user_test' };
@@ -160,7 +161,7 @@ test('knowledge store revalidates after mkdir before publishing into a swapped d
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(ownerDir)) {
+    if (!swapped && samePathReal(String(args[0]), ownerDir)) {
       fs.renameSync(appDir, displaced);
       try {
         linkDirectory(outside, appDir);

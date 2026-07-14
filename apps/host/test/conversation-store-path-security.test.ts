@@ -6,6 +6,7 @@ import test, { type TestContext } from 'node:test';
 import { conversationOwnerDirectory } from '../src/storage/conversation-owner.js';
 import { FileConversationStore } from '../src/storage/conversation-store.js';
 import type { ConversationContext } from '../src/storage/conversation-types.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -125,7 +126,7 @@ test('save revalidates the owner directory after mkdir before writing any file',
   let swapped = false;
   fs.mkdirSync = ((...args: unknown[]) => {
     const result = Reflect.apply(originalMkdirSync, fs, args);
-    if (!swapped && path.resolve(String(args[0])) === path.resolve(directory)) {
+    if (!swapped && samePathReal(String(args[0]), directory)) {
       fs.renameSync(directory, displaced);
       try {
         linkDirectory(outside, directory);
@@ -162,7 +163,7 @@ test('conversation reads reject a file replaced after its bytes are read', () =>
   fs.readFileSync = ((filePath: unknown, ...args: unknown[]) => {
     const value = Reflect.apply(originalReadFileSync, fs, [filePath, ...args]);
     if (!replaced && typeof filePath !== 'number'
-      && path.resolve(String(filePath)) === path.resolve(file)) {
+      && samePathReal(String(filePath), file)) {
       replaced = true;
       fs.writeFileSync(file, JSON.stringify({
         id: 'replace-me', title: 'replacement with different bytes', messages: [],

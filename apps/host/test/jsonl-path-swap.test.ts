@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { JsonlWriter } from '../src/storage/jsonl-writer.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 type SymlinkSync = (target: string, linkPath: string, type?: 'file' | 'dir' | 'junction') => void;
 const symlinkSync = (fs as unknown as { symlinkSync: SymlinkSync }).symlinkSync;
@@ -24,7 +25,7 @@ test('JsonlWriter append fails before writing when its managed parent is swapped
   const originalOpen = fs.openSync;
   let swapped = false;
   fs.openSync = ((target: string, flags: string | number, mode?: number) => {
-    if (!swapped && path.resolve(String(target)) === path.resolve(file)) {
+    if (!swapped && samePathReal(String(target), file)) {
       fs.renameSync(parent, displaced);
       try { symlinkSync(outside, parent, 'junction'); } catch (error) {
         fs.renameSync(displaced, parent);
@@ -55,7 +56,7 @@ test('JsonlWriter append rejects an ordinary replacement parent before writing',
   const writer = new JsonlWriter(file, { maxBytes: 1024 });
   const originalOpen = fs.openSync;
   fs.openSync = ((target: string, flags: string | number, mode?: number) => {
-    if (path.resolve(target) === path.resolve(file)) {
+    if (samePathReal(target, file)) {
       fs.renameSync(parent, displaced);
       fs.renameSync(replacement, parent);
     }
