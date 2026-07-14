@@ -145,7 +145,7 @@ export function ObservabilityPanel() {
   return (
     <section className="side-panel observability-panel">
       <div className="observe-head">
-        <h2>运行记录</h2>
+        <h2>成本 / 可观测</h2>
         <label className="observe-expert-toggle" title="打开后显示工具原因 / 模型归因 / 配置快照 / 来源等工程字段">
           <input type="checkbox" checked={expert} onChange={(e) => setExpert(e.target.checked)} />
           <span>专家视图</span>

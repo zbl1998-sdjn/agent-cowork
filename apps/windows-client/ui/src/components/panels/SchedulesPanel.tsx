@@ -10,11 +10,11 @@ import { Empty, ErrorState } from '../ui/StateViews';
 
 export function SchedulesPanelStateViews({ error, onRetry }: { error: string; onRetry: () => void }) {
   if (error) {
-    return <ErrorState title="定时任务加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
+    return <ErrorState title="自动任务加载失败" message={error} onRetry={onRetry} retryLabel="重新加载" />;
   }
   return (
     <Empty
-      title="还没有定时任务"
+      title="还没有自动任务"
       message="可以选择已启用的技能并设置周期或一次性触发时间。"
     />
   );
@@ -24,7 +24,7 @@ export function ScheduleMutationError({ error }: { error: string }) {
   if (!error) return null;
   return (
     <div className="panel-error" role="alert">
-      <strong>定时任务操作失败</strong>
+      <strong>自动任务操作失败</strong>
       <p>{error}</p>
       <small>当前输入和待处理任务仍保留，可直接重试原操作。</small>
     </div>
@@ -174,10 +174,10 @@ export function SchedulesPanel({ trustedRoot = '' }: { trustedRoot?: string }) {
 
   return (
     <section className="side-panel">
-      <h2>定时任务</h2>
+      <h2>自动任务</h2>
       <p className="panel-intro">把一个已启用技能绑定到周期或一次性触发时间；到点生成待审批草案，确认前不会写入工作区。</p>
       <form className="schedule-create-form" onSubmit={onCreate}>
-        <h3>新建定时任务</h3>
+        <h3>新建自动任务</h3>
         <div className="schedule-form-grid">
           <label>
             <span>任务名称</span>

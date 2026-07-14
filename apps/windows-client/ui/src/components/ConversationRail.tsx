@@ -8,7 +8,7 @@ import { Icon, type IconName } from './ui/Icon';
 type PanelId = Exclude<SidePanel, 'none'>;
 
 const PRIMARY_NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
-  { id: 'tasks', icon: 'history', label: '任务记录' },
+  { id: 'tasks', icon: 'history', label: '任务中心' },
   { id: 'artifacts', icon: 'artifacts', label: '文件成果' },
   { id: 'schedules', icon: 'schedules', label: '自动任务' },
   { id: 'viz', icon: 'viz', label: '可视化编辑' },
@@ -17,9 +17,9 @@ const PRIMARY_NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> =
 const MORE_NAV_ITEMS: Array<{ id: PanelId; icon: IconName; label: string }> = [
   { id: 'projects', icon: 'projects', label: '项目空间' },
   { id: 'tools', icon: 'tools', label: '扩展能力' },
-  { id: 'connectors', icon: 'connectors', label: '外部应用' },
-  { id: 'memory', icon: 'memory', label: '使用偏好' },
-  { id: 'observability', icon: 'observability', label: '运行详情' },
+  { id: 'connectors', icon: 'connectors', label: '连接外部工具' },
+  { id: 'memory', icon: 'memory', label: '我帮你记住的事' },
+  { id: 'observability', icon: 'observability', label: '成本 / 可观测' },
 ];
 
 interface ConversationRailProps {

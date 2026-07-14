@@ -48,7 +48,7 @@ export function useSchedulesPanel(trustedRoot: string) {
       setSkills(nextSkills);
       setRecipeId((current) => nextSkills.some((skill) => skill.id === current) ? current : (nextSkills[0]?.id || ''));
     } catch (error) {
-      setLoadError(humanizeError(error, { action: '读取定时任务' }));
+      setLoadError(humanizeError(error, { action: '读取自动任务' }));
     } finally {
       setBusy(false);
     }
@@ -79,7 +79,7 @@ export function useSchedulesPanel(trustedRoot: string) {
       setPrompt('');
       await refresh();
     } catch (error) {
-      setMutationError(humanizeError(error, { action: '创建定时任务' }));
+      setMutationError(humanizeError(error, { action: '创建自动任务' }));
     } finally {
       setCreating(false);
     }
@@ -91,7 +91,7 @@ export function useSchedulesPanel(trustedRoot: string) {
       await cancelSchedule(id);
       await refresh();
     } catch (error) {
-      setMutationError(humanizeError(error, { action: '取消定时任务' }));
+      setMutationError(humanizeError(error, { action: '取消自动任务' }));
     }
   };
 

@@ -287,9 +287,9 @@ export function App() {
   const handleApproveMessage = useCallback((message: AssistantMessage) => void handleApprove(message), [handleApprove]);
   const commands = useMemo<Command[]>(() => [
     { id: 'new', label: '新建对话', run: startNewConversation }, { id: 'theme', label: theme === 'dark' ? '切换到浅色' : '切换到深色', run: toggleTheme }, { id: 'mode-plan', label: '模式：计划', run: () => setMode('plan') },
-    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-auto', label: '模式：安全自动（高风险仍需批准）', run: () => setMode('auto') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：工具', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化编辑', run: () => setPanel('viz') },
-    { id: 'p-tasks', label: '面板：任务中心', run: () => setPanel('tasks') }, { id: 'p-conn', label: '面板：连接器', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：产物', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：定时任务', run: () => setPanel('schedules') },
-    { id: 'p-memory', label: '面板：记忆', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') },
+    { id: 'mode-exec', label: '模式：执行', run: () => setMode('execute') }, { id: 'mode-auto', label: '模式：安全自动（高风险仍需批准）', run: () => setMode('auto') }, { id: 'auto-clarify', label: autoClarify ? '关闭发送前澄清' : '开启发送前澄清', run: () => setAutoClarify((v) => !v) }, { id: 'p-tools', label: '面板：扩展能力', run: () => setPanel('tools') }, { id: 'p-viz', label: '面板：可视化编辑', run: () => setPanel('viz') },
+    { id: 'p-tasks', label: '面板：任务中心', run: () => setPanel('tasks') }, { id: 'p-conn', label: '面板：连接外部工具', run: () => setPanel('connectors') }, { id: 'p-art', label: '面板：文件成果', run: () => setPanel('artifacts') }, { id: 'p-sched', label: '面板：自动任务', run: () => setPanel('schedules') },
+    { id: 'p-memory', label: '面板：我帮你记住的事', run: () => setPanel('memory') }, { id: 'p-observe', label: '面板：成本 / 可观测', run: () => setPanel('observability') }, { id: 'p-projects', label: '面板：项目空间', run: () => setPanel('projects') },
     { id: 'settings', label: '模型设置', run: () => openSettings('model') }, { id: 'logout', label: '退出登录', run: () => void doLogout() },
   ], [autoClarify, startNewConversation, doLogout, openSettings, setAutoClarify, theme, toggleTheme]);
 

@@ -68,7 +68,7 @@ export function buildScheduleCreateRequest(draft: ScheduleDraft): ScheduleCreate
     if (!Number.isFinite(timestamp)) throw new Error('一次性触发时间无效');
     return { name, fireAt: new Date(timestamp).toISOString(), payload };
   }
-  throw new Error('未知的定时任务触发类型');
+  throw new Error('未知的自动任务触发类型');
 }
 
 export function resolveScheduleCreateAttempt(
@@ -99,7 +99,7 @@ export async function createSchedule(
     ...request,
     idempotencyKey,
   });
-  if (!res.schedule) throw new Error('Host 未返回新建的定时任务');
+  if (!res.schedule) throw new Error('Host 未返回新建的自动任务');
   return res.schedule;
 }
 
@@ -109,6 +109,6 @@ export async function cancelSchedule(id: string): Promise<boolean> {
     { idempotencyKey: newIdempotencyKey('sched') },
   );
   const cancelled = Boolean(res.ok || res.cancelled);
-  if (!cancelled) throw new Error('Host 未确认取消定时任务');
+  if (!cancelled) throw new Error('Host 未确认取消自动任务');
   return true;
 }

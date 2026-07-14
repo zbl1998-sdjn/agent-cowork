@@ -41,7 +41,7 @@ describe('AppSidePanel', () => {
       (child) => isValidElement(child) && child.type === ErrorBoundary,
     ) as ReactElement | undefined;
 
-    expect((boundary?.props as { label?: string }).label).toBe('任务记录');
+    expect((boundary?.props as { label?: string }).label).toBe('任务中心');
   });
 
   it('renders lazy panel fallback while the selected panel chunk loads', () => {
