@@ -49,11 +49,11 @@ test('host architecture has no layer waivers and rejects every former reverse de
   fs.mkdirSync(path.join(root, 'apps', 'windows-client', 'ui', 'src'), { recursive: true });
 
   writeFile(
-    path.join(root, 'apps', 'host', 'src', 'kimi', 'agent', 'model-resilience.js'),
+    path.join(root, 'apps', 'host', 'src', 'engine', 'agent', 'model-resilience.js'),
     "import { modelBreaker } from '../../runtime/model-breakers.js';\nexport const breaker = modelBreaker;\n",
   );
   writeFile(
-    path.join(root, 'apps', 'host', 'src', 'kimi', 'chat-stream.js'),
+    path.join(root, 'apps', 'host', 'src', 'engine', 'chat-stream.js'),
     [
       "import { writeRunRecord } from '../runtime/run-store.js';",
       "import { RunsIndex } from '../runtime/runs-index.js';",
@@ -109,9 +109,9 @@ test('host architecture has no layer waivers and rejects every former reverse de
 
   assert.ok(result.status !== 0, output);
   const formerEdges = [
-    'kimi/agent/model-resilience.js (L1) imports apps/host/src/runtime/model-breakers.ts (L2)',
-    'kimi/chat-stream.js (L1) imports apps/host/src/runtime/run-store.ts (L2)',
-    'kimi/chat-stream.js (L1) imports apps/host/src/runtime/runs-index.ts (L2)',
+    'engine/agent/model-resilience.js (L1) imports apps/host/src/runtime/model-breakers.ts (L2)',
+    'engine/chat-stream.js (L1) imports apps/host/src/runtime/run-store.ts (L2)',
+    'engine/chat-stream.js (L1) imports apps/host/src/runtime/runs-index.ts (L2)',
     'recipes/run-recipe.js (L1) imports apps/host/src/runtime/run-store.ts (L2)',
     'recipes/run-recipe.js (L1) imports apps/host/src/runtime/runs-index.ts (L2)',
     'sandbox/code-runner.js (L1) imports apps/host/src/runtime/run-store.ts (L2)',
