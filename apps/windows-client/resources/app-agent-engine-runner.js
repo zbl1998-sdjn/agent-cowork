@@ -1,17 +1,17 @@
-// classic-script Kimi 运行器:负责 API 调用与降级文案;app.js 负责外围对话/工作台编排。
+// classic-script Agent Engine 运行器:负责 API 调用与降级文案;app.js 负责外围对话/工作台编排。
 (function () {
-    function createKimiRunner({ state, postJson, setRunChip, setStatus, shortRunId }) {
-        async function tryKimiApiPlan(prompt, summary) {
-            if (!state.kimiApiEnabled) {
-                setRunChip("Kimi API 未配置", "muted");
+    function createAgentEngineRunner({ state, postJson, setRunChip, setStatus, shortRunId }) {
+        async function tryAgentEnginePlan(prompt, summary) {
+            if (!state.modelApiEnabled) {
+                setRunChip("模型 API 未配置", "muted");
                 return {
                     used: false,
-                    text: "Kimi API 未配置；当前使用本地只读摘要生成审批草稿。",
+                    text: "模型 API 未配置；当前使用本地只读摘要生成审批草稿。",
                 };
             }
             try {
-                setStatus("正在调用 Kimi API");
-                const result = await postJson("/api/kimi/plan", {
+                setStatus("正在调用模型 API");
+                const result = await postJson("/api/agent-engine/plan", {
                     trustedRoot: state.workspace,
                     prompt,
                     summary,
@@ -27,27 +27,27 @@
             }
             catch (error) {
                 const runId = error.payload?.runId;
-                setRunChip(runId ? `Kimi API 失败 · ${shortRunId(runId)}` : "Kimi API 已降级", "muted");
+                setRunChip(runId ? `模型 API 失败 · ${shortRunId(runId)}` : "模型 API 已降级", "muted");
                 return {
                     used: false,
-                    text: `Kimi API 暂不可用，已降级到本地计划：${error.message}`,
+                    text: `模型 API 暂不可用，已降级到本地计划：${error.message}`,
                     runId,
                     runPath: error.payload?.runPath,
                     failed: Boolean(runId),
                 };
             }
         }
-        async function tryKimiChat(prompt, summary) {
-            if (!state.kimiApiEnabled) {
-                setRunChip("Kimi API 未配置", "muted");
+        async function tryAgentEngineChat(prompt, summary) {
+            if (!state.modelApiEnabled) {
+                setRunChip("模型 API 未配置", "muted");
                 return {
                     used: false,
-                    text: `Kimi API 未配置；已收到消息：“${prompt.slice(0, 80)}”。需要真实对话时请设置 KIMI_API_KEY 或 MOONSHOT_API_KEY 后启动。`,
+                    text: `模型 API 未配置；已收到消息：“${prompt.slice(0, 80)}”。需要真实对话时请设置 KIMI_API_KEY 或 MOONSHOT_API_KEY 后启动。`,
                 };
             }
             try {
-                setRunChip("Kimi API 对话中", "ready");
-                const result = await postJson("/api/kimi/chat", {
+                setRunChip("模型 API 对话中", "ready");
+                const result = await postJson("/api/agent-engine/chat", {
                     trustedRoot: state.workspace,
                     prompt,
                     summary,
@@ -62,10 +62,10 @@
             }
             catch (error) {
                 const runId = error.payload?.runId;
-                setRunChip(runId ? `Kimi API 失败 · ${shortRunId(runId)}` : "Kimi API 已降级", "muted");
+                setRunChip(runId ? `模型 API 失败 · ${shortRunId(runId)}` : "模型 API 已降级", "muted");
                 return {
                     used: false,
-                    text: `Kimi API 暂不可用：${error.message}`,
+                    text: `模型 API 暂不可用：${error.message}`,
                     runId,
                     runPath: error.payload?.runPath,
                     failed: Boolean(runId),
@@ -73,11 +73,11 @@
             }
         }
         return {
-            tryKimiApiPlan,
-            tryKimiChat,
+            tryAgentEnginePlan,
+            tryAgentEngineChat,
         };
     }
-    window.AgentCoworkKimiRunner = {
-        createKimiRunner,
+    window.AgentCoworkAgentEngineRunner = {
+        createAgentEngineRunner,
     };
 })();

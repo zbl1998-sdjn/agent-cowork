@@ -25,15 +25,15 @@
             runList.replaceChildren();
             runSummary.textContent = state.hostApi
                 ? state.runs.length > 0
-                    ? `最近 ${state.runs.length} 次 Kimi 任务，点击可查看输入和结果`
-                    : "暂无 Kimi 运行记录"
+                    ? `最近 ${state.runs.length} 次 Agent 任务，点击可查看输入和结果`
+                    : "暂无 Agent 运行记录"
                 : "静态预览模式不会读取运行记录";
             if (state.runs.length === 0) {
                 const empty = document.createElement("button");
                 empty.className = "run-card is-empty";
                 empty.type = "button";
                 empty.setAttribute("role", "listitem");
-                empty.innerHTML = "<span>暂无运行记录</span><strong>发送任务后这里会展示 Kimi 运行卡片</strong><em>等待任务</em>";
+                empty.innerHTML = "<span>暂无运行记录</span><strong>发送任务后这里会展示 Agent 运行卡片</strong><em>等待任务</em>";
                 runList.append(empty);
                 return;
             }
@@ -100,13 +100,13 @@
                 },
                 {
                     state: failed ? "error" : "done",
-                    title: failed ? "错误信息" : "Kimi 输出",
+                    title: failed ? "错误信息" : "Agent 输出",
                     detail: compactText(failed ? run.error?.message : run.result?.text, 260),
                     meta: formatRunTime(run.finishedAt || run.startedAt),
                 },
             ], failed ? "任务失败" : "任务详情");
             setStatus(failed ? "任务记录失败" : "任务记录已打开");
-            setArtifact(failed ? `任务 ${shortRunId(run.id)} 调用失败：${run.error?.message || "未知错误"}` : `已打开任务 ${shortRunId(run.id)} 的 Kimi 输出。`, run.id);
+            setArtifact(failed ? `任务 ${shortRunId(run.id)} 调用失败：${run.error?.message || "未知错误"}` : `已打开任务 ${shortRunId(run.id)} 的 Agent 输出。`, run.id);
         }
         function replayRunEvents(message, run) {
             if (!message?.body) {

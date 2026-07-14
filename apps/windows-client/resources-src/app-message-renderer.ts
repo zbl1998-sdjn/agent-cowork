@@ -49,7 +49,7 @@
 
       const avatar = document.createElement("div");
       avatar.className = "message-avatar";
-      avatar.textContent = role === "user" ? "D" : "K";
+      avatar.textContent = role === "user" ? "D" : "A";
 
       const card = document.createElement("div");
       card.className = "message-card";
@@ -57,7 +57,7 @@
       const header = document.createElement("div");
       header.className = "message-header";
       const name = document.createElement("strong");
-      name.textContent = role === "user" ? "Derrick" : "Kimi";
+      name.textContent = role === "user" ? "Derrick" : "Agent";
       const right = document.createElement("span");
       if (status) {
         right.className = `message-status ${messageStatusClass(status)}`.trim();

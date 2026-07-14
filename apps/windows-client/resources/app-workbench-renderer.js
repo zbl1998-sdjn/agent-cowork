@@ -41,13 +41,13 @@
                 {
                     state: "wait",
                     title: "等待任务",
-                    detail: "发送后这里会展示 Kimi 的读取、计划、审批和执行过程。",
+                    detail: "发送后这里会展示 Agent 的读取、计划、审批和执行过程。",
                 },
             ], "等待任务输入");
         }
         function setWorkbenchCopy(view) {
             if (view === "code") {
-                workbenchTitle.textContent = "Kimi Code";
+                workbenchTitle.textContent = "Agent Code";
                 workbenchCopy.textContent = "读取当前项目上下文，生成代码任务计划，审批后写入本地产物。";
                 return;
             }

@@ -28,7 +28,7 @@
             {
                 state: "wait",
                 title: "等待 Host",
-                detail: "通过 localhost 启动后可读取文件、调用 Kimi API，并写入审计日志。",
+                detail: "通过 localhost 启动后可读取文件、调用模型 API，并写入审计日志。",
             },
         ], "静态预览");
     }

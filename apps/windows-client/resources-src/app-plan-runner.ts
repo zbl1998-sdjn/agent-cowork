@@ -25,7 +25,7 @@
     activeFiles,
     textCandidate,
     readCandidateSummary,
-    tryKimiApiPlan,
+    tryAgentEnginePlan,
     runRecipePlan,
     sendChatMessage,
     refreshRunCards,
@@ -71,7 +71,7 @@
           {
             state: "active",
             title: "读取本地上下文",
-            detail: "正在从可信工作区选择可读取的文本文件，生成给 Kimi 的安全摘要。",
+            detail: "正在从可信工作区选择可读取的文本文件，生成给 Agent 的安全摘要。",
           },
         ],
         "正在创建 Cowork 任务",
@@ -105,11 +105,11 @@
           },
           {
             state: "active",
-            title: "调用 Kimi 生成计划",
-            detail: state.kimiApiEnabled ? "正在调用服务端 Kimi API，输出只作为计划文本，不直接执行本地操作。" : "Kimi API 未配置，使用本地摘要生成安全草稿。",
+            title: "调用 Agent 生成计划",
+            detail: state.modelApiEnabled ? "正在调用服务端模型 API，输出只作为计划文本，不直接执行本地操作。" : "模型 API 未配置，使用本地摘要生成安全草稿。",
           },
         ],
-        "Kimi 正在规划",
+        "Agent 正在规划",
       );
       addProgressLines(taskMessage, [
         {
@@ -119,16 +119,16 @@
         },
         {
           state: "running",
-          title: state.kimiApiEnabled ? "正在调用 Kimi API 生成计划" : "Kimi API 未配置，使用本地摘要生成安全草稿",
+          title: state.modelApiEnabled ? "正在调用模型 API 生成计划" : "模型 API 未配置，使用本地摘要生成安全草稿",
         },
       ]);
-      const kimiPlan = await tryKimiApiPlan(prompt, summary);
-      state.lastRun = kimiPlan.runId
+      const agentPlan = await tryAgentEnginePlan(prompt, summary);
+      state.lastRun = agentPlan.runId
         ? {
-            id: kimiPlan.runId,
-            path: kimiPlan.runPath,
-            durationMs: kimiPlan.durationMs,
-            failed: kimiPlan.failed === true,
+            id: agentPlan.runId,
+            path: agentPlan.runPath,
+            durationMs: agentPlan.durationMs,
+            failed: agentPlan.failed === true,
           }
         : null;
       const now = new Date();
@@ -145,14 +145,14 @@
             `- 指令: ${prompt}`,
             `- 工作区: ${state.workspace}`,
             `- 来源摘要: ${summary}`,
-            `- Kimi API: ${kimiPlan.used ? `已接入，耗时 ${kimiPlan.durationMs}ms` : kimiPlan.failed ? "调用失败，已安全降级" : "未使用，安全降级"}`,
-            `- Run ID: ${kimiPlan.runId || "local-fallback"}`,
-            `- Run 记录: ${kimiPlan.runPath ? kimiPlan.runPath.replace(state.workspace, ".") : "未生成"}`,
+            `- 模型 API: ${agentPlan.used ? `已接入，耗时 ${agentPlan.durationMs}ms` : agentPlan.failed ? "调用失败，已安全降级" : "未使用，安全降级"}`,
+            `- Run ID: ${agentPlan.runId || "local-fallback"}`,
+            `- Run 记录: ${agentPlan.runPath ? agentPlan.runPath.replace(state.workspace, ".") : "未生成"}`,
             `- 生成时间: ${now.toISOString()}`,
             "",
-            "## Kimi API 计划",
+            "## 模型 API 计划",
             "",
-            kimiPlan.text,
+            agentPlan.text,
             "",
           ].join("\n"),
         },
@@ -168,21 +168,21 @@
       approveButton.classList.remove("is-done");
       renderOperations(preview.operations);
       setArtifact(
-        kimiPlan.used
-          ? `已读取本地内容：${summary}；Kimi API 已生成计划，运行记录 ${shortRunId(kimiPlan.runId)}。`
+        agentPlan.used
+          ? `已读取本地内容：${summary}；模型 API 已生成计划，运行记录 ${shortRunId(agentPlan.runId)}。`
           : `已读取本地内容：${summary}`,
         outputPath.replace(state.workspace, "."),
       );
-      if (kimiPlan.used) {
-        setRunChip(`Kimi API · ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs}ms`, "ready");
-      } else if (kimiPlan.failed) {
-        setRunChip(`Kimi API 失败 · ${shortRunId(kimiPlan.runId)}`, "muted");
+      if (agentPlan.used) {
+        setRunChip(`模型 API · ${shortRunId(agentPlan.runId)} · ${agentPlan.durationMs}ms`, "ready");
+      } else if (agentPlan.failed) {
+        setRunChip(`模型 API 失败 · ${shortRunId(agentPlan.runId)}`, "muted");
       }
       addProgressLines(taskMessage, [
         {
-          state: kimiPlan.failed ? "error" : "done",
-          title: kimiPlan.used ? "Kimi 计划已返回" : kimiPlan.failed ? "Kimi 调用失败，已降级" : "本地计划已生成",
-          meta: kimiPlan.runId ? `run ${shortRunId(kimiPlan.runId)}` : "local fallback",
+          state: agentPlan.failed ? "error" : "done",
+          title: agentPlan.used ? "Agent 计划已返回" : agentPlan.failed ? "Agent 调用失败，已降级" : "本地计划已生成",
+          meta: agentPlan.runId ? `run ${shortRunId(agentPlan.runId)}` : "local fallback",
         },
         {
           state: "running",
@@ -208,10 +208,10 @@
             meta: candidate ? candidate.path : "无可读文本文件",
           },
           {
-            state: kimiPlan.failed ? "error" : "done",
-            title: kimiPlan.used ? "Kimi 计划已返回" : kimiPlan.failed ? "Kimi 调用失败，已降级" : "本地计划已生成",
-            detail: compactText(kimiPlan.text),
-            meta: kimiPlan.runId ? `run ${shortRunId(kimiPlan.runId)} · ${kimiPlan.durationMs || 0}ms` : "local fallback",
+            state: agentPlan.failed ? "error" : "done",
+            title: agentPlan.used ? "Agent 计划已返回" : agentPlan.failed ? "Agent 调用失败，已降级" : "本地计划已生成",
+            detail: compactText(agentPlan.text),
+            meta: agentPlan.runId ? `run ${shortRunId(agentPlan.runId)} · ${agentPlan.durationMs || 0}ms` : "local fallback",
           },
           {
             state: "active",
@@ -222,7 +222,7 @@
         ],
         "等待审批",
       );
-      await refreshRunCards(kimiPlan.runId);
+      await refreshRunCards(agentPlan.runId);
       setStatus("计划就绪");
     }
 

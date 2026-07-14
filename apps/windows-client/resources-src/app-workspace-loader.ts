@@ -52,8 +52,8 @@
       try {
         const workspace = await getJson("/api/workspace");
         state.workspace = workspace.trustedRoot;
-        state.kimiApiEnabled = workspace.kimiApi?.planEnabled === true || workspace.kimiApi?.chatEnabled === true;
-        setRunChip(state.kimiApiEnabled ? "Kimi API 已接入" : "Kimi API 未配置", state.kimiApiEnabled ? "ready" : "muted");
+        state.modelApiEnabled = workspace.kimiApi?.planEnabled === true || workspace.kimiApi?.chatEnabled === true;
+        setRunChip(state.modelApiEnabled ? "模型 API 已接入" : "模型 API 未配置", state.modelApiEnabled ? "ready" : "muted");
         workspacePath.textContent = state.workspace;
 
         await refreshWorkspaceTree();
