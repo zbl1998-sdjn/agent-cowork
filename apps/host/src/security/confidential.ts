@@ -54,7 +54,7 @@ const TRUTHY = new Set(['1', 'true', 'on', 'yes']);
 
 /** 机密模式是否开启:仅显式真值(1/true/on/yes)生效,其余(含未设置)一律 false。 */
 export function isConfidentialMode(env: ConfidentialEnv = process.env): boolean {
-  return TRUTHY.has(String(env.KCW_CONFIDENTIAL ?? '').trim().toLowerCase());
+  return TRUTHY.has(String((env.ACW_CONFIDENTIAL ?? env.KCW_CONFIDENTIAL) ?? '').trim().toLowerCase());
 }
 
 export type McpServerFilterResult<T> = {

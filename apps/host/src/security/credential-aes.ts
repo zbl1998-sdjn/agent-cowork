@@ -8,12 +8,12 @@ function aesKey(keyMaterial: string): Buffer {
 }
 
 function requiredAesKeyMaterial(keyMaterial: unknown): string {
-  const material = String(keyMaterial ?? process.env.KCW_CREDENTIAL_KEY ?? '');
+  const material = String(keyMaterial ?? (process.env.ACW_CREDENTIAL_KEY ?? process.env.KCW_CREDENTIAL_KEY) ?? '');
   if (!material.trim()) {
-    throw new Error('KCW_CREDENTIAL_KEY is required when DPAPI is unavailable');
+    throw new Error('ACW_CREDENTIAL_KEY is required when DPAPI is unavailable');
   }
   if (Buffer.byteLength(material, 'utf8') < 16) {
-    throw new Error('KCW_CREDENTIAL_KEY must contain at least 16 bytes');
+    throw new Error('ACW_CREDENTIAL_KEY must contain at least 16 bytes');
   }
   return material;
 }

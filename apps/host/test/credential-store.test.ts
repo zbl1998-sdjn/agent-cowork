@@ -348,16 +348,45 @@ test('AES-GCM credential protector round-trips empty plaintext and rejects non-c
 });
 
 test('AES-GCM protector fails closed instead of deriving a key from public host metadata', () => {
-  const original = process.env.KCW_CREDENTIAL_KEY;
+  const originalAcw = process.env.ACW_CREDENTIAL_KEY;
+  const originalKcw = process.env.KCW_CREDENTIAL_KEY;
+  delete process.env.ACW_CREDENTIAL_KEY;
   delete process.env.KCW_CREDENTIAL_KEY;
   try {
     assert.throws(
       () => createAesGcmProtector({}),
-      /KCW_CREDENTIAL_KEY.*required/i,
+      /ACW_CREDENTIAL_KEY.*required/i,
     );
     assert.doesNotThrow(() => createAesGcmProtector({ keyMaterial: 'explicit-test-key' }));
   } finally {
-    if (original !== undefined) process.env.KCW_CREDENTIAL_KEY = original;
+    if (originalAcw !== undefined) process.env.ACW_CREDENTIAL_KEY = originalAcw;
+    if (originalKcw !== undefined) process.env.KCW_CREDENTIAL_KEY = originalKcw;
+  }
+});
+
+test('AES-GCM protector reads the new ACW_CREDENTIAL_KEY env name and prefers it over the legacy KCW_CREDENTIAL_KEY', () => {
+  const originalAcw = process.env.ACW_CREDENTIAL_KEY;
+  const originalKcw = process.env.KCW_CREDENTIAL_KEY;
+  try {
+    process.env.ACW_CREDENTIAL_KEY = 'new-name-key-material-16bytes';
+    delete process.env.KCW_CREDENTIAL_KEY;
+    assert.doesNotThrow(() => createAesGcmProtector({}), 'new ACW_ name alone should satisfy the key requirement');
+
+    process.env.KCW_CREDENTIAL_KEY = 'legacy-name-key-material-16bytes';
+    const protectorWithBoth = createAesGcmProtector({});
+    const protectorWithAcwOnly = (() => {
+      delete process.env.KCW_CREDENTIAL_KEY;
+      const p = createAesGcmProtector({});
+      process.env.KCW_CREDENTIAL_KEY = 'legacy-name-key-material-16bytes';
+      return p;
+    })();
+    const sealed = protectorWithBoth.protect('secret-value');
+    assert.equal(protectorWithAcwOnly.unprotect(sealed), 'secret-value', 'ACW_ name must win when both env names are set');
+  } finally {
+    if (originalAcw === undefined) delete process.env.ACW_CREDENTIAL_KEY;
+    else process.env.ACW_CREDENTIAL_KEY = originalAcw;
+    if (originalKcw === undefined) delete process.env.KCW_CREDENTIAL_KEY;
+    else process.env.KCW_CREDENTIAL_KEY = originalKcw;
   }
 });
 

@@ -42,7 +42,7 @@ function effectiveSecurityMode(env: AtRestEnv): SecurityMode {
 export function isAtRestEncryptionEnabled(env: AtRestEnv = process.env): boolean {
   const mode = effectiveSecurityMode(env);
   if (mode === 'air_gap') return true; // 隔离档:不可削弱
-  const raw = String(env.KCW_ENCRYPT_AT_REST ?? '').trim().toLowerCase();
+  const raw = String((env.ACW_ENCRYPT_AT_REST ?? env.KCW_ENCRYPT_AT_REST) ?? '').trim().toLowerCase();
   if (TRUTHY.has(raw)) return true; // 显式开(任意档)
   if (FALSY.has(raw)) return false; // 显式关(air_gap 之外)
   return mode === 'local_strict' || mode === 'enterprise_local'; // 本地严格/企业内网默认开

@@ -120,7 +120,7 @@ export function resolveSecurityMode({
   if (isConfidentialMode(env)) return 'air_gap';
   const configured = clean(configuredMode);
   if (configured) return normalizeSecurityMode(configured);
-  const envMode = clean(env.SECURITY_MODE || env.KCW_SECURITY_MODE);
+  const envMode = clean(env.SECURITY_MODE || env.ACW_SECURITY_MODE || env.KCW_SECURITY_MODE);
   if (envMode) return normalizeSecurityMode(envMode);
   return 'controlled_hybrid';
 }

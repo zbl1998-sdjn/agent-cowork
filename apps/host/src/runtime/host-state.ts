@@ -99,7 +99,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     startupReady: Promise.resolve(),
     approvalRegistry: config.approvalRegistry as ApprovalRegistryLike,
     authStore: config.authStore as HostState['authStore'],
-    enrollmentPolicy: createEnrollmentPolicy(config.enrollmentToken ?? process.env.KCW_ENROLLMENT_TOKEN),
+    enrollmentPolicy: createEnrollmentPolicy(config.enrollmentToken ?? (process.env.ACW_ENROLLMENT_TOKEN || process.env.KCW_ENROLLMENT_TOKEN)),
     cancellation: config.cancellation as CancellationRegistryLike,
     runEvents: config.runEventBus as RunEventsState,
     runsIndex: config.runsIndex as HostState['runsIndex'],
@@ -148,7 +148,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   state.sandboxEnabled = config.enableSandbox !== false;
   // 沙箱启动必须“诚实”:Docker 镜像可用才声明网络隔离,否则回退 local 并暴露 networkIsolated=false。
   state.sandboxStartup = config.sandboxStartup || resolveSandboxStartup(omitUndefined({
-    requestedBackend: config.sandboxBackend || process.env.KCW_SANDBOX_BACKEND || 'auto',
+    requestedBackend: config.sandboxBackend || process.env.ACW_SANDBOX_BACKEND || process.env.KCW_SANDBOX_BACKEND || 'auto',
     sandboxOptions: config.sandboxOptions || {},
     securityMode,
     env: process.env,
@@ -190,29 +190,29 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     state.startupReady = Promise.all(startupTasks).then(() => undefined);
   }
   state.agentConcurrency = config.agentConcurrency || createConcurrencyLimiter({
-    maxConcurrent: Number(process.env.KCW_MAX_CONCURRENT_RUNS || 64),
-    maxPerTenant: Number(process.env.KCW_MAX_RUNS_PER_TENANT || 8),
+    maxConcurrent: Number(process.env.ACW_MAX_CONCURRENT_RUNS || process.env.KCW_MAX_CONCURRENT_RUNS || 64),
+    maxPerTenant: Number(process.env.ACW_MAX_RUNS_PER_TENANT || process.env.KCW_MAX_RUNS_PER_TENANT || 8),
   });
   state.rateLimiter = config.rateLimit === false ? null : (config.rateLimiter || createRateLimiter({
-    ratePerSec: Number(config.rateLimitPerSec || process.env.KCW_RATE_PER_SEC || 50),
-    burst: Number(config.rateLimitBurst || process.env.KCW_RATE_BURST || 100),
+    ratePerSec: Number(config.rateLimitPerSec || process.env.ACW_RATE_PER_SEC || process.env.KCW_RATE_PER_SEC || 50),
+    burst: Number(config.rateLimitBurst || process.env.ACW_RATE_BURST || process.env.KCW_RATE_BURST || 100),
   }));
   state.clarifications = config.clarifications || createClarificationStore();
-  state.authStore = config.authStore || ((config.persistAuth ?? (process.env.KCW_AUTH_PERSIST !== 'false'))
+  state.authStore = config.authStore || ((config.persistAuth ?? ((process.env.ACW_AUTH_PERSIST ?? process.env.KCW_AUTH_PERSIST) !== 'false'))
     ? createSqliteUserStore({ dbPath: statePaths.authDbPath() })
     : createUserStore());
   // 凭证仓库是 OAuth/API token 的唯一持久入口;前端只拿脱敏状态,不接触明文凭证。
   state.credentialStore = config.credentialStore || createCredentialStore({
-    filePath: path.resolve(config.credentialStorePath || process.env.KCW_CREDENTIAL_STORE || path.join(getAppHome(), 'credentials.json')),
+    filePath: path.resolve(config.credentialStorePath || process.env.ACW_CREDENTIAL_STORE || process.env.KCW_CREDENTIAL_STORE || path.join(getAppHome(), 'credentials.json')),
   });
   state.oauthSessions = config.oauthSessions || new Map();
   state.oauthFetch = config.oauthFetch || fetch;
   state.oauthConfig = config.oauthConfig || {};
-  state.jwtSecret = config.jwtSecret || process.env.KCW_JWT_SECRET || null;
-  state.requireAuth = config.requireAuth ?? (process.env.KCW_REQUIRE_AUTH !== 'false');
-  state.trustIdentityHeaders = config.trustIdentityHeaders ?? (process.env.KCW_TRUST_IDENTITY_HEADERS === 'true');
+  state.jwtSecret = config.jwtSecret || process.env.ACW_JWT_SECRET || process.env.KCW_JWT_SECRET || null;
+  state.requireAuth = config.requireAuth ?? ((process.env.ACW_REQUIRE_AUTH ?? process.env.KCW_REQUIRE_AUTH) !== 'false');
+  state.trustIdentityHeaders = config.trustIdentityHeaders ?? ((process.env.ACW_TRUST_IDENTITY_HEADERS ?? process.env.KCW_TRUST_IDENTITY_HEADERS) === 'true');
   // Host 头白名单用于抵御 DNS rebinding,默认开启;只有明确绑定非回环地址时才关闭。
-  state.validateHost = config.validateHost ?? (process.env.KCW_VALIDATE_HOST !== 'false');
+  state.validateHost = config.validateHost ?? ((process.env.ACW_VALIDATE_HOST ?? process.env.KCW_VALIDATE_HOST) !== 'false');
 
   // 状态对象保留原接口；索引归一化与失败隔离由同层 helper 负责。
   state.indexRun = (
