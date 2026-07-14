@@ -1,16 +1,16 @@
 // useAppRuntimeState(UI · hooks 层)
 // ---------------------------------------------------------------------------
-// 职责:聚合应用级运行时状态——host 连通性/健康、Kimi 配置、运行时依赖、能力开关等的加载与轮询,
+// 职责:聚合应用级运行时状态——host 连通性/健康、Agent 引擎配置、运行时依赖、能力开关等的加载与轮询,
 //       为顶层组件提供统一的「环境就绪度」。依赖:lib/api(诊断/配置/依赖)。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getJson,
-  getKimiInfo,
+  getAgentEngineInfo,
   getMe,
   guestLogin,
   logout as apiLogout,
   type AuthIdentity,
-  type KimiInfo,
+  type AgentEngineInfo,
   type ModelProviderOption,
 } from '../lib/api';
 import { AUTO_CLARIFY_KEY, AUTO_CONTEXT_COMPACTION_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
@@ -59,7 +59,7 @@ function readStoredFontFamily(): AppFontFamily {
   }
 }
 
-function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): ModelProviderOption[] {
+function providersFromCatalog(info: Partial<AgentEngineInfo> | null | undefined): ModelProviderOption[] {
   if (Array.isArray(info?.providers) && info.providers.length) return info.providers;
   const catalog = info?.catalog?.all || {};
   return Object.values(catalog).map((item) => ({
@@ -78,7 +78,7 @@ function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): Model
   }));
 }
 
-export function runtimeDefaultsFromKimiInfo(info: Partial<KimiInfo> | null | undefined): RuntimeDefaults {
+export function runtimeDefaultsFromAgentEngineInfo(info: Partial<AgentEngineInfo> | null | undefined): RuntimeDefaults {
   const providers = providersFromCatalog(info);
   const provider = info?.provider || 'kimi-api';
   const model = info?.model || '';
@@ -142,8 +142,8 @@ export function useAppRuntimeState() {
   });
   const starters = useMemo(() => runtimeStarters(recipes, history), [recipes, history]);
 
-  const applyKimiInfo = useCallback((info: Partial<KimiInfo> | null | undefined) => {
-    const defaults = runtimeDefaultsFromKimiInfo(info);
+  const applyAgentEngineInfo = useCallback((info: Partial<AgentEngineInfo> | null | undefined) => {
+    const defaults = runtimeDefaultsFromAgentEngineInfo(info);
     setChatEnabled(defaults.chatEnabled);
     setDefaultProvider(defaults.provider);
     setDefaultBaseUrl(defaults.baseUrl);
@@ -220,13 +220,13 @@ export function useAppRuntimeState() {
         setHistory(historyRunsFromIndex(index.runs || []));
       } catch { /* 运行历史加载失败不阻断主界面 */ }
       try {
-        applyKimiInfo(await getKimiInfo());
+        applyAgentEngineInfo(await getAgentEngineInfo());
       } catch { /* 模型配置加载失败不阻断主界面 */ }
       try {
         setSecurityStatus(await getJson<SecurityStatus>('/api/security/status'));
       } catch { /* 安全状态加载失败不阻断主界面 */ }
     })();
-  }, [applyKimiInfo, user]);
+  }, [applyAgentEngineInfo, user]);
 
   const doLogout = useCallback(async () => {
     try { await apiLogout(); } catch { /* 登出尽力而为,本地仍会清掉身份 */ }
@@ -265,7 +265,7 @@ export function useAppRuntimeState() {
   const toggleTheme = useCallback(() => setTheme((value) => (value === 'dark' ? 'light' : 'dark')), []);
 
   return {
-    applyKimiInfo,
+    applyAgentEngineInfo,
     authReady,
     autoClarify,
     autoContextCompaction,

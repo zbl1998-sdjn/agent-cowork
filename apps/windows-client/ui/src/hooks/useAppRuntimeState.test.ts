@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { historyRunsFromIndex, runtimeDefaultsFromKimiInfo } from './useAppRuntimeState';
+import { historyRunsFromIndex, runtimeDefaultsFromAgentEngineInfo } from './useAppRuntimeState';
 import type { RunSummary } from '../lib/types';
 
-describe('runtimeDefaultsFromKimiInfo', () => {
-  it('normalizes host Kimi info into App runtime defaults', () => {
-    expect(runtimeDefaultsFromKimiInfo({
+describe('runtimeDefaultsFromAgentEngineInfo', () => {
+  it('normalizes host Agent Engine info into App runtime defaults', () => {
+    expect(runtimeDefaultsFromAgentEngineInfo({
       chatEnabled: true,
       provider: 'anthropic',
       baseUrl: 'https://anthropic.test',
@@ -20,7 +20,7 @@ describe('runtimeDefaultsFromKimiInfo', () => {
   });
 
   it('derives provider options and model choices from opencode-style catalog', () => {
-    const defaults = runtimeDefaultsFromKimiInfo({
+    const defaults = runtimeDefaultsFromAgentEngineInfo({
       chatEnabled: true,
       provider: 'deepseek',
       baseUrl: 'https://api.deepseek.com',
@@ -67,7 +67,7 @@ describe('runtimeDefaultsFromKimiInfo', () => {
   });
 
   it('keeps fallback provider and empty model list when info is partial', () => {
-    expect(runtimeDefaultsFromKimiInfo(null)).toEqual({
+    expect(runtimeDefaultsFromAgentEngineInfo(null)).toEqual({
       chatEnabled: false,
       provider: 'kimi-api',
       baseUrl: '',

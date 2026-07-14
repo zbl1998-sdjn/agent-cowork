@@ -1,15 +1,15 @@
 // API 设置弹窗(UI · 组件层 · components)
 // ---------------------------------------------------------------------------
-// 职责:填写 Kimi/模型配置(API Key、Base URL、模型)的模态;从 host 预填 baseUrl/model 与
+// 职责:填写 Agent 模型配置(API Key、Base URL、模型)的模态;从 host 预填 baseUrl/model 与
 //       hasKey(不回显明文),保存空 Key 即保留原值。仅渲染+回调,通过 lib/api 读写配置。
-// 依赖:getKimiInfo/saveKimiConfig(lib/api)、Button/IconButton。同文件导出 ApiSettingsActions(操作条)。
+// 依赖:getAgentEngineInfo/saveAgentEngineConfig(lib/api)、Button/IconButton。同文件导出 ApiSettingsActions(操作条)。
 import { useEffect, useState } from 'react';
-import { getKimiInfo, saveKimiConfig, type KimiInfo } from '../lib/api';
+import { getAgentEngineInfo, saveAgentEngineConfig, type AgentEngineInfo } from '../lib/api';
 import { Button, IconButton } from './ui/Button';
 
 interface ApiSettingsProps {
   onClose: () => void;
-  onSaved: (info: KimiInfo) => void;
+  onSaved: (info: AgentEngineInfo) => void;
 }
 
 export function ApiSettingsActions({
@@ -50,7 +50,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
   useEffect(() => {
     void (async () => {
       try {
-        const info = await getKimiInfo();
+        const info = await getAgentEngineInfo();
         setBaseUrl(info.baseUrl || '');
         setModel(info.model || '');
         setHasKey(Boolean(info.hasKey));
@@ -75,7 +75,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
       const payload = clearKey
         ? { clearKey: true }
         : { apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined, model: model.trim() || undefined };
-      const info = await saveKimiConfig(payload);
+      const info = await saveAgentEngineConfig(payload);
       setHasKey(Boolean(info.hasKey));
       setApiKey('');
       onSaved(info);

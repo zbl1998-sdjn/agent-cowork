@@ -1,7 +1,7 @@
 // ComposerModelControls(UI · components):输入框模型控制——选择提供商 + 从「精选模型」里挑(带能力标签/特点),
 // 也可手输任意 model id(后端仍支持全量)。纯展示 + 回调 + 一个本地开合状态。
 import { useState } from 'react';
-import type { ModelProviderOption } from '../lib/api/kimiConfig';
+import type { ModelProviderOption } from '../lib/api/agentEngine';
 import { highlightsForProvider, type ModelTag } from '../lib/model-highlights';
 
 const FALLBACK_PROVIDER_OPTIONS = [

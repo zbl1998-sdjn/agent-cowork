@@ -7,7 +7,7 @@ export * from './runs';
 export * from './tools';
 export * from './artifacts';
 export * from './schedules';
-export * from './kimiConfig';
+export * from './agentEngine';
 export * from './auth';
 export * from './conversations';
 export * from './files';

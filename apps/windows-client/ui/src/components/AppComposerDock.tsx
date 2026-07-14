@@ -7,7 +7,7 @@ import type { Command } from './CommandPalette';
 import { Composer, type ComposerDraftPreview, type ComposerMeta, type FileHit, type HistoryRun, type Recipe } from './Composer';
 import { Button } from './ui/Button';
 import type { PromptRefineResult } from '../lib/api/prompt';
-import type { ModelProviderOption } from '../lib/api/kimiConfig';
+import type { ModelProviderOption } from '../lib/api/agentEngine';
 
 interface AppComposerDockProps {
   commands: Command[];

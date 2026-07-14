@@ -3,7 +3,7 @@
 // 职责:集中按显隐标志挂载引导、命令面板、文件预览与设置(lazy)等模态;只负责显隐编排,自身不取数据。
 // 依赖:CommandPalette、FilePreview、OnboardingPanel、懒加载的 Settings、Loading。
 import { lazy, Suspense } from 'react';
-import type { AuthIdentity, KimiInfo } from '../lib/api';
+import type { AuthIdentity, AgentEngineInfo } from '../lib/api';
 import type { Command } from './CommandPalette';
 import { CommandPalette } from './CommandPalette';
 import { FilePreview } from './FilePreview';
@@ -35,7 +35,7 @@ interface AppOverlaysProps {
   onOpenSettingsFromOnboarding: () => void;
   onOpenSettingsTabFromOnboarding?: (tab: SettingsTab) => void;
   onLogout: () => void;
-  onSettingsSaved: (info: KimiInfo) => void;
+  onSettingsSaved: (info: AgentEngineInfo) => void;
   onSetAutoClarify: (enabled: boolean) => void;
   onSetAutoContextCompaction: (enabled: boolean) => void;
   onSetTheme: (theme: 'light' | 'dark') => void;

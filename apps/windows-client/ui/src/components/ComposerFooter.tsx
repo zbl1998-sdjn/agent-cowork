@@ -3,7 +3,7 @@
 import { ComposerSendAction, ComposerToolActions } from './ComposerActions';
 import { ComposerModelControls } from './ComposerModelControls';
 import { ComposerTriggers } from './ComposerTriggers';
-import type { ModelProviderOption } from '../lib/api/kimiConfig';
+import type { ModelProviderOption } from '../lib/api/agentEngine';
 import type { ComposerTriggerChar, ThinkingLevel } from '../lib/types/composer';
 
 export type { ThinkingLevel } from '../lib/types/composer';

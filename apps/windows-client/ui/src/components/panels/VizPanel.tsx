@@ -2,9 +2,9 @@
 // ---------------------------------------------------------------------------
 // 职责:默认展示当前 Agent Cowork 工作区的运行/产物/模型态势,并可渲染为可刷新的活页制品;
 //       高级区仍保留 JSON 模板/填表入口。只渲染+触发回调。
-// 依赖:lib/api(renderViz/listRunRecords/listArtifacts/getKimiInfo)+ LiveArtifactView、ui/Button、ui/StateViews。导出:VizPanel 等。
+// 依赖:lib/api(renderViz/listRunRecords/listArtifacts/getAgentEngineInfo)+ LiveArtifactView、ui/Button、ui/StateViews。导出:VizPanel 等。
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { renderViz, liveArtifactUrl, fetchArtifactHtml, listArtifacts, listRunRecords, getKimiInfo } from '../../lib/api';
+import { renderViz, liveArtifactUrl, fetchArtifactHtml, listArtifacts, listRunRecords, getAgentEngineInfo } from '../../lib/api';
 import { joinWorkspacePath } from '../../lib/app-logic';
 import { humanizeError } from '../../lib/friendly-error';
 import { LiveArtifactView } from '../LiveArtifactView';
@@ -191,7 +191,7 @@ export function VizPanel({ trustedRoot, workbenchPreview }: VizPanelProps) {
     const [runsResult, artifactsResult, infoResult] = await Promise.allSettled([
       listRunRecords(20),
       listArtifacts(trustedRoot, 20),
-      getKimiInfo(),
+      getAgentEngineInfo(),
     ]);
     const failures = [runsResult, artifactsResult, infoResult].filter((item) => item.status === 'rejected');
     const runs = runsResult.status === 'fulfilled' ? runsResult.value : [];
