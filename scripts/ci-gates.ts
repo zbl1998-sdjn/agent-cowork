@@ -6,7 +6,7 @@
 // 用法:被 scripts/ci.ts 导入调用(buildCiSteps / changedFilesFromEnv),
 //   变更文件经由 KCW_CI_CHANGED_FILES 或 CHANGED_FILES 环境变量传入;
 //   KCW_CI_FORCE_EVAL=1 可强制追加 eval。无独立 npm 脚本。
-// 依赖:kimi/eval 相关源码路径的正则白名单(命中即触发 eval)。
+// 依赖:engine/eval 相关源码路径的正则白名单(命中即触发 eval)。
 
 export type CiStep = {
   name: string;
@@ -34,11 +34,11 @@ const EVAL_STEP: CiStep = {
 };
 
 const EVAL_TRIGGER_PATTERNS = [
-  /^apps\/host\/src\/kimi\/system-prompt\.(?:js|ts)$/,
-  /^apps\/host\/src\/kimi\/model-call\.(?:js|ts)$/,
-  /^apps\/host\/src\/kimi\/model-/,
-  /^apps\/host\/src\/kimi\/agent\//,
-  /^apps\/host\/src\/kimi\/agent-runner\.(?:js|ts)$/,
+  /^apps\/host\/src\/engine\/system-prompt\.(?:js|ts)$/,
+  /^apps\/host\/src\/engine\/model-call\.(?:js|ts)$/,
+  /^apps\/host\/src\/engine\/model-/,
+  /^apps\/host\/src\/engine\/agent\//,
+  /^apps\/host\/src\/engine\/agent-runner\.(?:js|ts)$/,
   /^eval\//,
   /^scripts\/eval\.(?:mjs|ts)$/,
 ];
