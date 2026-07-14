@@ -9,9 +9,10 @@ import {
   canonicalCredentialProvider,
 } from '../security/credential-identity.js';
 import { requireIdentityScopeFrom } from '../security/identity-scope.js';
+import { readCompatEnv } from '../util/env-compat.js';
 import type { ConnectorDescriptor } from '../connectors/catalog.js';
 
-export const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
+export const GITHUB_CLIENT_ID_ENV_KEYS = Object.freeze(['ACW_GITHUB_OAUTH_CLIENT_ID', 'KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
 
 export type RequestContext = {
   tenantId?: string;
@@ -58,7 +59,7 @@ export function githubClientId(oauthConfig?: unknown): string {
   const configClientId = result.success ? result.data.github?.clientId : '';
   return String(
     configClientId
-      || process.env.KCW_GITHUB_OAUTH_CLIENT_ID
+      || readCompatEnv(process.env, 'ACW_GITHUB_OAUTH_CLIENT_ID', 'KCW_GITHUB_OAUTH_CLIENT_ID')
       || process.env.GITHUB_OAUTH_CLIENT_ID
       || '',
   ).trim();

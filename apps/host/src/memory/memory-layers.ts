@@ -13,6 +13,7 @@ import {
   readManagedMemoryFile,
   type MemoryFilesystemOperation,
 } from './memory-filesystem-boundary.js';
+import { readCompatEnv } from '../util/env-compat.js';
 
 // 五层按低→高优先级拼接:enterprise/user/project/local/session;越后的层可以修正前层。
 // 合并后的块注入 agent system prompt,同时保留每层来源与字节数便于 UI 展示。
@@ -63,7 +64,7 @@ function readOptionalExternalFile(filePath: string | null | undefined, maxBytes:
 export function loadLayeredMemory({
   trustedRoot,
   userHome = os.homedir(),
-  enterprisePath = process.env.KCW_ENTERPRISE_MEMORY || '',
+  enterprisePath = readCompatEnv(process.env, 'ACW_ENTERPRISE_MEMORY', 'KCW_ENTERPRISE_MEMORY') || '',
   sessionMemory = '',
   maxBytes = 12000,
   perLayerBytes = 6000,

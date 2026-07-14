@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { readCompatEnv } from '../util/env-compat.js';
 import {
   createManagedDirectoryBoundary,
   type ManagedDirectoryBoundary,
@@ -26,8 +27,8 @@ export type JsonlWriterOptions = {
 
 // 审计/事件日志会持续增长,因此写入前按大小轮转:当前文件进入 .1,旧代后移,超出 maxFiles 的最旧代丢弃。
 // 默认阈值可通过环境变量调优。
-const DEFAULT_MAX_BYTES = Number(process.env.KCW_LOG_MAX_BYTES || 8 * 1024 * 1024);
-const DEFAULT_MAX_FILES = Math.max(1, Number(process.env.KCW_LOG_MAX_FILES || 3));
+const DEFAULT_MAX_BYTES = Number(readCompatEnv(process.env, 'ACW_LOG_MAX_BYTES', 'KCW_LOG_MAX_BYTES') || 8 * 1024 * 1024);
+const DEFAULT_MAX_FILES = Math.max(1, Number(readCompatEnv(process.env, 'ACW_LOG_MAX_FILES', 'KCW_LOG_MAX_FILES') || 3));
 
 function isNotFound(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === 'ENOENT';

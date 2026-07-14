@@ -120,7 +120,7 @@ export async function handleConnectorOAuthRoutes({
             configured: false,
             code: 'OAUTH_NOT_CONFIGURED',
             requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
-            error: 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID 后再开始授权。',
+            error: 'GitHub OAuth 需要先配置 ACW_GITHUB_OAUTH_CLIENT_ID 后再开始授权。',
           });
           return;
         }

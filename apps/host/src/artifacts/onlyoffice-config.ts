@@ -1,6 +1,8 @@
 // ONLYOFFICE 配置(host · L1 artifacts)
 // ---------------------------------------------------------------------------
 // 职责:集中解析 Document Server、回调基址、JWT 与有界网络参数；不向客户端暴露 secret。
+import { readCompatEnv } from '../util/env-compat.js';
+
 export type OnlyOfficeConfigInput = Readonly<{
   enabled?: boolean;
   documentServerUrl?: string;
@@ -51,23 +53,23 @@ export function resolveOnlyOfficeConfig(
   input: OnlyOfficeConfigInput = {},
   env: Record<string, string | undefined> = process.env,
 ): OnlyOfficeConfig {
-  const enabled = input.enabled ?? booleanValue(env.KCW_ONLYOFFICE_ENABLED);
+  const enabled = input.enabled ?? booleanValue(readCompatEnv(env, 'ACW_ONLYOFFICE_ENABLED', 'KCW_ONLYOFFICE_ENABLED'));
   const documentServerUrl = serviceUrl(
-    input.documentServerUrl ?? env.KCW_ONLYOFFICE_DOCUMENT_SERVER_URL,
+    input.documentServerUrl ?? readCompatEnv(env, 'ACW_ONLYOFFICE_DOCUMENT_SERVER_URL', 'KCW_ONLYOFFICE_DOCUMENT_SERVER_URL'),
     'ONLYOFFICE documentServerUrl',
   );
   const publicBaseUrl = serviceUrl(
-    input.publicBaseUrl ?? env.KCW_ONLYOFFICE_PUBLIC_BASE_URL,
+    input.publicBaseUrl ?? readCompatEnv(env, 'ACW_ONLYOFFICE_PUBLIC_BASE_URL', 'KCW_ONLYOFFICE_PUBLIC_BASE_URL'),
     'ONLYOFFICE publicBaseUrl',
     true,
   );
-  const jwtSecret = String(input.jwtSecret ?? env.KCW_ONLYOFFICE_JWT_SECRET ?? '');
-  const jwtHeader = String(input.jwtHeader ?? env.KCW_ONLYOFFICE_JWT_HEADER ?? 'Authorization').trim();
+  const jwtSecret = String(input.jwtSecret ?? readCompatEnv(env, 'ACW_ONLYOFFICE_JWT_SECRET', 'KCW_ONLYOFFICE_JWT_SECRET') ?? '');
+  const jwtHeader = String(input.jwtHeader ?? readCompatEnv(env, 'ACW_ONLYOFFICE_JWT_HEADER', 'KCW_ONLYOFFICE_JWT_HEADER') ?? 'Authorization').trim();
   if (!/^[A-Za-z][A-Za-z0-9-]{0,63}$/u.test(jwtHeader)) throw new Error('ONLYOFFICE jwtHeader is invalid');
   const missing = [
-    !documentServerUrl && 'KCW_ONLYOFFICE_DOCUMENT_SERVER_URL',
-    !publicBaseUrl && 'KCW_ONLYOFFICE_PUBLIC_BASE_URL',
-    jwtSecret.length < 12 && 'KCW_ONLYOFFICE_JWT_SECRET(min 12 chars)',
+    !documentServerUrl && 'ACW_ONLYOFFICE_DOCUMENT_SERVER_URL',
+    !publicBaseUrl && 'ACW_ONLYOFFICE_PUBLIC_BASE_URL',
+    jwtSecret.length < 12 && 'ACW_ONLYOFFICE_JWT_SECRET(min 12 chars)',
   ].filter(Boolean) as string[];
   return Object.freeze({
     enabled,
@@ -77,9 +79,9 @@ export function resolveOnlyOfficeConfig(
     publicHost: publicBaseUrl ? new URL(publicBaseUrl).host : '',
     jwtSecret,
     jwtHeader,
-    sessionTtlMs: boundedNumber(input.sessionTtlMs ?? env.KCW_ONLYOFFICE_SESSION_TTL_MS, 2 * 60 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000),
-    fetchTimeoutMs: boundedNumber(input.fetchTimeoutMs ?? env.KCW_ONLYOFFICE_FETCH_TIMEOUT_MS, 15_000, 1_000, 60_000),
-    maxFileBytes: boundedNumber(input.maxFileBytes ?? env.KCW_ONLYOFFICE_MAX_FILE_BYTES, 100 * 1024 * 1024, 1024, 500 * 1024 * 1024),
+    sessionTtlMs: boundedNumber(input.sessionTtlMs ?? readCompatEnv(env, 'ACW_ONLYOFFICE_SESSION_TTL_MS', 'KCW_ONLYOFFICE_SESSION_TTL_MS'), 2 * 60 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000),
+    fetchTimeoutMs: boundedNumber(input.fetchTimeoutMs ?? readCompatEnv(env, 'ACW_ONLYOFFICE_FETCH_TIMEOUT_MS', 'KCW_ONLYOFFICE_FETCH_TIMEOUT_MS'), 15_000, 1_000, 60_000),
+    maxFileBytes: boundedNumber(input.maxFileBytes ?? readCompatEnv(env, 'ACW_ONLYOFFICE_MAX_FILE_BYTES', 'KCW_ONLYOFFICE_MAX_FILE_BYTES'), 100 * 1024 * 1024, 1024, 500 * 1024 * 1024),
     missing: Object.freeze(missing),
   });
 }

@@ -124,19 +124,21 @@ export type HistoryBudgetInput = ModelWindowInput & {
 
 /**
  * 一步到位:返回推导出的历史压缩预算,解析优先级:
- *   1) 显式窗口(contextWindowTokens 或环境变量 KCW_MODEL_CONTEXT_WINDOW);
+ *   1) 显式窗口(contextWindowTokens 或环境变量 ACW_MODEL_CONTEXT_WINDOW,兼容旧名 KCW_MODEL_CONTEXT_WINDOW);
  *   2) 非本地 provider 时按模型族/厂商静态窗口(skipFamilyWindow=false);
  *   3) 都没有 → undefined,让调用方保留既有保守默认(未知/本地模型行为不变、不高估)。
- * inputRatio 未显式传入时读环境变量 KCW_CONTEXT_INPUT_RATIO,再回落默认 0.75。
+ * inputRatio 未显式传入时读环境变量 ACW_CONTEXT_INPUT_RATIO(兼容旧名 KCW_CONTEXT_INPUT_RATIO),再回落默认 0.75。
  */
 export function resolveHistoryBudgetTokens(
   { provider, model, contextWindowTokens, inputRatio, skipFamilyWindow }: HistoryBudgetInput,
   env: Record<string, string | undefined> = process.env,
 ): number | undefined {
-  const explicitWindow = positiveInteger(contextWindowTokens) ?? positiveInteger(env.KCW_MODEL_CONTEXT_WINDOW);
+  const rawWindow = env.ACW_MODEL_CONTEXT_WINDOW ?? env.KCW_MODEL_CONTEXT_WINDOW;
+  const explicitWindow = positiveInteger(contextWindowTokens) ?? positiveInteger(rawWindow);
   const window = explicitWindow
     ?? (skipFamilyWindow ? undefined : resolveModelContextWindowTokens({ provider, model }));
   if (window == null) return undefined;
-  const ratio = inputRatio ?? (env.KCW_CONTEXT_INPUT_RATIO != null ? Number(env.KCW_CONTEXT_INPUT_RATIO) : undefined);
+  const rawRatio = env.ACW_CONTEXT_INPUT_RATIO ?? env.KCW_CONTEXT_INPUT_RATIO;
+  const ratio = inputRatio ?? (rawRatio != null ? Number(rawRatio) : undefined);
   return deriveHistoryBudgetTokens(window, ratio == null ? {} : { inputRatio: ratio });
 }

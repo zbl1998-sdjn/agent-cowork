@@ -6,6 +6,7 @@
 //       ResolvedStoreBackendConfig, resolveStoreBackendConfig。
 import path from 'node:path';
 import { assertTrustedPathForCreate } from '../security/path-policy.js';
+import { readCompatEnv } from '../util/env-compat.js';
 
 export type StoreBackend = 'file' | 'sqlite' | 'postgres';
 
@@ -26,7 +27,7 @@ export function resolveStoreBackendConfig(
   config: StoreBackendConfigInput,
   trustedRootDefault: string,
 ): ResolvedStoreBackendConfig {
-  const storeRaw = String(config.storeBackend || process.env.KCW_STORE || 'sqlite').toLowerCase();
+  const storeRaw = String(config.storeBackend || readCompatEnv(process.env, 'ACW_STORE', 'KCW_STORE') || 'sqlite').toLowerCase();
   const storeBackend = resolveStoreBackend(storeRaw);
   const rawDatabaseUrl = config.databaseUrl || process.env.DATABASE_URL || null;
   const databaseUrl = typeof rawDatabaseUrl === 'string' && rawDatabaseUrl.trim()
@@ -36,7 +37,7 @@ export function resolveStoreBackendConfig(
     throw new Error('KCW_STORE=postgres requires DATABASE_URL');
   }
 
-  const configuredSqliteDbPath = config.sqliteDbPath || process.env.KCW_SQLITE_PATH;
+  const configuredSqliteDbPath = config.sqliteDbPath || readCompatEnv(process.env, 'ACW_SQLITE_PATH', 'KCW_SQLITE_PATH');
   return {
     storeBackend,
     databaseUrl,

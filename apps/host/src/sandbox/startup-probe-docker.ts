@@ -3,6 +3,7 @@
 // 职责:解析配置中的 Docker 镜像身份,并在短超时探测中验证 daemon、不可变镜像
 //       策略和本地镜像存在性。选择/回退决策仍由 startup-probe 统一负责。
 import { isImmutableDockerImage } from './wsl-docker-runner.js';
+import { readCompatEnv } from '../util/env-compat.js';
 import type {
   BackendProbe,
   RuntimeEnv,
@@ -22,8 +23,8 @@ export function dockerImageFrom({
   env = {},
 }: { sandboxOptions?: SandboxStartupOptions; env?: RuntimeEnv }): string | null {
   return sandboxOptions.image
-    || env.KCW_SANDBOX_DOCKER_IMAGE
-    || env.KCW_SANDBOX_IMAGE
+    || readCompatEnv(env, 'ACW_SANDBOX_DOCKER_IMAGE', 'KCW_SANDBOX_DOCKER_IMAGE')
+    || readCompatEnv(env, 'ACW_SANDBOX_IMAGE', 'KCW_SANDBOX_IMAGE')
     || null;
 }
 

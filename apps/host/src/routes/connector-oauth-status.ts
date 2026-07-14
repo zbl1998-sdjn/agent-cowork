@@ -50,7 +50,7 @@ export function sendConnectorOAuthStatus({
     requiredEnv: GITHUB_CLIENT_ID_ENV_KEYS,
     configurationMessage: githubClientId(oauthConfig)
       ? 'GitHub OAuth client id 已配置。'
-      : 'GitHub OAuth 需要先配置 KCW_GITHUB_OAUTH_CLIENT_ID。',
+      : 'GitHub OAuth 需要先配置 ACW_GITHUB_OAUTH_CLIENT_ID。',
     permissions: oauthPermissions(githubConnector()),
   });
 }

@@ -128,8 +128,8 @@ test('GitHub OAuth start only accepts host-configured client id and preserves ap
     assert.equal(status.status, 200);
     const statusBody = parseOAuthStatus(status.body);
     assert.equal(statusBody.configured, false);
-    assert.deepEqual(statusBody.requiredEnv, ['KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
-    assert.match(statusBody.configurationMessage || '', /KCW_GITHUB_OAUTH_CLIENT_ID/);
+    assert.deepEqual(statusBody.requiredEnv, ['ACW_GITHUB_OAUTH_CLIENT_ID', 'KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
+    assert.match(statusBody.configurationMessage || '', /ACW_GITHUB_OAUTH_CLIENT_ID/);
 
     const approved = await jsonRequest(base, '/api/connectors/oauth/approve', {
       method: 'POST',
@@ -148,7 +148,7 @@ test('GitHub OAuth start only accepts host-configured client id and preserves ap
     });
     assert.equal(missingConfig.status, 428);
     assert.equal(missingConfig.body.code, 'OAUTH_NOT_CONFIGURED');
-    assert.match(String(missingConfig.body.error), /KCW_GITHUB_OAUTH_CLIENT_ID/);
+    assert.match(String(missingConfig.body.error), /ACW_GITHUB_OAUTH_CLIENT_ID/);
     assert.equal(calls.length, 0);
 
     process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'env-client';

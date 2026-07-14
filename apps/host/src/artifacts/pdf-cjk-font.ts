@@ -6,8 +6,8 @@
 // 依赖:仅 node:fs/zlib(读字体 + FlateDecode 压缩)。导出:createCjkPdfDocument / isCjkFontAvailable。
 // 说明:TrueType 大端序;子集保持 GID 不变(loca 仍 numGlyphs+1 项,未用字形零长),
 //       PDF 用 CIDToGIDMap=Identity 直接以 GID 编码文本,故字体自身 cmap 不被 PDF 使用。
-import fs from 'node:fs';
-import zlib from 'node:zlib';
+import fs from 'node:fs'; import zlib from 'node:zlib';
+import { readCompatEnv } from '../util/env-compat.js';
 
 const CJK_RE = /[぀-ヿ㐀-鿿-℀-￯豈-﫿]/;
 export function hasCjk(text: string): boolean { return CJK_RE.test(String(text || '')); }
@@ -175,10 +175,10 @@ function readHmtxAdvance(sfnt: Sfnt, gid: number): number {
 }
 
 let cachedFontPath: string | null | undefined;
-/** 找一份可嵌入的 CJK .ttf(env KCW_CJK_FONT 优先,否则系统黑体/等线)。找不到返回 null。 */
+/** 找一份可嵌入的 CJK .ttf(env ACW_CJK_FONT 优先,否则系统黑体/等线)。找不到返回 null。 */
 export function resolveCjkFontPath(env: Record<string, string | undefined> = process.env): string | null {
   if (cachedFontPath !== undefined) return cachedFontPath;
-  const candidates = [env.KCW_CJK_FONT, 'C:/Windows/Fonts/simhei.ttf', 'C:/Windows/Fonts/Deng.ttf', 'C:/Windows/Fonts/simkai.ttf', '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc'].filter(Boolean) as string[];
+  const candidates = [readCompatEnv(env, 'ACW_CJK_FONT', 'KCW_CJK_FONT'), 'C:/Windows/Fonts/simhei.ttf', 'C:/Windows/Fonts/Deng.ttf', 'C:/Windows/Fonts/simkai.ttf', '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc'].filter(Boolean) as string[];
   cachedFontPath = candidates.find((p) => { try { return fs.existsSync(p) && fs.statSync(p).isFile(); } catch { return false; } }) || null;
   return cachedFontPath;
 }

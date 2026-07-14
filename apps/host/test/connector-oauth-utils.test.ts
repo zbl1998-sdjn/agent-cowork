@@ -63,6 +63,29 @@ test('OAuth route utilities normalize identities, client id, and status codes', 
   }
 });
 
+test('githubClientId reads the new ACW_ env name and prefers it over the legacy KCW_ name', () => {
+  const previousAcw = process.env.ACW_GITHUB_OAUTH_CLIENT_ID;
+  const previousKcw = process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+  delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+  try {
+    process.env.ACW_GITHUB_OAUTH_CLIENT_ID = 'new-name-client-id';
+    assert.equal(githubClientId({}), 'new-name-client-id', 'new ACW_ name alone should be picked up');
+
+    process.env.KCW_GITHUB_OAUTH_CLIENT_ID = 'legacy-name-client-id';
+    assert.equal(githubClientId({}), 'new-name-client-id', 'new ACW_ name must win when both are set');
+
+    delete process.env.ACW_GITHUB_OAUTH_CLIENT_ID;
+    assert.equal(githubClientId({}), 'legacy-name-client-id', 'legacy KCW_ name still works when ACW_ is unset');
+
+    assert.deepEqual(GITHUB_CLIENT_ID_ENV_KEYS, ['ACW_GITHUB_OAUTH_CLIENT_ID', 'KCW_GITHUB_OAUTH_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID']);
+  } finally {
+    if (previousAcw === undefined) delete process.env.ACW_GITHUB_OAUTH_CLIENT_ID;
+    else process.env.ACW_GITHUB_OAUTH_CLIENT_ID = previousAcw;
+    if (previousKcw === undefined) delete process.env.KCW_GITHUB_OAUTH_CLIENT_ID;
+    else process.env.KCW_GITHUB_OAUTH_CLIENT_ID = previousKcw;
+  }
+});
+
 test('OAuth permissions normalize defaults, risks, and selected scopes without granting unknown scopes', () => {
   const connector = {
     auth: {

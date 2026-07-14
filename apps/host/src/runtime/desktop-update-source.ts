@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { omitUndefined } from '../util/object.js';
+import { readCompatEnv } from '../util/env-compat.js';
 
 const VERSION_RE = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
 
@@ -81,7 +82,7 @@ function platformEntry(manifest: DesktopUpdateManifest, target: string, arch: st
 
 export function readDesktopUpdateManifest(options: DesktopUpdateManifestOptions = {}): DesktopUpdateManifestResult | null {
   const env = options.env || process.env;
-  const manifestPath = cleanText(env.KCW_DESKTOP_UPDATE_MANIFEST, 1000);
+  const manifestPath = cleanText(readCompatEnv(env, 'ACW_DESKTOP_UPDATE_MANIFEST', 'KCW_DESKTOP_UPDATE_MANIFEST'), 1000);
   if (!manifestPath) return null;
 
   const manifest = JSON.parse(fs.readFileSync(path.resolve(manifestPath), 'utf8')) as DesktopUpdateManifest;
