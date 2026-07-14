@@ -15,9 +15,9 @@ export function createHostStatePathResolvers(
   trustedRoot: string,
   env: Record<string, string | undefined> = process.env,
 ): { modelConfigFile(): string; authDbPath(): string; folderGrantStoreFile(): string } {
-  const configuredKimiConfigFile = config.modelConfigFile;
-  const configuredAuthDbPath = config.authDbPath || env.KCW_AUTH_DB;
-  const configuredFolderGrantStore = config.folderGrantStorePath || env.KCW_FOLDER_GRANT_STORE;
+  const configuredModelConfigFile = config.modelConfigFile;
+  const configuredAuthDbPath = config.authDbPath || env.ACW_AUTH_DB || env.KCW_AUTH_DB;
+  const configuredFolderGrantStore = config.folderGrantStorePath || env.ACW_FOLDER_GRANT_STORE || env.KCW_FOLDER_GRANT_STORE;
   const resolve = (configuredPath: string | undefined, leaf: string): string => (
     configuredPath
       ? path.resolve(configuredPath)
@@ -27,7 +27,7 @@ export function createHostStatePathResolvers(
       )
   );
   return {
-    modelConfigFile: () => resolve(configuredKimiConfigFile, 'config.json'),
+    modelConfigFile: () => resolve(configuredModelConfigFile, 'config.json'),
     authDbPath: () => resolve(configuredAuthDbPath, 'auth.sqlite'),
     folderGrantStoreFile: () => resolve(configuredFolderGrantStore, 'folder-grants.json'),
   };

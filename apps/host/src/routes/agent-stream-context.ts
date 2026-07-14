@@ -63,9 +63,9 @@ export function resolveAgentConvergenceOptions(
   env: Record<string, string | undefined> = process.env,
 ): AgentConvergenceOptions {
   const out: AgentConvergenceOptions = {};
-  const ratio = env.KCW_STEP_NUDGE_RATIO;
+  const ratio = env.ACW_STEP_NUDGE_RATIO ?? env.KCW_STEP_NUDGE_RATIO;
   if (ratio != null && ratio !== '' && Number.isFinite(Number(ratio))) out.stepNudgeRatio = Number(ratio);
-  const discipline = String(env.KCW_TOOL_DISCIPLINE ?? '').trim().toLowerCase();
+  const discipline = String((env.ACW_TOOL_DISCIPLINE ?? env.KCW_TOOL_DISCIPLINE) ?? '').trim().toLowerCase();
   if (discipline === '0' || discipline === 'false' || discipline === 'off') out.toolDiscipline = false;
   return out;
 }

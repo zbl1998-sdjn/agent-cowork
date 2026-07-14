@@ -246,8 +246,8 @@ export async function streamAgentChat({
       skills,
       maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
       // 自动续跑窗数:大任务跑满一窗还没做完时,自动再扩窗接着做(硬上限 = maxSteps*(1+此值))。
-      // 默认 2(即最多 3 窗);可用 body.maxAutoContinues / 环境变量 KCW_MAX_AUTO_CONTINUE 覆盖,夹取 [0,10]。
-      maxAutoContinues: Math.min(10, Math.max(0, Math.floor(Number(body.maxAutoContinues ?? process.env.KCW_MAX_AUTO_CONTINUE ?? 2) || 0))),
+      // 默认 2(即最多 3 窗);可用 body.maxAutoContinues / 环境变量 ACW_MAX_AUTO_CONTINUE(兼容旧名 KCW_MAX_AUTO_CONTINUE)覆盖,夹取 [0,10]。
+      maxAutoContinues: Math.min(10, Math.max(0, Math.floor(Number(body.maxAutoContinues ?? process.env.ACW_MAX_AUTO_CONTINUE ?? process.env.KCW_MAX_AUTO_CONTINUE ?? 2) || 0))),
       verify: body.verify === true || body.thinking === 'deep',
       approvals,
       autoApprove,

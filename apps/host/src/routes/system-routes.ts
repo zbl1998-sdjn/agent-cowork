@@ -147,10 +147,10 @@ export async function handleSystemRoutes({
   }
 
   if (request.method === 'GET' && pathname === '/metrics') {
-    // 收口:运维指标默认不暴露,需显式设置 KCW_METRICS_ENABLED=true 才开启。这样既能在
-    // 需要时供 Prometheus 抓取(像 /health 一样豁免鉴权),默认又不向任何本地调用方匿名
-    // 泄露运行指标(进程内存、并发、熔断器等)。
-    if (process.env.KCW_METRICS_ENABLED !== 'true') {
+    // 收口:运维指标默认不暴露,需显式设置 ACW_METRICS_ENABLED=true(兼容旧名
+    // KCW_METRICS_ENABLED)才开启。这样既能在需要时供 Prometheus 抓取(像 /health 一样
+    // 豁免鉴权),默认又不向任何本地调用方匿名泄露运行指标(进程内存、并发、熔断器等)。
+    if ((process.env.ACW_METRICS_ENABLED ?? process.env.KCW_METRICS_ENABLED) !== 'true') {
       response.writeHead(404, SECURITY_HEADERS);
       response.end();
       return true;
