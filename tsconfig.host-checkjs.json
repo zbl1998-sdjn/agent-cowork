@@ -451,6 +451,7 @@
     "apps/host/src/tools/web-search.ts",
     "apps/host/src/tools/web-fetch.ts",
     "apps/host/src/util/circuit-breaker.ts",
+    "apps/host/src/util/env-compat.ts",
     "apps/host/src/util/ids.ts",
     "apps/host/src/util/object.ts",
     "apps/host/src/util/run-event-publisher.ts",
