@@ -6,6 +6,23 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-14
+
+### Changed
+
+- 全站品牌重命名:自有代码/UI/环境变量/持久化配置字段中的 "Kimi" 品牌标识改为 "Agent" / "Agent Cowork"(第三方 `kimi-api` provider、Kimi CLI 集成、Moonshot 模型名等按行业惯例原样保留)。`/api/kimi/*` 路由改为 `/api/agent-engine/*`；环境变量前缀从 `KCW_`/`KIMI_` 迁移到 `ACW_`,保留旧名读取兼容；持久化 `config.json` 的 `kimiApi` 字段改为 `modelApi`,同样保留旧格式读取兼容。
+- 统一了侧栏导航、命令面板与面板标题三处此前互不一致的面板命名。
+
+### Added
+
+- 审批卡片新增真正的逐行 diff 视图(Write/Edit 工具的改动),不再是纯 JSON 转储;二进制内容与超大文本改为安全兜底展示,其余工具的预览仍走原有 JSON 展示。
+
+### Fixed
+
+- 修复成果画布默认展开、且收起状态无法保持的问题——切换侧边面板会导致组件卸载重建,状态被重置回展开。
+- 5 个弹窗(设置/API 设置/工作区切换/实时预览/文件预览)的 Esc 关闭逻辑统一收编到共享 `useShortcuts` hook。
+- 修复 `managed-directory-boundary`(受管目录安全边界,覆盖运行记录/会话/记忆/知识库/检查点/调度器/审计日志等状态存储)在 Windows 上因 8.3 短文件名与长文件名互为别名而误判"路径越界"的问题——同一目录的两种合法写法此前会被当作不同目录直接拒绝合法读写。
+
 ## [0.4.0] - 2026-07-12
 
 ### Added
