@@ -31,10 +31,13 @@ function internalPathNotFound(): Error & { statusCode: number } {
   return error;
 }
 
+// 按「段数」而非字符串前缀切出 root 以下的段:Windows 8.3 短名只替换单段文本、不增删
+// 段数,candidatePath 与 safeRoot 字面形式(短名/长名)不一致时,path.relative 前缀匹配
+// 会失败并把本应 internal 的路径误判成 public——分类失手会让 directExposureAllowed 把
+// 内部容器里的 junction 当作可直达的公开路径放行。
 function classifyResolvedPath(safePath: string, safeRoot: string): ExternalWorkspacePathKind {
-  const relative = path.relative(safeRoot, safePath);
-  if (!relative) return 'public';
-  const parts = relative.split(path.sep).filter(Boolean);
+  const parts = pathSegments(safePath).slice(pathSegments(safeRoot).length);
+  if (parts.length === 0) return 'public';
   if (!segmentEquals(parts[0], INTERNAL_DIR)) return 'public';
   if (parts.length === 1) return 'internal-container';
   if (!segmentEquals(parts[1], ARTIFACT_DIR)) return 'internal';
