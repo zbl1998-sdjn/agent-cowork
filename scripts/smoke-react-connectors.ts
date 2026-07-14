@@ -424,8 +424,8 @@ async function main(): Promise<void> {
     });
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
-        localStorage.setItem('kcw.guest', '1');
-        localStorage.setItem('kcw.conversations.v1', JSON.stringify([{ id: 'connector-smoke-conv', title: 'P2-B1 connector smoke', messages: [] }]));
+        localStorage.setItem('acw.guest', '1');
+        localStorage.setItem('acw.conversations.v1', JSON.stringify([{ id: 'connector-smoke-conv', title: 'P2-B1 connector smoke', messages: [] }]));
       })();`,
     });
 
@@ -598,7 +598,7 @@ async function main(): Promise<void> {
     let afterOAuthRevoke = null;
     let oauthStatus: OAuthStatus = { connected: false };
     let oauthStatusAfterRevoke: OAuthStatus = { connected: false };
-    const authToken = String(await evaluate(sendPage, `localStorage.getItem('kcw.authToken') || ''`) || '');
+    const authToken = String(await evaluate(sendPage, `localStorage.getItem('acw.authToken') || ''`) || '');
     const authHeader = authToken ? { authorization: `Bearer ${authToken}` } : {};
 
     if (!liveGitHubRequested) {

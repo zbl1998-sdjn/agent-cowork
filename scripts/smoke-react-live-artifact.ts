@@ -175,8 +175,8 @@ async function main() {
     });
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
-        localStorage.setItem('kcw.guest', '1');
-        localStorage.setItem('kcw.conversations.v1', JSON.stringify([{ id: 'live-artifact-smoke-conv', title: '03-B1 live artifact smoke', messages: [] }]));
+        localStorage.setItem('acw.guest', '1');
+        localStorage.setItem('acw.conversations.v1', JSON.stringify([{ id: 'live-artifact-smoke-conv', title: '03-B1 live artifact smoke', messages: [] }]));
         const originalFetch = window.fetch.bind(window);
         window.__kcwLiveFetches = [];
         window.fetch = async (...args) => {

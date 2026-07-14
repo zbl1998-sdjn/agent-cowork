@@ -141,8 +141,8 @@ async function main() {
     });
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
-        localStorage.setItem('kcw.guest', '1');
-        localStorage.setItem('kcw.conversations.v1', JSON.stringify([{ id: 'artifact-smoke-conv', title: '03-B2 artifact smoke', messages: [] }]));
+        localStorage.setItem('acw.guest', '1');
+        localStorage.setItem('acw.conversations.v1', JSON.stringify([{ id: 'artifact-smoke-conv', title: '03-B2 artifact smoke', messages: [] }]));
       })();`,
     });
 

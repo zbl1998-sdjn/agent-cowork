@@ -86,8 +86,8 @@ async function main(): Promise<void> {
     connectMcpOnStart: false,
     enableScheduler: false,
     modelProvider: 'openai/local',
-    kimiBaseUrl: 'http://127.0.0.1:9/v1',
-    kimiModel: 'local-smoke-model',
+    modelBaseUrl: 'http://127.0.0.1:9/v1',
+    model: 'local-smoke-model',
     oauthFetch: fakeFetch,
   });
   const baseUrl = await listenLocal(server);

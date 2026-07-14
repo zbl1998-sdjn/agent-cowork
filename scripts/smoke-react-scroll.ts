@@ -213,8 +213,8 @@ async function main() {
     });
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
-        localStorage.setItem('kcw.guest', '1');
-        localStorage.setItem('kcw.conversations.v1', ${JSON.stringify(JSON.stringify(seededConversations()))});
+        localStorage.setItem('acw.guest', '1');
+        localStorage.setItem('acw.conversations.v1', ${JSON.stringify(JSON.stringify(seededConversations()))});
       })();`,
     });
 

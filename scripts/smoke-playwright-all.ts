@@ -184,9 +184,9 @@ async function main() {
     enableScheduler: false,
     uiDistRoot,
     securityMode: 'local_strict',
-    kimiProvider: 'ollama',
-    kimiBaseUrl: OLLAMA_BASE_URL,
-    kimiModel: OLLAMA_MODEL,
+    modelProvider: 'ollama',
+    modelBaseUrl: OLLAMA_BASE_URL,
+    model: OLLAMA_MODEL,
   });
   const startedAt = Date.now();
   let baseUrl = '';
@@ -259,10 +259,10 @@ async function main() {
     });
     await sendPage('Page.addScriptToEvaluateOnNewDocument', {
       source: `(() => {
-        localStorage.setItem('kcw.guest', '1');
-        localStorage.setItem('kcw.authToken', ${JSON.stringify(guestToken)});
-        localStorage.setItem('kcw.onboardingDone', '1');
-        localStorage.setItem('kcw.conversations.v1', JSON.stringify([{ id: 'playwright-all', title: 'Playwright all', messages: [] }]));
+        localStorage.setItem('acw.guest', '1');
+        localStorage.setItem('acw.authToken', ${JSON.stringify(guestToken)});
+        localStorage.setItem('acw.onboardingDone', '1');
+        localStorage.setItem('acw.conversations.v1', JSON.stringify([{ id: 'playwright-all', title: 'Playwright all', messages: [] }]));
       })();`,
     });
 
@@ -322,6 +322,9 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    // 成果画布默认收起(等首个成果出现才自动展开一次),这里手动展开一次以测试
+    // 「画布展开时」的分栏布局是否仍然正确——不测收起态的布局(收起时没有画布可比对)。
+    await evaluate(sendPage, `document.querySelector('.artifact-canvas-restore')?.click()`);
     await waitForPage(
       sendPage,
       `() => {

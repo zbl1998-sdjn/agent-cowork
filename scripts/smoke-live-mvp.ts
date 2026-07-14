@@ -310,7 +310,7 @@ async function main() {
         const deadline = Date.now() + 8000;
         function tick() {
           const shell = document.querySelector(".app-shell");
-          const token = localStorage.getItem("kcw.authToken");
+          const token = localStorage.getItem("acw.authToken");
           const user = document.querySelector(".header-user")?.innerText.trim();
           if (shell && token && user) resolve({ usedGuest: true, user });
           else if (Date.now() > deadline) reject(new Error("live MVP guest login did not reach shell"));
@@ -349,7 +349,7 @@ async function main() {
       sendPage,
       `new Promise((resolve, reject) => {
         const deadline = Date.now() + 8000;
-        function token() { return localStorage.getItem("kcw.authToken"); }
+        function token() { return localStorage.getItem("acw.authToken"); }
         function tick() {
           const bearer = token();
           if (!bearer) {
