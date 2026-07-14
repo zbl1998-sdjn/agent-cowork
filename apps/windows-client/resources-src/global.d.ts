@@ -29,7 +29,7 @@ interface Window {
   AgentCoworkComposerSources?: AgentCoworkJson;
   AgentCoworkControllerAssembly?: AgentCoworkJson;
   AgentCoworkFileUpload?: AgentCoworkJson;
-  AgentCoworkKimiRunner?: AgentCoworkJson;
+  AgentCoworkAgentEngineRunner?: AgentCoworkJson;
   AgentCoworkMessageActions?: AgentCoworkJson;
   AgentCoworkMessageRenderer?: AgentCoworkJson;
   AgentCoworkPlanPreview?: AgentCoworkJson;

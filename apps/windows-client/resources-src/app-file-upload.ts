@@ -59,7 +59,7 @@
       await refreshWorkspaceTree();
       const rootLabel = imported.uploadRoot.replace(state.workspace, ".");
       setArtifact(
-        `已${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。现在可以直接发送任务让 Kimi 基于摘要生成计划。`,
+        `已${sourceLabel} ${imported.imported.length} 个文件，合计 ${imported.totalBytes} 字节。现在可以直接发送任务让 Agent 基于摘要生成计划。`,
         rootLabel,
       );
       const message = appendAssistantMessage(
@@ -78,7 +78,7 @@
           {
             state: "active",
             title: "等待用户任务",
-            detail: "下一次发送会优先读取刚导入的文件，并在这里展示 Kimi 的计划过程。",
+            detail: "下一次发送会优先读取刚导入的文件，并在这里展示 Agent 的计划过程。",
           },
         ],
         "文件已就绪",
