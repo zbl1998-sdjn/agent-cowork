@@ -6,7 +6,7 @@
 //       并自动打开浏览器;收到 SIGINT/SIGTERM 时优雅关闭并清理运行时文件。
 // 用法:npm run start:mvp(即 node scripts/run-host-node.mjs scripts/start-mvp.ts);
 //       可用环境变量 PORT/TRUSTED_ROOT/MVP_RUNTIME_FILE、NO_OPEN=1 覆盖默认行为;HOST 仅接受回环地址;
-//       配置 KIMI_API_KEY/MOONSHOT_API_KEY 后启用 Kimi 计划能力(默认仅会议纪要演示)。
+//       配置 ACW_MODEL_API_KEY(或 KIMI_API_KEY/MOONSHOT_API_KEY)后启用模型计划能力(默认仅会议纪要演示)。
 // 依赖:apps/host 的 createServer 与 JsonlWriter;与 stop-mvp.ts/status-mvp.ts 共享运行时文件契约。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,7 +72,7 @@ const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
 const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
 const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'host-events.jsonl');
-const kimiApiPlanEnabled = Boolean(process.env.ACW_MODEL_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
+const modelApiPlanEnabled = Boolean(process.env.ACW_MODEL_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
 
 ensureDemoWorkspace(workspace);
 fs.mkdirSync(path.dirname(runtimeFile), { recursive: true });
@@ -98,7 +98,7 @@ function writeRuntimeFile(): void {
     url,
     workspace,
     auditPath,
-    kimiApiPlanEnabled,
+    modelApiPlanEnabled,
     startedAt: new Date().toISOString(),
   };
   fs.writeFileSync(runtimeFile, `${JSON.stringify(runtime, null, 2)}\n`, 'utf8');
@@ -129,7 +129,7 @@ server.listen(port, host, () => {
   writeRuntimeFile();
   console.log(`Agent Cowork MVP running at ${url}`);
   console.log(`Trusted workspace: ${workspace}`);
-  console.log(`Kimi API plan: ${kimiApiPlanEnabled ? 'enabled' : 'not configured'}`);
+  console.log(`Model API plan: ${modelApiPlanEnabled ? 'enabled' : 'not configured'}`);
   console.log(`Runtime file: ${runtimeFile}`);
   console.log('Press Ctrl+C to stop.');
   openBrowser(url);

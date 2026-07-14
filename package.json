@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Kimi-only local cowork host MVP scaffold",
+  "description": "Agent Cowork local host MVP scaffold",
   "scripts": {
     "start": "node scripts/run-host-node.mjs apps/host/src/main.ts",
     "start:mvp": "node scripts/run-host-node.mjs scripts/start-mvp.ts",

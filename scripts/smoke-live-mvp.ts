@@ -43,7 +43,7 @@ type MvpRuntime = {
   url: string;
   workspace: string;
   auditPath?: string | undefined;
-  kimiApiPlanEnabled?: boolean | undefined;
+  modelApiPlanEnabled?: boolean | undefined;
 };
 
 type HealthSnapshot = {
@@ -145,7 +145,7 @@ function readRuntime(): MvpRuntime {
     url: stringField(runtime, 'url'),
     workspace: stringField(runtime, 'workspace'),
     auditPath: optionalStringField(runtime, 'auditPath'),
-    kimiApiPlanEnabled: optionalBooleanField(runtime, 'kimiApiPlanEnabled'),
+    modelApiPlanEnabled: optionalBooleanField(runtime, 'modelApiPlanEnabled'),
   };
 }
 
@@ -453,7 +453,7 @@ async function main() {
     const interaction = readInteraction(await evaluate(
       sendPage,
       `new Promise((resolve, reject) => {
-        const planEnabled = ${runtime.kimiApiPlanEnabled ? 'true' : 'false'};
+        const planEnabled = ${runtime.modelApiPlanEnabled ? 'true' : 'false'};
         const textarea = document.querySelector(".composer textarea");
         const send = document.querySelector(".send-button");
         if (!textarea || !send) { reject(new Error("required controls missing")); return; }
