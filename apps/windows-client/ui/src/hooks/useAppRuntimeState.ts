@@ -32,8 +32,8 @@ interface RuntimeDefaults {
 }
 
 const LOCAL_PROVIDER_IDS = new Set(['ollama', 'lmstudio', 'openai/local']);
-const FONT_SCALE_KEY = 'kcw.fontScale';
-const FONT_FAMILY_KEY = 'kcw.fontFamily';
+const FONT_SCALE_KEY = 'acw.fontScale';
+const FONT_FAMILY_KEY = 'acw.fontFamily';
 const FONT_SCALES = new Set<AppFontScale>(['small', 'normal', 'large', 'xlarge']);
 const FONT_FAMILIES = new Set<AppFontFamily>(['system', 'chinese', 'serif', 'mono']);
 
@@ -129,7 +129,7 @@ export function useAppRuntimeState() {
   });
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return localStorage.getItem('kcw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+    try { return localStorage.getItem('acw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
   });
   const [fontScale, setFontScale] = useState<AppFontScale>(() => readStoredFontScale());
   const [fontFamily, setFontFamily] = useState<AppFontFamily>(() => readStoredFontFamily());
@@ -175,7 +175,7 @@ export function useAppRuntimeState() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('kcw.theme', theme); } catch { /* 本地存储不可用时只保留内存状态 */ }
+    try { localStorage.setItem('acw.theme', theme); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [theme]);
 
   useEffect(() => {

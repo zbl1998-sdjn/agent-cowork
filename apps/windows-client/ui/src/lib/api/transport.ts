@@ -19,9 +19,9 @@ export function defaultHostBase(): string {
 }
 
 const HOST_BASE = defaultHostBase();
-const AUTH_TOKEN_KEY = 'kcw.authToken';
-const WORKSPACE_GRANT_KEY = 'kcw.workspaceGrantId';
-const LEGACY_RECENT_WORKSPACES_KEY = 'kcw.recentWorkspaces';
+const AUTH_TOKEN_KEY = 'acw.authToken';
+const WORKSPACE_GRANT_KEY = 'acw.workspaceGrantId';
+const LEGACY_RECENT_WORKSPACES_KEY = 'acw.recentWorkspaces';
 const WORKSPACE_GRANT_ID_PATTERN = /^grant_[A-Za-z0-9-]{1,72}$/;
 
 export function resolveUrl(route: string): string {
@@ -183,7 +183,7 @@ export async function openPath(path: string): Promise<boolean> {
   return false;
 }
 
-export function newIdempotencyKey(prefix = 'kcw'): string {
+export function newIdempotencyKey(prefix = 'acw'): string {
   const rand = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}-${rand}`;
 }

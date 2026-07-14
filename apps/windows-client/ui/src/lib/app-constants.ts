@@ -1,10 +1,10 @@
 // 应用常量(UI · lib):集中存放界面默认值/限额/初始会话等常量(配置而非硬编码,plan/01 B.7)。
 import type { Conversation } from './app-types';
 
-export const GUEST_KEY = 'kcw.guest';
-export const CONV_KEY = 'kcw.conversations.v1'; // gitleaks:allow -- public localStorage key
-export const AUTO_CLARIFY_KEY = 'kcw.autoClarify';
-export const AUTO_CONTEXT_COMPACTION_KEY = 'kcw.autoContextCompaction';
+export const GUEST_KEY = 'acw.guest';
+export const CONV_KEY = 'acw.conversations.v1'; // gitleaks:allow -- public localStorage key
+export const AUTO_CLARIFY_KEY = 'acw.autoClarify';
+export const AUTO_CONTEXT_COMPACTION_KEY = 'acw.autoContextCompaction';
 export const STARTERS = [
   '整理工作区里的文档并列出清单',
   '把一个 CSV 文件做成图表',
