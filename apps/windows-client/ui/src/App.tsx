@@ -29,6 +29,7 @@ import type { Command } from './components/CommandPalette';
 import type { ComposerDraftPreview, ComposerMeta, FileHit, Recipe, WorkbenchPreviewState } from './components/Composer';
 import { useStickToBottom } from './hooks/useStickToBottom';
 import { useConversations } from './hooks/useConversations';
+import { useArtifactCanvasCollapse } from './hooks/useArtifactCanvasCollapse';
 import { useAppRuntimeState } from './hooks/useAppRuntimeState';
 import { useRecipeCapture } from './hooks/useRecipeCapture';
 import { useAgentTeamTimeline } from './hooks/useAgentTeamTimeline';
@@ -117,12 +118,11 @@ export function App() {
     generation: latestWorkbenchGeneration(messages),
   }), [composerDraft, defaultModel, defaultProvider, messages, mode, selectedRecipe, streamingId, trustedRoot]);
   const artifactMessage = useMemo(() => latestArtifactMessage(messages), [messages]);
+  const [canvasCollapsed, setCanvasCollapsed] = useArtifactCanvasCollapse(artifactMessage?.id || null);
   const conversations = useConversations({ messages, setMessages, setSelectedRecipe, streamingId, user });
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  const messagesRef = useRef(messages); messagesRef.current = messages;
   const togglePanel = useCallback((next: SidePanel) => setPanel((current) => (current === next ? 'none' : next)), []);
-  // 新建对话时同时关闭当前侧面板,切回对话视图——否则从面板(工具/记忆等)点"新建对话"会
-  // 停在面板上、看不到新对话(dogfood 实测的 UX 卡点)。
+  // 新建对话时同时关闭当前侧面板,切回对话视图——否则从面板(工具/记忆等)点"新建对话"会停在面板上、看不到新对话(dogfood 实测的 UX 卡点)。
   const startNewConversation = useCallback(() => { setPanel('none'); conversations.newConversation(); }, [conversations]);
   const patchAssistant = useCallback((id: string, patch: (m: AssistantMessage) => AssistantMessage) => {
     setMessages((list) => list.map((m) => (m.id === id && m.role === 'assistant' ? patch(m) : m)));
@@ -305,7 +305,7 @@ export function App() {
         {panel !== 'none' ? (
           <AppSidePanel panel={panel} trustedRoot={trustedRoot} workbenchPreview={workbenchPreview} onClose={() => setPanel('none')} onRunSubagent={(g, s) => void handleRunSubagent(g, s)} />
         ) : (
-          <ConversationWorkspace artifactId={artifactMessage?.id || null} artifactText={artifactMessage?.text || ''} streaming={Boolean(streamingId)} onApplyArtifact={applyArtifactText} onRequestRevision={quickSend}>
+          <ConversationWorkspace artifactId={artifactMessage?.id || null} artifactText={artifactMessage?.text || ''} streaming={Boolean(streamingId)} canvasCollapsed={canvasCollapsed} onApplyArtifact={applyArtifactText} onRequestRevision={quickSend} onSetCanvasCollapsed={setCanvasCollapsed}>
             <Timeline editText={editText} editingMsgId={editingMsgId} empty={messages.length === 0} hasNewContent={hasNewContent} isAtBottom={isAtBottom} messages={messages} starters={starters} streamingId={streamingId} timelineRef={timelineRef} trustedRoot={trustedRoot} onBeginEdit={beginEdit} onCopyText={copyText} onHandleApprove={handleApproveMessage} onOpenOrPreview={openOrPreview} onPatchAssistant={patchAssistant} onQuickSend={quickSend} onCaptureRecipe={captureRecipe} onRegenerate={regenerate} onResumeRun={resumeRun} onScrollToBottom={scrollToBottom} onSetEditingMsgId={setEditingMsgId} onSetEditText={setEditText} onSubmitEdit={submitEdit} />
             <AppComposerDock commands={commands} defaultBaseUrl={defaultBaseUrl} defaultModel={defaultModel} defaultProvider={defaultProvider} history={history} models={models} modelProviders={modelProviders} recipes={recipes} selectedRecipe={selectedRecipe} streamingId={streamingId} autoClarify={autoClarify} onClearRecipe={() => setSelectedRecipe(null)} onDraftChange={setComposerDraft} onPickTemplate={setSelectedRecipe} onRefinePrompt={handleRefinePrompt} onSearchFiles={searchFiles} onSend={(t, meta) => void handleSend(t, meta)} onStopStreaming={stopStreaming} onUploadTemplates={uploadTemplates} />
           </ConversationWorkspace>
