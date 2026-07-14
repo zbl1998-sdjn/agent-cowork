@@ -33,9 +33,9 @@ test('persistModelConfig seals apiKey (incl. fallbacks) so plaintext never hits 
   const raw = fs.readFileSync(file, 'utf8');
   assert.ok(!raw.includes(SECRET), 'plaintext primary key leaked to disk');
   assert.ok(!raw.includes(FALLBACK_SECRET), 'plaintext fallback key leaked to disk');
-  const parsed = JSON.parse(raw) as { kimiApi: { apiKey: string; fallbacks: Array<{ apiKey?: string }> } };
-  assert.ok(isSealedCredential(parsed.kimiApi.apiKey));
-  assert.ok(isSealedCredential(parsed.kimiApi.fallbacks[0]?.apiKey));
+  const parsed = JSON.parse(raw) as { modelApi: { apiKey: string; fallbacks: Array<{ apiKey?: string }> } };
+  assert.ok(isSealedCredential(parsed.modelApi.apiKey));
+  assert.ok(isSealedCredential(parsed.modelApi.fallbacks[0]?.apiKey));
 });
 
 test('applyPersistedAgentModelConfig round-trips sealed keys back to plaintext in memory', () => {
@@ -113,7 +113,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
     createServer({
       trustedRoot: path.dirname(file),
       modelConfigFile: file,
-      kimiConfigProtector: protector,
+      modelConfigProtector: protector,
       requireAuth: false,
       persistAuth: false,
       enableScheduler: false,
@@ -124,7 +124,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
     startupError = error;
   }
   assert.ok(startupError instanceof Error, 'corrupt config must fail startup');
-  assert.match(startupError.message, /Kimi config/i);
+  assert.match(startupError.message, /agent model config/i);
   assert.equal(startupError.message.includes(SECRET), false);
   assert.equal(fs.readFileSync(file, 'utf8'), corruptBytes);
 
@@ -132,7 +132,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
   assert.doesNotThrow(() => createServer({
     trustedRoot: path.dirname(missingFile),
     modelConfigFile: missingFile,
-    kimiConfigProtector: protector,
+    modelConfigProtector: protector,
     requireAuth: false,
     persistAuth: false,
     enableScheduler: false,

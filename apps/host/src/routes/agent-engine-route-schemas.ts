@@ -41,7 +41,7 @@ export const modelFallbackSchema = z.object({
   temperature: optionalNumber(),
 }).loose();
 
-export const agentEngineConfigBodySchema = objectBody('invalid kimi config request').pipe(z.object({
+export const agentEngineConfigBodySchema = objectBody('invalid agent config request').pipe(z.object({
   clearKey: z.boolean().optional(),
   apiKey: optionalText(4096),
   provider: optionalText(96),
@@ -50,7 +50,7 @@ export const agentEngineConfigBodySchema = objectBody('invalid kimi config reque
   model: optionalText(200),
 }).loose());
 
-export const agentEngineTestBodySchema = objectBody('invalid kimi test request').pipe(z.object({
+export const agentEngineTestBodySchema = objectBody('invalid agent test request').pipe(z.object({
   action: z.literal('models').default('models'),
   apiKey: optionalText(4096),
   provider: optionalText(96),
@@ -58,7 +58,7 @@ export const agentEngineTestBodySchema = objectBody('invalid kimi test request')
   model: optionalText(200),
 }).loose());
 
-export const agentEnginePlanChatBodySchema = objectBody('invalid kimi request').pipe(z.object({
+export const agentEnginePlanChatBodySchema = objectBody('invalid agent request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
   mode: optionalText(32),
@@ -72,7 +72,7 @@ export const agentEngineStreamBodySchema = objectBody('invalid agent stream requ
   templateFiles: z.array(z.string().trim().min(1).max(2000)).max(4).optional(),
 }).loose());
 
-export const agentEngineChatStreamBodySchema = objectBody('invalid kimi stream request').pipe(z.object({
+export const agentEngineChatStreamBodySchema = objectBody('invalid agent stream request').pipe(z.object({
   prompt: promptSchema,
   summary: z.unknown().optional(),
   thinking: z.unknown().optional(),

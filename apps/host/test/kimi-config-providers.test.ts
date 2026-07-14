@@ -98,10 +98,10 @@ test('POST /api/agent-engine/config stores provider without echoing the key', as
   });
 
   const persisted = readPersistedConfig(trustedRoot);
-  assert.equal(persisted.kimiApi.provider, 'openai');
+  assert.equal(persisted.modelApi.provider, 'openai');
   // apiKey 落盘为封印密文,不落明文(明文只在进程内存 + info.hasKey 反映)。
-  assert.ok(persisted.kimiApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
-  assert.match(String(persisted.kimiApi.apiKey), /^aesgcm:v1:/);
+  assert.ok(persisted.modelApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
+  assert.match(String(persisted.modelApi.apiKey), /^aesgcm:v1:/);
 
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
     const info = (await readKimiInfo(baseUrl)).body;
@@ -140,7 +140,7 @@ test('provider credentials remain isolated and survive provider switching', asyn
   const serialized = fs.readFileSync(`${trustedRoot}/.AgentCowork/config.json`, 'utf8');
   assert.equal(serialized.includes(CONFIG_SECRET), false);
   assert.equal(serialized.includes(anthropicSecret), false);
-  const profiles = readPersistedConfig(trustedRoot).kimiApi.providerProfiles;
+  const profiles = readPersistedConfig(trustedRoot).modelApi.providerProfiles;
   assert.match(String(profiles?.openai?.apiKey), /^aesgcm:v1:/);
   assert.match(String(profiles?.anthropic?.apiKey), /^aesgcm:v1:/);
 });
@@ -175,8 +175,8 @@ test('POST /api/agent-engine/config stores fallback providers without echoing fa
   });
 
   const persisted = readPersistedConfig(trustedRoot);
-  const firstPersisted = persisted.kimiApi.fallbacks?.[0];
-  const secondPersisted = persisted.kimiApi.fallbacks?.[1];
+  const firstPersisted = persisted.modelApi.fallbacks?.[0];
+  const secondPersisted = persisted.modelApi.fallbacks?.[1];
   assert.ok(firstPersisted);
   assert.ok(secondPersisted);
   assert.equal(firstPersisted.baseUrl, 'http://127.0.0.1:11434/v1');

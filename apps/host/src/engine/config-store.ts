@@ -1,11 +1,13 @@
-// Kimi 配置持久化(host · L1 领域层)
+// Agent Model 配置持久化(host · L1 领域层)
 // ---------------------------------------------------------------------------
-// 职责:读写磁盘上的 kimiApi 配置(provider/apiKey/baseUrl/model/fallbacks),
+// 职责:读写磁盘上的 modelApi 配置(provider/apiKey/baseUrl/model/fallbacks),
 //       做字段清洗与归一;仅缺失文件时回退到环境变量派生的配置。
 // 安全:apiKey(含 fallbacks 内的)写盘前经 CredentialProtector 封印
 //       (Windows=DPAPI / 其余 AES-GCM,与 credential-store 同一模式),磁盘不落明文;
 //       读侧兼容三种形态——封印密文(解封)、遗留明文(原样读入,下次写盘自动升级)、
 //       解封失败(如换机器/换用户 DPAPI 打不开)按"未配置"跳过该 key,不拖垮其他字段。
+//       字段名兼容:新写盘一律用 modelApi;读侧按 modelApi -> kimiApi(旧名) -> kimi(更旧)
+//       -> 裸对象(最旧扁平结构) 顺序回退,老用户已有的 config.json 不会失效。
 // 依赖:node:fs / node:path + L0 security/credential-store。
 // 导出:applyPersistedAgentModelConfig(读入并写进目标对象)、persistModelConfig(写盘)。
 import { composeFullModelId, normaliseModelProviderId, providerRequiresApiKey } from './provider/catalog.js';
@@ -126,24 +128,24 @@ function sealProfiles(
 export function applyPersistedAgentModelConfig(file: string, target: AgentModelConfigRecord, options: ConfigStoreOptions = {}): void {
   let serialized: string;
   try {
-    const persisted = createManagedSingleFileOperation(file, 'Kimi config directory').readText();
+    const persisted = createManagedSingleFileOperation(file, 'Agent model config directory').readText();
     if (persisted === null) return;
     serialized = persisted;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to read Kimi config file: ${file}: ${detail}`, { cause: error });
+    throw new Error(`Failed to read agent model config file: ${file}: ${detail}`, { cause: error });
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(serialized);
   } catch (error) {
-    throw new Error(`Failed to parse Kimi config file: ${file}`, { cause: error });
+    throw new Error(`Failed to parse agent model config file: ${file}`, { cause: error });
   }
   const config = raw && typeof raw === 'object' ? raw as AgentModelConfigRecord : {};
-  const kimi = config.kimiApi || config.kimi || config;
-  if (!kimi || typeof kimi !== 'object') return;
-  const source = kimi as AgentModelConfigRecord;
+  const persistedModel = config.modelApi || config.kimiApi || config.kimi || config;
+  if (!persistedModel || typeof persistedModel !== 'object') return;
+  const source = persistedModel as AgentModelConfigRecord;
   const targetProfiles = target.providerProfiles && typeof target.providerProfiles === 'object'
     ? target.providerProfiles as Record<string, ProviderProfile>
     : {};
@@ -171,12 +173,12 @@ export function applyPersistedAgentModelConfig(file: string, target: AgentModelC
   syncActiveProviderProfile(target as AgentModelConfig);
 }
 
-/** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
+/** 把 source 中的 modelApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
 export function persistModelConfig(file: string, source: AgentModelConfigRecord, options: ConfigStoreOptions = {}): void {
   syncActiveProviderProfile(source as AgentModelConfig);
   const apiKey = String(source.apiKey || '').trim();
   const payload = {
-    kimiApi: {
+    modelApi: {
       apiKey: apiKey ? sealSecret(apiKey, activeProtector(options)) : '',
       baseUrl: source.baseUrl || '',
       model: source.model || '',
@@ -190,5 +192,5 @@ export function persistModelConfig(file: string, source: AgentModelConfigRecord,
     },
   };
   const serialized = JSON.stringify(payload, null, 2);
-  createManagedSingleFileOperation(file, 'Kimi config directory').writeText(serialized);
+  createManagedSingleFileOperation(file, 'Agent model config directory').writeText(serialized);
 }

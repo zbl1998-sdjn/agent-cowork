@@ -55,10 +55,10 @@ test('POST /api/agent-engine/config stores key without claiming policy-blocked c
   assert.ok(fs.existsSync(persistedConfigPath(trustedRoot)), 'config.json was not written');
   const persisted = readPersistedConfig(trustedRoot);
   // 路由测试注入确定性的 AES-GCM 保护器；默认 Windows DPAPI 由独立保护器测试覆盖。
-  assert.ok(persisted.kimiApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
-  assert.match(String(persisted.kimiApi.apiKey), /^aesgcm:v1:/);
+  assert.ok(persisted.modelApi.apiKey !== CONFIG_SECRET, 'apiKey persisted as plaintext');
+  assert.match(String(persisted.modelApi.apiKey), /^aesgcm:v1:/);
   assert.ok(!fs.readFileSync(persistedConfigPath(trustedRoot), 'utf8').includes(CONFIG_SECRET), 'config.json leaked the plaintext API key');
-  assert.equal(persisted.kimiApi.model, 'kimi-k2-test');
+  assert.equal(persisted.modelApi.model, 'kimi-k2-test');
 });
 
 test('persisted config is reloaded on a fresh server boot (survives restart)', async () => {
@@ -66,7 +66,7 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
   fs.mkdirSync(path.join(trustedRoot, '.AgentCowork'), { recursive: true });
   fs.writeFileSync(
     persistedConfigPath(trustedRoot),
-    JSON.stringify({ kimiApi: { apiKey: CONFIG_SECRET, baseUrl: 'https://x.example/v1', model: 'persisted-model' } }),
+    JSON.stringify({ modelApi: { apiKey: CONFIG_SECRET, baseUrl: 'https://x.example/v1', model: 'persisted-model' } }),
     'utf8',
   );
 
@@ -80,6 +80,24 @@ test('persisted config is reloaded on a fresh server boot (survives restart)', a
   });
 });
 
+test('legacy kimiApi-shaped config.json (pre-rename) still loads on boot', async () => {
+  const trustedRoot = makeTestWorkspace('kcw-kimicfg-legacy-reload');
+  fs.mkdirSync(path.join(trustedRoot, '.AgentCowork'), { recursive: true });
+  fs.writeFileSync(
+    persistedConfigPath(trustedRoot),
+    JSON.stringify({ kimiApi: { apiKey: CONFIG_SECRET, baseUrl: 'https://legacy.example/v1', model: 'legacy-persisted-model' } }),
+    'utf8',
+  );
+
+  await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
+    const info = (await readKimiInfo(baseUrl)).body;
+    assert.equal(info.hasKey, true);
+    assert.equal(info.configured, true);
+    assert.equal(info.model, 'legacy-persisted-model');
+    assert.equal(info.baseUrl, 'https://legacy.example/v1');
+  });
+});
+
 test('POST /api/agent-engine/config rejects non-object JSON bodies without changing config', async () => {
   const trustedRoot = makeTestWorkspace('kcw-kimicfg-invalid-body');
   await withKimiConfigServer({ trustedRoot }, async (baseUrl) => {
@@ -87,7 +105,7 @@ test('POST /api/agent-engine/config rejects non-object JSON bodies without chang
 
     const response = await postKimiConfig(baseUrl, []);
     assert.equal(response.status, 400);
-    assert.match((await readErrorResponse(response)).error, /invalid kimi config request/i);
+    assert.match((await readErrorResponse(response)).error, /invalid agent config request/i);
 
     const info = (await readKimiInfo(baseUrl)).body;
     assert.equal(info.hasKey, true);
@@ -132,7 +150,7 @@ test('a persistence failure rolls back in-memory Kimi config and does not leak t
     protect() { throw new Error(`failed to seal ${CONFIG_SECRET}`); },
     unprotect(value: string) { return value; },
   };
-  await withKimiConfigServer({ trustedRoot, kimiConfigProtector: failingProtector }, async (baseUrl) => {
+  await withKimiConfigServer({ trustedRoot, modelConfigProtector: failingProtector }, async (baseUrl) => {
     const before = (await readKimiInfo(baseUrl)).body as Record<string, unknown>;
     const response = await postKimiConfig(baseUrl, {
       provider: 'openai',

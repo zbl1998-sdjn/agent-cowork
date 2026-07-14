@@ -44,7 +44,7 @@ export type HostConfig = Record<string, unknown> & StoreBackendConfigInput & {
   staticRoot?: string | false;
   uiDistRoot?: string;
   modelConfigFile?: string;
-  kimiConfigProtector?: CredentialProtector;
+  modelConfigProtector?: CredentialProtector;
   securityMode?: SecurityMode;
   modelPlanRunner?: typeof runModelApiPlan;
   modelChatRunner?: typeof runModelApiChat;

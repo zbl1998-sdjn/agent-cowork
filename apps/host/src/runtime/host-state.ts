@@ -70,7 +70,7 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
   const modelConfigFile = statePaths.modelConfigFile();
   const agentModelConfig = resolveAgentModelConfig(config);
-  const modelConfigStoreOptions = omitUndefined({ protector: config.kimiConfigProtector });
+  const modelConfigStoreOptions = omitUndefined({ protector: config.modelConfigProtector });
   applyPersistedAgentModelConfig(modelConfigFile, agentModelConfig, modelConfigStoreOptions);
   const securityMode = agentModelConfig.securityMode;
   const folderGrantStore = config.folderGrantStore || createFolderGrantStore(omitUndefined({

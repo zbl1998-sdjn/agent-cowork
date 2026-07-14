@@ -21,7 +21,7 @@ export const TEST_LOCAL_HOST_MODEL_CONFIG = Object.freeze({
   securityMode: 'controlled_hybrid',
 });
 
-const KIMI_CONFIG_TEST_PROTECTOR = createAesGcmProtector({
+const MODEL_CONFIG_TEST_PROTECTOR = createAesGcmProtector({
   keyMaterial: 'dummy-kimi-config-route-test-protector-key',
 });
 
@@ -63,7 +63,7 @@ export const kimiErrorResponseSchema = z.object({
 }).loose();
 
 const persistedConfigSchema = z.object({
-  kimiApi: z.object({
+  modelApi: z.object({
     provider: z.string().optional(),
     apiKey: z.string().optional(),
     baseUrl: z.string().optional(),
@@ -91,7 +91,7 @@ export async function withKimiConfigServer(
 ): Promise<void> {
   const server = createServer({
     requireAuth: false,
-    kimiConfigProtector: KIMI_CONFIG_TEST_PROTECTOR,
+    modelConfigProtector: MODEL_CONFIG_TEST_PROTECTOR,
     ...config,
   });
   const baseUrl = await bind(server);

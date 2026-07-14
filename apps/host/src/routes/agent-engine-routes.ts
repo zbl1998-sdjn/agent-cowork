@@ -73,7 +73,7 @@ export async function handleAgentEngineRoutes({
       && !requireGlobalMutationAdmin(response, requestContext, state.globalMutationAdmins)
     ) return true;
     await withJsonBody(request, response, async (body) => {
-      const input = parseAgentEngineBody(response, agentEngineConfigBodySchema, body, 'invalid kimi config request');
+      const input = parseAgentEngineBody(response, agentEngineConfigBodySchema, body, 'invalid agent config request');
       if (!input) return;
       const previousConfig = {
         ...routeState.agentModelConfig,
@@ -106,7 +106,7 @@ export async function handleAgentEngineRoutes({
         Object.assign(routeState.agentModelConfig, previousConfig);
         if (previousEnabled === undefined) delete routeState.modelApiEnabled;
         else routeState.modelApiEnabled = previousEnabled;
-        sendJson(response, 500, { error: 'Failed to persist Kimi config' });
+        sendJson(response, 500, { error: 'Failed to persist agent config' });
         return;
       }
       await sendAgentEngineInfo(response, routeState);
@@ -121,7 +121,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && pathname === '/api/agent-engine/test') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseAgentEngineBody(response, agentEngineTestBodySchema, body, 'invalid kimi test request');
+      const input = parseAgentEngineBody(response, agentEngineTestBodySchema, body, 'invalid agent test request');
       if (!input) return;
       const fetchImpl = typeof routeState.config.fetchImpl === 'function'
         ? routeState.config.fetchImpl as typeof fetch
@@ -137,7 +137,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && (pathname === '/api/agent-engine/plan' || pathname === '/api/agent-engine/chat')) {
     await withJsonBody(request, response, async (body) => {
-      const input = parseAgentEngineBody(response, agentEnginePlanChatBodySchema, body, 'invalid kimi request');
+      const input = parseAgentEngineBody(response, agentEnginePlanChatBodySchema, body, 'invalid agent request');
       if (!input) return;
       if (!routeState.modelApiEnabled) {
         sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
@@ -212,7 +212,7 @@ export async function handleAgentEngineRoutes({
 
   if (request.method === 'POST' && pathname === '/api/agent-engine/chat/stream') {
     await withJsonBody(request, response, async (body) => {
-      const input = parseAgentEngineBody(response, agentEngineChatStreamBodySchema, body, 'invalid kimi stream request');
+      const input = parseAgentEngineBody(response, agentEngineChatStreamBodySchema, body, 'invalid agent stream request');
       if (!input) return;
       if (!routeState.modelApiEnabled) {
         sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
