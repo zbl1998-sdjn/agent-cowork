@@ -54,7 +54,7 @@ export function detectEmbeddedPython(
     fsImpl = fs,
   }: { env?: EnvLike; execPath?: string; platform?: string; fsImpl?: ExistsFs } = {},
 ): EmbeddedPythonStatus {
-  const configured = envValue(env, ['KCW_EMBEDDED_PYTHON', 'KCW_PYTHON_HOME']);
+  const configured = envValue(env, ['ACW_EMBEDDED_PYTHON', 'KCW_EMBEDDED_PYTHON', 'ACW_PYTHON_HOME', 'KCW_PYTHON_HOME']);
   if (configured) {
     return { status: 'configured', source: configured.key, detail: '内置 Python 路径已配置' };
   }

@@ -54,7 +54,7 @@ function exists(fsImpl: Webview2Fs, target: string): boolean {
 export function detectWebview2(
   { env = {}, platform = process.platform, fsImpl = fs }: { env?: EnvLike; platform?: string; fsImpl?: Webview2Fs } = {},
 ): Webview2Status {
-  const configured = envValue(env, ['KCW_WEBVIEW2_MODE', 'WEBVIEW2_RELEASE_CHANNEL_PREFERENCE']);
+  const configured = envValue(env, ['ACW_WEBVIEW2_MODE', 'KCW_WEBVIEW2_MODE', 'WEBVIEW2_RELEASE_CHANNEL_PREFERENCE']);
   if (configured) {
     return { status: 'configured', source: configured.key, detail: `WebView2 模式: ${configured.value}` };
   }

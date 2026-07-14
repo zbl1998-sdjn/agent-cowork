@@ -73,7 +73,7 @@ function detectSystemCjkFont(fsImpl: FontFs): FontRuntimeStatus | null {
 }
 
 export function detectCjkFonts({ env = {}, fsImpl = fs }: { env?: EnvLike; fsImpl?: FontFs } = {}): FontRuntimeStatus {
-  const configured = envValue(env, ['KCW_CJK_FONT_DIR', 'KCW_CJK_FONT']);
+  const configured = envValue(env, ['ACW_CJK_FONT_DIR', 'KCW_CJK_FONT_DIR', 'ACW_CJK_FONT', 'KCW_CJK_FONT']);
   if (!configured) {
     // env 未显式指定字体包:回落探测系统字体(与 PDF 渲染实际使用的字体一致)。
     return detectSystemCjkFont(fsImpl)

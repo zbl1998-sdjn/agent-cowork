@@ -45,7 +45,7 @@ function hasPackageMarkers(root: string, fsImpl: ExistsFs): boolean {
 export function detectDataScienceRuntime(
   { env = {}, fsImpl = fs }: { env?: EnvLike; fsImpl?: ExistsFs } = {},
 ): DataScienceRuntimeStatus {
-  const configured = envValue(env, ['KCW_DATA_SCIENCE_HOME', 'KCW_DATA_SCIENCE_VENV']);
+  const configured = envValue(env, ['ACW_DATA_SCIENCE_HOME', 'KCW_DATA_SCIENCE_HOME', 'ACW_DATA_SCIENCE_VENV', 'KCW_DATA_SCIENCE_VENV']);
   if (!configured) {
     return { status: 'missing', detail: '未配置数据分析组件路径' };
   }

@@ -46,11 +46,11 @@ function hasPandocBinary(home: string, fsImpl: StatFs): boolean {
 }
 
 export function detectPandocRuntime({ env = {}, fsImpl = fs }: { env?: EnvLike; fsImpl?: StatFs } = {}): PandocRuntimeStatus {
-  const configured = envValue(env, ['KCW_PANDOC_EXE', 'KCW_PANDOC_HOME']);
+  const configured = envValue(env, ['ACW_PANDOC_EXE', 'KCW_PANDOC_EXE', 'ACW_PANDOC_HOME', 'KCW_PANDOC_HOME']);
   if (!configured) {
     return { status: 'missing', detail: '未配置 Pandoc 组件路径' };
   }
-  if (configured.key === 'KCW_PANDOC_EXE') {
+  if (configured.key === 'ACW_PANDOC_EXE' || configured.key === 'KCW_PANDOC_EXE') {
     if (!isFile(fsImpl, configured.value) || !isPandocBinary(configured.value)) {
       return { status: 'missing', source: configured.key, detail: 'Pandoc 可执行文件不存在或名称不匹配' };
     }

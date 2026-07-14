@@ -46,7 +46,7 @@ export function detectVcRuntime({
   platform = process.platform,
   spawnSync = childProcess.spawnSync,
 }: { env?: EnvLike; platform?: string; spawnSync?: SpawnSyncLike } = {}): VcRuntimeStatus {
-  const configured = envValue(env, ['KCW_VC_RUNTIME_HOME', 'KCW_VC_RUNTIME_INSTALLED']);
+  const configured = envValue(env, ['ACW_VC_RUNTIME_HOME', 'KCW_VC_RUNTIME_HOME', 'ACW_VC_RUNTIME_INSTALLED', 'KCW_VC_RUNTIME_INSTALLED']);
   if (configured) {
     return { status: 'configured', source: configured.key, detail: 'VC++ 运行库已由安装器配置' };
   }

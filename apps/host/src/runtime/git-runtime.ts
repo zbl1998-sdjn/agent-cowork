@@ -25,7 +25,7 @@ function envValue(env: EnvLike, keys: string[]): { key: string; value: string } 
 }
 
 export function detectGitRuntime({ env = {}, spawnSync = childProcess.spawnSync }: { env?: EnvLike; spawnSync?: SpawnSyncLike } = {}): RuntimeStatus {
-  const configured = envValue(env, ['KCW_MINGIT_HOME', 'KCW_GIT_HOME']);
+  const configured = envValue(env, ['ACW_MINGIT_HOME', 'KCW_MINGIT_HOME', 'ACW_GIT_HOME', 'KCW_GIT_HOME']);
   if (configured) {
     return { status: 'configured', source: configured.key, detail: 'Git 运行时路径已配置' };
   }

@@ -38,7 +38,7 @@ function hasTessdata(root: string, fsImpl: ExistsFs): boolean {
 }
 
 export function detectOcrRuntime({ env = {}, fsImpl = fs }: { env?: EnvLike; fsImpl?: ExistsFs } = {}): OcrRuntimeStatus {
-  const configured = envValue(env, ['KCW_TESSERACT_HOME', 'KCW_TESSDATA_PREFIX']);
+  const configured = envValue(env, ['ACW_TESSERACT_HOME', 'KCW_TESSERACT_HOME', 'ACW_TESSDATA_PREFIX', 'KCW_TESSDATA_PREFIX']);
   if (!configured) {
     return { status: 'missing', detail: '未配置 OCR 组件路径' };
   }

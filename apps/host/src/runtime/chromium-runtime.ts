@@ -48,11 +48,11 @@ function hasChromiumBinary(home: string, fsImpl: StatFs): boolean {
 }
 
 export function detectChromiumRuntime({ env = {}, fsImpl = fs }: { env?: EnvLike; fsImpl?: StatFs } = {}): ChromiumRuntimeStatus {
-  const configured = envValue(env, ['KCW_CHROMIUM_EXECUTABLE', 'KCW_PLAYWRIGHT_CHROMIUM_HOME']);
+  const configured = envValue(env, ['ACW_CHROMIUM_EXECUTABLE', 'KCW_CHROMIUM_EXECUTABLE', 'ACW_PLAYWRIGHT_CHROMIUM_HOME', 'KCW_PLAYWRIGHT_CHROMIUM_HOME']);
   if (!configured) {
     return { status: 'missing', detail: '未配置浏览器自动化组件路径' };
   }
-  if (configured.key === 'KCW_CHROMIUM_EXECUTABLE') {
+  if (configured.key === 'ACW_CHROMIUM_EXECUTABLE' || configured.key === 'KCW_CHROMIUM_EXECUTABLE') {
     if (!isFile(fsImpl, configured.value) || !isChromiumBinary(configured.value)) {
       return { status: 'missing', source: configured.key, detail: 'Chromium 可执行文件不存在或名称不匹配' };
     }
