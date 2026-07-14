@@ -1,4 +1,4 @@
-// Model provider profile management (host L1 kimi domain).
+// Model provider profile management (host L1 engine domain).
 // Keeps each provider's credential and endpoint independent while exposing one active config.
 import type { AgentModelConfig, ProviderProfile } from './api-runner-config.js';
 import {

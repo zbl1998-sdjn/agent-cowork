@@ -1,4 +1,4 @@
-// Provider model discovery (host L1 kimi domain).
+// Provider model discovery (host L1 engine domain).
 // Probes the standard /models endpoint through the shared secure model network boundary.
 import { createModelEndpointFetch } from '../security/model-endpoint-request.js';
 

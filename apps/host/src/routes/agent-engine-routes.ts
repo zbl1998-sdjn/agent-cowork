@@ -1,7 +1,7 @@
 // Kimi 路由(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/agent-engine/* —— Kimi 配置读写、CLI 探测、以及把对话请求接到流式聊天(SSE)。
-// 依赖:L1 kimi(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleAgentEngineRoutes。
+// 依赖:L1 engine(chat-stream/config-store/cli-* 等,经 state 注入)。导出:handleAgentEngineRoutes。
 import { streamChat } from '../engine/chat-stream.js';
 import { streamAgentChat } from './agent-stream.js';
 import { MODEL_API_NOT_CONFIGURED_MESSAGE } from '../engine/api-runner.js';

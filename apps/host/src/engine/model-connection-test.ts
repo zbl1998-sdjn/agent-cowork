@@ -1,4 +1,4 @@
-// Non-persisting model connection test (host L1 kimi domain).
+// Non-persisting model connection test (host L1 engine domain).
 import type { AgentModelConfig } from './api-runner-config.js';
 import { discoverProviderModels, type ModelDiscoveryResult } from './model-discovery.js';
 import {
