@@ -35,7 +35,7 @@ describe('conversationToMarkdown', () => {
     });
     expect(md).toContain('# 测试');
     expect(md).toContain('**我：** 画个柱状图');
-    expect(md).toContain('**Kimi：** 好的。');
+    expect(md).toContain('**Agent：** 好的。');
     expect(md).not.toContain('suggestions');
   });
 });

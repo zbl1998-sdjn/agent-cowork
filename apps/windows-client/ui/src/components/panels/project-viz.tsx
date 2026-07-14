@@ -1,7 +1,7 @@
 // Agent Cowork 项目态势视图(UI · panels 子组件)
 // ---------------------------------------------------------------------------
 // 职责:把 runs/artifacts/model info 归并为当前项目快照,并渲染项目概览与可视化 spec。
-import type { ArtifactItem, KimiInfo } from '../../lib/api';
+import type { ArtifactItem, AgentEngineInfo } from '../../lib/api';
 import type { RunRecord } from '../../lib/types';
 import { Button } from '../ui/Button';
 
@@ -65,7 +65,7 @@ export function snapshotFromApis(
   trustedRoot: string,
   runs: RunRecord[],
   artifacts: ArtifactItem[],
-  info: Partial<KimiInfo> | null | undefined,
+  info: Partial<AgentEngineInfo> | null | undefined,
 ): ProjectVizSnapshot {
   const providers: ProviderSignal[] = info?.providers || Object.values(info?.catalog?.all || {}).map((item) => ({
     id: item.id,

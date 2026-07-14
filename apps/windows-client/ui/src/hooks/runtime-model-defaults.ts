@@ -1,4 +1,4 @@
-import type { KimiInfo, ModelProviderOption } from '../lib/api';
+import type { AgentEngineInfo, ModelProviderOption } from '../lib/api';
 
 interface RuntimeDefaults {
   chatEnabled: boolean;
@@ -15,7 +15,7 @@ function isLocalProviderId(id: string): boolean {
   return id.includes('local') || LOCAL_PROVIDER_IDS.has(id);
 }
 
-function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): ModelProviderOption[] {
+function providersFromCatalog(info: Partial<AgentEngineInfo> | null | undefined): ModelProviderOption[] {
   const states = new Map((info?.providerStates || []).map((state) => [state.provider, state]));
   if (Array.isArray(info?.providers) && info.providers.length) {
     return info.providers.map((item) => ({
@@ -41,7 +41,7 @@ function providersFromCatalog(info: Partial<KimiInfo> | null | undefined): Model
   }));
 }
 
-export function runtimeDefaultsFromKimiInfo(info: Partial<KimiInfo> | null | undefined): RuntimeDefaults {
+export function runtimeDefaultsFromAgentEngineInfo(info: Partial<AgentEngineInfo> | null | undefined): RuntimeDefaults {
   const providers = providersFromCatalog(info);
   const provider = info?.provider || 'kimi-api';
   const model = info?.model || '';

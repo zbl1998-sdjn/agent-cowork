@@ -1,11 +1,11 @@
 // Settings(UI · components):设置模态外框——管理标签切换与保存,内容由 SettingsTabsContent 承载。纯展示+回调。
 import { useEffect, useState } from 'react';
 import {
-  getKimiInfo,
-  saveKimiConfig,
-  testKimiConfig,
+  getAgentEngineInfo,
+  saveAgentEngineConfig,
+  testAgentEngineConfig,
   getSelfCheck,
-  type KimiInfo,
+  type AgentEngineInfo,
   type ModelConnectionResult,
   type ModelProviderOption,
   type ModelProviderRuntimeState,
@@ -47,7 +47,7 @@ interface SettingsProps {
   onSetFontFamily: (family: AppFontFamily) => void;
   onLogout: () => void;
   onClose: () => void;
-  onSaved: (info: KimiInfo) => void;
+  onSaved: (info: AgentEngineInfo) => void;
 }
 
 // 统一设置中心:账户/外观/模型/API/健康检查在一个模态框里。
@@ -76,7 +76,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
   useEffect(() => {
     void (async () => {
       try {
-        const info = await getKimiInfo();
+        const info = await getAgentEngineInfo();
         setProvider(info.provider || 'kimi-api');
         setBaseUrl(info.baseUrl || '');
         setModel(info.model || '');
@@ -121,7 +121,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
     setBusy(true); setError(''); setSavedTip('');
     void (async () => {
       try {
-        const info = await saveKimiConfig(payload);
+        const info = await saveAgentEngineConfig(payload);
         setHasKey(Boolean(info.hasKey));
         setProvider(info.provider || provider);
         setBaseUrl(info.baseUrl || '');
@@ -159,7 +159,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
   const testConnection = () => {
     if (testingConnection) return;
     setTestingConnection(true); setError(''); setSavedTip('');
-    void testKimiConfig({
+    void testAgentEngineConfig({
       provider,
       apiKey: apiKey.trim() || undefined,
       baseUrl: baseUrl.trim() || undefined,

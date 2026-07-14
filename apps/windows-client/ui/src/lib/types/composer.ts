@@ -1,6 +1,6 @@
 // 输入框共享类型(UI · lib/types):Composer、hooks 与展示组件的单一类型事实来源。
 import type { ModelRunConfig } from '../api/chat';
-import type { ModelProviderOption } from '../api/kimiConfig';
+import type { ModelProviderOption } from '../api/agentEngine';
 import type { PromptRefineResult } from '../api/prompt';
 
 export type ThinkingLevel = 'fast' | 'standard' | 'deep';

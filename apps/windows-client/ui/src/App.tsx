@@ -4,7 +4,7 @@
 //       lib/api。本身只做编排与连线,具体数据逻辑在 hooks、渲染在 components(plan/00 目标:App < 250 行)。
 // 依赖:hooks/* + components/* + lib/api + lib/app-logic 纯逻辑。
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { agentChatStream, cancelRun, fileToUpload, getKimiInfo, importRecipeTemplate, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
+import { agentChatStream, cancelRun, fileToUpload, getAgentEngineInfo, importRecipeTemplate, importUploads, newIdempotencyKey, openPath, postJson, refinePrompt, runSubagent, subscribeRunEvents, type SubagentStep } from './lib/api';
 import { buildAgentChatStreamOptions, hasSessionModelAccess, reconcileChatEnabled, reduceAssistantRunEvent, resolveUploadedTemplatePaths } from './lib/app-logic';
 import { latestWorkbenchGeneration } from './lib/workbench-logic';
 import { latestArtifactMessage } from './lib/artifact-canvas';
@@ -53,7 +53,7 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [contextRailCollapsed, setContextRailCollapsed] = useState(true);
   const {
-    applyKimiInfo,
+    applyAgentEngineInfo,
     authReady,
     autoClarify,
     autoContextCompaction,
@@ -203,7 +203,7 @@ export function App() {
     let enabled = Boolean(resumeRunId) || chatEnabled || sessionModelAccess;
     if (!enabled) {
       try {
-        const reconciled = reconcileChatEnabled(chatEnabled, await getKimiInfo());
+        const reconciled = reconcileChatEnabled(chatEnabled, await getAgentEngineInfo());
         enabled = reconciled.enabled;
         if (reconciled.shouldUpdateState) setChatEnabled(true);
       } catch { /* host 不可达时继续走配置兜底 */ }
@@ -318,7 +318,7 @@ export function App() {
       ) : (
         <AppContextRail trustedRoot={trustedRoot} recipes={recipes} streamingId={streamingId} mode={mode} model={workbenchPreview.model} messageCount={messages.length} agentTeamView={agentTeamTimeline.view} agentTeamLoading={agentTeamTimeline.loading} agentTeamError={agentTeamTimeline.error} onRefreshAgentTeam={agentTeamTimeline.refresh} onOpenRuns={() => setPanel('tasks')} onPickRecipe={setSelectedRecipe} onToggle={() => setContextRailCollapsed(true)} />
       )}
-      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} autoContextCompaction={autoContextCompaction} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyKimiInfo} onSetAutoClarify={setAutoClarify} onSetAutoContextCompaction={setAutoContextCompaction} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
+      <AppOverlays cmdkOpen={cmdkOpen} commands={commands} previewPath={previewPath} onboardingOpen={onboardingOpen} settingsOpen={settingsOpen} settingsInitialTab={settingsInitialTab} theme={theme} fontScale={fontScale} fontFamily={fontFamily} trustedRoot={trustedRoot} user={user} autoClarify={autoClarify} autoContextCompaction={autoContextCompaction} onCloseCommandPalette={() => setCmdkOpen(false)} onCompleteOnboarding={completeOnboarding} onClosePreview={() => setPreviewPath(null)} onCloseSettings={closeSettings} onOpenSettingsFromOnboarding={openSettingsFromOnboarding} onOpenSettingsTabFromOnboarding={openSettingsTabFromOnboarding} onLogout={() => { closeSettings(); void doLogout(); }} onSettingsSaved={applyAgentEngineInfo} onSetAutoClarify={setAutoClarify} onSetAutoContextCompaction={setAutoContextCompaction} onSetTheme={setTheme} onSetFontScale={setFontScale} onSetFontFamily={setFontFamily} />
     </div>
   );
 }

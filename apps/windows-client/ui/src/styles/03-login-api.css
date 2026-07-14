@@ -1,4 +1,4 @@
-/* ================= 登录门 + API 设置(kimi.exe 风格) ================= */
+/* ================= 登录门 + API 设置(Agent Cowork 风格) ================= */
 .auth-boot { height: 100vh; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 14px; }
 
 .auth-screen { display: flex; height: 100vh; background: var(--bg); }

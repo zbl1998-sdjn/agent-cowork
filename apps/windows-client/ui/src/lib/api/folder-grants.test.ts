@@ -18,7 +18,7 @@ it('persists only the selected grant id and sends it with host requests', async 
       removeItem: (key: string) => stored.delete(key),
     },
   });
-  stored.set('kcw.recentWorkspaces', JSON.stringify(['C:\\private\\workspace']));
+  stored.set('acw.recentWorkspaces', JSON.stringify(['C:\\private\\workspace']));
   const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
@@ -37,8 +37,8 @@ it('persists only the selected grant id and sends it with host requests', async 
   await api.listFolderGrants();
   await api.getJson('/api/projects');
 
-  expect(stored.get('kcw.workspaceGrantId')).toBe('grant_selected-1');
-  expect(stored.has('kcw.recentWorkspaces')).toBe(false);
+  expect(stored.get('acw.workspaceGrantId')).toBe('grant_selected-1');
+  expect(stored.has('acw.recentWorkspaces')).toBe(false);
   expect(JSON.stringify([...stored.entries()])).not.toContain('C:\\private\\workspace');
   const projectRequest = calls.find((call) => call.url.endsWith('/api/projects'));
   expect(projectRequest?.init?.headers).toMatchObject({

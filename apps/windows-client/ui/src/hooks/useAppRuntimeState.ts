@@ -1,16 +1,16 @@
 // useAppRuntimeState(UI · hooks 层)
 // ---------------------------------------------------------------------------
-// 职责:聚合应用级运行时状态——host 连通性/健康、Kimi 配置、运行时依赖、能力开关等的加载与轮询,
+// 职责:聚合应用级运行时状态——host 连通性/健康、Agent 引擎配置、运行时依赖、能力开关等的加载与轮询,
 //       为顶层组件提供统一的「环境就绪度」。依赖:lib/api(诊断/配置/依赖)。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getJson,
-  getKimiInfo,
+  getAgentEngineInfo,
   getMe,
   guestLogin,
   logout as apiLogout,
   type AuthIdentity,
-  type KimiInfo,
+  type AgentEngineInfo,
   type ModelProviderOption,
 } from '../lib/api';
 import { AUTO_CLARIFY_KEY, AUTO_CONTEXT_COMPACTION_KEY, GUEST_KEY, STARTERS } from '../lib/app-constants';
@@ -21,10 +21,10 @@ import type { RunSummary } from '../lib/types';
 import type { HistoryRun, Recipe } from '../lib/types/composer';
 import type { SecurityStatus } from '../lib/types/security';
 import type { AppFontFamily, AppFontScale, SettingsTab } from '../lib/types/settings';
-import { runtimeDefaultsFromKimiInfo } from './runtime-model-defaults';
-export { runtimeDefaultsFromKimiInfo } from './runtime-model-defaults';
-const FONT_SCALE_KEY = 'kcw.fontScale';
-const FONT_FAMILY_KEY = 'kcw.fontFamily';
+import { runtimeDefaultsFromAgentEngineInfo } from './runtime-model-defaults';
+export { runtimeDefaultsFromAgentEngineInfo } from './runtime-model-defaults';
+const FONT_SCALE_KEY = 'acw.fontScale';
+const FONT_FAMILY_KEY = 'acw.fontFamily';
 const FONT_SCALES = new Set<AppFontScale>(['small', 'normal', 'large', 'xlarge']);
 const FONT_FAMILIES = new Set<AppFontFamily>(['system', 'chinese', 'serif', 'mono']);
 
@@ -76,7 +76,7 @@ export function useAppRuntimeState() {
   });
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return localStorage.getItem('kcw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+    try { return localStorage.getItem('acw.theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
   });
   const [fontScale, setFontScale] = useState<AppFontScale>(() => readStoredFontScale());
   const [fontFamily, setFontFamily] = useState<AppFontFamily>(() => readStoredFontFamily());
@@ -89,8 +89,8 @@ export function useAppRuntimeState() {
   });
   const starters = useMemo(() => runtimeStarters(recipes, history), [recipes, history]);
 
-  const applyKimiInfo = useCallback((info: Partial<KimiInfo> | null | undefined) => {
-    const defaults = runtimeDefaultsFromKimiInfo(info);
+  const applyAgentEngineInfo = useCallback((info: Partial<AgentEngineInfo> | null | undefined) => {
+    const defaults = runtimeDefaultsFromAgentEngineInfo(info);
     setChatEnabled(defaults.chatEnabled);
     setDefaultProvider(defaults.provider);
     setDefaultBaseUrl(defaults.baseUrl);
@@ -122,7 +122,7 @@ export function useAppRuntimeState() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('kcw.theme', theme); } catch { /* 本地存储不可用时只保留内存状态 */ }
+    try { localStorage.setItem('acw.theme', theme); } catch { /* 本地存储不可用时只保留内存状态 */ }
   }, [theme]);
 
   useEffect(() => {
@@ -167,13 +167,13 @@ export function useAppRuntimeState() {
         setHistory(historyRunsFromIndex(index.runs || []));
       } catch { /* 运行历史加载失败不阻断主界面 */ }
       try {
-        applyKimiInfo(await getKimiInfo());
+        applyAgentEngineInfo(await getAgentEngineInfo());
       } catch { /* 模型配置加载失败不阻断主界面 */ }
       try {
         setSecurityStatus(await getJson<SecurityStatus>('/api/security/status'));
       } catch { /* 安全状态加载失败不阻断主界面 */ }
     })();
-  }, [applyKimiInfo, user]);
+  }, [applyAgentEngineInfo, user]);
 
   const doLogout = useCallback(async () => {
     try { await apiLogout(); } catch { /* 登出尽力而为,本地仍会清掉身份 */ }
@@ -212,7 +212,7 @@ export function useAppRuntimeState() {
   const toggleTheme = useCallback(() => setTheme((value) => (value === 'dark' ? 'light' : 'dark')), []);
 
   return {
-    applyKimiInfo,
+    applyAgentEngineInfo,
     authReady,
     autoClarify,
     autoContextCompaction,
