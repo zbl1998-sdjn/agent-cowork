@@ -359,7 +359,7 @@ export async function handleSystemRoutes({
       trustedRoot: state.trustedRootDefault,
       context: requestContext,
       securityMode: state.securityMode || 'controlled_hybrid',
-      kimiApi: {
+      modelApi: {
         provider: modelProvider(state.agentModelConfig),
         configured: state.agentModelConfig.configured,
         planEnabled: state.modelApiEnabled,

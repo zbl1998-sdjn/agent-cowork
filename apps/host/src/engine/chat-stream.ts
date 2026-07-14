@@ -1,7 +1,7 @@
 // SSE 流式聊天端点(host · L1 领域层)
 // ---------------------------------------------------------------------------
 // 职责:把一次非 agent 的简单对话以 text/event-stream 推给前端,逐 token 下发,
-//       并把整次对话落盘成一条 kimi-chat run 记录(成功/取消/失败三态)。
+//       并把整次对话落盘成一条 agent-chat run 记录(成功/取消/失败三态)。
 // 依赖:storage/run-store(落盘)、storage/runs-index(索引)、
 //       ./system-prompt(env 块)、./agent-env(环境事实);模型调用由外部注入的 streamRunner 提供。
 // 导出:streamChat —— 单一入口,被 routes 层装配。
@@ -119,7 +119,7 @@ export async function streamChat({
     const finishedAt = new Date();
     const base = {
       id: runId,
-      type: 'kimi-chat',
+      type: 'agent-chat',
       provider: modelProvider(modelConfig),
       mode: 'chat',
       trustedRoot,

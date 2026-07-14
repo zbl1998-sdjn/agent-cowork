@@ -70,10 +70,10 @@ test('workspace endpoint returns configured trusted root', async () => {
     assert.equal(response.status, 200);
     const body = await jsonBody(response, 'workspace response');
     assert.equal(body.trustedRoot, trustedRoot);
-    const kimiApi = recordValue(body.kimiApi, 'workspace kimiApi');
-    assert.equal(kimiApi.configured, false);
-    assert.equal(kimiApi.chatEnabled, false);
-    assert.equal(kimiApi.planEnabled, false);
+    const modelApi = recordValue(body.modelApi, 'workspace modelApi');
+    assert.equal(modelApi.configured, false);
+    assert.equal(modelApi.chatEnabled, false);
+    assert.equal(modelApi.planEnabled, false);
     const kimiCli = recordValue(body.kimiCli, 'workspace kimiCli');
     assert.equal(kimiCli.chatEnabled, false);
     assert.equal(kimiCli.planEnabled, false);
@@ -138,7 +138,7 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
     const record = recordValue(JSON.parse(fs.readFileSync(String(body.runPath), 'utf8')) as unknown, 'kimi plan record');
     assert.equal(record.id, body.runId);
     assert.equal(record.status, 'succeeded');
-    assert.equal(record.type, 'kimi-plan');
+    assert.equal(record.type, 'agent-plan');
     assert.equal(record.provider, 'kimi-api');
     assert.equal(recordValue(record.input, 'kimi plan record input').prompt, '生成计划');
     assert.equal(recordValue(record.result, 'kimi plan record result').text, 'Kimi API 计划输出');
@@ -183,7 +183,7 @@ test('kimi chat endpoint calls configured Kimi API runner', async () => {
     assert.equal(capturedChat.prompt, '你好');
 
     const record = recordValue(JSON.parse(fs.readFileSync(String(body.runPath), 'utf8')) as unknown, 'kimi chat record');
-    assert.equal(record.type, 'kimi-chat');
+    assert.equal(record.type, 'agent-chat');
     assert.equal(record.status, 'succeeded');
     assert.equal(recordValue(record.result, 'kimi chat record result').text, 'Kimi 对话输出');
   });

@@ -146,7 +146,7 @@ export async function handleAgentEngineRoutes({
       const isPlan = pathname === '/api/agent-engine/plan';
       await runKimiAndRecord({
         state: routeState,
-        type: isPlan ? 'kimi-plan' : 'kimi-chat',
+        type: isPlan ? 'agent-plan' : 'agent-chat',
         mode: isPlan && input.mode === 'code' ? 'code' : isPlan ? 'cowork' : 'chat',
         trustedRoot: safeTrustedRoot(input.trustedRoot),
         prompt: input.prompt,

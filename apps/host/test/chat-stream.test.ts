@@ -102,7 +102,7 @@ test('POST /api/agent-engine/chat/stream emits start/token/done SSE frames and r
 
     const indexBody = recordValue(await (await fetch(`${base}/api/runs/index`)).json(), 'runs index body');
     const runs = recordArray(indexBody.runs, 'runs index records');
-    assert.ok(runs.some((run) => run.type === 'kimi-chat'));
+    assert.ok(runs.some((run) => run.type === 'agent-chat'));
   } finally {
     await closeTestServer(server);
   }
