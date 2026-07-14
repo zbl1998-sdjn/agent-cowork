@@ -1,7 +1,8 @@
 // Microsoft Edge WebView2 运行时探测(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
 // 职责:探测 Windows 桌面外壳依赖的 WebView2 Evergreen 运行时是否已安装。优先认
-//       KCW_WEBVIEW2_MODE / WEBVIEW2_RELEASE_CHANNEL_PREFERENCE env;否则实地探测标准安装
+//       ACW_WEBVIEW2_MODE(兼容旧名 KCW_WEBVIEW2_MODE)/ WEBVIEW2_RELEASE_CHANNEL_PREFERENCE
+//       env;否则实地探测标准安装
 //       目录(%ProgramFiles(x86)%/%ProgramFiles%/%LOCALAPPDATA% 下 Microsoft\EdgeWebView\
 //       Application,或随 Edge 浏览器附带的 Microsoft\Edge\Application)。探测不到时保持
 //       unknown(而非误判缺失),由安装器/Windows 运行时兜底。dogfood 2026-07-09:此前 win32

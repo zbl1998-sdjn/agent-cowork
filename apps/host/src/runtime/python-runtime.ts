@@ -1,7 +1,8 @@
 // 内置 Python 探测(host · L2 运行时 · runtime)
 // ---------------------------------------------------------------------------
 // 职责:探测随包内置 Python 是否就绪。优先认桌面外壳(src-tauri/sidecar.rs)启动 host 时
-//       注入的 KCW_EMBEDDED_PYTHON / KCW_PYTHON_HOME 环境变量;env 缺失时回落到「host 可执行
+//       注入的 ACW_EMBEDDED_PYTHON / ACW_PYTHON_HOME(兼容旧名 KCW_EMBEDDED_PYTHON /
+//       KCW_PYTHON_HOME)环境变量;env 缺失时回落到「host 可执行
 //       文件同级 python-embedded/ 目录」实地探测——安装版里 python-embedded/ 与
 //       agent-cowork-host.exe 同目录(见 tauri.conf.json bundle.resources 与 sidecar.rs),
 //       不能仅因某次启动没设 env 就误报「缺失」(dogfood 2026-07-09 发现的面板误报)。
