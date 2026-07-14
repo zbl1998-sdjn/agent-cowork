@@ -126,9 +126,9 @@ test('fallback status route reports degraded local-only ability with explicit de
     requireAuth: false,
     enableScheduler: false,
     trustedRoot,
-    kimiProvider: 'offline-test-provider',
-    kimiBaseUrl: '',
-    kimiModel: '',
+    modelProvider: 'offline-test-provider',
+    modelBaseUrl: '',
+    model: '',
     sandboxStartup: degradedSandboxStartup,
   });
   const base = await bind(server);

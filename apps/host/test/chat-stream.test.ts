@@ -70,7 +70,7 @@ async function bind(server: HostServer): Promise<string> {
 }
 
 test('POST /api/agent-engine/chat/stream emits start/token/done SSE frames and records a run', async () => {
-  const fakeStream: NonNullable<ServerConfig['kimiChatStreamRunner']> = async ({ prompt, onToken } = {}) => {
+  const fakeStream: NonNullable<ServerConfig['modelChatStreamRunner']> = async ({ prompt, onToken } = {}) => {
     assert.match(String(prompt), /你好/);
     if (typeof onToken !== 'function') {
       throw new Error('stream test requires onToken callback');
@@ -81,8 +81,8 @@ test('POST /api/agent-engine/chat/stream emits start/token/done SSE frames and r
   const server = createServer({
     trustedRoot: tempRoot(),
     enableScheduler: false,
-    kimiChatRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'fake-model', mode: 'chat', text: 'x', durationMs: 0 }), // flips kimiApiEnabled on
-    kimiChatStreamRunner: fakeStream,
+    modelChatRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'fake-model', mode: 'chat', text: 'x', durationMs: 0 }), // flips modelApiEnabled on
+    modelChatStreamRunner: fakeStream,
   });
   const base = await bind(server);
   try {

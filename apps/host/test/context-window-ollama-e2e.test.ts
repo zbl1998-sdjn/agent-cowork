@@ -52,10 +52,10 @@ test('金标准 E2E: 真实 HTTP + 真实 Ollama + 短窗口 → SSE 出现 cont
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiProvider: 'openai/local',
-    kimiBaseUrl: `${OLLAMA_BASE}/v1`,
-    kimiModel: OLLAMA_MODEL,
-    kimiChatRunner: noopKimiChatRunner,
+    modelProvider: 'openai/local',
+    modelBaseUrl: `${OLLAMA_BASE}/v1`,
+    model: OLLAMA_MODEL,
+    modelChatRunner: noopKimiChatRunner,
   });
   const base = await bind(server);
   try {

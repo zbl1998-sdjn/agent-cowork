@@ -33,7 +33,7 @@ test('E2E: client disconnect mid-question cancels the run and frees the approval
   // The agent keeps asking the user a question; the user never answers — instead
   // the client disconnects. The server must not leak the pending question.
   const agentModelCall = async () => ({ content: '', tool_calls: [{ id: 'c1', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '继续吗?', options: ['是', '否'] }) } }] });
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, kimiChatRunner: fakeKimiChatRunner, agentModelCall, approvalRegistry, cancellation });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, modelChatRunner: fakeKimiChatRunner, agentModelCall, approvalRegistry, cancellation });
   const base = await bind(server);
   try {
     const ac = new AbortController();

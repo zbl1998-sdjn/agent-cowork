@@ -15,9 +15,9 @@ export const TEST_LOCAL_MODEL_CONFIG = Object.freeze({
 });
 
 export const TEST_LOCAL_HOST_MODEL_CONFIG = Object.freeze({
-  kimiProvider: TEST_LOCAL_MODEL_CONFIG.provider,
-  kimiBaseUrl: TEST_LOCAL_MODEL_CONFIG.baseUrl,
-  kimiModel: TEST_LOCAL_MODEL_CONFIG.model,
+  modelProvider: TEST_LOCAL_MODEL_CONFIG.provider,
+  modelBaseUrl: TEST_LOCAL_MODEL_CONFIG.baseUrl,
+  model: TEST_LOCAL_MODEL_CONFIG.model,
   securityMode: 'controlled_hybrid',
 });
 

@@ -7,7 +7,7 @@
 //       读侧兼容三种形态——封印密文(解封)、遗留明文(原样读入,下次写盘自动升级)、
 //       解封失败(如换机器/换用户 DPAPI 打不开)按"未配置"跳过该 key,不拖垮其他字段。
 // 依赖:node:fs / node:path + L0 security/credential-store。
-// 导出:applyPersistedKimiConfig(读入并写进目标对象)、persistKimiConfig(写盘)。
+// 导出:applyPersistedAgentModelConfig(读入并写进目标对象)、persistModelConfig(写盘)。
 import { composeFullModelId, normaliseModelProviderId, providerRequiresApiKey } from './provider/catalog.js';
 import {
   createDefaultCredentialProtector,
@@ -18,7 +18,7 @@ import { createManagedSingleFileOperation } from '../security/managed-single-fil
 import { syncActiveProviderProfile } from './provider-profiles.js';
 import type { AgentModelConfig, ProviderProfile } from './api-runner-config.js';
 
-type KimiConfigRecord = Record<string, unknown>;
+type AgentModelConfigRecord = Record<string, unknown>;
 type ConfigStoreOptions = { protector?: CredentialProtector };
 
 // 默认加密器懒加载单例:DPAPI 每次 protect/unprotect 都要拉起 PowerShell,
@@ -51,7 +51,7 @@ function cleanProvider(value: unknown): string {
   return normaliseModelProviderId(value, '');
 }
 
-function recomputeConfigured(target: KimiConfigRecord): void {
+function recomputeConfigured(target: AgentModelConfigRecord): void {
   const provider = cleanProvider(target.provider) || 'kimi-api';
   const baseUrl = String(target.baseUrl || '').trim();
   const model = String(target.model || '').trim();
@@ -62,11 +62,11 @@ function recomputeConfigured(target: KimiConfigRecord): void {
 }
 
 /** 清洗 fallback 列表:仅保留有效字段,丢弃完全为空的项。 */
-function cleanFallbacks(value: unknown): KimiConfigRecord[] {
+function cleanFallbacks(value: unknown): AgentModelConfigRecord[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => {
-    const source = item && typeof item === 'object' ? item as KimiConfigRecord : {};
-    const out: KimiConfigRecord = {};
+    const source = item && typeof item === 'object' ? item as AgentModelConfigRecord : {};
+    const out: AgentModelConfigRecord = {};
     if (typeof source.provider === 'string' && source.provider.trim()) out.provider = cleanProvider(source.provider);
     if (typeof source.apiKey === 'string' && source.apiKey.trim()) out.apiKey = source.apiKey.trim();
     if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) out.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
@@ -78,7 +78,7 @@ function cleanFallbacks(value: unknown): KimiConfigRecord[] {
 }
 
 function cleanProfile(value: unknown): ProviderProfile {
-  const source = value && typeof value === 'object' ? value as KimiConfigRecord : {};
+  const source = value && typeof value === 'object' ? value as AgentModelConfigRecord : {};
   const profile: ProviderProfile = {};
   if (typeof source.apiKey === 'string' && source.apiKey.trim()) profile.apiKey = source.apiKey.trim();
   if (typeof source.baseUrl === 'string' && source.baseUrl.trim()) profile.baseUrl = source.baseUrl.trim().replace(/\/+$/, '');
@@ -95,7 +95,7 @@ function unsealProfiles(
 ): Record<string, ProviderProfile> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const profiles: Record<string, ProviderProfile> = {};
-  for (const [rawProvider, rawProfile] of Object.entries(value as KimiConfigRecord)) {
+  for (const [rawProvider, rawProfile] of Object.entries(value as AgentModelConfigRecord)) {
     const provider = cleanProvider(rawProvider);
     if (!provider) continue;
     const profile = cleanProfile(rawProfile);
@@ -123,7 +123,7 @@ function sealProfiles(
 }
 
 /** 读取持久化配置文件并把清洗后的字段写进 target(原地修改);仅文件不存在时不动。 */
-export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
+export function applyPersistedAgentModelConfig(file: string, target: AgentModelConfigRecord, options: ConfigStoreOptions = {}): void {
   let serialized: string;
   try {
     const persisted = createManagedSingleFileOperation(file, 'Kimi config directory').readText();
@@ -140,10 +140,10 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord,
   } catch (error) {
     throw new Error(`Failed to parse Kimi config file: ${file}`, { cause: error });
   }
-  const config = raw && typeof raw === 'object' ? raw as KimiConfigRecord : {};
+  const config = raw && typeof raw === 'object' ? raw as AgentModelConfigRecord : {};
   const kimi = config.kimiApi || config.kimi || config;
   if (!kimi || typeof kimi !== 'object') return;
-  const source = kimi as KimiConfigRecord;
+  const source = kimi as AgentModelConfigRecord;
   const targetProfiles = target.providerProfiles && typeof target.providerProfiles === 'object'
     ? target.providerProfiles as Record<string, ProviderProfile>
     : {};
@@ -172,7 +172,7 @@ export function applyPersistedKimiConfig(file: string, target: KimiConfigRecord,
 }
 
 /** 把 source 中的 kimiApi 字段序列化写入磁盘(自动创建父目录);apiKey 一律封印后落盘。 */
-export function persistKimiConfig(file: string, source: KimiConfigRecord, options: ConfigStoreOptions = {}): void {
+export function persistModelConfig(file: string, source: AgentModelConfigRecord, options: ConfigStoreOptions = {}): void {
   syncActiveProviderProfile(source as AgentModelConfig);
   const apiKey = String(source.apiKey || '').trim();
   const payload = {

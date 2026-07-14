@@ -26,7 +26,7 @@ test('E2E /api/agent/chat/stream: lazy tools — connected mcp tools hidden unti
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'search_tools', arguments: JSON.stringify({ query: 'fs list dir' }) } }] };
     return { content: '已检索到可用工具。' };
   };
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const conn = await fetch(`${base}/api/connectors/connect`, {
@@ -78,7 +78,7 @@ test('E2E /api/agent/chat/stream: resumeRunId continues from checkpoint without 
       }],
     };
   };
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const first = await postAgentStream(base, { prompt: '写入后模拟崩溃', autoApprove: true });

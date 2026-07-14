@@ -13,7 +13,7 @@ test('confidential mode: connector attack surface is locked (client commands rej
   const prev = process.env.KCW_CONFIDENTIAL;
   process.env.KCW_CONFIDENTIAL = '1';
   const root = tempRoot('kcw-conf-conn-');
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner });
   const base = await bind(server);
   try {
     // 客户端指定命令 / 未知连接器 → 拒绝(只允许 host 内置)

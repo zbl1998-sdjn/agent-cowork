@@ -242,14 +242,14 @@ async function main(): Promise<void> {
     enableScheduler: false,
     ...(mode === 'dry-run' ? {
       agentModelCall: makeDryRunModelCall(),
-      kimiChatRunner: dryRunKimiChatRunner,
+      modelChatRunner: dryRunKimiChatRunner,
     } : {}),
-    ...(apiKey ? { kimiApiKey: apiKey } : {}),
+    ...(apiKey ? { modelApiKey: apiKey } : {}),
     ...(process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL
-      ? { kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL }
+      ? { modelBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL }
       : {}),
-    ...(process.env.KIMI_MODEL ? { kimiModel: process.env.KIMI_MODEL } : {}),
-    kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
+    ...(process.env.KIMI_MODEL ? { model: process.env.KIMI_MODEL } : {}),
+    modelApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
   });
 
   const startedAt = Date.now();

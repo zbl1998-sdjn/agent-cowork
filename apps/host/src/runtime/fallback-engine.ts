@@ -59,7 +59,7 @@ function modelDecision(configured: boolean): FallbackDecision | null {
     severity: 'warning',
     mode: 'degrade',
     userMessage: '模型未配置或不可用,本地文件、记忆和人工计划仍可继续使用。',
-    technicalMessage: 'kimiApiConfig.configured=false',
+    technicalMessage: 'agentModelConfig.configured=false',
     suggestedActions: [
       { id: 'configure-model', label: '配置模型', kind: 'open_settings' },
       { id: 'continue-local', label: '继续本地计划', kind: 'continue_degraded' },

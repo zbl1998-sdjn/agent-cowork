@@ -85,7 +85,7 @@ export async function handleRouteChain({
     runsIndex: state.runsIndex,
     runEvents: state.runEvents,
     toolRegistry: state.toolRegistry,
-    modelConfig: state.kimiApiConfig,
+    modelConfig: state.agentModelConfig,
     fetchImpl: state.oauthFetch,
     cancellation: state.cancellation,
     cacheKeyFor: state.cacheKeyFor,
@@ -105,7 +105,7 @@ export async function handleRouteChain({
     safeTrustedRoot,
     fileOperationApprovals: state.fileOperationApprovals,
     // 模型已配置时,支持 AI 路径的 recipe(如会议纪要)走模型提取,否则回退模板。
-    resolveModelConfig: () => (state.kimiApiConfig?.configured ? state.kimiApiConfig as unknown as Record<string, unknown> : null),
+    resolveModelConfig: () => (state.agentModelConfig?.configured ? state.agentModelConfig as unknown as Record<string, unknown> : null),
   }))) return true;
   if (await handleMemoryKnowledgeRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryKnowledgeRoutes>>({
     ...base,
@@ -153,7 +153,7 @@ export async function handleRouteChain({
     fileOperationApprovals: state.fileOperationApprovals, config: state.onlyOfficeConfig, fetchImpl: state.onlyOfficeFetch,
   }))) return true;
   if (await handleArtifactVersionRoutes(routeOptions<RouteHandlerOptions<typeof handleArtifactVersionRoutes>>({
-    ...base, requestUrl, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor, requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore, fileOperationApprovals: state.fileOperationApprovals, resolveSecurityMode: () => state.kimiApiConfig?.securityMode,
+    ...base, requestUrl, trustedRootDefault: state.trustedRootDefault, safeTrustedRoot, cacheKeyFor: state.cacheKeyFor, requireIdempotencyKey: state.requireIdempotencyKey, sendCachedOrStore: state.sendCachedOrStore, fileOperationApprovals: state.fileOperationApprovals, resolveSecurityMode: () => state.agentModelConfig?.securityMode,
   }))) return true;
   if (await handlePromptRoutes(routeOptions<RouteHandlerOptions<typeof handlePromptRoutes>>({ ...base, state: requestState }))) return true;
   if (await handleSearchRoutes(routeOptions<RouteHandlerOptions<typeof handleSearchRoutes>>({ ...base, state: requestState }))) return true;
@@ -206,7 +206,7 @@ export async function handleRouteChain({
     sendCachedOrStore: state.sendCachedOrStore,
     toolRegistry: state.toolRegistry,
     fileOperationApprovals: state.fileOperationApprovals,
-    resolveSecurityMode: () => state.kimiApiConfig?.securityMode,
+    resolveSecurityMode: () => state.agentModelConfig?.securityMode,
   }))) return true;
   if (await handleSkillRoutes(routeOptions<RouteHandlerOptions<typeof handleSkillRoutes>>({
     ...base,

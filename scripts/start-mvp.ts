@@ -81,11 +81,11 @@ const server = createServer(withPublicHostSecurity({
   trustedRoot: workspace,
   allowLocalModelConfigSelfService: true,
   allowLocalGuestEnrollment: true,
-  kimiApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
-  kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
-  kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),
-  kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
-  kimiModel: process.env.KIMI_MODEL,
+  modelApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
+  modelBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+  modelApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),
+  modelApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
+  model: process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(auditPath),
 }));
 

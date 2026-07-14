@@ -109,7 +109,7 @@ test('agent HTTP entry binds run-trace events to the authenticated request scope
     requireAuth: false,
     trustIdentityHeaders: true,
     enableScheduler: false,
-    kimiChatRunner: noopKimiChatRunner,
+    modelChatRunner: noopKimiChatRunner,
     agentModelCall: async () => ({ content: 'scoped agent result' }),
     runEventBus: bus as never,
   });

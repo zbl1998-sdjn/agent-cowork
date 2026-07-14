@@ -158,8 +158,8 @@ async function main() {
     enableScheduler: false,
     uiDistRoot,
     agentModelCall: makeScrollModelCall(),
-    kimiChatRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'chat', text: 'dry-run', durationMs: 1 }),
-    kimiPlanRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'plan', text: 'dry-run', durationMs: 1 }),
+    modelChatRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'chat', text: 'dry-run', durationMs: 1 }),
+    modelPlanRunner: async () => ({ ok: true, provider: 'kimi-api', model: 'kimi-test', mode: 'plan', text: 'dry-run', durationMs: 1 }),
   });
 
   const startedAt = Date.now();

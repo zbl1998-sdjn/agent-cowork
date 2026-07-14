@@ -63,7 +63,7 @@ test('HTTP surface: selfcheck exposes confidential + air_gap, OAuth routes are 4
   const previous = process.env.KCW_CONFIDENTIAL;
   process.env.KCW_CONFIDENTIAL = '1';
   const root = tempRoot('kcw-confidential-');
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner });
   const base = await bind(server);
   try {
     const selfcheck = await jsonRequest(base, '/api/selfcheck');
@@ -86,7 +86,7 @@ test('HTTP surface without confidential keeps selfcheck flag false and OAuth rea
   const previous = process.env.KCW_CONFIDENTIAL;
   delete process.env.KCW_CONFIDENTIAL;
   const root = tempRoot('kcw-confidential-off-');
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner });
   const base = await bind(server);
   try {
     const selfcheck = await jsonRequest(base, '/api/selfcheck');

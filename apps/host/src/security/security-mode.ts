@@ -241,7 +241,7 @@ function providerSuggestsLocal(provider: string): boolean {
 }
 
 function configuredBaseUrl(config: Record<string, unknown>): unknown {
-  return config.baseUrl || config.kimiBaseUrl || config.apiBaseUrl;
+  return config.baseUrl || config.modelBaseUrl || config.apiBaseUrl;
 }
 
 export function classifyModelProvider(

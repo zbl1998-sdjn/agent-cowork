@@ -48,7 +48,7 @@ function kimiRouteState(root: string, overrides: Partial<AgentEngineRouteState> 
     memoryStore: {
       loadMemoryContext: () => ({ enabled: false, text: '' }),
     },
-    kimiApiConfig: {
+    agentModelConfig: {
       provider: ' OpenAI ',
       configured: true,
       apiKey: 'test-route-support-key',
@@ -59,12 +59,12 @@ function kimiRouteState(root: string, overrides: Partial<AgentEngineRouteState> 
       userAgent: 'agent-cowork-test',
       temperature: 0.2,
     },
-    kimiApiEnabled: true,
-    kimiPlanRunner: async () => ({ ok: true }),
-    kimiChatRunner: async () => ({ ok: true }),
-    kimiChatStreamRunner: async () => ({ text: '' }),
-    recomputeKimiEnabled: () => undefined,
-    persistKimiConfig: () => undefined,
+    modelApiEnabled: true,
+    modelPlanRunner: async () => ({ ok: true }),
+    modelChatRunner: async () => ({ ok: true }),
+    modelChatStreamRunner: async () => ({ text: '' }),
+    recomputeModelEnabled: () => undefined,
+    persistModelConfig: () => undefined,
     indexRun: (record: Record<string, unknown>, context: Record<string, unknown>) => { indexed.push({ record, context }); },
     agentConcurrency: { tryAcquire: () => () => undefined },
     indexed,
@@ -198,7 +198,7 @@ test('sendAgentEngineInfo normalizes providers and summarizes fallback keys with
   const root = makeTestWorkspace('kcw-kimi-route-info');
   const response = new CapturingJsonResponse();
   const state = kimiRouteState(root, {
-    kimiApiConfig: {
+    agentModelConfig: {
       provider: '  ',
       configured: true,
       apiKey: CONFIG_SECRET,
@@ -252,7 +252,7 @@ test('runKimiAndRecord writes success evidence, indexes the run, and returns onl
         return { enabled: true, bytes: 12, notes: [{ name: 'note.md' }], text: 'memory text that must stay out of the response' };
       },
     },
-    kimiApiConfig: {
+    agentModelConfig: {
       provider: 'OpenAI',
       configured: true,
       apiKey: CONFIG_SECRET,

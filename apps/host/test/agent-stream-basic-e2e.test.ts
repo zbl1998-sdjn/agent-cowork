@@ -23,7 +23,7 @@ test('E2E /api/agent/chat/stream: file_written + verify_start + done (deep think
     if (n === 3) return { content: '', tool_calls: [{ id: 'c3', function: { name: 'Read', arguments: JSON.stringify({ path: 'report.md' }) } }] };
     return { content: '已核对，report.md 无误。' };
   };
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '写报告', autoApprove: true, thinking: 'deep' });
@@ -44,7 +44,7 @@ test('E2E /api/agent/chat/stream: inline chart fenced block streams through to t
   const root = tempRoot('kcw-e2e-');
   const chart = '```chart\n{"kind":"bar","data":{"labels":["A","B"],"datasets":[{"data":[1,2]}]}}\n```';
   const agentModelCall = async () => ({ content: `这是结果：\n${chart}` });
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '画个图' });
@@ -64,11 +64,11 @@ test('E2E /api/agent/chat/stream records configured model provider', async () =>
     trustedRoot: root,
     enableScheduler: false,
     securityMode: 'controlled_hybrid',
-    kimiProvider: 'openai/local',
-    kimiApiKey: 'test-key-provider',
-    kimiBaseUrl: 'http://127.0.0.1:11434/v1',
-    kimiModel: 'gpt-test',
-    kimiChatRunner: noopKimiChatRunner,
+    modelProvider: 'openai/local',
+    modelApiKey: 'test-key-provider',
+    modelBaseUrl: 'http://127.0.0.1:11434/v1',
+    model: 'gpt-test',
+    modelChatRunner: noopKimiChatRunner,
     agentModelCall,
   });
   const base = await bind(server);

@@ -56,7 +56,7 @@ test('agent stream runSeed emits a deterministic start runId', async () => {
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
+    modelChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: 'seeded done' }),
   });
   const base = await bind(server);

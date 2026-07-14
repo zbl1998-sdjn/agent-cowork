@@ -40,7 +40,7 @@ function checkStatus(body: JsonRecord, id: string): unknown {
 
 test('GET /api/selfcheck reports posture and never exposes the API key', async () => {
   const trustedRoot = makeTestWorkspace('kcw-selfcheck');
-  await withServer({ trustedRoot, kimiApiKey: 'sk-SELFCHECKSECRET1234567890' }, async (base) => {
+  await withServer({ trustedRoot, modelApiKey: 'sk-SELFCHECKSECRET1234567890' }, async (base) => {
     const res = await fetch(`${base}/api/selfcheck`);
     assert.equal(res.status, 200);
     const raw = await res.text();

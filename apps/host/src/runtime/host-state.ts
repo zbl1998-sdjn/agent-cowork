@@ -34,7 +34,7 @@ import { createCredentialStore } from '../security/credential-store.js';
 import { getAppHome } from '../storage/app-home.js';
 import { sendJson, type HttpResponseLike } from '../http/request-utils.js';
 import { omitUndefined } from '../util/object.js';
-import { applyPersistedKimiConfig, persistKimiConfig } from '../engine/config-store.js';
+import { applyPersistedAgentModelConfig, persistModelConfig } from '../engine/config-store.js';
 import { providerRuntimeState } from '../engine/provider-profiles.js';
 import { createKimiRefineModelCall } from '../engine/prompt/refine-model-call.js';
 import { resolveSandboxStartup } from '../sandbox/startup-probe.js';
@@ -68,11 +68,11 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
   const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
-  const kimiConfigFile = statePaths.kimiConfigFile();
-  const kimiApiConfig = resolveAgentModelConfig(config);
-  const kimiConfigStoreOptions = omitUndefined({ protector: config.kimiConfigProtector });
-  applyPersistedKimiConfig(kimiConfigFile, kimiApiConfig, kimiConfigStoreOptions);
-  const securityMode = kimiApiConfig.securityMode;
+  const modelConfigFile = statePaths.modelConfigFile();
+  const agentModelConfig = resolveAgentModelConfig(config);
+  const modelConfigStoreOptions = omitUndefined({ protector: config.kimiConfigProtector });
+  applyPersistedAgentModelConfig(modelConfigFile, agentModelConfig, modelConfigStoreOptions);
+  const securityMode = agentModelConfig.securityMode;
   const folderGrantStore = config.folderGrantStore || createFolderGrantStore(omitUndefined({
     filePath: statePaths.folderGrantStoreFile(),
     protector: config.folderGrantProtector,
@@ -85,12 +85,12 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     staticRoot,
     uiDistRoot,
     uiDistEnabled: isUiDistEnabled(config, uiDistRoot),
-    kimiConfigFile,
+    modelConfigFile,
     securityMode,
-    kimiApiConfig,
-    kimiPlanRunner: config.kimiPlanRunner || runModelApiPlan,
-    kimiChatRunner: config.kimiChatRunner || runModelApiChat,
-    kimiChatStreamRunner: config.kimiChatStreamRunner || runModelApiChatStream,
+    agentModelConfig,
+    modelPlanRunner: config.modelPlanRunner || runModelApiPlan,
+    modelChatRunner: config.modelChatRunner || runModelApiChat,
+    modelChatStreamRunner: config.modelChatStreamRunner || runModelApiChatStream,
     runStoreRoot: config.runStoreRoot ? path.resolve(config.runStoreRoot) : assertTrustedPathForCreate(path.join(trustedRootDefault, '.AgentCowork', 'runs'), trustedRootDefault),
     idempotencyStore: config.idempotencyStore instanceof Map
       ? config.idempotencyStore as Map<string, IdempotencyEntry>
@@ -111,17 +111,17 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     globalMutationAdmins: resolveGlobalMutationAdmins(config.globalMutationAdmins, process.env),
     allowLocalModelConfigSelfService: config.allowLocalModelConfigSelfService === true,
   };
-  state.recomputeKimiEnabled = () => {
-    state.kimiApiEnabled = config.enableKimiApi !== false && (providerRuntimeState(kimiApiConfig, kimiApiConfig.provider).enabled || Boolean(config.kimiPlanRunner) || Boolean(config.kimiChatRunner));
-    return state.kimiApiEnabled;
+  state.recomputeModelEnabled = () => {
+    state.modelApiEnabled = config.enableModelApi !== false && (providerRuntimeState(agentModelConfig, agentModelConfig.provider).enabled || Boolean(config.modelPlanRunner) || Boolean(config.modelChatRunner));
+    return state.modelApiEnabled;
   };
-  state.recomputeKimiEnabled();
-  state.persistKimiConfig = () => persistKimiConfig(statePaths.kimiConfigFile(), kimiApiConfig, kimiConfigStoreOptions);
+  state.recomputeModelEnabled();
+  state.persistModelConfig = () => persistModelConfig(statePaths.modelConfigFile(), agentModelConfig, modelConfigStoreOptions);
   // 提示词改写(/api/prompt/refine)默认接入当前模型:未显式注入且已配置 API Key 时,
   // 用当前 Kimi 配置造一个 refine 专用的非流式模型调用;否则保持空,refiner 走本地兜底。
-  if (!config.promptRefineModelCall && !config.promptRefiner && kimiApiConfig.configured) {
+  if (!config.promptRefineModelCall && !config.promptRefiner && agentModelConfig.configured) {
     config.promptRefineModelCall = createKimiRefineModelCall({
-      modelConfig: kimiApiConfig as unknown as Record<string, unknown>, ...(typeof config.fetchImpl === 'function' ? { fetchImpl: config.fetchImpl as typeof fetch } : {}),
+      modelConfig: agentModelConfig as unknown as Record<string, unknown>, ...(typeof config.fetchImpl === 'function' ? { fetchImpl: config.fetchImpl as typeof fetch } : {}),
     });
     if (config.promptRefineTimeoutMs == null) {
       config.promptRefineTimeoutMs = 20_000;
@@ -168,9 +168,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     runStoreRoot: state.runStoreRoot,
     runEvents: state.runEvents,
     runsIndex: state.runsIndex,
-    // 传 getter 而非快照值:kimiApiConfig 会被 agent-engine-routes 等原地更新,WebFetch/WebSearch
+    // 传 getter 而非快照值:agentModelConfig 会被 agent-engine-routes 等原地更新,WebFetch/WebSearch
     // 的出站策略检查必须读到「当前」安全模式,不是装配这一刻的值。
-    resolveSecurityMode: () => kimiApiConfig.securityMode,
+    resolveSecurityMode: () => agentModelConfig.securityMode,
   }))) as unknown as HostState['toolRegistry'];
   state.skillRegistry = config.skillRegistry || createSkillRegistry();
   state.cancellation = config.cancellation || createCancellationRegistry();

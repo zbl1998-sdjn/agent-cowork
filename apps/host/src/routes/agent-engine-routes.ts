@@ -76,36 +76,36 @@ export async function handleAgentEngineRoutes({
       const input = parseAgentEngineBody(response, agentEngineConfigBodySchema, body, 'invalid kimi config request');
       if (!input) return;
       const previousConfig = {
-        ...routeState.kimiApiConfig,
-        fallbacks: routeState.kimiApiConfig.fallbacks.map((fallback) => ({ ...fallback })),
-        providerProfiles: cloneProviderProfiles(routeState.kimiApiConfig.providerProfiles),
+        ...routeState.agentModelConfig,
+        fallbacks: routeState.agentModelConfig.fallbacks.map((fallback) => ({ ...fallback })),
+        providerProfiles: cloneProviderProfiles(routeState.agentModelConfig.providerProfiles),
       };
-      const previousEnabled = routeState.kimiApiEnabled;
-      const previousProvider = modelProvider(routeState.kimiApiConfig);
+      const previousEnabled = routeState.modelApiEnabled;
+      const previousProvider = modelProvider(routeState.agentModelConfig);
       const parsedModel = splitFullModelId(input.model);
       const requestedProvider = input.provider?.trim()
         ? modelProvider(input)
         : parsedModel.provider || previousProvider;
       if (requestedProvider !== previousProvider) {
-        activateProviderProfile(routeState.kimiApiConfig, requestedProvider);
+        activateProviderProfile(routeState.agentModelConfig, requestedProvider);
       }
-      if (input.clearKey === true) routeState.kimiApiConfig.apiKey = '';
-      else if (input.apiKey?.trim()) routeState.kimiApiConfig.apiKey = input.apiKey.trim();
-      if (input.fallbacks) routeState.kimiApiConfig.fallbacks = normalizeModelFallbacks(input.fallbacks);
-      if (input.baseUrl?.trim()) routeState.kimiApiConfig.baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
+      if (input.clearKey === true) routeState.agentModelConfig.apiKey = '';
+      else if (input.apiKey?.trim()) routeState.agentModelConfig.apiKey = input.apiKey.trim();
+      if (input.fallbacks) routeState.agentModelConfig.fallbacks = normalizeModelFallbacks(input.fallbacks);
+      if (input.baseUrl?.trim()) routeState.agentModelConfig.baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
       if (input.model?.trim()) {
-        routeState.kimiApiConfig.model = parsedModel.provider && (!input.provider?.trim() || parsedModel.provider === modelProvider(routeState.kimiApiConfig))
+        routeState.agentModelConfig.model = parsedModel.provider && (!input.provider?.trim() || parsedModel.provider === modelProvider(routeState.agentModelConfig))
           ? parsedModel.model
           : input.model.trim();
       }
-      syncActiveProviderProfile(routeState.kimiApiConfig);
-      routeState.recomputeKimiEnabled();
+      syncActiveProviderProfile(routeState.agentModelConfig);
+      routeState.recomputeModelEnabled();
       try {
-        routeState.persistKimiConfig();
+        routeState.persistModelConfig();
       } catch {
-        Object.assign(routeState.kimiApiConfig, previousConfig);
-        if (previousEnabled === undefined) delete routeState.kimiApiEnabled;
-        else routeState.kimiApiEnabled = previousEnabled;
+        Object.assign(routeState.agentModelConfig, previousConfig);
+        if (previousEnabled === undefined) delete routeState.modelApiEnabled;
+        else routeState.modelApiEnabled = previousEnabled;
         sendJson(response, 500, { error: 'Failed to persist Kimi config' });
         return;
       }
@@ -127,7 +127,7 @@ export async function handleAgentEngineRoutes({
         ? routeState.config.fetchImpl as typeof fetch
         : undefined;
       sendJson(response, 200, await testModelConnection(
-        routeState.kimiApiConfig,
+        routeState.agentModelConfig,
         omitUndefined(input),
         fetchImpl,
       ));
@@ -139,7 +139,7 @@ export async function handleAgentEngineRoutes({
     await withJsonBody(request, response, async (body) => {
       const input = parseAgentEngineBody(response, agentEnginePlanChatBodySchema, body, 'invalid kimi request');
       if (!input) return;
-      if (!routeState.kimiApiEnabled) {
+      if (!routeState.modelApiEnabled) {
         sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
@@ -151,7 +151,7 @@ export async function handleAgentEngineRoutes({
         trustedRoot: safeTrustedRoot(input.trustedRoot),
         prompt: input.prompt,
         summary: input.summary,
-        runner: isPlan ? routeState.kimiPlanRunner : routeState.kimiChatRunner,
+        runner: isPlan ? routeState.modelPlanRunner : routeState.modelChatRunner,
         response,
         context: requestContext,
       });
@@ -163,7 +163,7 @@ export async function handleAgentEngineRoutes({
     await withJsonBody(request, response, async (body) => {
       const input = parseAgentEngineBody(response, agentEngineStreamBodySchema, body, 'invalid agent stream request');
       if (!input) return;
-      if (!routeState.kimiApiEnabled && !hasSessionModelAccess(input)) {
+      if (!routeState.modelApiEnabled && !hasSessionModelAccess(input)) {
         sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
@@ -189,7 +189,7 @@ export async function handleAgentEngineRoutes({
           request,
           requestContext,
           body: input,
-          modelConfig: routeState.kimiApiConfig,
+          modelConfig: routeState.agentModelConfig,
           trustedRoot: safeTrustedRoot(input.trustedRoot),
           runStoreRoot: routeState.runStoreRoot,
           runsIndex: routeState.runsIndex,
@@ -214,7 +214,7 @@ export async function handleAgentEngineRoutes({
     await withJsonBody(request, response, async (body) => {
       const input = parseAgentEngineBody(response, agentEngineChatStreamBodySchema, body, 'invalid kimi stream request');
       if (!input) return;
-      if (!routeState.kimiApiEnabled) {
+      if (!routeState.modelApiEnabled) {
         sendJson(response, 503, { error: MODEL_API_NOT_CONFIGURED_MESSAGE });
         return;
       }
@@ -222,9 +222,9 @@ export async function handleAgentEngineRoutes({
         response,
         requestContext,
         body: input,
-        streamRunner: routeState.kimiChatStreamRunner,
+        streamRunner: routeState.modelChatStreamRunner,
         cancellation: routeState.cancellation,
-        modelConfig: routeState.kimiApiConfig,
+        modelConfig: routeState.agentModelConfig,
         trustedRoot: safeTrustedRoot(input.trustedRoot),
         runStoreRoot: routeState.runStoreRoot,
         runsIndex: routeState.runsIndex,

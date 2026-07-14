@@ -54,7 +54,7 @@ function makeServerConfig(
   fs.mkdirSync(stateRoot, { recursive: true });
   return {
     trustedRoot: workspaceRoot,
-    kimiConfigFile: path.join(stateRoot, 'bench-kimi.json'),
+    modelConfigFile: path.join(stateRoot, 'bench-kimi.json'),
     credentialStorePath: path.join(stateRoot, 'bench-credentials.json'),
     storeBackend: 'file',
     databaseUrl: null,
@@ -67,16 +67,16 @@ function makeServerConfig(
     sandboxStartup: BENCH_SANDBOX_STARTUP,
     connectMcpOnStart: false,
     mcpServers: [],
-    kimiProvider: 'openai/local',
-    kimiBaseUrl: 'http://127.0.0.1:1/v1',
-    kimiModel: 'benchmark-injected-model',
+    modelProvider: 'openai/local',
+    modelBaseUrl: 'http://127.0.0.1:1/v1',
+    model: 'benchmark-injected-model',
     securityMode: 'controlled_hybrid',
     fetchImpl: rejectInjectedFetch,
     oauthFetch: rejectInjectedFetch,
     approvalRegistry: approvals,
     cancellation,
     agentConcurrency: concurrency,
-    kimiChatRunner: async () => ({
+    modelChatRunner: async () => ({
       ok: true as const,
       provider: 'benchmark-injected',
       model: 'benchmark-injected-model',

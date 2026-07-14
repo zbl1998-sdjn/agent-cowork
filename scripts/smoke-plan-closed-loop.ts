@@ -323,7 +323,7 @@ async function main(): Promise<void> {
     requireAuth: false,
     enableScheduler: false,
     agentModelCall: makeClosedLoopModelCall(),
-    kimiChatRunner: async () => ({
+    modelChatRunner: async () => ({
       ok: true,
       provider: 'smoke',
       model: 'closed-loop-scripted',

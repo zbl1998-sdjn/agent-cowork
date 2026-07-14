@@ -66,9 +66,9 @@ type HostStateLike = {
   agentConcurrency: AgentConcurrencyLike;
   rateLimiter?: RateLimiterLike | null;
   draining?: boolean;
-  kimiApiConfig: AgentModelConfigLike;
+  agentModelConfig: AgentModelConfigLike;
   securityMode?: string;
-  kimiApiEnabled?: boolean;
+  modelApiEnabled?: boolean;
   sandboxEnabled?: boolean;
   sandbox?: SandboxLike | null;
   sandboxStartup?: SandboxStartupLike | null;
@@ -207,7 +207,7 @@ export async function handleSystemRoutes({
         leakedProxy.length === 0 ? '代理环境已剥离(NO_PROXY=*),子进程不经本机代理外呼' : `残留代理变量:${leakedProxy.join(', ')}(有经代理外泄风险)`);
     }
     add('cors-loopback-only', true, 'only loopback http/https + tauri: origins reflected');
-    add('api-key', state.kimiApiConfig.configured, state.kimiApiConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
+    add('api-key', state.agentModelConfig.configured, state.agentModelConfig.configured ? 'configured (never echoed)' : '未配置 API Key');
     add('rate-limit', Boolean(rateLimitStats), rateLimitStats ? `${rateLimitStats.ratePerSec}/s · burst ${rateLimitStats.burst}` : '限流未启用');
     add('model-circuit', !breakers.some((b) => b.state === 'open'), breakers.length ? breakers.map((b) => `${b.name}:${b.state}`).join(', ') : '尚无模型调用');
     add(
@@ -224,7 +224,7 @@ export async function handleSystemRoutes({
         confidential: isConfidentialMode(),
         responseHeaders: Object.keys(SECURITY_HEADERS),
         cors: 'loopback+tauri only',
-        apiKey: { configured: state.kimiApiConfig.configured, hasKey: Boolean(state.kimiApiConfig.apiKey) },
+        apiKey: { configured: state.agentModelConfig.configured, hasKey: Boolean(state.agentModelConfig.apiKey) },
         bodyLimitBytes: 1024 * 1024,
       },
       resilience: {
@@ -257,7 +257,7 @@ export async function handleSystemRoutes({
       report: buildTrustReport({
         trustedRoot: state.trustedRootDefault,
         securityMode: state.securityMode,
-        modelConfig: state.kimiApiConfig as unknown as Record<string, unknown>,
+        modelConfig: state.agentModelConfig as unknown as Record<string, unknown>,
         sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
       }),
       context: requestContext,
@@ -269,7 +269,7 @@ export async function handleSystemRoutes({
     const report = buildTrustReport({
       trustedRoot: state.trustedRootDefault,
       securityMode: state.securityMode,
-      modelConfig: state.kimiApiConfig as unknown as Record<string, unknown>,
+      modelConfig: state.agentModelConfig as unknown as Record<string, unknown>,
       sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
     });
     sendJson(response, 200, {
@@ -311,7 +311,7 @@ export async function handleSystemRoutes({
     const dependencies = runtimeDependencyStatus(state);
     sendJson(response, 200, {
       ...buildFallbackStatus(omitUndefined({
-        modelConfigured: state.kimiApiConfig.configured,
+        modelConfigured: state.agentModelConfig.configured,
         sandboxNetworkIsolated: Boolean(state.sandboxEnabled && state.sandbox && state.sandbox.networkIsolated),
         sandboxMessage: state.sandboxStartup?.info?.userMessage,
         memorySettings: safeMemorySettings(state, requestContext),
@@ -360,12 +360,12 @@ export async function handleSystemRoutes({
       context: requestContext,
       securityMode: state.securityMode || 'controlled_hybrid',
       kimiApi: {
-        provider: modelProvider(state.kimiApiConfig),
-        configured: state.kimiApiConfig.configured,
-        planEnabled: state.kimiApiEnabled,
-        chatEnabled: state.kimiApiEnabled,
-        baseUrl: state.kimiApiConfig.baseUrl,
-        model: state.kimiApiConfig.model,
+        provider: modelProvider(state.agentModelConfig),
+        configured: state.agentModelConfig.configured,
+        planEnabled: state.modelApiEnabled,
+        chatEnabled: state.modelApiEnabled,
+        baseUrl: state.agentModelConfig.baseUrl,
+        model: state.agentModelConfig.model,
       },
       kimiCli: { planEnabled: false, chatEnabled: false, legacy: true },
     });

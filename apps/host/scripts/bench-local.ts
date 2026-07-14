@@ -19,9 +19,9 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-bench-'));
 const approvalRegistry = createApprovalRegistry();
 const cancellation = createCancellationRegistry();
 const agentConcurrency = createConcurrencyLimiter({ maxConcurrent: 100000, maxPerTenant: 100000 });
-const kimiChatRunner = async () => ({ ok: true as const, provider: 'bench', model: 'mock', mode: 'chat', text: '已完成。', durationMs: 0 });
+const modelChatRunner = async () => ({ ok: true as const, provider: 'bench', model: 'mock', mode: 'chat', text: '已完成。', durationMs: 0 });
 const agentModelCall = async () => ({ content: '已完成。', usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } });
-const server = createServer({ trustedRoot: root, requireAuth: false, enableScheduler: false, kimiChatRunner, agentModelCall, approvalRegistry, cancellation, agentConcurrency });
+const server = createServer({ trustedRoot: root, requireAuth: false, enableScheduler: false, modelChatRunner, agentModelCall, approvalRegistry, cancellation, agentConcurrency });
 await new Promise<void>((resolve) => {
   server.listen(0, '127.0.0.1', resolve);
 });

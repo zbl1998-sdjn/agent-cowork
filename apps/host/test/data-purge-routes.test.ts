@@ -18,7 +18,7 @@ function seed(root: string): void {
 test('purge-plan is read-only; purge requires confirm; key store survives content purge', async () => {
   const root = tempRoot('kcw-purge-route-');
   seed(root);
-  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner });
+  const server = createServer({ requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner });
   const base = await bind(server);
   try {
     const plan = await jsonRequest(base, '/api/security/data/purge-plan', { method: 'POST', body: { scope: 'content' } });

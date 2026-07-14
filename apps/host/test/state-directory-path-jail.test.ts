@@ -65,8 +65,8 @@ function testHostConfig(trustedRoot: string): HostConfig {
   return {
     trustedRoot,
     staticRoot: false,
-    kimiConfigFile: path.join(trustedRoot, 'test-kimi-config.json'),
-    enableKimiApi: false,
+    modelConfigFile: path.join(trustedRoot, 'test-kimi-config.json'),
+    enableModelApi: false,
     storeBackend: 'file',
     memoryStore: {},
     conversationStore: {},
@@ -179,7 +179,7 @@ test('default Kimi config path rejects an escaped .AgentCowork directory', () =>
     runsIndexRoot: path.join(trustedRoot, 'managed-index'),
     sqliteDbPath: path.join(trustedRoot, 'managed-state.sqlite'),
   };
-  delete config.kimiConfigFile;
+  delete config.modelConfigFile;
 
   assert.throws(
     () => createHostState(config, { hostSrcDir: HOST_SRC_DIR }),
@@ -235,13 +235,13 @@ test('explicit external run and index roots retain their managed trust boundary'
   const externalRoot = tempRoot('kcw-state-explicit-managed-');
   const runStoreRoot = path.join(externalRoot, 'runs');
   const runsIndexRoot = path.join(externalRoot, 'index');
-  const kimiConfigFile = path.join(externalRoot, 'config.json');
+  const modelConfigFile = path.join(externalRoot, 'config.json');
   const sqliteDbPath = path.join(externalRoot, 'state.sqlite');
   const scheduleStoreDir = path.join(externalRoot, 'schedules');
 
   const state = createHostState({
     ...testHostConfig(trustedRoot),
-    kimiConfigFile,
+    modelConfigFile,
     runStoreRoot,
     runsIndexRoot,
     sqliteDbPath,
@@ -250,7 +250,7 @@ test('explicit external run and index roots retain their managed trust boundary'
     startScheduler: false,
   }, { hostSrcDir: HOST_SRC_DIR });
 
-  assert.equal(state.kimiConfigFile, path.resolve(kimiConfigFile));
+  assert.equal(state.modelConfigFile, path.resolve(modelConfigFile));
   assert.equal(state.runStoreRoot, path.resolve(runStoreRoot));
   assert.equal(state.sqliteDbPath, path.resolve(sqliteDbPath));
   assert.equal(state.activeScheduler?.storeDir, path.resolve(scheduleStoreDir));

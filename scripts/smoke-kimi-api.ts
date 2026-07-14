@@ -91,11 +91,11 @@ async function main(): Promise<void> {
 
   const server = createServer({
     trustedRoot: workspace,
-    kimiApiKey: apiKey,
-    kimiBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
-    kimiApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
-    kimiApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
-    kimiModel: process.env.KIMI_MODEL,
+    modelApiKey: apiKey,
+    modelBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+    modelApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 90_000),
+    modelApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
+    model: process.env.KIMI_MODEL,
     staticRoot: false,
   });
 

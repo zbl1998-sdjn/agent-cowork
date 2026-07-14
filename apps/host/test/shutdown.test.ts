@@ -46,7 +46,7 @@ test('shutdown drains: refuses new agent streams (503) and unblocks approvals', 
     ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
+    modelChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: 'hi' }),
     cancellation,
     approvalRegistry,
@@ -79,7 +79,7 @@ test('draining server replies 503 to new agent streams (listener still open)', a
     ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
+    modelChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: 'hi' }),
   });
   const base = await bind(server);

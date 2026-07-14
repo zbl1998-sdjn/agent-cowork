@@ -27,7 +27,7 @@ test('resolveAgentModelConfig reads model provider from env/config', () => {
   });
   assert.equal(envConfig.provider, 'openai');
 
-  const explicitConfig = resolveAgentModelConfig({ kimiProvider: 'openai/local' }, {});
+  const explicitConfig = resolveAgentModelConfig({ modelProvider: 'openai/local' }, {});
   assert.equal(explicitConfig.provider, 'openai/local');
 });
 

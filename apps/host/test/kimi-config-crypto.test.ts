@@ -1,6 +1,6 @@
 // Kimi 配置 apiKey 落盘加密(切片 2 · 明文凭据缺口修复)
 // ---------------------------------------------------------------------------
-// persistKimiConfig 写盘前封印 apiKey(含 fallbacks 内的),applyPersistedKimiConfig
+// persistModelConfig 写盘前封印 apiKey(含 fallbacks 内的),applyPersistedAgentModelConfig
 // 读侧兼容:密文解封 / 遗留明文原样 / 解封失败按未配置跳过且不拖垮其他字段。
 // 测试注入 AES-GCM protector(跨平台、避免 DPAPI 拉 PowerShell 的耗时)。
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { applyPersistedKimiConfig, persistKimiConfig } from '../src/engine/config-store.js';
+import { applyPersistedAgentModelConfig, persistModelConfig } from '../src/engine/config-store.js';
 import { createAesGcmProtector, isSealedCredential } from '../src/security/credential-store.js';
 import { createServer } from '../src/server.js';
 
@@ -21,9 +21,9 @@ function tmpFile(): string {
 
 const protector = createAesGcmProtector({ keyMaterial: 'kimi-config-crypto-test' });
 
-test('persistKimiConfig seals apiKey (incl. fallbacks) so plaintext never hits disk', () => {
+test('persistModelConfig seals apiKey (incl. fallbacks) so plaintext never hits disk', () => {
   const file = tmpFile();
-  persistKimiConfig(file, {
+  persistModelConfig(file, {
     apiKey: SECRET,
     baseUrl: 'https://api.moonshot.cn/v1',
     model: 'kimi-k2.6',
@@ -38,9 +38,9 @@ test('persistKimiConfig seals apiKey (incl. fallbacks) so plaintext never hits d
   assert.ok(isSealedCredential(parsed.kimiApi.fallbacks[0]?.apiKey));
 });
 
-test('applyPersistedKimiConfig round-trips sealed keys back to plaintext in memory', () => {
+test('applyPersistedAgentModelConfig round-trips sealed keys back to plaintext in memory', () => {
   const file = tmpFile();
-  persistKimiConfig(file, {
+  persistModelConfig(file, {
     apiKey: SECRET,
     baseUrl: 'https://api.moonshot.cn/v1',
     model: 'kimi-k2.6',
@@ -48,7 +48,7 @@ test('applyPersistedKimiConfig round-trips sealed keys back to plaintext in memo
   }, { protector });
 
   const target: Record<string, unknown> = {};
-  applyPersistedKimiConfig(file, target, { protector });
+  applyPersistedAgentModelConfig(file, target, { protector });
   assert.equal(target.apiKey, SECRET);
   assert.equal(target.model, 'kimi-k2.6');
   const fallbacks = target.fallbacks as Array<{ apiKey?: string }>;
@@ -61,12 +61,12 @@ test('legacy plaintext config files keep loading (migrate-on-write compatibility
   fs.writeFileSync(file, JSON.stringify({ kimiApi: { apiKey: SECRET, baseUrl: 'https://x.example/v1', model: 'legacy-model' } }), 'utf8');
 
   const target: Record<string, unknown> = {};
-  applyPersistedKimiConfig(file, target, { protector });
+  applyPersistedAgentModelConfig(file, target, { protector });
   assert.equal(target.apiKey, SECRET);
   assert.equal(target.model, 'legacy-model');
 
   // 下次写盘自动升级为密文
-  persistKimiConfig(file, target, { protector });
+  persistModelConfig(file, target, { protector });
   assert.ok(!fs.readFileSync(file, 'utf8').includes(SECRET));
 });
 
@@ -83,7 +83,7 @@ test('an unopenable sealed key is treated as unconfigured without dropping other
   }), 'utf8');
 
   const target: Record<string, unknown> = {};
-  applyPersistedKimiConfig(file, target, { protector });
+  applyPersistedAgentModelConfig(file, target, { protector });
   assert.equal(target.apiKey, undefined, 'unopenable key must not surface as a usable value');
   assert.equal(target.baseUrl, 'https://api.moonshot.cn/v1', 'other fields survive an unopenable key');
   assert.equal(target.model, 'kimi-k2.6');
@@ -95,12 +95,12 @@ test('an unopenable sealed key is treated as unconfigured without dropping other
 
 test('default protector path round-trips without injection (DPAPI on win32, AES elsewhere)', () => {
   const file = tmpFile();
-  persistKimiConfig(file, { apiKey: SECRET, baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' });
+  persistModelConfig(file, { apiKey: SECRET, baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' });
   const raw = fs.readFileSync(file, 'utf8');
   assert.ok(!raw.includes(SECRET), 'default protector left plaintext on disk');
 
   const target: Record<string, unknown> = {};
-  applyPersistedKimiConfig(file, target);
+  applyPersistedAgentModelConfig(file, target);
   assert.equal(target.apiKey, SECRET);
 });
 
@@ -112,7 +112,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
   try {
     createServer({
       trustedRoot: path.dirname(file),
-      kimiConfigFile: file,
+      modelConfigFile: file,
       kimiConfigProtector: protector,
       requireAuth: false,
       persistAuth: false,
@@ -131,7 +131,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
   const missingFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-cfg-missing-')), 'config.json');
   assert.doesNotThrow(() => createServer({
     trustedRoot: path.dirname(missingFile),
-    kimiConfigFile: missingFile,
+    modelConfigFile: missingFile,
     kimiConfigProtector: protector,
     requireAuth: false,
     persistAuth: false,
@@ -142,7 +142,7 @@ test('a non-empty corrupt Kimi config fails startup without exposing or overwrit
   assert.equal(fs.existsSync(missingFile), false);
 });
 
-test('persistKimiConfig keeps the previous file and cleans temp data when atomic replace fails', () => {
+test('persistModelConfig keeps the previous file and cleans temp data when atomic replace fails', () => {
   const file = tmpFile();
   const originalBytes = 'original-config-bytes';
   fs.writeFileSync(file, originalBytes, 'utf8');
@@ -151,7 +151,7 @@ test('persistKimiConfig keeps the previous file and cleans temp data when atomic
   fs.renameSync = (() => { throw renameError; }) as typeof fs.renameSync;
   try {
     assert.throws(
-      () => persistKimiConfig(file, { apiKey: SECRET, baseUrl: 'https://new.example/v1', model: 'new-model' }, { protector }),
+      () => persistModelConfig(file, { apiKey: SECRET, baseUrl: 'https://new.example/v1', model: 'new-model' }, { protector }),
       (error: unknown) => error === renameError,
     );
   } finally {
@@ -161,7 +161,7 @@ test('persistKimiConfig keeps the previous file and cleans temp data when atomic
   assert.deepEqual(fs.readdirSync(path.dirname(file)), [path.basename(file)]);
 });
 
-test('persistKimiConfig never deletes a colliding temporary file it did not create', () => {
+test('persistModelConfig never deletes a colliding temporary file it did not create', () => {
   const file = tmpFile();
   fs.writeFileSync(file, 'original-config-bytes', 'utf8');
   const mutableFs = fs as unknown as {
@@ -179,7 +179,7 @@ test('persistKimiConfig never deletes a colliding temporary file it did not crea
 
   try {
     assert.throws(
-      () => persistKimiConfig(file, { apiKey: SECRET, model: 'new-model' }, { protector }),
+      () => persistModelConfig(file, { apiKey: SECRET, model: 'new-model' }, { protector }),
       (error: unknown) => Boolean(error)
         && typeof error === 'object'
         && (error as { code?: unknown }).code === 'EEXIST',

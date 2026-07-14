@@ -53,10 +53,10 @@ test('Kimi plan and prompt-refine routes never fetch when audit persistence fail
   await withServer({
     trustedRoot,
     securityMode: LOCAL_MODEL.securityMode,
-    kimiProvider: LOCAL_MODEL.provider,
-    kimiBaseUrl: LOCAL_MODEL.baseUrl,
-    kimiModel: LOCAL_MODEL.model,
-    kimiApiKey: LOCAL_MODEL.apiKey,
+    modelProvider: LOCAL_MODEL.provider,
+    modelBaseUrl: LOCAL_MODEL.baseUrl,
+    model: LOCAL_MODEL.model,
+    modelApiKey: LOCAL_MODEL.apiKey,
     fetchImpl,
     promptRefineModelCall,
   }, async (baseUrl) => {

@@ -27,7 +27,7 @@ test('a new conversation recalls relevant active topic knowledge into the system
   const root = tempRoot('kcw-krecall-');
   upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '我们项目代号是什么来着？', conversationId: 'fresh-conv' });
@@ -45,7 +45,7 @@ test('an unrelated prompt does not pull in topic knowledge (relevance-gated, no 
   const root = tempRoot('kcw-krecall-none-');
   upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '帮我把这两个数相加：18 加 24', conversationId: 'fresh-conv-2' }));
@@ -60,7 +60,7 @@ test('paused memory does not recall topic knowledge', async () => {
   upsertKnowledgeItem(root, { topic: '项目', title: '项目代号', content: '项目代号是 Phoenix-7', confidence: 0.95 }, { confidenceThreshold: 0.7, context: owner });
   writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '项目代号是什么？', conversationId: 'fresh-conv-3' }));

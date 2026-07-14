@@ -225,7 +225,7 @@ test('E2E /api/agent/chat/stream: question frame over SSE, POST { answer } resum
     if (n === 1) return { content: '', tool_calls: [{ id: 'c1', function: { name: 'AskUserQuestion', arguments: JSON.stringify({ question: '导出什么格式?', options: ['PDF', 'Excel'] }) } }] };
     return { content: '已按所选格式导出。' };
   };
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: async () => fakeKimiTextResult(), agentModelCall });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: async () => fakeKimiTextResult(), agentModelCall });
   const base = await bind(server);
   try {
     const res = await fetch(`${base}/api/agent/chat/stream`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: '导出报告' }) });

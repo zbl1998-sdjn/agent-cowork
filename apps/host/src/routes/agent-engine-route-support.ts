@@ -28,13 +28,13 @@ type StreamChatRunner = Parameters<typeof streamChat>[0]['streamRunner'];
 
 export type AgentEngineRouteState = HostState & {
   memoryStore: MemoryStoreLike;
-  kimiApiConfig: AgentModelConfig;
-  kimiApiEnabled?: boolean;
-  kimiPlanRunner: ModelRunner;
-  kimiChatRunner: ModelRunner;
-  kimiChatStreamRunner: StreamChatRunner;
-  recomputeKimiEnabled: () => unknown;
-  persistKimiConfig: () => void;
+  agentModelConfig: AgentModelConfig;
+  modelApiEnabled?: boolean;
+  modelPlanRunner: ModelRunner;
+  modelChatRunner: ModelRunner;
+  modelChatStreamRunner: StreamChatRunner;
+  recomputeModelEnabled: () => unknown;
+  persistModelConfig: () => void;
   indexRun: (record: Record<string, unknown>, context: RequestContext) => void;
   agentConcurrency: AgentConcurrencyLike;
 };
@@ -70,28 +70,28 @@ function modelCatalogOptions(state: AgentEngineRouteState): CatalogOptions {
 }
 
 export async function sendAgentEngineInfo(response: HttpResponseLike, state: AgentEngineRouteState): Promise<void> {
-  const provider = modelProvider(state.kimiApiConfig);
-  state.recomputeKimiEnabled();
+  const provider = modelProvider(state.agentModelConfig);
+  state.recomputeModelEnabled();
   const { activeState, connectionResult, providerStates } = await inspectRouteModelConnection(
-    state.kimiApiConfig,
+    state.agentModelConfig,
     provider,
     state.config.fetchImpl,
   );
-  if (connectionResult && connectionResult.connection.status !== 'connected') state.kimiApiEnabled = false;
+  if (connectionResult && connectionResult.connection.status !== 'connected') state.modelApiEnabled = false;
   const catalog = await modelsDevProviderCatalogResponse(modelCatalogOptions(state));
   sendJson(response, 200, {
     provider,
     configured: activeState.configured,
-    planEnabled: state.kimiApiEnabled,
-    chatEnabled: state.kimiApiEnabled,
-    baseUrl: state.kimiApiConfig.baseUrl,
-    model: state.kimiApiConfig.model,
-    fullModelId: state.kimiApiConfig.fullModelId || composeFullModelId(provider, state.kimiApiConfig.model),
+    planEnabled: state.modelApiEnabled,
+    chatEnabled: state.modelApiEnabled,
+    baseUrl: state.agentModelConfig.baseUrl,
+    model: state.agentModelConfig.model,
+    fullModelId: state.agentModelConfig.fullModelId || composeFullModelId(provider, state.agentModelConfig.model),
     modelIdFormat: catalog.modelIdFormat,
     providers: catalog.providers,
     catalog: catalog.catalog,
     catalogSource: catalog.source,
-    fallbacks: fallbackSummaries(state.kimiApiConfig.fallbacks),
+    fallbacks: fallbackSummaries(state.agentModelConfig.fallbacks),
     hasKey: activeState.hasKey,
     providerStates,
     availableModels: connectionResult?.models || [],
@@ -100,16 +100,16 @@ export async function sendAgentEngineInfo(response: HttpResponseLike, state: Age
 }
 
 export async function sendModelProviderCatalog(response: HttpResponseLike, state: AgentEngineRouteState): Promise<void> {
-  const provider = modelProvider(state.kimiApiConfig);
+  const provider = modelProvider(state.agentModelConfig);
   sendJson(response, 200, {
     ...await modelsDevProviderCatalogResponse(modelCatalogOptions(state)),
     current: {
       provider,
-      model: state.kimiApiConfig.model,
-      fullModelId: state.kimiApiConfig.fullModelId || composeFullModelId(provider, state.kimiApiConfig.model),
-      baseUrl: state.kimiApiConfig.baseUrl,
-      configured: state.kimiApiConfig.configured,
-      hasKey: Boolean(state.kimiApiConfig.apiKey),
+      model: state.agentModelConfig.model,
+      fullModelId: state.agentModelConfig.fullModelId || composeFullModelId(provider, state.agentModelConfig.model),
+      baseUrl: state.agentModelConfig.baseUrl,
+      configured: state.agentModelConfig.configured,
+      hasKey: Boolean(state.agentModelConfig.apiKey),
     },
   });
 }

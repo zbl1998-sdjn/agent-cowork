@@ -40,7 +40,7 @@ type HostSchedulerState = Record<string, unknown> & {
   // 定时任务复用与手动运行相同的 AI recipe 路径:有模型配置就走 AI 提取(过出站策略检查),
   // 否则回退模板。此前定时任务从不传 modelConfig,导致自动化的 recipe 永远是机械模板输出——
   // 用户设了「每周一自动生成周报」享受不到 AI 提取(功能完整性缺口,非安全问题)。
-  kimiApiConfig?: { configured?: boolean } & Record<string, unknown>;
+  agentModelConfig?: { configured?: boolean } & Record<string, unknown>;
 };
 type ScheduleRecordLike = {
   id: string;
@@ -156,7 +156,7 @@ export function configureHostScheduler({
       runStoreRoot: state.runStoreRoot,
       runEvents: state.runEvents as RunEventsLike | null | undefined,
       runsIndex: state.runsIndex as RunsIndexLike | null | undefined,
-      modelConfig: state.kimiApiConfig?.configured ? state.kimiApiConfig : null,
+      modelConfig: state.agentModelConfig?.configured ? state.agentModelConfig : null,
     }));
     return { runId: result.runId, operations: result.operations.length };
   };

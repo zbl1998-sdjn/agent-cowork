@@ -5,7 +5,7 @@ import path from 'node:path';
 import { assertTrustedPathForCreate } from '../security/path-policy.js';
 
 type HostStatePathConfig = {
-  kimiConfigFile?: string;
+  modelConfigFile?: string;
   authDbPath?: string;
   folderGrantStorePath?: string;
 };
@@ -14,8 +14,8 @@ export function createHostStatePathResolvers(
   config: HostStatePathConfig,
   trustedRoot: string,
   env: Record<string, string | undefined> = process.env,
-): { kimiConfigFile(): string; authDbPath(): string; folderGrantStoreFile(): string } {
-  const configuredKimiConfigFile = config.kimiConfigFile;
+): { modelConfigFile(): string; authDbPath(): string; folderGrantStoreFile(): string } {
+  const configuredKimiConfigFile = config.modelConfigFile;
   const configuredAuthDbPath = config.authDbPath || env.KCW_AUTH_DB;
   const configuredFolderGrantStore = config.folderGrantStorePath || env.KCW_FOLDER_GRANT_STORE;
   const resolve = (configuredPath: string | undefined, leaf: string): string => (
@@ -27,7 +27,7 @@ export function createHostStatePathResolvers(
       )
   );
   return {
-    kimiConfigFile: () => resolve(configuredKimiConfigFile, 'config.json'),
+    modelConfigFile: () => resolve(configuredKimiConfigFile, 'config.json'),
     authDbPath: () => resolve(configuredAuthDbPath, 'auth.sqlite'),
     folderGrantStoreFile: () => resolve(configuredFolderGrantStore, 'folder-grants.json'),
   };

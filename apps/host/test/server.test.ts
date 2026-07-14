@@ -8,8 +8,8 @@ import type { ServerConfig } from '../src/server.js';
 import { closeTestServer } from './helpers/close-server.js';
 import { makeTestWorkspace } from './test-fixtures.js';
 
-type KimiPlanInput = NonNullable<Parameters<NonNullable<ServerConfig['kimiPlanRunner']>>[0]>;
-type KimiChatInput = NonNullable<Parameters<NonNullable<ServerConfig['kimiChatRunner']>>[0]>;
+type KimiPlanInput = NonNullable<Parameters<NonNullable<ServerConfig['modelPlanRunner']>>[0]>;
+type KimiChatInput = NonNullable<Parameters<NonNullable<ServerConfig['modelChatRunner']>>[0]>;
 type KimiRunnerCapture<T> = T & { trustedRoot?: unknown };
 
 function recordValue(value: unknown, label: string): Record<string, unknown> {
@@ -100,7 +100,7 @@ test('kimi plan endpoint calls configured API runner inside trusted root', async
   let captured: KimiRunnerCapture<KimiPlanInput> | null = null;
   await withServer({
     trustedRoot,
-    kimiPlanRunner: async (input = {}) => {
+    modelPlanRunner: async (input = {}) => {
       const runnerInput = input as KimiRunnerCapture<KimiPlanInput>;
       captured = runnerInput;
       return {
@@ -150,7 +150,7 @@ test('kimi chat endpoint calls configured Kimi API runner', async () => {
   let captured: KimiRunnerCapture<KimiChatInput> | null = null;
   await withServer({
     trustedRoot,
-    kimiChatRunner: async (input = {}) => {
+    modelChatRunner: async (input = {}) => {
       const runnerInput = input as KimiRunnerCapture<KimiChatInput>;
       captured = runnerInput;
       return {
@@ -246,7 +246,7 @@ test('run endpoints expose persisted Kimi plan records', async () => {
   let runId = '';
   await withServer({
     trustedRoot,
-    kimiPlanRunner: async () => ({
+    modelPlanRunner: async () => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-k2.6',
@@ -290,7 +290,7 @@ test('task endpoint maps persisted runs into task cards', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({
     trustedRoot,
-    kimiPlanRunner: async () => ({
+    modelPlanRunner: async () => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-k2.6',
@@ -569,7 +569,7 @@ test('kimi plan failures persist run record and expose run id', async () => {
   const trustedRoot = makeTestWorkspace('kcw-trusted');
   await withServer({
     trustedRoot,
-    kimiPlanRunner: async () => {
+    modelPlanRunner: async () => {
       throw new Error('simulated kimi failure');
     },
   }, async (baseUrl) => {

@@ -107,7 +107,7 @@ test('agent stream persists token usage metrics from the run outcome', async () 
     ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: async () => ({
+    modelChatRunner: async () => ({
       ok: true,
       provider: 'kimi-api',
       model: 'test-model',

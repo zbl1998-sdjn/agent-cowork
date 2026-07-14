@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { applyPersistedKimiConfig, persistKimiConfig } from '../src/engine/config-store.js';
+import { applyPersistedAgentModelConfig, persistModelConfig } from '../src/engine/config-store.js';
 import { createCustomRecipeStore } from '../src/recipes/custom-recipes.js';
 import {
   createCredentialStore,
@@ -130,7 +130,7 @@ test('Kimi config read rejects a symbolic-link file without reading its target',
   }
   const target: Record<string, unknown> = {};
   assert.throws(
-    () => applyPersistedKimiConfig(filePath, target),
+    () => applyPersistedAgentModelConfig(filePath, target),
     /symbolic link|junction|reparse point|managed/i,
   );
   assert.deepEqual(target, {});
@@ -142,7 +142,7 @@ test('Kimi config write rejects an ordinary parent replacement before publish', 
   const swap = replaceDirectoryWhenTemporaryFileOpens(directory);
   try {
     assert.throws(
-      () => persistKimiConfig(filePath, { provider: 'ollama', model: 'qwen3' }),
+      () => persistModelConfig(filePath, { provider: 'ollama', model: 'qwen3' }),
       /managed directory changed|managed path parent changed/i,
     );
   } finally {
@@ -170,7 +170,7 @@ for (const surface of ['credential', 'recipe', 'kimi'] as const) {
       : surface === 'recipe'
         ? () => createCustomRecipeStore({ storePath: filePath })
           .save({ id: 'blocked', name: 'Blocked', redacted: true }, OWNER)
-        : () => persistKimiConfig(filePath, { provider: 'ollama', model: 'qwen3' });
+        : () => persistModelConfig(filePath, { provider: 'ollama', model: 'qwen3' });
     assert.throws(action, /symbolic link|junction|reparse point|managed directory/i);
     assert.deepEqual(fs.readdirSync(outside), []);
   });

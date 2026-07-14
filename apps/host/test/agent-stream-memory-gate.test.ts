@@ -43,7 +43,7 @@ test('E2E agent run injects layered memory when memory is active (control)', asy
   const root = tempRoot('kcw-mem-active-');
   seedProjectMemory(root);
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });
@@ -62,7 +62,7 @@ test('E2E agent run does NOT inject layered memory when memory is paused', async
   // 用户在 UI 里把记忆暂停:实时对话应既不注入记忆(也不回写)。
   writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });
@@ -86,7 +86,7 @@ test('E2E recalled memory is redacted before injection (read-side DLP)', async (
     'utf8',
   );
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const res = await postAgentStream(base, { prompt: '你好' });

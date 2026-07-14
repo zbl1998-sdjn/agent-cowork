@@ -26,7 +26,7 @@ test('POST /api/agent/chat/stream (autoApprove) writes the file and records an a
     ...TEST_LOCAL_HOST_MODEL_CONFIG,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: noopKimiChatRunner,
+    modelChatRunner: noopKimiChatRunner,
     agentModelCall,
   });
   const base = await bind(server);

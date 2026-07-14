@@ -42,17 +42,17 @@ test('E2E /api/agent/chat/stream falls back through provider router without leak
     trustedRoot: root,
     enableScheduler: false,
     securityMode: 'controlled_hybrid',
-    kimiProvider: 'openai/local',
-    kimiApiKey: primarySecret,
-    kimiBaseUrl: 'http://127.0.0.1:11440/v1',
-    kimiModel: 'gpt-primary-router',
-    kimiFallbacks: [{
+    modelProvider: 'openai/local',
+    modelApiKey: primarySecret,
+    modelBaseUrl: 'http://127.0.0.1:11440/v1',
+    model: 'gpt-primary-router',
+    modelFallbacks: [{
       provider: 'openai/local',
       apiKey: fallbackSecret,
       baseUrl: 'http://127.0.0.1:11441/v1',
       model: 'gpt-fallback-router',
     }],
-    kimiChatRunner: noopKimiChatRunner,
+    modelChatRunner: noopKimiChatRunner,
     agentModelCall,
   });
   const base = await bind(server);

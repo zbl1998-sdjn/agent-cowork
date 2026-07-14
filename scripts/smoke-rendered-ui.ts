@@ -228,7 +228,7 @@ async function main() {
     journalWriter: new JsonlWriter(auditPath),
     requireAuth: false,
     uiDist: false,
-    kimiPlanRunner: async (options = {}) => ({
+    modelPlanRunner: async (options = {}) => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-test',
@@ -236,7 +236,7 @@ async function main() {
       text: `测试 Kimi 计划：${options.mode} / ${options.prompt} / ${options.summary}`,
       durationMs: 16,
     }),
-    kimiChatRunner: async (options = {}) => ({
+    modelChatRunner: async (options = {}) => ({
       ok: true,
       provider: 'kimi-api',
       model: 'kimi-test',

@@ -270,7 +270,7 @@ test('diagnostic recorders and Kimi routes do not swallow or reclassify at-rest 
   const kimiError = new AtRestKeyError('kimi record key unavailable');
   const state = {
     memoryStore: { loadMemoryContext: () => ({ enabled: false, text: '' }) },
-    kimiApiConfig: {
+    agentModelConfig: {
       provider: 'test', model: 'test-model', baseUrl: 'http://127.0.0.1',
       configured: true, apiKey: 'test-placeholder-key', timeoutMs: 10, maxTokens: 10,
     },
@@ -325,7 +325,7 @@ test('memory settings and system fallback status do not hide at-rest key failure
       requestContext: context,
       state: {
         agentConcurrency: { stats: () => ({ active: 0, maxConcurrent: 1, tenants: 0 }) },
-        kimiApiConfig: { configured: false, apiKey: '', provider: 'test', baseUrl: '', model: '' },
+        agentModelConfig: { configured: false, apiKey: '', provider: 'test', baseUrl: '', model: '' },
         config: { runtimeDependencyEnv: {} },
         trustedRootDefault: root,
         cancellation: { cancel: () => false },

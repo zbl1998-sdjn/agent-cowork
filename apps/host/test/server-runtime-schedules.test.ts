@@ -116,17 +116,17 @@ test('schedules: default executor forwards configured model to runRecipe (functi
   const notesPath = path.join(trustedRoot, 'notes.txt');
   fs.writeFileSync(notesPath, '张三负责登录模块联调,截止下周三。', 'utf8');
   // 不传 scheduleExecutor:走 host-scheduler.ts 的 defaultScheduleExecutor,验证它真的把
-  // state.kimiApiConfig 转发给了 runRecipe(此前从不转发,定时任务永远只能走模板路径)。
+  // state.agentModelConfig 转发给了 runRecipe(此前从不转发,定时任务永远只能走模板路径)。
   const server = createServer({
     trustedRoot,
     scheduleStore: fileScheduleStore(trustedRoot),
     enableScheduler: true,
     startScheduler: false,
-    kimiProvider: 'ollama',
+    modelProvider: 'ollama',
     // 端口 1 通常无人监听:立即 ECONNREFUSED,不用等 AI_MODEL_TIMEOUT_MS 超时——
     // 本测试只验证 modelConfig 被转发、AI 路径被尝试,不验证真实模型响应。
-    kimiBaseUrl: 'http://127.0.0.1:1/v1',
-    kimiModel: 'kimi-k2.7-code',
+    modelBaseUrl: 'http://127.0.0.1:1/v1',
+    model: 'kimi-k2.7-code',
   });
   const base = await bind(server);
   try {

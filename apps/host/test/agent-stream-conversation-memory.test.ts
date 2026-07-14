@@ -29,7 +29,7 @@ function captureModelCall(): { call: (input: AgentModelCallInput) => Promise<{ c
 test('MASE off: same-conversation turn 2 recalls turn 1 via the built-in conversation buffer', async () => {
   const root = tempRoot('kcw-convmem-');
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     const t1 = await postAgentStream(base, { prompt: '我的工位号是 555，请记住。', conversationId: 'conv-X' });
@@ -52,7 +52,7 @@ test('MASE off: same-conversation turn 2 recalls turn 1 via the built-in convers
 test('conversation buffers are isolated: a different conversationId does not leak turn 1', async () => {
   const root = tempRoot('kcw-convmem-iso-');
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '我的暗号是 蓝鲸4242。', conversationId: 'conv-A' }));
@@ -68,7 +68,7 @@ test('paused memory does not buffer or inject prior turns', async () => {
   const root = tempRoot('kcw-convmem-paused-');
   writeMemorySettings(root, { paused: true }, owner);
   const model = captureModelCall();
-  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, kimiChatRunner: noopKimiChatRunner, agentModelCall: model.call });
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: false, trustedRoot: root, enableScheduler: false, modelChatRunner: noopKimiChatRunner, agentModelCall: model.call });
   const base = await bind(server);
   try {
     await readAgentStream(await postAgentStream(base, { prompt: '我的工位号是 555。', conversationId: 'conv-P' }));

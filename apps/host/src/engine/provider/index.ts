@@ -29,12 +29,12 @@ export {
 export { clearModelsDevCatalogCache, modelsDevProviderCatalogResponse } from './models-dev-catalog.js';
 
 const anthropicProvider = createAnthropicProvider();
-const kimiProvider = createKimiProvider();
+const modelProvider = createKimiProvider();
 const openAiProvider = createOpenAiProvider();
 const localOpenAiProvider = createLocalOpenAiCompatibleProvider();
 
 function providerFromCatalogEntry(entry: (typeof MODEL_PROVIDER_CATALOG)[number]): Provider {
-  if (entry.id === 'kimi-api') return kimiProvider;
+  if (entry.id === 'kimi-api') return modelProvider;
   if (entry.id === 'openai') return openAiProvider;
   if (entry.id === 'anthropic') return anthropicProvider;
   if (entry.id === 'openai/local') return localOpenAiProvider;
@@ -47,7 +47,7 @@ function providerFromCatalogEntry(entry: (typeof MODEL_PROVIDER_CATALOG)[number]
       notConfiguredMessage: `未配置 ${entry.displayName} 模型。请配置 baseUrl、model${entry.requiresApiKey ? ' 和 API key' : ''} 后重试。`,
     });
   }
-  return kimiProvider;
+  return modelProvider;
 }
 
 function createBuiltinProviders(): Map<string, Provider> {

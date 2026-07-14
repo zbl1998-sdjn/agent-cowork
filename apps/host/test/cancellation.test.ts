@@ -171,8 +171,8 @@ test('streaming chat can be cancelled mid-flight via /api/runs/:id/cancel', asyn
   };
   const server = createServer({
     trustedRoot: tmp(), enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
-    kimiChatStreamRunner: fakeStream,
+    modelChatRunner: fakeKimiChatRunner,
+    modelChatStreamRunner: fakeStream,
   });
   const base = await bind(server);
   try {

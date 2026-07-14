@@ -73,7 +73,7 @@ test('E2E: agent stream returns 429 when the limiter is full', async () => {
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
+    modelChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: 'hi' }),
     agentConcurrency,
   });
@@ -98,7 +98,7 @@ test('E2E: a normal run acquires then releases its slot (capacity restored)', as
     requireAuth: false,
     trustedRoot: root,
     enableScheduler: false,
-    kimiChatRunner: fakeKimiChatRunner,
+    modelChatRunner: fakeKimiChatRunner,
     agentModelCall: async () => ({ content: '完成。' }),
     agentConcurrency: lim,
   });
