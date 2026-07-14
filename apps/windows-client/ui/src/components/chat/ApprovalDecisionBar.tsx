@@ -4,6 +4,7 @@ import { respondApproval } from '../../lib/api';
 import type { AssistantMessage } from '../../lib/app-types';
 import { clearAcknowledgedAssistantRequest, requireAcknowledgement } from '../../lib/pending-action';
 import { Button } from '../ui/Button';
+import { ApprovalDiffView, isDiffPreview } from './ApprovalDiffView';
 
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
 
@@ -31,7 +32,9 @@ export function ApprovalDecisionBar({ message, onPatchAssistant }: { message: As
     <div className="approval-bar">
       <span className="approval-q">需要批准操作：<code>{approval.name}</code></span>
       {approval.risk && <span className="approval-q">风险级别：<code>{approval.risk}</code></span>}
-      {approval.preview != null && <pre className="approval-preview">{formatApprovalPreview(approval.preview)}</pre>}
+      {isDiffPreview(approval.preview)
+        ? <ApprovalDiffView preview={approval.preview} />
+        : approval.preview != null && <pre className="approval-preview">{formatApprovalPreview(approval.preview)}</pre>}
       <div className="approval-actions">
         <Button variant="primary" disabled={pending} onClick={() => respond('once')}>{pending ? '提交中…' : '本次批准'}</Button>
         {approval.sessionReusable === true && <Button variant="secondary" disabled={pending} onClick={() => respond('session')}>本会话批准</Button>}

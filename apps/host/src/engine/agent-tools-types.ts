@@ -29,5 +29,6 @@ export type AgentTool = {
   description?: string;
   parameters?: unknown;
   inputSchema?: unknown;
+  approvalPreview?: (args: ToolArgs) => Record<string, unknown>;
   handler?: (args?: ToolArgs) => unknown | Promise<unknown>;
 };

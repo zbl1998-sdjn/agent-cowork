@@ -18,6 +18,7 @@ import { parseBuiltinToolArgs } from '../tools/builtin-tool-options.js';
 import { createArtifactAccessGuards } from '../artifacts/artifact-access-guards.js';
 import { createShellTool } from './agent-tools-shell.js';
 import { clip, globToRegExp, walkFiles } from './agent-tools-support.js';
+import { buildEditApprovalPreview, buildWriteApprovalPreview } from './agent-tools-write-edit-preview.js';
 import { omitUndefined } from '../util/object.js';
 import { decideEgressPolicy, enforceRecordedEgressDecision } from '../security/egress-gateway.js';
 import type { AgentTool, AgentToolsContext } from './agent-tools-types.js';
@@ -53,6 +54,7 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
       name: 'Write', mutating: true, risk: 'write',
       description: '写入/覆盖工作区内一个文件（自动创建目录）。',
       parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
+      approvalPreview: (args = {}) => buildWriteApprovalPreview(artifactAccess, args),
       handler: async (args = {}) => {
         if (!args.path) throw new Error('path is required');
         const content = String(args.content ?? '');
@@ -70,11 +72,8 @@ export function createAgentTools(ctx: AgentToolsContext = {}): AgentTool[] {
     {
       name: 'Edit', mutating: true, risk: 'write',
       description: '在工作区文件中把 old_string 精确替换为 new_string（默认替换第一处，replace_all=true 替换全部）。',
-      parameters: {
-        type: 'object',
-        properties: { path: { type: 'string' }, old_string: { type: 'string' }, new_string: { type: 'string' }, replace_all: { type: 'boolean' } },
-        required: ['path', 'old_string', 'new_string'],
-      },
+      parameters: { type: 'object', properties: { path: { type: 'string' }, old_string: { type: 'string' }, new_string: { type: 'string' }, replace_all: { type: 'boolean' } }, required: ['path', 'old_string', 'new_string'] },
+      approvalPreview: (args = {}) => buildEditApprovalPreview(args),
       handler: async (args = {}) => {
         const target = artifactAccess.readPath(args.path);
         const original = fs.readFileSync(target, 'utf8');
