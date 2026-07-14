@@ -29,7 +29,7 @@ export function conversationToMarkdown(c: ConvLike): string {
       lines.push(`**我：** ${m.text || ''}`, '');
     } else {
       const body = extractSuggestions(m.text || '').text;
-      lines.push(`**Kimi：** ${body || ''}`, '');
+      lines.push(`**Agent：** ${body || ''}`, '');
     }
   }
   return lines.join('\n');

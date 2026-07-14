@@ -25,7 +25,7 @@ describe('MemoryPanel state views', () => {
 
     // 文案已改成面向非技术用户的说法。
     expect(html).toContain('还没记下任何东西');
-    expect(html).toContain('Kimi');
+    expect(html).toContain('Agent');
     expect(html).toContain('state-view--empty');
     expect(html).toContain('role="status"');
     expect(html).toContain('ui-btn ui-btn--secondary');

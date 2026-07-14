@@ -38,7 +38,7 @@ export function MemoryPanelStateViews({ error, onRetry }: { error: string; onRet
   if (error) {
     return <ErrorState title="记忆没读出来" message={error} onRetry={onRetry} retryLabel="重试" />;
   }
-  return <Empty title="还没记下任何东西" message="把你想让 Kimi 记住的名词、项目、偏好写在下面,以后它就能用上。" />;
+  return <Empty title="还没记下任何东西" message="把你想让 Agent 记住的名词、项目、偏好写在下面,以后它就能用上。" />;
 }
 
 export function MemoryEntryItem({
@@ -152,7 +152,7 @@ export function MemoryPanel({ trustedRoot }: MemoryPanelProps) {
     <section className="side-panel memory-panel">
       <h2>我帮你记住的事</h2>
       <p className="memory-intro">
-        在这里登记你想让 Kimi 记住的<strong>名词解释</strong>、<strong>项目</strong>和<strong>偏好</strong>;
+        在这里登记你想让 Agent 记住的<strong>名词解释</strong>、<strong>项目</strong>和<strong>偏好</strong>;
         以后它在帮你做事时会自动用上。
       </p>
 
