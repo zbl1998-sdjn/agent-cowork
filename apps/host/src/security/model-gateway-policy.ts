@@ -42,7 +42,7 @@ export function isCustomerGatewayHostAllowed(
 ): boolean {
   const candidate = canonicalHost(host);
   if (!candidate) return false;
-  return splitList(env.KCW_CUSTOMER_MODEL_GATEWAY_HOSTS).some((entry) => {
+  return splitList(env.ACW_CUSTOMER_MODEL_GATEWAY_HOSTS || env.KCW_CUSTOMER_MODEL_GATEWAY_HOSTS).some((entry) => {
     const wildcard = entry.startsWith('*.');
     const rawPattern = wildcard ? entry.slice(2) : entry;
     if (!rawPattern || rawPattern.includes('*') || /[\/@?#]/.test(rawPattern)) return false;

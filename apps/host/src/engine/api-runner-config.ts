@@ -127,12 +127,12 @@ export function resolveAgentModelConfig(
   config: Record<string, unknown> = {},
   env: Record<string, string | undefined> = process.env,
 ): AgentModelConfig {
-  const explicitProvider = config.kimiProvider || config.modelProvider || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER;
-  const initialModelInput = config.model || env.KIMI_MODEL || '';
+  const explicitProvider = config.kimiProvider || config.modelProvider || env.ACW_MODEL_PROVIDER || env.KCW_MODEL_PROVIDER || env.KIMI_PROVIDER;
+  const initialModelInput = config.model || env.ACW_MODEL || env.KIMI_MODEL || '';
   const parsedInitialModel = splitFullModelId(initialModelInput);
   const provider = cleanProvider(explicitProvider || parsedInitialModel.provider);
   const securityMode = resolveSecurityMode({ configuredMode: config.securityMode, env });
-  const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;
+  const fallbackInput = config.kimiFallbacks ?? config.modelFallbacks ?? env.ACW_MODEL_FALLBACKS ?? env.KCW_MODEL_FALLBACKS ?? env.KIMI_MODEL_FALLBACKS;
   const anthropic = isAnthropicProvider(provider);
   const apiKey = String(
     config.modelApiKey
@@ -155,10 +155,10 @@ export function resolveAgentModelConfig(
     || defaultBaseUrlForProvider(provider)
     || (anthropic ? DEFAULT_ANTHROPIC_BASE_URL : DEFAULT_BASE_URL),
   ).trim();
-  const timeoutMs = Math.max(1000, Number(config.modelApiTimeoutMs || env.KIMI_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS));
-  const maxTokens = Math.max(1, Number(config.modelApiMaxTokens || env.KIMI_API_MAX_TOKENS || DEFAULT_MAX_TOKENS));
-  const userAgent = String(config.modelUserAgent || env.KIMI_USER_AGENT || '').trim();
-  const tempRaw = config.modelTemperature != null ? config.modelTemperature : env.KIMI_TEMPERATURE;
+  const timeoutMs = Math.max(1000, Number(config.modelApiTimeoutMs || env.ACW_MODEL_API_TIMEOUT_MS || env.KIMI_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS));
+  const maxTokens = Math.max(1, Number(config.modelApiMaxTokens || env.ACW_MODEL_API_MAX_TOKENS || env.KIMI_API_MAX_TOKENS || DEFAULT_MAX_TOKENS));
+  const userAgent = String(config.modelUserAgent || env.ACW_MODEL_USER_AGENT || env.KIMI_USER_AGENT || '').trim();
+  const tempRaw = config.modelTemperature != null ? config.modelTemperature : (env.ACW_MODEL_TEMPERATURE ?? env.KIMI_TEMPERATURE);
   const temperature = tempRaw != null && tempRaw !== '' && Number.isFinite(Number(tempRaw)) ? Number(tempRaw) : undefined;
   const providerProfile = omitUndefined({
     apiKey,

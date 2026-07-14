@@ -115,6 +115,27 @@ test('customer gateway allowlists reject ambiguous patterns and private-host gue
   assert.equal(isCustomerGatewayHostAllowed('', env), false);
 });
 
+test('isCustomerGatewayHostAllowed reads the new ACW_ allowlist env var and prefers it over the legacy KCW_ one', () => {
+  assert.equal(
+    isCustomerGatewayHostAllowed('east.gateway.corp', { ACW_CUSTOMER_MODEL_GATEWAY_HOSTS: '*.gateway.corp' }),
+    true,
+    'new ACW_ name alone should be honoured',
+  );
+  assert.equal(
+    isCustomerGatewayHostAllowed('east.gateway.corp', {
+      ACW_CUSTOMER_MODEL_GATEWAY_HOSTS: '*.other.corp',
+      KCW_CUSTOMER_MODEL_GATEWAY_HOSTS: '*.gateway.corp',
+    }),
+    false,
+    'new ACW_ name must win over the legacy KCW_ allowlist, not merge with it',
+  );
+  assert.equal(
+    isCustomerGatewayHostAllowed('east.gateway.corp', { KCW_CUSTOMER_MODEL_GATEWAY_HOSTS: '*.gateway.corp' }),
+    true,
+    'legacy KCW_ name still works when ACW_ is unset',
+  );
+});
+
 test('orchestrator mode adapter ignores request-owned cloud aliases except the legacy internal value', () => {
   assert.equal(resolveOrchestratorSecurityMode({ securityMode: 'cloud-opt-in' }), 'cloud_opt_in');
   assert.equal(resolveOrchestratorSecurityMode({ securityMode: 'controlled hybrid' }), 'cloud_opt_in');

@@ -20,14 +20,21 @@ const envSchema = z.object({
   HOST: z.string().trim().min(1).catch('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65_535).catch(3001),
   TRUSTED_ROOT: z.string().trim().min(1).optional(),
+  ACW_MODEL_API_KEY: z.string().optional(),
   KIMI_API_KEY: z.string().optional(),
   MOONSHOT_API_KEY: z.string().optional(),
+  ACW_MODEL_BASE_URL: z.string().optional(),
   KIMI_BASE_URL: z.string().optional(),
   MOONSHOT_BASE_URL: z.string().optional(),
+  ACW_MODEL_API_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   KIMI_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(60_000),
+  ACW_MODEL_API_MAX_TOKENS: z.coerce.number().int().positive().optional(),
   KIMI_API_MAX_TOKENS: z.coerce.number().int().positive().catch(2048),
+  ACW_MODEL: z.string().optional(),
   KIMI_MODEL: z.string().optional(),
+  ACW_TAURI: z.literal('1').optional(),
   KCW_TAURI: z.literal('1').optional(),
+  ACW_PARENT_PID: z.coerce.number().int().positive().optional().catch(undefined),
   KCW_PARENT_PID: z.coerce.number().int().positive().optional().catch(undefined),
   MASE_MCP_ENABLED: z.string().optional(),
   MASE_REPO: z.string().optional(),
@@ -71,15 +78,16 @@ function buildMaseMcpServers(): McpServerSpec[] {
   ];
 }
 
+const isTauriShell = env.ACW_TAURI === '1' || env.KCW_TAURI === '1';
 const server = createServer(withPublicHostSecurity(omitUndefined({
   trustedRoot,
-  allowLocalModelConfigSelfService: env.KCW_TAURI === '1' || undefined,
-  allowLocalGuestEnrollment: env.KCW_TAURI === '1' || undefined,
-  modelApiKey: firstNonEmpty(env.KIMI_API_KEY, env.MOONSHOT_API_KEY),
-  modelBaseUrl: firstNonEmpty(env.KIMI_BASE_URL, env.MOONSHOT_BASE_URL),
-  modelApiTimeoutMs: env.KIMI_API_TIMEOUT_MS,
-  modelApiMaxTokens: env.KIMI_API_MAX_TOKENS,
-  model: env.KIMI_MODEL,
+  allowLocalModelConfigSelfService: isTauriShell || undefined,
+  allowLocalGuestEnrollment: isTauriShell || undefined,
+  modelApiKey: firstNonEmpty(env.ACW_MODEL_API_KEY, env.KIMI_API_KEY, env.MOONSHOT_API_KEY),
+  modelBaseUrl: firstNonEmpty(env.ACW_MODEL_BASE_URL, env.KIMI_BASE_URL, env.MOONSHOT_BASE_URL),
+  modelApiTimeoutMs: env.ACW_MODEL_API_TIMEOUT_MS ?? env.KIMI_API_TIMEOUT_MS,
+  modelApiMaxTokens: env.ACW_MODEL_API_MAX_TOKENS ?? env.KIMI_API_MAX_TOKENS,
+  model: env.ACW_MODEL || env.KIMI_MODEL,
   mcpServers: buildMaseMcpServers(),
   journalWriter: new JsonlWriter(
     path.join(getSessionPath('default'), 'events.jsonl'),
@@ -127,14 +135,16 @@ function gracefulExit() {
 process.once('SIGINT', gracefulExit);
 process.once('SIGTERM', gracefulExit);
 
-// 父进程看门狗:作为桌面外壳的 sidecar 启动时(外壳传 KCW_PARENT_PID),父进程
-// 消失(强杀/崩溃/关窗未及清理)即优雅退出,杜绝孤儿 host 常驻占 3017;
-// 优雅停机卡住时 5s 兜底硬退。独立启动(npm start / start:mvp)不传该变量,不受影响。
-if (env.KCW_PARENT_PID) {
+// 父进程看门狗:作为桌面外壳的 sidecar 启动时(外壳传 ACW_PARENT_PID,兼容旧名
+// KCW_PARENT_PID),父进程消失(强杀/崩溃/关窗未及清理)即优雅退出,杜绝孤儿 host
+// 常驻占 3017;优雅停机卡住时 5s 兜底硬退。独立启动(npm start / start:mvp)不传
+// 该变量,不受影响。
+const parentPid = env.ACW_PARENT_PID ?? env.KCW_PARENT_PID;
+if (parentPid) {
   startParentWatchdog({
-    parentPid: env.KCW_PARENT_PID,
+    parentPid,
     onParentGone: () => {
-      console.error(`[host] parent process ${env.KCW_PARENT_PID} is gone; shutting down to avoid an orphaned sidecar.`);
+      console.error(`[host] parent process ${parentPid} is gone; shutting down to avoid an orphaned sidecar.`);
       const hardExit: ReturnType<typeof setTimeout> = setTimeout(() => process.exit(0), 5000);
       (hardExit as unknown as { unref?: () => void }).unref?.();
       gracefulExit();

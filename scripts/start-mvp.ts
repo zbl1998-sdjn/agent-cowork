@@ -72,7 +72,7 @@ const port = Number(process.env.PORT || 3017);
 const url = `http://${host}:${port}/`;
 const runtimeFile = path.resolve(process.env.MVP_RUNTIME_FILE || path.join(buildDir, 'mvp-runtime.json'));
 const auditPath = path.join(workspace, '.AgentCowork', 'audit', 'host-events.jsonl');
-const kimiApiPlanEnabled = Boolean(process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
+const kimiApiPlanEnabled = Boolean(process.env.ACW_MODEL_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY);
 
 ensureDemoWorkspace(workspace);
 fs.mkdirSync(path.dirname(runtimeFile), { recursive: true });
@@ -81,11 +81,11 @@ const server = createServer(withPublicHostSecurity({
   trustedRoot: workspace,
   allowLocalModelConfigSelfService: true,
   allowLocalGuestEnrollment: true,
-  modelApiKey: process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
-  modelBaseUrl: process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
-  modelApiTimeoutMs: Number(process.env.KIMI_API_TIMEOUT_MS || 60_000),
-  modelApiMaxTokens: Number(process.env.KIMI_API_MAX_TOKENS || 2048),
-  model: process.env.KIMI_MODEL,
+  modelApiKey: process.env.ACW_MODEL_API_KEY || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY,
+  modelBaseUrl: process.env.ACW_MODEL_BASE_URL || process.env.KIMI_BASE_URL || process.env.MOONSHOT_BASE_URL,
+  modelApiTimeoutMs: Number(process.env.ACW_MODEL_API_TIMEOUT_MS || process.env.KIMI_API_TIMEOUT_MS || 60_000),
+  modelApiMaxTokens: Number(process.env.ACW_MODEL_API_MAX_TOKENS || process.env.KIMI_API_MAX_TOKENS || 2048),
+  model: process.env.ACW_MODEL || process.env.KIMI_MODEL,
   journalWriter: new JsonlWriter(auditPath),
 }));
 
