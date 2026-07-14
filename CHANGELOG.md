@@ -22,6 +22,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 - 修复成果画布默认展开、且收起状态无法保持的问题——切换侧边面板会导致组件卸载重建,状态被重置回展开。
 - 5 个弹窗(设置/API 设置/工作区切换/实时预览/文件预览)的 Esc 关闭逻辑统一收编到共享 `useShortcuts` hook。
 - 修复 `managed-directory-boundary`(受管目录安全边界,覆盖运行记录/会话/记忆/知识库/检查点/调度器/审计日志等状态存储)在 Windows 上因 8.3 短文件名与长文件名互为别名而误判"路径越界"的问题——同一目录的两种合法写法此前会被当作不同目录直接拒绝合法读写。
+- 修复 `external-workspace-boundary` 同一根因导致的另一处越权:落在 `.AgentCowork/index`、`.AgentCowork/runs` 等内部容器目录里的 junction/符号链接,此前在 trustedRoot 恰好以 8.3 短文件名形式传入时会被误判为"公开路径"直接放行给 Read/Edit/Write 等原生文件工具,不再受内部元数据保护。
 
 ## [0.4.0] - 2026-07-12
 
