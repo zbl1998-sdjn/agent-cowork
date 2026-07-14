@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { previewFile, openPath, type FilePreviewResult } from '../lib/api';
 import { renderMarkdown } from '../lib/md';
+import { useShortcuts } from '../hooks/useShortcuts';
 import { Button, IconButton } from './ui/Button';
 
 interface FilePreviewProps {
@@ -27,11 +28,7 @@ export function FilePreview({ path, trustedRoot, onClose }: FilePreviewProps) {
     return () => { alive = false; };
   }, [path, trustedRoot]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useShortcuts({ escape: onClose });
 
   const name = data?.name || path.split(/[\\/]/).pop() || '文件';
 

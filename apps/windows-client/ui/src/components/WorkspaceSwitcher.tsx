@@ -5,6 +5,7 @@
 // 依赖:hooks/useConnectedFolders + lib/api(isDesktop)+ lib/icons + ui/Button;@tauri-apps/plugin-dialog 动态导入。
 import { useEffect, useRef, useState } from 'react';
 import { useConnectedFolders } from '../hooks/useConnectedFolders';
+import { useShortcuts } from '../hooks/useShortcuts';
 import { isDesktop } from '../lib/api';
 import { ICONS } from '../lib/icons';
 import { Button } from './ui/Button';
@@ -59,14 +60,11 @@ export function WorkspaceSwitcher({ current, onSwitch }: WorkspaceSwitcherProps)
     const onMouseDown = (event: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(event.target as Node)) setOpen(false);
     };
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
     window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('mousedown', onMouseDown);
   }, [open]);
+
+  useShortcuts({ escape: () => setOpen(false) }, { enabled: open });
 
   const apply = async (next: string, source: 'picker' | 'manual' = 'manual') => {
     const cleaned = next.trim();

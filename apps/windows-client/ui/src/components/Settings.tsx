@@ -16,6 +16,7 @@ import { IconButton } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsTabsContent, type SettingsPersistPayload } from './SettingsTabsContent';
 import type { AppFontFamily, AppFontScale, SettingsTab } from './settings-types';
+import { useShortcuts } from '../hooks/useShortcuts';
 
 // 再导出 SettingsTab,让 App.tsx/Settings.test.tsx 的旧 import path 不变。
 export type { SettingsTab } from './settings-types';
@@ -93,11 +94,7 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
     })();
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useShortcuts({ escape: onClose });
 
   useEffect(() => {
     setTab(initialTab);

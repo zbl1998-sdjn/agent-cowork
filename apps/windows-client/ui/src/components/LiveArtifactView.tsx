@@ -1,6 +1,7 @@
 // LiveArtifactView(UI · components):活页制品视图——在 iframe/容器内展示可刷新的实时制品 HTML,支持手动刷新。纯展示+回调。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLiveArtifactData, openPath, type LiveArtifactData } from '../lib/api';
+import { useShortcuts } from '../hooks/useShortcuts';
 import { Button } from './ui/Button';
 import { Empty, ErrorState, Loading } from './ui/StateViews';
 
@@ -153,12 +154,7 @@ export function LiveArtifactView({
     return () => window.clearInterval(interval);
   }, [refresh, state.autoRefresh, state.canRefresh, state.autoRefreshSeconds]);
 
-  useEffect(() => {
-    if (!fullscreen) return undefined;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [fullscreen]);
+  useShortcuts({ escape: () => setFullscreen(false) }, { enabled: fullscreen });
 
   const flashCopied = (what: string) => { setCopied(what); window.setTimeout(() => setCopied(''), 1400); };
   const onCopyView = async () => { if (await copyToClipboard(viewUrl)) flashCopied('view'); };

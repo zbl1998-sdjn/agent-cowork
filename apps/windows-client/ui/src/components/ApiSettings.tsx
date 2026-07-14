@@ -5,6 +5,7 @@
 // 依赖:getAgentEngineInfo/saveAgentEngineConfig(lib/api)、Button/IconButton。同文件导出 ApiSettingsActions(操作条)。
 import { useEffect, useState } from 'react';
 import { getAgentEngineInfo, saveAgentEngineConfig, type AgentEngineInfo } from '../lib/api';
+import { useShortcuts } from '../hooks/useShortcuts';
 import { Button, IconButton } from './ui/Button';
 
 interface ApiSettingsProps {
@@ -62,11 +63,7 @@ export function ApiSettings({ onClose, onSaved }: ApiSettingsProps) {
     })();
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useShortcuts({ escape: onClose });
 
   const save = async (clearKey = false) => {
     if (busy) return;
