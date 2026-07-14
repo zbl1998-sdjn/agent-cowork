@@ -95,7 +95,7 @@ test('file-size baseline parser cannot loosen the fixed limits', () => {
 const COVERAGE_TEXT = `
 ℹ  auth                                 |        |          |         |
 ℹ   user-store.ts                       |  96.10 |    85.19 |   87.50 |
-ℹ  kimi                                 |        |          |         |
+ℹ  engine                               |        |          |         |
 ℹ   agent                               |        |          |         |
 ℹ    approval-gate.ts                   | 100.00 |    93.67 |  100.00 |
 ℹ all files                             |  94.00 |    79.00 |   95.00 |
@@ -106,7 +106,7 @@ const NODE_22_TAP_COVERAGE_TEXT = `
 # src                                   |        |          |         |
 #  auth                                 |        |          |         |
 #   user-store.ts                       |  96.10 |    85.19 |   87.50 |
-#  kimi                                 |        |          |         |
+#  engine                               |        |          |         |
 #   agent                               |        |          |         |
 #    approval-gate.ts                   | 100.00 |    93.67 |  100.00 |
 # all files                             |  94.00 |    79.00 |   95.00 |
@@ -177,7 +177,7 @@ test('coverage policy enforces line, branch, and function floors per critical fi
   const missingCriticalFile = parseCoverageReport(COVERAGE_TEXT.replace('approval-gate.ts', 'renamed.ts'));
   assert.match(
     evaluateCoverageThresholds(missingCriticalFile, COVERAGE_POLICY).failures.join('\n'),
-    /missing coverage row for critical file src\/kimi\/agent\/approval-gate\.ts/,
+    /missing coverage row for critical file src\/engine\/agent\/approval-gate\.ts/,
   );
 });
 
