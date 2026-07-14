@@ -13,6 +13,7 @@ import {
   stringField,
   tempRoot,
 } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 test('connected-folder grant authorizes an owner path and revoke denies later requests', async () => {
   const trustedRoot = tempRoot('kcw-folder-grants-root-');
@@ -40,7 +41,7 @@ test('connected-folder grant authorizes an owner path and revoke denies later re
     assert.equal(created.status, 201);
     const grant = created.body.grant as Record<string, unknown>;
     const grantId = stringField(grant, 'id');
-    assert.equal(grant.path, connectedRoot);
+    assert.ok(samePathReal(String(grant.path), connectedRoot));
     assert.equal(grant.revokedAt, null);
 
     const duplicate = await jsonRequest(base, '/api/folder-grants', {
@@ -52,7 +53,7 @@ test('connected-folder grant authorizes an owner path and revoke denies later re
     assert.equal(stringField(duplicate.body.grant as Record<string, unknown>, 'id'), grantId);
     const activeList = await jsonRequest(base, '/api/folder-grants');
     assert.equal(
-      recordArray(activeList.body.grants, 'active grants').filter((item) => item.path === connectedRoot).length,
+      recordArray(activeList.body.grants, 'active grants').filter((item) => samePathReal(String(item.path), connectedRoot)).length,
       1,
     );
 

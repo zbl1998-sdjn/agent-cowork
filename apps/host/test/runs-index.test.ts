@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { RunsIndex, SqliteRunsIndex, createRunsIndex, createUlid, summariseRunForIndex } from '../src/runtime/runs-index.js';
 import type { SqliteDatabase, SqliteStatement } from '../src/runtime/runs-index.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 function tempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'kcw-runs-'));
@@ -98,7 +99,7 @@ test('RunsIndex keeps memory aligned with replay when an upsert append fails', (
   let eventDescriptor: number | null = null;
   fs.openSync = ((file: string, flags: string | number, mode?: number) => {
     const descriptor = originalOpenSync(file, flags, mode);
-    if (file === index.eventFile && flags === 'a') eventDescriptor = descriptor;
+    if (samePathReal(file, index.eventFile) && flags === 'a') eventDescriptor = descriptor;
     return descriptor;
   }) as typeof fs.openSync;
   fs.writeFileSync = ((file: unknown, ...args: unknown[]) => {
@@ -131,7 +132,7 @@ test('RunsIndex keeps memory aligned with replay when a remove append fails', ()
   let eventDescriptor: number | null = null;
   fs.openSync = ((file: string, flags: string | number, mode?: number) => {
     const descriptor = originalOpenSync(file, flags, mode);
-    if (file === index.eventFile && flags === 'a') eventDescriptor = descriptor;
+    if (samePathReal(file, index.eventFile) && flags === 'a') eventDescriptor = descriptor;
     return descriptor;
   }) as typeof fs.openSync;
   fs.writeFileSync = ((file: unknown, ...args: unknown[]) => {

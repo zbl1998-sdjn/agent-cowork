@@ -12,6 +12,7 @@ import { Scheduler, SqliteScheduleStore } from '../src/runtime/scheduler.js';
 import { createServer } from '../src/server.js';
 import { migrateSqliteDatabase, openSqliteDatabase } from '../src/storage/sqlite.js';
 import { closeTestServer } from './helpers/close-server.js';
+import { samePathReal } from './helpers/path-swap.js';
 import type { HostServer } from '../src/server.js';
 
 type JsonRequestOptions = {
@@ -345,7 +346,7 @@ test('resolveStoreBackendConfig prefers explicit config and falls back to enviro
     assert.equal(defaults.storeBackend, 'sqlite');
     assert.equal(defaults.databaseUrl, null);
     assert.equal(defaults.usePostgresState, false);
-    assert.equal(defaults.sqliteDbPath, path.resolve(root, '.AgentCowork', 'state.sqlite'));
+    assert.ok(samePathReal(defaults.sqliteDbPath, path.resolve(root, '.AgentCowork', 'state.sqlite')));
 
     process.env.KCW_STORE = 'postgres';
     assert.throws(
@@ -365,7 +366,7 @@ test('resolveStoreBackendConfig prefers explicit config and falls back to enviro
     assert.equal(fromEnv.storeBackend, 'postgres');
     assert.equal(fromEnv.databaseUrl, 'postgres://example.invalid/agent_cowork_test');
     assert.equal(fromEnv.usePostgresState, true);
-    assert.equal(fromEnv.sqliteDbPath, path.resolve(root, 'env-state.sqlite'));
+    assert.ok(samePathReal(fromEnv.sqliteDbPath, path.resolve(root, 'env-state.sqlite')));
 
     const explicit = resolveStoreBackendConfig({
       storeBackend: 'sqlite',
@@ -375,7 +376,7 @@ test('resolveStoreBackendConfig prefers explicit config and falls back to enviro
     assert.equal(explicit.storeBackend, 'sqlite');
     assert.equal(explicit.databaseUrl, 'postgres://example.invalid/agent_cowork_test');
     assert.equal(explicit.usePostgresState, false);
-    assert.equal(explicit.sqliteDbPath, path.resolve(root, 'explicit-state.sqlite'));
+    assert.ok(samePathReal(explicit.sqliteDbPath, path.resolve(root, 'explicit-state.sqlite')));
 
     const explicitFile = resolveStoreBackendConfig({ storeBackend: 'file' }, root);
     assert.equal(explicitFile.storeBackend, 'file');

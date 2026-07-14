@@ -12,6 +12,7 @@ import {
 import { rollbackFileOperations } from '../src/workspace/file-operations.js';
 import { createServer } from '../src/server.js';
 import { bind, close, jsonRequest, stringField, tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const TENANT = 'tenant_shared';
 const ALICE_OWNER = Object.freeze({ tenantId: TENANT, userId: 'alice' });
@@ -120,7 +121,7 @@ test('delete-created rollback removes its claim and restores it if unlink fails'
   const originalUnlink = fs.unlinkSync;
   let observedClaimRemoved = false;
   fs.unlinkSync = ((filePath: string) => {
-    if (String(filePath) === target) {
+    if (samePathReal(String(filePath), target)) {
       observedClaimRemoved = !fs.existsSync(artifactOwnerClaimPath({ trustedRoot: root, artifactPath: target }));
       throw new Error('injected unlink failure');
     }
@@ -162,7 +163,7 @@ test('restore-backup denies sibling targets and preserves a concurrent sibling c
   const originalCopy = fs.copyFileSync;
   let observedReservation = false;
   fs.copyFileSync = ((source: string, destination: string) => {
-    if (String(destination) === target) {
+    if (samePathReal(String(destination), target)) {
       const authorization = authorizeArtifactOwner({ trustedRoot: root, artifactPath: target, context: ALICE_OWNER });
       observedReservation = true;
       removeAuthorizedArtifactOwnerClaim({ trustedRoot: root, artifactPath: target, authorization });
@@ -192,7 +193,7 @@ test('rename-back reserves/migrates claims, rolls them back on failure, and pres
   const originalRename = fs.renameSync;
   let observedSourceClaimPreserved = false;
   fs.renameSync = ((from: string, to: string) => {
-    if (String(from) === source && String(to) === target) {
+    if (samePathReal(String(from), source) && samePathReal(String(to), target)) {
       authorizeArtifactOwner({ trustedRoot: root, artifactPath: target, context: ALICE_OWNER });
       observedSourceClaimPreserved = fs.existsSync(artifactOwnerClaimPath({
         trustedRoot: root,

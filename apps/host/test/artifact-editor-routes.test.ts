@@ -7,6 +7,7 @@ import { openEditableArtifact } from '../src/artifacts/office-component-editor.j
 import { createDocxDocument } from '../src/artifacts/office-writers.js';
 import { createServer } from '../src/server.js';
 import { bind, close, jsonRequest, stringField, tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 test('artifact editor opens a DOCX and saves an approved copy without overwriting the source', async () => {
   const trustedRoot = tempRoot('kcw-office-editor-');
@@ -53,7 +54,7 @@ test('artifact editor opens a DOCX and saves an approved copy without overwritin
     assert.deepEqual(fs.readFileSync(sourcePath), original, 'source file must remain byte-identical');
 
     const copyPath = path.join(artifactRoot, 'weekly-edited.docx');
-    assert.equal(stringField(saved.body, 'path'), copyPath);
+    assert.ok(samePathReal(stringField(saved.body, 'path'), copyPath));
     const copySession = openEditableArtifact('weekly-edited.docx', fs.readFileSync(copyPath));
     assert.ok(copySession.sections.flatMap((section) => section.nodes).some((node) => node.text === '新内容'));
   } finally {

@@ -11,6 +11,7 @@ import {
   normalizeArtifactOwner,
 } from '../src/artifacts/artifact-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const ALICE = Object.freeze({ tenantId: 'tenant_shared', userId: 'alice' });
 const BOB = Object.freeze({ tenantId: 'tenant_shared', userId: 'bob' });
@@ -81,7 +82,7 @@ test('artifact access guards freeze a canonical owner snapshot', () => {
   const mutableAlice: { tenantId: string; userId: string } = { ...ALICE };
   const aliceGuard = createArtifactAccessGuards(root, mutableAlice);
   mutableAlice.userId = 'bob';
-  assert.equal(aliceGuard.readPath(artifactPath), artifactPath);
+  assert.ok(samePathReal(aliceGuard.readPath(artifactPath), artifactPath));
   assert.deepEqual(aliceGuard.owner, ALICE);
 });
 

@@ -9,6 +9,7 @@ import { createDocxDocument } from '../src/artifacts/office-writers.js';
 import { fetchOnlyOfficeFile, probeOnlyOffice } from '../src/routes/onlyoffice-route-support.js';
 import { createServer } from '../src/server.js';
 import { bind, close, jsonRequest, stringField, tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const SECRET = 'sample-onlyoffice-jwt-secret-for-tests';
 
@@ -70,7 +71,7 @@ test('ONLYOFFICE session is approval-bound and callback publishes one owned copy
       },
     });
     assert.equal(started.status, 201, JSON.stringify(started.body));
-    assert.equal(stringField(started.body, 'path'), targetPath);
+    assert.ok(samePathReal(stringField(started.body, 'path'), targetPath));
     const editorPath = stringField(started.body, 'editorPath');
     const sessionToken = new URL(editorPath, base).searchParams.get('session');
     assert.ok(sessionToken);

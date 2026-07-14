@@ -16,6 +16,7 @@ import {
   ensureArtifactOwnerClaim,
 } from '../src/artifacts/artifact-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const ALICE = Object.freeze({ tenantId: 'tenant_shared', userId: 'alice' });
 const BOB = Object.freeze({ tenantId: 'tenant_shared', userId: 'bob' });
@@ -60,8 +61,8 @@ test('catalog rename never overwrites a target created after the target prefligh
   let targetChecks = 0;
 
   fs.existsSync = ((candidate: fs.PathLike) => {
-    if (String(candidate) === target) targetChecks += 1;
-    if (!interleaved && String(candidate) === target && targetChecks === 2) {
+    if (samePathReal(String(candidate), target)) targetChecks += 1;
+    if (!interleaved && samePathReal(String(candidate), target) && targetChecks === 2) {
       interleaved = true;
       fs.writeFileSync(target, 'CONCURRENT_WINNER', 'utf8');
       return false;
@@ -101,7 +102,7 @@ test('JSON rename reports an atomic rollback write failure and leaves an authori
   let rollbackWriteReached = false;
 
   fs.unlinkSync = ((candidate: fs.PathLike) => {
-    if (String(candidate) === sourceClaim) throw new Error('injected claim cleanup failure');
+    if (samePathReal(String(candidate), sourceClaim)) throw new Error('injected claim cleanup failure');
     return originalUnlink(candidate);
   }) as typeof fs.unlinkSync;
   fs.writeFileSync = ((...args: Parameters<typeof fs.writeFileSync>) => {
@@ -148,18 +149,18 @@ test('JSON rename reports rename-back publication failure without corrupting tar
   let rollbackMoveReached = false;
 
   fs.unlinkSync = ((candidate: fs.PathLike) => {
-    if (String(candidate) === sourceClaim) throw new Error('injected claim cleanup failure');
+    if (samePathReal(String(candidate), sourceClaim)) throw new Error('injected claim cleanup failure');
     return originalUnlink(candidate);
   }) as typeof fs.unlinkSync;
   fs.renameSync = ((from: fs.PathLike, to: fs.PathLike) => {
-    if (String(from) === target && String(to) === source) {
+    if (samePathReal(String(from), target) && samePathReal(String(to), source)) {
       rollbackMoveReached = true;
       throw new Error('injected rename-back failure');
     }
     return originalRename(from, to);
   }) as typeof fs.renameSync;
   fs.linkSync = ((existingPath: fs.PathLike, newPath: fs.PathLike) => {
-    if (String(newPath) === source) {
+    if (samePathReal(String(newPath), source)) {
       rollbackMoveReached = true;
       throw new Error('injected rename-back failure');
     }

@@ -10,6 +10,7 @@ import {
 } from '../src/security/credential-store.js';
 import { createFolderGrantStore } from '../src/workspace/folder-grant-store.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const OWNER_A = { tenantId: 'tenant-folder-a', userId: 'user-folder-a' };
 const OWNER_B = { tenantId: 'tenant-folder-b', userId: 'user-folder-b' };
@@ -84,8 +85,8 @@ test('folder grant store is owner-scoped, idempotent, encrypted, and preserves t
   };
   const reloadedStore = createFolderGrantStore({ filePath, protector: countingProtector });
   const registry = createFolderGrantRegistry({ trustedRootDefault: trustedRoot, store: reloadedStore });
-  assert.equal(registry.safeTrustedRoot(connectedRoot, OWNER_A, recreated.id), connectedRoot);
-  assert.equal(registry.safeTrustedRoot(connectedRoot, OWNER_A, recreated.id), connectedRoot);
+  assert.ok(samePathReal(registry.safeTrustedRoot(connectedRoot, OWNER_A, recreated.id), connectedRoot));
+  assert.ok(samePathReal(registry.safeTrustedRoot(connectedRoot, OWNER_A, recreated.id), connectedRoot));
   assert.equal(unprotectCalls, 1, 'unchanged ciphertext should be decrypted and validated once');
 
   fs.writeFileSync(filePath, '{"schemaVersion":1,"sealed":"corrupt"}\n', 'utf8');

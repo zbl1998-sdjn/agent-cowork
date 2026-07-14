@@ -10,6 +10,7 @@ import {
   ensureArtifactOwnerClaim,
 } from '../src/artifacts/artifact-owner.js';
 import { tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const ALICE = Object.freeze({ tenantId: 'tenant_shared', userId: 'alice' });
 const BOB = Object.freeze({ tenantId: 'tenant_shared', userId: 'bob' });
@@ -26,7 +27,7 @@ test('catalog rollback removes its own claim but preserves a concurrent sibling 
   let injected = false;
 
   fs.linkSync = ((existingPath: string, newPath: string) => {
-    if (!injected && newPath === target) {
+    if (!injected && samePathReal(newPath, target)) {
       injected = true;
       fs.unlinkSync(targetClaim);
       ensureArtifactOwnerClaim({ trustedRoot: root, artifactPath: target, owner: BOB });

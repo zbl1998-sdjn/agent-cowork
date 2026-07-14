@@ -11,6 +11,7 @@ import {
 import { createDocxDocument } from '../src/artifacts/office-writers.js';
 import { readZipEntries } from '../src/workspace/zip-utils.js';
 import { createTemplateLockedToolset } from '../src/routes/agent-template-mode.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const owner = { tenantId: 'local', userId: 'local' };
 
@@ -36,7 +37,7 @@ test('template contract exposes editable node ids and DOCX copy preserves unrela
     changes: [{ targetId: target.id, text: '本周完成模板锁定模式。' }],
   });
 
-  assert.equal(result.path, path.join(root, '.AgentCowork', 'artifacts', 'weekly.docx'));
+  assert.ok(samePathReal(result.path, path.join(root, '.AgentCowork', 'artifacts', 'weekly.docx')));
   assert.ok(fs.existsSync(result.path));
   const originalParts = readZipEntries(original).map((entry) => entry.name);
   const nextParts = readZipEntries(fs.readFileSync(result.path)).map((entry) => entry.name);

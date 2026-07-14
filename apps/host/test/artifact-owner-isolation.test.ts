@@ -12,6 +12,7 @@ import { createAgentTools } from '../src/engine/agent-tools.js';
 import { createServer } from '../src/server.js';
 import { createBuiltinTools } from '../src/tools/builtin-tools.js';
 import { bind, close, jsonRequest, stringField, tempRoot } from './helpers/host-http.js';
+import { samePathReal } from './helpers/path-swap.js';
 
 const TENANT = 'tenant_shared';
 const ALICE = { authorization: 'Bearer alice-token' };
@@ -387,7 +388,7 @@ test('claimed rename rejects reserved targets and rolls back file and claims on 
   const moveFailureTarget = path.join(artifactRoot, 'move-failure-target.md');
   const originalLink = fs.linkSync;
   fs.linkSync = ((source: fs.PathLike, target: fs.PathLike) => {
-    if (String(source) === moveFailureSource && String(target) === moveFailureTarget) {
+    if (samePathReal(String(source), moveFailureSource) && samePathReal(String(target), moveFailureTarget)) {
       throw new Error('injected rename failure');
     }
     originalLink(source, target);
@@ -424,7 +425,7 @@ test('claimed rename rejects reserved targets and rolls back file and claims on 
   });
   const originalUnlink = fs.unlinkSync;
   fs.unlinkSync = ((filePath: string) => {
-    if (String(filePath) === sourceClaim) throw new Error('injected claim cleanup failure');
+    if (samePathReal(String(filePath), sourceClaim)) throw new Error('injected claim cleanup failure');
     originalUnlink(filePath);
   }) as typeof fs.unlinkSync;
   try {
