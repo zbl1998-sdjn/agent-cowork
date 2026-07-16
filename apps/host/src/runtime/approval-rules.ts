@@ -30,6 +30,26 @@ function readRules(trustedRoot: string): Set<string> {
   }
 }
 
+function persistRules(trustedRoot: string, merged: Set<string>): string[] {
+  const sorted = [...merged].sort();
+  const file = rulesPath(trustedRoot);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ alwaysAllow: sorted, updatedAt: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+  return sorted;
+}
+
+/** 列出本工作区已持久化的 always-allow 工具名(排序后)。 */
+export function listWorkspaceApprovalRules(trustedRoot: string): string[] {
+  return [...readRules(trustedRoot)].sort();
+}
+
+/** 删除一条 always-allow 规则并落盘;返回删除后的名单。非法/不存在的名字为幂等 no-op。 */
+export function removeWorkspaceApprovalRule(trustedRoot: string, name: string): string[] {
+  const merged = readRules(trustedRoot);
+  merged.delete(name);
+  return persistRules(trustedRoot, merged);
+}
+
 /** 按工作区创建规则快照:has 用创建时名单 + 本进程内新增;add 读改写落盘(非法名忽略)。 */
 export function createWorkspaceApprovalRules(trustedRoot: string): WorkspaceApprovalRules {
   const names = readRules(trustedRoot);
@@ -42,9 +62,7 @@ export function createWorkspaceApprovalRules(trustedRoot: string): WorkspaceAppr
       const merged = readRules(trustedRoot);
       merged.add(name);
       names.add(name);
-      const file = rulesPath(trustedRoot);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, JSON.stringify({ alwaysAllow: [...merged].sort(), updatedAt: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+      persistRules(trustedRoot, merged);
     },
     list() {
       return [...names].sort();

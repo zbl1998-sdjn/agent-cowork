@@ -23,6 +23,7 @@ import { handleSandboxRoutes } from './sandbox-routes.js';
 import { handleScheduleRoutes } from './schedule-routes.js';
 import { handleSearchRoutes } from './search-routes.js';
 import { handleSkillRoutes } from './skill-routes.js';
+import { handleApprovalRulesRoutes } from './approval-rules-routes.js';
 import { handleSystemRoutes } from './system-routes.js';
 import { handleToolRoutes } from './tool-routes.js';
 import { handleVizRoutes } from './viz-routes.js';
@@ -108,14 +109,10 @@ export async function handleRouteChain({
     resolveModelConfig: () => (state.agentModelConfig?.configured ? state.agentModelConfig as unknown as Record<string, unknown> : null),
   }))) return true;
   if (await handleMemoryKnowledgeRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryKnowledgeRoutes>>({
-    ...base,
-    requestUrl,
-    safeTrustedRoot,
+    ...base, requestUrl, safeTrustedRoot,
   }))) return true;
   if (await handleMemoryRoutes(routeOptions<RouteHandlerOptions<typeof handleMemoryRoutes>>({
-    ...base,
-    requestUrl,
-    safeTrustedRoot,
+    ...base, requestUrl, safeTrustedRoot,
     memoryStore: state.memoryStore,
   }))) return true;
   if (await handleProjectRoutes(routeOptions<RouteHandlerOptions<typeof handleProjectRoutes>>({
@@ -197,10 +194,8 @@ export async function handleRouteChain({
     safeTrustedRoot,
   }))) return true;
   if (await handleVizRoutes(routeOptions<RouteHandlerOptions<typeof handleVizRoutes>>({
-    ...base,
-    requestUrl,
+    ...base, requestUrl, safeTrustedRoot,
     trustedRootDefault: state.trustedRootDefault,
-    safeTrustedRoot,
     cacheKeyFor: state.cacheKeyFor,
     requireIdempotencyKey: state.requireIdempotencyKey,
     sendCachedOrStore: state.sendCachedOrStore,
@@ -212,6 +207,9 @@ export async function handleRouteChain({
     ...base, requestUrl, safeTrustedRoot,
     globalMutationAdmins: state.globalMutationAdmins,
     skillRegistry: state.skillRegistry,
+  }))) return true;
+  if (await handleApprovalRulesRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRulesRoutes>>({
+    ...base, requestUrl, safeTrustedRoot, globalMutationAdmins: state.globalMutationAdmins,
   }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({
     ...base,

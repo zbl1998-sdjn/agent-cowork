@@ -305,6 +305,7 @@
     "apps/host/src/routes/agent-stream-record.ts",
     "apps/host/src/routes/agent-stream-schemas.ts",
     "apps/host/src/routes/agent-stream-skills.ts",
+    "apps/host/src/routes/approval-rules-routes.ts",
     "apps/host/src/routes/agent-resume.ts",
     "apps/host/src/routes/approval-routes.ts",
     "apps/host/src/routes/artifact-routes.ts",

@@ -28,6 +28,7 @@ const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'input', label: '输入助手' },
   { value: 'api', label: '密钥' },
   { value: 'skills', label: '技能包' },
+  { value: 'approvals', label: '审批规则' },
   { value: 'runtime', label: '组件' },
   { value: 'updates', label: '更新' },
   { value: 'selfcheck', label: '健康检查' },

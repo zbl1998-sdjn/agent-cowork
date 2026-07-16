@@ -15,6 +15,7 @@ import {
 // 懒加载较重的运行时/更新子面板,避免打开账户标签时把这些 bundle 一起拖进来。
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((m) => ({ default: m.RuntimeDependenciesPanel })));
 const SkillPacksPanel = lazy(() => import('./panels/SkillPacksPanel').then((m) => ({ default: m.SkillPacksPanel })));
+const ApprovalRulesPanel = lazy(() => import('./panels/ApprovalRulesPanel').then((m) => ({ default: m.ApprovalRulesPanel })));
 const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((m) => ({ default: m.UpdatePanel })));
 
 const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
@@ -174,6 +175,11 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
       {tab === 'skills' && (
         <Suspense fallback={<Loading message="正在加载技能包…" />}>
           <SkillPacksPanel />
+        </Suspense>
+      )}
+      {tab === 'approvals' && (
+        <Suspense fallback={<Loading message="正在加载审批规则…" />}>
+          <ApprovalRulesPanel />
         </Suspense>
       )}
       {tab === 'runtime' && (

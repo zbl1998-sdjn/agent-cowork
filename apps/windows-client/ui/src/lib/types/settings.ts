@@ -6,6 +6,7 @@ export type SettingsTab =
   | 'input'
   | 'api'
   | 'skills'
+  | 'approvals'
   | 'runtime'
   | 'updates'
   | 'selfcheck';

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { createWorkspaceApprovalRules } from '../src/runtime/approval-rules.js';
+import { createWorkspaceApprovalRules, listWorkspaceApprovalRules, removeWorkspaceApprovalRule } from '../src/runtime/approval-rules.js';
 
 function makeRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'acw-apprule-'));
@@ -43,4 +43,17 @@ test('invalid tool names are ignored on add and dropped on read', () => {
 
   fs.writeFileSync(file, '坏 JSON');
   assert.deepEqual(createWorkspaceApprovalRules(root).list(), [], 'corrupt file degrades to empty');
+});
+
+test('list and remove expose and revoke persisted rules idempotently', () => {
+  const root = makeRoot();
+  const rules = createWorkspaceApprovalRules(root);
+  rules.add('Write');
+  rules.add('Edit');
+  assert.deepEqual(listWorkspaceApprovalRules(root), ['Edit', 'Write']);
+
+  assert.deepEqual(removeWorkspaceApprovalRule(root, 'Edit'), ['Write']);
+  assert.deepEqual(removeWorkspaceApprovalRule(root, 'Edit'), ['Write'], 'removing twice is a no-op');
+  assert.deepEqual(listWorkspaceApprovalRules(root), ['Write']);
+  assert.equal(createWorkspaceApprovalRules(root).has('Edit'), false, 'revoked rule no longer auto-approves');
 });
