@@ -1,5 +1,6 @@
 // 任务中心(UI · components/panels):复核 Host 任务记录,支持搜索、状态筛选和显式刷新;
-// 选中任务后 attach 其 run 事件流(回放+实时),待审批项可直接在详情卡上批准/拒绝。
+// 选中任务后 attach 其 run 事件流(回放+实时),待审批项可直接在详情卡上批准/拒绝,进行中任务可停止。
+import { cancelRun } from '../../lib/api';
 import { useTaskLiveEvents } from '../../hooks/useTaskLiveEvents';
 import { useTasksPanel, type TaskFilter } from '../../hooks/useTasksPanel';
 import type { TaskSummary } from '../../lib/types/tasks';
@@ -126,6 +127,7 @@ export function TasksPanel() {
           busy={state.detailBusy}
           error={state.detailError}
           live={live}
+          onStop={() => { if (state.selectedId) void cancelRun(state.selectedId); }}
           onClose={state.closeTaskDetail}
         />
       )}

@@ -118,11 +118,11 @@ export async function streamAgentChat({
   sse(response, 'start', { runId, resumed: !!resumeState });
   let finished = false;
   const onDisconnect = () => {
-    if (finished) return;
+    if (finished || body.background === true) return; // 后台运行:断开不取消,任务中心可 attach/审批/停止(/api/runs/:id/cancel)
     if (cancellation) cancellation.cancel(runId, 'client disconnected', requestContext);
     cancelApprovalsForDisconnectedRun(approvals, runId, requestContext);
   };
-  if (response && typeof response.on === 'function') response.on('close', onDisconnect);
+  if (response && typeof response.on === 'function') { response.on('close', onDisconnect); response.on('error', () => undefined); }
   if (request && typeof request.on === 'function') request.on('close', onDisconnect);
   const events: Array<Record<string, unknown>> = [];
   const emit = createAgentRunEmitter({ response, events, runEvents, requestContext, runId });
@@ -271,14 +271,14 @@ export async function streamAgentChat({
     templateMode.assertApplied(outcome.steps);
     if (controller && controller.signal.aborted) {
       status = 'cancelled';
-      sse(response, 'cancelled', { runId, text: outcome.text, usage: outcome.usage });
+      emit('cancelled', { runId, text: outcome.text, usage: outcome.usage });
     } else {
       // stepsExhausted=true 表示自动续跑到硬上限仍没做完 → 前端可提示"任务较大,已完成部分,可点继续"并携原 runId 续跑。
-      sse(response, 'done', omitUndefined({ runId, text: outcome.text, steps: outcome.steps, usage: outcome.usage, stepsExhausted: outcome.stepsExhausted === true ? true : undefined, autoContinues: outcome.autoContinues }));
+      emit('done', omitUndefined({ runId, text: outcome.text, steps: outcome.steps, usage: outcome.usage, stepsExhausted: outcome.stepsExhausted === true ? true : undefined, autoContinues: outcome.autoContinues }));
     }
   } catch (err) {
     status = 'failed';
-    sse(response, 'error', { error: friendlyAgentError(err, requestContext), runId });
+    emit('error', { error: friendlyAgentError(err, requestContext), runId });
   } finally {
     finished = true;
     if (cancellation) cancellation.done(runId, requestContext);
@@ -307,6 +307,6 @@ export async function streamAgentChat({
         rememberBuiltinConversation(trustedRoot, maseConversation, String(body.prompt || ''), outcome.text, requestContext);
       } catch { /* 缓冲写入失败不阻断收尾 */ }
     }
-    response.end();
+    try { response.end(); } catch { /* 后台运行时客户端可能已断开 */ }
   }
 }

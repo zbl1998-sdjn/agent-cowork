@@ -23,15 +23,19 @@ export type AgentRunEmitterOptions = {
   runId: string;
 };
 
-/** 构造对话流的事件发射器:同一份脱敏载荷进 SSE、诊断数组与 run 事件总线;总线失败不打断对话。 */
+/** 构造对话流的事件发射器:同一份脱敏载荷进 SSE、诊断数组与 run 事件总线;总线失败不打断对话,
+ * 客户端断开(后台运行)后 SSE 写入静默跳过,事件仍进总线供任务中心 attach。 */
 export function createAgentRunEmitter({ response, events, runEvents, requestContext, runId }: AgentRunEmitterOptions): (type: string, data: unknown) => void {
   const bus = runEvents && typeof (runEvents as RunEventPublisher).publish === 'function'
     ? bindRunEventPublisher(runEvents as RunEventPublisher, requestContext)
     : null;
+  const stream = response as { writableEnded?: boolean; destroyed?: boolean } & AgentRunEmitterOptions['response'];
   return (type, data) => {
     const safeEventData = sanitizeAgentEventData(data);
     events.push({ type, ...safeEventData });
-    sse(response, type, safeEventData);
+    try {
+      if (stream.writableEnded !== true && stream.destroyed !== true) sse(response, type, safeEventData);
+    } catch { /* 客户端已断开:后台运行继续,事件走总线 */ }
     try { bus?.publish(runId, { type, ...safeEventData }); } catch { /* 总线发布失败只影响 attach 视图 */ }
   };
 }

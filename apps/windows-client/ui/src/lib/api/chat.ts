@@ -188,9 +188,9 @@ export async function agentChatStream(
       permissionMode: opts.permissionMode,
       autoApprove: opts.autoApprove,
       planMode: opts.planMode,
+      background: true, // 后台运行:断开 SSE 不取消 run,可从任务中心 attach/审批/停止
       images: opts.images, templateFiles: opts.templateFiles,
-      resumeRunId: opts.resumeRunId,
-      conversationId: opts.conversationId,
+      resumeRunId: opts.resumeRunId, conversationId: opts.conversationId,
       contextCompaction: opts.contextCompaction,
     }),
   });

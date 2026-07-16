@@ -11,14 +11,18 @@ export interface TaskDetailViewProps {
   busy: boolean;
   error: string;
   live?: TaskLiveEvents | null;
+  onStop?: (() => void) | undefined;
   onClose: () => void;
 }
 
-function LiveSection({ live }: { live: TaskLiveEvents }) {
+function LiveSection({ live, onStop }: { live: TaskLiveEvents; onStop?: (() => void) | undefined }) {
   const recent = live.timeline.slice(-8);
   return (
     <section className="task-live" aria-label="实时动态">
-      <h4>实时动态{live.finished ? '(已结束)' : ''}</h4>
+      <div className="task-live-head">
+        <h4>实时动态{live.finished ? '(已结束)' : ''}</h4>
+        {!live.finished && onStop && <Button size="sm" variant="danger" onClick={onStop}>停止任务</Button>}
+      </div>
       {live.streamError && <p className="panel-error" role="alert">{live.streamError}</p>}
       {live.pending.map((item) => (
         <div className="approval-bar" key={item.id}>
@@ -64,7 +68,7 @@ function resultText(value: unknown): string {
   }
 }
 
-export function TaskDetailView({ record, busy, error, live = null, onClose }: TaskDetailViewProps) {
+export function TaskDetailView({ record, busy, error, live = null, onStop, onClose }: TaskDetailViewProps) {
   const prompt = record?.promptPreview || record?.prompt || record?.input?.prompt || '';
   const rows = record ? [
     ['运行 ID', record.id],
@@ -99,7 +103,7 @@ export function TaskDetailView({ record, busy, error, live = null, onClose }: Ta
             ))}
           </dl>
           {failure && <p className="panel-error" role="alert">{failure}</p>}
-          {live && <LiveSection live={live} />}
+          {live && <LiveSection live={live} onStop={onStop} />}
           {result && (
             <>
               <h4>运行产出</h4>
