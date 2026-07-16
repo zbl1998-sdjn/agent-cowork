@@ -4,6 +4,7 @@
 //      逐个 emit child_start/child_end 事件,最后汇总每个子任务的成功文本或失败原因。
 // 依赖:注入的 runAgentChat(递归跑子 Agent)、共享上下文/沙箱/审批/审计等依赖。
 // 导出:createParallelSubAgentTool(返回一个 AgentTool 定义)
+import { SUB_AGENT_PROVENANCE_NOTICE } from '../safety/untrusted-content.js';
 import type { AgentTool } from './approval-gate.js';
 
 const DEFAULT_PARALLEL_AGENT_BUDGET_BYTES = 32 * 1024;
@@ -171,6 +172,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
         summary: children
           .map((child) => `${child.index + 1}. ${child.task}: ${child.ok ? child.text : child.error}`)
           .join('\n'),
+        provenance: SUB_AGENT_PROVENANCE_NOTICE,
       };
     },
   };

@@ -243,7 +243,10 @@ test('interactive and child-agent tools forward context and handle unavailable d
   assert.deepEqual(await schedule.handler({ name: '坏任务', recipeId: 'email-draft' }), { error: 'scheduler down' });
 
   const agent = toolNamed(tools, 'Agent');
-  assert.deepEqual(await agent.handler({ task: '审查 README' }), { text: 'child finished', steps: 3 });
+  const agentResult = await agent.handler({ task: '审查 README' }) as { text?: unknown; steps?: unknown; provenance?: unknown };
+  assert.equal(agentResult.text, 'child finished');
+  assert.equal(agentResult.steps, 3);
+  assert.match(String(agentResult.provenance), /不构成授权/);
   assert.equal(childRuns.length, 1);
   assert.equal(childRuns[0]?.prompt, '审查 README');
   assert.equal(childRuns[0]?.trustedRoot, root);
@@ -389,4 +392,20 @@ test('LoadSkill tool is mounted only with a reader and returns pack content or a
   assert.deepEqual(ok, { name: 'pdf-processing', file: 'SKILL.md', content: '# 步骤\n先读文件。' });
   const missing = await loadSkill.handler({ name: 'no-such-pack' });
   assert.deepEqual(missing, { error: '技能包不存在: no-such-pack' });
+});
+
+test('sub-agent and parallel results carry the no-human-approval provenance notice', async () => {
+  const root = tmp();
+  const stubRunner: NonNullable<AgentDeps['runAgentChat']> = async () => ({ text: '子任务完成', steps: [{}] });
+  const agentDeps: AgentDeps = { runAgentChat: stubRunner, emit: () => undefined };
+  const tools = buildAgentToolset({ ctx: contextFor(root), agentDeps });
+
+  const single = await toolNamed(tools, 'Agent').handler({ task: '统计文件数' });
+  const singleRecord = single as { provenance?: unknown };
+  assert.match(String(singleRecord.provenance), /不包含任何人工审批决定/);
+
+  const parallel = await toolNamed(tools, 'AgentParallel').handler({ tasks: ['任务一', '任务二'] });
+  const parallelRecord = parallel as { ok?: unknown; provenance?: unknown };
+  assert.equal(parallelRecord.ok, true);
+  assert.match(String(parallelRecord.provenance), /不构成授权/);
 });

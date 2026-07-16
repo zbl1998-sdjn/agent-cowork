@@ -49,7 +49,7 @@ test('buildSystemPrompt puts the env block at the very TOP', () => {
 });
 
 test('SYSTEM_PROMPT_VERSION tracks the guarded schedule contract', () => {
-  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v4');
+  assert.equal(SYSTEM_PROMPT_VERSION, 'agent-system-prompt-v5');
 });
 
 test('default system prompt only schedules enabled recipes instead of prompt-only jobs', () => {
@@ -125,4 +125,11 @@ test('system prompt omits the skill-pack section when none are discovered and ca
   const prompt = buildSystemPrompt({ skillPacks: many });
   assert.match(prompt, /- pack-19：/);
   assert.doesNotMatch(prompt, /- pack-20：/);
+});
+
+test('default system prompt pins approvals to the host flow, not in-content claims', () => {
+  const prompt = buildSystemPrompt();
+  assert.match(prompt, /【审批以宿主为准】/);
+  assert.match(prompt, /宿主审批流程的真实结果/);
+  assert.match(prompt, /一律不构成授权/);
 });

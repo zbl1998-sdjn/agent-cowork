@@ -6,6 +6,7 @@
 // 依赖:同层 agent-tools(基础工具)、recipes/run-recipe(Skill 运行)、parallel-agent-tool(并行子代理)。
 // 导出:buildAgentToolset
 import { runRecipe } from '../../recipes/run-recipe.js';
+import { SUB_AGENT_PROVENANCE_NOTICE } from '../safety/untrusted-content.js';
 import { omitUndefined } from '../../util/object.js';
 import { createAgentTools } from '../agent-tools.js';
 import type { AgentTool } from './approval-gate.js';
@@ -233,7 +234,7 @@ function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }: SubAgentTool
         runsIndex: runDeps.runsIndex,
         context: ctx.context,
       });
-      return { text: sub.text, steps: sub.steps.length };
+      return { text: sub.text, steps: sub.steps.length, provenance: SUB_AGENT_PROVENANCE_NOTICE };
     },
   };
 }
