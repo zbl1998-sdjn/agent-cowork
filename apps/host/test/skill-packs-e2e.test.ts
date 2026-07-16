@@ -107,3 +107,18 @@ test('E2E skill packs: /api/skill-packs lists, toggling persists, and disabled p
     await close(server);
   }
 });
+
+test('E2E skill packs: a non-admin scoped user can toggle packs in their workspace', async () => {
+  const root = tempRoot('acw-skillpack-guest-');
+  writeWeeklyReportPack(root);
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, requireAuth: true, trustIdentityHeaders: true, trustedRoot: root, enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const headers = { 'content-type': 'application/json', 'x-tenant-id': 'tenant_guest_1', 'x-user-id': 'guest_1' };
+    const off = await fetch(`${base}/api/skill-packs/weekly-report/toggle`, { method: 'POST', headers, body: JSON.stringify({ enabled: false }) });
+    assert.equal(off.status, 200, 'workspace-scoped settings must not require the global-mutation admin');
+    assert.equal(((await off.json()) as { enabled?: unknown }).enabled, false);
+  } finally {
+    await close(server);
+  }
+});

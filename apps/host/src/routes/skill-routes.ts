@@ -86,8 +86,9 @@ export async function handleSkillRoutes({
       return true;
     }
     const packMatch = pathname.match(PACK_TOGGLE_RE);
+    // 技能包启停是当前用户工作区级设置(经认证 + safeTrustedRoot 授权),不要求全局 admin;
+    // recipe 技能的 /api/skills/:id/toggle 改的是 host 进程级单例,仍保留 admin 门禁。
     if (request.method === 'POST' && packMatch) {
-      if (!requireGlobalMutationAdmin(response, requestContext || {}, globalMutationAdmins)) return true;
       await withJsonBody(request, response, async (body) => {
         try {
           const input = skillPackToggleBodySchema.parse(body);

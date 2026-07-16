@@ -209,7 +209,7 @@ export async function handleRouteChain({
     skillRegistry: state.skillRegistry,
   }))) return true;
   if (await handleApprovalRulesRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRulesRoutes>>({
-    ...base, requestUrl, safeTrustedRoot, globalMutationAdmins: state.globalMutationAdmins,
+    ...base, requestUrl, safeTrustedRoot,
   }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({
     ...base,

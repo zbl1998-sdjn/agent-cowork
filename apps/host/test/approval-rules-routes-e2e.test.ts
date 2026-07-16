@@ -35,3 +35,18 @@ test('E2E approval rules: list reflects persisted rules and remove revokes them'
     await close(server);
   }
 });
+
+test('E2E approval rules: a non-admin scoped user can manage their own workspace rules', async () => {
+  const root = tempRoot('acw-aprule-guest-');
+  createWorkspaceApprovalRules(root).add('Write');
+  const server = createServer({ ...TEST_LOCAL_HOST_MODEL_CONFIG, trustedRoot: root, enableScheduler: false, requireAuth: true, trustIdentityHeaders: true });
+  const base = await bind(server);
+  try {
+    const headers = { 'content-type': 'application/json', 'x-tenant-id': 'tenant_guest_1', 'x-user-id': 'guest_1' };
+    const removed = await fetch(`${base}/api/approval-rules/Write/remove`, { method: 'POST', headers, body: '{}' });
+    assert.equal(removed.status, 200, 'workspace-scoped settings must not require the global-mutation admin');
+    assert.deepEqual(((await removed.json()) as { alwaysAllow?: unknown }).alwaysAllow, []);
+  } finally {
+    await close(server);
+  }
+});

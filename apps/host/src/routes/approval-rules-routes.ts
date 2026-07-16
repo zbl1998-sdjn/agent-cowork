@@ -2,12 +2,12 @@
 // ---------------------------------------------------------------------------
 // 职责:处理 /api/approval-rules/* —— 列出/删除工作区级 always-allow 审批规则。
 //       新增规则只能经审批卡的 workspace 决定,不提供 API 直加,防止绕过人工确认。
+//       授权口径:这是当前用户自己工作区的设置(经认证 + safeTrustedRoot 工作区授权),
+//       不是 host 全局状态,因此不要求 global-mutation-admin;删除规则只会收紧审批。
 // 依赖:L0 request-utils + L2 runtime/approval-rules。导出:handleApprovalRulesRoutes。
 import { z } from 'zod';
 import { sendJson, withJsonBody } from '../http/request-utils.js';
 import type { HttpRequestLike, HttpResponseLike } from '../http/request-utils.js';
-import { requireGlobalMutationAdmin } from '../auth/global-mutation-admin.js';
-import type { GlobalMutationAdminIdentity } from '../auth/global-mutation-admin.js';
 import { listWorkspaceApprovalRules, removeWorkspaceApprovalRule } from '../runtime/approval-rules.js';
 
 type RouteRequest = HttpRequestLike & { method?: string };
@@ -18,7 +18,6 @@ type ApprovalRulesRouteOptions = {
   pathname: string;
   requestUrl?: URL;
   requestContext?: Record<string, unknown>;
-  globalMutationAdmins: readonly GlobalMutationAdminIdentity[];
   safeTrustedRoot?: (input?: unknown) => string;
 };
 
@@ -38,7 +37,6 @@ export async function handleApprovalRulesRoutes({
   pathname,
   requestUrl,
   requestContext,
-  globalMutationAdmins,
   safeTrustedRoot,
 }: ApprovalRulesRouteOptions): Promise<boolean> {
   if (typeof safeTrustedRoot !== 'function') return false;
@@ -56,7 +54,6 @@ export async function handleApprovalRulesRoutes({
 
   const match = pathname.match(REMOVE_RE);
   if (request.method === 'POST' && match) {
-    if (!requireGlobalMutationAdmin(response, requestContext || {}, globalMutationAdmins)) return true;
     await withJsonBody(request, response, async (body) => {
       try {
         const input = removeBodySchema.parse(body);
