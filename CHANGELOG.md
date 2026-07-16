@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+### Security
+
+- 审批卡片(diff 视图、二进制摘要与 JSON 预览)渲染前把 bidi 覆盖/隔离控制符与零宽字符可见化为 `\uXXXX` 转义,防止工具参数用不可见字符在视觉上重排或隐藏审批内容(对标 Claude Code 2.1.211 同类加固)。
+
 ## [0.5.0] - 2026-07-14
 
 ### Changed

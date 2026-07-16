@@ -1,7 +1,9 @@
 // ApprovalDecisionBar(UI · components/chat):呈现单项审批风险/预览，并在 Host 明确确认后清除卡片。
+// 预览文本渲染前经 neutralizeInvisibleDirectives 可见化 bidi/零宽字符,防审批视觉欺骗。
 import { usePendingAction } from '../../hooks/usePendingAction';
 import { respondApproval } from '../../lib/api';
 import type { AssistantMessage } from '../../lib/app-types';
+import { neutralizeInvisibleDirectives } from '../../lib/approval-text-guard';
 import { clearAcknowledgedAssistantRequest, requireAcknowledgement } from '../../lib/pending-action';
 import { Button } from '../ui/Button';
 import { ApprovalDiffView, isDiffPreview } from './ApprovalDiffView';
@@ -9,9 +11,9 @@ import { ApprovalDiffView, isDiffPreview } from './ApprovalDiffView';
 type PatchAssistant = (id: string, patch: (message: AssistantMessage) => AssistantMessage) => void;
 
 function formatApprovalPreview(preview: unknown): string {
-  if (typeof preview === 'string') return preview;
+  if (typeof preview === 'string') return neutralizeInvisibleDirectives(preview);
   try {
-    return JSON.stringify(preview, null, 2);
+    return neutralizeInvisibleDirectives(JSON.stringify(preview, null, 2));
   } catch {
     return '审批预览无法显示';
   }

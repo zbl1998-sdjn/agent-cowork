@@ -54,4 +54,23 @@ describe('ApprovalDiffView', () => {
     expect(html).toContain('line 0');
     expect(html).toContain('changed 0');
   });
+
+  it('neutralizes bidi override characters in diff lines and the target path', () => {
+    const rlo = String.fromCharCode(0x202e);
+    const html = renderToStaticMarkup(
+      <ApprovalDiffView preview={{ kind: 'text', path: 'a' + rlo + '.txt', before: 'safe', after: 'safe' + rlo + 'evil' }} />,
+    );
+    expect(html).not.toContain(rlo);
+    expect(html).toContain('u202E');
+  });
+
+  it('neutralizes zero-width characters in the too-large fallback blocks', () => {
+    const zwsp = String.fromCharCode(0x200b);
+    const before = Array.from({ length: 2000 }, (_, i) => `line ${i}`).join('\n');
+    const after = Array.from({ length: 2000 }, (_, i) => `changed${zwsp} ${i}`).join('\n');
+    const html = renderToStaticMarkup(<ApprovalDiffView preview={{ kind: 'text', path: 'big.txt', before, after }} />);
+    expect(html).toContain('改动过大');
+    expect(html).not.toContain(zwsp);
+    expect(html).toContain('u200B');
+  });
 });

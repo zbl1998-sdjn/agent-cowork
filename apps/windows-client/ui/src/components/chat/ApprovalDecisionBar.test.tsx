@@ -58,4 +58,11 @@ describe('ApprovalDecisionBar', () => {
     expect(html).toContain('本次批准');
     expect(html).toContain('拒绝');
   });
+
+  it('neutralizes bidi override characters hidden in a JSON preview', () => {
+    const rlo = String.fromCharCode(0x202e);
+    const html = render({ id: 'ap5', name: 'ScheduleTask', risk: 'high', preview: { name: 'digest' + rlo + 'evil' } });
+    expect(html).not.toContain(rlo);
+    expect(html).toContain('u202E');
+  });
 });
