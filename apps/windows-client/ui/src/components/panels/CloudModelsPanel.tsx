@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getCloudModels, setCloudModels, type CloudProviderOption } from '../../lib/api';
 import { humanizeError } from '../../lib/friendly-error';
 import { CloudModelsPanelView } from './CloudModelsPanelView';
+import { OllamaCloudSection } from './OllamaCloudSection';
 
 export function CloudModelsPanel() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
@@ -56,16 +57,19 @@ export function CloudModelsPanel() {
   };
 
   return (
-    <CloudModelsPanelView
-      status={status}
-      enabled={enabled}
-      providers={providers}
-      available={available}
-      error={error}
-      busy={busy}
-      onToggleEnabled={onToggleEnabled}
-      onToggleProvider={onToggleProvider}
-      onRefresh={load}
-    />
+    <div className="cloud-models">
+      <OllamaCloudSection />
+      <CloudModelsPanelView
+        status={status}
+        enabled={enabled}
+        providers={providers}
+        available={available}
+        error={error}
+        busy={busy}
+        onToggleEnabled={onToggleEnabled}
+        onToggleProvider={onToggleProvider}
+        onRefresh={load}
+      />
+    </div>
   );
 }

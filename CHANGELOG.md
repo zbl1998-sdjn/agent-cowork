@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ### Added
 
+- Ollama 云一键接入:「云端模型」标签内新增 Ollama Cloud 区——「登录 Ollama 云」一键触发 `ollama signin` 浏览器设备配对(返回配对链接兜底),再一键拉取推荐的 `-cloud` 云端模型;模型在 Ollama 云端运行,办公电脑无 GPU 也能用,仍通过本机 `127.0.0.1:11434` 同一 API 调用(不改本地安全边界)。拉取的模型名严格按 `-cloud/:cloud` 后缀+字符集校验后经 `execFile`(shell:false)执行,杜绝命令注入。对应 API:`POST /api/ollama-cloud/{signin,pull}`、`GET /api/ollama-cloud/recommended`。
 - 云端模型用户开关:设置页新增「云端模型」标签,办公电脑跑不动本地模型时可由用户自己启用公网云厂商(DeepSeek/OpenAI/Kimi 等,按厂商勾选放行),不再只能改管理员环境变量。启用时弹知情确认(数据会发送到所选厂商);后端把放行厂商的主机并入 gateway 名单,复用既有出站策略归类为 customer_gateway 放行,出站预览与 `egress-audit` 照常记录、状态条显示外发字节。关闭即回落,绝不清掉管理员原有放行。对应 API:`GET/POST /api/cloud-models`。
 - 新增 `AgentTeam` 编排工具:一组带依赖关系的子任务按拓扑分层执行——同层并行(并发受限)、前置结果作为"仅供参考的资料"注入后继任务、前置失败整链跳过而独立分支照常;子任务事件带 `dependsOn/stage` 供任务中心时间线分组,写入/高危操作仍逐项走宿主审批。
 - 设置页新增「审批规则」标签:列出本工作区 always-allow 工具并可随时删除(`GET /api/approval-rules`、`POST /api/approval-rules/:tool/remove`);规则只能经审批卡的「本工作区总是允许」决定新增,不提供直加 API。

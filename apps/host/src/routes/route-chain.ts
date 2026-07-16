@@ -25,6 +25,7 @@ import { handleSearchRoutes } from './search-routes.js';
 import { handleSkillRoutes } from './skill-routes.js';
 import { handleApprovalRulesRoutes } from './approval-rules-routes.js';
 import { handleCloudModelsRoutes } from './cloud-models-routes.js';
+import { handleOllamaCloudRoutes } from './ollama-cloud-routes.js';
 import { handleSystemRoutes } from './system-routes.js';
 import { handleToolRoutes } from './tool-routes.js';
 import { handleVizRoutes } from './viz-routes.js';
@@ -210,9 +211,8 @@ export async function handleRouteChain({
     skillRegistry: state.skillRegistry,
   }))) return true;
   if (await handleApprovalRulesRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRulesRoutes>>({ ...base, requestUrl, safeTrustedRoot }))) return true;
-  if (await handleCloudModelsRoutes(routeOptions<RouteHandlerOptions<typeof handleCloudModelsRoutes>>({
-    ...base, requestUrl, safeTrustedRoot, syncCloudOptIn: state.syncCloudOptIn,
-  }))) return true;
+  if (await handleCloudModelsRoutes(routeOptions<RouteHandlerOptions<typeof handleCloudModelsRoutes>>({ ...base, requestUrl, safeTrustedRoot, syncCloudOptIn: state.syncCloudOptIn }))) return true;
+  if (await handleOllamaCloudRoutes(routeOptions<RouteHandlerOptions<typeof handleOllamaCloudRoutes>>({ ...base }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({
     ...base,
     toolRegistry: state.toolRegistry,
