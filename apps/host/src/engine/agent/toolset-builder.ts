@@ -11,6 +11,7 @@ import { omitUndefined } from '../../util/object.js';
 import { createAgentTools } from '../agent-tools.js';
 import type { AgentTool } from './approval-gate.js';
 import { createParallelSubAgentTool } from './parallel-agent-tool.js';
+import { createTeamSubAgentTool } from './team-agent-tool.js';
 import type { AgentDeps, ApprovalRegistry, BuildToolsetOptions, SkillPackReader, SkillRegistry, SubAgentToolOptions, ToolsetContext } from './toolset-builder-types.js';
 
 export type { AgentTool } from './approval-gate.js';
@@ -82,6 +83,7 @@ export function buildAgentToolset({
   if (agentDeps.scheduler) tools.push(createScheduleTaskTool(ctx, agentDeps, skillRegistry));
   tools.push(createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }));
   tools.push(createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools }));
+  tools.push(createTeamSubAgentTool({ ctx, runDeps, agentDeps, baseTools }));
   return tools;
 }
 

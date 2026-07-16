@@ -79,6 +79,7 @@
     "apps/host/src/engine/agent/run-timeout.ts",
     "apps/host/src/engine/agent/todo-state.ts",
     "apps/host/src/engine/agent/tool-call-executor.ts",
+    "apps/host/src/engine/agent/team-agent-tool.ts",
     "apps/host/src/engine/agent/tool-loop.ts",
     "apps/host/src/engine/agent/tool-loop-support.ts",
     "apps/host/src/engine/agent/tool-loop-types.ts",

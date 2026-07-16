@@ -290,6 +290,7 @@
     "apps/host/test/skill-packs-e2e.test.ts",
     "apps/host/test/skills.test.ts",
     "apps/host/test/task-center-live-e2e.test.ts",
+    "apps/host/test/team-agent-tool.test.ts",
     "apps/host/test/ssrf-guard.test.ts",
     "apps/host/test/system-prompt.test.ts",
     "apps/host/test/tauri-scaffold.test.ts",
