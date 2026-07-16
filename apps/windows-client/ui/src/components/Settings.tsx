@@ -17,6 +17,7 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsTabsContent, type SettingsPersistPayload } from './SettingsTabsContent';
 import type { AppFontFamily, AppFontScale, SettingsTab } from './settings-types';
 import { useShortcuts } from '../hooks/useShortcuts';
+import { shouldAutoDiscoverModels } from '../lib/model-auto-discovery';
 
 // 再导出 SettingsTab,让 App.tsx/Settings.test.tsx 的旧 import path 不变。
 export type { SettingsTab } from './settings-types';
@@ -97,6 +98,16 @@ export function Settings({ initialTab = 'account', username, tenantId, theme, fo
   }, []);
 
   useShortcuts({ escape: onClose });
+
+  // 打开「默认模型」页或切到本地回环 provider 时自动发现本机模型(等价一次"测试连接")。
+  // 只对 region==='local' 自动;云端 provider 绝不自动外发,仍需手动测试。
+  useEffect(() => {
+    const providerRegion = providers.find((item) => item.id === provider)?.region;
+    if (shouldAutoDiscoverModels({ tab, loading, testingConnection, providerRegion, hasModels: availableModels.length > 0, hasConnection: connection !== null })) {
+      testConnection();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loading, provider, providers]);
 
   useEffect(() => {
     setTab(initialTab);
