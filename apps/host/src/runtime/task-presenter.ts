@@ -25,7 +25,7 @@ export type TaskSummary = RunSummary & {
 export function taskFromRun(run: RunSummary): TaskSummary {
   const status: TaskSummary['status'] = run.status === 'succeeded'
     ? 'done'
-    : run.status === 'failed'
+    : run.status === 'failed' || run.status === 'interrupted'
       ? 'failed'
       : run.status === 'awaiting_approval'
         ? 'awaiting_approval'

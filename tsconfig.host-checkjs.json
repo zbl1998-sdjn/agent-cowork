@@ -225,6 +225,7 @@
     "apps/host/src/security/trust-report.ts",
     "apps/host/src/runtime/action-audit.ts",
     "apps/host/src/runtime/approval-rules.ts",
+    "apps/host/src/runtime/run-janitor.ts",
     "apps/host/src/runtime/approvals.ts",
     "apps/host/src/runtime/audit-events.ts",
     "apps/host/src/runtime/background-tasks.ts",

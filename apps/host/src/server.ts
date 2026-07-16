@@ -20,6 +20,7 @@ import { filterMcpServersForConfidential, applyConfidentialProxyLockdown } from 
 import { resolveSecurityMode } from './security/security-mode.js';
 import { setAtRestSecurityMode } from './security/at-rest.js';
 import { createHostState } from './runtime/host-state.js';
+import { markInterruptedRuns } from './runtime/run-janitor.js';
 import type { HostConfig } from './runtime/host-state-types.js';
 import { redactText } from './security/redaction.js';
 import { omitUndefined } from './util/object.js';
@@ -44,6 +45,8 @@ export type HostServer = HttpServer & {
 
 export function createServer(config: ServerConfig = {}): HostServer {
   const state = createHostState(config, { hostSrcDir });
+  // 启动清道夫:上一进程遗留的 running 档案标为 interrupted,任务中心不再永久显示假"进行中"(失败不阻断启动)。
+  void markInterruptedRuns({ runStoreRoot: state.runStoreRoot, runsIndex: state.runsIndex }).catch(() => undefined);
   const serveStatic = createStaticResponder({
     staticRoot: state.staticRoot,
     uiDistRoot: state.uiDistRoot,
