@@ -8,6 +8,7 @@ import {
   getAgentEngineInfo,
   getMe,
   guestLogin,
+  guestLoginOrThrow,
   logout as apiLogout,
   type AuthIdentity,
   type AgentEngineInfo,
@@ -201,12 +202,16 @@ export function useAppRuntimeState() {
     openSettings(tab);
   }, [completeOnboarding, openSettings]);
 
-  const continueAsGuest = useCallback(() => {
+  // 返回访客登录结果;失败时把真实错误消息一并带回,让 Login 显示原因而不是静默失败。
+  const continueAsGuest = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* 本地存储不可用时忽略 */ }
-    void (async () => {
-      const guest = await guestLogin();
-      if (guest) setUser(guest);
-    })();
+    try {
+      const guest = await guestLoginOrThrow();
+      setUser(guest);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }, []);
 
   const toggleTheme = useCallback(() => setTheme((value) => (value === 'dark' ? 'light' : 'dark')), []);

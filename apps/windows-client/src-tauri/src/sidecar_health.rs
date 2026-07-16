@@ -46,15 +46,36 @@ fn verify_proof(secret: &[u8], challenge_hex: &str, proof_hex: &str) -> bool {
     hmac::verify(&key, message.as_bytes(), &proof).is_ok()
 }
 
+/// 一次身份探测的结果:reachable 表示端口接受了连接(sidecar 至少活着),
+/// verified 表示同时返回了合法 HMAC proof。监控循环用 reachable 区分"慢启动"与"真死"。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct HealthProbe {
+    pub reachable: bool,
+    pub verified: bool,
+}
+
+impl HealthProbe {
+    const UNREACHABLE: Self = Self {
+        reachable: false,
+        verified: false,
+    };
+    const fn reachable(verified: bool) -> Self {
+        Self {
+            reachable: true,
+            verified,
+        }
+    }
+}
+
 /// 对固定 loopback 端口发起一次带随机 challenge 的身份探测。
 pub(crate) fn request_authenticated_health(
     address: &SocketAddr,
     secret: &[u8],
     challenge: &[u8; SECRET_BYTES],
-) -> bool {
+) -> HealthProbe {
     let challenge_hex = encode_hex(challenge);
     let Ok(mut stream) = TcpStream::connect_timeout(address, Duration::from_millis(300)) else {
-        return false;
+        return HealthProbe::UNREACHABLE;
     };
     let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
     let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
@@ -63,7 +84,7 @@ pub(crate) fn request_authenticated_health(
         "GET /health HTTP/1.1\r\nHost: {HOST}:{PORT}\r\n{SIDECAR_CHALLENGE_HEADER}: {challenge_hex}\r\nConnection: close\r\n\r\n"
     );
     if stream.write_all(request.as_bytes()).is_err() {
-        return false;
+        return HealthProbe::reachable(false);
     }
 
     let mut response = Vec::new();
@@ -72,38 +93,38 @@ pub(crate) fn request_authenticated_health(
         .read_to_end(&mut response)
         .is_err()
     {
-        return false;
+        return HealthProbe::reachable(false);
     }
     let Ok(response) = std::str::from_utf8(&response) else {
-        return false;
+        return HealthProbe::reachable(false);
     };
     let Some((headers, _body)) = response.split_once("\r\n\r\n") else {
-        return false;
+        return HealthProbe::reachable(false);
     };
     let mut lines = headers.split("\r\n");
     let status = lines.next().unwrap_or_default();
     if status != "HTTP/1.1 200 OK" && status != "HTTP/1.0 200 OK" {
-        return false;
+        return HealthProbe::reachable(false);
     }
 
     let mut proof: Option<&str> = None;
     for line in lines {
         let Some((name, value)) = line.split_once(':') else {
-            return false;
+            return HealthProbe::reachable(false);
         };
         if name.eq_ignore_ascii_case(SIDECAR_PROOF_HEADER) {
             if proof.is_some() {
-                return false;
+                return HealthProbe::reachable(false);
             }
             proof = Some(value.trim());
         }
     }
-    proof.is_some_and(|value| verify_proof(secret, &challenge_hex, value))
+    HealthProbe::reachable(proof.is_some_and(|value| verify_proof(secret, &challenge_hex, value)))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::verify_proof;
+    use super::{verify_proof, HealthProbe};
 
     const ZERO_SECRET: [u8; 32] = [0_u8; 32];
     const CHALLENGE: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -122,5 +143,27 @@ mod tests {
             CHALLENGE,
             "0000000000000000000000000000000000000000000000000000000000000000"
         ));
+    }
+
+    #[test]
+    fn health_probe_separates_reachable_from_verified() {
+        // 端口没连上:两者都 false —— 监控循环据此判定"可能真死"。
+        assert_eq!(
+            HealthProbe::UNREACHABLE,
+            HealthProbe {
+                reachable: false,
+                verified: false
+            }
+        );
+        // 连上但还没给出合法 proof(慢启动/初始化中):reachable=true 但 verified=false,
+        // 监控循环应继续重试而不是把健康的 sidecar 杀掉。
+        assert_eq!(
+            HealthProbe::reachable(false),
+            HealthProbe {
+                reachable: true,
+                verified: false
+            }
+        );
+        assert!(HealthProbe::reachable(true).verified);
     }
 }

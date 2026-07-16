@@ -88,6 +88,37 @@ test('reflects CORS for the Tauri webview origin (Windows: http://tauri.localhos
   }
 });
 
+test('grants Private Network Access to the Tauri webview so WebView2 does not block loopback fetches', async () => {
+  const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
+  const base = await bind(server);
+  try {
+    const origin = 'http://tauri.localhost';
+    // Chromium/WebView2 sends this on the preflight when a "public" document (tauri.localhost)
+    // fetches a private/loopback address (127.0.0.1). Without the matching response header the
+    // real request fails with "Failed to fetch" and the app can never log in.
+    const pre = await fetch(`${base}/api/auth/guest`, {
+      method: 'OPTIONS',
+      headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-private-network': 'true' },
+    });
+    assert.equal(pre.status, 204);
+    assert.equal(pre.headers.get('access-control-allow-private-network'), 'true');
+
+    // Without the request header the response must NOT advertise private-network access.
+    const plain = await fetch(`${base}/api/auth/guest`, { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST' } });
+    assert.equal(plain.headers.get('access-control-allow-private-network'), null);
+
+    // A disallowed origin never gets private-network access even if it asks.
+    const evil = await fetch(`${base}/api/tools/call`, {
+      method: 'OPTIONS',
+      headers: { origin: 'http://evil.example.com', 'access-control-request-private-network': 'true' },
+    });
+    assert.equal(evil.status, 403);
+    assert.equal(evil.headers.get('access-control-allow-private-network'), null);
+  } finally {
+    await closeTestServer(server);
+  }
+});
+
 test('a non-loopback origin is not reflected and its preflight is rejected', async () => {
   const server = createServer({ trustedRoot: tempRoot(), enableScheduler: false });
   const base = await bind(server);

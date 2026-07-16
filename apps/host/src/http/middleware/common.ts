@@ -145,6 +145,13 @@ export function applyRequestMiddleware({
       'authorization,content-type,accept,idempotency-key,x-tenant-id,x-user-id,x-trace-id,x-acw-enrollment-token,x-kcw-enrollment-token,last-event-id',
     );
     response.setHeader('access-control-max-age', '600');
+    // Private Network Access(Chromium/WebView2):Tauri 主界面(tauri.localhost)属"public"
+    // 地址空间,fetch 到 127.0.0.1(loopback/private)会被 PNA 拦成 "Failed to fetch",
+    // 除非预检回 Allow-Private-Network。只对已通过白名单校验的自有 origin、且请求显式声明
+    // 需要私网访问时才回,不对任意网页放开。
+    if (headerValue(request, 'access-control-request-private-network') === 'true') {
+      response.setHeader('access-control-allow-private-network', 'true');
+    }
   }
   if (request.method === 'OPTIONS') {
     response.writeHead(originOk ? 204 : 403);

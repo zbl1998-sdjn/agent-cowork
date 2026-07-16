@@ -30,7 +30,7 @@
     "apps/windows-client/src-tauri/src/security.rs": { "maxLines": 276 },
     "apps/windows-client/ui/src/App.tsx": { "maxLines": 325 },
     "apps/windows-client/ui/src/components/Composer.tsx": { "maxLines": 256 },
-    "apps/windows-client/ui/src/hooks/useAppRuntimeState.ts": { "maxLines": 257 },
+    "apps/windows-client/ui/src/hooks/useAppRuntimeState.ts": { "maxLines": 256 },
     "apps/windows-client/ui/src/hooks/useConversations.ts": { "maxLines": 254 },
     "apps/windows-client/ui/src/lib/agent-team-timeline.ts": { "maxLines": 350 },
     "apps/windows-client/ui/src/lib/api/chat.ts": { "maxLines": 279 },

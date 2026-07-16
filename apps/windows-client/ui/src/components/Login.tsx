@@ -8,7 +8,8 @@ import { Button } from './ui/Button';
 
 interface LoginProps {
   onAuthed: (identity: AuthIdentity) => void;
-  onGuest: () => void;
+  // 返回访客登录结果;失败时带回原因,Login 显示反馈,避免"点了没反应"。
+  onGuest: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 function authTabStyle(active: boolean): CSSProperties {
@@ -29,7 +30,24 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [guestBusy, setGuestBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const enterAsGuest = async () => {
+    if (guestBusy) return;
+    setError('');
+    setGuestBusy(true);
+    try {
+      const result = await onGuest();
+      if (!result.ok) {
+        setError(result.error ? `进入本地失败：${result.error}` : '本地服务正在启动，请稍候几秒再点一次「跳过」。');
+      }
+    } catch (err) {
+      setError(`本地服务暂时不可用：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setGuestBusy(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,7 +92,7 @@ export function Login({ onAuthed, onGuest }: LoginProps) {
           </label>
           {error && <div className="auth-error" role="alert">{error}</div>}
           <Button type="submit" variant="primary" className="auth-submit" disabled={busy} style={{ border: 'none', borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 600, cursor: busy ? 'progress' : 'pointer' }}>{busy ? '请稍候…' : (mode === 'login' ? '登录' : '注册并登录')}</Button>
-          <Button variant="ghost" className="auth-guest" onClick={onGuest} style={{ border: 'none', background: 'none', color: 'var(--muted)', marginTop: 12, padding: 6, fontSize: 13 }}>跳过，先在本地使用 →</Button>
+          <Button variant="ghost" className="auth-guest" disabled={guestBusy} onClick={enterAsGuest} style={{ border: 'none', background: 'none', color: 'var(--muted)', marginTop: 12, padding: 6, fontSize: 13, cursor: guestBusy ? 'progress' : 'pointer' }}>{guestBusy ? '正在进入本地…' : '跳过，先在本地使用 →'}</Button>
         </form>
         <p className="auth-foot">账户信息仅保存在本机，用于区分多用户的工作数据。</p>
       </main>

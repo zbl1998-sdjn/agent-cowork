@@ -18,6 +18,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ### Fixed
 
+- 修复安装版在新版 WebView2(150+)上完全无法登录/进入的问题("跳过,先在本地使用"点击无反应):Chromium 的 Local Network Access 会硬阻断非安全上下文(`http://tauri.localhost`)到 `127.0.0.1` 回环的一切 fetch。修复为双管齐下——窗口启用 `useHttpsScheme`(`https://tauri.localhost` 安全上下文)+ host 对白名单 origin 的预检按需回 `Access-Control-Allow-Private-Network: true`。同批修复:壳对 sidecar 的身份校验从"10 秒硬超时即杀进程"改为"只要端口从未连通才在 90 秒后放弃"(高负载机器上 SEA sidecar 冷启动超 10 秒会被误杀,verified 永远为 false);访客登录失败不再静默,按钮显示进行中/失败原因。注意:origin 变更会使旧的本地登录态失效一次,重新点「跳过」或登录即可。
 - host 启动时清扫上一进程遗留的 `status=running` 运行档案(标为 `interrupted` 并附说明),任务中心不再因宿主崩溃/被杀而永久显示假"进行中";配方的 `awaiting_approval` 等合法持久状态不受影响。
 
 ### Security
