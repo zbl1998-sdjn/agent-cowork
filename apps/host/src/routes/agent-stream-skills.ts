@@ -6,6 +6,7 @@
 //       模板模式下两者都不注入。纯本地文件/注册表访问,零出站。
 // 依赖:L1 skills/skill-md-loader。导出:resolveAgentSkills、resolveAgentSkillPacks。
 import { discoverSkillPacks, readSkillPackFile, type SkillPackDescriptor } from '../skills/skill-md-loader.js';
+import { readDisabledSkillPacks } from '../skills/skill-pack-settings.js';
 import type { SkillPackReader } from '../engine/agent/toolset-builder.js';
 import { omitUndefined } from '../util/object.js';
 
@@ -32,16 +33,22 @@ export function resolveAgentSkills(
 
 export type ResolvedSkillPacks = { packs: SkillPackDescriptor[]; reader: SkillPackReader | null };
 
-/** SKILL.md 技能包(渐进披露):目录进系统提示,全文只经 LoadSkill 读取;无包时 reader 为 null 不挂工具。 */
+/** SKILL.md 技能包(渐进披露):目录进系统提示,全文只经 LoadSkill 读取;无包时 reader 为 null 不挂工具。
+ * 用户在设置页禁用的包(skill-pack-settings 持久名单)整体剔除——既不进目录也不可被 LoadSkill 读到。 */
 export function resolveAgentSkillPacks(trustedRoot: string, templateActive: boolean): ResolvedSkillPacks {
   if (templateActive) return { packs: [], reader: null };
-  const { packs } = discoverSkillPacks(trustedRoot);
+  const disabled = readDisabledSkillPacks(trustedRoot);
+  const packs = discoverSkillPacks(trustedRoot).packs.filter((pack) => !disabled.has(pack.name));
   if (!packs.length) return { packs, reader: null };
+  const active = new Set(packs.map((pack) => pack.name));
   return {
     packs,
     reader: {
       list: () => packs,
-      read: (name: string, file?: string) => readSkillPackFile(trustedRoot, name, file),
+      read: (name: string, file?: string) => {
+        if (!active.has(name)) throw new Error(`技能包不可用(未发现或已被用户禁用): ${name}`);
+        return readSkillPackFile(trustedRoot, name, file);
+      },
     },
   };
 }

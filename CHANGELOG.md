@@ -9,6 +9,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 ### Added
 
 - 支持 Agent Skills(SKILL.md)开放标准(agentskills.io)第一阶段:host 从 trusted root 下 `.AgentCowork/skills/<name>/SKILL.md` 发现技能包,按渐进披露注入——系统提示只带 name+description 目录,新增只读低风险 `LoadSkill` 工具按需读取完整指令与 `references/` 参考文档;不执行技能包附带脚本。技能包内容按不可信数据包装(经 InjectionGuard),目录/文件拒绝 symlink、name 必须匹配目录名、有字节与数量上限;读取纯本地、零出站。
+- 技能包启停管理:设置页新增「技能包」标签,列出当前工作区发现的技能包与被跳过目录的原因,可逐个停用/启用;禁用名单按工作区持久化到 `.AgentCowork/settings/skill-packs.json`,禁用的包既不进系统提示目录、也无法被 `LoadSkill` 读取。对应 API:`GET /api/skill-packs`、`POST /api/skill-packs/:name/toggle`。
 
 ### Security
 

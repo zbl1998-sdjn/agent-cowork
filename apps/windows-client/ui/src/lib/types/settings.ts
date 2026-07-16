@@ -5,6 +5,7 @@ export type SettingsTab =
   | 'model'
   | 'input'
   | 'api'
+  | 'skills'
   | 'runtime'
   | 'updates'
   | 'selfcheck';

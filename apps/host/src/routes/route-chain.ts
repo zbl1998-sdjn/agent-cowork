@@ -209,7 +209,7 @@ export async function handleRouteChain({
     resolveSecurityMode: () => state.agentModelConfig?.securityMode,
   }))) return true;
   if (await handleSkillRoutes(routeOptions<RouteHandlerOptions<typeof handleSkillRoutes>>({
-    ...base,
+    ...base, requestUrl, safeTrustedRoot,
     globalMutationAdmins: state.globalMutationAdmins,
     skillRegistry: state.skillRegistry,
   }))) return true;

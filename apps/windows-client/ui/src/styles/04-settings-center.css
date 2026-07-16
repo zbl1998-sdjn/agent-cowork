@@ -15,3 +15,17 @@
 .seg button { font: inherit; font-size: 13px; border: none; background: none; color: var(--muted); padding: 6px 16px; border-radius: 7px; cursor: pointer; }
 .seg button.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 500; }
 [data-theme="dark"] .seg button.is-active { box-shadow: none; background: #2f2f29; }
+
+/* 技能包(SKILL.md 标准)设置区 */
+.skill-packs { display: flex; flex-direction: column; gap: 12px; }
+.skill-packs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.skill-packs-head h3 { margin: 0 0 4px; font-size: 15px; }
+.skill-packs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.skill-pack-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border, #e2e2e2); border-radius: 8px; }
+.skill-pack-item.is-disabled .skill-pack-meta { opacity: 0.55; }
+.skill-pack-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.skill-pack-meta code { font-size: 13px; }
+.skill-pack-meta span { font-size: 12px; color: var(--text-muted, #666); overflow-wrap: anywhere; }
+.skill-packs-warnings { font-size: 12px; color: var(--text-muted, #666); }
+.skill-packs-warnings h4 { margin: 0 0 4px; font-size: 12px; }
+.skill-packs-warnings ul { margin: 0; padding-left: 18px; }

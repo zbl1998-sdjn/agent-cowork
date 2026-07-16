@@ -392,6 +392,7 @@
     "apps/host/src/skills/capability-pack-catalog.ts",
     "apps/host/src/skills/capability-pack-governance.ts",
     "apps/host/src/skills/skill-md-loader.ts",
+    "apps/host/src/skills/skill-pack-settings.ts",
     "apps/host/src/skills/skill-registry.ts",
     "apps/host/src/storage/app-home.ts",
     "apps/host/src/storage/audit-chain.ts",
