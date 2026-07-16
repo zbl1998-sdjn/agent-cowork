@@ -40,6 +40,7 @@ type AgentDeps = {
   modelConfig?: unknown;
   modelCall?: unknown;
   approvals?: unknown;
+  workspaceApproved?: unknown;
   autoApprove?: unknown;
   planMode?: unknown;
   auditBus?: unknown;
@@ -137,6 +138,7 @@ export function createParallelSubAgentTool({ ctx, runDeps, agentDeps, baseTools 
               modelCall: agentDeps.modelCall,
               maxSteps,
               approvals: agentDeps.approvals,
+              workspaceApproved: agentDeps.workspaceApproved,
               autoApprove: agentDeps.autoApprove,
               planMode: agentDeps.planMode,
               auditBus: agentDeps.auditBus,

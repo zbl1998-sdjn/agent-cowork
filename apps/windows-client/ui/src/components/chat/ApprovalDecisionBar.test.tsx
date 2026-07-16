@@ -65,4 +65,16 @@ describe('ApprovalDecisionBar', () => {
     expect(html).not.toContain(rlo);
     expect(html).toContain('u202E');
   });
+
+  it('offers the workspace always-allow button only when the host declares it persistable', () => {
+    const persistable = render({ id: 'ap6', name: 'Write', risk: 'write', sessionReusable: true, workspacePersistable: true, preview: { kind: 'text', path: 'a.txt', before: null, after: 'x' } });
+    expect(persistable).toContain('本工作区总是允许');
+    expect(persistable).toContain('本会话批准');
+
+    const notPersistable = render({ id: 'ap7', name: 'Shell', risk: 'high', sessionReusable: false, workspacePersistable: false, preview: { command: 'del *' } });
+    expect(notPersistable).not.toContain('本工作区总是允许');
+
+    const legacyMissingField = render({ id: 'ap8', name: 'Write', risk: 'write', preview: { kind: 'text', path: 'a.txt', before: null, after: 'x' } });
+    expect(legacyMissingField).not.toContain('本工作区总是允许');
+  });
 });

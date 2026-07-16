@@ -37,6 +37,7 @@ export type Scheduler = {
 };
 export type AgentDeps = {
   approvals?: ApprovalRegistry | null;
+  workspaceApproved?: { has(name: string): boolean; add(name: string): void } | null;
   scheduler?: Scheduler | null;
   emit?: (type: string, payload: Record<string, unknown>) => void;
   runId?: unknown;

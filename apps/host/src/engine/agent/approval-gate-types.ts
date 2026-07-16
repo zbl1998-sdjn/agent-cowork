@@ -65,11 +65,14 @@ export type PlanBlockOptions = {
   messages: MessageList;
   call: ToolCall;
 };
+// 工作区级"总是允许"规则(L2 runtime/approval-rules 实现,经接口注入避免 L1→L2 反向依赖)。
+export type WorkspaceApprovedLike = { has(name: string): boolean; add(name: string): void };
 export type ToolApprovalOptions = {
   needsApproval: boolean;
   hasApprovals: boolean;
   approvals?: ApprovalRegistry | null;
   sessionApproved: Set<string>;
+  workspaceApproved?: WorkspaceApprovedLike | null;
   name: string;
   args: ToolArgs;
   tool: AgentTool;

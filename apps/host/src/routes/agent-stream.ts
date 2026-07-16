@@ -18,6 +18,7 @@ import { sse } from '../engine/agent/finalize.js';
 import { runAgentChat } from '../engine/agent/tool-loop.js';
 import { buildAgentToolset } from '../engine/agent/toolset-builder.js';
 import { resolveAgentSkillPacks, resolveAgentSkills } from './agent-stream-skills.js';
+import { createWorkspaceApprovalRules } from '../runtime/approval-rules.js';
 import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
@@ -153,6 +154,8 @@ export async function streamAgentChat({
     const subAgentRunner: NonNullable<AgentDeps['runAgentChat']> = (args) => runAgentChat(args as RunAgentChatOptions);
     // SKILL.md 标准技能包(渐进披露):目录注入系统提示,全文只经 LoadSkill 工具按需读取;模板模式不注入。
     const { packs: skillPacks, reader: skillPackReader } = resolveAgentSkillPacks(trustedRoot, templateMode.active);
+    // 工作区级"总是允许"审批规则:用户在审批卡显式选择后落盘,后续 run 自动放行同名非显式审批工具。
+    const workspaceApproved = createWorkspaceApprovalRules(trustedRoot);
     const agentTools = buildAgentToolset({
       ctx: agentCtx,
       toolRegistry,
@@ -162,9 +165,7 @@ export async function streamAgentChat({
       agentDeps: {
         modelConfig: runKimiConfig,
         modelCall,
-        approvals,
-        autoApprove,
-        planMode,
+        approvals, workspaceApproved, autoApprove, planMode,
         hooks,
         emit,
         auditBus,
@@ -239,16 +240,13 @@ export async function streamAgentChat({
       lazyTools,
       hooks,
       memoryText,
-      skills,
-      skillPacks,
+      skills, skillPacks,
       maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
       // 自动续跑窗数:大任务跑满一窗还没做完时,自动再扩窗接着做(硬上限 = maxSteps*(1+此值))。
       // 默认 2(即最多 3 窗);可用 body.maxAutoContinues / 环境变量 ACW_MAX_AUTO_CONTINUE(兼容旧名 KCW_MAX_AUTO_CONTINUE)覆盖,夹取 [0,10]。
       maxAutoContinues: Math.min(10, Math.max(0, Math.floor(Number(body.maxAutoContinues ?? process.env.ACW_MAX_AUTO_CONTINUE ?? process.env.KCW_MAX_AUTO_CONTINUE ?? 2) || 0))),
       verify: body.verify === true || body.thinking === 'deep',
-      approvals,
-      autoApprove,
-      planMode,
+      approvals, workspaceApproved, autoApprove, planMode,
       developerMode: body.developerMode === true || body.mode === 'developer',
       auditBus,
       emit,

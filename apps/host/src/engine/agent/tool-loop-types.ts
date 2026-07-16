@@ -3,6 +3,7 @@
 // 职责:集中放置 runAgentChat 的输入/输出契约,让 tool-loop.ts 保持编排职责。
 import type { SkillDescriptor, SkillPackDescriptor } from '../system-prompt.js';
 import type { ApprovalRegistry, AuditBus, HookEngine, RequestContext } from './approval-gate.js';
+import type { WorkspaceApprovedLike } from './approval-gate-types.js';
 import type { Checkpointer } from './checkpoint-state.js';
 import type { Message as FinalizeMessage, Usage, UsageTotals } from './finalize.js';
 import type { TrustedInProcessModelCallCapability } from './model-call-capability.js';
@@ -42,7 +43,7 @@ export type ResumeState = { usage?: Usage; messages?: ChatMessage[]; approvedToo
 export type RunAgentChatOptions = {
   prompt?: unknown; modelConfig?: ModelConfig; trustedRoot: string; tools?: AgentTool[]; modelCall?: ModelCall;
   inProcessModelCallCapability?: TrustedInProcessModelCallCapability; maxSteps?: number;
-  approvals?: ApprovalRegistry | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
+  approvals?: ApprovalRegistry | null; workspaceApproved?: WorkspaceApprovedLike | null; autoApprove?: boolean; planMode?: boolean; developerMode?: boolean; auditBus?: AuditBus | null; hooks?: HookEngine | null;
   memoryText?: string; skills?: SkillDescriptor[]; skillPacks?: SkillPackDescriptor[]; emit?: EmitFn; sandbox?: unknown; sandboxLimits?: unknown; runStoreRoot?: unknown; runEvents?: unknown; runsIndex?: unknown;
   context?: RequestContext; fetchImpl?: unknown; lazyTools?: AgentTool[]; verify?: boolean; maxVerifySteps?: number; signal?: AbortSignal | null; runId?: string | null; cacheKey?: string | null;
   userContent?: unknown; clarifyBeforeModel?: boolean; contextManager?: ContextManagerLike | null; contextOptions?: unknown; loopGuard?: LoopGuard | null; loopGuardOptions?: unknown;

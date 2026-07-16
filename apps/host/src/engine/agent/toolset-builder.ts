@@ -222,6 +222,7 @@ function createSubAgentTool({ ctx, runDeps, agentDeps, baseTools }: SubAgentTool
         modelCall: agentDeps.modelCall,
         maxSteps: 4,
         approvals: agentDeps.approvals,
+        workspaceApproved: agentDeps.workspaceApproved,
         autoApprove: agentDeps.autoApprove,
         planMode: agentDeps.planMode,
         auditBus: agentDeps.auditBus,

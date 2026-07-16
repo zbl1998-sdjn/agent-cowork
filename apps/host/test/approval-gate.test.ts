@@ -724,3 +724,85 @@ test('approval events are not published before durable readiness', async () => {
   markToolReady?.();
   assert.equal(await toolResult, false);
 });
+
+test('workspace always-allow rules auto-approve, persist via decision, and never cover explicit approvals', async () => {
+  const events: Event[] = [];
+  const steps: Record<string, unknown>[] = [];
+  const messages: Record<string, unknown>[] = [];
+  const sessionApproved = new Set<string>();
+  const ruleNames = new Set<string>();
+  const workspaceApproved = { has: (n: string) => ruleNames.has(n), add: (n: string) => { ruleNames.add(n); } };
+  const tool: AgentTool = { name: 'Write', risk: 'low', mutating: true };
+  const base = {
+    hasApprovals: true,
+    approvals: approval('once'),
+    sessionApproved,
+    workspaceApproved,
+    name: 'Write',
+    args: { path: 'a.txt' },
+    tool,
+    runId: 'run_ws',
+    emit: emitTo(events),
+    audit: auditTo(events),
+    steps,
+    messages,
+    call: { id: 'call_ws' },
+    autoApprove: false,
+    planMode: false,
+    planApproved: false,
+    context: {},
+  };
+
+  // 命中工作区规则:直接放行,不发审批请求。
+  ruleNames.add('Write');
+  const noRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({ ...base, needsApproval: true, approvals: approval('once', noRequests) }), false);
+  assert.equal(noRequests.length, 0);
+  assert.equal(events.at(-1)?.payload.kind, 'tool.auto_approved');
+  assert.equal(events.at(-1)?.payload.via, 'workspace_rule');
+  ruleNames.clear();
+
+  // 选择 workspace 决定:规则被持久化,本会话也放行,approval_request 声明 workspacePersistable。
+  const wsRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({ ...base, needsApproval: true, approvals: approval('workspace', wsRequests) }), false);
+  assert.equal(wsRequests.length, 1);
+  assert.equal(ruleNames.has('Write'), true);
+  assert.equal(sessionApproved.has('Write'), true);
+  const wsRequestEvent = events.filter((e) => e.type === 'approval_request').at(-1);
+  assert.equal(wsRequestEvent?.payload.workspacePersistable, true);
+  assert.equal(events.at(-1)?.payload.decision, 'workspace');
+  ruleNames.clear();
+  sessionApproved.clear();
+
+  // 显式审批工具:规则命中也不放行、workspace 决定降级为 once、规则不落盘。
+  ruleNames.add('Shell');
+  const shellRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({
+    ...base,
+    needsApproval: true,
+    approvals: approval('workspace', shellRequests),
+    tool: { name: 'Shell', risk: 'high', mutating: true },
+    name: 'Shell',
+    args: { command: 'del *' },
+  }), false);
+  assert.equal(shellRequests.length, 1, 'explicit-approval tools must still request approval despite a rule');
+  const shellRequestEvent = events.filter((e) => e.type === 'approval_request').at(-1);
+  assert.equal(shellRequestEvent?.payload.workspacePersistable, false);
+  assert.equal(events.at(-1)?.payload.decision, 'once');
+  assert.equal(events.at(-1)?.payload.requestedDecision, 'workspace');
+  assert.equal(ruleNames.has('Write'), false);
+  assert.equal(sessionApproved.has('Shell'), false);
+
+  // 未注入规则接口时,workspace 决定降级为 session,不报错。
+  const fallbackRequests: Record<string, unknown>[] = [];
+  assert.equal(await requestToolApproval({
+    ...base,
+    workspaceApproved: null,
+    needsApproval: true,
+    approvals: approval('workspace', fallbackRequests),
+  }), false);
+  const fallbackRequestEvent = events.filter((e) => e.type === 'approval_request').at(-1);
+  assert.equal(fallbackRequestEvent?.payload.workspacePersistable, false);
+  assert.equal(events.at(-1)?.payload.decision, 'session');
+  assert.equal(sessionApproved.has('Write'), true);
+});

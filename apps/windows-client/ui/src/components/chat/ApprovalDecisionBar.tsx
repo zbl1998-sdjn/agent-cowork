@@ -22,7 +22,7 @@ function formatApprovalPreview(preview: unknown): string {
 export function ApprovalDecisionBar({ message, onPatchAssistant }: { message: AssistantMessage; onPatchAssistant: PatchAssistant }) {
   const approval = message.approval;
   const { pending, error, run } = usePendingAction('提交审批决定');
-  const respond = (decision: 'once' | 'session' | 'reject') => {
+  const respond = (decision: 'once' | 'session' | 'workspace' | 'reject') => {
     if (!approval) return;
     void run(() => requireAcknowledgement(
       () => respondApproval(approval.id, decision),
@@ -40,6 +40,7 @@ export function ApprovalDecisionBar({ message, onPatchAssistant }: { message: As
       <div className="approval-actions">
         <Button variant="primary" disabled={pending} onClick={() => respond('once')}>{pending ? '提交中…' : '本次批准'}</Button>
         {approval.sessionReusable === true && <Button variant="secondary" disabled={pending} onClick={() => respond('session')}>本会话批准</Button>}
+        {approval.workspacePersistable === true && <Button variant="secondary" disabled={pending} onClick={() => respond('workspace')}>本工作区总是允许</Button>}
         <Button variant="danger" disabled={pending} onClick={() => respond('reject')}>拒绝</Button>
       </div>
       {(error || approval.error) && <div className="panel-error" role="alert">{error || approval.error}</div>}

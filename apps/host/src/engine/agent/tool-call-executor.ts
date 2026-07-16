@@ -18,7 +18,7 @@ import { traceToolResult, type RunTraceLike } from './run-trace-events.js';
 import { parseToolCall } from './tool-loop-support.js';
 import { omitUndefined } from '../../util/object.js';
 import { decideToolPolicy } from '../../security/policy-decision.js';
-import type { ApprovalRegistry, HookEngine, RequestContext } from './approval-gate.js';
+import type { ApprovalRegistry, HookEngine, RequestContext, WorkspaceApprovedLike } from './approval-gate.js';
 
 export type ToolArgs = Record<string, unknown>;
 export type ToolCall = { id?: unknown; function?: { name?: string; arguments?: string } };
@@ -55,7 +55,7 @@ export type ExecuteToolCallOptions = {
   hasApprovals: boolean;
   autoApprove: boolean;
   approvals?: ApprovalRegistry | null;
-  sessionApproved: Set<string>;
+  sessionApproved: Set<string>; workspaceApproved?: WorkspaceApprovedLike | null;
   runId?: unknown;
   planMode: boolean;
   planApproved: boolean;
@@ -94,7 +94,7 @@ export async function executeToolCall({
   hasApprovals,
   autoApprove,
   approvals,
-  sessionApproved,
+  sessionApproved, workspaceApproved = null,
   runId,
   planMode,
   planApproved,
@@ -188,7 +188,7 @@ export async function executeToolCall({
   if (tool && await requestToolApproval(omitUndefined({
     needsApproval,
     hasApprovals,
-    sessionApproved,
+    sessionApproved, workspaceApproved,
     name: toolName,
     args,
     tool,

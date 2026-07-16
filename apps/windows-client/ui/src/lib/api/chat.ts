@@ -228,7 +228,7 @@ export async function agentChatStream(
   });
 }
 
-export async function respondApproval(id: string, decision: 'once' | 'session' | 'reject'): Promise<boolean> {
+export async function respondApproval(id: string, decision: 'once' | 'session' | 'workspace' | 'reject'): Promise<boolean> {
   try {
     const res = await postJson<{ ok?: boolean }>(`/api/approvals/${encodeURIComponent(id)}`, { decision });
     return Boolean(res.ok);

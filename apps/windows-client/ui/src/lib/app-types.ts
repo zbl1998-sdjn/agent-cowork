@@ -9,6 +9,8 @@ export interface PendingApproval {
   preview?: unknown;
   /** Host 明确声明该批准可以按工具名复用于本会话；缺失时失败关闭。 */
   sessionReusable?: boolean | undefined;
+  /** Host 明确声明该批准可持久化为本工作区规则(后续 run 自动放行);缺失时失败关闭。 */
+  workspacePersistable?: boolean | undefined;
   /** 批量回传部分失败时持久化到剩余单卡，避免批量条卸载后丢失错误。 */
   error?: string | undefined;
 }

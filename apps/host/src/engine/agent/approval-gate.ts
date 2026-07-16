@@ -10,7 +10,7 @@ import { todoItemsFromPlan } from './todo-state.js';
 import { approvalScope, recordUnavailableApproval } from './approval-support.js';
 import type { AgentTool, ApprovalRegistry, AuditBus, AuditFn, ExitPlanOptions, PlanBlockOptions, PreToolHookOptions, RequestContext, ToolApprovalOptions } from './approval-gate-types.js';
 
-export type { AgentTool, ApprovalRegistry, AuditBus, AuditFn, EmitFn, ExitPlanOptions, HookBlock, HookEngine, MessageList, PlanBlockOptions, PreToolHookOptions, RequestContext, StepList, ToolApprovalOptions, ToolArgs, ToolCall } from './approval-gate-types.js';
+export type { AgentTool, ApprovalRegistry, AuditBus, AuditFn, EmitFn, ExitPlanOptions, HookBlock, HookEngine, MessageList, PlanBlockOptions, PreToolHookOptions, RequestContext, StepList, ToolApprovalOptions, ToolArgs, ToolCall, WorkspaceApprovedLike } from './approval-gate-types.js';
 
 /** 计划模式下确保工具集里存在 ExitPlanMode 工具(只读,供模型提交计划草案)。 */
 export function ensureExitPlanModeTool(agentTools: AgentTool[], planMode: boolean): void {
@@ -143,12 +143,13 @@ export function blockUntilPlanApproved({
   return true;
 }
 
-/** 向用户申请单次工具审批:命中自动批准则放行,否则等待用户决定(可记会话级)。 */
+/** 向用户申请单次工具审批:命中自动批准则放行,否则等待用户决定(可记会话级或工作区级)。 */
 export async function requestToolApproval({
   needsApproval,
   hasApprovals,
   approvals,
   sessionApproved,
+  workspaceApproved = null,
   name,
   args,
   tool,
@@ -165,6 +166,7 @@ export async function requestToolApproval({
   const risk = String(tool.risk || '').toLowerCase();
   const requiresExplicitApproval = tool.requiresApproval === true || risk === 'high' || risk === 'critical';
   if (!requiresExplicitApproval && sessionApproved.has(name)) return false;
+  if (!requiresExplicitApproval && workspaceApproved?.has(name)) { audit('tool.auto_approved', { tool: name, risk: tool.risk, via: 'workspace_rule' }); return false; }
   if (autoApprove && !requiresExplicitApproval) {
     audit('tool.auto_approved', { tool: name, risk: tool.risk, via: 'auto' });
     return false;
@@ -210,6 +212,7 @@ export async function requestToolApproval({
     args,
     risk: tool.risk,
     sessionReusable: !requiresExplicitApproval,
+    workspacePersistable: !requiresExplicitApproval && !!workspaceApproved,
     ...previewPayload,
   });
   let decision: string;
@@ -220,9 +223,15 @@ export async function requestToolApproval({
       '该操作的审批未能持久化，已阻止执行', 'tool.approval_persistence_failed', { tool: name, risk: tool.risk });
     return true;
   }
-  if (isApprovedDecision(decision)) {
-    const effectiveDecision = decision === 'session' && requiresExplicitApproval ? 'once' : decision;
+  if (isApprovedDecision(decision) || decision === 'workspace') {
+    // 显式审批工具(requiresApproval/high/critical)不允许任何形式的记住,一律降级为单次。
+    let effectiveDecision = requiresExplicitApproval && decision !== 'once' ? 'once' : decision;
+    if (effectiveDecision === 'workspace' && !workspaceApproved) effectiveDecision = 'session';
     if (effectiveDecision === 'session') sessionApproved.add(name);
+    if (effectiveDecision === 'workspace') {
+      sessionApproved.add(name);
+      try { workspaceApproved?.add(name); } catch { /* 规则落盘失败不阻断本次已批准的执行 */ }
+    }
     audit('tool.approved', {
       tool: name,
       risk: tool.risk,

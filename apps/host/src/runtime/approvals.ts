@@ -9,7 +9,7 @@
 import crypto from 'node:crypto';
 import { requireIdentityScopeFrom, type IdentityScope } from '../security/identity-scope.js';
 
-export type ApprovalDecision = 'once' | 'session' | 'reject';
+export type ApprovalDecision = 'once' | 'session' | 'workspace' | 'reject';
 
 export type ApprovalMeta = {
   tenantId?: string;
@@ -55,7 +55,7 @@ export type ApprovalRegistry = {
   prune(now?: number): number;
 };
 
-const DECISIONS = new Set<ApprovalDecision>(['once', 'session', 'reject']);
+const DECISIONS = new Set<ApprovalDecision>(['once', 'session', 'workspace', 'reject']);
 
 function hasOwnIdentity(meta: ApprovalMeta): boolean {
   return Boolean(

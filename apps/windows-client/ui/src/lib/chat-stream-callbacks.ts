@@ -62,6 +62,7 @@ export function buildChatStreamCallbacks(deps: ChatStreamCallbackDeps): AgentStr
           risk: meta?.risk,
           preview: meta?.preview,
           sessionReusable: meta?.sessionReusable === true,
+          workspacePersistable: meta?.workspacePersistable === true,
         },
       }));
     },

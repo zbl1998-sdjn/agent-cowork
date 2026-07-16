@@ -121,14 +121,14 @@ describe('buildChatStreamCallbacks', () => {
 
   it('onApprovalRequest in execute mode parks an approval on the message', () => {
     const { cb, getState } = makeHarness();
-    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { risk: 'high', preview: { command: 'npm test' }, sessionReusable: false });
-    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', risk: 'high', preview: { command: 'npm test' }, sessionReusable: false });
+    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { risk: 'high', preview: { command: 'npm test' }, sessionReusable: false, workspacePersistable: false });
+    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', risk: 'high', preview: { command: 'npm test' }, sessionReusable: false, workspacePersistable: false });
   });
 
   it('onApprovalRequest in guarded auto mode still parks an explicit host approval', () => {
     const { cb, getState } = makeHarness();
-    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { sessionReusable: true });
-    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', sessionReusable: true });
+    cb.onApprovalRequest?.('appr-1', 'Bash', undefined, { sessionReusable: true, workspacePersistable: false });
+    expect(getState().approval).toEqual({ id: 'appr-1', name: 'Bash', sessionReusable: true, workspacePersistable: false });
   });
 });
 

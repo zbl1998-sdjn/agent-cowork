@@ -5,6 +5,7 @@ export interface ApprovalRequestMeta {
   risk?: string | undefined;
   preview?: unknown;
   sessionReusable: boolean;
+  workspacePersistable: boolean;
 }
 
 export function approvalRequestMeta(data: SsePayload): ApprovalRequestMeta {
@@ -12,5 +13,6 @@ export function approvalRequestMeta(data: SsePayload): ApprovalRequestMeta {
     risk: typeof data.risk === 'string' ? data.risk : undefined,
     preview: data.preview,
     sessionReusable: data.sessionReusable === true,
+    workspacePersistable: data.workspacePersistable === true,
   };
 }
