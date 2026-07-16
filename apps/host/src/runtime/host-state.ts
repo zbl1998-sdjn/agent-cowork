@@ -5,6 +5,7 @@
 // 依赖:kimi/api-runner、storage/*、memory、sandbox 及同层 runs-index/scheduler/run-events 等。导出:host 状态工厂。
 import path from 'node:path';
 import { resolveAgentModelConfig, runModelApiChat, runModelApiPlan, runModelApiChatStream } from '../engine/api-runner.js';
+import { applyCloudOptInToEnv, GATEWAY_HOSTS_ENV } from '../engine/provider/cloud-model-optin.js';
 import { createRunsIndex } from './runs-index.js';
 import { createPostgresRunsIndex, withSafeWrites } from '../storage/postgres-runs-index.js';
 import { RunEventBus } from './run-events.js';
@@ -65,6 +66,8 @@ import type {
 export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostSrcDir: string }): HostState {
   // 配置优先级在装配根统一处理:config→环境变量→安全默认值,排查只需看 HostConfig 与 `.env.example`。
   const trustedRootDefault = path.resolve(config.trustedRoot || process.env.TRUSTED_ROOT || process.cwd());
+  // 云端 provider 用户开关的 gateway env baseline(管理员原始放行值),用户开关只在其上叠加。
+  const cloudGatewayBaseline = String(process.env[GATEWAY_HOSTS_ENV] || '');
   const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
   const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
@@ -111,6 +114,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
     globalMutationAdmins: resolveGlobalMutationAdmins(config.globalMutationAdmins, process.env),
     allowLocalModelConfigSelfService: config.allowLocalModelConfigSelfService === true,
   };
+  // 启动即把用户开关叠加进 gateway env;变更后由路由再调 syncCloudOptIn 重新同步(L0 策略读同一变量)。
+  state.syncCloudOptIn = () => applyCloudOptInToEnv(trustedRootDefault, cloudGatewayBaseline);
+  state.syncCloudOptIn();
   state.recomputeModelEnabled = () => {
     state.modelApiEnabled = config.enableModelApi !== false && (providerRuntimeState(agentModelConfig, agentModelConfig.provider).enabled || Boolean(config.modelPlanRunner) || Boolean(config.modelChatRunner));
     return state.modelApiEnabled;

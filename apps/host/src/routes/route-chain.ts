@@ -24,6 +24,7 @@ import { handleScheduleRoutes } from './schedule-routes.js';
 import { handleSearchRoutes } from './search-routes.js';
 import { handleSkillRoutes } from './skill-routes.js';
 import { handleApprovalRulesRoutes } from './approval-rules-routes.js';
+import { handleCloudModelsRoutes } from './cloud-models-routes.js';
 import { handleSystemRoutes } from './system-routes.js';
 import { handleToolRoutes } from './tool-routes.js';
 import { handleVizRoutes } from './viz-routes.js';
@@ -208,8 +209,9 @@ export async function handleRouteChain({
     globalMutationAdmins: state.globalMutationAdmins,
     skillRegistry: state.skillRegistry,
   }))) return true;
-  if (await handleApprovalRulesRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRulesRoutes>>({
-    ...base, requestUrl, safeTrustedRoot,
+  if (await handleApprovalRulesRoutes(routeOptions<RouteHandlerOptions<typeof handleApprovalRulesRoutes>>({ ...base, requestUrl, safeTrustedRoot }))) return true;
+  if (await handleCloudModelsRoutes(routeOptions<RouteHandlerOptions<typeof handleCloudModelsRoutes>>({
+    ...base, requestUrl, safeTrustedRoot, syncCloudOptIn: state.syncCloudOptIn,
   }))) return true;
   if (await handlePlanRoutes(routeOptions<RouteHandlerOptions<typeof handlePlanRoutes>>({
     ...base,

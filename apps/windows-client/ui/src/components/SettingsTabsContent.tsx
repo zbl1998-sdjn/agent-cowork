@@ -16,6 +16,7 @@ import {
 const RuntimeDependenciesPanel = lazy(() => import('./panels/RuntimeDependenciesPanel').then((m) => ({ default: m.RuntimeDependenciesPanel })));
 const SkillPacksPanel = lazy(() => import('./panels/SkillPacksPanel').then((m) => ({ default: m.SkillPacksPanel })));
 const ApprovalRulesPanel = lazy(() => import('./panels/ApprovalRulesPanel').then((m) => ({ default: m.ApprovalRulesPanel })));
+const CloudModelsPanel = lazy(() => import('./panels/CloudModelsPanel').then((m) => ({ default: m.CloudModelsPanel })));
 const UpdatePanel = lazy(() => import('./panels/UpdatePanel').then((m) => ({ default: m.UpdatePanel })));
 
 const THEME_OPTIONS: Array<{ value: 'light' | 'dark'; label: string }> = [
@@ -138,6 +139,11 @@ export function SettingsTabsContent(props: SettingsTabsContentProps) {
             <Button variant="primary" className="btn-primary" disabled={busy} onClick={() => persist({ provider, model: model.trim() || undefined }, '模型已保存')}>保存</Button>
           </div>
         </div>
+      )}
+      {tab === 'cloud' && (
+        <Suspense fallback={<Loading message="正在加载云端设置…" />}>
+          <CloudModelsPanel />
+        </Suspense>
       )}
       {tab === 'input' && (
         <div>

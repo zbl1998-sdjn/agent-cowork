@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ### Added
 
+- 云端模型用户开关:设置页新增「云端模型」标签,办公电脑跑不动本地模型时可由用户自己启用公网云厂商(DeepSeek/OpenAI/Kimi 等,按厂商勾选放行),不再只能改管理员环境变量。启用时弹知情确认(数据会发送到所选厂商);后端把放行厂商的主机并入 gateway 名单,复用既有出站策略归类为 customer_gateway 放行,出站预览与 `egress-audit` 照常记录、状态条显示外发字节。关闭即回落,绝不清掉管理员原有放行。对应 API:`GET/POST /api/cloud-models`。
 - 新增 `AgentTeam` 编排工具:一组带依赖关系的子任务按拓扑分层执行——同层并行(并发受限)、前置结果作为"仅供参考的资料"注入后继任务、前置失败整链跳过而独立分支照常;子任务事件带 `dependsOn/stage` 供任务中心时间线分组,写入/高危操作仍逐项走宿主审批。
 - 设置页新增「审批规则」标签:列出本工作区 always-allow 工具并可随时删除(`GET /api/approval-rules`、`POST /api/approval-rules/:tool/remove`);规则只能经审批卡的「本工作区总是允许」决定新增,不提供直加 API。
 - 任务中心从只读升级为可交互:对话 run 启动即写入 `status=running` 初始档案(进行中任务立即出现在任务中心),全部执行事件实时发布到 run 事件总线;任务详情新增「实时动态」区——attach 选中任务的事件流(中途接入可回放缓冲事件)、滚动最近时间线,**待审批项可直接在任务卡上批准/拒绝**,与对话内审批同一注册表互通。审批结果新增显式 `approval_resolved` 事件。

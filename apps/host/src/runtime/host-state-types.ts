@@ -165,6 +165,7 @@ export type HostState = Record<string, unknown> & {
   validateHost?: boolean;
   recomputeModelEnabled?: () => boolean;
   persistModelConfig?: () => void;
+  syncCloudOptIn?: () => string;
   folderGrantStore: FolderGrantStore;
   folderGrants: FolderGrantRegistry;
   onlyOfficeConfig: OnlyOfficeConfig;

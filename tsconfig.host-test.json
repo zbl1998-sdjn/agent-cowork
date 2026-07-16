@@ -115,6 +115,8 @@
     "apps/host/test/concurrency.test.ts",
     "apps/host/test/concurrency-soak.test.ts",
     "apps/host/test/context-bundle.test.ts",
+    "apps/host/test/cloud-model-optin.test.ts",
+    "apps/host/test/cloud-models-routes-e2e.test.ts",
     "apps/host/test/cors.test.ts",
     "apps/host/test/custom-recipe-persistence-security.test.ts",
     "apps/host/test/custom-recipes-identity.test.ts",

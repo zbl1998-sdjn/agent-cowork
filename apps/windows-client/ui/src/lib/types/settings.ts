@@ -3,6 +3,7 @@ export type SettingsTab =
   | 'account'
   | 'appearance'
   | 'model'
+  | 'cloud'
   | 'input'
   | 'api'
   | 'skills'

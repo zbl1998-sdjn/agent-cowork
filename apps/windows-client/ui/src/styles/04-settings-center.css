@@ -39,3 +39,6 @@
 }
 .skill-packs-warnings h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--text); }
 .skill-packs-warnings ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+
+/* 云端模型开关区:复用技能包卡片语言 */
+.cloud-models { display: flex; flex-direction: column; gap: 12px; }

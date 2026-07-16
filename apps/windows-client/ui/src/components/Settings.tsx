@@ -26,6 +26,7 @@ const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'account', label: '账户' },
   { value: 'appearance', label: '外观' },
   { value: 'model', label: '默认模型' },
+  { value: 'cloud', label: '云端模型' },
   { value: 'input', label: '输入助手' },
   { value: 'api', label: '密钥' },
   { value: 'skills', label: '技能包' },
