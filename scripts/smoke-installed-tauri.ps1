@@ -307,16 +307,20 @@ try {
     $buildDesktopEvidence = Get-KcwArtifactEvidence -Path (Join-Path $releaseRoot "agent-cowork-desktop.exe")
     $buildSidecarEvidence = Get-KcwArtifactEvidence -Path (Join-Path $releaseRoot "agent-cowork-host.exe")
     Assert-KcwArtifactVersion -Evidence $buildDesktopEvidence -ExpectedVersion $ExpectedVersion -Label "Built desktop"
+    # 完整性口径:安装出的文件必须逐字节等于安装包内的文件(7z 解包 NSIS 取基准)。
+    # target/release 的 desktop exe 会在 makensis 之后被 tauri 写入 bundle 类型标记(Patching …
+    # with bundle type information),与安装包内容天然不同字节,不能充当 frozen 基准——
+    # 旧断言用它导致每次真机装机必红。sidecar 不经 patch,仍与构建产物强比对。
+    $frozen = Get-KcwInstallerFrozenEvidence -InstallerPath $InstallerPath
     if ([string]::IsNullOrWhiteSpace($ExpectedDesktopSha256)) {
-        $ExpectedDesktopSha256 = $buildDesktopEvidence.sha256
+        $ExpectedDesktopSha256 = $frozen.desktop.sha256
     }
     if ([string]::IsNullOrWhiteSpace($ExpectedSidecarSha256)) {
-        $ExpectedSidecarSha256 = $buildSidecarEvidence.sha256
+        $ExpectedSidecarSha256 = $frozen.sidecar.sha256
     }
-    Assert-KcwArtifactSha256 -Actual $buildDesktopEvidence.sha256 -Expected $ExpectedDesktopSha256 -Label "Built desktop"
     Assert-KcwArtifactSha256 -Actual $installedDesktopEvidence.sha256 -Expected $ExpectedDesktopSha256 -Label "Installed desktop"
-    Assert-KcwArtifactSha256 -Actual $buildSidecarEvidence.sha256 -Expected $ExpectedSidecarSha256 -Label "Built sidecar"
     Assert-KcwArtifactSha256 -Actual $installedSidecarEvidence.sha256 -Expected $ExpectedSidecarSha256 -Label "Installed sidecar"
+    Assert-KcwArtifactSha256 -Actual $buildSidecarEvidence.sha256 -Expected $ExpectedSidecarSha256 -Label "Built sidecar"
     $embeddedPythonHome = Join-Path $installDir "python-embedded"
     $embeddedPythonExe = Join-Path $embeddedPythonHome "python.exe"
     $embeddedPythonHomeExists = Test-Path -LiteralPath $embeddedPythonHome
@@ -421,7 +425,7 @@ try {
     Assert-True (-not [string]::IsNullOrWhiteSpace($guest.token)) "Guest auth did not return a token"
     $authHeaders = @{ authorization = "Bearer $($guest.token)" }
     $me = Invoke-Json -Uri "$baseUrl/api/auth/me" -Headers $authHeaders
-    $kimiInfo = Invoke-Json -Uri "$baseUrl/api/kimi/info" -Headers $authHeaders
+    $kimiInfo = Invoke-Json -Uri "$baseUrl/api/agent-engine/info" -Headers $authHeaders
     $runtimeDependencies = Invoke-Json -Uri "$baseUrl/api/runtime/dependencies" -Headers $authHeaders
     $sqliteDependency = $runtimeDependencies.dependencies | Where-Object { $_.id -eq "sqlite" } | Select-Object -First 1
     Assert-True ($null -ne $sqliteDependency) "Runtime dependency catalog did not include sqlite"
@@ -429,7 +433,7 @@ try {
     $pythonDependency = $runtimeDependencies.dependencies | Where-Object { $_.id -eq "python-embedded" } | Select-Object -First 1
     Assert-True ($null -ne $pythonDependency) "Runtime dependency catalog did not include python-embedded"
     Assert-True ($pythonDependency.status -eq "configured") "Installed sidecar did not discover bundled Python: $($pythonDependency | ConvertTo-Json -Compress)"
-    Assert-True (@("KCW_EMBEDDED_PYTHON", "KCW_PYTHON_HOME") -contains $pythonDependency.source) "Bundled Python was not discovered through sidecar env wiring: $($pythonDependency | ConvertTo-Json -Compress)"
+    Assert-True (@("ACW_EMBEDDED_PYTHON", "ACW_PYTHON_HOME", "KCW_EMBEDDED_PYTHON", "KCW_PYTHON_HOME") -contains $pythonDependency.source) "Bundled Python was not discovered through sidecar env wiring: $($pythonDependency | ConvertTo-Json -Compress)"
 
     $memoryFact = Invoke-Json -Uri "$baseUrl/api/memory/facts" -Method POST -Headers $authHeaders -Body @{
         key = "安装版 SQLite"

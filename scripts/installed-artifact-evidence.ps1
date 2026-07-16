@@ -82,3 +82,34 @@ function Get-KcwSourceCommit {
     }
     return $commit.ToLowerInvariant()
 }
+
+function Get-KcwInstallerFrozenEvidence {
+    param([Parameter(Mandatory = $true)][string]$InstallerPath)
+
+    # 从 NSIS 安装包解出 desktop/sidecar 两个 exe,作为"安装完整性"的冻结基准。
+    $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+    if (-not (Test-Path -LiteralPath $sevenZip -PathType Leaf)) {
+        throw "7-Zip not found at $sevenZip; it is required to extract the frozen installer contents"
+    }
+    if (-not (Test-Path -LiteralPath $InstallerPath -PathType Leaf)) {
+        throw "Installer not found: $InstallerPath"
+    }
+    $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("acw-frozen-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $extractDir | Out-Null
+    try {
+        & $sevenZip x "-o$extractDir" -y $InstallerPath "agent-cowork-desktop.exe" "agent-cowork-host.exe" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip failed to extract the installer (exit $LASTEXITCODE): $InstallerPath"
+        }
+        $desktop = Get-ChildItem -Path $extractDir -Recurse -Filter "agent-cowork-desktop.exe" | Select-Object -First 1
+        $sidecarItem = Get-ChildItem -Path $extractDir -Recurse -Filter "agent-cowork-host.exe" | Select-Object -First 1
+        if ($null -eq $desktop) { throw "agent-cowork-desktop.exe not found inside the installer" }
+        if ($null -eq $sidecarItem) { throw "agent-cowork-host.exe not found inside the installer" }
+        return [ordered]@{
+            desktop = Get-KcwArtifactEvidence -Path $desktop.FullName
+            sidecar = Get-KcwArtifactEvidence -Path $sidecarItem.FullName
+        }
+    } finally {
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
