@@ -8,6 +8,7 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ### Added
 
+- 任务中心从只读升级为可交互:对话 run 启动即写入 `status=running` 初始档案(进行中任务立即出现在任务中心),全部执行事件实时发布到 run 事件总线;任务详情新增「实时动态」区——attach 选中任务的事件流(中途接入可回放缓冲事件)、滚动最近时间线,**待审批项可直接在任务卡上批准/拒绝**,与对话内审批同一注册表互通。审批结果新增显式 `approval_resolved` 事件。
 - 支持 Agent Skills(SKILL.md)开放标准(agentskills.io)第一阶段:host 从 trusted root 下 `.AgentCowork/skills/<name>/SKILL.md` 发现技能包,按渐进披露注入——系统提示只带 name+description 目录,新增只读低风险 `LoadSkill` 工具按需读取完整指令与 `references/` 参考文档;不执行技能包附带脚本。技能包内容按不可信数据包装(经 InjectionGuard),目录/文件拒绝 symlink、name 必须匹配目录名、有字节与数量上限;读取纯本地、零出站。
 - 技能包启停管理:设置页新增「技能包」标签,列出当前工作区发现的技能包与被跳过目录的原因,可逐个停用/启用;禁用名单按工作区持久化到 `.AgentCowork/settings/skill-packs.json`,禁用的包既不进系统提示目录、也无法被 `LoadSkill` 读取。对应 API:`GET /api/skill-packs`、`POST /api/skill-packs/:name/toggle`。
 - 审批新增「本工作区总是允许」:审批卡对可复用批准的工具多一个持久选项,规则按工作区落盘到 `.AgentCowork/settings/approval-rules.json`,后续 run(含子代理)同名工具自动放行并留 `workspace_rule` 审计;显式审批工具(requiresApproval/high/critical)不受规则影响,任何"记住"决定都会被降级为单次。规则跨工作区互不泄漏。

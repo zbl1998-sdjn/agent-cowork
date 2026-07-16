@@ -74,7 +74,10 @@ export interface RunEvent {
     | 'todo_snapshot'
     | 'todo_update'
     | 'child_start'
-    | 'child_end';
+    | 'child_end'
+    | 'approval_request'
+    | 'approval_resolved'
+    | 'done';
   id?: string | undefined;
   text?: string | undefined;
   icon?: 'check' | 'loader' | string | undefined;

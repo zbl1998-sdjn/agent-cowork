@@ -179,8 +179,7 @@ export async function requestToolApproval({
       'tool.approval_unavailable', { tool: name, risk: tool.risk });
     return true;
   }
-  const preview = tool.approvalPreview?.(args);
-  const previewPayload = preview ? { preview } : {};
+  const preview = tool.approvalPreview?.(args); const previewPayload = preview ? { preview } : {};
   let approvalRequest: ReturnType<ApprovalRegistry['request']>;
   try {
     approvalRequest = approvals.request({
@@ -223,7 +222,9 @@ export async function requestToolApproval({
       '该操作的审批未能持久化，已阻止执行', 'tool.approval_persistence_failed', { tool: name, risk: tool.risk });
     return true;
   }
-  if (isApprovedDecision(decision) || decision === 'workspace') {
+  // 审批结果显式进事件流:任务中心 attach 视图据此消掉待审批项,不必反推工具结果。
+  const approvedDecision = isApprovedDecision(decision) || decision === 'workspace'; emit('approval_resolved', { id, name, approved: approvedDecision });
+  if (approvedDecision) {
     // 显式审批工具(requiresApproval/high/critical)不允许任何形式的记住,一律降级为单次。
     let effectiveDecision = requiresExplicitApproval && decision !== 'once' ? 'once' : decision;
     if (effectiveDecision === 'workspace' && !workspaceApproved) effectiveDecision = 'session';
@@ -240,8 +241,7 @@ export async function requestToolApproval({
     });
     return false;
   }
-  const rejected = { error: '用户拒绝了该操作' };
-  steps.push({ tool: name, ok: false, rejected: true });
+  const rejected = { error: '用户拒绝了该操作' }; steps.push({ tool: name, ok: false, rejected: true });
   audit('tool.rejected', { tool: name, risk: tool.risk });
   emit('tool_result', { name, status: 'rejected', result: rejected });
   messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(rejected) });

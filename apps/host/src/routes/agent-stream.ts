@@ -22,7 +22,7 @@ import { createWorkspaceApprovalRules } from '../runtime/approval-rules.js';
 import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
-import { recordAgentRun } from './agent-stream-record.js';
+import { recordAgentRun, recordAgentRunStart } from './agent-stream-record.js';
 import { maseRecallSessionMemory, maseRememberTurn } from '../memory/mase-bridge.js';
 import { maybeConsolidatePreviousConversation } from '../memory/consolidate-trigger.js';
 import type { ConsolidateCallJson } from '../memory/consolidate.js';
@@ -31,7 +31,7 @@ import type { ModelConfig } from '../engine/provider/types.js';
 import { parseAgentStreamBody } from './agent-stream-schemas.js';
 import { resolveAgentContextOptions, resolveAgentConvergenceOptions } from './agent-stream-context.js';
 import { cancelApprovalsForDisconnectedRun, type DisconnectApprovalRegistry } from './agent-stream-disconnect.js';
-import { sanitizeAgentEventData } from './agent-stream-events.js';
+import { createAgentRunEmitter } from './agent-stream-events.js';
 import { buildMaseMemoryThread, recallBuiltinAgentMemory, rememberBuiltinConversation } from './agent-stream-memory.js';
 import { createAgentTemplateMode } from './agent-template-mode.js';
 import type { HttpResponseLike } from '../http/request-utils.js';
@@ -125,11 +125,9 @@ export async function streamAgentChat({
   if (response && typeof response.on === 'function') response.on('close', onDisconnect);
   if (request && typeof request.on === 'function') request.on('close', onDisconnect);
   const events: Array<Record<string, unknown>> = [];
-  const emit = (type: string, data: unknown): void => {
-    const safeEventData = sanitizeAgentEventData(data);
-    events.push({ type, ...safeEventData });
-    sse(response, type, safeEventData);
-  };
+  const emit = createAgentRunEmitter({ response, events, runEvents, requestContext, runId });
+  // 启动即写 status=running 初始档案:任务中心立即可见,/api/runs/:id/events 可 attach。
+  recordAgentRunStart({ runStoreRoot, runsIndex, requestContext, runId, modelConfig: runKimiConfig, trustedRoot, startedAt, prompt: String(body.prompt || '') });
   let outcome: AgentOutcome = { text: '', steps: [] };
   let status = 'succeeded';
   // 记忆总闸(读/写共用):默认活跃,进 try 后按 memory-settings 覆写。声明在 try 外,

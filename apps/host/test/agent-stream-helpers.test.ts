@@ -331,7 +331,8 @@ test('streamAgentChat cancels runs and pending approvals when the client disconn
   assert.deepEqual(done, [runId]);
   assert.equal(ssePayload(streamText, 'cancelled').runId, runId);
   assert.equal(streamText.includes('event: done'), false);
-  assert.equal(summaries.length, 1);
+  assert.equal(summaries.length, 2, 'start writes a running summary, completion overwrites it');
+  assert.equal(recordValue(present(summaries[0], 'start summary'), 'start summary').status, 'running');
   const record = recordValue(present(readRunRecord(root, runId), 'cancelled run record'), 'cancelled run record');
   assert.equal(record.status, 'cancelled');
 });
@@ -382,7 +383,8 @@ test('streamAgentChat emits safe error events and still records failed runs', as
   assert.match(stringField(error, 'error'), /trace_agent_stream/);
   assert.equal(error.runId, runId);
   assert.equal(response.ended, true);
-  assert.equal(summaries.length, 1);
+  assert.equal(summaries.length, 2, 'start writes a running summary, completion overwrites it');
+  assert.equal(recordValue(present(summaries[0], 'start summary'), 'start summary').status, 'running');
   const record = recordValue(present(readRunRecord(root, runId), 'failed run record'), 'failed run record');
   assert.equal(record.status, 'failed');
 });

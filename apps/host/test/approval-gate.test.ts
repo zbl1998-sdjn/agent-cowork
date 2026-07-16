@@ -315,8 +315,10 @@ test('tool approval handles early exits, auto approval, session approval, and re
     userId: 'user-a',
   });
   assert.equal(sessionApproved.has('Shell'), false, 'high-risk approvals must never enter the reusable session cache');
-  assert.equal(events.at(-2)?.type, 'approval_request');
-  assert.equal(events.at(-2)?.payload.sessionReusable, false);
+  assert.equal(events.at(-3)?.type, 'approval_request');
+  assert.equal(events.at(-3)?.payload.sessionReusable, false);
+  assert.equal(events.at(-2)?.type, 'approval_resolved');
+  assert.equal(events.at(-2)?.payload.approved, true);
   assert.equal(events.at(-1)?.payload.kind, 'tool.approved');
   assert.equal(events.at(-1)?.payload.decision, 'once');
   assert.equal(events.at(-1)?.payload.requestedDecision, 'session');
@@ -383,7 +385,8 @@ test('high-risk and critical tools still require approval requests despite auto 
   assert.equal(requests.length, 1);
   assert.equal(requests[0]?.name, 'Shell');
   assert.equal(requests[0]?.risk, 'HIGH');
-  assert.equal(events.at(-2)?.type, 'approval_request');
+  assert.equal(events.at(-3)?.type, 'approval_request');
+  assert.equal(events.at(-2)?.type, 'approval_resolved');
   assert.equal(events.at(-1)?.payload.kind, 'tool.approved');
   assert.equal(steps.length, 0, 'approved high-risk tools should not write a rejection step');
   assert.equal(messages.length, 0, 'approved high-risk tools should not write a tool rejection message');

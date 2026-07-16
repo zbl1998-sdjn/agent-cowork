@@ -24,6 +24,9 @@ const RUN_EVENT_TYPES = new Set<string>([
   'todo_update',
   'child_start',
   'child_end',
+  'approval_request',
+  'approval_resolved',
+  'done',
 ]);
 
 export interface RunEventSubscriptionOptions {
@@ -115,7 +118,7 @@ export function subscribeRunEvents(
             controller.abort();
             return;
           }
-          if (type === 'assistant_end') {
+          if (type === 'assistant_end' || type === 'done') {
             terminal = true;
             controller.abort();
           }

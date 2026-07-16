@@ -1,4 +1,6 @@
-// 任务中心(UI · components/panels):复核 Host 任务记录，支持搜索、状态筛选和显式刷新；不执行或重放任务。
+// 任务中心(UI · components/panels):复核 Host 任务记录,支持搜索、状态筛选和显式刷新;
+// 选中任务后 attach 其 run 事件流(回放+实时),待审批项可直接在详情卡上批准/拒绝。
+import { useTaskLiveEvents } from '../../hooks/useTaskLiveEvents';
 import { useTasksPanel, type TaskFilter } from '../../hooks/useTasksPanel';
 import type { TaskSummary } from '../../lib/types/tasks';
 import { formatDurationMs } from '../../lib/usage-display';
@@ -66,6 +68,7 @@ export function TaskPanelItem({
 
 export function TasksPanel() {
   const state = useTasksPanel();
+  const live = useTaskLiveEvents(state.selectedId);
 
   return (
     <section className="side-panel">
@@ -122,6 +125,7 @@ export function TasksPanel() {
           record={state.selected}
           busy={state.detailBusy}
           error={state.detailError}
+          live={live}
           onClose={state.closeTaskDetail}
         />
       )}

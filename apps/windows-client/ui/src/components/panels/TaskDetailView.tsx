@@ -1,5 +1,7 @@
 // Owner-scoped run detail presentation for the task center (UI · components/panels).
 import type { RunRecord } from '../../lib/types';
+import { taskLiveEventLabel } from '../../lib/task-live';
+import type { TaskLiveEvents } from '../../hooks/useTaskLiveEvents';
 import { formatDurationMs } from '../../lib/usage-display';
 import { Button } from '../ui/Button';
 import { ErrorState, Loading } from '../ui/StateViews';
@@ -8,7 +10,36 @@ export interface TaskDetailViewProps {
   record: RunRecord | null;
   busy: boolean;
   error: string;
+  live?: TaskLiveEvents | null;
   onClose: () => void;
+}
+
+function LiveSection({ live }: { live: TaskLiveEvents }) {
+  const recent = live.timeline.slice(-8);
+  return (
+    <section className="task-live" aria-label="实时动态">
+      <h4>实时动态{live.finished ? '(已结束)' : ''}</h4>
+      {live.streamError && <p className="panel-error" role="alert">{live.streamError}</p>}
+      {live.pending.map((item) => (
+        <div className="approval-bar" key={item.id}>
+          <span className="approval-q">等待批准:<code>{item.name}</code>{item.risk && <>(风险 <code>{item.risk}</code>)</>}</span>
+          <div className="approval-actions">
+            <Button variant="primary" size="sm" disabled={Boolean(live.respondBusy)} onClick={() => live.respond(item.id, 'once')}>
+              {live.respondBusy === item.id ? '提交中…' : '批准'}
+            </Button>
+            <Button variant="danger" size="sm" disabled={Boolean(live.respondBusy)} onClick={() => live.respond(item.id, 'reject')}>拒绝</Button>
+          </div>
+        </div>
+      ))}
+      {recent.length > 0 ? (
+        <ul className="task-live-timeline">
+          {recent.map((event, index) => <li key={`${event.seq ?? index}`}>{taskLiveEventLabel(event)}</li>)}
+        </ul>
+      ) : (
+        <p className="panel-note">暂无事件;进行中的任务会在这里实时滚动。</p>
+      )}
+    </section>
+  );
 }
 
 function displayTime(value?: string | null): string {
@@ -33,7 +64,7 @@ function resultText(value: unknown): string {
   }
 }
 
-export function TaskDetailView({ record, busy, error, onClose }: TaskDetailViewProps) {
+export function TaskDetailView({ record, busy, error, live = null, onClose }: TaskDetailViewProps) {
   const prompt = record?.promptPreview || record?.prompt || record?.input?.prompt || '';
   const rows = record ? [
     ['运行 ID', record.id],
@@ -68,13 +99,14 @@ export function TaskDetailView({ record, busy, error, onClose }: TaskDetailViewP
             ))}
           </dl>
           {failure && <p className="panel-error" role="alert">{failure}</p>}
+          {live && <LiveSection live={live} />}
           {result && (
             <>
               <h4>运行产出</h4>
               <pre className="tool-output">{result}</pre>
             </>
           )}
-          <p className="panel-note">此处仅复核已保存的运行记录，不会重放任务或执行操作。</p>
+          <p className="panel-note">运行记录为已保存快照;实时动态区可跟进进行中任务并直接处理待审批项。</p>
         </>
       )}
     </aside>

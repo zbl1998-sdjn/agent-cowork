@@ -1,7 +1,9 @@
 // Agent 运行记录(host · L3 路由层 · routes)
 // ---------------------------------------------------------------------------
-// 职责:把一次 Agent 流式运行收尾落成 run 记录(含配置快照、系统提示词版本)并写入运行索引。
-//       记录是诊断路径,失败不能打断主响应。依赖:L2 run-store/runs-index + L1 system-prompt。
+// 职责:把一次 Agent 流式运行落成 run 记录并写入运行索引——启动时先写 status=running 的
+//       初始档案(让任务中心立即看到进行中任务、事件回放端点可订阅),收尾时用完整记录
+//       (含配置快照、系统提示词版本、事件)覆盖。记录是诊断路径,失败不能打断主响应。
+// 依赖:L2 run-store/runs-index + L1 system-prompt。
 import { z } from 'zod';
 import { writeRunRecord } from '../runtime/run-store.js';
 import { summariseRunForIndex } from '../runtime/runs-index.js';
@@ -78,6 +80,50 @@ function safeDiagnosticValue(value: unknown, fallback: unknown): unknown {
     return redactValue(value);
   } catch {
     return fallback;
+  }
+}
+
+export type RecordAgentRunStartOptions = {
+  runStoreRoot: string;
+  runsIndex: RunsIndexLike;
+  requestContext: RequestContext;
+  runId: string;
+  modelConfig: ModelConfig;
+  trustedRoot: string;
+  startedAt: Date;
+  prompt: unknown;
+};
+
+/** 运行启动时写入 status=running 的初始档案;收尾的 recordAgentRun 会整体覆盖它。 */
+export function recordAgentRunStart({
+  runStoreRoot,
+  runsIndex,
+  requestContext,
+  runId,
+  modelConfig,
+  trustedRoot,
+  startedAt,
+  prompt,
+}: RecordAgentRunStartOptions): void {
+  try {
+    const record = {
+      id: runId,
+      type: 'agent-chat',
+      provider: modelProvider(modelConfig),
+      model: modelConfig.model,
+      mode: 'agent',
+      trustedRoot,
+      startedAt: startedAt.toISOString(),
+      status: 'running',
+      context: requestContext,
+      input: { prompt: String(prompt || '') },
+      events: [],
+    };
+    const runPath = writeRunRecord(runStoreRoot, record);
+    runsIndex.upsert(summariseRunForIndex({ ...record, runPath }, requestContext), requestContext);
+  } catch (error) {
+    if (error instanceof AtRestKeyError) throw error;
+    // 初始档案仅用于任务中心可见性;写入失败不阻断对话流,收尾记录仍会照常落盘。
   }
 }
 
