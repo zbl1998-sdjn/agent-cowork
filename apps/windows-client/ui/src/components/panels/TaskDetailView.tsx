@@ -60,6 +60,9 @@ function errorText(value: RunRecord['error']): string {
 function resultText(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string') return value;
+  // agent-chat 的 result 是 { ok, text, steps, usage }:优先给用户看回答文本,而不是原始 JSON。
+  const record = value as { text?: unknown };
+  if (typeof record.text === 'string' && record.text.trim()) return record.text;
   try {
     const text = JSON.stringify(value);
     return text.length > 600 ? `${text.slice(0, 600)}…` : text;

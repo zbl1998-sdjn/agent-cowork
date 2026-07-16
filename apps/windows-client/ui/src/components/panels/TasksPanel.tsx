@@ -74,7 +74,7 @@ export function TasksPanel() {
   return (
     <section className="side-panel">
       <h2>任务中心</h2>
-      <p className="panel-intro">集中回看最近任务、待审批草案与失败原因；这里是只读复核面，不会自动重放操作。</p>
+      <p className="panel-intro">集中跟进最近任务：进行中的任务可实时查看动态、直接批准或停止；历史任务可回看结果与失败原因。</p>
       <div className="panel-row">
         <input
           aria-label="搜索任务"

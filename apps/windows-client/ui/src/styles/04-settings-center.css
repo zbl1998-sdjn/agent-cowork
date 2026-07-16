@@ -16,16 +16,26 @@
 .seg button.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 500; }
 [data-theme="dark"] .seg button.is-active { box-shadow: none; background: #2f2f29; }
 
-/* 技能包(SKILL.md 标准)设置区 */
-.skill-packs { display: flex; flex-direction: column; gap: 12px; }
+/* 技能包(SKILL.md 标准)与审批规则设置区:沿用产品卡片语言(surface + 12px 圆角 + 柔和描边) */
+.skill-packs, .approval-rules { display: flex; flex-direction: column; gap: 14px; }
 .skill-packs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.skill-packs-head h3 { margin: 0 0 4px; font-size: 15px; }
+.skill-packs-head h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--text); }
+.skill-packs-head .settings-hint { margin: 0; max-width: 46ch; }
 .skill-packs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.skill-pack-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border, #e2e2e2); border-radius: 8px; }
-.skill-pack-item.is-disabled .skill-pack-meta { opacity: 0.55; }
-.skill-pack-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.skill-pack-meta code { font-size: 13px; }
-.skill-pack-meta span { font-size: 12px; color: var(--text-muted, #666); overflow-wrap: anywhere; }
-.skill-packs-warnings { font-size: 12px; color: var(--text-muted, #666); }
-.skill-packs-warnings h4 { margin: 0 0 4px; font-size: 12px; }
-.skill-packs-warnings ul { margin: 0; padding-left: 18px; }
+.skill-pack-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); transition: border-color 0.15s ease;
+}
+.skill-pack-item:hover { border-color: var(--muted); }
+.skill-pack-item.is-disabled { border-style: dashed; background: var(--bg); }
+.skill-pack-item.is-disabled .skill-pack-meta { opacity: 0.6; }
+.skill-pack-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.skill-pack-meta code { font-size: 13px; font-weight: 600; color: var(--text); }
+.skill-pack-meta span { font-size: 12px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.skill-packs-warnings {
+  font-size: 12px; color: var(--muted); border-left: 3px solid var(--border);
+  padding: 8px 12px; background: var(--bg); border-radius: 0 8px 8px 0;
+}
+.skill-packs-warnings h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--text); }
+.skill-packs-warnings ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
