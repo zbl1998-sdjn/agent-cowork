@@ -17,6 +17,7 @@ import { friendlyAgentError } from '../engine/agent/model-resilience.js';
 import { sse } from '../engine/agent/finalize.js';
 import { runAgentChat } from '../engine/agent/tool-loop.js';
 import { buildAgentToolset } from '../engine/agent/toolset-builder.js';
+import { resolveAgentSkillPacks, resolveAgentSkills } from './agent-stream-skills.js';
 import { resolveAgentRunStart } from './agent-resume.js';
 import { applySessionModelConfig } from './session-model-config.js';
 import { createAgentBudgetGuard, resolveAgentRunTimeoutMs } from './agent-stream-budget.js';
@@ -150,10 +151,13 @@ export async function streamAgentChat({
       : [];
     const userContent = imageParts.length ? [{ type: 'text', text: templateMode.prompt }, ...imageParts] : null;
     const subAgentRunner: NonNullable<AgentDeps['runAgentChat']> = (args) => runAgentChat(args as RunAgentChatOptions);
+    // SKILL.md 标准技能包(渐进披露):目录注入系统提示,全文只经 LoadSkill 工具按需读取;模板模式不注入。
+    const { packs: skillPacks, reader: skillPackReader } = resolveAgentSkillPacks(trustedRoot, templateMode.active);
     const agentTools = buildAgentToolset({
       ctx: agentCtx,
       toolRegistry,
       skillRegistry,
+      skillPackReader,
       runDeps: { runStoreRoot, runEvents, runsIndex },
       agentDeps: {
         modelConfig: runKimiConfig,
@@ -225,15 +229,7 @@ export async function streamAgentChat({
     const convergenceOptions = resolveAgentConvergenceOptions();
     const budgetGuard = createAgentBudgetGuard(omitUndefined({ body, modelConfig: runKimiConfig, startedAt, runTimeoutMs }));
     const runTrace = createRunTrace(omitUndefined({ runId, runEvents, context: requestContext }));
-    const skills = !templateMode.active && skillRegistry && typeof skillRegistry.enabledSkills === 'function'
-      ? skillRegistry.enabledSkills()
-        .map((sk) => omitUndefined({
-          id: String(sk.id || ''),
-          name: String(sk.name || ''),
-          description: typeof sk.description === 'string' ? sk.description : undefined,
-        }))
-        .filter((sk) => sk.id && sk.name)
-      : [];
+    const skills = resolveAgentSkills(skillRegistry, templateMode.active);
     outcome = await runAgentChat(omitUndefined({
       prompt: templateMode.prompt,
       modelConfig: runKimiConfig,
@@ -244,6 +240,7 @@ export async function streamAgentChat({
       hooks,
       memoryText,
       skills,
+      skillPacks,
       maxSteps: Math.min(Math.max(Number(body.maxSteps) || 20, 1), 40),
       // 自动续跑窗数:大任务跑满一窗还没做完时,自动再扩窗接着做(硬上限 = maxSteps*(1+此值))。
       // 默认 2(即最多 3 窗);可用 body.maxAutoContinues / 环境变量 ACW_MAX_AUTO_CONTINUE(兼容旧名 KCW_MAX_AUTO_CONTINUE)覆盖,夹取 [0,10]。

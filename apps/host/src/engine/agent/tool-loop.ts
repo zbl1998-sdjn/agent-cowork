@@ -55,7 +55,7 @@ function hasToolResult(messages: ChatMessage[]): boolean {
 
 /** Agent 主循环:装配工具与上下文,按步调用模型并执行工具调用,直至收尾或被各类守卫叫停。 */
 export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAgentChatResult> {
-  const { prompt, modelConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, inProcessModelCallCapability, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = defaultAgentContext(options), fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
+  const { prompt, modelConfig, trustedRoot, tools, modelCall = defaultAgentModelCall, inProcessModelCallCapability, maxSteps = 6, approvals = null, autoApprove = false, planMode = false, developerMode = false, auditBus = null, hooks = null, memoryText = '', skills = [], skillPacks = [], emit = () => undefined, sandbox, sandboxLimits, runStoreRoot, runEvents, runsIndex, context = defaultAgentContext(options), fetchImpl, lazyTools = [], verify = false, maxVerifySteps = 3, signal = null, runId = null, cacheKey = null, userContent = null, clarifyBeforeModel = false, contextManager = null, contextOptions = {}, loopGuard = null, loopGuardOptions = {}, retryPolicy = null, retryOptions = {}, budgetGuard = null, runTimeoutMs = 0, checkpointer = null, resumeState = null, runTrace = null, stepNudgeRatio, toolDiscipline, maxAutoContinues = 0 } = options;
   // Agent 主循环骨架:准备工具/上下文/守卫后,按步调用模型;有 tool_calls 则执行工具并回填消息,无 tool_calls 则收尾。
   const agentTools = (tools
     || createAgentTools({ trustedRoot, sandbox, sandboxLimits, context } as Parameters<typeof createAgentTools>[0]) as AgentTool[]).slice();
@@ -81,7 +81,7 @@ export async function runAgentChat(options: RunAgentChatOptions): Promise<RunAge
   const activeBudgetGuard = budgetGuard || createNoopBudgetGuard();
   const resumed = resumeState;
   const resumeUsage = (resumed && resumed.usage) || {};
-  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt(omitUndefined({ memoryText, skills, planMode, developerMode, toolDiscipline, includeEnvBlock: false })) }, userMessage];
+  const defaultMessages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt(omitUndefined({ memoryText, skills, skillPacks, planMode, developerMode, toolDiscipline, includeEnvBlock: false })) }, userMessage];
   let messages = (resumed && Array.isArray(resumed.messages) && resumed.messages.length) ? resumed.messages : defaultMessages;
   const steps: Array<Record<string, unknown>> = [];
   const sessionApproved = new Set((resumed && Array.isArray(resumed.approvedTools)) ? resumed.approvedTools : []);

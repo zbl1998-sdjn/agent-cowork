@@ -17,7 +17,7 @@
     "apps/host/src/orchestrator/workflow-runner.ts": { "maxLines": 387 },
     "apps/host/src/recipes/registry.ts": { "maxLines": 308 },
     "apps/host/src/recipes/run-recipe.ts": { "maxLines": 251 },
-    "apps/host/src/routes/agent-stream.ts": { "maxLines": 320 },
+    "apps/host/src/routes/agent-stream.ts": { "maxLines": 317 },
     "apps/host/src/routes/memory-routes.ts": { "maxLines": 373 },
     "apps/host/src/routes/orchestrator-route-support.ts": { "maxLines": 393 },
     "apps/host/src/routes/orchestrator-routes.ts": { "maxLines": 295 },

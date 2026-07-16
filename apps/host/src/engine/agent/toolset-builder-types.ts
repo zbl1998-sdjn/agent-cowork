@@ -10,6 +10,11 @@ export type ToolRegistry = {
 };
 export type SkillDescriptor = { enabled?: boolean };
 export type SkillRegistry = { get(id: unknown): SkillDescriptor | null | undefined };
+// SKILL.md 标准技能包读取器(由路由层用 skills/skill-md-loader 构造后注入,避免领域层互相 import)。
+export type SkillPackReader = {
+  list(): Array<{ name: string; description: string }>;
+  read(name: string, file?: string): { name: string; file: string; content: string };
+};
 export type RequestContext = { tenantId?: unknown; userId?: unknown; traceId?: unknown; [key: string]: unknown };
 export type ToolsetContext = {
   trustedRoot: string;
@@ -47,6 +52,7 @@ export type BuildToolsetOptions = {
   ctx: ToolsetContext;
   toolRegistry?: ToolRegistry | null;
   skillRegistry?: SkillRegistry | null;
+  skillPackReader?: SkillPackReader | null;
   runDeps?: RunDeps;
   agentDeps?: AgentDeps | null;
 };

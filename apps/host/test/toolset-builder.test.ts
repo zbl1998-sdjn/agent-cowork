@@ -367,3 +367,26 @@ test('AgentParallel normalizes agents aliases, records child failures, and forwa
     'succeeded',
   ]);
 });
+
+test('LoadSkill tool is mounted only with a reader and returns pack content or a safe error', async () => {
+  const root = tmp();
+  const withoutReader = buildAgentToolset({ ctx: contextFor(root) });
+  assert.ok(!toolNames(withoutReader).includes('LoadSkill'), 'no reader -> no LoadSkill tool');
+
+  const reader = {
+    list: () => [{ name: 'pdf-processing', description: '处理 PDF。' }],
+    read: (name: string, file?: string) => {
+      if (name !== 'pdf-processing') throw new Error(`技能包不存在: ${name}`);
+      return { name, file: file || 'SKILL.md', content: '# 步骤\n先读文件。' };
+    },
+  };
+  const tools = buildAgentToolset({ ctx: contextFor(root), skillPackReader: reader });
+  const loadSkill = toolNamed(tools, 'LoadSkill');
+  assert.equal(loadSkill.risk, 'safe');
+  assert.equal(loadSkill.mutating, false);
+
+  const ok = await loadSkill.handler({ name: 'pdf-processing' });
+  assert.deepEqual(ok, { name: 'pdf-processing', file: 'SKILL.md', content: '# 步骤\n先读文件。' });
+  const missing = await loadSkill.handler({ name: 'no-such-pack' });
+  assert.deepEqual(missing, { error: '技能包不存在: no-such-pack' });
+});

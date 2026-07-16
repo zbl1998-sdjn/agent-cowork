@@ -6,6 +6,10 @@ The format follows Keep a Changelog, and release versions use SemVer.
 
 ## [Unreleased]
 
+### Added
+
+- 支持 Agent Skills(SKILL.md)开放标准(agentskills.io)第一阶段:host 从 trusted root 下 `.AgentCowork/skills/<name>/SKILL.md` 发现技能包,按渐进披露注入——系统提示只带 name+description 目录,新增只读低风险 `LoadSkill` 工具按需读取完整指令与 `references/` 参考文档;不执行技能包附带脚本。技能包内容按不可信数据包装(经 InjectionGuard),目录/文件拒绝 symlink、name 必须匹配目录名、有字节与数量上限;读取纯本地、零出站。
+
 ### Security
 
 - 审批卡片(diff 视图、二进制摘要与 JSON 预览)渲染前把 bidi 覆盖/隔离控制符与零宽字符可见化为 `\uXXXX` 转义,防止工具参数用不可见字符在视觉上重排或隐藏审批内容(对标 Claude Code 2.1.211 同类加固)。

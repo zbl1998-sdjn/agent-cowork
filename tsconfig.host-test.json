@@ -282,6 +282,7 @@
     "apps/host/test/sqlite-adapters.test.ts",
     "apps/host/test/sqlite-memory-owner-isolation.test.ts",
     "apps/host/test/state-directory-path-jail.test.ts",
+    "apps/host/test/skill-md-loader.test.ts",
     "apps/host/test/skills.test.ts",
     "apps/host/test/ssrf-guard.test.ts",
     "apps/host/test/system-prompt.test.ts",

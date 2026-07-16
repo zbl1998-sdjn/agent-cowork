@@ -18,6 +18,7 @@
 - **安全护城河 / 出口治理**：5 档安全模式（`local_demo`/`local_strict`/`enterprise_local`/`air_gap`/`controlled_hybrid`）+ 统一出站网关对模型调用/WebFetch/WebSearch/连接器/插件下载做策略判定与审计留痕（`.AgentCowork/security/egress-audit.jsonl`），前端安全状态条实时展示当前档位与「外发 N B」；工具风险分类（`network_external`/`sandbox_exec`/`connector`/…）让 `local_strict`/`air_gap` 下自动拦截对外网络工具（含 WebSearch）与非网络隔离沙箱执行
 - **多 Provider 目录**：内置 14+ 家 OpenAI-compatible / Anthropic 兼容 provider（Kimi/Moonshot、DeepSeek、通义千问、智谱 GLM、火山方舟、百度千帆、腾讯混元、MiniMax、讯飞星火、硅基流动、OpenAI、Anthropic/Claude、Ollama、LM Studio、自定义 OpenAI-compatible）。当前 Internal Beta 的可执行路径限本机 Ollama/LM Studio 与管理员明确放行的客户网关；公网云 provider 只提供目录/配置发现，审批回执消费链完成验收前会 fail-closed
 - **一键办公配方**：内置周报草稿、给老板看的一页总结、聊天转行动项清单、PPT 初稿、正式 Word、邮件初稿等配方，产出 Markdown/DOCX/XLSX/PPTX/PDF；支持把一次真实操作「存成我的配方」复用
+- **Agent Skills(SKILL.md)开放标准技能包(第一阶段)**：把符合 agentskills.io 标准的技能包目录放进工作区 `.AgentCowork/skills/<name>/`(含 `SKILL.md`),对话时会按渐进披露自动注入技能目录,模型经只读 `LoadSkill` 工具按需读取完整指令与 `references/` 参考文档;技能包附带脚本一律不执行,内容按不可信数据包装,读取纯本地、零出站
 - **子代理**：`/api/subagent/run`（单个，只读/低风险直跑，写入型仍走审批）与 `/api/subagent/parallel` + `AgentParallel` 工具（并发派发多个子任务，各自独立上下文预算/步数上限，子任务生命周期事件前端分组展示）
 - **Agent 运行时韧性**：LoopGuard（重复调用/连续失败打断）、有界重试（仅对可重试错误退避）、BudgetGuard（token/成本/wall-clock 硬上限）、整轮超时、流式中断保留已生成内容、Checkpoint/Resume（可从崩溃点续跑、不重放已完成写操作）、InjectionGuard（工具输出包成不可信数据块，检测提示注入/工具劫持/数据外泄/审批绕过模式）
 - **可观测性 + 确定性评测**：每次 run 自动带 token/成本/耗时/工具/失败率与决策 trace，前端可观测面板可查历史 run；`npm run eval` 跑 golden + 红队任务集，走离线回放后端（ModelRecorder/Replayer），默认必须提供 replay records 才回放（缺失 fail-closed）
