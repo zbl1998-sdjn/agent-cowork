@@ -1,7 +1,7 @@
 {
-  "ok": false,
+  "ok": true,
   "mode": "installed-tauri",
-  "generatedAt": "2026-07-16T22:54:20.5416586Z",
+  "generatedAt": "2026-07-16T22:56:12.2464202Z",
   "expectedVersion": "0.5.0",
   "installedExe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
   "installer": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\target\\release\\bundle\\nsis\\Agent Cowork_0.5.0_x64-setup.exe",
@@ -14,7 +14,22 @@
     "installedVersion": "passed",
     "registryVersion": "passed",
     "desktopBuildHash": "passed",
-    "sidecarBuildHash": "passed"
+    "sidecarBuildHash": "passed",
+    "installedExeExists": true,
+    "sidecarExists": true,
+    "embeddedPythonHomeExists": "passed",
+    "embeddedPythonExeExists": "passed",
+    "bundledPythonProbe": "passed",
+    "bundledPythonRuntime": "passed",
+    "perUserInstallRoot": "passed",
+    "hkcuUninstallEntry": "passed",
+    "hklmUninstallEntryAbsent": "passed",
+    "mainWindow": "passed",
+    "sidecarHealth": "passed",
+    "authRoundTrip": "passed",
+    "sqliteRuntime": "passed",
+    "sqliteWriteChain": "passed",
+    "sqliteRestartPersistence": "passed"
   },
   "deferred": [
     "deep WebView UI interaction",
@@ -39,7 +54,7 @@
   },
   "artifactIdentity": {
     "expectedVersion": "0.5.0",
-    "sourceCommit": "c943162a851b4e659d7fe841cb92bb397d2dae9a",
+    "sourceCommit": "5cd5295836f58216dda936bae1ed7f20f97f935a",
     "installer": {
       "path": "C:\\Users\\Administrator\\Desktop\\agent cowork\\apps\\windows-client\\src-tauri\\target\\release\\bundle\\nsis\\Agent Cowork_0.5.0_x64-setup.exe",
       "bytes": 81949857,
@@ -124,6 +139,101 @@
     "PSPath": "Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Agent Cowork"
   },
   "liveReplyConfigured": false,
-  "error": "Port 3017 is already in use before launch: {\"pid\":24668,\"processName\":\"agent-cowork-host\",\"path\":\"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Agent Cowork\\\\agent-cowork-host.exe\"}",
-  "cleanup": {}
+  "process": {
+    "pid": 113428,
+    "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-desktop.exe",
+    "window": {
+      "handle": 12715938,
+      "title": "Agent Cowork"
+    },
+    "restartWindow": {
+      "handle": 22358208,
+      "title": ""
+    }
+  },
+  "host": {
+    "url": "http://127.0.0.1:3017",
+    "health": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "restartHealth": {
+      "ok": true,
+      "service": "agent-cowork-host"
+    },
+    "portOwner": {
+      "pid": 20988,
+      "processName": "agent-cowork-host",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\agent-cowork-host.exe"
+    }
+  },
+  "auth": {
+    "guestUserId": "guest_25f40e789e32",
+    "meUserId": "guest_25f40e789e32",
+    "tenantId": "tenant_guest_25f40e789e32"
+  },
+  "kimi": {
+    "configured": false,
+    "provider": "kimi-api",
+    "model": "kimi-k2.7-code"
+  },
+  "sqlite": {
+    "dbPath": "C:\\Users\\Administrator\\Desktop\\agent cowork\\build\\installed-tauri-smoke-workspace\\.AgentCowork\\state.sqlite",
+    "dependency": {
+      "id": "sqlite",
+      "section": "F2",
+      "label": "SQLite 存储运行时",
+      "description": "用于本地会话、记录与轻量索引存储。",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "available",
+      "version": "3.53.0",
+      "detail": "node:sqlite 可用"
+    },
+    "dependencySummary": {
+      "total": 14,
+      "requiredMissing": 0,
+      "byStatus": {
+        "available": 6,
+        "configured": 2,
+        "missing": 5,
+        "unknown": 1
+      }
+    },
+    "memoryFactFile": "sqlite://memory_facts/memfact_01KXPJAAQRSNZHK4QWYKNM03X4",
+    "runId": "run_20260716225620_203bf6eb5cb5d4d3184812b4bfe24e77",
+    "scheduleId": "sched_01KXPJAAT75AJ412HS1Y5RRTX3",
+    "persistedAfterRestart": {
+      "auth": true,
+      "memory": true,
+      "run": true,
+      "schedule": true
+    }
+  },
+  "python": {
+    "dependency": {
+      "id": "python-embedded",
+      "section": "A2",
+      "label": "内置 Python",
+      "description": "随包提供的 Python 环境，用于可选数据处理与脚本能力。",
+      "required": true,
+      "installMode": "bundled",
+      "estimatedDownloadBytes": 0,
+      "status": "configured",
+      "source": "ACW_EMBEDDED_PYTHON",
+      "detail": "内置 Python 路径已配置"
+    },
+    "home": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded",
+    "exe": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+    "probe": {
+      "version": "3.12.10",
+      "executable": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded\\python.exe",
+      "prefix": "C:\\Users\\Administrator\\AppData\\Local\\Agent Cowork\\python-embedded"
+    }
+  },
+  "cleanup": {
+    "closedDesktop": true,
+    "hostStoppedAfterClose": true
+  }
 }
