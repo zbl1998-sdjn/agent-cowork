@@ -8,6 +8,30 @@
 
 一个面向 Windows 本地协作场景的 Agentic Cowork 项目，让 AI Agent 帮你完成本地文件操作、代码执行和跨工具协作任务。
 
+![Agent Cowork 工作台](docs/media/hero.png)
+
+<!-- TODO: 录制 demo.gif 后替换上图，分镜脚本见 docs/media/GIF分镜脚本.md -->
+
+## 30 秒了解
+
+- **它是什么**：Windows 本地 Agent 工作台——AI 在你电脑上读写文件、跑代码、产出 Word/PPT/Excel；写操作先出计划，你审批了才动手。
+- **它的差异点**：安全边界是第一公民——5 档安全模式、统一出站网关 + 审计留痕、路径 jail、沙箱执行、记忆 DLP 脱敏。不是又一个聊天壳。
+- **怎么验证**：下面的快速开始 3 条命令能真跑起来；`npm run demo:mvp` 一键做完整演示验收；合并级门禁是 `python -X utf8 scripts/quality_gate.py --level full`。README 里每条能力都能在源码和 smoke 脚本里对上号。
+
+## 快速开始
+
+前置：Windows + Node ≥ 20（实测 Node v24.16.0，2026-07-17）。
+
+```powershell
+git clone https://github.com/zbl1998-sdjn/agent-cowork.git
+cd agent-cowork
+npm install
+npm run start:mvp   # 启动本地工作台并打开浏览器（默认 http://127.0.0.1:3017）
+npm run stop:mvp    # 用完停止
+```
+
+不依赖任何云端 API key：模型默认走本机 Ollama / LM Studio（配置示例见下文「验收与演示」）。一条命令做完整演示验收：`npm run demo:mvp`（启动 + live 操作测试 + 审计，报告写入 `build/mvp-demo-report.json`）。
+
 **核心能力：**
 - **Agentic tool-calling loop**：模型自主决策调用 Read/Write/Edit/Glob/Grep/Shell/WebFetch 工具，多步完成复杂任务
 - **Plan Mode**：生成可审批的执行计划，用户批准后才执行写操作
@@ -50,10 +74,9 @@ $env:KCW_REQUIRE_REAL_DOCKER_TEST = '1'
 node scripts/run-host-node.mjs --cwd apps/host -- --test --test-timeout=60000 --import ../../scripts/test-setup.ts test/sandbox-docker-integration.test.ts
 ```
 
-## 快速开始
+## 验收与演示
 
 ```powershell
-cd "C:\Users\Administrator\Desktop\agent cowork"
 npm run demo:mvp
 ```
 
