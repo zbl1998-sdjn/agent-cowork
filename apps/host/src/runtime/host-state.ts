@@ -69,7 +69,9 @@ export function createHostState(config: HostConfig = {}, { hostSrcDir }: { hostS
   // 云端 provider 用户开关的 gateway env baseline(管理员原始放行值),用户开关只在其上叠加。
   const cloudGatewayBaseline = String(process.env[GATEWAY_HOSTS_ENV] || '');
   const staticRoot = config.staticRoot === false ? null : path.resolve(config.staticRoot || defaultStaticRoot(hostSrcDir));
-  const uiDistRoot = path.resolve(config.uiDistRoot || defaultUiDistRoot(hostSrcDir));
+  // 打包桌面态:外壳经 ACW_UI_DIST_ROOT 指向随附的 ui-dist,让 host 同源直出 SPA
+  // (规避 WebView2 150 LNA 对 tauri.localhost→127.0.0.1 跨地址空间 fetch 的拦截)。
+  const uiDistRoot = path.resolve(config.uiDistRoot || process.env.ACW_UI_DIST_ROOT || defaultUiDistRoot(hostSrcDir));
   const statePaths = createHostStatePathResolvers(config, trustedRootDefault);
   const modelConfigFile = statePaths.modelConfigFile();
   const agentModelConfig = resolveAgentModelConfig(config);

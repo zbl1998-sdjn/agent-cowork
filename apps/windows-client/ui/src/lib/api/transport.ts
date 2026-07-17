@@ -29,9 +29,52 @@ export function resolveUrl(route: string): string {
   return `${HOST_BASE}${route.startsWith('/') ? '' : '/'}${route}`;
 }
 
-// withGlobalTauri:false 下没有 window.__TAURI__,桌面检测要看 Tauri 2 internals 通道。
-export function isDesktop(): boolean {
+const HOST_ORIGIN = 'http://127.0.0.1:3017';
+
+// 原始检测:文档是否运行在 Tauri WebView 内(withGlobalTauri:false 下无 window.__TAURI__,
+// 只能看 Tauri 2 internals 通道)。无论 origin 都成立,仅供同源重定向自举内部判定。
+function inTauriWebview(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+// 文档是否由打包外壳的 tauri 自定义协议直出(tauri.localhost)。开发态来自 Vite(127.0.0.1:5173)不算。
+function servedByTauriOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { protocol, hostname } = window.location;
+  return protocol === 'tauri:' || hostname === 'tauri.localhost' || hostname === 'tauri';
+}
+
+// 文档是否已由 host 在其自身 origin(127.0.0.1:3017)同源直出(即已完成同源重定向)。
+function servedByHostOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { protocol, hostname, port } = window.location;
+  return (protocol === 'http:' || protocol === 'https:')
+    && (hostname === '127.0.0.1' || hostname === 'localhost')
+    && port === '3017';
+}
+
+// 桌面态判定:在 Tauri WebView 内即为桌面态并走 IPC(开发态 5173 与打包态 tauri.localhost 都是)。
+// 例外:打包态经同源重定向后文档来自 127.0.0.1:3017,capability 不授权该 origin 的 IPC,
+// 此时按同源 web 应用处理(用同源 fetch/health),避免 IPC 调用必然抛错反而挡住登录。
+export function isDesktop(): boolean {
+  return inTauriWebview() && !servedByHostOrigin();
+}
+
+/**
+ * 打包桌面态自举:先经 IPC 拉起并校验 host,再把整页跳到 host 同源地址(HOST_ORIGIN)。
+ * 之后所有 fetch/SSE 都是回环文档→同源回环,规避 WebView2 150 Local Network Access 对
+ * tauri.localhost(非本地地址空间)→127.0.0.1 跨地址空间请求的拦截。返回:
+ * - 'redirecting':已发起跳转,调用方应停止渲染(文档即将卸载);
+ * - 'render':非打包态、开发态或 host 起不来,调用方正常渲染。
+ */
+export async function bootstrapHostOrigin(): Promise<'redirecting' | 'render'> {
+  if (!(inTauriWebview() && servedByTauriOrigin())) return 'render';
+  // 慢机(办公电脑)冷启动 SEA + 校验可能较久,给足轮询预算(与 native 校验 ~90s 窗口对齐)。
+  const ok = await ensureHost(360, 300);
+  if (!ok) return 'render'; // host 起不来:留在 tauri.localhost 渲染错误/重试,不白屏
+  const { pathname, search, hash } = window.location;
+  window.location.replace(`${HOST_ORIGIN}${pathname}${search}${hash}`);
+  return 'redirecting';
 }
 
 export async function invokeDesktop<T>(command: string, args?: Record<string, unknown>): Promise<T> {

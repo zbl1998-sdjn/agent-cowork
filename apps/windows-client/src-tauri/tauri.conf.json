@@ -23,9 +23,7 @@
         "minWidth": 1120,
         "minHeight": 760,
         "resizable": true,
-        "fullscreen": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks",
-        "useHttpsScheme": true
+        "fullscreen": false
       }
     ]
   },
@@ -53,7 +51,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../resources/python-embedded": "python-embedded"
+      "../resources/python-embedded": "python-embedded",
+      "../ui-dist": "ui-dist"
     },
     "externalBin": [
       "binaries/agent-cowork-host"

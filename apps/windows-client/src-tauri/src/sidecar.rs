@@ -34,6 +34,13 @@ const EMBEDDED_PYTHON_DIR: &str = "python-embedded";
 #[cfg(windows)]
 const EMBEDDED_PYTHON_EXE: &str = "python.exe";
 
+// 打包随附的前端构建产物目录(bundle.resources: ../ui-dist -> ui-dist)。让 host 从这里
+// 同源直出 SPA:打包 WebView 文档来自 tauri.localhost(非本地地址空间),其 fetch 到
+// 127.0.0.1 会被 WebView2 150 的 Local Network Access 拦截;改由 host 在 127.0.0.1:3017
+// 同源托管页面后,回环文档→同源回环不触发 LNA。跨平台可用,故不加 cfg(windows)。
+const UI_DIST_DIR: &str = "ui-dist";
+const UI_DIST_ROOT_ENV: &str = "ACW_UI_DIST_ROOT";
+
 /// Tauri 托管状态:保存唯一 host 子进程及其仅限 native 层使用的身份状态。
 #[derive(Default)]
 pub struct HostSidecar {
@@ -95,6 +102,18 @@ fn configure_embedded_python_env(command: &mut Command, app: &AppHandle) {
 #[cfg(not(windows))]
 fn configure_embedded_python_env(_command: &mut Command, _app: &AppHandle) {}
 
+/// 若打包资源里存在 ui-dist/index.html,则把其绝对路径经 ACW_UI_DIST_ROOT 告知 host,
+/// 让 host 同源直出前端(见 UI_DIST_DIR 注释)。开发态资源目录通常无此文件,函数静默跳过,
+/// host 回退到默认 ui-dist 目录,开发态仍由 Vite 提供,不受影响。
+fn configure_ui_dist_env(command: &mut Command, app: &AppHandle) {
+    if let Ok(resources) = app.path().resource_dir() {
+        let ui_dist = resources.join(UI_DIST_DIR);
+        if ui_dist.join("index.html").is_file() {
+            command.env(UI_DIST_ROOT_ENV, &ui_dist);
+        }
+    }
+}
+
 impl HostSidecar {
     /// 查询真实进程态和 native 身份校验态；子进程退出后立即撤销信任。
     pub fn status(&self) -> DesktopResult<HostStatus> {
@@ -140,6 +159,7 @@ impl HostSidecar {
             .env("ACW_PARENT_PID", std::process::id().to_string())
             .env("KCW_PARENT_PID", std::process::id().to_string());
         configure_embedded_python_env(&mut command, app);
+        configure_ui_dist_env(&mut command, app);
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;

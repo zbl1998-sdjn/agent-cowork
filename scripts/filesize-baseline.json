@@ -24,7 +24,7 @@
     "apps/host/src/routes/recipe-routes.ts": { "maxLines": 281 },
     "apps/host/src/routes/system-routes.ts": { "maxLines": 391 },
     "apps/host/src/routes/tool-routes.ts": { "maxLines": 287 },
-    "apps/host/src/runtime/host-state.ts": { "maxLines": 263 },
+    "apps/host/src/runtime/host-state.ts": { "maxLines": 265 },
     "apps/host/src/security/security-mode.ts": { "maxLines": 361 },
     "apps/windows-client/resources-src/app-controller-assembly.ts": { "maxLines": 260 },
     "apps/windows-client/src-tauri/src/security.rs": { "maxLines": 276 },
@@ -34,6 +34,7 @@
     "apps/windows-client/ui/src/hooks/useConversations.ts": { "maxLines": 254 },
     "apps/windows-client/ui/src/lib/agent-team-timeline.ts": { "maxLines": 350 },
     "apps/windows-client/ui/src/lib/api/chat.ts": { "maxLines": 279 },
+    "apps/windows-client/ui/src/lib/api/transport.ts": { "maxLines": 277 },
     "apps/windows-client/ui/src/lib/model-highlights.ts": { "maxLines": 289 }
   }
 }
