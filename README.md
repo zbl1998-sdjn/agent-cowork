@@ -8,9 +8,9 @@
 
 一个面向 Windows 本地协作场景的 Agentic Cowork 项目，让 AI Agent 帮你完成本地文件操作、代码执行和跨工具协作任务。
 
-![Agent Cowork 工作台](docs/media/hero.png)
+![Agent Cowork 演示：引用本地文件 → 计划待批准 → 批准后执行 → 产物落盘](docs/media/demo.gif)
 
-<!-- TODO: 录制 demo.gif 后替换上图，分镜脚本见 docs/media/GIF分镜脚本.md -->
+<sub>26 秒演示：引用工作区文件发起任务 → 模型提交计划、出现「计划待批准」卡 → 批准后执行、`Write` 落盘 `action-items.md` → 产物预览与「仅本地处理」安全状态条。静态截图见 [docs/media/hero.png](docs/media/hero.png)，分镜脚本见 [docs/media/GIF分镜脚本.md](docs/media/GIF分镜脚本.md)。</sub>
 
 ## 30 秒了解
 
